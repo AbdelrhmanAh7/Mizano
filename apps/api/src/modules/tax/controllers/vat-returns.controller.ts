@@ -1,0 +1,74 @@
+import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { VatReturnsService } from '../services/vat-returns.service';
+import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+
+@ApiTags('VAT Returns')
+@ApiBearerAuth()
+@Controller('vat-returns')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+export class VatReturnsController {
+  constructor(private readonly vatReturnsService: VatReturnsService) {}
+
+  @Post()
+  @Permissions('tax.create')
+  @ApiOperation({ summary: 'Create a new VAT return' })
+  create(@CurrentOrg() orgId: string, @Body() dto: { startDate: string; endDate: string }) {
+    return this.vatReturnsService.create(orgId, dto);
+  }
+
+  @Get()
+  @Permissions('tax.view')
+  @ApiOperation({ summary: 'Get all VAT returns' })
+  findAll(@CurrentOrg() orgId: string, @Query() query: { status?: string; year?: number }) {
+    return this.vatReturnsService.findAll(orgId, query);
+  }
+
+  @Get('summary')
+  @Permissions('tax.view')
+  @ApiOperation({ summary: 'Get VAT summary for period' })
+  getSummary(@CurrentOrg() orgId: string, @Query('startDate') startDate: string, @Query('endDate') endDate: string) {
+    return this.vatReturnsService.getVatSummary(orgId, startDate, endDate);
+  }
+
+  @Get(':id')
+  @Permissions('tax.view')
+  @ApiOperation({ summary: 'Get VAT return by ID' })
+  findOne(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.vatReturnsService.findOne(orgId, id);
+  }
+
+  @Post(':id/calculate')
+  @Permissions('tax.edit')
+  @ApiOperation({ summary: 'Calculate VAT return' })
+  calculate(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.vatReturnsService.calculate(orgId, id);
+  }
+
+  @Post(':id/submit')
+  @Permissions('tax.submit')
+  @ApiOperation({ summary: 'Submit VAT return' })
+  submit(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.vatReturnsService.submit(orgId, id);
+  }
+
+  @Post(':id/payment')
+  @Permissions('tax.edit')
+  @ApiOperation({ summary: 'Record VAT payment' })
+  recordPayment(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: { amount: number; date: string; paidFromAccountId: string; reference?: string },
+  ) {
+    return this.vatReturnsService.recordPayment(orgId, id, dto);
+  }
+
+  @Delete(':id')
+  @Permissions('tax.delete')
+  @ApiOperation({ summary: 'Delete VAT return' })
+  remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.vatReturnsService.deleteReturn(orgId, id);
+  }
+}

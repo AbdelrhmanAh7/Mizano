@@ -1,0 +1,71 @@
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { EmployeesService } from '../services/employees.service';
+import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+
+@ApiTags('Employees')
+@ApiBearerAuth()
+@Controller('employees')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+export class EmployeesController {
+  constructor(private readonly employeesService: EmployeesService) {}
+
+  @Post()
+  @Permissions('hr.create')
+  @ApiOperation({ summary: 'Create a new employee' })
+  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+    return this.employeesService.create(orgId, dto);
+  }
+
+  @Get()
+  @Permissions('hr.view')
+  @ApiOperation({ summary: 'Get all employees' })
+  findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto & { status?: string; department?: string }) {
+    return this.employeesService.findAll(orgId, query);
+  }
+
+  @Get('summary')
+  @Permissions('hr.view')
+  @ApiOperation({ summary: 'Get employee summary by department' })
+  getDepartmentSummary(@CurrentOrg() orgId: string) {
+    return this.employeesService.getDepartmentSummary(orgId);
+  }
+
+  @Get('count')
+  @Permissions('hr.view')
+  @ApiOperation({ summary: 'Get active employees count' })
+  getActiveCount(@CurrentOrg() orgId: string) {
+    return this.employeesService.getActiveEmployeesCount(orgId);
+  }
+
+  @Get(':id')
+  @Permissions('hr.view')
+  @ApiOperation({ summary: 'Get employee by ID' })
+  findOne(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.employeesService.findOne(orgId, id);
+  }
+
+  @Put(':id')
+  @Permissions('hr.edit')
+  @ApiOperation({ summary: 'Update employee' })
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+    return this.employeesService.update(orgId, id, dto);
+  }
+
+  @Delete(':id')
+  @Permissions('hr.delete')
+  @ApiOperation({ summary: 'Delete employee' })
+  remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.employeesService.remove(orgId, id);
+  }
+
+  @Post(':id/terminate')
+  @Permissions('hr.edit')
+  @ApiOperation({ summary: 'Terminate employee' })
+  terminate(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.employeesService.terminate(orgId, id);
+  }
+}

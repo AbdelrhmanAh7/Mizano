@@ -1,0 +1,134 @@
+{
+  "title": "المشاريع",
+  "description": "إدارة المشاريع والمهام وتتبع الوقت",
+  "projects": {
+    "title": "المشاريع",
+    "newProject": "مشروع جديد",
+    "editProject": "تعديل المشروع",
+    "deleteProject": "حذف المشروع",
+    "projectDetails": "تفاصيل المشروع",
+    "form": {
+      "name": "اسم المشروع",
+      "namePlaceholder": "أدخل اسم المشروع",
+      "customer": "العميل",
+      "customerPlaceholder": "اختر العميل (اختياري)",
+      "billingMethod": "طريقة الفوترة",
+      "budgetAmount": "الميزانية",
+      "budgetHours": "ساعات الميزانية",
+      "startDate": "تاريخ البداية",
+      "endDate": "تاريخ النهاية",
+      "description": "الوصف",
+      "descriptionPlaceholder": "أدخل وصف المشروع"
+    },
+    "billingMethods": {
+      "fixed": "سعر ثابت",
+      "projectHourly": "سعر الساعة للمشروع",
+      "taskHourly": "سعر الساعة للمهمة",
+      "staffHourly": "سعر الساعة للموظف"
+    },
+    "status": {
+      "active": "نشط",
+      "onHold": "معلق",
+      "completed": "مكتمل",
+      "cancelled": "ملغي"
+    },
+    "table": {
+      "name": "الاسم",
+      "customer": "العميل",
+      "billingMethod": "الفوترة",
+      "progress": "التقدم",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا توجد مشاريع بعد",
+      "description": "أنشئ أول مشروع"
+    }
+  },
+  "tasks": {
+    "title": "المهام",
+    "newTask": "مهمة جديدة",
+    "editTask": "تعديل المهمة",
+    "deleteTask": "حذف المهمة",
+    "taskDetails": "تفاصيل المهمة",
+    "form": {
+      "name": "اسم المهمة",
+      "namePlaceholder": "أدخل اسم المهمة",
+      "project": "المشروع",
+      "projectPlaceholder": "اختر المشروع",
+      "description": "الوصف",
+      "descriptionPlaceholder": "أدخل وصف المهمة",
+      "ratePerHour": "سعر الساعة",
+      "isBillable": "قابل للفوترة",
+      "assignee": "المسؤول",
+      "assigneePlaceholder": "اختر المسؤول",
+      "dueDate": "تاريخ الاستحقاق",
+      "estimatedHours": "الساعات المقدرة",
+      "priority": "الأولوية",
+      "tags": "الوسوم"
+    },
+    "status": {
+      "todo": "للتنفيذ",
+      "inProgress": "قيد التنفيذ",
+      "review": "للمراجعة",
+      "done": "مكتمل"
+    },
+    "priority": {
+      "low": "منخفضة",
+      "medium": "متوسطة",
+      "high": "عالية",
+      "urgent": "عاجلة"
+    },
+    "table": {
+      "name": "الاسم",
+      "project": "المشروع",
+      "assignee": "المسؤول",
+      "dueDate": "تاريخ الاستحقاق",
+      "status": "الحالة",
+      "priority": "الأولوية"
+    },
+    "empty": {
+      "title": "لا توجد مهام بعد",
+      "description": "أضف مهام لمشاريعك"
+    }
+  },
+  "timesheets": {
+    "title": "سجلات الوقت",
+    "newEntry": "إدخال وقت جديد",
+    "editEntry": "تعديل إدخال الوقت",
+    "deleteEntry": "حذف إدخال الوقت",
+    "entryDetails": "تفاصيل إدخال الوقت",
+    "form": {
+      "project": "المشروع",
+      "projectPlaceholder": "اختر المشروع",
+      "task": "المهمة",
+      "taskPlaceholder": "اختر المهمة (اختياري)",
+      "date": "التاريخ",
+      "startTime": "وقت البداية",
+      "endTime": "وقت النهاية",
+      "duration": "المدة",
+      "description": "الوصف",
+      "descriptionPlaceholder": "ماذا عملت؟",
+      "isBillable": "قابل للفوترة"
+    },
+    "status": {
+      "unbilled": "غير مفوتر",
+      "invoiced": "مفوتر"
+    },
+    "table": {
+      "date": "التاريخ",
+      "project": "المشروع",
+      "task": "المهمة",
+      "duration": "المدة",
+      "status": "الحالة"
+    },
+    "summary": {
+      "totalHours": "إجمالي الساعات",
+      "billableHours": "الساعات القابلة للفوترة",
+      "nonBillableHours": "الساعات غير القابلة للفوترة"
+    },
+    "empty": {
+      "title": "لا توجد إدخالات وقت بعد",
+      "description": "ابدأ تتبع وقتك"
+    }
+  }
+}

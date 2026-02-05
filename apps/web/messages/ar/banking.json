@@ -1,0 +1,161 @@
+{
+  "title": "البنوك",
+  "description": "إدارة الحسابات البنكية والمعاملات والتسوية",
+  "accounts": {
+    "title": "الحسابات البنكية",
+    "newAccount": "حساب بنكي جديد",
+    "editAccount": "تعديل الحساب البنكي",
+    "deleteAccount": "حذف الحساب البنكي",
+    "accountDetails": "تفاصيل الحساب البنكي",
+    "form": {
+      "name": "اسم الحساب",
+      "namePlaceholder": "أدخل اسم الحساب",
+      "accountNumber": "رقم الحساب",
+      "accountNumberPlaceholder": "أدخل رقم الحساب",
+      "currency": "العملة",
+      "type": "نوع الحساب",
+      "openingBalance": "الرصيد الافتتاحي",
+      "linkedAccount": "الحساب المرتبط",
+      "linkedAccountPlaceholder": "اختر الحساب المرتبط"
+    },
+    "types": {
+      "bank": "حساب بنكي",
+      "creditCard": "بطاقة ائتمان",
+      "pettyCash": "صندوق نثرية"
+    },
+    "table": {
+      "name": "الاسم",
+      "accountNumber": "رقم الحساب",
+      "type": "النوع",
+      "balance": "الرصيد",
+      "currency": "العملة"
+    },
+    "empty": {
+      "title": "لا توجد حسابات بنكية بعد",
+      "description": "أضف أول حساب بنكي"
+    }
+  },
+  "transactions": {
+    "title": "المعاملات البنكية",
+    "newTransaction": "معاملة جديدة",
+    "editTransaction": "تعديل المعاملة",
+    "deleteTransaction": "حذف المعاملة",
+    "transactionDetails": "تفاصيل المعاملة",
+    "import": "استيراد المعاملات",
+    "form": {
+      "bankAccount": "الحساب البنكي",
+      "bankAccountPlaceholder": "اختر الحساب البنكي",
+      "date": "التاريخ",
+      "type": "النوع",
+      "amount": "المبلغ",
+      "description": "الوصف",
+      "descriptionPlaceholder": "أدخل الوصف",
+      "reference": "المرجع",
+      "referencePlaceholder": "أدخل المرجع",
+      "payee": "المستفيد",
+      "payeePlaceholder": "أدخل اسم المستفيد"
+    },
+    "types": {
+      "deposit": "إيداع",
+      "withdrawal": "سحب"
+    },
+    "table": {
+      "date": "التاريخ",
+      "type": "النوع",
+      "payee": "المستفيد",
+      "description": "الوصف",
+      "amount": "المبلغ",
+      "status": "الحالة"
+    },
+    "status": {
+      "pending": "قيد الانتظار",
+      "matched": "مطابق",
+      "created": "منشأ",
+      "reconciled": "مسوى"
+    },
+    "empty": {
+      "title": "لا توجد معاملات بعد",
+      "description": "استورد أو أضف أول معاملة"
+    }
+  },
+  "rules": {
+    "title": "قواعد البنك",
+    "newRule": "قاعدة جديدة",
+    "editRule": "تعديل القاعدة",
+    "deleteRule": "حذف القاعدة",
+    "ruleDetails": "تفاصيل القاعدة",
+    "form": {
+      "name": "اسم القاعدة",
+      "namePlaceholder": "أدخل اسم القاعدة",
+      "bankAccount": "الحساب البنكي",
+      "bankAccountPlaceholder": "جميع الحسابات",
+      "conditions": "الشروط",
+      "action": "الإجراء"
+    },
+    "conditions": {
+      "field": "الحقل",
+      "operator": "العملية",
+      "value": "القيمة",
+      "fields": {
+        "description": "الوصف",
+        "payee": "المستفيد",
+        "amount": "المبلغ"
+      },
+      "operators": {
+        "contains": "يحتوي على",
+        "equals": "يساوي",
+        "startsWith": "يبدأ بـ",
+        "endsWith": "ينتهي بـ"
+      }
+    },
+    "actions": {
+      "type": "نوع الإجراء",
+      "account": "الحساب",
+      "vendor": "المورد",
+      "types": {
+        "expense": "إنشاء مصروف",
+        "transfer": "إنشاء تحويل"
+      }
+    },
+    "table": {
+      "name": "الاسم",
+      "conditions": "الشروط",
+      "action": "الإجراء",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا توجد قواعد بعد",
+      "description": "أنشئ قواعد لأتمتة تصنيف المعاملات"
+    }
+  },
+  "reconciliation": {
+    "title": "التسوية",
+    "newReconciliation": "تسوية جديدة",
+    "reconciliationDetails": "تفاصيل التسوية",
+    "form": {
+      "bankAccount": "الحساب البنكي",
+      "reconciliationDate": "تاريخ التسوية",
+      "statementDate": "تاريخ الكشف",
+      "statementBalance": "رصيد الكشف",
+      "reconciledBalance": "الرصيد المسوى",
+      "notes": "ملاحظات"
+    },
+    "summary": {
+      "openingBalance": "الرصيد الافتتاحي",
+      "clearedDeposits": "الإيداعات المسجلة",
+      "clearedWithdrawals": "السحوبات المسجلة",
+      "endingBalance": "الرصيد الختامي",
+      "difference": "الفرق"
+    },
+    "table": {
+      "date": "التاريخ",
+      "statementBalance": "رصيد الكشف",
+      "reconciledBalance": "الرصيد المسوى",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا توجد تسويات بعد",
+      "description": "ابدأ تسوية حساباتك البنكية"
+    }
+  }
+}

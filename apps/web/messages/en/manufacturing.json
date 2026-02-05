@@ -1,0 +1,94 @@
+{
+  "title": "Manufacturing",
+  "description": "Manage bills of materials and work orders",
+  "bom": {
+    "title": "Bills of Materials",
+    "newBom": "New BOM",
+    "editBom": "Edit BOM",
+    "deleteBom": "Delete BOM",
+    "bomDetails": "BOM Details",
+    "form": {
+      "name": "BOM Name",
+      "namePlaceholder": "Enter BOM name",
+      "outputItem": "Output Item",
+      "outputItemPlaceholder": "Select output item",
+      "outputQuantity": "Output Quantity",
+      "operationsCost": "Operations Cost",
+      "items": "Input Items",
+      "addItem": "Add Item",
+      "item": "Item",
+      "itemPlaceholder": "Select item",
+      "quantity": "Quantity",
+      "minItems": "BOM must have at least 1 input item"
+    },
+    "table": {
+      "name": "Name",
+      "outputItem": "Output",
+      "outputQuantity": "Output Qty",
+      "cost": "Cost",
+      "itemCount": "Items"
+    },
+    "empty": {
+      "title": "No BOMs yet",
+      "description": "Create your first bill of materials"
+    }
+  },
+  "workOrders": {
+    "title": "Work Orders",
+    "newWorkOrder": "New Work Order",
+    "editWorkOrder": "Edit Work Order",
+    "deleteWorkOrder": "Delete Work Order",
+    "workOrderDetails": "Work Order Details",
+    "recordProduction": "Record Production",
+    "form": {
+      "bom": "Bill of Materials",
+      "bomPlaceholder": "Select BOM",
+      "quantity": "Quantity",
+      "plannedStartDate": "Planned Start Date",
+      "notes": "Notes",
+      "notesPlaceholder": "Enter notes"
+    },
+    "status": {
+      "draft": "Draft",
+      "inProcess": "In Process",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "table": {
+      "workOrderNumber": "Work Order #",
+      "bom": "BOM",
+      "quantity": "Quantity",
+      "plannedStart": "Planned Start",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No work orders yet",
+      "description": "Create your first work order"
+    }
+  },
+  "production": {
+    "title": "Production Entries",
+    "newEntry": "New Production Entry",
+    "entryDetails": "Production Entry Details",
+    "form": {
+      "workOrder": "Work Order",
+      "workOrderPlaceholder": "Select work order",
+      "date": "Date",
+      "quantityProduced": "Quantity Produced",
+      "quantityRejected": "Quantity Rejected",
+      "wastageQuantity": "Wastage Quantity",
+      "notes": "Notes"
+    },
+    "table": {
+      "date": "Date",
+      "workOrder": "Work Order",
+      "produced": "Produced",
+      "rejected": "Rejected",
+      "wastage": "Wastage"
+    },
+    "empty": {
+      "title": "No production entries yet",
+      "description": "Record production against work orders"
+    }
+  }
+}

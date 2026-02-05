@@ -1,0 +1,187 @@
+{
+  "title": "Purchases",
+  "description": "Manage vendors, expenses, bills, and payments",
+  "stats": {
+    "totalPayable": "Total Payable",
+    "overdueAmount": "Overdue Amount",
+    "unpaidBills": "Unpaid Bills",
+    "paidThisMonth": "Paid This Month"
+  },
+  "vendors": {
+    "title": "Vendors",
+    "newVendor": "New Vendor",
+    "editVendor": "Edit Vendor",
+    "deleteVendor": "Delete Vendor",
+    "vendorDetails": "Vendor Details",
+    "form": {
+      "name": "Vendor Name",
+      "namePlaceholder": "Enter vendor name",
+      "displayName": "Display Name",
+      "displayNamePlaceholder": "Enter display name",
+      "email": "Email",
+      "emailPlaceholder": "Enter email address",
+      "phone": "Phone",
+      "phonePlaceholder": "Enter phone number",
+      "currency": "Currency",
+      "taxId": "Tax ID",
+      "taxIdPlaceholder": "Enter tax ID",
+      "paymentTerms": "Payment Terms",
+      "billingAddress": "Billing Address"
+    },
+    "table": {
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "payable": "Payable",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No vendors yet",
+      "description": "Get started by adding your first vendor"
+    }
+  },
+  "expenses": {
+    "title": "Expenses",
+    "newExpense": "New Expense",
+    "editExpense": "Edit Expense",
+    "deleteExpense": "Delete Expense",
+    "expenseDetails": "Expense Details",
+    "form": {
+      "date": "Date",
+      "account": "Expense Account",
+      "accountPlaceholder": "Select expense account",
+      "vendor": "Vendor",
+      "vendorPlaceholder": "Select vendor (optional)",
+      "amount": "Amount",
+      "taxRate": "Tax Rate",
+      "taxInclusive": "Tax Inclusive",
+      "paidThrough": "Paid Through",
+      "paidThroughPlaceholder": "Select payment account",
+      "description": "Description",
+      "reference": "Reference",
+      "project": "Project"
+    },
+    "table": {
+      "date": "Date",
+      "vendor": "Vendor",
+      "account": "Account",
+      "amount": "Amount",
+      "reference": "Reference"
+    },
+    "empty": {
+      "title": "No expenses yet",
+      "description": "Record your first expense to start tracking"
+    }
+  },
+  "bills": {
+    "title": "Bills",
+    "newBill": "New Bill",
+    "editBill": "Edit Bill",
+    "deleteBill": "Delete Bill",
+    "billDetails": "Bill Details",
+    "recordPayment": "Record Payment",
+    "voidBill": "Void Bill",
+    "form": {
+      "billNumber": "Bill Number",
+      "billNumberPlaceholder": "Enter bill number",
+      "vendor": "Vendor",
+      "vendorPlaceholder": "Select a vendor",
+      "vendorRequired": "Vendor is required",
+      "date": "Bill Date",
+      "dateRequired": "Bill date is required",
+      "dueDate": "Due Date",
+      "dueDateRequired": "Due date is required",
+      "notes": "Notes",
+      "project": "Project",
+      "lineItemRequired": "At least one line item is required"
+    },
+    "table": {
+      "billNumber": "Bill #",
+      "vendor": "Vendor",
+      "date": "Date",
+      "dueDate": "Due Date",
+      "amount": "Amount",
+      "balance": "Balance",
+      "status": "Status"
+    },
+    "status": {
+      "draft": "Draft",
+      "open": "Open",
+      "partiallyPaid": "Partially Paid",
+      "paid": "Paid",
+      "overdue": "Overdue",
+      "void": "Void"
+    },
+    "empty": {
+      "title": "No bills yet",
+      "description": "Record your first bill to track payables"
+    }
+  },
+  "credits": {
+    "title": "Vendor Credits",
+    "newCredit": "New Vendor Credit",
+    "editCredit": "Edit Vendor Credit",
+    "deleteCredit": "Delete Vendor Credit",
+    "creditDetails": "Vendor Credit Details",
+    "form": {
+      "vendor": "Vendor",
+      "bill": "Bill",
+      "date": "Date",
+      "reason": "Reason",
+      "amount": "Amount",
+      "applyToBill": "Apply to Bill"
+    },
+    "table": {
+      "creditNumber": "Credit #",
+      "vendor": "Vendor",
+      "bill": "Bill",
+      "date": "Date",
+      "amount": "Amount"
+    },
+    "empty": {
+      "title": "No vendor credits yet",
+      "description": "Vendor credits will appear here when created"
+    }
+  },
+  "payments": {
+    "title": "Payments Made",
+    "newPayment": "New Payment",
+    "editPayment": "Edit Payment",
+    "deletePayment": "Delete Payment",
+    "paymentDetails": "Payment Details",
+    "form": {
+      "vendor": "Vendor",
+      "vendorPlaceholder": "Select a vendor",
+      "date": "Payment Date",
+      "amount": "Amount",
+      "paymentMode": "Payment Mode",
+      "paidFrom": "Paid From",
+      "reference": "Reference Number",
+      "notes": "Notes",
+      "allocations": "Bill Allocations",
+      "allocationRequired": "Payment must be allocated to at least 1 bill"
+    },
+    "table": {
+      "paymentNumber": "Payment #",
+      "vendor": "Vendor",
+      "date": "Date",
+      "amount": "Amount",
+      "mode": "Mode"
+    },
+    "empty": {
+      "title": "No payments yet",
+      "description": "Payments will appear here when recorded"
+    }
+  },
+  "lineItems": {
+    "title": "Line Items",
+    "addItem": "Add Line Item",
+    "item": "Item",
+    "account": "Account",
+    "description": "Description",
+    "quantity": "Qty",
+    "rate": "Rate",
+    "tax": "Tax",
+    "amount": "Amount"
+  }
+}

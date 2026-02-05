@@ -1,0 +1,189 @@
+{
+  "appName": "ميزانو",
+  "appDescription": "منصة تخطيط موارد المؤسسات بالذكاء الاصطناعي",
+  "dashboard": {
+    "title": "لوحة التحكم",
+    "subtitle": "نظرة عامة على أعمالك",
+    "refresh": "تحديث",
+    "failedToLoad": "فشل تحميل بيانات لوحة التحكم",
+    "tryAgain": "حاول مرة أخرى",
+    "stats": {
+      "revenue": "الإيرادات",
+      "expenses": "المصروفات",
+      "netProfit": "صافي الربح",
+      "bankBalance": "الرصيد البنكي"
+    },
+    "charts": {
+      "cashFlow": "التدفق النقدي",
+      "revenue": "الإيرادات",
+      "receivablesPayables": "المستحقات مقابل المدفوعات",
+      "expenses": "أعلى المصروفات"
+    },
+    "aiAlerts": {
+      "title": "رؤى الذكاء الاصطناعي",
+      "noAlerts": "لا توجد تنبيهات في الوقت الحالي"
+    },
+    "recentTransactions": {
+      "title": "المعاملات الأخيرة",
+      "noTransactions": "لا توجد معاملات حديثة"
+    }
+  },
+  "header": {
+    "welcomeBack": "مرحباً بعودتك، {name}",
+    "signOut": "تسجيل الخروج",
+    "profile": "الملف الشخصي",
+    "notifications": "الإشعارات"
+  },
+  "buttons": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "create": "إنشاء",
+    "submit": "إرسال",
+    "back": "رجوع",
+    "next": "التالي",
+    "previous": "السابق",
+    "close": "إغلاق",
+    "confirm": "تأكيد",
+    "add": "إضافة",
+    "remove": "إزالة",
+    "search": "بحث",
+    "filter": "تصفية",
+    "export": "تصدير",
+    "import": "استيراد",
+    "refresh": "تحديث",
+    "view": "عرض",
+    "download": "تحميل",
+    "upload": "رفع",
+    "print": "طباعة",
+    "send": "إرسال",
+    "approve": "موافقة",
+    "reject": "رفض",
+    "reset": "إعادة تعيين",
+    "apply": "تطبيق",
+    "clear": "مسح"
+  },
+  "loading": {
+    "default": "جاري التحميل...",
+    "saving": "جاري الحفظ...",
+    "creating": "جاري الإنشاء...",
+    "updating": "جاري التحديث...",
+    "deleting": "جاري الحذف...",
+    "submitting": "جاري الإرسال...",
+    "sending": "جاري الإرسال...",
+    "processing": "جاري المعالجة..."
+  },
+  "status": {
+    "draft": "مسودة",
+    "sent": "مرسل",
+    "paid": "مدفوع",
+    "partiallyPaid": "مدفوع جزئياً",
+    "overdue": "متأخر",
+    "void": "ملغي",
+    "active": "نشط",
+    "inactive": "غير نشط",
+    "suspended": "موقوف",
+    "pending": "قيد الانتظار",
+    "completed": "مكتمل",
+    "cancelled": "ملغي",
+    "open": "مفتوح",
+    "closed": "مغلق",
+    "accepted": "مقبول",
+    "declined": "مرفوض",
+    "expired": "منتهي الصلاحية",
+    "invoiced": "تم إصدار فاتورة"
+  },
+  "table": {
+    "noResults": "لا توجد نتائج",
+    "loading": "جاري تحميل البيانات...",
+    "error": "خطأ في تحميل البيانات",
+    "actions": "إجراءات",
+    "rowsPerPage": "صفوف في الصفحة",
+    "of": "من",
+    "selectAll": "تحديد الكل",
+    "deselectAll": "إلغاء تحديد الكل"
+  },
+  "pagination": {
+    "previous": "السابق",
+    "next": "التالي",
+    "first": "الأول",
+    "last": "الأخير",
+    "showing": "عرض {from} إلى {to} من {total} نتيجة",
+    "page": "صفحة {current} من {total}"
+  },
+  "confirm": {
+    "deleteTitle": "تأكيد الحذف",
+    "deleteMessage": "هل أنت متأكد من حذف هذا العنصر؟ لا يمكن التراجع عن هذا الإجراء.",
+    "yes": "نعم",
+    "no": "لا",
+    "cancel": "إلغاء",
+    "confirm": "تأكيد"
+  },
+  "errors": {
+    "generic": "حدث خطأ ما",
+    "notFound": "غير موجود",
+    "unauthorized": "غير مصرح",
+    "forbidden": "الوصول مرفوض",
+    "validation": "خطأ في التحقق",
+    "network": "خطأ في الشبكة. يرجى التحقق من اتصالك.",
+    "server": "خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً."
+  },
+  "empty": {
+    "title": "لا توجد بيانات",
+    "description": "لا يوجد شيء هنا حتى الآن.",
+    "action": "ابدأ"
+  },
+  "paymentModes": {
+    "cash": "نقداً",
+    "bankTransfer": "تحويل بنكي",
+    "creditCard": "بطاقة ائتمان",
+    "debitCard": "بطاقة خصم",
+    "cheque": "شيك",
+    "online": "إلكتروني",
+    "other": "أخرى"
+  },
+  "paymentTerms": {
+    "dueOnReceipt": "مستحق عند الاستلام",
+    "net15": "صافي 15 يوم",
+    "net30": "صافي 30 يوم",
+    "net45": "صافي 45 يوم",
+    "net60": "صافي 60 يوم"
+  },
+  "accountTypes": {
+    "asset": "أصول",
+    "liability": "التزامات",
+    "equity": "حقوق الملكية",
+    "income": "إيرادات",
+    "revenue": "إيرادات",
+    "expense": "مصروفات"
+  },
+  "currency": "العملة",
+  "date": "التاريخ",
+  "amount": "المبلغ",
+  "total": "الإجمالي",
+  "subtotal": "المجموع الفرعي",
+  "tax": "الضريبة",
+  "discount": "الخصم",
+  "balance": "الرصيد",
+  "description": "الوصف",
+  "notes": "ملاحظات",
+  "reference": "المرجع",
+  "quantity": "الكمية",
+  "rate": "السعر",
+  "unit": "الوحدة",
+  "price": "السعر",
+  "name": "الاسم",
+  "email": "البريد الإلكتروني",
+  "phone": "الهاتف",
+  "address": "العنوان",
+  "city": "المدينة",
+  "state": "المنطقة",
+  "country": "الدولة",
+  "postalCode": "الرمز البريدي",
+  "all": "الكل",
+  "none": "لا شيء",
+  "select": "اختر",
+  "optional": "(اختياري)",
+  "required": "(مطلوب)"
+}

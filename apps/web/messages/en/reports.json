@@ -1,0 +1,126 @@
+{
+  "title": "Reports",
+  "description": "Financial reports and analytics",
+  "categories": {
+    "financial": "Financial Reports",
+    "sales": "Sales Reports",
+    "purchases": "Purchase Reports",
+    "inventory": "Inventory Reports",
+    "tax": "Tax Reports"
+  },
+  "profitLoss": {
+    "title": "Profit & Loss",
+    "description": "Income and expense summary",
+    "revenue": "Revenue",
+    "costOfSales": "Cost of Sales",
+    "grossProfit": "Gross Profit",
+    "operatingExpenses": "Operating Expenses",
+    "operatingProfit": "Operating Profit",
+    "otherIncome": "Other Income",
+    "otherExpenses": "Other Expenses",
+    "netProfit": "Net Profit"
+  },
+  "balanceSheet": {
+    "title": "Balance Sheet",
+    "description": "Assets, liabilities, and equity",
+    "assets": "Assets",
+    "currentAssets": "Current Assets",
+    "fixedAssets": "Fixed Assets",
+    "totalAssets": "Total Assets",
+    "liabilities": "Liabilities",
+    "currentLiabilities": "Current Liabilities",
+    "longTermLiabilities": "Long-Term Liabilities",
+    "totalLiabilities": "Total Liabilities",
+    "equity": "Equity",
+    "totalEquity": "Total Equity",
+    "totalLiabilitiesAndEquity": "Total Liabilities & Equity"
+  },
+  "cashFlow": {
+    "title": "Cash Flow Statement",
+    "description": "Cash inflows and outflows",
+    "operatingActivities": "Operating Activities",
+    "investingActivities": "Investing Activities",
+    "financingActivities": "Financing Activities",
+    "netCashFlow": "Net Cash Flow",
+    "openingBalance": "Opening Balance",
+    "closingBalance": "Closing Balance"
+  },
+  "trialBalance": {
+    "title": "Trial Balance",
+    "description": "Account balances verification",
+    "account": "Account",
+    "debit": "Debit",
+    "credit": "Credit",
+    "totalDebit": "Total Debit",
+    "totalCredit": "Total Credit"
+  },
+  "generalLedger": {
+    "title": "General Ledger",
+    "description": "Detailed account transactions"
+  },
+  "arAging": {
+    "title": "AR Aging",
+    "description": "Accounts receivable aging",
+    "customer": "Customer",
+    "current": "Current",
+    "days1to30": "1-30 Days",
+    "days31to60": "31-60 Days",
+    "days61to90": "61-90 Days",
+    "over90": "Over 90 Days",
+    "total": "Total"
+  },
+  "apAging": {
+    "title": "AP Aging",
+    "description": "Accounts payable aging",
+    "vendor": "Vendor",
+    "current": "Current",
+    "days1to30": "1-30 Days",
+    "days31to60": "31-60 Days",
+    "days61to90": "61-90 Days",
+    "over90": "Over 90 Days",
+    "total": "Total"
+  },
+  "salesByCustomer": {
+    "title": "Sales by Customer",
+    "description": "Sales breakdown by customer"
+  },
+  "salesByItem": {
+    "title": "Sales by Item",
+    "description": "Sales breakdown by item"
+  },
+  "purchasesByVendor": {
+    "title": "Purchases by Vendor",
+    "description": "Purchases breakdown by vendor"
+  },
+  "inventoryValuation": {
+    "title": "Inventory Valuation",
+    "description": "Current inventory value"
+  },
+  "stockSummary": {
+    "title": "Stock Summary",
+    "description": "Inventory stock levels"
+  },
+  "vatReport": {
+    "title": "VAT Report",
+    "description": "VAT summary for filing"
+  },
+  "filters": {
+    "dateRange": "Date Range",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "period": "Period",
+    "thisMonth": "This Month",
+    "lastMonth": "Last Month",
+    "thisQuarter": "This Quarter",
+    "lastQuarter": "Last Quarter",
+    "thisYear": "This Year",
+    "lastYear": "Last Year",
+    "custom": "Custom"
+  },
+  "actions": {
+    "generate": "Generate Report",
+    "export": "Export",
+    "print": "Print",
+    "refresh": "Refresh"
+  }
+}

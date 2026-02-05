@@ -1,0 +1,119 @@
+{
+  "title": "المحاسبة",
+  "description": "إدارة دليل الحسابات وقيود اليومية والمعاملات المتكررة",
+  "accounts": {
+    "title": "دليل الحسابات",
+    "newAccount": "حساب جديد",
+    "editAccount": "تعديل الحساب",
+    "deleteAccount": "حذف الحساب",
+    "accountDetails": "تفاصيل الحساب",
+    "form": {
+      "code": "رمز الحساب",
+      "codePlaceholder": "أدخل رمز الحساب",
+      "name": "اسم الحساب",
+      "namePlaceholder": "أدخل اسم الحساب",
+      "type": "نوع الحساب",
+      "typePlaceholder": "اختر نوع الحساب",
+      "parent": "الحساب الأب",
+      "parentPlaceholder": "اختر الحساب الأب (اختياري)",
+      "currency": "العملة",
+      "description": "الوصف",
+      "descriptionPlaceholder": "أدخل الوصف",
+      "isActive": "نشط"
+    },
+    "table": {
+      "code": "الرمز",
+      "name": "الاسم",
+      "type": "النوع",
+      "balance": "الرصيد",
+      "status": "الحالة"
+    },
+    "types": {
+      "asset": "أصول",
+      "liability": "التزامات",
+      "equity": "حقوق الملكية",
+      "income": "إيرادات",
+      "expense": "مصروفات"
+    },
+    "empty": {
+      "title": "لا توجد حسابات بعد",
+      "description": "أعد دليل الحسابات للبدء"
+    }
+  },
+  "journals": {
+    "title": "قيود اليومية",
+    "newJournal": "قيد يومية جديد",
+    "editJournal": "تعديل قيد اليومية",
+    "deleteJournal": "حذف قيد اليومية",
+    "journalDetails": "تفاصيل قيد اليومية",
+    "form": {
+      "date": "التاريخ",
+      "reference": "المرجع",
+      "referencePlaceholder": "أدخل المرجع (اختياري)",
+      "notes": "ملاحظات",
+      "notesPlaceholder": "أدخل الملاحظات (اختياري)",
+      "lines": "بنود القيد",
+      "account": "الحساب",
+      "accountPlaceholder": "اختر الحساب",
+      "debit": "مدين",
+      "credit": "دائن",
+      "description": "الوصف",
+      "addLine": "إضافة بند",
+      "minLines": "يجب أن يحتوي القيد على بندين على الأقل",
+      "mustBalance": "يجب أن يتساوى إجمالي المدين مع إجمالي الدائن"
+    },
+    "table": {
+      "journalNumber": "رقم القيد",
+      "date": "التاريخ",
+      "reference": "المرجع",
+      "debit": "مدين",
+      "credit": "دائن",
+      "notes": "ملاحظات"
+    },
+    "summary": {
+      "totalDebit": "إجمالي المدين",
+      "totalCredit": "إجمالي الدائن",
+      "difference": "الفرق"
+    },
+    "empty": {
+      "title": "لا توجد قيود يومية بعد",
+      "description": "أنشئ أول قيد يومية"
+    }
+  },
+  "recurring": {
+    "title": "الملفات المتكررة",
+    "newProfile": "ملف متكرر جديد",
+    "editProfile": "تعديل الملف المتكرر",
+    "deleteProfile": "حذف الملف المتكرر",
+    "profileDetails": "تفاصيل الملف المتكرر",
+    "form": {
+      "name": "اسم الملف",
+      "namePlaceholder": "أدخل اسم الملف",
+      "frequency": "التكرار",
+      "startDate": "تاريخ البداية",
+      "endDate": "تاريخ النهاية",
+      "endDatePlaceholder": "بلا تاريخ نهاية (اختياري)",
+      "autoPost": "ترحيل تلقائي",
+      "autoPostDescription": "ترحيل القيود تلقائياً عند إنشائها",
+      "entityType": "نوع الكيان",
+      "templateData": "بيانات القالب"
+    },
+    "frequencies": {
+      "daily": "يومي",
+      "weekly": "أسبوعي",
+      "monthly": "شهري",
+      "yearly": "سنوي"
+    },
+    "table": {
+      "name": "الاسم",
+      "frequency": "التكرار",
+      "nextRun": "التشغيل التالي",
+      "lastRun": "آخر تشغيل",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا توجد ملفات متكررة بعد",
+      "description": "أعد المعاملات المتكررة لأتمتة القيود"
+    }
+  }
+}

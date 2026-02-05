@@ -1,0 +1,134 @@
+{
+  "title": "Projects",
+  "description": "Manage projects, tasks, and time tracking",
+  "projects": {
+    "title": "Projects",
+    "newProject": "New Project",
+    "editProject": "Edit Project",
+    "deleteProject": "Delete Project",
+    "projectDetails": "Project Details",
+    "form": {
+      "name": "Project Name",
+      "namePlaceholder": "Enter project name",
+      "customer": "Customer",
+      "customerPlaceholder": "Select customer (optional)",
+      "billingMethod": "Billing Method",
+      "budgetAmount": "Budget Amount",
+      "budgetHours": "Budget Hours",
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "description": "Description",
+      "descriptionPlaceholder": "Enter project description"
+    },
+    "billingMethods": {
+      "fixed": "Fixed Price",
+      "projectHourly": "Project Hourly Rate",
+      "taskHourly": "Task Hourly Rate",
+      "staffHourly": "Staff Hourly Rate"
+    },
+    "status": {
+      "active": "Active",
+      "onHold": "On Hold",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "table": {
+      "name": "Name",
+      "customer": "Customer",
+      "billingMethod": "Billing",
+      "progress": "Progress",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No projects yet",
+      "description": "Create your first project"
+    }
+  },
+  "tasks": {
+    "title": "Tasks",
+    "newTask": "New Task",
+    "editTask": "Edit Task",
+    "deleteTask": "Delete Task",
+    "taskDetails": "Task Details",
+    "form": {
+      "name": "Task Name",
+      "namePlaceholder": "Enter task name",
+      "project": "Project",
+      "projectPlaceholder": "Select project",
+      "description": "Description",
+      "descriptionPlaceholder": "Enter task description",
+      "ratePerHour": "Rate per Hour",
+      "isBillable": "Billable",
+      "assignee": "Assignee",
+      "assigneePlaceholder": "Select assignee",
+      "dueDate": "Due Date",
+      "estimatedHours": "Estimated Hours",
+      "priority": "Priority",
+      "tags": "Tags"
+    },
+    "status": {
+      "todo": "To Do",
+      "inProgress": "In Progress",
+      "review": "Review",
+      "done": "Done"
+    },
+    "priority": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "urgent": "Urgent"
+    },
+    "table": {
+      "name": "Name",
+      "project": "Project",
+      "assignee": "Assignee",
+      "dueDate": "Due Date",
+      "status": "Status",
+      "priority": "Priority"
+    },
+    "empty": {
+      "title": "No tasks yet",
+      "description": "Add tasks to your projects"
+    }
+  },
+  "timesheets": {
+    "title": "Timesheets",
+    "newEntry": "New Time Entry",
+    "editEntry": "Edit Time Entry",
+    "deleteEntry": "Delete Time Entry",
+    "entryDetails": "Time Entry Details",
+    "form": {
+      "project": "Project",
+      "projectPlaceholder": "Select project",
+      "task": "Task",
+      "taskPlaceholder": "Select task (optional)",
+      "date": "Date",
+      "startTime": "Start Time",
+      "endTime": "End Time",
+      "duration": "Duration",
+      "description": "Description",
+      "descriptionPlaceholder": "What did you work on?",
+      "isBillable": "Billable"
+    },
+    "status": {
+      "unbilled": "Unbilled",
+      "invoiced": "Invoiced"
+    },
+    "table": {
+      "date": "Date",
+      "project": "Project",
+      "task": "Task",
+      "duration": "Duration",
+      "status": "Status"
+    },
+    "summary": {
+      "totalHours": "Total Hours",
+      "billableHours": "Billable Hours",
+      "nonBillableHours": "Non-Billable Hours"
+    },
+    "empty": {
+      "title": "No time entries yet",
+      "description": "Start tracking your time"
+    }
+  }
+}

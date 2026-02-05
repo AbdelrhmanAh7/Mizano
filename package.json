@@ -1,0 +1,33 @@
+{
+  "name": "mizano",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-powered ERP system - Autonomous Accounting Platform",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "db:generate": "pnpm --filter api prisma generate",
+    "db:push": "pnpm --filter api prisma db push",
+    "db:migrate": "pnpm --filter api prisma migrate dev",
+    "db:seed": "pnpm --filter api prisma db seed",
+    "db:studio": "pnpm --filter api prisma studio",
+    "clean": "turbo clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "prettier": "^3.2.4",
+    "turbo": "^2.0.0",
+    "typescript": "^5.3.3"
+  },
+  "packageManager": "pnpm@8.14.0",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

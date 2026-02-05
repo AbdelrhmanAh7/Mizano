@@ -1,0 +1,119 @@
+{
+  "title": "Accounting",
+  "description": "Manage your chart of accounts, journal entries, and recurring transactions",
+  "accounts": {
+    "title": "Chart of Accounts",
+    "newAccount": "New Account",
+    "editAccount": "Edit Account",
+    "deleteAccount": "Delete Account",
+    "accountDetails": "Account Details",
+    "form": {
+      "code": "Account Code",
+      "codePlaceholder": "Enter account code",
+      "name": "Account Name",
+      "namePlaceholder": "Enter account name",
+      "type": "Account Type",
+      "typePlaceholder": "Select account type",
+      "parent": "Parent Account",
+      "parentPlaceholder": "Select parent account (optional)",
+      "currency": "Currency",
+      "description": "Description",
+      "descriptionPlaceholder": "Enter description",
+      "isActive": "Active"
+    },
+    "table": {
+      "code": "Code",
+      "name": "Name",
+      "type": "Type",
+      "balance": "Balance",
+      "status": "Status"
+    },
+    "types": {
+      "asset": "Asset",
+      "liability": "Liability",
+      "equity": "Equity",
+      "income": "Income",
+      "expense": "Expense"
+    },
+    "empty": {
+      "title": "No accounts yet",
+      "description": "Set up your chart of accounts to start"
+    }
+  },
+  "journals": {
+    "title": "Journal Entries",
+    "newJournal": "New Journal Entry",
+    "editJournal": "Edit Journal Entry",
+    "deleteJournal": "Delete Journal Entry",
+    "journalDetails": "Journal Entry Details",
+    "form": {
+      "date": "Date",
+      "reference": "Reference",
+      "referencePlaceholder": "Enter reference (optional)",
+      "notes": "Notes",
+      "notesPlaceholder": "Enter notes (optional)",
+      "lines": "Journal Lines",
+      "account": "Account",
+      "accountPlaceholder": "Select account",
+      "debit": "Debit",
+      "credit": "Credit",
+      "description": "Description",
+      "addLine": "Add Line",
+      "minLines": "Journal must have at least 2 lines",
+      "mustBalance": "Total debits must equal total credits"
+    },
+    "table": {
+      "journalNumber": "Journal #",
+      "date": "Date",
+      "reference": "Reference",
+      "debit": "Debit",
+      "credit": "Credit",
+      "notes": "Notes"
+    },
+    "summary": {
+      "totalDebit": "Total Debit",
+      "totalCredit": "Total Credit",
+      "difference": "Difference"
+    },
+    "empty": {
+      "title": "No journal entries yet",
+      "description": "Create your first journal entry"
+    }
+  },
+  "recurring": {
+    "title": "Recurring Profiles",
+    "newProfile": "New Recurring Profile",
+    "editProfile": "Edit Recurring Profile",
+    "deleteProfile": "Delete Recurring Profile",
+    "profileDetails": "Recurring Profile Details",
+    "form": {
+      "name": "Profile Name",
+      "namePlaceholder": "Enter profile name",
+      "frequency": "Frequency",
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "endDatePlaceholder": "No end date (optional)",
+      "autoPost": "Auto Post",
+      "autoPostDescription": "Automatically post entries when generated",
+      "entityType": "Entity Type",
+      "templateData": "Template Data"
+    },
+    "frequencies": {
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "yearly": "Yearly"
+    },
+    "table": {
+      "name": "Name",
+      "frequency": "Frequency",
+      "nextRun": "Next Run",
+      "lastRun": "Last Run",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No recurring profiles yet",
+      "description": "Set up recurring transactions to automate entries"
+    }
+  }
+}

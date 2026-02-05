@@ -1,0 +1,80 @@
+{
+  "dashboard": "لوحة التحكم",
+  "sales": {
+    "title": "المبيعات",
+    "customers": "العملاء",
+    "quotes": "عروض الأسعار",
+    "invoices": "الفواتير",
+    "creditNotes": "إشعارات الائتمان",
+    "payments": "المدفوعات"
+  },
+  "purchases": {
+    "title": "المشتريات",
+    "vendors": "الموردون",
+    "expenses": "المصروفات",
+    "bills": "الفواتير",
+    "payments": "المدفوعات",
+    "credits": "الائتمانات"
+  },
+  "accounting": {
+    "title": "المحاسبة",
+    "chartOfAccounts": "دليل الحسابات",
+    "journalEntries": "قيود اليومية",
+    "recurring": "المتكررة"
+  },
+  "inventory": {
+    "title": "المخزون",
+    "items": {
+      "title": "الأصناف"
+    },
+    "warehouses": {
+      "title": "المستودعات"
+    },
+    "adjustments": {
+      "title": "التسويات"
+    }
+  },
+  "banking": {
+    "accounts": {
+      "title": "الحسابات البنكية"
+    },
+    "reconciliation": {
+      "title": "المطابقة"
+    },
+    "rules": {
+      "title": "قواعد البنك"
+    }
+  },
+  "projects": {
+    "title": "المشاريع",
+    "projects": {
+      "title": "كل المشاريع"
+    },
+    "timesheets": {
+      "title": "سجلات الوقت"
+    }
+  },
+  "manufacturing": {
+    "title": "التصنيع",
+    "bom": "قائمة المواد",
+    "workOrders": "أوامر العمل"
+  },
+  "hr": {
+    "employees": {
+      "title": "الموظفون"
+    },
+    "attendance": {
+      "title": "الحضور"
+    },
+    "payroll": {
+      "title": "الرواتب"
+    }
+  },
+  "crm": "إدارة العلاقات",
+  "reports": "التقارير",
+  "aiInsights": "رؤى الذكاء الاصطناعي",
+  "settings": "الإعدادات",
+  "expandSidebar": "توسيع القائمة",
+  "collapseSidebar": "تصغير القائمة",
+  "openMenu": "فتح القائمة"
+}

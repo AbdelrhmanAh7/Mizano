@@ -1,0 +1,99 @@
+{
+  "title": "إدارة العلاقات",
+  "description": "إدارة العملاء المحتملين والصفقات",
+  "leads": {
+    "title": "العملاء المحتملون",
+    "newLead": "عميل محتمل جديد",
+    "editLead": "تعديل العميل المحتمل",
+    "deleteLead": "حذف العميل المحتمل",
+    "leadDetails": "تفاصيل العميل المحتمل",
+    "convertToDeal": "تحويل إلى صفقة",
+    "form": {
+      "name": "الاسم",
+      "namePlaceholder": "أدخل اسم العميل المحتمل",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "أدخل البريد الإلكتروني",
+      "phone": "الهاتف",
+      "phonePlaceholder": "أدخل رقم الهاتف",
+      "company": "الشركة",
+      "companyPlaceholder": "أدخل اسم الشركة",
+      "source": "المصدر",
+      "notes": "ملاحظات",
+      "notesPlaceholder": "أدخل الملاحظات",
+      "assignedTo": "المسؤول",
+      "assignedToPlaceholder": "اختر المسؤول"
+    },
+    "status": {
+      "new": "جديد",
+      "contacted": "تم التواصل",
+      "qualified": "مؤهل",
+      "junk": "غير مهتم"
+    },
+    "sources": {
+      "website": "الموقع الإلكتروني",
+      "facebookAds": "إعلانات فيسبوك",
+      "googleAds": "إعلانات جوجل",
+      "referral": "إحالة",
+      "coldCall": "اتصال بارد",
+      "other": "أخرى"
+    },
+    "table": {
+      "name": "الاسم",
+      "company": "الشركة",
+      "source": "المصدر",
+      "assignedTo": "المسؤول",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا يوجد عملاء محتملون بعد",
+      "description": "أضف أول عميل محتمل"
+    }
+  },
+  "deals": {
+    "title": "الصفقات",
+    "newDeal": "صفقة جديدة",
+    "editDeal": "تعديل الصفقة",
+    "deleteDeal": "حذف الصفقة",
+    "dealDetails": "تفاصيل الصفقة",
+    "convertToCustomer": "تحويل إلى عميل",
+    "form": {
+      "name": "اسم الصفقة",
+      "namePlaceholder": "أدخل اسم الصفقة",
+      "lead": "العميل المحتمل",
+      "leadPlaceholder": "اختر العميل المحتمل (اختياري)",
+      "customer": "العميل",
+      "customerPlaceholder": "اختر العميل (اختياري)",
+      "stage": "المرحلة",
+      "value": "قيمة الصفقة",
+      "expectedCloseDate": "تاريخ الإغلاق المتوقع",
+      "notes": "ملاحظات",
+      "notesPlaceholder": "أدخل الملاحظات",
+      "assignedTo": "المسؤول",
+      "assignedToPlaceholder": "اختر المسؤول"
+    },
+    "stages": {
+      "new": "جديدة",
+      "meetingScheduled": "تم جدولة اجتماع",
+      "proposalSent": "تم إرسال العرض",
+      "negotiation": "قيد التفاوض",
+      "won": "ناجحة",
+      "lost": "خاسرة"
+    },
+    "table": {
+      "name": "الاسم",
+      "customer": "العميل",
+      "value": "القيمة",
+      "expectedClose": "الإغلاق المتوقع",
+      "stage": "المرحلة"
+    },
+    "pipeline": {
+      "title": "خط أنابيب الصفقات",
+      "totalValue": "إجمالي القيمة",
+      "dealCount": "{count} صفقات"
+    },
+    "empty": {
+      "title": "لا توجد صفقات بعد",
+      "description": "أنشئ أول صفقة"
+    }
+  }
+}

@@ -1,0 +1,161 @@
+{
+  "title": "Banking",
+  "description": "Manage bank accounts, transactions, and reconciliation",
+  "accounts": {
+    "title": "Bank Accounts",
+    "newAccount": "New Bank Account",
+    "editAccount": "Edit Bank Account",
+    "deleteAccount": "Delete Bank Account",
+    "accountDetails": "Bank Account Details",
+    "form": {
+      "name": "Account Name",
+      "namePlaceholder": "Enter account name",
+      "accountNumber": "Account Number",
+      "accountNumberPlaceholder": "Enter account number",
+      "currency": "Currency",
+      "type": "Account Type",
+      "openingBalance": "Opening Balance",
+      "linkedAccount": "Linked GL Account",
+      "linkedAccountPlaceholder": "Select GL account"
+    },
+    "types": {
+      "bank": "Bank Account",
+      "creditCard": "Credit Card",
+      "pettyCash": "Petty Cash"
+    },
+    "table": {
+      "name": "Name",
+      "accountNumber": "Account #",
+      "type": "Type",
+      "balance": "Balance",
+      "currency": "Currency"
+    },
+    "empty": {
+      "title": "No bank accounts yet",
+      "description": "Add your first bank account"
+    }
+  },
+  "transactions": {
+    "title": "Bank Transactions",
+    "newTransaction": "New Transaction",
+    "editTransaction": "Edit Transaction",
+    "deleteTransaction": "Delete Transaction",
+    "transactionDetails": "Transaction Details",
+    "import": "Import Transactions",
+    "form": {
+      "bankAccount": "Bank Account",
+      "bankAccountPlaceholder": "Select bank account",
+      "date": "Date",
+      "type": "Type",
+      "amount": "Amount",
+      "description": "Description",
+      "descriptionPlaceholder": "Enter description",
+      "reference": "Reference",
+      "referencePlaceholder": "Enter reference",
+      "payee": "Payee",
+      "payeePlaceholder": "Enter payee name"
+    },
+    "types": {
+      "deposit": "Deposit",
+      "withdrawal": "Withdrawal"
+    },
+    "table": {
+      "date": "Date",
+      "type": "Type",
+      "payee": "Payee",
+      "description": "Description",
+      "amount": "Amount",
+      "status": "Status"
+    },
+    "status": {
+      "pending": "Pending",
+      "matched": "Matched",
+      "created": "Created",
+      "reconciled": "Reconciled"
+    },
+    "empty": {
+      "title": "No transactions yet",
+      "description": "Import or add your first transaction"
+    }
+  },
+  "rules": {
+    "title": "Bank Rules",
+    "newRule": "New Rule",
+    "editRule": "Edit Rule",
+    "deleteRule": "Delete Rule",
+    "ruleDetails": "Rule Details",
+    "form": {
+      "name": "Rule Name",
+      "namePlaceholder": "Enter rule name",
+      "bankAccount": "Bank Account",
+      "bankAccountPlaceholder": "All accounts",
+      "conditions": "Conditions",
+      "action": "Action"
+    },
+    "conditions": {
+      "field": "Field",
+      "operator": "Operator",
+      "value": "Value",
+      "fields": {
+        "description": "Description",
+        "payee": "Payee",
+        "amount": "Amount"
+      },
+      "operators": {
+        "contains": "Contains",
+        "equals": "Equals",
+        "startsWith": "Starts with",
+        "endsWith": "Ends with"
+      }
+    },
+    "actions": {
+      "type": "Action Type",
+      "account": "Account",
+      "vendor": "Vendor",
+      "types": {
+        "expense": "Create Expense",
+        "transfer": "Create Transfer"
+      }
+    },
+    "table": {
+      "name": "Name",
+      "conditions": "Conditions",
+      "action": "Action",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No rules yet",
+      "description": "Create rules to automate transaction categorization"
+    }
+  },
+  "reconciliation": {
+    "title": "Reconciliation",
+    "newReconciliation": "New Reconciliation",
+    "reconciliationDetails": "Reconciliation Details",
+    "form": {
+      "bankAccount": "Bank Account",
+      "reconciliationDate": "Reconciliation Date",
+      "statementDate": "Statement Date",
+      "statementBalance": "Statement Balance",
+      "reconciledBalance": "Reconciled Balance",
+      "notes": "Notes"
+    },
+    "summary": {
+      "openingBalance": "Opening Balance",
+      "clearedDeposits": "Cleared Deposits",
+      "clearedWithdrawals": "Cleared Withdrawals",
+      "endingBalance": "Ending Balance",
+      "difference": "Difference"
+    },
+    "table": {
+      "date": "Date",
+      "statementBalance": "Statement Balance",
+      "reconciledBalance": "Reconciled Balance",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No reconciliations yet",
+      "description": "Start reconciling your bank accounts"
+    }
+  }
+}

@@ -1,0 +1,152 @@
+{
+  "title": "Settings",
+  "description": "Configure your organization and application settings",
+  "organization": {
+    "title": "Organization",
+    "description": "Manage your organization settings",
+    "form": {
+      "name": "Organization Name",
+      "namePlaceholder": "Enter organization name",
+      "email": "Email",
+      "emailPlaceholder": "Enter email address",
+      "phone": "Phone",
+      "phonePlaceholder": "Enter phone number",
+      "address": "Address",
+      "addressPlaceholder": "Enter address",
+      "currency": "Default Currency",
+      "taxId": "Tax ID",
+      "taxIdPlaceholder": "Enter tax ID",
+      "lockDate": "Lock Date",
+      "lockDateDescription": "Prevent changes to transactions before this date"
+    }
+  },
+  "users": {
+    "title": "Users",
+    "description": "Manage users and their access",
+    "newUser": "New User",
+    "editUser": "Edit User",
+    "deleteUser": "Delete User",
+    "userDetails": "User Details",
+    "form": {
+      "name": "Name",
+      "namePlaceholder": "Enter full name",
+      "email": "Email",
+      "emailPlaceholder": "Enter email address",
+      "password": "Password",
+      "passwordPlaceholder": "Enter password",
+      "role": "Role",
+      "rolePlaceholder": "Select role",
+      "status": "Status"
+    },
+    "table": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "status": "Status",
+      "lastLogin": "Last Login"
+    },
+    "empty": {
+      "title": "No users yet",
+      "description": "Invite users to your organization"
+    }
+  },
+  "roles": {
+    "title": "Roles & Permissions",
+    "description": "Define roles and their permissions",
+    "newRole": "New Role",
+    "editRole": "Edit Role",
+    "deleteRole": "Delete Role",
+    "roleDetails": "Role Details",
+    "form": {
+      "name": "Role Name",
+      "namePlaceholder": "Enter role name",
+      "description": "Description",
+      "descriptionPlaceholder": "Enter description",
+      "permissions": "Permissions"
+    },
+    "permissions": {
+      "view": "View",
+      "create": "Create",
+      "edit": "Edit",
+      "delete": "Delete",
+      "export": "Export"
+    },
+    "modules": {
+      "sales": "Sales",
+      "purchases": "Purchases",
+      "accounting": "Accounting",
+      "inventory": "Inventory",
+      "banking": "Banking",
+      "hr": "HR",
+      "manufacturing": "Manufacturing",
+      "projects": "Projects",
+      "crm": "CRM",
+      "reports": "Reports",
+      "settings": "Settings"
+    },
+    "table": {
+      "name": "Name",
+      "description": "Description",
+      "userCount": "Users"
+    },
+    "empty": {
+      "title": "No custom roles yet",
+      "description": "Create roles to manage permissions"
+    }
+  },
+  "taxes": {
+    "title": "Tax Rates",
+    "description": "Configure tax rates for sales and purchases",
+    "newTaxRate": "New Tax Rate",
+    "editTaxRate": "Edit Tax Rate",
+    "deleteTaxRate": "Delete Tax Rate",
+    "form": {
+      "name": "Tax Name",
+      "namePlaceholder": "e.g., VAT, Sales Tax",
+      "rate": "Rate (%)",
+      "type": "Type",
+      "linkedAccount": "Linked Account",
+      "linkedAccountPlaceholder": "Select tax account",
+      "isDefault": "Default"
+    },
+    "types": {
+      "sales": "Sales",
+      "purchases": "Purchases",
+      "both": "Both"
+    },
+    "table": {
+      "name": "Name",
+      "rate": "Rate",
+      "type": "Type",
+      "default": "Default"
+    },
+    "empty": {
+      "title": "No tax rates yet",
+      "description": "Set up tax rates for your transactions"
+    }
+  },
+  "accounts": {
+    "title": "Default Accounts",
+    "description": "Configure default accounts for transactions"
+  },
+  "integrations": {
+    "title": "Integrations",
+    "description": "Connect third-party services",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "configure": "Configure"
+  },
+  "appearance": {
+    "title": "Appearance",
+    "description": "Customize the look and feel",
+    "theme": "Theme",
+    "themes": {
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "language": "Language"
+  }
+}

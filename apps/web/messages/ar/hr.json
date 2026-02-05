@@ -1,0 +1,113 @@
+{
+  "title": "الموارد البشرية",
+  "description": "إدارة الموظفين والحضور والرواتب",
+  "employees": {
+    "title": "الموظفون",
+    "newEmployee": "موظف جديد",
+    "editEmployee": "تعديل الموظف",
+    "deleteEmployee": "حذف الموظف",
+    "employeeDetails": "تفاصيل الموظف",
+    "form": {
+      "employeeId": "رقم الموظف",
+      "employeeIdPlaceholder": "أدخل رقم الموظف",
+      "name": "الاسم الكامل",
+      "namePlaceholder": "أدخل الاسم الكامل",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "أدخل البريد الإلكتروني",
+      "phone": "الهاتف",
+      "phonePlaceholder": "أدخل رقم الهاتف",
+      "department": "القسم",
+      "departmentPlaceholder": "أدخل القسم",
+      "jobTitle": "المسمى الوظيفي",
+      "jobTitlePlaceholder": "أدخل المسمى الوظيفي",
+      "dateOfJoining": "تاريخ الانضمام",
+      "basicSalary": "الراتب الأساسي",
+      "allowances": "البدلات",
+      "deductions": "الاستقطاعات",
+      "bankAccount": "الحساب البنكي",
+      "bankAccountPlaceholder": "أدخل الحساب البنكي",
+      "isActive": "نشط"
+    },
+    "table": {
+      "employeeId": "رقم الموظف",
+      "name": "الاسم",
+      "department": "القسم",
+      "jobTitle": "المسمى الوظيفي",
+      "salary": "الراتب",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا يوجد موظفون بعد",
+      "description": "أضف أول موظف"
+    }
+  },
+  "attendance": {
+    "title": "الحضور",
+    "newAttendance": "تسجيل الحضور",
+    "editAttendance": "تعديل الحضور",
+    "attendanceDetails": "تفاصيل الحضور",
+    "form": {
+      "employee": "الموظف",
+      "employeePlaceholder": "اختر الموظف",
+      "date": "التاريخ",
+      "status": "الحالة",
+      "checkIn": "وقت الحضور",
+      "checkOut": "وقت الانصراف",
+      "notes": "ملاحظات"
+    },
+    "status": {
+      "present": "حاضر",
+      "absent": "غائب",
+      "leave": "إجازة",
+      "halfDay": "نصف يوم"
+    },
+    "table": {
+      "employee": "الموظف",
+      "date": "التاريخ",
+      "checkIn": "الحضور",
+      "checkOut": "الانصراف",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا توجد سجلات حضور بعد",
+      "description": "ابدأ تسجيل حضور الموظفين"
+    }
+  },
+  "payroll": {
+    "title": "الرواتب",
+    "newRun": "مسير رواتب جديد",
+    "runDetails": "تفاصيل مسير الرواتب",
+    "process": "معالجة الرواتب",
+    "markAsPaid": "تحديد كمدفوع",
+    "form": {
+      "month": "الشهر",
+      "year": "السنة"
+    },
+    "status": {
+      "draft": "مسودة",
+      "processed": "تمت المعالجة",
+      "paid": "مدفوع"
+    },
+    "table": {
+      "period": "الفترة",
+      "employeeCount": "الموظفون",
+      "grossAmount": "الإجمالي",
+      "netAmount": "الصافي",
+      "status": "الحالة"
+    },
+    "payslip": {
+      "title": "كشف الراتب",
+      "employee": "الموظف",
+      "period": "الفترة",
+      "basicSalary": "الراتب الأساسي",
+      "allowances": "البدلات",
+      "deductions": "الاستقطاعات",
+      "grossPay": "إجمالي الراتب",
+      "netPay": "صافي الراتب"
+    },
+    "empty": {
+      "title": "لا توجد مسيرات رواتب بعد",
+      "description": "أنشئ أول مسير رواتب"
+    }
+  }
+}

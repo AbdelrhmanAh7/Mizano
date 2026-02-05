@@ -1,0 +1,143 @@
+{
+  "title": "Inventory",
+  "description": "Manage items, warehouses, and inventory movements",
+  "items": {
+    "title": "Items",
+    "newItem": "New Item",
+    "editItem": "Edit Item",
+    "deleteItem": "Delete Item",
+    "itemDetails": "Item Details",
+    "form": {
+      "name": "Item Name",
+      "namePlaceholder": "Enter item name",
+      "sku": "SKU",
+      "skuPlaceholder": "Enter SKU",
+      "type": "Item Type",
+      "unit": "Unit",
+      "unitPlaceholder": "e.g., pcs, kg, hrs",
+      "sellingPrice": "Selling Price",
+      "costPrice": "Cost Price",
+      "salesAccount": "Sales Account",
+      "purchaseAccount": "Purchase Account",
+      "inventoryAccount": "Inventory Account",
+      "description": "Description",
+      "descriptionPlaceholder": "Enter description",
+      "reorderPoint": "Reorder Point",
+      "openingStock": "Opening Stock",
+      "isActive": "Active"
+    },
+    "types": {
+      "goods": "Goods",
+      "service": "Service",
+      "digital": "Digital"
+    },
+    "table": {
+      "name": "Name",
+      "sku": "SKU",
+      "type": "Type",
+      "stock": "Stock",
+      "sellingPrice": "Selling Price",
+      "costPrice": "Cost Price",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No items yet",
+      "description": "Add your first item to start managing inventory"
+    }
+  },
+  "warehouses": {
+    "title": "Warehouses",
+    "newWarehouse": "New Warehouse",
+    "editWarehouse": "Edit Warehouse",
+    "deleteWarehouse": "Delete Warehouse",
+    "warehouseDetails": "Warehouse Details",
+    "form": {
+      "name": "Warehouse Name",
+      "namePlaceholder": "Enter warehouse name",
+      "code": "Warehouse Code",
+      "codePlaceholder": "Enter warehouse code",
+      "address": "Address",
+      "isDefault": "Default Warehouse"
+    },
+    "table": {
+      "name": "Name",
+      "code": "Code",
+      "itemCount": "Items",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No warehouses yet",
+      "description": "Create your first warehouse"
+    }
+  },
+  "adjustments": {
+    "title": "Inventory Adjustments",
+    "newAdjustment": "New Adjustment",
+    "adjustmentDetails": "Adjustment Details",
+    "form": {
+      "date": "Date",
+      "warehouse": "Warehouse",
+      "warehousePlaceholder": "Select warehouse",
+      "item": "Item",
+      "itemPlaceholder": "Select item",
+      "type": "Adjustment Type",
+      "quantity": "Quantity",
+      "reason": "Reason",
+      "account": "Adjustment Account",
+      "accountPlaceholder": "Select account",
+      "notes": "Notes"
+    },
+    "types": {
+      "increase": "Increase",
+      "decrease": "Decrease"
+    },
+    "reasons": {
+      "damaged": "Damaged",
+      "stolen": "Stolen",
+      "stocktake": "Stocktake",
+      "returned": "Returned",
+      "expired": "Expired",
+      "other": "Other"
+    },
+    "table": {
+      "date": "Date",
+      "item": "Item",
+      "warehouse": "Warehouse",
+      "type": "Type",
+      "quantity": "Quantity",
+      "reason": "Reason"
+    },
+    "empty": {
+      "title": "No adjustments yet",
+      "description": "Inventory adjustments will appear here"
+    }
+  },
+  "priceLists": {
+    "title": "Price Lists",
+    "newPriceList": "New Price List",
+    "editPriceList": "Edit Price List",
+    "deletePriceList": "Delete Price List",
+    "priceListDetails": "Price List Details",
+    "form": {
+      "name": "Price List Name",
+      "namePlaceholder": "Enter price list name",
+      "description": "Description",
+      "type": "Type",
+      "adjustment": "Adjustment"
+    },
+    "types": {
+      "percentage": "Percentage",
+      "fixed": "Fixed"
+    },
+    "table": {
+      "name": "Name",
+      "type": "Type",
+      "adjustment": "Adjustment",
+      "itemCount": "Items"
+    },
+    "empty": {
+      "title": "No price lists yet",
+      "description": "Create price lists for different customer groups"
+    }
+  }
+}

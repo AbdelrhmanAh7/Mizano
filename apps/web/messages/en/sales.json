@@ -1,0 +1,201 @@
+{
+  "title": "Sales",
+  "description": "Manage customers, quotes, invoices, and payments",
+  "stats": {
+    "totalOutstanding": "Total Outstanding",
+    "overdueAmount": "Overdue Amount",
+    "pendingQuotes": "Pending Quotes",
+    "receivedThisMonth": "Received This Month"
+  },
+  "customers": {
+    "title": "Customers",
+    "newCustomer": "New Customer",
+    "editCustomer": "Edit Customer",
+    "deleteCustomer": "Delete Customer",
+    "customerDetails": "Customer Details",
+    "form": {
+      "name": "Customer Name",
+      "namePlaceholder": "Enter customer name",
+      "displayName": "Display Name",
+      "displayNamePlaceholder": "Enter display name",
+      "email": "Email",
+      "emailPlaceholder": "Enter email address",
+      "phone": "Phone",
+      "phonePlaceholder": "Enter phone number",
+      "currency": "Currency",
+      "taxId": "Tax ID",
+      "taxIdPlaceholder": "Enter tax ID",
+      "paymentTerms": "Payment Terms",
+      "priceList": "Price List",
+      "billingAddress": "Billing Address",
+      "shippingAddress": "Shipping Address"
+    },
+    "table": {
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "outstanding": "Outstanding",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No customers yet",
+      "description": "Get started by adding your first customer"
+    }
+  },
+  "quotes": {
+    "title": "Quotes",
+    "newQuote": "New Quote",
+    "editQuote": "Edit Quote",
+    "deleteQuote": "Delete Quote",
+    "quoteDetails": "Quote Details",
+    "sendQuote": "Send Quote",
+    "convertToInvoice": "Convert to Invoice",
+    "form": {
+      "customer": "Customer",
+      "customerPlaceholder": "Select a customer",
+      "date": "Quote Date",
+      "expiryDate": "Expiry Date",
+      "notes": "Notes",
+      "terms": "Terms & Conditions"
+    },
+    "table": {
+      "quoteNumber": "Quote #",
+      "customer": "Customer",
+      "date": "Date",
+      "expiryDate": "Expiry Date",
+      "amount": "Amount",
+      "status": "Status"
+    },
+    "status": {
+      "draft": "Draft",
+      "sent": "Sent",
+      "accepted": "Accepted",
+      "invoiced": "Invoiced",
+      "declined": "Declined",
+      "expired": "Expired"
+    },
+    "empty": {
+      "title": "No quotes yet",
+      "description": "Create your first quote to get started"
+    }
+  },
+  "invoices": {
+    "title": "Invoices",
+    "newInvoice": "New Invoice",
+    "editInvoice": "Edit Invoice",
+    "deleteInvoice": "Delete Invoice",
+    "invoiceDetails": "Invoice Details",
+    "sendInvoice": "Send Invoice",
+    "recordPayment": "Record Payment",
+    "voidInvoice": "Void Invoice",
+    "form": {
+      "customer": "Customer",
+      "customerPlaceholder": "Select a customer",
+      "customerRequired": "Customer is required",
+      "date": "Invoice Date",
+      "dateRequired": "Invoice date is required",
+      "dueDate": "Due Date",
+      "dueDateRequired": "Due date is required",
+      "shippingAmount": "Shipping",
+      "notes": "Notes",
+      "terms": "Terms & Conditions",
+      "project": "Project",
+      "lineItemRequired": "At least one line item is required"
+    },
+    "table": {
+      "invoiceNumber": "Invoice #",
+      "customer": "Customer",
+      "date": "Date",
+      "dueDate": "Due Date",
+      "amount": "Amount",
+      "balance": "Balance",
+      "status": "Status"
+    },
+    "status": {
+      "draft": "Draft",
+      "sent": "Sent",
+      "partiallyPaid": "Partially Paid",
+      "paid": "Paid",
+      "overdue": "Overdue",
+      "void": "Void"
+    },
+    "empty": {
+      "title": "No invoices yet",
+      "description": "Create your first invoice to start billing"
+    }
+  },
+  "creditNotes": {
+    "title": "Credit Notes",
+    "newCreditNote": "New Credit Note",
+    "editCreditNote": "Edit Credit Note",
+    "deleteCreditNote": "Delete Credit Note",
+    "creditNoteDetails": "Credit Note Details",
+    "form": {
+      "customer": "Customer",
+      "invoice": "Invoice",
+      "date": "Date",
+      "reason": "Reason",
+      "amount": "Amount",
+      "type": "Type",
+      "applyToInvoice": "Apply to Invoice"
+    },
+    "types": {
+      "refund": "Refund",
+      "applyToInvoice": "Apply to Invoice"
+    },
+    "table": {
+      "creditNoteNumber": "Credit Note #",
+      "customer": "Customer",
+      "invoice": "Invoice",
+      "date": "Date",
+      "amount": "Amount",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No credit notes yet",
+      "description": "Credit notes will appear here when created"
+    }
+  },
+  "payments": {
+    "title": "Payments Received",
+    "newPayment": "New Payment",
+    "editPayment": "Edit Payment",
+    "deletePayment": "Delete Payment",
+    "paymentDetails": "Payment Details",
+    "form": {
+      "customer": "Customer",
+      "customerPlaceholder": "Select a customer",
+      "date": "Payment Date",
+      "amount": "Amount",
+      "paymentMode": "Payment Mode",
+      "depositTo": "Deposit To",
+      "reference": "Reference Number",
+      "notes": "Notes",
+      "allocations": "Invoice Allocations",
+      "allocationRequired": "Payment must be allocated to at least 1 invoice"
+    },
+    "table": {
+      "paymentNumber": "Payment #",
+      "customer": "Customer",
+      "date": "Date",
+      "amount": "Amount",
+      "mode": "Mode",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No payments yet",
+      "description": "Payments will appear here when recorded"
+    }
+  },
+  "lineItems": {
+    "title": "Line Items",
+    "addItem": "Add Line Item",
+    "item": "Item",
+    "description": "Description",
+    "quantity": "Qty",
+    "rate": "Rate",
+    "discount": "Discount",
+    "tax": "Tax",
+    "amount": "Amount"
+  }
+}

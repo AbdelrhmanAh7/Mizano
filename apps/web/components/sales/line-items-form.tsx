@@ -1,0 +1,368 @@
+'use client';
+
+import { useFieldArray, Control, UseFormWatch, UseFormSetValue } from 'react-hook-form';
+import { Plus, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useActiveItems, Item } from '@/lib/hooks/use-items';
+
+export interface LineItem {
+  itemId?: string;
+  description: string;
+  quantity: string;
+  rate: string;
+  discountPercent?: string;
+  taxRateId?: string;
+  amount: string;
+}
+
+interface TaxRate {
+  id: string;
+  name: string;
+  rate: number;
+}
+
+interface LineItemsFormProps {
+  control: Control<any>;
+  watch: UseFormWatch<any>;
+  setValue: UseFormSetValue<any>;
+  name: string;
+  taxRates?: TaxRate[];
+  currency?: string;
+  showTax?: boolean;
+  showDiscount?: boolean;
+}
+
+/**
+ * Calculate line amount based on quantity, rate, and discount
+ */
+export function calculateLineAmount(
+  quantity: string | number,
+  rate: string | number,
+  discountPercent?: string | number
+): string {
+  const qty = typeof quantity === 'string' ? parseFloat(quantity) || 0 : quantity;
+  const unitRate = typeof rate === 'string' ? parseFloat(rate) || 0 : rate;
+  const discount = typeof discountPercent === 'string' ? parseFloat(discountPercent) || 0 : discountPercent || 0;
+
+  const amount = qty * unitRate * (1 - discount / 100);
+  return amount.toFixed(2);
+}
+
+/**
+ * Calculate totals for all line items
+ */
+export function calculateLineTotals(
+  lines: LineItem[],
+  taxRates?: TaxRate[]
+): {
+  subtotal: number;
+  totalDiscount: number;
+  totalTax: number;
+  grandTotal: number;
+} {
+  let subtotal = 0;
+  let totalDiscount = 0;
+  let totalTax = 0;
+
+  lines.forEach((line) => {
+    const qty = parseFloat(line.quantity) || 0;
+    const rate = parseFloat(line.rate) || 0;
+    const discount = parseFloat(line.discountPercent || '0') || 0;
+    const lineAmount = parseFloat(line.amount) || 0;
+
+    const grossAmount = qty * rate;
+    const discountAmount = grossAmount * (discount / 100);
+
+    subtotal += grossAmount;
+    totalDiscount += discountAmount;
+
+    // Calculate tax if applicable
+    if (line.taxRateId && taxRates) {
+      const taxRate = taxRates.find((t) => t.id === line.taxRateId);
+      if (taxRate) {
+        totalTax += lineAmount * (taxRate.rate / 100);
+      }
+    }
+  });
+
+  const grandTotal = subtotal - totalDiscount + totalTax;
+
+  return {
+    subtotal,
+    totalDiscount,
+    totalTax,
+    grandTotal,
+  };
+}
+
+export function formatAmount(amount: number, currency = 'USD'): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+export function LineItemsForm({
+  control,
+  watch,
+  setValue,
+  name,
+  taxRates = [],
+  currency = 'USD',
+  showTax = true,
+  showDiscount = true,
+}: LineItemsFormProps) {
+  const { data: items = [] } = useActiveItems();
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name,
+  });
+
+  const lines = watch(name) || [];
+  const totals = calculateLineTotals(lines, taxRates);
+
+  const handleItemSelect = (index: number, itemId: string) => {
+    const item = items.find((i: Item) => i.id === itemId);
+    if (item) {
+      setValue(`${name}.${index}.itemId`, itemId);
+      setValue(`${name}.${index}.description`, item.description || item.name);
+      setValue(`${name}.${index}.rate`, item.sellingPrice);
+      if (item.taxRateId) {
+        setValue(`${name}.${index}.taxRateId`, item.taxRateId);
+      }
+      // Recalculate amount
+      const qty = watch(`${name}.${index}.quantity`) || '1';
+      const discount = watch(`${name}.${index}.discountPercent`) || '0';
+      const amount = calculateLineAmount(qty, item.sellingPrice, discount);
+      setValue(`${name}.${index}.amount`, amount);
+    }
+  };
+
+  const handleQuantityChange = (index: number, value: string) => {
+    setValue(`${name}.${index}.quantity`, value);
+    const rate = watch(`${name}.${index}.rate`) || '0';
+    const discount = watch(`${name}.${index}.discountPercent`) || '0';
+    const amount = calculateLineAmount(value, rate, discount);
+    setValue(`${name}.${index}.amount`, amount);
+  };
+
+  const handleRateChange = (index: number, value: string) => {
+    setValue(`${name}.${index}.rate`, value);
+    const qty = watch(`${name}.${index}.quantity`) || '0';
+    const discount = watch(`${name}.${index}.discountPercent`) || '0';
+    const amount = calculateLineAmount(qty, value, discount);
+    setValue(`${name}.${index}.amount`, amount);
+  };
+
+  const handleDiscountChange = (index: number, value: string) => {
+    setValue(`${name}.${index}.discountPercent`, value);
+    const qty = watch(`${name}.${index}.quantity`) || '0';
+    const rate = watch(`${name}.${index}.rate`) || '0';
+    const amount = calculateLineAmount(qty, rate, value);
+    setValue(`${name}.${index}.amount`, amount);
+  };
+
+  const addLine = () => {
+    append({
+      itemId: '',
+      description: '',
+      quantity: '1',
+      rate: '0',
+      discountPercent: '0',
+      taxRateId: '',
+      amount: '0',
+    });
+  };
+
+  const removeLine = (index: number) => {
+    if (fields.length > 1) {
+      remove(index);
+    }
+  };
+
+  // Calculate column span based on visible columns
+  const baseColumns = 4; // Item/Description, Qty, Rate, Amount
+  const extraColumns = (showDiscount ? 1 : 0) + (showTax ? 1 : 0) + 1; // +1 for actions
+  const totalColumns = baseColumns + extraColumns;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">Line Items</CardTitle>
+          <Button type="button" variant="outline" size="sm" onClick={addLine}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Line
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {/* Table Header */}
+        <div className="grid gap-2 mb-2 text-sm font-medium text-muted-foreground"
+             style={{ gridTemplateColumns: `3fr 1fr 1fr ${showDiscount ? '1fr ' : ''}${showTax ? '1.5fr ' : ''}1fr 0.5fr` }}>
+          <div>Item / Description</div>
+          <div className="text-right">Qty</div>
+          <div className="text-right">Rate</div>
+          {showDiscount && <div className="text-right">Disc %</div>}
+          {showTax && <div>Tax</div>}
+          <div className="text-right">Amount</div>
+          <div></div>
+        </div>
+
+        {/* Lines */}
+        <div className="space-y-2">
+          {fields.map((field, index) => (
+            <div
+              key={field.id}
+              className="grid gap-2 items-center"
+              style={{ gridTemplateColumns: `3fr 1fr 1fr ${showDiscount ? '1fr ' : ''}${showTax ? '1.5fr ' : ''}1fr 0.5fr` }}
+            >
+              {/* Item/Description */}
+              <div className="space-y-1">
+                <Select
+                  value={watch(`${name}.${index}.itemId`) || ''}
+                  onValueChange={(value) => handleItemSelect(index, value)}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Select item (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Custom item</SelectItem>
+                    {items.map((item: Item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name} - {formatAmount(parseFloat(item.sellingPrice), currency)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="Description"
+                  className="h-9"
+                  value={watch(`${name}.${index}.description`) || ''}
+                  onChange={(e) => setValue(`${name}.${index}.description`, e.target.value)}
+                />
+              </div>
+
+              {/* Quantity */}
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                className="text-right h-9"
+                placeholder="1"
+                value={watch(`${name}.${index}.quantity`) || ''}
+                onChange={(e) => handleQuantityChange(index, e.target.value)}
+              />
+
+              {/* Rate */}
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                className="text-right h-9"
+                placeholder="0.00"
+                value={watch(`${name}.${index}.rate`) || ''}
+                onChange={(e) => handleRateChange(index, e.target.value)}
+              />
+
+              {/* Discount */}
+              {showDiscount && (
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  className="text-right h-9"
+                  placeholder="0"
+                  value={watch(`${name}.${index}.discountPercent`) || ''}
+                  onChange={(e) => handleDiscountChange(index, e.target.value)}
+                />
+              )}
+
+              {/* Tax */}
+              {showTax && (
+                <Select
+                  value={watch(`${name}.${index}.taxRateId`) || ''}
+                  onValueChange={(value) => setValue(`${name}.${index}.taxRateId`, value)}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="No tax" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No tax</SelectItem>
+                    {taxRates.map((tax) => (
+                      <SelectItem key={tax.id} value={tax.id}>
+                        {tax.name} ({tax.rate}%)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Amount */}
+              <div className="text-right font-mono text-sm font-medium h-9 flex items-center justify-end">
+                {formatAmount(parseFloat(watch(`${name}.${index}.amount`) || '0'), currency)}
+              </div>
+
+              {/* Actions */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => removeLine(index)}
+                disabled={fields.length <= 1}
+                className="h-9 w-9"
+              >
+                <Trash2 className="h-4 w-4 text-muted-foreground hover:text-red-500" />
+              </Button>
+            </div>
+          ))}
+        </div>
+
+        {/* Totals */}
+        <div className="border-t mt-4 pt-4 space-y-2">
+          <div className="flex justify-end gap-8 text-sm">
+            <span className="text-muted-foreground">Subtotal:</span>
+            <span className="font-mono w-24 text-right">
+              {formatAmount(totals.subtotal, currency)}
+            </span>
+          </div>
+          {showDiscount && totals.totalDiscount > 0 && (
+            <div className="flex justify-end gap-8 text-sm">
+              <span className="text-muted-foreground">Discount:</span>
+              <span className="font-mono w-24 text-right text-red-600">
+                -{formatAmount(totals.totalDiscount, currency)}
+              </span>
+            </div>
+          )}
+          {showTax && totals.totalTax > 0 && (
+            <div className="flex justify-end gap-8 text-sm">
+              <span className="text-muted-foreground">Tax:</span>
+              <span className="font-mono w-24 text-right">
+                {formatAmount(totals.totalTax, currency)}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-end gap-8 text-base font-semibold border-t pt-2">
+            <span>Total:</span>
+            <span className="font-mono w-24 text-right">
+              {formatAmount(totals.grandTotal, currency)}
+            </span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

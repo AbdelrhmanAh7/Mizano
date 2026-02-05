@@ -1,0 +1,113 @@
+{
+  "title": "HR",
+  "description": "Manage employees, attendance, and payroll",
+  "employees": {
+    "title": "Employees",
+    "newEmployee": "New Employee",
+    "editEmployee": "Edit Employee",
+    "deleteEmployee": "Delete Employee",
+    "employeeDetails": "Employee Details",
+    "form": {
+      "employeeId": "Employee ID",
+      "employeeIdPlaceholder": "Enter employee ID",
+      "name": "Full Name",
+      "namePlaceholder": "Enter full name",
+      "email": "Email",
+      "emailPlaceholder": "Enter email address",
+      "phone": "Phone",
+      "phonePlaceholder": "Enter phone number",
+      "department": "Department",
+      "departmentPlaceholder": "Enter department",
+      "jobTitle": "Job Title",
+      "jobTitlePlaceholder": "Enter job title",
+      "dateOfJoining": "Date of Joining",
+      "basicSalary": "Basic Salary",
+      "allowances": "Allowances",
+      "deductions": "Deductions",
+      "bankAccount": "Bank Account",
+      "bankAccountPlaceholder": "Enter bank account",
+      "isActive": "Active"
+    },
+    "table": {
+      "employeeId": "Employee ID",
+      "name": "Name",
+      "department": "Department",
+      "jobTitle": "Job Title",
+      "salary": "Salary",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No employees yet",
+      "description": "Add your first employee"
+    }
+  },
+  "attendance": {
+    "title": "Attendance",
+    "newAttendance": "Record Attendance",
+    "editAttendance": "Edit Attendance",
+    "attendanceDetails": "Attendance Details",
+    "form": {
+      "employee": "Employee",
+      "employeePlaceholder": "Select employee",
+      "date": "Date",
+      "status": "Status",
+      "checkIn": "Check In",
+      "checkOut": "Check Out",
+      "notes": "Notes"
+    },
+    "status": {
+      "present": "Present",
+      "absent": "Absent",
+      "leave": "Leave",
+      "halfDay": "Half Day"
+    },
+    "table": {
+      "employee": "Employee",
+      "date": "Date",
+      "checkIn": "Check In",
+      "checkOut": "Check Out",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No attendance records yet",
+      "description": "Start recording employee attendance"
+    }
+  },
+  "payroll": {
+    "title": "Payroll",
+    "newRun": "New Payroll Run",
+    "runDetails": "Payroll Run Details",
+    "process": "Process Payroll",
+    "markAsPaid": "Mark as Paid",
+    "form": {
+      "month": "Month",
+      "year": "Year"
+    },
+    "status": {
+      "draft": "Draft",
+      "processed": "Processed",
+      "paid": "Paid"
+    },
+    "table": {
+      "period": "Period",
+      "employeeCount": "Employees",
+      "grossAmount": "Gross Amount",
+      "netAmount": "Net Amount",
+      "status": "Status"
+    },
+    "payslip": {
+      "title": "Payslip",
+      "employee": "Employee",
+      "period": "Period",
+      "basicSalary": "Basic Salary",
+      "allowances": "Allowances",
+      "deductions": "Deductions",
+      "grossPay": "Gross Pay",
+      "netPay": "Net Pay"
+    },
+    "empty": {
+      "title": "No payroll runs yet",
+      "description": "Create your first payroll run"
+    }
+  }
+}

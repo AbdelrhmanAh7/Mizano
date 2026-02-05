@@ -1,0 +1,80 @@
+{
+  "dashboard": "Dashboard",
+  "sales": {
+    "title": "Sales",
+    "customers": "Customers",
+    "quotes": "Quotes",
+    "invoices": "Invoices",
+    "creditNotes": "Credit Notes",
+    "payments": "Payments"
+  },
+  "purchases": {
+    "title": "Purchases",
+    "vendors": "Vendors",
+    "expenses": "Expenses",
+    "bills": "Bills",
+    "payments": "Payments",
+    "credits": "Credits"
+  },
+  "accounting": {
+    "title": "Accounting",
+    "chartOfAccounts": "Chart of Accounts",
+    "journalEntries": "Journal Entries",
+    "recurring": "Recurring"
+  },
+  "inventory": {
+    "title": "Inventory",
+    "items": {
+      "title": "Items"
+    },
+    "warehouses": {
+      "title": "Warehouses"
+    },
+    "adjustments": {
+      "title": "Adjustments"
+    }
+  },
+  "banking": {
+    "accounts": {
+      "title": "Bank Accounts"
+    },
+    "reconciliation": {
+      "title": "Reconciliation"
+    },
+    "rules": {
+      "title": "Bank Rules"
+    }
+  },
+  "projects": {
+    "title": "Projects",
+    "projects": {
+      "title": "All Projects"
+    },
+    "timesheets": {
+      "title": "Timesheets"
+    }
+  },
+  "manufacturing": {
+    "title": "Manufacturing",
+    "bom": "Bill of Materials",
+    "workOrders": "Work Orders"
+  },
+  "hr": {
+    "employees": {
+      "title": "Employees"
+    },
+    "attendance": {
+      "title": "Attendance"
+    },
+    "payroll": {
+      "title": "Payroll"
+    }
+  },
+  "crm": "CRM",
+  "reports": "Reports",
+  "aiInsights": "AI Insights",
+  "settings": "Settings",
+  "expandSidebar": "Expand sidebar",
+  "collapseSidebar": "Collapse sidebar",
+  "openMenu": "Open menu"
+}

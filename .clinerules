@@ -1,0 +1,289 @@
+# ERP System — AI Assistant Rules
+
+## Project Overview
+This is an AI-powered ERP system (Autonomous Accounting Platform) built with:
+- **Frontend**: Next.js 14+ (App Router, React Server Components, TypeScript)
+- **Backend**: NestJS (TypeScript, modular architecture, strict mode)
+- **Database**: PostgreSQL 16 with Prisma ORM
+- **UI**: shadcn/ui + Tailwind CSS + lucide-react icons
+- **State Management**: TanStack Query (React Query) for server state
+- **Forms**: React Hook Form + Zod validation (shared schemas)
+- **Charts**: Recharts for dashboards and reports
+- **Auth**: NextAuth.js (frontend) + JWT (backend) with refresh tokens
+- **Queue**: BullMQ with Redis for background jobs
+- **Monorepo**: Turborepo with pnpm workspaces
+
+## Vision
+Zero-touch ERP for entrepreneurs. AI handles 95% of work. No accounting knowledge required.
+Key concepts: Zero-Day Close, Perpetual General Ledger, Human-in-the-Loop.
+Three AI Agents: Reconciliation Agent, Forecasting Agent, Compliance Agent.
+
+## Architecture Principles
+1. **Multi-tenancy**: ALL database queries MUST be scoped by `organizationId`. Never leak data across organizations.
+2. **Double-entry accounting**: Every financial transaction MUST have balanced journal entries (total debits === total credits). Block save if unbalanced.
+3. **Modular monolith**: Each business domain is a separate NestJS module and Next.js route group. Modules communicate via service injection.
+4. **Type-safe end-to-end**: Share types via `packages/shared-types`, validation via `packages/validators`.
+5. **FIFO inventory valuation**: All stock movements use First-In First-Out costing.
+6. **Soft delete**: Critical financial records use `deletedAt` — never hard delete invoices, bills, journals, or payments.
+7. **Audit everything**: Every write operation creates an audit log entry automatically.
+
+## Code Style & Conventions
+
+### Backend (NestJS) — apps/api/
+- One module per business domain: `src/modules/{domain}/`
+- Module structure: `{domain}.module.ts`, `{domain}.controller.ts`, `{domain}.service.ts`, `dto/`, `entities/`
+- Use NestJS dependency injection consistently — never instantiate services manually
+- ALL endpoints protected by `JwtAuthGuard` + `OrganizationGuard` (except auth routes)
+- Use `@Permissions('module.action')` decorator for RBAC checks
+- Standardized responses: `{ data: T, meta?: { page, limit, total, totalPages } }`
+- Use Prisma interactive transactions (`prisma.$transaction()`) for multi-table writes
+- Monetary values: ALWAYS use `Decimal` type from Prisma, NEVER use JavaScript `number` or `float`
+- Auto-generate document numbers per org: INV-001, EST-001, JRN-001, BILL-001, etc.
+- Error responses: `{ statusCode, message, error, details?: fieldErrors }`
+- Use `class-validator` + `class-transformer` for DTO validation
+- Cron jobs via `@nestjs/schedule` for: recurring transactions, overdue status updates, AI analysis
+
+### Frontend (Next.js) — apps/web/
+- App Router with route groups: `(auth)` for login/register, `(dashboard)` for protected pages
+- React Server Components by default. Add `'use client'` ONLY for interactive components
+- Page structure: `app/(dashboard)/{module}/page.tsx` for list, `app/(dashboard)/{module}/[id]/page.tsx` for detail
+- Module components: `components/{module}/` — module-specific UI
+- Shared components: `components/ui/` — shadcn/ui primitives
+- Data fetching: TanStack Query hooks in `lib/hooks/use-{resource}.ts`
+- API client: typed functions in `lib/api/{module}.ts` using fetch
+- Forms: react-hook-form + zodResolver with schemas from `packages/validators`
+- Tables: TanStack Table (`@tanstack/react-table`) for ALL data tables
+- Every page must handle: loading skeleton, error state, empty state
+- Toast notifications via sonner for success/error feedback
+- Use `next/navigation` for routing (useRouter, redirect)
+- Responsive design: mobile-first with Tailwind breakpoints
+- Dark mode support via next-themes
+
+### Database (Prisma) — apps/api/prisma/
+- All models include: `id String @id @default(cuid())`, `createdAt DateTime @default(now())`, `updatedAt DateTime @updatedAt`, `organizationId String`
+- Financial models add: `deletedAt DateTime?` for soft delete
+- Money fields: `Decimal @db.Decimal(19, 4)` — supports up to 999 trillion with 4 decimal places
+- Use Prisma enums for all statuses and types
+- Composite indexes on: `[organizationId, status]`, `[organizationId, createdAt]`
+- Relations with explicit foreign keys and appropriate cascade rules
+- Seed script (`prisma/seed.ts`) with: default COA templates, roles, permissions, sample data
+
+## Module Reference & Business Rules
+
+### Accounting Module (src/modules/accounting/)
+- **Chart of Accounts**: Tree structure with parent-child. Types: Asset, Liability, Equity, Income, Expense. Default templates per industry.
+- **Journals**: Manual entries with debit/credit lines. MUST balance. Auto-numbering JRN-XXX.
+- **Recurring Journals**: Profiles with frequency. Background job creates entries on schedule.
+- **Transaction Locking**: Lock Date field. Reject any write operation on transactions before lock date.
+- **Currency Adjustments**: Auto-calculate exchange rate gain/loss journal entries.
+
+### Sales Module (src/modules/sales/)
+- **Flow**: Customer → Quote → Invoice → Payment Received
+- **Quote**: EST-XXX. Statuses: Draft → Sent → Accepted → Invoiced → Declined. [Convert to Invoice] copies all data.
+- **Invoice**: INV-XXX. Statuses: Draft → Sent → Overdue → Partially Paid → Paid → Void.
+  - Auto-Overdue: cron job checks daily, marks unpaid past due date.
+  - Balance Due = Grand Total - sum(Payments) - sum(Applied Credits).
+  - Accounting: Dr Accounts Receivable / Cr Sales Revenue / Cr VAT Payable.
+- **Credit Note**: CN-XXX. Linked to original invoice. Options: Refund or Apply to Invoice. Reverses AR and VAT.
+- **Payment Received**: Allocate across multiple invoices. Update balance due. Mark Paid when balance = 0.
+- **Recurring Invoices**: Auto-generate and optionally email on schedule.
+- **Delivery Challan**: DC-XXX. Decreases stock. No journal unless perpetual inventory.
+
+### Purchases Module (src/modules/purchases/)
+- **Flow**: Vendor → Bill/Expense → Payment Made
+- **Expense**: Immediate cash transaction. No AP. Dr Expense + Dr VAT Input / Cr Cash/Bank.
+- **Bill**: BILL-XXX. Creates AP. Statuses: Draft → Open → Overdue → Paid. On Open: increase stock.
+  - Accounting: Dr Inventory/Expense + Dr VAT Input / Cr Accounts Payable.
+- **Payment Made**: Allocate across bills. Dr AP / Cr Bank/Cash.
+- **Vendor Credit**: Mirror of Credit Note. Apply to bills or refund.
+- **Recurring**: Both expenses and bills support recurring profiles.
+
+### Inventory Module (src/modules/inventory/)
+- **Items**: Types — Goods (tracked), Service (no stock), Digital. SKU unique per org.
+- **Valuation**: FIFO. Track cost per batch.
+- **Bundles**: Composite items with components. Selling 1 bundle deducts all component stock.
+- **Warehouses**: Multi-location. Warehouse_ID on every stock movement. Transfers: qty only, no journal.
+- **Adjustments**: Stocktake corrections. Loss: Dr Shrinkage / Cr Inventory. Gain: Dr Inventory / Cr Income.
+- **Price Lists**: Multiple lists per org. Link customer to list. Auto-pull prices on invoice creation.
+- **Reorder Point**: AI-updated based on sales velocity and lead time.
+
+### Banking Module (src/modules/banking/)
+- **Bank Accounts**: Types: Bank, Credit Card, Petty Cash. Track system vs bank balance.
+- **Feeds Import**: Parse CSV/Excel/OFX files. Store as BankTransaction records.
+- **AI Reconciliation**: 5-step algorithm:
+  1. Direction Check (deposit → invoices, withdrawal → bills)
+  2. Exact Amount Match (90% confidence)
+  3. Reference/Regex Parsing (100% confidence)
+  4. Fuzzy Name Matching — Levenshtein Distance (medium confidence)
+  5. Display with confidence color coding (green/yellow/red)
+- **Reconciliation Screen**: Split view. One-click confirm creates payment.
+- **Bank Rules**: Learn from 2+ manual categorizations → auto-suggest.
+
+### HR & Payroll Module (src/modules/hr/)
+- **Employees**: Salary structure: Basic + Allowances (JSON) + Deductions.
+- **Attendance**: Daily status tracking. Links to Timesheets.
+- **Payroll**: One-click Run: Gross → LOP → Taxes → Net. Generate payslips. Accounting entries.
+- **AI Alert**: Overtime anomaly detection (500%+ above average).
+
+### Manufacturing Module (src/modules/manufacturing/)
+- **BOM**: Recipe with output item + input materials + operations cost.
+- **Work Orders**: WO-XXX. Auto-calculate material needs. Stock check with alerts.
+- **Production**: On complete: decrease raw materials, increase finished goods.
+- **AI**: Wastage prediction, Smart purchase for production (auto Material Request).
+
+### Projects Module (src/modules/projects/)
+- **Projects**: Billing methods: Fixed, Project Hourly, Task Hourly, Staff Hourly.
+- **Cost Centers**: Project_ID field on invoices, expenses, bills. Real-time profitability.
+- **Tasks**: Per project with hourly rate and billable flag.
+- **Timesheets**: Timer widget + manual entry. Status: Unbilled → Invoiced (locked).
+- **Project Invoicing**: Bill unbilled hours, expenses, or fixed installments.
+- **AI**: Budget alerts at 80%, burn rate forecast, voice-to-timesheet.
+
+### Tax Module (src/modules/tax/)
+- **Tax Rates**: Name, percentage, type, linked account.
+- **VAT Returns**: Aggregate Output VAT (sales) vs Input VAT (purchases) for period.
+- **Filing**: Locks period transactions. Creates clearing journal. Status: Draft → Generated → Filed.
+- **Payments**: Record payment to tax authority. Dr VAT Payable / Cr Bank.
+- **AI**: Anomaly detection pre-filing, smart tax categorization, deadline alerts.
+
+### Reports Module (src/modules/reports/)
+- P&L, Balance Sheet, Cash Flow, Sales by Customer/Item/Salesperson
+- AR/AP Aging (buckets: 1-15, 16-30, 31-60, 61-90, 90+)
+- General Ledger, Trial Balance, Activity Logs
+- Project Profitability, Timesheet Details
+- All reports: date range filter, comparison, CSV export
+- **AI Insights**: Natural language summaries, cash flow prediction, "Ask Your Data" NL→SQL
+
+### Dashboard (app/(dashboard)/page.tsx)
+- Widgets: Receivables vs Payables bar, Cash Flow trend line, Top Expenses pie, Revenue area
+- Stat cards: Revenue, Expenses, Net Profit, Bank Balance
+- AI Alert Box: upcoming dues, low stock, overdue payments
+- Recent transactions feed
+
+### Admin Module (src/modules/admin/)
+- **Roles**: Admin, Accountant, SalesRep, StoreKeeper, Manager + custom
+- **Permissions**: Per module × action (View/Create/Edit/Delete/Export)
+- **Audit Trail**: User, Timestamp, Action, Entity, Old/New values
+
+## AI Features Guidelines
+- All AI suggestions MUST be dismissible — user has final say (Human-in-the-Loop)
+- Show confidence scores on all AI-generated data
+- Learn from user corrections (store feedback, retrain patterns)
+- Run pattern analysis in background jobs (not blocking UI)
+- Natural language insights: compare periods, identify outliers, suggest actions
+- NEVER auto-post financial transactions without explicit user confirmation
+- AI module is a NestJS service that other modules inject and call
+
+## API Design Conventions
+- RESTful: GET (list/detail), POST (create), PATCH (update), DELETE (soft delete)
+- List endpoints: `?page=1&limit=20&sortBy=createdAt&sortOrder=desc`
+- Filtering: `?status=OPEN&dateFrom=2026-01-01&dateTo=2026-01-31&customerId=xxx`
+- Search: `?search=keyword` (searches relevant text fields)
+- Include relations: `?include=customer,items,payments`
+- Bulk operations: POST `/{resource}/bulk` with array body
+
+## Error Handling
+- Backend: Global exception filter. Format: `{ statusCode, message, error, timestamp, path }`
+- Validation errors: `{ statusCode: 400, message: 'Validation failed', details: { field: 'error' } }`
+- Business rules: descriptive messages (e.g., "Cannot delete customer with 5 existing invoices")
+- Frontend: Error boundaries per route segment. Toast for transient errors. Inline for form errors.
+
+## Security Checklist
+- JWT access tokens (15min) + refresh tokens (7d)
+- RBAC checked on every protected endpoint
+- Organization isolation on every database query
+- Input sanitization (strip HTML, validate types)
+- Rate limiting on auth endpoints (10 req/min)
+- CORS restricted to frontend origin
+- Helmet headers on NestJS
+- Prisma parameterized queries (SQL injection safe)
+- File upload validation (type, size limits)
+- Audit log for compliance
+
+## File Structure
+```
+erp-system/
+├── apps/
+│   ├── web/                          # Next.js 14 frontend
+│   │   ├── app/
+│   │   │   ├── (auth)/
+│   │   │   │   ├── login/page.tsx
+│   │   │   │   └── register/page.tsx
+│   │   │   ├── (dashboard)/
+│   │   │   │   ├── layout.tsx        # Sidebar + Header
+│   │   │   │   ├── page.tsx          # Dashboard home
+│   │   │   │   ├── finance/          # COA, Journals, Assets
+│   │   │   │   ├── sales/            # Customers, Quotes, Invoices, Payments
+│   │   │   │   ├── purchases/        # Vendors, Bills, Expenses
+│   │   │   │   ├── inventory/        # Items, Warehouses, Adjustments
+│   │   │   │   ├── banking/          # Bank Accounts, Reconciliation
+│   │   │   │   ├── hr/               # Employees, Attendance, Payroll
+│   │   │   │   ├── manufacturing/    # BOM, Work Orders
+│   │   │   │   ├── projects/         # Projects, Tasks, Timesheets
+│   │   │   │   ├── tax/              # VAT Returns, Payments
+│   │   │   │   ├── reports/          # All reports
+│   │   │   │   ├── crm/              # Leads, Deals Pipeline
+│   │   │   │   └── settings/         # Roles, Permissions, Tax Rates, Org
+│   │   │   └── api/                  # Next.js API routes (BFF proxy)
+│   │   ├── components/
+│   │   │   ├── ui/                   # shadcn/ui components
+│   │   │   ├── forms/                # Reusable form components
+│   │   │   ├── tables/               # Data table + columns
+│   │   │   ├── charts/               # Chart wrappers
+│   │   │   └── {module}/             # Module-specific components
+│   │   └── lib/
+│   │       ├── api/                  # API client per module
+│   │       ├── hooks/                # React Query hooks
+│   │       ├── auth.ts               # NextAuth config
+│   │       └── utils.ts
+│   └── api/                          # NestJS backend
+│       ├── src/
+│       │   ├── modules/
+│       │   │   ├── auth/
+│       │   │   ├── users/
+│       │   │   ├── organizations/
+│       │   │   ├── accounting/
+│       │   │   ├── sales/
+│       │   │   ├── purchases/
+│       │   │   ├── inventory/
+│       │   │   ├── banking/
+│       │   │   ├── hr/
+│       │   │   ├── manufacturing/
+│       │   │   ├── projects/
+│       │   │   ├── tax/
+│       │   │   ├── reports/
+│       │   │   ├── crm/
+│       │   │   ├── ai/
+│       │   │   └── notifications/
+│       │   ├── common/
+│       │   │   ├── decorators/       # @CurrentUser, @CurrentOrg, @Permissions
+│       │   │   ├── guards/           # JWT, Roles, Organization
+│       │   │   ├── interceptors/     # Audit, Transform, Timeout
+│       │   │   ├── filters/          # Exception filters
+│       │   │   └── pipes/            # Validation pipe
+│       │   └── config/               # Environment config
+│       └── prisma/
+│           ├── schema.prisma
+│           ├── seed.ts
+│           └── migrations/
+├── packages/
+│   ├── shared-types/                 # TypeScript interfaces, enums, DTOs
+│   └── validators/                   # Zod schemas (shared FE + BE)
+├── turbo.json
+├── package.json
+├── docker-compose.yml                # PostgreSQL + Redis
+├── .env.example
+└── .clinerules                       # THIS FILE
+```
+
+## When Generating Code — Checklist
+1. Include proper TypeScript types — no `any`
+2. Handle loading, error, and empty states in EVERY page/component
+3. Use Prisma interactive transactions for multi-table writes
+4. Include `organizationId` in ALL where clauses
+5. Verify journal entries balance (debits === credits) before saving
+6. Add database indexes for query performance
+7. Use the established patterns from existing modules
+8. Self-documenting code with clear names — JSDoc for complex logic
+9. Mobile-responsive UI — test at 375px width
+10. Include proper error messages for business rule violations

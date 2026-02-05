@@ -1,0 +1,152 @@
+{
+  "title": "الإعدادات",
+  "description": "تكوين إعدادات المؤسسة والتطبيق",
+  "organization": {
+    "title": "المؤسسة",
+    "description": "إدارة إعدادات المؤسسة",
+    "form": {
+      "name": "اسم المؤسسة",
+      "namePlaceholder": "أدخل اسم المؤسسة",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "أدخل البريد الإلكتروني",
+      "phone": "الهاتف",
+      "phonePlaceholder": "أدخل رقم الهاتف",
+      "address": "العنوان",
+      "addressPlaceholder": "أدخل العنوان",
+      "currency": "العملة الافتراضية",
+      "taxId": "الرقم الضريبي",
+      "taxIdPlaceholder": "أدخل الرقم الضريبي",
+      "lockDate": "تاريخ الإقفال",
+      "lockDateDescription": "منع التغييرات على المعاملات قبل هذا التاريخ"
+    }
+  },
+  "users": {
+    "title": "المستخدمون",
+    "description": "إدارة المستخدمين وصلاحياتهم",
+    "newUser": "مستخدم جديد",
+    "editUser": "تعديل المستخدم",
+    "deleteUser": "حذف المستخدم",
+    "userDetails": "تفاصيل المستخدم",
+    "form": {
+      "name": "الاسم",
+      "namePlaceholder": "أدخل الاسم الكامل",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "أدخل البريد الإلكتروني",
+      "password": "كلمة المرور",
+      "passwordPlaceholder": "أدخل كلمة المرور",
+      "role": "الدور",
+      "rolePlaceholder": "اختر الدور",
+      "status": "الحالة"
+    },
+    "table": {
+      "name": "الاسم",
+      "email": "البريد الإلكتروني",
+      "role": "الدور",
+      "status": "الحالة",
+      "lastLogin": "آخر دخول"
+    },
+    "empty": {
+      "title": "لا يوجد مستخدمون بعد",
+      "description": "دعوة المستخدمين لمؤسستك"
+    }
+  },
+  "roles": {
+    "title": "الأدوار والصلاحيات",
+    "description": "تحديد الأدوار وصلاحياتها",
+    "newRole": "دور جديد",
+    "editRole": "تعديل الدور",
+    "deleteRole": "حذف الدور",
+    "roleDetails": "تفاصيل الدور",
+    "form": {
+      "name": "اسم الدور",
+      "namePlaceholder": "أدخل اسم الدور",
+      "description": "الوصف",
+      "descriptionPlaceholder": "أدخل الوصف",
+      "permissions": "الصلاحيات"
+    },
+    "permissions": {
+      "view": "عرض",
+      "create": "إنشاء",
+      "edit": "تعديل",
+      "delete": "حذف",
+      "export": "تصدير"
+    },
+    "modules": {
+      "sales": "المبيعات",
+      "purchases": "المشتريات",
+      "accounting": "المحاسبة",
+      "inventory": "المخزون",
+      "banking": "البنوك",
+      "hr": "الموارد البشرية",
+      "manufacturing": "التصنيع",
+      "projects": "المشاريع",
+      "crm": "إدارة العلاقات",
+      "reports": "التقارير",
+      "settings": "الإعدادات"
+    },
+    "table": {
+      "name": "الاسم",
+      "description": "الوصف",
+      "userCount": "المستخدمون"
+    },
+    "empty": {
+      "title": "لا توجد أدوار مخصصة بعد",
+      "description": "أنشئ أدواراً لإدارة الصلاحيات"
+    }
+  },
+  "taxes": {
+    "title": "معدلات الضرائب",
+    "description": "تكوين معدلات الضرائب للمبيعات والمشتريات",
+    "newTaxRate": "معدل ضريبة جديد",
+    "editTaxRate": "تعديل معدل الضريبة",
+    "deleteTaxRate": "حذف معدل الضريبة",
+    "form": {
+      "name": "اسم الضريبة",
+      "namePlaceholder": "مثال: ضريبة القيمة المضافة",
+      "rate": "النسبة (%)",
+      "type": "النوع",
+      "linkedAccount": "الحساب المرتبط",
+      "linkedAccountPlaceholder": "اختر حساب الضريبة",
+      "isDefault": "افتراضي"
+    },
+    "types": {
+      "sales": "مبيعات",
+      "purchases": "مشتريات",
+      "both": "كلاهما"
+    },
+    "table": {
+      "name": "الاسم",
+      "rate": "النسبة",
+      "type": "النوع",
+      "default": "افتراضي"
+    },
+    "empty": {
+      "title": "لا توجد معدلات ضرائب بعد",
+      "description": "أعد معدلات الضرائب لمعاملاتك"
+    }
+  },
+  "accounts": {
+    "title": "الحسابات الافتراضية",
+    "description": "تكوين الحسابات الافتراضية للمعاملات"
+  },
+  "integrations": {
+    "title": "التكاملات",
+    "description": "ربط الخدمات الخارجية",
+    "connected": "متصل",
+    "disconnected": "غير متصل",
+    "connect": "ربط",
+    "disconnect": "إلغاء الربط",
+    "configure": "تكوين"
+  },
+  "appearance": {
+    "title": "المظهر",
+    "description": "تخصيص مظهر التطبيق",
+    "theme": "المظهر",
+    "themes": {
+      "light": "فاتح",
+      "dark": "داكن",
+      "system": "النظام"
+    },
+    "language": "اللغة"
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "title": "CRM",
+  "description": "Manage leads and deals",
+  "leads": {
+    "title": "Leads",
+    "newLead": "New Lead",
+    "editLead": "Edit Lead",
+    "deleteLead": "Delete Lead",
+    "leadDetails": "Lead Details",
+    "convertToDeal": "Convert to Deal",
+    "form": {
+      "name": "Name",
+      "namePlaceholder": "Enter lead name",
+      "email": "Email",
+      "emailPlaceholder": "Enter email address",
+      "phone": "Phone",
+      "phonePlaceholder": "Enter phone number",
+      "company": "Company",
+      "companyPlaceholder": "Enter company name",
+      "source": "Source",
+      "notes": "Notes",
+      "notesPlaceholder": "Enter notes",
+      "assignedTo": "Assigned To",
+      "assignedToPlaceholder": "Select assignee"
+    },
+    "status": {
+      "new": "New",
+      "contacted": "Contacted",
+      "qualified": "Qualified",
+      "junk": "Junk"
+    },
+    "sources": {
+      "website": "Website",
+      "facebookAds": "Facebook Ads",
+      "googleAds": "Google Ads",
+      "referral": "Referral",
+      "coldCall": "Cold Call",
+      "other": "Other"
+    },
+    "table": {
+      "name": "Name",
+      "company": "Company",
+      "source": "Source",
+      "assignedTo": "Assigned To",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No leads yet",
+      "description": "Add your first lead"
+    }
+  },
+  "deals": {
+    "title": "Deals",
+    "newDeal": "New Deal",
+    "editDeal": "Edit Deal",
+    "deleteDeal": "Delete Deal",
+    "dealDetails": "Deal Details",
+    "convertToCustomer": "Convert to Customer",
+    "form": {
+      "name": "Deal Name",
+      "namePlaceholder": "Enter deal name",
+      "lead": "Lead",
+      "leadPlaceholder": "Select lead (optional)",
+      "customer": "Customer",
+      "customerPlaceholder": "Select customer (optional)",
+      "stage": "Stage",
+      "value": "Deal Value",
+      "expectedCloseDate": "Expected Close Date",
+      "notes": "Notes",
+      "notesPlaceholder": "Enter notes",
+      "assignedTo": "Assigned To",
+      "assignedToPlaceholder": "Select assignee"
+    },
+    "stages": {
+      "new": "New",
+      "meetingScheduled": "Meeting Scheduled",
+      "proposalSent": "Proposal Sent",
+      "negotiation": "Negotiation",
+      "won": "Won",
+      "lost": "Lost"
+    },
+    "table": {
+      "name": "Name",
+      "customer": "Customer",
+      "value": "Value",
+      "expectedClose": "Expected Close",
+      "stage": "Stage"
+    },
+    "pipeline": {
+      "title": "Deal Pipeline",
+      "totalValue": "Total Value",
+      "dealCount": "{count} deals"
+    },
+    "empty": {
+      "title": "No deals yet",
+      "description": "Create your first deal"
+    }
+  }
+}

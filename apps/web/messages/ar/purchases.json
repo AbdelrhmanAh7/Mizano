@@ -1,0 +1,187 @@
+{
+  "title": "المشتريات",
+  "description": "إدارة الموردين والمصروفات والفواتير والمدفوعات",
+  "stats": {
+    "totalPayable": "إجمالي المستحق",
+    "overdueAmount": "المبالغ المتأخرة",
+    "unpaidBills": "الفواتير غير المدفوعة",
+    "paidThisMonth": "المدفوع هذا الشهر"
+  },
+  "vendors": {
+    "title": "الموردون",
+    "newVendor": "مورد جديد",
+    "editVendor": "تعديل المورد",
+    "deleteVendor": "حذف المورد",
+    "vendorDetails": "تفاصيل المورد",
+    "form": {
+      "name": "اسم المورد",
+      "namePlaceholder": "أدخل اسم المورد",
+      "displayName": "الاسم المعروض",
+      "displayNamePlaceholder": "أدخل الاسم المعروض",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "أدخل البريد الإلكتروني",
+      "phone": "الهاتف",
+      "phonePlaceholder": "أدخل رقم الهاتف",
+      "currency": "العملة",
+      "taxId": "الرقم الضريبي",
+      "taxIdPlaceholder": "أدخل الرقم الضريبي",
+      "paymentTerms": "شروط الدفع",
+      "billingAddress": "عنوان الفوترة"
+    },
+    "table": {
+      "name": "الاسم",
+      "email": "البريد الإلكتروني",
+      "phone": "الهاتف",
+      "payable": "المستحق",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا يوجد موردون بعد",
+      "description": "ابدأ بإضافة أول مورد"
+    }
+  },
+  "expenses": {
+    "title": "المصروفات",
+    "newExpense": "مصروف جديد",
+    "editExpense": "تعديل المصروف",
+    "deleteExpense": "حذف المصروف",
+    "expenseDetails": "تفاصيل المصروف",
+    "form": {
+      "date": "التاريخ",
+      "account": "حساب المصروفات",
+      "accountPlaceholder": "اختر حساب المصروفات",
+      "vendor": "المورد",
+      "vendorPlaceholder": "اختر المورد (اختياري)",
+      "amount": "المبلغ",
+      "taxRate": "نسبة الضريبة",
+      "taxInclusive": "شامل الضريبة",
+      "paidThrough": "مدفوع من",
+      "paidThroughPlaceholder": "اختر حساب الدفع",
+      "description": "الوصف",
+      "reference": "المرجع",
+      "project": "المشروع"
+    },
+    "table": {
+      "date": "التاريخ",
+      "vendor": "المورد",
+      "account": "الحساب",
+      "amount": "المبلغ",
+      "reference": "المرجع"
+    },
+    "empty": {
+      "title": "لا توجد مصروفات بعد",
+      "description": "سجل أول مصروف لبدء التتبع"
+    }
+  },
+  "bills": {
+    "title": "الفواتير",
+    "newBill": "فاتورة جديدة",
+    "editBill": "تعديل الفاتورة",
+    "deleteBill": "حذف الفاتورة",
+    "billDetails": "تفاصيل الفاتورة",
+    "recordPayment": "تسجيل دفعة",
+    "voidBill": "إلغاء الفاتورة",
+    "form": {
+      "billNumber": "رقم الفاتورة",
+      "billNumberPlaceholder": "أدخل رقم الفاتورة",
+      "vendor": "المورد",
+      "vendorPlaceholder": "اختر مورداً",
+      "vendorRequired": "المورد مطلوب",
+      "date": "تاريخ الفاتورة",
+      "dateRequired": "تاريخ الفاتورة مطلوب",
+      "dueDate": "تاريخ الاستحقاق",
+      "dueDateRequired": "تاريخ الاستحقاق مطلوب",
+      "notes": "ملاحظات",
+      "project": "المشروع",
+      "lineItemRequired": "مطلوب عنصر واحد على الأقل"
+    },
+    "table": {
+      "billNumber": "رقم الفاتورة",
+      "vendor": "المورد",
+      "date": "التاريخ",
+      "dueDate": "تاريخ الاستحقاق",
+      "amount": "المبلغ",
+      "balance": "الرصيد",
+      "status": "الحالة"
+    },
+    "status": {
+      "draft": "مسودة",
+      "open": "مفتوحة",
+      "partiallyPaid": "مدفوعة جزئياً",
+      "paid": "مدفوعة",
+      "overdue": "متأخرة",
+      "void": "ملغاة"
+    },
+    "empty": {
+      "title": "لا توجد فواتير بعد",
+      "description": "سجل أول فاتورة لتتبع المستحقات"
+    }
+  },
+  "credits": {
+    "title": "ائتمانات الموردين",
+    "newCredit": "ائتمان مورد جديد",
+    "editCredit": "تعديل ائتمان المورد",
+    "deleteCredit": "حذف ائتمان المورد",
+    "creditDetails": "تفاصيل ائتمان المورد",
+    "form": {
+      "vendor": "المورد",
+      "bill": "الفاتورة",
+      "date": "التاريخ",
+      "reason": "السبب",
+      "amount": "المبلغ",
+      "applyToBill": "تطبيق على فاتورة"
+    },
+    "table": {
+      "creditNumber": "رقم الائتمان",
+      "vendor": "المورد",
+      "bill": "الفاتورة",
+      "date": "التاريخ",
+      "amount": "المبلغ"
+    },
+    "empty": {
+      "title": "لا توجد ائتمانات موردين بعد",
+      "description": "ستظهر ائتمانات الموردين هنا عند إنشائها"
+    }
+  },
+  "payments": {
+    "title": "المدفوعات",
+    "newPayment": "دفعة جديدة",
+    "editPayment": "تعديل الدفعة",
+    "deletePayment": "حذف الدفعة",
+    "paymentDetails": "تفاصيل الدفعة",
+    "form": {
+      "vendor": "المورد",
+      "vendorPlaceholder": "اختر مورداً",
+      "date": "تاريخ الدفع",
+      "amount": "المبلغ",
+      "paymentMode": "طريقة الدفع",
+      "paidFrom": "مدفوع من",
+      "reference": "رقم المرجع",
+      "notes": "ملاحظات",
+      "allocations": "توزيع الفواتير",
+      "allocationRequired": "يجب توزيع الدفعة على فاتورة واحدة على الأقل"
+    },
+    "table": {
+      "paymentNumber": "رقم الدفعة",
+      "vendor": "المورد",
+      "date": "التاريخ",
+      "amount": "المبلغ",
+      "mode": "الطريقة"
+    },
+    "empty": {
+      "title": "لا توجد مدفوعات بعد",
+      "description": "ستظهر المدفوعات هنا عند تسجيلها"
+    }
+  },
+  "lineItems": {
+    "title": "البنود",
+    "addItem": "إضافة بند",
+    "item": "الصنف",
+    "account": "الحساب",
+    "description": "الوصف",
+    "quantity": "الكمية",
+    "rate": "السعر",
+    "tax": "الضريبة",
+    "amount": "المبلغ"
+  }
+}

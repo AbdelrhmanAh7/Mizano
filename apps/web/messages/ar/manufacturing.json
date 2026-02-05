@@ -1,0 +1,94 @@
+{
+  "title": "التصنيع",
+  "description": "إدارة قوائم المواد وأوامر العمل",
+  "bom": {
+    "title": "قوائم المواد",
+    "newBom": "قائمة مواد جديدة",
+    "editBom": "تعديل قائمة المواد",
+    "deleteBom": "حذف قائمة المواد",
+    "bomDetails": "تفاصيل قائمة المواد",
+    "form": {
+      "name": "اسم قائمة المواد",
+      "namePlaceholder": "أدخل اسم قائمة المواد",
+      "outputItem": "المنتج النهائي",
+      "outputItemPlaceholder": "اختر المنتج النهائي",
+      "outputQuantity": "كمية الإنتاج",
+      "operationsCost": "تكلفة العمليات",
+      "items": "المواد الداخلة",
+      "addItem": "إضافة مادة",
+      "item": "المادة",
+      "itemPlaceholder": "اختر المادة",
+      "quantity": "الكمية",
+      "minItems": "يجب أن تحتوي قائمة المواد على مادة واحدة على الأقل"
+    },
+    "table": {
+      "name": "الاسم",
+      "outputItem": "المنتج",
+      "outputQuantity": "كمية الإنتاج",
+      "cost": "التكلفة",
+      "itemCount": "المواد"
+    },
+    "empty": {
+      "title": "لا توجد قوائم مواد بعد",
+      "description": "أنشئ أول قائمة مواد"
+    }
+  },
+  "workOrders": {
+    "title": "أوامر العمل",
+    "newWorkOrder": "أمر عمل جديد",
+    "editWorkOrder": "تعديل أمر العمل",
+    "deleteWorkOrder": "حذف أمر العمل",
+    "workOrderDetails": "تفاصيل أمر العمل",
+    "recordProduction": "تسجيل الإنتاج",
+    "form": {
+      "bom": "قائمة المواد",
+      "bomPlaceholder": "اختر قائمة المواد",
+      "quantity": "الكمية",
+      "plannedStartDate": "تاريخ البداية المخطط",
+      "notes": "ملاحظات",
+      "notesPlaceholder": "أدخل الملاحظات"
+    },
+    "status": {
+      "draft": "مسودة",
+      "inProcess": "قيد التنفيذ",
+      "completed": "مكتمل",
+      "cancelled": "ملغي"
+    },
+    "table": {
+      "workOrderNumber": "رقم أمر العمل",
+      "bom": "قائمة المواد",
+      "quantity": "الكمية",
+      "plannedStart": "تاريخ البداية",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا توجد أوامر عمل بعد",
+      "description": "أنشئ أول أمر عمل"
+    }
+  },
+  "production": {
+    "title": "إدخالات الإنتاج",
+    "newEntry": "إدخال إنتاج جديد",
+    "entryDetails": "تفاصيل إدخال الإنتاج",
+    "form": {
+      "workOrder": "أمر العمل",
+      "workOrderPlaceholder": "اختر أمر العمل",
+      "date": "التاريخ",
+      "quantityProduced": "الكمية المنتجة",
+      "quantityRejected": "الكمية المرفوضة",
+      "wastageQuantity": "كمية الهدر",
+      "notes": "ملاحظات"
+    },
+    "table": {
+      "date": "التاريخ",
+      "workOrder": "أمر العمل",
+      "produced": "المنتج",
+      "rejected": "المرفوض",
+      "wastage": "الهدر"
+    },
+    "empty": {
+      "title": "لا توجد إدخالات إنتاج بعد",
+      "description": "سجل الإنتاج مقابل أوامر العمل"
+    }
+  }
+}

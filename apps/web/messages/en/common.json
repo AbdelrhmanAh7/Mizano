@@ -1,0 +1,189 @@
+{
+  "appName": "Mizano",
+  "appDescription": "AI-Powered ERP Platform",
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Your business at a glance",
+    "refresh": "Refresh",
+    "failedToLoad": "Failed to load dashboard data",
+    "tryAgain": "Try Again",
+    "stats": {
+      "revenue": "Revenue",
+      "expenses": "Expenses",
+      "netProfit": "Net Profit",
+      "bankBalance": "Bank Balance"
+    },
+    "charts": {
+      "cashFlow": "Cash Flow",
+      "revenue": "Revenue",
+      "receivablesPayables": "Receivables vs Payables",
+      "expenses": "Top Expenses"
+    },
+    "aiAlerts": {
+      "title": "AI Insights",
+      "noAlerts": "No alerts at this time"
+    },
+    "recentTransactions": {
+      "title": "Recent Transactions",
+      "noTransactions": "No recent transactions"
+    }
+  },
+  "header": {
+    "welcomeBack": "Welcome back, {name}",
+    "signOut": "Sign out",
+    "profile": "Profile",
+    "notifications": "Notifications"
+  },
+  "buttons": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "submit": "Submit",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "close": "Close",
+    "confirm": "Confirm",
+    "add": "Add",
+    "remove": "Remove",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "import": "Import",
+    "refresh": "Refresh",
+    "view": "View",
+    "download": "Download",
+    "upload": "Upload",
+    "print": "Print",
+    "send": "Send",
+    "approve": "Approve",
+    "reject": "Reject",
+    "reset": "Reset",
+    "apply": "Apply",
+    "clear": "Clear"
+  },
+  "loading": {
+    "default": "Loading...",
+    "saving": "Saving...",
+    "creating": "Creating...",
+    "updating": "Updating...",
+    "deleting": "Deleting...",
+    "submitting": "Submitting...",
+    "sending": "Sending...",
+    "processing": "Processing..."
+  },
+  "status": {
+    "draft": "Draft",
+    "sent": "Sent",
+    "paid": "Paid",
+    "partiallyPaid": "Partially Paid",
+    "overdue": "Overdue",
+    "void": "Void",
+    "active": "Active",
+    "inactive": "Inactive",
+    "suspended": "Suspended",
+    "pending": "Pending",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "open": "Open",
+    "closed": "Closed",
+    "accepted": "Accepted",
+    "declined": "Declined",
+    "expired": "Expired",
+    "invoiced": "Invoiced"
+  },
+  "table": {
+    "noResults": "No results found",
+    "loading": "Loading data...",
+    "error": "Error loading data",
+    "actions": "Actions",
+    "rowsPerPage": "Rows per page",
+    "of": "of",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all"
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next",
+    "first": "First",
+    "last": "Last",
+    "showing": "Showing {from} to {to} of {total} results",
+    "page": "Page {current} of {total}"
+  },
+  "confirm": {
+    "deleteTitle": "Confirm Delete",
+    "deleteMessage": "Are you sure you want to delete this item? This action cannot be undone.",
+    "yes": "Yes",
+    "no": "No",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
+  },
+  "errors": {
+    "generic": "Something went wrong",
+    "notFound": "Not found",
+    "unauthorized": "Unauthorized",
+    "forbidden": "Access denied",
+    "validation": "Validation error",
+    "network": "Network error. Please check your connection.",
+    "server": "Server error. Please try again later."
+  },
+  "empty": {
+    "title": "No data",
+    "description": "There's nothing here yet.",
+    "action": "Get started"
+  },
+  "paymentModes": {
+    "cash": "Cash",
+    "bankTransfer": "Bank Transfer",
+    "creditCard": "Credit Card",
+    "debitCard": "Debit Card",
+    "cheque": "Cheque",
+    "online": "Online",
+    "other": "Other"
+  },
+  "paymentTerms": {
+    "dueOnReceipt": "Due on Receipt",
+    "net15": "Net 15",
+    "net30": "Net 30",
+    "net45": "Net 45",
+    "net60": "Net 60"
+  },
+  "accountTypes": {
+    "asset": "Asset",
+    "liability": "Liability",
+    "equity": "Equity",
+    "income": "Income",
+    "revenue": "Revenue",
+    "expense": "Expense"
+  },
+  "currency": "Currency",
+  "date": "Date",
+  "amount": "Amount",
+  "total": "Total",
+  "subtotal": "Subtotal",
+  "tax": "Tax",
+  "discount": "Discount",
+  "balance": "Balance",
+  "description": "Description",
+  "notes": "Notes",
+  "reference": "Reference",
+  "quantity": "Quantity",
+  "rate": "Rate",
+  "unit": "Unit",
+  "price": "Price",
+  "name": "Name",
+  "email": "Email",
+  "phone": "Phone",
+  "address": "Address",
+  "city": "City",
+  "state": "State",
+  "country": "Country",
+  "postalCode": "Postal Code",
+  "all": "All",
+  "none": "None",
+  "select": "Select",
+  "optional": "(Optional)",
+  "required": "(Required)"
+}

@@ -1,0 +1,201 @@
+{
+  "title": "المبيعات",
+  "description": "إدارة العملاء وعروض الأسعار والفواتير والمدفوعات",
+  "stats": {
+    "totalOutstanding": "إجمالي المستحقات",
+    "overdueAmount": "المبالغ المتأخرة",
+    "pendingQuotes": "عروض الأسعار المعلقة",
+    "receivedThisMonth": "المستلم هذا الشهر"
+  },
+  "customers": {
+    "title": "العملاء",
+    "newCustomer": "عميل جديد",
+    "editCustomer": "تعديل العميل",
+    "deleteCustomer": "حذف العميل",
+    "customerDetails": "تفاصيل العميل",
+    "form": {
+      "name": "اسم العميل",
+      "namePlaceholder": "أدخل اسم العميل",
+      "displayName": "الاسم المعروض",
+      "displayNamePlaceholder": "أدخل الاسم المعروض",
+      "email": "البريد الإلكتروني",
+      "emailPlaceholder": "أدخل البريد الإلكتروني",
+      "phone": "الهاتف",
+      "phonePlaceholder": "أدخل رقم الهاتف",
+      "currency": "العملة",
+      "taxId": "الرقم الضريبي",
+      "taxIdPlaceholder": "أدخل الرقم الضريبي",
+      "paymentTerms": "شروط الدفع",
+      "priceList": "قائمة الأسعار",
+      "billingAddress": "عنوان الفوترة",
+      "shippingAddress": "عنوان الشحن"
+    },
+    "table": {
+      "name": "الاسم",
+      "email": "البريد الإلكتروني",
+      "phone": "الهاتف",
+      "outstanding": "المستحق",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا يوجد عملاء بعد",
+      "description": "ابدأ بإضافة أول عميل"
+    }
+  },
+  "quotes": {
+    "title": "عروض الأسعار",
+    "newQuote": "عرض أسعار جديد",
+    "editQuote": "تعديل عرض الأسعار",
+    "deleteQuote": "حذف عرض الأسعار",
+    "quoteDetails": "تفاصيل عرض الأسعار",
+    "sendQuote": "إرسال عرض الأسعار",
+    "convertToInvoice": "تحويل إلى فاتورة",
+    "form": {
+      "customer": "العميل",
+      "customerPlaceholder": "اختر عميلاً",
+      "date": "تاريخ العرض",
+      "expiryDate": "تاريخ الانتهاء",
+      "notes": "ملاحظات",
+      "terms": "الشروط والأحكام"
+    },
+    "table": {
+      "quoteNumber": "رقم العرض",
+      "customer": "العميل",
+      "date": "التاريخ",
+      "expiryDate": "تاريخ الانتهاء",
+      "amount": "المبلغ",
+      "status": "الحالة"
+    },
+    "status": {
+      "draft": "مسودة",
+      "sent": "مرسل",
+      "accepted": "مقبول",
+      "invoiced": "تم إصدار فاتورة",
+      "declined": "مرفوض",
+      "expired": "منتهي الصلاحية"
+    },
+    "empty": {
+      "title": "لا توجد عروض أسعار بعد",
+      "description": "أنشئ أول عرض أسعار للبدء"
+    }
+  },
+  "invoices": {
+    "title": "الفواتير",
+    "newInvoice": "فاتورة جديدة",
+    "editInvoice": "تعديل الفاتورة",
+    "deleteInvoice": "حذف الفاتورة",
+    "invoiceDetails": "تفاصيل الفاتورة",
+    "sendInvoice": "إرسال الفاتورة",
+    "recordPayment": "تسجيل دفعة",
+    "voidInvoice": "إلغاء الفاتورة",
+    "form": {
+      "customer": "العميل",
+      "customerPlaceholder": "اختر عميلاً",
+      "customerRequired": "العميل مطلوب",
+      "date": "تاريخ الفاتورة",
+      "dateRequired": "تاريخ الفاتورة مطلوب",
+      "dueDate": "تاريخ الاستحقاق",
+      "dueDateRequired": "تاريخ الاستحقاق مطلوب",
+      "shippingAmount": "الشحن",
+      "notes": "ملاحظات",
+      "terms": "الشروط والأحكام",
+      "project": "المشروع",
+      "lineItemRequired": "مطلوب عنصر واحد على الأقل"
+    },
+    "table": {
+      "invoiceNumber": "رقم الفاتورة",
+      "customer": "العميل",
+      "date": "التاريخ",
+      "dueDate": "تاريخ الاستحقاق",
+      "amount": "المبلغ",
+      "balance": "الرصيد",
+      "status": "الحالة"
+    },
+    "status": {
+      "draft": "مسودة",
+      "sent": "مرسلة",
+      "partiallyPaid": "مدفوعة جزئياً",
+      "paid": "مدفوعة",
+      "overdue": "متأخرة",
+      "void": "ملغاة"
+    },
+    "empty": {
+      "title": "لا توجد فواتير بعد",
+      "description": "أنشئ أول فاتورة للبدء بالفوترة"
+    }
+  },
+  "creditNotes": {
+    "title": "إشعارات الائتمان",
+    "newCreditNote": "إشعار ائتمان جديد",
+    "editCreditNote": "تعديل إشعار الائتمان",
+    "deleteCreditNote": "حذف إشعار الائتمان",
+    "creditNoteDetails": "تفاصيل إشعار الائتمان",
+    "form": {
+      "customer": "العميل",
+      "invoice": "الفاتورة",
+      "date": "التاريخ",
+      "reason": "السبب",
+      "amount": "المبلغ",
+      "type": "النوع",
+      "applyToInvoice": "تطبيق على فاتورة"
+    },
+    "types": {
+      "refund": "استرداد",
+      "applyToInvoice": "تطبيق على فاتورة"
+    },
+    "table": {
+      "creditNoteNumber": "رقم إشعار الائتمان",
+      "customer": "العميل",
+      "invoice": "الفاتورة",
+      "date": "التاريخ",
+      "amount": "المبلغ",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا توجد إشعارات ائتمان بعد",
+      "description": "ستظهر إشعارات الائتمان هنا عند إنشائها"
+    }
+  },
+  "payments": {
+    "title": "المدفوعات المستلمة",
+    "newPayment": "دفعة جديدة",
+    "editPayment": "تعديل الدفعة",
+    "deletePayment": "حذف الدفعة",
+    "paymentDetails": "تفاصيل الدفعة",
+    "form": {
+      "customer": "العميل",
+      "customerPlaceholder": "اختر عميلاً",
+      "date": "تاريخ الدفع",
+      "amount": "المبلغ",
+      "paymentMode": "طريقة الدفع",
+      "depositTo": "إيداع في",
+      "reference": "رقم المرجع",
+      "notes": "ملاحظات",
+      "allocations": "توزيع الفواتير",
+      "allocationRequired": "يجب توزيع الدفعة على فاتورة واحدة على الأقل"
+    },
+    "table": {
+      "paymentNumber": "رقم الدفعة",
+      "customer": "العميل",
+      "date": "التاريخ",
+      "amount": "المبلغ",
+      "mode": "الطريقة",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا توجد مدفوعات بعد",
+      "description": "ستظهر المدفوعات هنا عند تسجيلها"
+    }
+  },
+  "lineItems": {
+    "title": "البنود",
+    "addItem": "إضافة بند",
+    "item": "الصنف",
+    "description": "الوصف",
+    "quantity": "الكمية",
+    "rate": "السعر",
+    "discount": "الخصم",
+    "tax": "الضريبة",
+    "amount": "المبلغ"
+  }
+}

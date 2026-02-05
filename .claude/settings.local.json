@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm build:*)",
+      "Bash(npx tsc:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(lsof:*)",
+      "Bash(docker logs:*)",
+      "Bash(pnpm db:push:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(kill:*)",
+      "Bash(xargs kill:*)",
+      "Bash(pkill:*)",
+      "Bash(ls:*)",
+      "Bash(npx prisma db seed:*)",
+      "Bash(curl:*)",
+      "Bash(npx shadcn-ui@latest add:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(pnpm add:*)",
+      "Bash(find:*)",
+      "Bash(pnpm db:generate:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(cat:*)"
+    ]
+  }
+}

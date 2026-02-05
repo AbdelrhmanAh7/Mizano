@@ -1,0 +1,143 @@
+{
+  "title": "المخزون",
+  "description": "إدارة الأصناف والمستودعات وحركات المخزون",
+  "items": {
+    "title": "الأصناف",
+    "newItem": "صنف جديد",
+    "editItem": "تعديل الصنف",
+    "deleteItem": "حذف الصنف",
+    "itemDetails": "تفاصيل الصنف",
+    "form": {
+      "name": "اسم الصنف",
+      "namePlaceholder": "أدخل اسم الصنف",
+      "sku": "رمز الصنف",
+      "skuPlaceholder": "أدخل رمز الصنف",
+      "type": "نوع الصنف",
+      "unit": "الوحدة",
+      "unitPlaceholder": "مثال: قطعة، كجم، ساعة",
+      "sellingPrice": "سعر البيع",
+      "costPrice": "سعر التكلفة",
+      "salesAccount": "حساب المبيعات",
+      "purchaseAccount": "حساب المشتريات",
+      "inventoryAccount": "حساب المخزون",
+      "description": "الوصف",
+      "descriptionPlaceholder": "أدخل الوصف",
+      "reorderPoint": "نقطة إعادة الطلب",
+      "openingStock": "الرصيد الافتتاحي",
+      "isActive": "نشط"
+    },
+    "types": {
+      "goods": "سلع",
+      "service": "خدمات",
+      "digital": "رقمي"
+    },
+    "table": {
+      "name": "الاسم",
+      "sku": "الرمز",
+      "type": "النوع",
+      "stock": "المخزون",
+      "sellingPrice": "سعر البيع",
+      "costPrice": "سعر التكلفة",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا توجد أصناف بعد",
+      "description": "أضف أول صنف لبدء إدارة المخزون"
+    }
+  },
+  "warehouses": {
+    "title": "المستودعات",
+    "newWarehouse": "مستودع جديد",
+    "editWarehouse": "تعديل المستودع",
+    "deleteWarehouse": "حذف المستودع",
+    "warehouseDetails": "تفاصيل المستودع",
+    "form": {
+      "name": "اسم المستودع",
+      "namePlaceholder": "أدخل اسم المستودع",
+      "code": "رمز المستودع",
+      "codePlaceholder": "أدخل رمز المستودع",
+      "address": "العنوان",
+      "isDefault": "المستودع الافتراضي"
+    },
+    "table": {
+      "name": "الاسم",
+      "code": "الرمز",
+      "itemCount": "الأصناف",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا توجد مستودعات بعد",
+      "description": "أنشئ أول مستودع"
+    }
+  },
+  "adjustments": {
+    "title": "تسويات المخزون",
+    "newAdjustment": "تسوية جديدة",
+    "adjustmentDetails": "تفاصيل التسوية",
+    "form": {
+      "date": "التاريخ",
+      "warehouse": "المستودع",
+      "warehousePlaceholder": "اختر المستودع",
+      "item": "الصنف",
+      "itemPlaceholder": "اختر الصنف",
+      "type": "نوع التسوية",
+      "quantity": "الكمية",
+      "reason": "السبب",
+      "account": "حساب التسوية",
+      "accountPlaceholder": "اختر الحساب",
+      "notes": "ملاحظات"
+    },
+    "types": {
+      "increase": "زيادة",
+      "decrease": "نقص"
+    },
+    "reasons": {
+      "damaged": "تالف",
+      "stolen": "مسروق",
+      "stocktake": "جرد",
+      "returned": "مرتجع",
+      "expired": "منتهي الصلاحية",
+      "other": "أخرى"
+    },
+    "table": {
+      "date": "التاريخ",
+      "item": "الصنف",
+      "warehouse": "المستودع",
+      "type": "النوع",
+      "quantity": "الكمية",
+      "reason": "السبب"
+    },
+    "empty": {
+      "title": "لا توجد تسويات بعد",
+      "description": "ستظهر تسويات المخزون هنا"
+    }
+  },
+  "priceLists": {
+    "title": "قوائم الأسعار",
+    "newPriceList": "قائمة أسعار جديدة",
+    "editPriceList": "تعديل قائمة الأسعار",
+    "deletePriceList": "حذف قائمة الأسعار",
+    "priceListDetails": "تفاصيل قائمة الأسعار",
+    "form": {
+      "name": "اسم قائمة الأسعار",
+      "namePlaceholder": "أدخل اسم قائمة الأسعار",
+      "description": "الوصف",
+      "type": "النوع",
+      "adjustment": "التعديل"
+    },
+    "types": {
+      "percentage": "نسبة مئوية",
+      "fixed": "ثابت"
+    },
+    "table": {
+      "name": "الاسم",
+      "type": "النوع",
+      "adjustment": "التعديل",
+      "itemCount": "الأصناف"
+    },
+    "empty": {
+      "title": "لا توجد قوائم أسعار بعد",
+      "description": "أنشئ قوائم أسعار لمجموعات العملاء المختلفة"
+    }
+  }
+}

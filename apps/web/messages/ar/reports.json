@@ -1,0 +1,126 @@
+{
+  "title": "التقارير",
+  "description": "التقارير المالية والتحليلات",
+  "categories": {
+    "financial": "التقارير المالية",
+    "sales": "تقارير المبيعات",
+    "purchases": "تقارير المشتريات",
+    "inventory": "تقارير المخزون",
+    "tax": "التقارير الضريبية"
+  },
+  "profitLoss": {
+    "title": "الأرباح والخسائر",
+    "description": "ملخص الإيرادات والمصروفات",
+    "revenue": "الإيرادات",
+    "costOfSales": "تكلفة المبيعات",
+    "grossProfit": "إجمالي الربح",
+    "operatingExpenses": "المصروفات التشغيلية",
+    "operatingProfit": "الربح التشغيلي",
+    "otherIncome": "إيرادات أخرى",
+    "otherExpenses": "مصروفات أخرى",
+    "netProfit": "صافي الربح"
+  },
+  "balanceSheet": {
+    "title": "الميزانية العمومية",
+    "description": "الأصول والالتزامات وحقوق الملكية",
+    "assets": "الأصول",
+    "currentAssets": "الأصول المتداولة",
+    "fixedAssets": "الأصول الثابتة",
+    "totalAssets": "إجمالي الأصول",
+    "liabilities": "الالتزامات",
+    "currentLiabilities": "الالتزامات المتداولة",
+    "longTermLiabilities": "الالتزامات طويلة الأجل",
+    "totalLiabilities": "إجمالي الالتزامات",
+    "equity": "حقوق الملكية",
+    "totalEquity": "إجمالي حقوق الملكية",
+    "totalLiabilitiesAndEquity": "إجمالي الالتزامات وحقوق الملكية"
+  },
+  "cashFlow": {
+    "title": "قائمة التدفقات النقدية",
+    "description": "التدفقات النقدية الداخلة والخارجة",
+    "operatingActivities": "الأنشطة التشغيلية",
+    "investingActivities": "الأنشطة الاستثمارية",
+    "financingActivities": "الأنشطة التمويلية",
+    "netCashFlow": "صافي التدفق النقدي",
+    "openingBalance": "الرصيد الافتتاحي",
+    "closingBalance": "الرصيد الختامي"
+  },
+  "trialBalance": {
+    "title": "ميزان المراجعة",
+    "description": "التحقق من أرصدة الحسابات",
+    "account": "الحساب",
+    "debit": "مدين",
+    "credit": "دائن",
+    "totalDebit": "إجمالي المدين",
+    "totalCredit": "إجمالي الدائن"
+  },
+  "generalLedger": {
+    "title": "دفتر الأستاذ العام",
+    "description": "معاملات الحسابات التفصيلية"
+  },
+  "arAging": {
+    "title": "أعمار الذمم المدينة",
+    "description": "تقادم حسابات العملاء",
+    "customer": "العميل",
+    "current": "جاري",
+    "days1to30": "1-30 يوم",
+    "days31to60": "31-60 يوم",
+    "days61to90": "61-90 يوم",
+    "over90": "أكثر من 90 يوم",
+    "total": "الإجمالي"
+  },
+  "apAging": {
+    "title": "أعمار الذمم الدائنة",
+    "description": "تقادم حسابات الموردين",
+    "vendor": "المورد",
+    "current": "جاري",
+    "days1to30": "1-30 يوم",
+    "days31to60": "31-60 يوم",
+    "days61to90": "61-90 يوم",
+    "over90": "أكثر من 90 يوم",
+    "total": "الإجمالي"
+  },
+  "salesByCustomer": {
+    "title": "المبيعات حسب العميل",
+    "description": "تفصيل المبيعات حسب العميل"
+  },
+  "salesByItem": {
+    "title": "المبيعات حسب الصنف",
+    "description": "تفصيل المبيعات حسب الصنف"
+  },
+  "purchasesByVendor": {
+    "title": "المشتريات حسب المورد",
+    "description": "تفصيل المشتريات حسب المورد"
+  },
+  "inventoryValuation": {
+    "title": "تقييم المخزون",
+    "description": "قيمة المخزون الحالية"
+  },
+  "stockSummary": {
+    "title": "ملخص المخزون",
+    "description": "مستويات مخزون الأصناف"
+  },
+  "vatReport": {
+    "title": "تقرير الضريبة",
+    "description": "ملخص الضريبة للإقرار"
+  },
+  "filters": {
+    "dateRange": "الفترة الزمنية",
+    "startDate": "تاريخ البداية",
+    "endDate": "تاريخ النهاية",
+    "period": "الفترة",
+    "thisMonth": "هذا الشهر",
+    "lastMonth": "الشهر الماضي",
+    "thisQuarter": "هذا الربع",
+    "lastQuarter": "الربع الماضي",
+    "thisYear": "هذه السنة",
+    "lastYear": "السنة الماضية",
+    "custom": "مخصص"
+  },
+  "actions": {
+    "generate": "إنشاء التقرير",
+    "export": "تصدير",
+    "print": "طباعة",
+    "refresh": "تحديث"
+  }
+}
