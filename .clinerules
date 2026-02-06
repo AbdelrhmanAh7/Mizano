@@ -276,6 +276,44 @@ erp-system/
 └── .clinerules                       # THIS FILE
 ```
 
+## AI Module Implementation Rules (src/modules/ai/)
+
+### AI Services
+- **Zero external dependencies**: All AI features are custom-built
+- **Libraries used**: `natural` (Naive Bayes), `simple-statistics` (z-score, IQR), `tesseract.js` (OCR)
+- **Confidence scoring**: Every AI prediction includes a confidence score (0-1)
+- **Human-in-the-Loop**: All suggestions are dismissible — user has final say
+- **Feedback loop**: accept/reject/correct feedback is stored and improves model
+- **Multi-tenant AI**: Models are per-organization, not global
+- **Model storage**: Store models in `ai_models` table as serialized JSON, NOT as files
+- **Model caching**: Cache loaded models in memory `Map<orgId, Model>` for performance
+- **Predictions caching**: Cache AI predictions in `ai_predictions` table with input hash to avoid recomputation
+
+### Retraining Triggers
+- **Categorization**: Retrain after 50 corrections
+- **Forecasting**: Retrain weekly
+- **Anomaly detection**: Retrain daily
+
+### AI Business Rules
+- **Never auto-post**: All financial suggestions require explicit user confirmation
+- **Anomaly detection**: z-score > 3 = warning, z-score > 4 = critical alert
+- **Reconciliation confidence**: > 0.8 = high (green), > 0.6 = medium (yellow), else = low (red)
+- **Lead scoring**: Rule-based initially, ML model after 100+ conversions
+- **Cash flow forecasting**: Monte Carlo with 500 simulations, report 10th/50th/90th percentile
+- **Reorder points**: Default 95% service level, configurable per item
+
+### Fixed Assets Module
+- **Depreciation method**: Straight-line
+- **Depreciation schedule**: Monthly cron job on 30th
+- **Auto-journaling**: Dr Depreciation Expense / Cr Accumulated Depreciation
+- **Disposal logic**: Calculate gain/loss vs book value on disposal
+
+### CRM Module (src/modules/crm/)
+- **Lead sources**: Track all channels (web, email, phone, referral, etc.)
+- **Lead scoring**: 0-100 scale, improves over time with conversions
+- **Deal pipeline**: Enforce stage transitions based on organization configuration
+- **Won deal automation**: Automatically convert to Customer + generate Quote
+
 ## When Generating Code — Checklist
 1. Include proper TypeScript types — no `any`
 2. Handle loading, error, and empty states in EVERY page/component

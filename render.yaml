@@ -1,0 +1,103 @@
+# Mizano ERP - Render Blueprint
+# ==============================
+# Deploy with: render.com/docs/blueprint-spec
+# Create a new Blueprint Instance in Render dashboard
+
+version: "1"
+
+services:
+  # ==========================================
+  # API Service
+  # ==========================================
+  - type: web
+    name: mizano-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    region: frankfurt  # Change to your preferred region
+    plan: starter  # starter, standard, pro
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+      targetMemoryPercent: 80
+      targetCPUPercent: 80
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mizano-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: mizano-redis
+          type: redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: API_PORT
+        value: "3001"
+
+  # ==========================================
+  # Web Service (Frontend)
+  # ==========================================
+  - type: web
+    name: mizano-web
+    runtime: docker
+    dockerfilePath: ./apps/web/Dockerfile
+    dockerContext: .
+    region: frankfurt
+    plan: starter
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: mizano-api
+          type: web
+          property: url
+
+  # ==========================================
+  # Background Worker (Optional)
+  # ==========================================
+  # - type: worker
+  #   name: mizano-worker
+  #   runtime: docker
+  #   dockerfilePath: ./apps/api/Dockerfile
+  #   dockerContext: .
+  #   region: frankfurt
+  #   plan: starter
+  #   envVars:
+  #     - key: WORKER_MODE
+  #       value: "true"
+  #     - key: DATABASE_URL
+  #       fromDatabase:
+  #         name: mizano-db
+  #         property: connectionString
+  #     - key: REDIS_URL
+  #       fromService:
+  #         name: mizano-redis
+  #         type: redis
+  #         property: connectionString
+
+databases:
+  # ==========================================
+  # PostgreSQL Database
+  # ==========================================
+  - name: mizano-db
+    databaseName: mizano
+    user: mizano
+    plan: starter  # starter (1GB), standard (4GB), pro (16GB)
+    region: frankfurt
+    ipAllowList: []  # Allow all by default, restrict in production
+    postgresMajorVersion: "16"
+
+# Redis is automatically created when referenced in envVars
+# Render creates a managed Redis instance

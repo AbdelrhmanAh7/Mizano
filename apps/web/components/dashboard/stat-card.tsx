@@ -1,6 +1,7 @@
 'use client';
 
 import { LucideIcon } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
@@ -27,6 +28,8 @@ export function StatCard({
   iconBgColor = 'bg-blue-100',
   currency = 'USD',
 }: StatCardProps) {
+  const t = useTranslations('common.dashboard');
+
   return (
     <Card>
       <CardContent className="pt-6">
@@ -43,7 +46,7 @@ export function StatCard({
                   trend.isPositive ? 'text-green-600' : 'text-red-600'
                 )}
               >
-                {trend.isPositive ? '↑' : '↓'} {Math.abs(trend.value)}% from last month
+                {trend.isPositive ? '↑' : '↓'} {t('fromLastMonth', { value: Math.abs(trend.value) })}
               </p>
             )}
           </div>

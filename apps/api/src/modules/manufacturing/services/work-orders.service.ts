@@ -135,7 +135,7 @@ export class WorkOrdersService {
           organizationId,
         },
       });
-      const currentStock = movements.reduce((sum: number, m: { quantity: number }) => sum + m.quantity, 0);
+      const currentStock = movements.reduce((sum: number, m) => sum + parseFloat(m.quantity.toString()), 0);
 
       const shortfall = Math.max(0, requiredQty - currentStock);
       if (shortfall > 0) isAvailable = false;
@@ -298,8 +298,8 @@ export class WorkOrdersService {
     });
 
     // Separate consumed materials and produced goods
-    const consumed = movements.filter((m) => m.quantity < 0);
-    const produced = movements.filter((m) => m.quantity > 0);
+    const consumed = movements.filter((m) => parseFloat(m.quantity.toString()) < 0);
+    const produced = movements.filter((m) => parseFloat(m.quantity.toString()) > 0);
 
     return {
       workOrderId: id,
@@ -308,16 +308,16 @@ export class WorkOrdersService {
       consumed: consumed.map((m) => ({
         item: m.item,
         warehouse: m.warehouse,
-        quantity: Math.abs(m.quantity),
+        quantity: Math.abs(parseFloat(m.quantity.toString())),
         date: m.createdAt,
       })),
       produced: produced.map((m) => ({
         item: m.item,
         warehouse: m.warehouse,
-        quantity: m.quantity,
+        quantity: parseFloat(m.quantity.toString()),
         date: m.createdAt,
       })),
-      totalProduced: produced.reduce((sum, m) => sum + m.quantity, 0),
+      totalProduced: produced.reduce((sum, m) => sum + parseFloat(m.quantity.toString()), 0),
     };
   }
 

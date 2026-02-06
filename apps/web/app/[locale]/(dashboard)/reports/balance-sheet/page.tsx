@@ -130,7 +130,7 @@ export default function BalanceSheetReportPage() {
             <CardTitle>Assets</CardTitle>
           </CardHeader>
           <CardContent>
-            {mockReport.assets.map((account) => renderAccountRow(account))}
+            {mockReport.assets.map((account: any) => renderAccountRow(account))}
             <div className="flex justify-between py-3 border-t-2 font-bold">
               <span>Total Assets</span>
               <span className="font-mono">{formatCurrency(mockReport.totalAssets)}</span>
@@ -145,7 +145,7 @@ export default function BalanceSheetReportPage() {
               <CardTitle>Liabilities</CardTitle>
             </CardHeader>
             <CardContent>
-              {mockReport.liabilities.map((account) => renderAccountRow(account))}
+              {mockReport.liabilities.map((account: any) => renderAccountRow(account))}
               <div className="flex justify-between py-3 border-t-2 font-bold">
                 <span>Total Liabilities</span>
                 <span className="font-mono">{formatCurrency(mockReport.totalLiabilities)}</span>
@@ -158,7 +158,7 @@ export default function BalanceSheetReportPage() {
               <CardTitle>Equity</CardTitle>
             </CardHeader>
             <CardContent>
-              {mockReport.equity.map((account) => renderAccountRow(account))}
+              {mockReport.equity.map((account: any) => renderAccountRow(account))}
               <div className="flex justify-between py-3 border-t-2 font-bold">
                 <span>Total Equity</span>
                 <span className="font-mono">{formatCurrency(mockReport.totalEquity)}</span>

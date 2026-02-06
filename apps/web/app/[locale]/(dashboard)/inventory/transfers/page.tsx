@@ -34,6 +34,7 @@ import {
   getTransferStatusLabel,
   getTransferStatusColor,
   Transfer,
+  TransferStatus,
 } from '@/lib/hooks/use-transfers';
 
 export default function TransfersPage() {
@@ -42,7 +43,7 @@ export default function TransfersPage() {
 
   const { data, isLoading } = useTransfers({
     search,
-    status: statusFilter !== 'all' ? statusFilter : undefined,
+    status: statusFilter !== 'all' ? statusFilter as TransferStatus : undefined,
   });
 
   const transfers: Transfer[] = data?.data || [];
@@ -150,10 +151,10 @@ export default function TransfersPage() {
                       {format(new Date(transfer.date), 'MMM d, yyyy')}
                     </TableCell>
                     <TableCell>
-                      {transfer.sourceWarehouse?.name || '-'}
+                      {transfer.fromWarehouse?.name || '-'}
                     </TableCell>
                     <TableCell>
-                      {transfer.destinationWarehouse?.name || '-'}
+                      {transfer.toWarehouse?.name || '-'}
                     </TableCell>
                     <TableCell className="text-right">
                       {transfer.lines?.length || 0}

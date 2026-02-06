@@ -1,0 +1,51 @@
+{
+  "errors": {
+    "notFound": "{resource} غير موجود",
+    "unauthorized": "ليس لديك صلاحية لتنفيذ هذا الإجراء",
+    "forbidden": "الوصول مرفوض",
+    "badRequest": "طلب غير صالح",
+    "internalError": "حدث خطأ داخلي في الخادم",
+    "validationFailed": "فشل التحقق",
+    "duplicateEntry": "{field} موجود بالفعل",
+    "invalidCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+    "tokenExpired": "انتهت صلاحية جلستك. يرجى تسجيل الدخول مرة أخرى",
+    "invalidToken": "رمز غير صالح أو منتهي الصلاحية"
+  },
+  "success": {
+    "created": "تم إنشاء {resource} بنجاح",
+    "updated": "تم تحديث {resource} بنجاح",
+    "deleted": "تم حذف {resource} بنجاح",
+    "sent": "تم إرسال {resource} بنجاح"
+  },
+  "validation": {
+    "required": "{field} مطلوب",
+    "email": "يرجى إدخال بريد إلكتروني صالح",
+    "minLength": "{field} يجب أن يكون على الأقل {min} حرفاً",
+    "maxLength": "{field} يجب ألا يتجاوز {max} حرفاً",
+    "min": "{field} يجب أن يكون على الأقل {min}",
+    "max": "{field} يجب ألا يتجاوز {max}",
+    "positive": "{field} يجب أن يكون رقماً موجباً",
+    "date": "يرجى إدخال تاريخ صالح",
+    "enum": "{field} يجب أن يكون أحد: {values}"
+  },
+  "resources": {
+    "user": "المستخدم",
+    "organization": "المؤسسة",
+    "account": "الحساب",
+    "journal": "قيد اليومية",
+    "invoice": "الفاتورة",
+    "quote": "عرض السعر",
+    "customer": "العميل",
+    "vendor": "المورد",
+    "bill": "فاتورة المشتريات",
+    "expense": "المصروف",
+    "payment": "الدفعة",
+    "item": "الصنف",
+    "warehouse": "المستودع",
+    "bankAccount": "الحساب البنكي",
+    "transaction": "المعاملة",
+    "employee": "الموظف",
+    "project": "المشروع",
+    "timesheet": "سجل الوقت"
+  }
+}

@@ -157,7 +157,7 @@ export class BomService {
       const stockMovements = await this.prisma.inventoryMovement.findMany({
         where: { itemId: bomItem.itemId, organizationId },
       });
-      const currentStock = stockMovements.reduce((sum: number, m: { quantity: number }) => sum + m.quantity, 0);
+      const currentStock = stockMovements.reduce((sum: number, m) => sum + parseFloat(m.quantity.toString()), 0);
 
       requirements.push({
         item: bomItem.item,

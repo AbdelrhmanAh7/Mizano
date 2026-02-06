@@ -158,7 +158,7 @@ export default function TrialBalanceReportPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockReport.accounts.map((account) => (
+              {mockReport.accounts.map((account: any) => (
                 <TableRow key={account.id}>
                   <TableCell className="font-mono">{account.code}</TableCell>
                   <TableCell className="font-medium">{account.name}</TableCell>

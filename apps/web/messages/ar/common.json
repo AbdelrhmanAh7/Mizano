@@ -7,6 +7,7 @@
     "refresh": "تحديث",
     "failedToLoad": "فشل تحميل بيانات لوحة التحكم",
     "tryAgain": "حاول مرة أخرى",
+    "fromLastMonth": "{value}% من الشهر الماضي",
     "stats": {
       "revenue": "الإيرادات",
       "expenses": "المصروفات",
@@ -14,18 +15,29 @@
       "bankBalance": "الرصيد البنكي"
     },
     "charts": {
-      "cashFlow": "التدفق النقدي",
-      "revenue": "الإيرادات",
+      "cashFlowTrend": "اتجاه التدفق النقدي",
+      "revenueTrend": "اتجاه الإيرادات",
       "receivablesPayables": "المستحقات مقابل المدفوعات",
-      "expenses": "أعلى المصروفات"
+      "topExpenses": "أعلى المصروفات",
+      "inflow": "التدفق الداخل",
+      "outflow": "التدفق الخارج",
+      "net": "الصافي",
+      "revenue": "الإيرادات",
+      "receivables": "المستحقات",
+      "payables": "المدفوعات",
+      "outstanding": "المستحقة",
+      "owed": "المدينة"
     },
     "aiAlerts": {
       "title": "رؤى الذكاء الاصطناعي",
-      "noAlerts": "لا توجد تنبيهات في الوقت الحالي"
+      "noAlerts": "جميع الأنظمة تعمل بشكل جيد. لا توجد تنبيهات في الوقت الحالي.",
+      "alertCount": "{count} تنبيه",
+      "alertsCount": "{count} تنبيهات"
     },
     "recentTransactions": {
       "title": "المعاملات الأخيرة",
-      "noTransactions": "لا توجد معاملات حديثة"
+      "noTransactions": "لا توجد معاملات حديثة",
+      "viewAll": "عرض الكل"
     }
   },
   "header": {

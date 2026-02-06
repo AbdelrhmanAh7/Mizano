@@ -130,7 +130,7 @@ export default function ProfitLossReportPage() {
           <CardTitle>Income</CardTitle>
         </CardHeader>
         <CardContent>
-          {mockReport.income.map((account) => renderAccountRow(account))}
+          {mockReport.income.map((account: any) => renderAccountRow(account))}
           <div className="flex justify-between py-3 border-t-2 font-bold">
             <span>Total Income</span>
             <span className="font-mono text-green-600">
@@ -145,7 +145,7 @@ export default function ProfitLossReportPage() {
           <CardTitle>Expenses</CardTitle>
         </CardHeader>
         <CardContent>
-          {mockReport.expenses.map((account) => renderAccountRow(account))}
+          {mockReport.expenses.map((account: any) => renderAccountRow(account))}
           <div className="flex justify-between py-3 border-t-2 font-bold">
             <span>Total Expenses</span>
             <span className="font-mono text-red-600">

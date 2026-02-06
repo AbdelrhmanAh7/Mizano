@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   LineChart,
@@ -19,10 +20,12 @@ interface CashFlowChartProps {
 }
 
 export function CashFlowChart({ data, currency = 'USD' }: CashFlowChartProps) {
+  const t = useTranslations('common.dashboard.charts');
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Cash Flow Trend</CardTitle>
+        <CardTitle className="text-lg">{t('cashFlowTrend')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">
@@ -56,7 +59,7 @@ export function CashFlowChart({ data, currency = 'USD' }: CashFlowChartProps) {
               <Line
                 type="monotone"
                 dataKey="inflow"
-                name="Inflow"
+                name={t('inflow')}
                 stroke="#22c55e"
                 strokeWidth={2}
                 dot={{ fill: '#22c55e', strokeWidth: 2 }}
@@ -65,7 +68,7 @@ export function CashFlowChart({ data, currency = 'USD' }: CashFlowChartProps) {
               <Line
                 type="monotone"
                 dataKey="outflow"
-                name="Outflow"
+                name={t('outflow')}
                 stroke="#ef4444"
                 strokeWidth={2}
                 dot={{ fill: '#ef4444', strokeWidth: 2 }}
@@ -74,7 +77,7 @@ export function CashFlowChart({ data, currency = 'USD' }: CashFlowChartProps) {
               <Line
                 type="monotone"
                 dataKey="net"
-                name="Net"
+                name={t('net')}
                 stroke="#3b82f6"
                 strokeWidth={2}
                 strokeDasharray="5 5"

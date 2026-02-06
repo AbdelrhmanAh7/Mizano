@@ -177,7 +177,12 @@ export function useDeleteEmployee() {
 }
 
 // Attendance Hooks
-export function useAttendance(params?: any) {
+export function useAttendance(startDateOrParams?: string | any, endDate?: string) {
+  // Support both (params) and (startDate, endDate) call signatures
+  const params = typeof startDateOrParams === 'string'
+    ? { startDate: startDateOrParams, endDate }
+    : startDateOrParams;
+
   return useQuery({
     queryKey: ['attendance', params],
     queryFn: async () => {
@@ -217,6 +222,9 @@ export function useMarkBulkAttendance() {
   });
 }
 
+// Alias for backward compatibility
+export const useBulkMarkAttendance = useMarkBulkAttendance;
+
 // Payroll Hooks
 export function usePayrollRuns(params?: any) {
   return useQuery({
@@ -243,7 +251,10 @@ export function useRunPayroll() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: payrollApi.run,
+    mutationFn: async (data: { month: number; year: number }) => {
+      const response = await payrollApi.run(data);
+      return response.data?.data || response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll'] });
       toast.success('Payroll run created');
@@ -281,6 +292,40 @@ export function useMarkPayrollPaid() {
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to mark payroll as paid');
     },
+  });
+}
+
+export function useEmployeePayslips(employeeId: string) {
+  return useQuery({
+    queryKey: ['payslips', 'employee', employeeId],
+    queryFn: async () => {
+      const response = await api.get(`/employees/${employeeId}/payslips`);
+      return response.data?.data || response.data;
+    },
+    enabled: !!employeeId,
+  });
+}
+
+export function usePayslip(payslipIdOrPayrollId: string, payslipId?: string) {
+  // Support both (payslipId) and (payrollId, payslipId) call signatures
+  const isDirectAccess = !payslipId;
+
+  return useQuery({
+    queryKey: isDirectAccess
+      ? ['payslips', payslipIdOrPayrollId]
+      : ['payslips', payslipIdOrPayrollId, payslipId],
+    queryFn: async () => {
+      if (isDirectAccess) {
+        // Direct access by payslip ID
+        const response = await api.get(`/payslips/${payslipIdOrPayrollId}`);
+        return response.data?.data || response.data;
+      } else {
+        // Access via payroll run
+        const response = await payrollApi.getPayslip(payslipIdOrPayrollId, payslipId!);
+        return response.data?.data || response.data;
+      }
+    },
+    enabled: !!payslipIdOrPayrollId,
   });
 }
 

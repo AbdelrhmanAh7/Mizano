@@ -237,6 +237,13 @@ export function getReasonText(reason: AdjustmentReason): string {
   return reasons[reason] || reason;
 }
 
+// Alias functions for backward compatibility
+export const getReasonLabel = getReasonText;
+export const getAdjustmentStatusLabel = getStatusText;
+export function getAdjustmentStatusColor(status: AdjustmentStatus): string {
+  return status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+}
+
 /**
  * Reason options for dropdowns
  */

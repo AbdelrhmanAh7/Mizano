@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   PieChart,
@@ -19,10 +20,12 @@ interface ExpensesPieProps {
 const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export function ExpensesPie({ data, currency = 'USD' }: ExpensesPieProps) {
+  const t = useTranslations('common.dashboard.charts');
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Top Expenses</CardTitle>
+        <CardTitle className="text-lg">{t('topExpenses')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">

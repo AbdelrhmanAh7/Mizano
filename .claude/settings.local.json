@@ -23,7 +23,19 @@
       "Bash(find:*)",
       "Bash(pnpm db:generate:*)",
       "Bash(npx prisma generate:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(timeout 30 pnpm:*)",
+      "Bash(pnpm dev)",
+      "Bash(tree:*)",
+      "Bash(npm install:*)",
+      "Bash(pnpm --filter api build:*)",
+      "Bash(pnpm prisma generate:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash(pnpm --filter api exec prisma generate:*)",
+      "Bash(pnpm exec tsc:*)",
+      "Bash(pnpm prisma migrate status:*)"
     ]
   }
 }

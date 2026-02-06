@@ -16,7 +16,8 @@ import { authApi } from '@/lib/api';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
 
 const registerSchema = z.object({
-  name: z.string().min(2),
+  firstName: z.string().min(2),
+  lastName: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
   confirmPassword: z.string(),
@@ -45,7 +46,8 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       await authApi.register({
-        name: data.name,
+        firstName: data.firstName,
+        lastName: data.lastName,
         email: data.email,
         password: data.password,
         organizationName: data.organizationName,
@@ -80,12 +82,21 @@ export default function RegisterPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">{t('name')}</Label>
-              <Input id="name" placeholder={t('namePlaceholder')} {...register('name')} />
-              {errors.name && (
-                <p className="text-sm text-red-500">{tValidation('nameMin')}</p>
-              )}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">{t('firstName')}</Label>
+                <Input id="firstName" placeholder={t('firstNamePlaceholder')} {...register('firstName')} />
+                {errors.firstName && (
+                  <p className="text-sm text-red-500">{tValidation('nameMin')}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">{t('lastName')}</Label>
+                <Input id="lastName" placeholder={t('lastNamePlaceholder')} {...register('lastName')} />
+                {errors.lastName && (
+                  <p className="text-sm text-red-500">{tValidation('nameMin')}</p>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="organizationName">{t('organizationName')}</Label>

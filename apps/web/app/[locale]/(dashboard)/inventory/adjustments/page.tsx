@@ -36,6 +36,8 @@ import {
   getAdjustmentStatusColor,
   getReasonLabel,
   Adjustment,
+  AdjustmentStatus,
+  AdjustmentType,
 } from '@/lib/hooks/use-adjustments';
 
 export default function AdjustmentsPage() {
@@ -45,8 +47,8 @@ export default function AdjustmentsPage() {
 
   const { data, isLoading } = useAdjustments({
     search,
-    status: statusFilter !== 'all' ? statusFilter : undefined,
-    type: typeFilter !== 'all' ? typeFilter : undefined,
+    status: statusFilter !== 'all' ? statusFilter as AdjustmentStatus : undefined,
+    type: typeFilter !== 'all' ? typeFilter as AdjustmentType : undefined,
   });
 
   const adjustments: Adjustment[] = data?.data || [];

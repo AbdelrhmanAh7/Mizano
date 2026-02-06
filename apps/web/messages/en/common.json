@@ -7,6 +7,7 @@
     "refresh": "Refresh",
     "failedToLoad": "Failed to load dashboard data",
     "tryAgain": "Try Again",
+    "fromLastMonth": "{value}% from last month",
     "stats": {
       "revenue": "Revenue",
       "expenses": "Expenses",
@@ -14,18 +15,29 @@
       "bankBalance": "Bank Balance"
     },
     "charts": {
-      "cashFlow": "Cash Flow",
-      "revenue": "Revenue",
+      "cashFlowTrend": "Cash Flow Trend",
+      "revenueTrend": "Revenue Trend",
       "receivablesPayables": "Receivables vs Payables",
-      "expenses": "Top Expenses"
+      "topExpenses": "Top Expenses",
+      "inflow": "Inflow",
+      "outflow": "Outflow",
+      "net": "Net",
+      "revenue": "Revenue",
+      "receivables": "Receivables",
+      "payables": "Payables",
+      "outstanding": "Outstanding",
+      "owed": "Owed"
     },
     "aiAlerts": {
       "title": "AI Insights",
-      "noAlerts": "No alerts at this time"
+      "noAlerts": "All systems healthy. No alerts at this time.",
+      "alertCount": "{count} alert",
+      "alertsCount": "{count} alerts"
     },
     "recentTransactions": {
       "title": "Recent Transactions",
-      "noTransactions": "No recent transactions"
+      "noTransactions": "No recent transactions",
+      "viewAll": "View All"
     }
   },
   "header": {

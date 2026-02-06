@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AreaChart,
@@ -18,10 +19,12 @@ interface RevenueChartProps {
 }
 
 export function RevenueChart({ data, currency = 'USD' }: RevenueChartProps) {
+  const t = useTranslations('common.dashboard.charts');
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Revenue Trend</CardTitle>
+        <CardTitle className="text-lg">{t('revenueTrend')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">
@@ -60,7 +63,7 @@ export function RevenueChart({ data, currency = 'USD' }: RevenueChartProps) {
               <Area
                 type="monotone"
                 dataKey="revenue"
-                name="Revenue"
+                name={t('revenue')}
                 stroke="#22c55e"
                 strokeWidth={2}
                 fill="url(#revenueGradient)"

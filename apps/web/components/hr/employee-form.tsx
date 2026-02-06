@@ -69,17 +69,38 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
   const createEmployee = useCreateEmployee();
   const updateEmployee = useUpdateEmployee();
 
+  // Convert Record<string, number> to array format
+  const allowancesToArray = (allowances: Record<string, number> | null | undefined) => {
+    if (!allowances || Array.isArray(allowances)) return allowances || [];
+    return Object.entries(allowances).map(([name, amount]) => ({ name, amount }));
+  };
+
+  const deductionsToArray = (deductions: Record<string, number> | null | undefined) => {
+    if (!deductions || Array.isArray(deductions)) return deductions || [];
+    return Object.entries(deductions).map(([name, amount]) => ({ name, amount }));
+  };
+
   const form = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
     defaultValues: employee
       ? {
-          ...employee,
+          employeeNumber: employee.employeeNumber,
+          firstName: employee.firstName,
+          lastName: employee.lastName,
+          email: employee.email,
+          phone: employee.phone || '',
           joiningDate: new Date(employee.joiningDate),
+          department: employee.departmentId || '',
+          jobTitle: employee.jobTitle || '',
           basicSalary: typeof employee.basicSalary === 'string'
             ? parseFloat(employee.basicSalary)
             : employee.basicSalary,
-          allowances: employee.allowances || [],
-          deductions: employee.deductions || [],
+          allowances: allowancesToArray(employee.allowances as Record<string, number> | null),
+          deductions: deductionsToArray(employee.deductions as Record<string, number> | null),
+          bankName: employee.bankName || '',
+          bankAccountNumber: employee.bankAccountNumber || '',
+          taxId: employee.taxId || '',
+          status: employee.status,
         }
       : {
           employeeNumber: '',

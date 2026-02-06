@@ -213,7 +213,7 @@ export function ExpenseForm({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No Vendor</SelectItem>
-                  {vendors.map((vendor) => (
+                  {vendors.map((vendor: any) => (
                     <SelectItem key={vendor.id} value={vendor.id}>
                       {vendor.name}
                     </SelectItem>

@@ -44,6 +44,7 @@ import {
   Landmark,
   Layers,
   Wrench,
+  Percent,
 } from 'lucide-react';
 
 interface NavItem {
@@ -144,6 +145,17 @@ const navigationConfig: NavItem[] = [
       { nameKey: 'hr.employees.title', href: '/hr/employees', icon: Users },
       { nameKey: 'hr.attendance.title', href: '/hr/attendance', icon: Clock },
       { nameKey: 'hr.payroll.title', href: '/hr/payroll', icon: DollarSign },
+    ],
+  },
+  {
+    nameKey: 'tax.title',
+    href: '/tax',
+    icon: Percent,
+    permission: 'tax.view',
+    children: [
+      { nameKey: 'tax.rates', href: '/tax/rates', icon: Percent },
+      { nameKey: 'tax.vatReturns', href: '/tax/returns', icon: FileText },
+      { nameKey: 'tax.payments', href: '/tax/payments', icon: DollarSign },
     ],
   },
   { nameKey: 'crm', href: '/crm', icon: Target, permission: 'crm.view' },

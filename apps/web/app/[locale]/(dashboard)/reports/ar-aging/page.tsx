@@ -148,7 +148,7 @@ export default function ARAgingReportPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {mockReport.buckets.map((bucket) => (
+            {mockReport.buckets.map((bucket: AgingBucket) => (
               <button
                 key={bucket.range}
                 onClick={() =>
@@ -182,7 +182,7 @@ export default function ARAgingReportPage() {
             <CardTitle>{getAgingBucketLabel(expandedBucket)} Invoices</CardTitle>
           </CardHeader>
           <CardContent>
-            {mockReport.buckets.find((b) => b.range === expandedBucket)?.items?.length ? (
+            {mockReport.buckets.find((b: AgingBucket) => b.range === expandedBucket)?.items?.length ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -197,8 +197,8 @@ export default function ARAgingReportPage() {
                 </TableHeader>
                 <TableBody>
                   {mockReport.buckets
-                    .find((b) => b.range === expandedBucket)
-                    ?.items?.map((item) => (
+                    .find((b: AgingBucket) => b.range === expandedBucket)
+                    ?.items?.map((item: any) => (
                       <TableRow key={item.id}>
                         <TableCell>
                           <Link

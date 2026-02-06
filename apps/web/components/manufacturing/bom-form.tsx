@@ -82,9 +82,9 @@ export function BOMForm({ bom }: BOMFormProps) {
   const handleSubmit = async (data: BOMFormData) => {
     try {
       if (bom) {
-        await updateBOM.mutateAsync({ id: bom.id, data });
+        await updateBOM.mutateAsync({ id: bom.id, data: data as any });
       } else {
-        await createBOM.mutateAsync(data);
+        await createBOM.mutateAsync(data as any);
       }
       router.push('/manufacturing/bom');
     } catch (error) {

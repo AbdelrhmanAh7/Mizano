@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   BarChart,
@@ -19,14 +20,16 @@ interface ARAPChartProps {
 }
 
 export function ARAPChart({ data, currency = 'USD' }: ARAPChartProps) {
+  const t = useTranslations('common.dashboard.charts');
+
   const chartData = [
     {
-      name: 'Receivables',
+      name: t('receivables'),
       value: data.receivables,
       fill: '#3b82f6',
     },
     {
-      name: 'Payables',
+      name: t('payables'),
       value: data.payables,
       fill: '#ef4444',
     },
@@ -35,7 +38,7 @@ export function ARAPChart({ data, currency = 'USD' }: ARAPChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Receivables vs Payables</CardTitle>
+        <CardTitle className="text-lg">{t('receivablesPayables')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-[250px]">
@@ -66,14 +69,14 @@ export function ARAPChart({ data, currency = 'USD' }: ARAPChartProps) {
         <div className="mt-4 flex justify-center gap-8 text-sm">
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 rounded bg-blue-500" />
-            <span className="text-muted-foreground">Outstanding</span>
+            <span className="text-muted-foreground">{t('outstanding')}</span>
             <span className="font-mono font-medium">
               {formatCompactCurrency(data.receivables, currency)}
             </span>
           </div>
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 rounded bg-red-500" />
-            <span className="text-muted-foreground">Owed</span>
+            <span className="text-muted-foreground">{t('owed')}</span>
             <span className="font-mono font-medium">
               {formatCompactCurrency(data.payables, currency)}
             </span>

@@ -32,29 +32,31 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Handle i18n routing first
-  const response = intlMiddleware(request);
-
   // Check authentication for protected routes
   const token = await getToken({ req: request });
   const locale = getLocale(pathname);
-
-  // Determine the target path after locale handling
-  const targetPath = pathname;
+  const pathWithoutLocale = pathname.replace(/^\/(en|ar)/, '') || '/';
 
   // If trying to access protected route without token, redirect to login
-  if (!isPublicPath(targetPath) && !token) {
-    const loginUrl = new URL(`/${locale}/login`, request.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
-    return NextResponse.redirect(loginUrl);
+  if (!isPublicPath(pathname) && !token) {
+    // Don't redirect if already going to login
+    if (!pathname.includes('/login')) {
+      const loginUrl = new URL(`/${locale}/login`, request.url);
+      loginUrl.searchParams.set('callbackUrl', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
   }
 
   // If authenticated user tries to access login/register, redirect to dashboard
-  if (token && isPublicPath(targetPath)) {
-    return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
+  if (token && isPublicPath(pathname)) {
+    // Don't redirect if already going to dashboard
+    if (!pathname.includes('/dashboard')) {
+      return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
+    }
   }
 
-  return response;
+  // Handle i18n routing
+  return intlMiddleware(request);
 }
 
 export const config = {

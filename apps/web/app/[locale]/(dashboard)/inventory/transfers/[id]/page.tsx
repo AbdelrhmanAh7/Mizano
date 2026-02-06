@@ -86,8 +86,8 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
     0
   ) || 0;
 
-  const canComplete = transfer.status === 'DRAFT' || transfer.status === 'IN_TRANSIT';
-  const canCancel = transfer.status === 'DRAFT' || transfer.status === 'IN_TRANSIT';
+  const canComplete = transfer.status === 'PENDING' || transfer.status === 'IN_TRANSIT';
+  const canCancel = transfer.status === 'PENDING' || transfer.status === 'IN_TRANSIT';
 
   return (
     <div className="space-y-6">
@@ -183,7 +183,7 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
                 <Truck className="h-8 w-8 text-blue-600" />
               </div>
               <p className="mt-2 font-semibold">
-                {transfer.sourceWarehouse?.name}
+                {transfer.fromWarehouse?.name}
               </p>
               <p className="text-sm text-muted-foreground">Source</p>
             </div>
@@ -197,7 +197,7 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
                 <Truck className="h-8 w-8 text-green-600" />
               </div>
               <p className="mt-2 font-semibold">
-                {transfer.destinationWarehouse?.name}
+                {transfer.toWarehouse?.name}
               </p>
               <p className="text-sm text-muted-foreground">Destination</p>
             </div>
@@ -231,30 +231,16 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
         </Card>
       </div>
 
-      {/* Details */}
-      {(transfer.reference || transfer.reason) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {transfer.reference && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Reference</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="font-mono">{transfer.reference}</p>
-              </CardContent>
-            </Card>
-          )}
-          {transfer.reason && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Reason</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm">{transfer.reason}</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+      {/* Notes */}
+      {transfer.notes && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Notes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm">{transfer.notes}</p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Line Items */}

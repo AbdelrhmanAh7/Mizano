@@ -180,7 +180,7 @@ export class NotificationsService {
       const movements = await this.prisma.inventoryMovement.findMany({
         where: { itemId: item.id },
       });
-      const currentStock = movements.reduce((sum: number, m: { quantity: number }) => sum + m.quantity, 0);
+      const currentStock = movements.reduce((sum, m) => sum + parseFloat(m.quantity.toString()), 0);
       const reorderPoint = item.reorderPoint || 10;
 
       if (currentStock <= reorderPoint) {

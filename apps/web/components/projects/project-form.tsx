@@ -223,7 +223,7 @@ export function ProjectForm({
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {form.watch('endDate')
-                      ? format(form.watch('endDate'), 'PPP')
+                      ? format(form.watch('endDate') as Date, 'PPP')
                       : 'No end date'}
                   </Button>
                 </PopoverTrigger>
