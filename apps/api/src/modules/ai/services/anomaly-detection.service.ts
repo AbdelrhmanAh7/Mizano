@@ -8,6 +8,10 @@ import {
   zScoreWithStats,
   interquartileRange,
 } from '../utils/statistics.util';
+import {
+  buildIsolationForest1D,
+  isolationForestScore1D,
+} from '../utils/isolation-forest.util';
 
 export interface AnomalyResult {
   isAnomaly: boolean;
@@ -15,8 +19,9 @@ export interface AnomalyResult {
   mean: number;
   stdDev: number;
   zScore: number;
+  isolationScore: number;
   severity: AnomalySeverity | null;
-  method: 'zscore' | 'iqr' | 'combined';
+  method: 'zscore' | 'iqr' | 'isolation_forest' | 'ensemble';
   reason: string;
 }
 
@@ -44,7 +49,7 @@ export class AnomalyDetectionService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Core anomaly detection method using Z-Score and IQR
+   * Core anomaly detection method using Z-Score + IQR + Isolation Forest ensemble
    */
   detectAnomaly(value: number, historicalValues: number[]): AnomalyResult {
     // Check for minimum data points
@@ -55,8 +60,9 @@ export class AnomalyDetectionService {
         mean: 0,
         stdDev: 0,
         zScore: 0,
+        isolationScore: 0,
         severity: null,
-        method: 'combined',
+        method: 'ensemble',
         reason: 'insufficient_data',
       };
     }
@@ -76,19 +82,29 @@ export class AnomalyDetectionService {
     const absZScore = Math.abs(zScore);
     const isZScoreOutlier = absZScore > this.Z_SCORE_THRESHOLD;
 
-    // Combined detection (both methods must flag)
-    const isAnomaly = isZScoreOutlier || isIqrOutlier;
-    const severity = this.determineSeverity(absZScore);
+    // Isolation Forest detection
+    let isolationScore = 0;
+    let isIsolationOutlier = false;
+    if (historicalValues.length >= 20) {
+      const forest = buildIsolationForest1D(historicalValues, 100);
+      isolationScore = isolationForestScore1D(value, forest);
+      isIsolationOutlier = isolationScore > 0.6;
+    }
+
+    // Ensemble: any method flags → anomaly
+    const isAnomaly = isZScoreOutlier || isIqrOutlier || isIsolationOutlier;
+
+    // Count how many methods agree for severity boosting
+    const methodsAgreed = [isZScoreOutlier, isIqrOutlier, isIsolationOutlier].filter(Boolean).length;
+    const severity = this.determineSeverity(absZScore, isolationScore, methodsAgreed);
 
     let reason = 'normal';
     if (isAnomaly) {
-      if (isZScoreOutlier && isIqrOutlier) {
-        reason = `Value ${value.toFixed(2)} is ${absZScore.toFixed(1)} standard deviations from mean and outside IQR bounds`;
-      } else if (isZScoreOutlier) {
-        reason = `Value ${value.toFixed(2)} is ${absZScore.toFixed(1)} standard deviations from mean (${avg.toFixed(2)})`;
-      } else {
-        reason = `Value ${value.toFixed(2)} is outside IQR bounds [${iqrLower.toFixed(2)}, ${iqrUpper.toFixed(2)}]`;
-      }
+      const methods: string[] = [];
+      if (isZScoreOutlier) methods.push(`z-score ${absZScore.toFixed(1)}σ`);
+      if (isIqrOutlier) methods.push(`outside IQR [${iqrLower.toFixed(2)}, ${iqrUpper.toFixed(2)}]`);
+      if (isIsolationOutlier) methods.push(`isolation score ${isolationScore.toFixed(2)}`);
+      reason = `Value ${value.toFixed(2)} flagged by ${methods.join(', ')} (mean: ${avg.toFixed(2)})`;
     }
 
     return {
@@ -97,20 +113,46 @@ export class AnomalyDetectionService {
       mean: avg,
       stdDev,
       zScore,
+      isolationScore,
       severity: isAnomaly ? severity : null,
-      method: 'combined',
+      method: 'ensemble',
       reason,
     };
   }
 
   /**
-   * Determine severity based on z-score
+   * Determine severity based on z-score, isolation score, and method agreement.
+   * Multiple methods agreeing boosts severity by one level.
    */
-  private determineSeverity(absZScore: number): AnomalySeverity {
-    if (absZScore > 4) return 'CRITICAL';
-    if (absZScore > 3.5) return 'HIGH';
-    if (absZScore > 3) return 'MEDIUM';
-    return 'LOW';
+  private determineSeverity(
+    absZScore: number,
+    isolationScore: number = 0,
+    methodsAgreed: number = 1,
+  ): AnomalySeverity {
+    // Base severity from z-score
+    let baseSeverity: AnomalySeverity;
+    if (absZScore > 4 || isolationScore > 0.85) {
+      baseSeverity = 'CRITICAL';
+    } else if (absZScore > 3.5 || isolationScore > 0.75) {
+      baseSeverity = 'HIGH';
+    } else if (absZScore > 3 || isolationScore > 0.65) {
+      baseSeverity = 'MEDIUM';
+    } else {
+      baseSeverity = 'LOW';
+    }
+
+    // Boost severity if multiple methods agree (3/3 → boost by one level)
+    if (methodsAgreed >= 3) {
+      const boostMap: Record<AnomalySeverity, AnomalySeverity> = {
+        LOW: 'MEDIUM',
+        MEDIUM: 'HIGH',
+        HIGH: 'CRITICAL',
+        CRITICAL: 'CRITICAL',
+      };
+      return boostMap[baseSeverity];
+    }
+
+    return baseSeverity;
   }
 
   /**
@@ -251,8 +293,9 @@ export class AnomalyDetectionService {
         mean: 0,
         stdDev: 0,
         zScore: 0,
+        isolationScore: 0,
         severity: null,
-        method: 'combined',
+        method: 'ensemble',
         reason: 'payroll_run_not_found',
       };
     }

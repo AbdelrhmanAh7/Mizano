@@ -13,6 +13,7 @@ import reports from './reports.json';
 import crm from './crm.json';
 import settings from './settings.json';
 import validation from './validation.json';
+import tour from './tour.json';
 
 export default {
   common,
@@ -30,4 +31,5 @@ export default {
   crm,
   settings,
   validation,
+  tour,
 } as const;

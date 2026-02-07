@@ -289,6 +289,97 @@ export class JournalsService {
     return { message: 'Journal deleted successfully' };
   }
 
+  async reverse(organizationId: string, id: string, dto?: { date?: string }) {
+    const journal = await this.prisma.journal.findFirst({
+      where: { id, organizationId, deletedAt: null },
+      include: {
+        lines: true,
+        reversedBy: true,
+      },
+    });
+
+    if (!journal) {
+      throw new NotFoundException('Journal not found');
+    }
+
+    if (journal.reversedBy) {
+      throw new BadRequestException('This journal has already been reversed');
+    }
+
+    if (journal.reversalOfId) {
+      throw new BadRequestException('Cannot reverse a reversal journal');
+    }
+
+    const reversalDate = dto?.date ? new Date(dto.date) : new Date();
+
+    // Check lock date for both original and reversal dates
+    await this.checkLockDate(organizationId, journal.date);
+    await this.checkLockDate(organizationId, reversalDate);
+
+    const reversalJournal = await this.prisma.$transaction(async (tx) => {
+      const journalNumber = await this.generateJournalNumberTx(tx, organizationId);
+
+      return tx.journal.create({
+        data: {
+          journalNumber,
+          date: reversalDate,
+          reference: `REV-${journal.journalNumber}`,
+          notes: `Reversal of ${journal.journalNumber}`,
+          isPosted: true,
+          reversalOfId: journal.id,
+          organizationId,
+          lines: {
+            create: journal.lines.map((line) => ({
+              accountId: line.accountId,
+              debit: line.credit,
+              credit: line.debit,
+              description: `Reversal: ${line.description || ''}`.trim(),
+            })),
+          },
+        },
+        include: {
+          lines: {
+            include: {
+              account: {
+                select: { id: true, code: true, name: true, type: true },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    const totalDebit = reversalJournal.lines.reduce(
+      (sum, line) => sum + parseFloat(line.debit.toString()),
+      0,
+    );
+    const totalCredit = reversalJournal.lines.reduce(
+      (sum, line) => sum + parseFloat(line.credit.toString()),
+      0,
+    );
+
+    return {
+      ...reversalJournal,
+      totalDebit: totalDebit.toFixed(4),
+      totalCredit: totalCredit.toFixed(4),
+    };
+  }
+
+  private async generateJournalNumberTx(tx: any, organizationId: string): Promise<string> {
+    const lastJournal = await tx.journal.findFirst({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      select: { journalNumber: true },
+    });
+
+    if (!lastJournal) {
+      return 'JRN-001';
+    }
+
+    const lastNumber = parseInt(lastJournal.journalNumber.split('-')[1], 10);
+    return `JRN-${String(lastNumber + 1).padStart(3, '0')}`;
+  }
+
   private async generateJournalNumber(organizationId: string): Promise<string> {
     const lastJournal = await this.prisma.journal.findFirst({
       where: { organizationId },

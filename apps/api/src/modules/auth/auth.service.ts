@@ -20,7 +20,8 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const { email, password, name, organizationName } = registerDto;
+    const { email, password, firstName, lastName, organizationName } = registerDto;
+    const name = `${firstName} ${lastName}`;
 
     // Check if email already exists
     const existingUser = await this.prisma.user.findFirst({

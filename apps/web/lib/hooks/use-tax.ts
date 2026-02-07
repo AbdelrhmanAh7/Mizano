@@ -61,68 +61,63 @@ export interface VATPayment {
 
 const taxRatesApi = {
   list: async (params?: { isActive?: boolean }) => {
-    const response = await api.get('/tax/rates', { params });
+    const response = await api.get('/tax-rates', { params });
     return response.data;
   },
   get: async (id: string) => {
-    const response = await api.get(`/tax/rates/${id}`);
+    const response = await api.get(`/tax-rates/${id}`);
     return response.data;
   },
   create: async (data: Partial<TaxRate>) => {
-    const response = await api.post('/tax/rates', data);
+    const response = await api.post('/tax-rates', data);
     return response.data;
   },
   update: async ({ id, data }: { id: string; data: Partial<TaxRate> }) => {
-    const response = await api.patch(`/tax/rates/${id}`, data);
+    const response = await api.put(`/tax-rates/${id}`, data);
     return response.data;
   },
   delete: async (id: string) => {
-    const response = await api.delete(`/tax/rates/${id}`);
+    const response = await api.delete(`/tax-rates/${id}`);
     return response.data;
   },
 };
 
 const vatReturnsApi = {
   list: async (params?: { status?: string; year?: number }) => {
-    const response = await api.get('/tax/vat-returns', { params });
+    const response = await api.get('/vat-returns', { params });
     return response.data;
   },
   get: async (id: string) => {
-    const response = await api.get(`/tax/vat-returns/${id}`);
+    const response = await api.get(`/vat-returns/${id}`);
     return response.data;
   },
   generate: async (startDate: string, endDate: string) => {
-    const response = await api.post('/tax/vat-returns/generate', {
+    const response = await api.post('/vat-returns', {
       startDate,
       endDate,
     });
     return response.data;
   },
   file: async (id: string) => {
-    const response = await api.post(`/tax/vat-returns/${id}/file`);
+    const response = await api.post(`/vat-returns/${id}/submit`);
     return response.data;
   },
   delete: async (id: string) => {
-    const response = await api.delete(`/tax/vat-returns/${id}`);
+    const response = await api.delete(`/vat-returns/${id}`);
     return response.data;
   },
 };
 
 const vatPaymentsApi = {
-  list: async (params?: { vatReturnId?: string }) => {
-    const response = await api.get('/tax/vat-payments', { params });
-    return response.data;
-  },
-  get: async (id: string) => {
-    const response = await api.get(`/tax/vat-payments/${id}`);
-    return response.data;
-  },
-  create: async (data: Partial<VATPayment>) => {
-    const response = await api.post('/tax/vat-payments', data);
-    return response.data;
-  },
-  delete: async (id: string) => {
-    const response = await api.delete(`/tax/vat-payments/${id}`);
+  recordPayment: async (data: {
+    vatReturnId: string;
+    amount: number;
+    date: string;
+    paidFromAccountId: string;
+    reference?: string;
+  }) => {
+    const { vatReturnId, ...paymentData } = data;
+    const response = await api.post(`/vat-returns/${vatReturnId}/payment`, paymentData);
     return response.data;
   },
 };
@@ -226,38 +221,11 @@ export function useDeleteVATReturn() {
 
 // ============ Hooks - VAT Payments ============
 
-export function useVATPayments(params?: { vatReturnId?: string }) {
-  return useQuery({
-    queryKey: ['vat-payments', params],
-    queryFn: () => vatPaymentsApi.list(params),
-  });
-}
-
-export function useVATPayment(id: string) {
-  return useQuery({
-    queryKey: ['vat-payments', id],
-    queryFn: () => vatPaymentsApi.get(id),
-    enabled: !!id,
-  });
-}
-
-export function useCreateVATPayment() {
+export function useRecordVATPayment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: vatPaymentsApi.create,
+    mutationFn: vatPaymentsApi.recordPayment,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vat-payments'] });
-      queryClient.invalidateQueries({ queryKey: ['vat-returns'] });
-    },
-  });
-}
-
-export function useDeleteVATPayment() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: vatPaymentsApi.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vat-payments'] });
       queryClient.invalidateQueries({ queryKey: ['vat-returns'] });
     },
   });

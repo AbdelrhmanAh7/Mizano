@@ -1,319 +1,278 @@
-import { PrismaClient, UserStatus } from '@prisma/client';
+import { PrismaClient, UserStatus, AccountType, InvoiceStatus, BillStatus, ItemType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { Decimal } from '@prisma/client/runtime/library';
 
 const prisma = new PrismaClient();
-
-/**
- * Default roles and permissions for Mizano ERP
- */
-const DEFAULT_ROLES = [
-  {
-    name: 'Admin',
-    description: 'Full system access - can manage all modules and settings',
-    isDefault: true,
-    permissions: [
-      { module: 'accounting', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'sales', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'purchases', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'inventory', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'banking', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'hr', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'manufacturing', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'projects', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'tax', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'reports', actions: ['view', 'export'] },
-      { module: 'crm', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'settings', actions: ['view', 'create', 'edit', 'delete'] },
-      { module: 'users', actions: ['view', 'create', 'edit', 'delete'] },
-    ],
-  },
-  {
-    name: 'Manager',
-    description: 'Can manage most modules except system settings and user deletion',
-    isDefault: false,
-    permissions: [
-      { module: 'accounting', actions: ['view', 'create', 'edit', 'export'] },
-      { module: 'sales', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'purchases', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'inventory', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'banking', actions: ['view', 'create', 'edit', 'export'] },
-      { module: 'hr', actions: ['view', 'create', 'edit', 'export'] },
-      { module: 'manufacturing', actions: ['view', 'create', 'edit', 'export'] },
-      { module: 'projects', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'tax', actions: ['view', 'export'] },
-      { module: 'reports', actions: ['view', 'export'] },
-      { module: 'crm', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'settings', actions: ['view'] },
-      { module: 'users', actions: ['view'] },
-    ],
-  },
-  {
-    name: 'Accountant',
-    description: 'Full access to accounting, banking, tax, and reports',
-    isDefault: false,
-    permissions: [
-      { module: 'accounting', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'sales', actions: ['view', 'export'] },
-      { module: 'purchases', actions: ['view', 'export'] },
-      { module: 'banking', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'tax', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'reports', actions: ['view', 'export'] },
-      { module: 'hr', actions: ['view'] },
-    ],
-  },
-  {
-    name: 'SalesRep',
-    description: 'Manage customers, quotes, invoices, and CRM activities',
-    isDefault: false,
-    permissions: [
-      { module: 'sales', actions: ['view', 'create', 'edit', 'export'] },
-      { module: 'crm', actions: ['view', 'create', 'edit', 'export'] },
-      { module: 'projects', actions: ['view'] },
-      { module: 'inventory', actions: ['view'] },
-      { module: 'reports', actions: ['view'] },
-    ],
-  },
-  {
-    name: 'StoreKeeper',
-    description: 'Manage inventory, warehouses, and stock movements',
-    isDefault: false,
-    permissions: [
-      { module: 'inventory', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'manufacturing', actions: ['view', 'create', 'edit'] },
-      { module: 'purchases', actions: ['view'] },
-      { module: 'sales', actions: ['view'] },
-    ],
-  },
-];
-
-/**
- * Demo users for testing - password is "password123" for all
- */
-const DEMO_USERS = [
-  {
-    email: 'admin@mizano.com',
-    name: 'Admin User',
-    firstName: 'Admin',
-    lastName: 'User',
-    roleName: 'Admin',
-  },
-  {
-    email: 'manager@mizano.com',
-    name: 'Manager User',
-    firstName: 'Manager',
-    lastName: 'User',
-    roleName: 'Manager',
-  },
-  {
-    email: 'accountant@mizano.com',
-    name: 'Accountant User',
-    firstName: 'Accountant',
-    lastName: 'User',
-    roleName: 'Accountant',
-  },
-  {
-    email: 'sales@mizano.com',
-    name: 'Sales Rep',
-    firstName: 'Sales',
-    lastName: 'Rep',
-    roleName: 'SalesRep',
-  },
-  {
-    email: 'storekeeper@mizano.com',
-    name: 'Store Keeper',
-    firstName: 'Store',
-    lastName: 'Keeper',
-    roleName: 'StoreKeeper',
-  },
-];
-
-/**
- * Default password for all demo users
- */
 const DEFAULT_PASSWORD = 'password123';
 
-async function seedRolesForOrganization(organizationId: string, orgName: string) {
-  console.log(`\n  Seeding roles for organization: ${orgName} (${organizationId})`);
+async function main() {
+  console.log('='.repeat(60));
+  console.log('Mizano ERP - Database Seed');
+  console.log('='.repeat(60));
 
-  let created = 0;
-  let existing = 0;
-  const rolesMap = new Map<string, string>();
-
-  for (const roleData of DEFAULT_ROLES) {
-    // Check if role already exists
-    let role = await prisma.role.findFirst({
-      where: { name: roleData.name, organizationId },
-    });
-
-    if (role) {
-      console.log(`    - Role "${roleData.name}" already exists, skipping`);
-      existing++;
-      rolesMap.set(roleData.name, role.id);
-      continue;
-    }
-
-    // Create role with permissions
-    role = await prisma.role.create({
-      data: {
-        name: roleData.name,
-        description: roleData.description,
-        isDefault: roleData.isDefault,
-        organizationId,
-        permissions: {
-          create: roleData.permissions.map((p) => ({
-            module: p.module,
-            actions: p.actions,
-          })),
-        },
-      },
-    });
-
-    rolesMap.set(roleData.name, role.id);
-    console.log(`    + Created role: ${roleData.name}`);
-    created++;
-  }
-
-  return { created, existing, rolesMap };
-}
-
-async function seedUsersForOrganization(
-  organizationId: string,
-  orgName: string,
-  rolesMap: Map<string, string>,
-) {
-  console.log(`\n  Seeding users for organization: ${orgName} (${organizationId})`);
-
-  let created = 0;
-  let existing = 0;
-
-  // Hash the default password once
-  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
-
-  for (const userData of DEMO_USERS) {
-    // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
-      where: { email: userData.email, organizationId },
-    });
-
-    if (existingUser) {
-      console.log(`    - User "${userData.email}" already exists, skipping`);
-      existing++;
-      continue;
-    }
-
-    // Get role ID
-    const roleId = rolesMap.get(userData.roleName);
-    if (!roleId) {
-      console.log(`    ! Role "${userData.roleName}" not found for user "${userData.email}", skipping`);
-      continue;
-    }
-
-    // Create user
-    await prisma.user.create({
-      data: {
-        email: userData.email,
-        passwordHash,
-        name: userData.name,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        status: UserStatus.ACTIVE,
-        roleId,
-        organizationId,
-      },
-    });
-
-    console.log(`    + Created user: ${userData.email} (${userData.roleName})`);
-    created++;
-  }
-
-  return { created, existing };
-}
-
-async function createDemoOrganization() {
-  console.log('\nChecking for demo organization...');
-
-  // Check if demo organization exists
-  let org = await prisma.organization.findFirst({
-    where: { name: 'Mizano Demo' },
-  });
-
-  if (org) {
-    console.log('  Demo organization already exists');
-    return org;
-  }
-
-  // Create demo organization
-  org = await prisma.organization.create({
-    data: {
-      name: 'Mizano Demo',
+  // 1. ORGANIZATION
+  console.log('\n1. Creating organization...');
+  const org = await prisma.organization.upsert({
+    where: { id: 'seed-org-001' },
+    update: {},
+    create: {
+      id: 'seed-org-001',
+      name: 'Mizano Demo Company',
       email: 'demo@mizano.com',
-      phone: '+1-555-123-4567',
-      address: '123 Demo Street, Demo City, DC 12345',
+      phone: '+201234567890',
+      address: '123 Tahrir Square, Downtown',
+      city: 'Cairo',
+      country: 'Egypt',
       currency: 'USD',
-      taxId: 'DEMO-TAX-123',
+      taxId: 'TAX-DEMO-2024',
+    },
+  });
+  const orgId = org.id;
+  console.log(`  ✓ Organization: ${org.name}`);
+
+  // 2. ROLES
+  console.log('\n2. Creating roles...');
+  const admin = await prisma.role.upsert({
+    where: { name_organizationId: { name: 'Admin', organizationId: orgId } },
+    update: {},
+    create: {
+      name: 'Admin',
+      description: 'Full system access',
+      isDefault: true,
+      organizationId: orgId,
     },
   });
 
-  console.log('  + Created demo organization: Mizano Demo');
-  return org;
-}
-
-async function main() {
-  console.log('='.repeat(50));
-  console.log('Starting Mizano ERP database seed...');
-  console.log('='.repeat(50));
-
-  // Create demo organization if none exist
-  const organizations = await prisma.organization.findMany({
-    select: { id: true, name: true },
+  await prisma.role.upsert({
+    where: { name_organizationId: { name: 'Manager', organizationId: orgId } },
+    update: {},
+    create: { name: 'Manager', description: 'Manager', isDefault: false, organizationId: orgId },
   });
 
-  let orgsToSeed = organizations;
+  await prisma.role.upsert({
+    where: { name_organizationId: { name: 'Accountant', organizationId: orgId } },
+    update: {},
+    create: { name: 'Accountant', description: 'Accountant', isDefault: false, organizationId: orgId },
+  });
 
-  if (organizations.length === 0) {
-    console.log('\nNo organizations found. Creating demo organization...');
-    const demoOrg = await createDemoOrganization();
-    orgsToSeed = [{ id: demoOrg.id, name: demoOrg.name }];
+  await prisma.role.upsert({
+    where: { name_organizationId: { name: 'SalesRep', organizationId: orgId } },
+    update: {},
+    create: { name: 'SalesRep', description: 'Sales Rep', isDefault: false, organizationId: orgId },
+  });
+
+  await prisma.role.upsert({
+    where: { name_organizationId: { name: 'StoreKeeper', organizationId: orgId } },
+    update: {},
+    create: { name: 'StoreKeeper', description: 'Store Keeper', isDefault: false, organizationId: orgId },
+  });
+
+  console.log('  ✓ 5 roles created');
+
+  // 3. USERS
+  console.log('\n3. Creating users...');
+  const users = [
+    { email: 'admin@mizano.com', name: 'Admin User' },
+    { email: 'manager@mizano.com', name: 'Manager' },
+    { email: 'accountant@mizano.com', name: 'Accountant' },
+    { email: 'sales@mizano.com', name: 'Sales Rep' },
+    { email: 'storekeeper@mizano.com', name: 'Store Keeper' },
+  ];
+
+  for (const userData of users) {
+    const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+    await prisma.user.upsert({
+      where: { email_organizationId: { email: userData.email, organizationId: orgId } },
+      update: {},
+      create: {
+        email: userData.email,
+        name: userData.name,
+        passwordHash: hashedPassword,
+        status: UserStatus.ACTIVE,
+        roleId: admin.id,
+        organizationId: orgId,
+      },
+    });
   }
+  console.log(`  ✓ ${users.length} users created`);
 
-  console.log(`\nFound ${orgsToSeed.length} organization(s) to seed`);
+  // 4. CHART OF ACCOUNTS
+  console.log('\n4. Creating chart of accounts...');
+  const accountsData = [
+    { code: '1000', name: 'Cash', type: AccountType.ASSET },
+    { code: '1010', name: 'Bank Account', type: AccountType.ASSET },
+    { code: '1100', name: 'Inventory', type: AccountType.ASSET },
+    { code: '2000', name: 'Accounts Payable', type: AccountType.LIABILITY },
+    { code: '3000', name: 'Owner Capital', type: AccountType.EQUITY },
+    { code: '4000', name: 'Sales Revenue', type: AccountType.REVENUE },
+    { code: '5000', name: 'Cost of Goods Sold', type: AccountType.EXPENSE },
+    { code: '5100', name: 'Salary Expense', type: AccountType.EXPENSE },
+  ];
 
-  let totalRolesCreated = 0;
-  let totalRolesExisting = 0;
-  let totalUsersCreated = 0;
-  let totalUsersExisting = 0;
-
-  for (const org of orgsToSeed) {
-    // Seed roles first
-    const roleResult = await seedRolesForOrganization(org.id, org.name);
-    totalRolesCreated += roleResult.created;
-    totalRolesExisting += roleResult.existing;
-
-    // Seed users with roles
-    const userResult = await seedUsersForOrganization(org.id, org.name, roleResult.rolesMap);
-    totalUsersCreated += userResult.created;
-    totalUsersExisting += userResult.existing;
+  const accountMap: Record<string, string> = {};
+  for (const accData of accountsData) {
+    const acc = await prisma.account.upsert({
+      where: { code_organizationId: { code: accData.code, organizationId: orgId } },
+      update: {},
+      create: { ...accData, organizationId: orgId },
+    });
+    accountMap[accData.code] = acc.id;
   }
+  console.log(`  ✓ ${accountsData.length} accounts created`);
 
-  console.log('\n' + '='.repeat(50));
-  console.log('Seed Summary');
-  console.log('='.repeat(50));
-  console.log(`Roles created:        ${totalRolesCreated}`);
-  console.log(`Roles already exist:  ${totalRolesExisting}`);
-  console.log(`Users created:        ${totalUsersCreated}`);
-  console.log(`Users already exist:  ${totalUsersExisting}`);
-  console.log('='.repeat(50));
+  // 5. CUSTOMERS
+  console.log('\n5. Creating customers...');
+  const customers = [
+    { id: 'cust-001', name: 'TechCorp Egypt', email: 'hello@techcorp.eg', phone: '+201001234567', billingCity: 'Cairo', billingCountry: 'Egypt' },
+    { id: 'cust-002', name: 'Global Solutions', email: 'info@global.com', phone: '+201101234567', billingCity: 'Alexandria', billingCountry: 'Egypt' },
+    { id: 'cust-003', name: 'Retail Plus', email: 'contact@retail.eg', phone: '+201201234567', billingCity: 'Giza', billingCountry: 'Egypt' },
+  ];
+
+  const custMap: Record<string, string> = {};
+  for (const custData of customers) {
+    const cust = await prisma.customer.upsert({
+      where: { id: custData.id },
+      update: {},
+      create: { ...custData, organizationId: orgId },
+    });
+    custMap[custData.id] = cust.id;
+  }
+  console.log(`  ✓ ${customers.length} customers created`);
+
+  // 6. VENDORS
+  console.log('\n6. Creating vendors...');
+  const vendors = [
+    { id: 'vend-001', name: 'Supplier Alpha', email: 'sales@alpha.com', phone: '+201001111111', billingCity: 'Cairo', billingCountry: 'Egypt' },
+    { id: 'vend-002', name: 'Supplier Beta', email: 'contact@beta.com', phone: '+201101111111', billingCity: 'Alexandria', billingCountry: 'Egypt' },
+  ];
+
+  const vendMap: Record<string, string> = {};
+  for (const vendData of vendors) {
+    const vend = await prisma.vendor.upsert({
+      where: { id: vendData.id },
+      update: {},
+      create: { ...vendData, organizationId: orgId },
+    });
+    vendMap[vendData.id] = vend.id;
+  }
+  console.log(`  ✓ ${vendors.length} vendors created`);
+
+  // 7. ITEMS
+  console.log('\n7. Creating inventory items...');
+  const items = [
+    { id: 'item-001', sku: 'ITEM-001', name: 'Laptop Pro 15"', type: ItemType.GOODS, sellingPrice: new Decimal(1299.99) },
+    { id: 'item-002', sku: 'ITEM-002', name: 'Desktop Monitor', type: ItemType.GOODS, sellingPrice: new Decimal(349.99) },
+    { id: 'item-003', sku: 'ITEM-003', name: 'USB Cable', type: ItemType.GOODS, sellingPrice: new Decimal(9.99) },
+  ];
+
+  const itemMap: Record<string, string> = {};
+  for (const itemData of items) {
+    const item = await prisma.item.upsert({
+      where: { id: itemData.id },
+      update: {},
+      create: { ...itemData, organizationId: orgId },
+    });
+    itemMap[itemData.id] = item.id;
+  }
+  console.log(`  ✓ ${items.length} items created`);
+
+  // 8. WAREHOUSES
+  console.log('\n8. Creating warehouses...');
+  const warehouses = [
+    { id: 'wh-001', code: 'WH-MAIN', name: 'Main Warehouse', street: '10 Industrial Zone', city: 'Cairo', country: 'Egypt', isDefault: true },
+    { id: 'wh-002', code: 'WH-NORTH', name: 'North Center', street: '55 Alex-Cairo Rd', city: 'Alexandria', country: 'Egypt', isDefault: false },
+  ];
+
+  const whMap: Record<string, string> = {};
+  for (const whData of warehouses) {
+    const wh = await prisma.warehouse.upsert({
+      where: { id: whData.id },
+      update: {},
+      create: { ...whData, organizationId: orgId },
+    });
+    whMap[whData.id] = wh.id;
+  }
+  console.log(`  ✓ ${warehouses.length} warehouses created`);
+
+  // 9. BANK ACCOUNTS
+  console.log('\n9. Creating bank accounts...');
+  const bankAccounts = [
+    { id: 'bank-001', name: 'Business Checking', type: 'BANK' as const, accountNumber: '1234567890', linkedAccountId: accountMap['1010'] },
+    { id: 'bank-002', name: 'Petty Cash', type: 'PETTY_CASH' as const, linkedAccountId: accountMap['1000'] },
+  ];
+
+  const bankMap: Record<string, string> = {};
+  for (const baData of bankAccounts) {
+    const ba = await prisma.bankAccount.upsert({
+      where: { id: baData.id },
+      update: {},
+      create: { ...baData, organizationId: orgId },
+    });
+    bankMap[baData.id] = ba.id;
+  }
+  console.log(`  ✓ ${bankAccounts.length} bank accounts created`);
+
+  // 10. INVOICES
+  console.log('\n10. Creating invoices...');
+  const invoices = [
+    { invoiceNumber: 'INV-001', customerId: custMap['cust-001'], date: new Date(Date.now() - 30 * 86400000), dueDate: new Date(), status: InvoiceStatus.DRAFT, grandTotal: new Decimal(1299.99) },
+    { invoiceNumber: 'INV-002', customerId: custMap['cust-002'], date: new Date(Date.now() - 20 * 86400000), dueDate: new Date(), status: InvoiceStatus.DRAFT, grandTotal: new Decimal(699.98) },
+  ];
+
+  for (const invData of invoices) {
+    await prisma.invoice.upsert({
+      where: { id: `inv-${invData.invoiceNumber}` },
+      update: {},
+      create: {
+        id: `inv-${invData.invoiceNumber}`,
+        ...invData,
+        subtotal: invData.grandTotal,
+        balanceDue: invData.grandTotal,
+        organizationId: orgId,
+      },
+    });
+  }
+  console.log(`  ✓ ${invoices.length} invoices created`);
+
+  // 11. BILLS
+  console.log('\n11. Creating bills...');
+  const bills = [
+    { billNumber: 'BILL-001', vendorId: vendMap['vend-001'], date: new Date(Date.now() - 25 * 86400000), dueDate: new Date(), status: BillStatus.DRAFT, grandTotal: new Decimal(5000) },
+    { billNumber: 'BILL-002', vendorId: vendMap['vend-002'], date: new Date(Date.now() - 15 * 86400000), dueDate: new Date(), status: BillStatus.DRAFT, grandTotal: new Decimal(3500) },
+  ];
+
+  for (const billData of bills) {
+    await prisma.bill.upsert({
+      where: { id: `bill-${billData.billNumber}` },
+      update: {},
+      create: {
+        id: `bill-${billData.billNumber}`,
+        ...billData,
+        subtotal: billData.grandTotal,
+        balanceDue: billData.grandTotal,
+        organizationId: orgId,
+      },
+    });
+  }
+  console.log(`  ✓ ${bills.length} bills created`);
+
+  console.log('\n' + '='.repeat(60));
+  console.log('✅ Seed completed successfully!');
+  console.log('='.repeat(60));
   console.log('\nDemo Credentials:');
-  console.log('  Email: admin@mizano.com');
+  console.log('  Email:    admin@mizano.com');
   console.log('  Password: password123');
   console.log('\nOther demo users:');
-  DEMO_USERS.forEach((u) => console.log(`  - ${u.email} (${u.roleName})`));
-  console.log('\nSeed completed successfully!');
+  console.log('  manager@mizano.com');
+  console.log('  accountant@mizano.com');
+  console.log('  sales@mizano.com');
+  console.log('  storekeeper@mizano.com');
+  console.log('='.repeat(60));
 }
 
 main()
   .catch((e) => {
-    console.error('Seed failed:', e);
+    console.error(e);
     process.exit(1);
   })
   .finally(async () => {

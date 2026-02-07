@@ -50,6 +50,20 @@ const billSchema = z.object({
 
 type BillFormData = z.infer<typeof billSchema>;
 
+export interface BillFormDefaultValues {
+  vendorId?: string;
+  date?: string;
+  dueDate?: string;
+  notes?: string;
+  projectId?: string;
+  lines?: Array<{
+    description: string;
+    quantity: string;
+    rate: string;
+    taxRate?: string;
+  }>;
+}
+
 interface BillFormProps {
   bill?: Bill | null;
   accounts?: Array<{ id: string; code: string; name: string; type: string }>;
@@ -59,6 +73,8 @@ interface BillFormProps {
   onCancel: () => void;
   isSubmitting?: boolean;
   defaultVendorId?: string;
+  /** Pre-fill form from AI document scan */
+  scanDefaults?: BillFormDefaultValues;
 }
 
 const taxRates = [
@@ -78,6 +94,7 @@ export function BillForm({
   onCancel,
   isSubmitting,
   defaultVendorId,
+  scanDefaults,
 }: BillFormProps) {
   const isEditing = !!bill;
   const { data: vendorsData } = useVendors({ limit: 100 });
@@ -89,12 +106,19 @@ export function BillForm({
   const form = useForm<BillFormData>({
     resolver: zodResolver(billSchema),
     defaultValues: {
-      vendorId: defaultVendorId || '',
-      date: format(new Date(), 'yyyy-MM-dd'),
-      dueDate: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
-      notes: '',
-      projectId: '',
-      lines: [{ description: '', quantity: '1', rate: '', taxRate: '0' }],
+      vendorId: scanDefaults?.vendorId || defaultVendorId || '',
+      date: scanDefaults?.date || format(new Date(), 'yyyy-MM-dd'),
+      dueDate: scanDefaults?.dueDate || format(addDays(new Date(), 30), 'yyyy-MM-dd'),
+      notes: scanDefaults?.notes || '',
+      projectId: scanDefaults?.projectId || '',
+      lines: scanDefaults?.lines?.length
+        ? scanDefaults.lines.map((l) => ({
+            description: l.description,
+            quantity: l.quantity,
+            rate: l.rate,
+            taxRate: l.taxRate || '0',
+          }))
+        : [{ description: '', quantity: '1', rate: '', taxRate: '0' }],
     },
   });
 

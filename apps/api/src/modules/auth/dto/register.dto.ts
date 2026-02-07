@@ -15,11 +15,17 @@ export class RegisterDto {
   @Matches(/[0-9]/, { message: 'Password must contain at least one number' })
   password: string;
 
-  @ApiProperty({ example: 'John Doe' })
+  @ApiProperty({ example: 'John' })
   @IsString()
   @IsNotEmpty()
-  @MinLength(2)
-  name: string;
+  @MinLength(1)
+  firstName: string;
+
+  @ApiProperty({ example: 'Doe' })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(1)
+  lastName: string;
 
   @ApiProperty({ example: 'Acme Corporation' })
   @IsString()

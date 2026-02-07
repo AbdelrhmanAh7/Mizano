@@ -1,4 +1,7 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Inject, Optional } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface HealthCheckResponse {
@@ -11,29 +14,31 @@ interface HealthCheckResponse {
       status: 'connected' | 'disconnected';
       latency?: number;
     };
-    redis?: {
-      status: 'connected' | 'disconnected';
+    redis: {
+      status: 'connected' | 'disconnected' | 'not_configured';
       latency?: number;
     };
   };
 }
 
+@SkipThrottle()
 @Controller('health')
 export class HealthController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
+  ) {}
 
   @Get()
   async check(): Promise<HealthCheckResponse> {
-    const startTime = Date.now();
     const response: HealthCheckResponse = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       version: process.env.npm_package_version || '1.0.0',
       services: {
-        database: {
-          status: 'disconnected',
-        },
+        database: { status: 'disconnected' },
+        redis: { status: 'not_configured' },
       },
     };
 
@@ -45,11 +50,31 @@ export class HealthController {
         status: 'connected',
         latency: Date.now() - dbStart,
       };
-    } catch (error) {
+    } catch {
       response.status = 'unhealthy';
-      response.services.database = {
-        status: 'disconnected',
-      };
+      response.services.database = { status: 'disconnected' };
+    }
+
+    // Check Redis/cache connection
+    if (this.cacheManager) {
+      try {
+        const redisStart = Date.now();
+        const testKey = '__health_check__';
+        await this.cacheManager.set(testKey, 'ok', 5000);
+        const result = await this.cacheManager.get(testKey);
+        await this.cacheManager.del(testKey);
+        if (result === 'ok') {
+          response.services.redis = {
+            status: 'connected',
+            latency: Date.now() - redisStart,
+          };
+        } else {
+          response.services.redis = { status: 'disconnected' };
+          response.status = 'unhealthy';
+        }
+      } catch {
+        response.services.redis = { status: 'disconnected' };
+      }
     }
 
     return response;
@@ -60,7 +85,7 @@ export class HealthController {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
       return { ready: true, message: 'Service is ready' };
-    } catch (error) {
+    } catch {
       return { ready: false, message: 'Database not available' };
     }
   }

@@ -93,29 +93,28 @@ const projectsApi = {
   getAll: (params?: ProjectFilters) => api.get('/projects', { params }),
   getOne: (id: string) => api.get(`/projects/${id}`),
   create: (data: any) => api.post('/projects', data),
-  update: (id: string, data: any) => api.patch(`/projects/${id}`, data),
+  update: (id: string, data: any) => api.put(`/projects/${id}`, data),
   delete: (id: string) => api.delete(`/projects/${id}`),
   getProfitability: (id: string) => api.get(`/projects/${id}/profitability`),
-  createInvoice: (id: string, data: any) => api.post(`/projects/${id}/create-invoice`, data),
+  createInvoice: (id: string, data: any) => api.post(`/projects/${id}/invoice`, data),
 };
 
 const tasksApi = {
-  getAll: (projectId: string) => api.get(`/projects/${projectId}/tasks`),
-  create: (projectId: string, data: any) => api.post(`/projects/${projectId}/tasks`, data),
-  update: (projectId: string, taskId: string, data: any) =>
-    api.patch(`/projects/${projectId}/tasks/${taskId}`, data),
-  delete: (projectId: string, taskId: string) =>
-    api.delete(`/projects/${projectId}/tasks/${taskId}`),
+  getAll: (projectId: string) => api.get(`/tasks/project/${projectId}`),
+  create: (data: any) => api.post('/tasks', data),
+  update: (taskId: string, data: any) => api.put(`/tasks/${taskId}`, data),
+  delete: (taskId: string) => api.delete(`/tasks/${taskId}`),
 };
 
 const timesheetsApi = {
   getAll: (params?: TimesheetFilters) => api.get('/timesheets', { params }),
   create: (data: any) => api.post('/timesheets', data),
-  update: (id: string, data: any) => api.patch(`/timesheets/${id}`, data),
+  update: (id: string, data: any) => api.put(`/timesheets/${id}`, data),
   delete: (id: string) => api.delete(`/timesheets/${id}`),
-  startTimer: (taskId: string) => api.post('/timesheets/timer/start', { taskId }),
-  stopTimer: () => api.post('/timesheets/timer/stop'),
-  getActiveTimer: () => api.get('/timesheets/timer/active'),
+  startTimer: (data: { projectId: string; taskId?: string; description?: string }) =>
+    api.post('/timesheets/timer/start', data),
+  stopTimer: (id: string) => api.post(`/timesheets/timer/stop/${id}`),
+  getActiveTimer: () => api.get('/timesheets/timer/running'),
 };
 
 // Project Hooks
@@ -229,7 +228,7 @@ export function useCreateTask() {
 
   return useMutation({
     mutationFn: ({ projectId, data }: { projectId: string; data: any }) =>
-      tasksApi.create(projectId, data),
+      tasksApi.create({ ...data, projectId }),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
@@ -246,7 +245,7 @@ export function useUpdateTask() {
 
   return useMutation({
     mutationFn: ({ projectId, taskId, data }: { projectId: string; taskId: string; data: any }) =>
-      tasksApi.update(projectId, taskId, data),
+      tasksApi.update(taskId, data),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
@@ -263,7 +262,7 @@ export function useDeleteTask() {
 
   return useMutation({
     mutationFn: ({ projectId, taskId }: { projectId: string; taskId: string }) =>
-      tasksApi.delete(projectId, taskId),
+      tasksApi.delete(taskId),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });

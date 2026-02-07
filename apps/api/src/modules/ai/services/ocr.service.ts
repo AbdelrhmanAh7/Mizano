@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { Decimal } from '@prisma/client/runtime/library';
 import * as Tesseract from 'tesseract.js';
 
 export interface ExtractedInvoiceData {
@@ -423,7 +424,7 @@ export class OcrService {
         where: {
           organizationId,
           vendorId,
-          grandTotal: amount,
+          grandTotal: new Decimal(amount),
           createdAt: { gte: threeDaysAgo },
           deletedAt: null,
         },

@@ -42,6 +42,27 @@ export interface DeadStockItem {
   suggestedDiscount: number;
 }
 
+export interface AbcClassification {
+  itemId: string;
+  itemName: string;
+  sku: string;
+  annualValue: number;
+  cumulativePercentage: number;
+  category: 'A' | 'B' | 'C';
+  serviceLevel: number;
+}
+
+export interface AbcDashboard {
+  classifications: AbcClassification[];
+  summary: {
+    A: { count: number; valuePercentage: number; serviceLevel: number };
+    B: { count: number; valuePercentage: number; serviceLevel: number };
+    C: { count: number; valuePercentage: number; serviceLevel: number };
+  };
+  totalItems: number;
+  totalAnnualValue: number;
+}
+
 @Injectable()
 export class ReorderPointsService {
   private readonly logger = new Logger(ReorderPointsService.name);
@@ -50,6 +71,7 @@ export class ReorderPointsService {
   private readonly HOLDING_COST_RATE = 0.25; // 25% of item cost
   private readonly DEFAULT_ORDERING_COST = 50; // Default ordering cost
   private readonly DEAD_STOCK_DAYS = 90;
+  private readonly ABC_SERVICE_LEVELS = { A: 0.98, B: 0.95, C: 0.90 };
 
   constructor(private prisma: PrismaService) {}
 
@@ -605,5 +627,191 @@ export class ReorderPointsService {
       deadStockCount: deadStock.length,
       totalDeadStockValue: deadStock.reduce((sum, d) => sum + d.stockValue, 0),
     };
+  }
+
+  // ─── ABC ANALYSIS ───
+
+  /**
+   * Perform ABC Analysis on inventory items.
+   * Classifies items into A (top 80% of value), B (next 15%), C (remaining 5%).
+   * Each category gets a different service level for reorder point calculations.
+   */
+  async performAbcAnalysis(organizationId: string): Promise<AbcDashboard> {
+    // Get all GOODS items with their demand data
+    const items = await this.prisma.item.findMany({
+      where: {
+        organizationId,
+        type: 'GOODS',
+        isActive: true,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        costPrice: true,
+        reorderAnalysis: {
+          select: {
+            avgDailyDemand: true,
+          },
+        },
+      },
+    });
+
+    if (items.length === 0) {
+      return {
+        classifications: [],
+        summary: {
+          A: { count: 0, valuePercentage: 0, serviceLevel: this.ABC_SERVICE_LEVELS.A },
+          B: { count: 0, valuePercentage: 0, serviceLevel: this.ABC_SERVICE_LEVELS.B },
+          C: { count: 0, valuePercentage: 0, serviceLevel: this.ABC_SERVICE_LEVELS.C },
+        },
+        totalItems: 0,
+        totalAnnualValue: 0,
+      };
+    }
+
+    // Calculate annual value for each item
+    const itemValues = items.map((item) => {
+      const avgDailyDemand = item.reorderAnalysis
+        ? Number(item.reorderAnalysis.avgDailyDemand)
+        : 0;
+      const annualValue = avgDailyDemand * 365 * Number(item.costPrice);
+
+      return {
+        itemId: item.id,
+        itemName: item.name,
+        sku: item.sku,
+        annualValue,
+      };
+    });
+
+    // Sort by annual value descending
+    itemValues.sort((a, b) => b.annualValue - a.annualValue);
+
+    // Calculate total annual value
+    const totalAnnualValue = itemValues.reduce((sum, i) => sum + i.annualValue, 0);
+
+    // Classify items into A, B, C
+    let cumulativeValue = 0;
+    const classifications: AbcClassification[] = itemValues.map((item) => {
+      cumulativeValue += item.annualValue;
+      const cumulativePercentage =
+        totalAnnualValue > 0 ? (cumulativeValue / totalAnnualValue) * 100 : 0;
+
+      let category: 'A' | 'B' | 'C';
+      if (cumulativePercentage <= 80) {
+        category = 'A';
+      } else if (cumulativePercentage <= 95) {
+        category = 'B';
+      } else {
+        category = 'C';
+      }
+
+      return {
+        itemId: item.itemId,
+        itemName: item.itemName,
+        sku: item.sku,
+        annualValue: item.annualValue,
+        cumulativePercentage,
+        category,
+        serviceLevel: this.ABC_SERVICE_LEVELS[category],
+      };
+    });
+
+    // Build summary
+    const summary = { A: { count: 0, value: 0 }, B: { count: 0, value: 0 }, C: { count: 0, value: 0 } };
+    for (const item of classifications) {
+      summary[item.category].count++;
+      summary[item.category].value += item.annualValue;
+    }
+
+    return {
+      classifications,
+      summary: {
+        A: {
+          count: summary.A.count,
+          valuePercentage: totalAnnualValue > 0 ? (summary.A.value / totalAnnualValue) * 100 : 0,
+          serviceLevel: this.ABC_SERVICE_LEVELS.A,
+        },
+        B: {
+          count: summary.B.count,
+          valuePercentage: totalAnnualValue > 0 ? (summary.B.value / totalAnnualValue) * 100 : 0,
+          serviceLevel: this.ABC_SERVICE_LEVELS.B,
+        },
+        C: {
+          count: summary.C.count,
+          valuePercentage: totalAnnualValue > 0 ? (summary.C.value / totalAnnualValue) * 100 : 0,
+          serviceLevel: this.ABC_SERVICE_LEVELS.C,
+        },
+      },
+      totalItems: classifications.length,
+      totalAnnualValue,
+    };
+  }
+
+  /**
+   * Recalculate reorder points using ABC-based service levels.
+   * A items get higher service levels (less stockout risk), C items get lower.
+   */
+  async recalculateWithAbcServiceLevels(organizationId: string): Promise<{
+    updated: number;
+    byCategory: { A: number; B: number; C: number };
+  }> {
+    const abcResult = await this.performAbcAnalysis(organizationId);
+    let updated = 0;
+    const byCategory = { A: 0, B: 0, C: 0 };
+
+    for (const item of abcResult.classifications) {
+      try {
+        const analysis = await this.calculateForItem(
+          organizationId,
+          item.itemId,
+          this.DEFAULT_LEAD_TIME_DAYS,
+          item.serviceLevel,
+        );
+
+        // Update the reorder analysis with ABC-adjusted values
+        await this.prisma.itemReorderAnalysis.upsert({
+          where: { itemId: item.itemId },
+          update: {
+            safetyStock: analysis.safetyStock,
+            reorderPoint: analysis.reorderPoint,
+            economicOrderQty: analysis.economicOrderQty,
+            status: analysis.status,
+            calculatedAt: new Date(),
+          },
+          create: {
+            organizationId,
+            itemId: item.itemId,
+            avgDailyDemand: new Decimal(analysis.avgDailyDemand),
+            demandStdDev: new Decimal(analysis.demandStdDev),
+            leadTimeDays: this.DEFAULT_LEAD_TIME_DAYS,
+            safetyStock: analysis.safetyStock,
+            reorderPoint: analysis.reorderPoint,
+            economicOrderQty: analysis.economicOrderQty,
+            status: analysis.status,
+          },
+        });
+
+        await this.prisma.item.update({
+          where: { id: item.itemId },
+          data: { reorderPoint: analysis.reorderPoint },
+        });
+
+        updated++;
+        byCategory[item.category]++;
+      } catch (error) {
+        this.logger.error(
+          `Failed to update reorder for item ${item.itemId} (${item.category}): ${error}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `ABC-adjusted reorder points: ${updated} items (A:${byCategory.A}, B:${byCategory.B}, C:${byCategory.C})`,
+    );
+
+    return { updated, byCategory };
   }
 }

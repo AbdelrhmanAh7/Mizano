@@ -106,7 +106,7 @@ const navigationConfig: NavItem[] = [
     ],
   },
   {
-    nameKey: 'banking',
+    nameKey: 'banking.title',
     href: '/banking',
     icon: Landmark,
     permission: 'banking.view',
@@ -137,7 +137,7 @@ const navigationConfig: NavItem[] = [
     ],
   },
   {
-    nameKey: 'hr',
+    nameKey: 'hr.title',
     href: '/hr',
     icon: UserCircle,
     permission: 'hr.view',
@@ -158,7 +158,16 @@ const navigationConfig: NavItem[] = [
       { nameKey: 'tax.payments', href: '/tax/payments', icon: DollarSign },
     ],
   },
-  { nameKey: 'crm', href: '/crm', icon: Target, permission: 'crm.view' },
+  {
+    nameKey: 'crm.title',
+    href: '/crm',
+    icon: Target,
+    permission: 'crm.view',
+    children: [
+      { nameKey: 'crm.leads', href: '/crm/leads', icon: Users },
+      { nameKey: 'crm.deals', href: '/crm/deals', icon: DollarSign },
+    ],
+  },
   { nameKey: 'reports', href: '/reports', icon: BarChart3, permission: 'reports.view' },
   { nameKey: 'aiInsights', href: '/ai-insights', icon: Brain },
   { nameKey: 'settings', href: '/settings', icon: Settings, permission: 'settings.view' },

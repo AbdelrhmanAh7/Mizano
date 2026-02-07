@@ -28,6 +28,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -273,6 +274,7 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Warehouse</DialogTitle>
+            <DialogDescription>Update warehouse details below.</DialogDescription>
           </DialogHeader>
           <WarehouseForm
             warehouse={warehouse}

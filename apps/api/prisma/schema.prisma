@@ -97,6 +97,13 @@ enum AdjustmentReason {
   OTHER
 }
 
+enum TransferStatus {
+  PENDING
+  IN_TRANSIT
+  COMPLETED
+  CANCELLED
+}
+
 enum BankAccountType {
   BANK
   CREDIT_CARD
@@ -253,6 +260,7 @@ enum PriceListType {
 // ============================================
 
 enum AiFeature {
+  // Core Financial AI (10)
   CATEGORIZATION
   RECONCILIATION
   OCR_LAYOUT
@@ -263,6 +271,35 @@ enum AiFeature {
   PAYMENT_PREDICTION
   CASH_FLOW
   PATTERN_DETECTION
+  // Sales & CRM AI (5)
+  CHURN_PREDICTION
+  CLV_ANALYSIS
+  CROSS_SELL
+  DYNAMIC_PRICING
+  PIPELINE_FORECAST
+  // Security & Compliance AI (3)
+  FRAUD_DETECTION
+  COMPLIANCE_MONITORING
+  AUDIT_RISK
+  // NLP AI (4)
+  DOCUMENT_CLASSIFICATION
+  SENTIMENT_ANALYSIS
+  ENTITY_EXTRACTION
+  CONTRACT_ANALYSIS
+  // HR AI (3)
+  EMPLOYEE_ATTRITION
+  COMPENSATION_BENCHMARK
+  SKILLS_GAP
+  // Operations AI (5)
+  QUALITY_PREDICTION
+  PREDICTIVE_MAINTENANCE
+  WORKFORCE_SCHEDULING
+  ROUTE_OPTIMIZATION
+  RESOURCE_OPTIMIZATION
+  // Conversational & Voice AI (3)
+  CHATBOT
+  KNOWLEDGE_ASSISTANT
+  VOICE_COMMAND
 }
 
 enum LeadTier {
@@ -452,6 +489,8 @@ model Organization {
   inventoryMovements    InventoryMovement[]
   inventoryAdjustments  InventoryAdjustment[]
   inventoryLevels       InventoryLevel[]
+  inventoryCostLayers   InventoryCostLayer[]
+  inventoryTransfers    InventoryTransfer[]
   priceLists            PriceList[]
   bankAccounts          BankAccount[]
   bankTransactions      BankTransaction[]
@@ -491,8 +530,12 @@ model Organization {
   leadScores             LeadScore[]
 
   // New AI & Module Relations
-  transactionPatterns TransactionPattern[]
-  deliveryChallans    DeliveryChallan[]
+  transactionPatterns            TransactionPattern[]
+  customerAiProfiles             CustomerAiProfile[]
+  employeeAiProfiles             EmployeeAiProfile[]
+  fraudAlerts                    FraudAlert[]
+  assetMaintenancePredictions    AssetMaintenancePrediction[]
+  deliveryChallans               DeliveryChallan[]
   exchangeRates       ExchangeRate[]
   emailLogs           EmailLog[]
   activityLogs        ActivityLog[]
@@ -576,6 +619,7 @@ model User {
   // Relations
   organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   role             Role             @relation(fields: [roleId], references: [id])
+  preferences      UserPreferences?
   timesheetEntries TimesheetEntry[]
   auditLogs        AuditLog[]
   notifications    Notification[]
@@ -588,6 +632,30 @@ model User {
   @@index([organizationId])
   @@index([email])
   @@map("users")
+}
+
+model UserPreferences {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  // Tour Progress Tracking
+  tourProgress   Json?     // { "sales_invoices": { completed: true, step: 5, completedAt: "..." }, ... }
+  tourDismissed  String[]  // Array of dismissed tour IDs
+  lastTourSeenAt DateTime?
+
+  // UI Preferences (future-proofing)
+  theme             String?  @default("light")
+  sidebarCollapsed  Boolean  @default(false)
+  dashboardLayout   Json?
+  notificationPrefs Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
 }
 
 model Role {
@@ -674,6 +742,7 @@ model Journal {
   reference      String?
   notes          String?
   isPosted       Boolean   @default(true)
+  reversalOfId   String?   @unique
   organizationId String
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -683,6 +752,10 @@ model Journal {
   organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   lines                 JournalLine[]
   depreciationSchedules DepreciationSchedule[]
+  reversalOf            Journal?               @relation("JournalReversal", fields: [reversalOfId], references: [id])
+  reversedBy            Journal?               @relation("JournalReversal")
+  payrollRun            PayrollRun?
+  workOrder             WorkOrder?
 
   @@unique([journalNumber, organizationId])
   @@index([organizationId])
@@ -780,6 +853,7 @@ model Customer {
   projects         Project[]
   deals            Deal[]
   deliveryChallans DeliveryChallan[]
+  aiProfile        CustomerAiProfile?
 
   @@index([organizationId])
   @@index([name])
@@ -1228,6 +1302,8 @@ model Item {
   reorderAnalysis      ItemReorderAnalysis?
   demandForecasts      ItemDemandForecast[]
   deliveryChallanLines DeliveryChallanLine[]
+  costLayers           InventoryCostLayer[]
+  transferLines        InventoryTransferLine[]
 
   @@unique([sku, organizationId])
   @@index([organizationId])
@@ -1289,6 +1365,9 @@ model Warehouse {
   inventoryAdjustments InventoryAdjustment[]
   inventoryLevels      InventoryLevel[]
   deliveryChallanLines DeliveryChallanLine[]
+  costLayers           InventoryCostLayer[]
+  transfersFrom        InventoryTransfer[]     @relation("TransferFrom")
+  transfersTo          InventoryTransfer[]     @relation("TransferTo")
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -1342,6 +1421,29 @@ model InventoryLevel {
   @@map("inventory_levels")
 }
 
+model InventoryCostLayer {
+  id             String   @id @default(cuid())
+  itemId         String
+  warehouseId    String
+  quantity       Decimal  @db.Decimal(19, 4) // remaining quantity in this layer
+  originalQty    Decimal  @db.Decimal(19, 4) // original quantity when created
+  costPerUnit    Decimal  @db.Decimal(19, 4)
+  referenceType  String? // bill, adjustment, production, opening
+  referenceId    String?
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  item         Item         @relation(fields: [itemId], references: [id])
+  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id])
+
+  @@index([organizationId])
+  @@index([itemId, warehouseId])
+  @@index([createdAt])
+  @@map("inventory_cost_layers")
+}
+
 model InventoryAdjustment {
   id               String           @id @default(cuid())
   adjustmentNumber String
@@ -1366,6 +1468,44 @@ model InventoryAdjustment {
   @@unique([adjustmentNumber, organizationId])
   @@index([organizationId])
   @@map("inventory_adjustments")
+}
+
+model InventoryTransfer {
+  id              String         @id @default(cuid())
+  transferNumber  String
+  fromWarehouseId String
+  toWarehouseId   String
+  date            DateTime
+  status          TransferStatus @default(PENDING)
+  notes           String?
+  organizationId  String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relations
+  organization  Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fromWarehouse Warehouse              @relation("TransferFrom", fields: [fromWarehouseId], references: [id])
+  toWarehouse   Warehouse              @relation("TransferTo", fields: [toWarehouseId], references: [id])
+  lines         InventoryTransferLine[]
+
+  @@unique([transferNumber, organizationId])
+  @@index([organizationId])
+  @@index([status])
+  @@map("inventory_transfers")
+}
+
+model InventoryTransferLine {
+  id         String  @id @default(cuid())
+  transferId String
+  itemId     String
+  quantity   Decimal @db.Decimal(19, 4)
+
+  // Relations
+  transfer InventoryTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  item     Item              @relation(fields: [itemId], references: [id])
+
+  @@index([transferId])
+  @@map("inventory_transfer_lines")
 }
 
 model PriceList {
@@ -1540,6 +1680,7 @@ model Employee {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   attendances  Attendance[]
   payslips     Payslip[]
+  aiProfile    EmployeeAiProfile?
 
   @@unique([employeeId, organizationId])
   @@index([organizationId])
@@ -1581,6 +1722,7 @@ model PayrollRun {
   totalGross      Decimal       @default(0) @db.Decimal(19, 4)
   totalDeductions Decimal       @default(0) @db.Decimal(19, 4)
   totalNet        Decimal       @default(0) @db.Decimal(19, 4)
+  journalId       String?       @unique
   organizationId  String
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -1588,6 +1730,7 @@ model PayrollRun {
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   payslips     Payslip[]
+  journal      Journal?     @relation(fields: [journalId], references: [id])
 
   @@unique([month, year, organizationId])
   @@index([organizationId])
@@ -1679,6 +1822,7 @@ model WorkOrder {
   actualStartDate  DateTime?
   completedDate    DateTime?
   notes            String?
+  journalId        String?         @unique
   organizationId   String
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
@@ -1687,6 +1831,7 @@ model WorkOrder {
   organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   bom               BOM               @relation(fields: [bomId], references: [id])
   productionEntries ProductionEntry[]
+  journal           Journal?          @relation(fields: [journalId], references: [id])
 
   @@unique([workOrderNumber, organizationId])
   @@index([organizationId])
@@ -2386,7 +2531,8 @@ model Asset {
   assetAccount           Account                @relation("AssetAccount", fields: [assetAccountId], references: [id])
   depreciationAccount    Account                @relation("DepreciationAccount", fields: [depreciationAccountId], references: [id])
   accumulatedDeprAccount Account                @relation("AccumulatedDeprAccount", fields: [accumulatedDeprAccountId], references: [id])
-  depreciationSchedule   DepreciationSchedule[]
+  depreciationSchedule      DepreciationSchedule[]
+  maintenancePredictions    AssetMaintenancePrediction[]
 
   @@unique([organizationId, assetNumber])
   @@index([organizationId])
@@ -2648,4 +2794,110 @@ model OrganizationOnboarding {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("organization_onboarding")
+}
+
+// ============================================
+// AI - CUSTOMER AI PROFILE (Churn, CLV, Cross-sell)
+// ============================================
+
+model CustomerAiProfile {
+  id               String    @id @default(cuid())
+  customerId       String    @unique
+  churnRisk        Decimal   @default(0) @db.Decimal(5, 4)
+  churnFactors     Json      @default("[]")
+  lifetimeValue    Decimal   @default(0) @db.Decimal(19, 4)
+  clvSegment       String?
+  rfmRecency       Int?
+  rfmFrequency     Int?
+  rfmMonetary      Decimal?  @db.Decimal(19, 4)
+  lastPurchaseDate DateTime?
+  crossSellItems   Json      @default("[]")
+  upsellItems      Json      @default("[]")
+  organizationId   String
+  calculatedAt     DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, churnRisk])
+  @@map("customer_ai_profiles")
+}
+
+// ============================================
+// AI - EMPLOYEE AI PROFILE (Attrition, Compensation, Skills)
+// ============================================
+
+model EmployeeAiProfile {
+  id                String    @id @default(cuid())
+  employeeId        String    @unique
+  attritionRisk     Decimal   @default(0) @db.Decimal(5, 4)
+  attritionFactors  Json      @default("[]")
+  compensationIndex Decimal?  @db.Decimal(5, 4)
+  skillsProfile     Json      @default("{}")
+  skillsGaps        Json      @default("[]")
+  organizationId    String
+  calculatedAt      DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee     Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, attritionRisk])
+  @@map("employee_ai_profiles")
+}
+
+// ============================================
+// AI - FRAUD ALERTS
+// ============================================
+
+model FraudAlert {
+  id               String    @id @default(cuid())
+  entityType       String
+  entityId         String
+  fraudScore       Decimal   @db.Decimal(5, 4)
+  signals          Json      @default("[]")
+  velocityCheck    Boolean   @default(false)
+  amountAnomaly    Boolean   @default(false)
+  timeAnomaly      Boolean   @default(false)
+  duplicateCheck   Boolean   @default(false)
+  isConfirmedFraud Boolean   @default(false)
+  isResolved       Boolean   @default(false)
+  resolvedAt       DateTime?
+  resolvedBy       String?
+  organizationId   String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, isResolved])
+  @@index([entityType, entityId])
+  @@map("fraud_alerts")
+}
+
+// ============================================
+// AI - ASSET MAINTENANCE PREDICTIONS
+// ============================================
+
+model AssetMaintenancePrediction {
+  id                   String    @id @default(cuid())
+  assetId              String
+  predictedFailureDate DateTime?
+  riskScore            Decimal   @db.Decimal(5, 4)
+  healthScore          Decimal   @db.Decimal(5, 4)
+  factors              Json      @default("[]")
+  recommendedAction    String?
+  organizationId       String
+  calculatedAt         DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([assetId])
+  @@map("asset_maintenance_predictions")
 }

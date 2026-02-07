@@ -73,3 +73,94 @@
   border-right: none;
   border-left: 1px solid hsl(var(--border));
 }
+
+/* ============================================
+   DRIVER.JS CUSTOMIZATION
+   ============================================ */
+
+/* Driver.js Popover Styling */
+.driver-popover {
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: hsl(var(--radius));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.driver-popover-title {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.driver-popover-description {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* Driver.js Buttons */
+.driver-popover-button {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: hsl(var(--radius));
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 200ms;
+}
+
+.driver-popover-button:hover {
+  opacity: 0.9;
+}
+
+.driver-popover-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Driver.js Progress Bar */
+.driver-popover-progress-bar {
+  height: 2px;
+  background-color: hsl(var(--border));
+  margin: 0.5rem 0 1rem;
+}
+
+.driver-popover-progress {
+  height: 100%;
+  background-color: hsl(var(--primary));
+  transition: width 300ms ease;
+}
+
+/* Driver.js Highlight */
+.driver-highlight {
+  border-radius: hsl(var(--radius));
+  box-shadow: inset 0 0 0 9999px rgba(0, 0, 0, 0.5);
+}
+
+/* RTL Support for Driver.js */
+[dir="rtl"] .driver-popover {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] .driver-popover-button {
+  margin-right: 0.5rem;
+  margin-left: 0;
+}
+
+/* Driver.js in Dark Mode */
+.dark .driver-popover {
+  background-color: hsl(var(--background));
+  border-color: hsl(var(--border));
+}
+
+.dark .driver-popover-title {
+  color: hsl(var(--foreground));
+}
+
+.dark .driver-popover-description {
+  color: hsl(var(--muted-foreground));
+}

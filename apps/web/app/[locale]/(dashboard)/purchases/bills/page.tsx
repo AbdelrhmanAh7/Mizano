@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Plus, Search, RefreshCw, Eye, Edit, Trash2, FileText } from 'lucide-react';
+import { Plus, Search, RefreshCw, Eye, Edit, Trash2, FileText, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -112,12 +112,20 @@ export default function BillsPage() {
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
-            <Button asChild>
-              <Link href="/purchases/bills/new">
-                <Plus className="mr-2 h-4 w-4" />
-                New Bill
-              </Link>
-            </Button>
+            <>
+              <Button asChild variant="outline">
+                <Link href="/purchases/bills/scan">
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Scan Bill
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href="/purchases/bills/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Bill
+                </Link>
+              </Button>
+            </>
           )}
         </div>
       </div>

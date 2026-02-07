@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class AiCategorizationService {
+  private readonly logger = new Logger(AiCategorizationService.name);
   constructor(private prisma: PrismaService) {}
 
   async categorizeTransaction(organizationId: string, description: string, amount: number, type: 'expense' | 'income') {
@@ -46,7 +47,7 @@ export class AiCategorizationService {
     const normalizedPattern = this.normalizeDescription(description);
 
     // Log the categorization for debugging/analytics purposes
-    console.log(`Categorization learned: ${normalizedPattern} -> ${accountId} (${type})`);
+    this.logger.log(`Categorization learned: ${normalizedPattern} -> ${accountId} (${type})`);
 
     return { success: true, pattern: normalizedPattern };
   }

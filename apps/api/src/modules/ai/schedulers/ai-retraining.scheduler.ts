@@ -130,6 +130,7 @@ export class AiRetrainingScheduler {
         'LEAD_SCORING',
         'DEMAND_FORECAST',
         'PATTERN_DETECTION',
+        'REORDER',
       ];
 
       for (const org of organizations) {
@@ -187,10 +188,18 @@ export class AiRetrainingScheduler {
             },
           });
 
-          // Only retrain if we have 20+ outcomes
-          if (leadOutcomes >= 20) {
+          // Train ML model if we have 50+ outcomes, otherwise just rescore
+          if (leadOutcomes >= 50) {
             this.logger.log(
-              `Org ${org.name}: Triggering lead scoring retraining (${leadOutcomes} outcomes)`,
+              `Org ${org.name}: Training lead scoring ML model (${leadOutcomes} outcomes)`,
+            );
+            const mlResult = await this.leadScoringService.trainMLModel(org.id);
+            this.logger.log(
+              `Org ${org.name}: ML model trained - accuracy: ${(mlResult.accuracy * 100).toFixed(1)}%`,
+            );
+          } else if (leadOutcomes >= 20) {
+            this.logger.log(
+              `Org ${org.name}: Triggering lead scoring rescore (${leadOutcomes} outcomes, need 50 for ML)`,
             );
             await this.triggerModelRetraining(org.id, 'LEAD_SCORING');
           }
@@ -653,6 +662,42 @@ export class AiRetrainingScheduler {
   }
 
   /**
+   * Monthly ABC analysis - runs on the 1st of each month at 2 AM
+   * Reclassifies items and adjusts service levels accordingly
+   */
+  @Cron('0 2 1 * *')
+  async runMonthlyAbcAnalysis() {
+    this.logger.log('Starting monthly ABC analysis...');
+
+    try {
+      const organizations = await this.prisma.organization.findMany({
+        where: {},
+        select: { id: true, name: true },
+      });
+
+      for (const org of organizations) {
+        try {
+          const result =
+            await this.reorderService.recalculateWithAbcServiceLevels(org.id);
+
+          this.logger.log(
+            `Org ${org.name}: ABC analysis updated ${result.updated} items ` +
+              `(A:${result.byCategory.A}, B:${result.byCategory.B}, C:${result.byCategory.C})`,
+          );
+        } catch (error) {
+          this.logger.error(
+            `Error running ABC analysis for org ${org.id}: ${error.message}`,
+          );
+        }
+      }
+
+      this.logger.log('Monthly ABC analysis completed');
+    } catch (error) {
+      this.logger.error(`Monthly ABC analysis failed: ${error.message}`);
+    }
+  }
+
+  /**
    * Trigger model retraining for a specific feature
    */
   private async triggerModelRetraining(
@@ -687,6 +732,10 @@ export class AiRetrainingScheduler {
 
         case 'PATTERN_DETECTION':
           await this.patternDetectionService.analyzePatterns(organizationId);
+          break;
+
+        case 'REORDER':
+          await this.reorderService.updateItemReorderPoints(organizationId);
           break;
 
         default:

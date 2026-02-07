@@ -9,6 +9,7 @@ import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PhoneInput } from '@/components/ui/phone-input';
 import {
   Select,
   SelectContent,
@@ -237,10 +238,10 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
 
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
-              <Input
+              <PhoneInput
                 id="phone"
-                placeholder="+1 234 567 8900"
-                {...form.register('phone')}
+                value={form.watch('phone') || ''}
+                onChange={(val) => form.setValue('phone', val)}
               />
             </div>
           </div>

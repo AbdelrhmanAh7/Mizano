@@ -13,6 +13,14 @@ import {
   getRecommendedAction,
   getReengagementSuggestion,
 } from '../config/lead-scoring.config';
+import { ModelRegistryService } from './model-registry.service';
+import {
+  trainLogisticRegression,
+  predictProbability,
+  serializeModel,
+  deserializeModel,
+  LogisticRegressionModel,
+} from '../utils/logistic-regression.util';
 
 export interface ScoreBreakdown {
   category: string;
@@ -89,12 +97,38 @@ export interface LeadData {
   lastActivityAt?: Date | null;
 }
 
+export interface MLModelStatus {
+  hasModel: boolean;
+  version: number | null;
+  accuracy: number | null;
+  sampleCount: number | null;
+  trainedAt: Date | null;
+  blendWeight: number;
+}
+
+export interface MLTrainingResult {
+  version: number;
+  accuracy: number;
+  precision: number;
+  recall: number;
+  f1Score: number;
+  sampleCount: number;
+  message: string;
+}
+
 @Injectable()
 export class LeadScoringService {
   private readonly logger = new Logger(LeadScoringService.name);
   private config: ScoringConfig = defaultScoringConfig;
+  private readonly ML_BLEND_WEIGHT = 0.3; // 30% ML, 70% rule-based
+  private readonly MIN_TRAINING_SAMPLES = 50;
+  private mlModelCache: Map<string, { model: LogisticRegressionModel; loadedAt: number }> = new Map();
+  private readonly ML_CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private modelRegistry: ModelRegistryService,
+  ) {}
 
   /**
    * Score a single lead
@@ -128,18 +162,40 @@ export class LeadScoringService {
     const weeksInactive = this.calculateWeeksInactive(lead.lastActivityAt);
     const decayMultiplier = getDecayMultiplier(weeksInactive, this.config);
 
-    // Calculate total score
+    // Calculate rule-based score
     const rawScore =
       demographicResult.score +
       behavioralResult.score +
       engagementResult.score;
-    const totalScore = Math.round(rawScore * decayMultiplier);
+    let totalScore = Math.round(rawScore * decayMultiplier);
+
+    // Blend with ML score if model available
+    let mlProbability: number | null = null;
+    try {
+      const mlModel = await this.loadMLModel(organizationId);
+      if (mlModel) {
+        const features = this.extractMLFeatures(lead, {
+          demographicScore: demographicResult.score,
+          behavioralScore: behavioralResult.score,
+          engagementScore: engagementResult.score,
+        });
+        mlProbability = predictProbability(mlModel, features);
+        const mlScore = Math.round(mlProbability * 100);
+        totalScore = Math.round(
+          totalScore * (1 - this.ML_BLEND_WEIGHT) + mlScore * this.ML_BLEND_WEIGHT,
+        );
+      }
+    } catch (error) {
+      this.logger.debug(`ML scoring fallback for lead ${leadId}: ${error.message}`);
+    }
 
     // Determine tier
     const tier = getTierFromScore(totalScore);
 
-    // Estimate conversion probability
-    const conversionProbability = estimateConversionProbability(totalScore, tier);
+    // Estimate conversion probability (use ML if available, else rule-based)
+    const conversionProbability = mlProbability !== null
+      ? mlProbability
+      : estimateConversionProbability(totalScore, tier);
 
     // Combine breakdowns
     const breakdown: ScoreBreakdown[] = [
@@ -725,9 +781,259 @@ export class LeadScoringService {
     };
   }
 
+  // ─── ML MODEL METHODS ───
+
+  /**
+   * Train a logistic regression ML model from historical lead outcomes.
+   * Requires at least 50 leads with WON/LOST status.
+   */
+  async trainMLModel(organizationId: string): Promise<MLTrainingResult> {
+    // Fetch leads with conversion outcomes
+    const leads = await this.prisma.lead.findMany({
+      where: {
+        organizationId,
+        status: { in: ['WON', 'LOST'] },
+      },
+    });
+
+    if (leads.length < this.MIN_TRAINING_SAMPLES) {
+      return {
+        version: 0,
+        accuracy: 0,
+        precision: 0,
+        recall: 0,
+        f1Score: 0,
+        sampleCount: leads.length,
+        message: `Insufficient data: ${leads.length} leads, need ${this.MIN_TRAINING_SAMPLES}`,
+      };
+    }
+
+    this.logger.log(
+      `Training lead scoring ML model for org ${organizationId} with ${leads.length} samples`,
+    );
+
+    // Extract features and labels
+    const features: number[][] = [];
+    const labels: number[] = [];
+
+    for (const lead of leads) {
+      const leadData = this.buildLeadDataFromRecord(lead);
+
+      // Get rule-based scores to use as features
+      const demographicResult = this.calculateCategoryScore(
+        leadData,
+        this.config.demographic,
+      );
+      const behavioralResult = this.calculateCategoryScore(
+        leadData,
+        this.config.behavioral,
+      );
+      const engagementResult = this.calculateCategoryScore(
+        leadData,
+        this.config.engagement,
+      );
+
+      const featureVector = this.extractMLFeatures(leadData, {
+        demographicScore: demographicResult.score,
+        behavioralScore: behavioralResult.score,
+        engagementScore: engagementResult.score,
+      });
+
+      features.push(featureVector);
+      labels.push(lead.status === 'WON' ? 1 : 0);
+    }
+
+    const featureNames = [
+      'demographicScore',
+      'behavioralScore',
+      'engagementScore',
+      'daysSinceCreation',
+      'daysInactive',
+      'sourceEncoded',
+    ];
+
+    // Train the model
+    const result = trainLogisticRegression(features, labels, featureNames);
+
+    // Serialize and save via ModelRegistry
+    const serialized = serializeModel(result.model);
+    const modelData = JSON.parse(serialized);
+
+    const saved = await this.modelRegistry.saveModel(
+      organizationId,
+      'LEAD_SCORING',
+      modelData,
+      result.accuracy,
+      leads.length,
+    );
+
+    // Clear cache so next scoring uses the new model
+    this.mlModelCache.delete(organizationId);
+
+    this.logger.log(
+      `Lead scoring ML model trained: v${saved.version}, accuracy=${(result.accuracy * 100).toFixed(1)}%, ` +
+      `precision=${(result.precision * 100).toFixed(1)}%, recall=${(result.recall * 100).toFixed(1)}%`,
+    );
+
+    return {
+      version: saved.version,
+      accuracy: result.accuracy,
+      precision: result.precision,
+      recall: result.recall,
+      f1Score: result.f1Score,
+      sampleCount: leads.length,
+      message: `Model trained successfully with ${leads.length} samples`,
+    };
+  }
+
+  /**
+   * Get the status of the ML model for an organization.
+   */
+  async getMLModelStatus(organizationId: string): Promise<MLModelStatus> {
+    const status = await this.modelRegistry.getModelStatus(
+      organizationId,
+      'LEAD_SCORING',
+    );
+
+    let accuracy: number | null = null;
+    let sampleCount: number | null = null;
+
+    if (status.hasActiveModel && status.activeVersion) {
+      const model = await this.modelRegistry.loadActiveModel(
+        organizationId,
+        'LEAD_SCORING',
+      );
+      if (model) {
+        accuracy = model.accuracy;
+        sampleCount = model.sampleCount;
+      }
+    }
+
+    return {
+      hasModel: status.hasActiveModel,
+      version: status.activeVersion,
+      accuracy,
+      sampleCount,
+      trainedAt: status.lastTrainedAt,
+      blendWeight: this.ML_BLEND_WEIGHT,
+    };
+  }
+
+  /**
+   * Load ML model from cache or database.
+   */
+  private async loadMLModel(
+    organizationId: string,
+  ): Promise<LogisticRegressionModel | null> {
+    // Check cache
+    const cached = this.mlModelCache.get(organizationId);
+    if (cached && Date.now() - cached.loadedAt < this.ML_CACHE_TTL) {
+      return cached.model;
+    }
+
+    // Load from database
+    const savedModel = await this.modelRegistry.loadActiveModel(
+      organizationId,
+      'LEAD_SCORING',
+    );
+
+    if (!savedModel) return null;
+
+    try {
+      const modelJson = JSON.stringify(savedModel.modelData);
+      const model = deserializeModel(modelJson);
+
+      // Cache it
+      this.mlModelCache.set(organizationId, {
+        model,
+        loadedAt: Date.now(),
+      });
+
+      return model;
+    } catch (error) {
+      this.logger.warn(`Failed to load ML model: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Extract ML features from a lead for model input.
+   */
+  private extractMLFeatures(
+    lead: LeadData,
+    scores: {
+      demographicScore: number;
+      behavioralScore: number;
+      engagementScore: number;
+    },
+  ): number[] {
+    const maxDemographic = this.config.demographic.maxScore;
+    const maxBehavioral = this.config.behavioral.maxScore;
+    const maxEngagement = this.config.engagement.maxScore;
+
+    const daysSinceCreation = Math.floor(
+      (Date.now() - lead.createdAt.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    const daysInactive = lead.lastActivityAt
+      ? Math.floor(
+          (Date.now() - lead.lastActivityAt.getTime()) / (1000 * 60 * 60 * 24),
+        )
+      : 999;
+
+    return [
+      scores.demographicScore / maxDemographic, // Normalized 0-1
+      scores.behavioralScore / maxBehavioral,    // Normalized 0-1
+      scores.engagementScore / maxEngagement,    // Normalized 0-1
+      Math.log1p(daysSinceCreation),             // Log-normalized
+      Math.log1p(daysInactive),                  // Log-normalized
+      this.encodeSource(lead.source),            // Numeric encoding
+    ];
+  }
+
+  /**
+   * Encode lead source as a numeric value.
+   */
+  private encodeSource(source: string): number {
+    const sourceMap: Record<string, number> = {
+      referral: 1.0,
+      website: 0.8,
+      social_media: 0.6,
+      email: 0.5,
+      advertisement: 0.4,
+      cold_call: 0.3,
+      event: 0.7,
+      partner: 0.9,
+      other: 0.2,
+    };
+    return sourceMap[source?.toLowerCase()] || 0.2;
+  }
+
+  /**
+   * Build LeadData from a Prisma lead record.
+   */
+  private buildLeadDataFromRecord(lead: any): LeadData {
+    return {
+      id: lead.id,
+      name: lead.leadName,
+      company: lead.companyName,
+      email: lead.email,
+      source: lead.source,
+      status: lead.status,
+      createdAt: lead.createdAt,
+      companySize: this.inferCompanySize(lead),
+      industry: this.inferIndustry(lead),
+      country: this.inferCountry(lead),
+      estimatedBudget: 0,
+      websiteVisits30d: 0,
+      contentType: undefined,
+      demoRequested: lead.notes?.toLowerCase().includes('demo') || false,
+      trialStatus: undefined,
+      lastActivityAt: lead.updatedAt,
+    };
+  }
+
   // Inference helpers (simplified - in production would use ML or lookup tables)
   private inferCompanySize(lead: any): string | undefined {
-    // Could infer from email domain, company name, etc.
     return undefined;
   }
 

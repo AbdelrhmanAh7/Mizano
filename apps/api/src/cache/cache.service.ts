@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 
@@ -9,6 +9,7 @@ export interface CacheOptions {
 
 @Injectable()
 export class CacheService {
+  private readonly logger = new Logger(CacheService.name);
   constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 
   /**
@@ -100,7 +101,7 @@ export class CacheService {
   async clearOrganization(organizationId: string): Promise<void> {
     // Note: This would require direct Redis access with SCAN command
     // For now, we'll handle this at the application level
-    console.log(`Cache clear requested for organization: ${organizationId}`);
+    this.logger.log(`Cache clear requested for organization: ${organizationId}`);
   }
 
   /**
@@ -114,6 +115,6 @@ export class CacheService {
       await cacheStore.reset();
     }
     // Fallback: log warning as full reset may not be supported
-    console.warn('Cache reset requested - may require manual intervention for complete cache clear');
+    this.logger.warn('Cache reset requested - may require manual intervention for complete cache clear');
   }
 }

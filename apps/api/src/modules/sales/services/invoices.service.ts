@@ -389,6 +389,70 @@ export class InvoicesService {
     return { message: 'Invoice deleted successfully' };
   }
 
+  async recordPayment(
+    organizationId: string,
+    id: string,
+    dto: { amount: number; date: string; bankAccountId: string; reference?: string },
+  ) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, organizationId, deletedAt: null },
+      include: { customer: { select: { id: true, name: true } } },
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.status === InvoiceStatus.DRAFT) {
+      throw new BadRequestException('Cannot record payment for a draft invoice');
+    }
+    if (invoice.status === InvoiceStatus.VOID) {
+      throw new BadRequestException('Cannot record payment for a voided invoice');
+    }
+
+    const paymentAmount = new Decimal(dto.amount);
+    const balanceDue = invoice.balanceDue || invoice.grandTotal;
+    if (paymentAmount.greaterThan(balanceDue)) {
+      throw new BadRequestException('Payment amount exceeds balance due');
+    }
+
+    // Generate payment number
+    const lastPayment = await this.prisma.paymentReceived.findFirst({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      select: { paymentNumber: true },
+    });
+    const paymentNum = lastPayment?.paymentNumber
+      ? parseInt(lastPayment.paymentNumber.split('-')[1], 10) + 1
+      : 1;
+    const paymentNumber = `PMT-${String(paymentNum).padStart(3, '0')}`;
+
+    const payment = await this.prisma.$transaction(async (tx) => {
+      const pr = await tx.paymentReceived.create({
+        data: {
+          paymentNumber,
+          customerId: invoice.customerId,
+          date: new Date(dto.date),
+          amount: paymentAmount,
+          paymentMode: 'BANK_TRANSFER',
+          depositToAccountId: dto.bankAccountId,
+          reference: dto.reference,
+          organizationId,
+          allocations: {
+            create: {
+              invoiceId: id,
+              amount: paymentAmount,
+            },
+          },
+        },
+        include: {
+          customer: { select: { id: true, name: true } },
+          allocations: true,
+        },
+      });
+      return pr;
+    });
+
+    await this.updateBalanceDue(id);
+    return payment;
+  }
+
   // Update balance due after payment
   async updateBalanceDue(invoiceId: string) {
     const invoice = await this.prisma.invoice.findUnique({

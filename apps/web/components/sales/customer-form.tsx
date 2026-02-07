@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { CountrySelect } from '@/components/ui/country-select';
+import { CitySelect } from '@/components/ui/city-select';
 import {
   Select,
   SelectContent,
@@ -211,10 +214,10 @@ export function CustomerForm({
 
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
-              <Input
+              <PhoneInput
                 id="phone"
-                placeholder="+1 234 567 8900"
-                {...form.register('phone')}
+                value={form.watch('phone') || ''}
+                onChange={(val) => form.setValue('phone', val)}
               />
             </div>
           </div>
@@ -298,14 +301,29 @@ export function CustomerForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="billingCity">City</Label>
-              <Input
-                id="billingCity"
-                placeholder="City"
-                {...form.register('billingAddress.city')}
+              <Label htmlFor="billingCountry">Country</Label>
+              <CountrySelect
+                id="billingCountry"
+                value={form.watch('billingAddress.country') || ''}
+                onValueChange={(val) => {
+                  form.setValue('billingAddress.country', val);
+                  form.setValue('billingAddress.city', '');
+                }}
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="billingCity">City</Label>
+              <CitySelect
+                id="billingCity"
+                value={form.watch('billingAddress.city') || ''}
+                onValueChange={(val) => form.setValue('billingAddress.city', val)}
+                country={form.watch('billingAddress.country') || ''}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="billingState">State/Province</Label>
               <Input
@@ -314,24 +332,13 @@ export function CustomerForm({
                 {...form.register('billingAddress.state')}
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="billingPostalCode">Zip/Postal Code</Label>
               <Input
                 id="billingPostalCode"
                 placeholder="Postal code"
                 {...form.register('billingAddress.postalCode')}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="billingCountry">Country</Label>
-              <Input
-                id="billingCountry"
-                placeholder="Country"
-                {...form.register('billingAddress.country')}
               />
             </div>
           </div>
@@ -366,14 +373,29 @@ export function CustomerForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="shippingCity">City</Label>
-              <Input
-                id="shippingCity"
-                placeholder="City"
-                {...form.register('shippingAddress.city')}
+              <Label htmlFor="shippingCountry">Country</Label>
+              <CountrySelect
+                id="shippingCountry"
+                value={form.watch('shippingAddress.country') || ''}
+                onValueChange={(val) => {
+                  form.setValue('shippingAddress.country', val);
+                  form.setValue('shippingAddress.city', '');
+                }}
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="shippingCity">City</Label>
+              <CitySelect
+                id="shippingCity"
+                value={form.watch('shippingAddress.city') || ''}
+                onValueChange={(val) => form.setValue('shippingAddress.city', val)}
+                country={form.watch('shippingAddress.country') || ''}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="shippingState">State/Province</Label>
               <Input
@@ -382,24 +404,13 @@ export function CustomerForm({
                 {...form.register('shippingAddress.state')}
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="shippingPostalCode">Zip/Postal Code</Label>
               <Input
                 id="shippingPostalCode"
                 placeholder="Postal code"
                 {...form.register('shippingAddress.postalCode')}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="shippingCountry">Country</Label>
-              <Input
-                id="shippingCountry"
-                placeholder="Country"
-                {...form.register('shippingAddress.country')}
               />
             </div>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -11,7 +11,6 @@ import {
   Plus,
   Clock,
   DollarSign,
-  FileText,
   CheckCircle,
   Circle,
   Play,
@@ -45,8 +44,10 @@ import { cn } from '@/lib/utils';
 import {
   useProject,
   useTasks,
+  useTimesheets,
   useDeleteProject,
   useUpdateTask,
+  useStartTimer,
   getProjectStatusLabel,
   getProjectStatusColor,
   getBillingMethodLabel,
@@ -55,6 +56,7 @@ import {
   formatCurrency,
   formatHours,
   Task,
+  TimesheetEntry,
 } from '@/lib/hooks/use-projects';
 
 interface ProjectDetailPageProps {
@@ -66,10 +68,13 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const router = useRouter();
   const { data: project, isLoading } = useProject(id);
   const { data: tasksData } = useTasks(id);
+  const { data: timesheetsData } = useTimesheets({ projectId: id });
   const deleteProject = useDeleteProject();
   const updateTask = useUpdateTask();
+  const startTimer = useStartTimer();
 
   const tasks: Task[] = tasksData?.data || [];
+  const timeEntries: TimesheetEntry[] = timesheetsData?.data || [];
 
   const handleDelete = async () => {
     await deleteProject.mutateAsync(id);
@@ -307,7 +312,17 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                         <span className="text-sm font-mono">
                           {formatHours(task.actualHours)}
                         </span>
-                        <Button size="sm" variant="ghost">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            startTimer.mutate({
+                              projectId: id,
+                              taskId: task.id,
+                            })
+                          }
+                          disabled={startTimer.isPending}
+                        >
                           <Play className="h-4 w-4" />
                         </Button>
                       </div>
@@ -333,9 +348,51 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                Time entries will appear here.
-              </div>
+              {timeEntries.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No time entries yet. Log your first time entry.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Task</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Hours</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {timeEntries.map((entry) => (
+                      <TableRow key={entry.id}>
+                        <TableCell>
+                          {format(new Date(entry.date), 'MMM d, yyyy')}
+                        </TableCell>
+                        <TableCell>{entry.task?.name || '-'}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">
+                          {entry.description || '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatHours(entry.hours)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              entry.status === 'INVOICED'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }
+                          >
+                            {entry.status === 'INVOICED' ? 'Invoiced' : 'Unbilled'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

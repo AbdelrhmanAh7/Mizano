@@ -94,10 +94,17 @@ export class ImportController {
       'text/csv',
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/x-ofx',
+      'application/ofx',
+      'text/ofx',
     ];
 
-    if (!allowedMimes.includes(file.mimetype)) {
-      throw new BadRequestException('Only CSV and Excel files are allowed');
+    // Check by MIME type or file extension (OFX MIME types are unreliable)
+    const extension = file.originalname?.toLowerCase().split('.').pop();
+    const isAllowedByExtension = ['csv', 'xlsx', 'xls', 'ofx', 'qfx'].includes(extension || '');
+
+    if (!allowedMimes.includes(file.mimetype) && !isAllowedByExtension) {
+      throw new BadRequestException('Only CSV, Excel, and OFX/QFX files are allowed');
     }
 
     return this.importService.parseFile(file.buffer, file.originalname);

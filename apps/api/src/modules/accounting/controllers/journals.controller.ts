@@ -57,6 +57,17 @@ export class JournalsController {
     return this.journalsService.update(orgId, id, updateJournalDto);
   }
 
+  @Post(':id/reverse')
+  @Permissions('accounting.create')
+  @ApiOperation({ summary: 'Reverse a journal entry' })
+  reverse(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: { date?: string },
+  ) {
+    return this.journalsService.reverse(orgId, id, dto);
+  }
+
   @Delete(':id')
   @Permissions('accounting.delete')
   @ApiOperation({ summary: 'Delete journal entry (soft delete)' })

@@ -107,4 +107,34 @@ export class ReorderPointsController {
   updateReorderPoints(@CurrentOrg() orgId: string) {
     return this.reorderService.updateItemReorderPoints(orgId);
   }
+
+  @Get('abc-analysis')
+  @Permissions('inventory.view')
+  @ApiOperation({
+    summary: 'Perform ABC analysis on inventory items',
+    description:
+      'Classifies items into A (top 80% value), B (next 15%), C (remaining 5%) with service level recommendations',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns ABC classification for all items',
+  })
+  getAbcAnalysis(@CurrentOrg() orgId: string) {
+    return this.reorderService.performAbcAnalysis(orgId);
+  }
+
+  @Post('abc-recalculate')
+  @Permissions('inventory.manage')
+  @ApiOperation({
+    summary: 'Recalculate reorder points using ABC-based service levels',
+    description:
+      'Uses ABC classification to apply different service levels: A=98%, B=95%, C=90%',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns count of updated items by category',
+  })
+  recalculateWithAbc(@CurrentOrg() orgId: string) {
+    return this.reorderService.recalculateWithAbcServiceLevels(orgId);
+  }
 }

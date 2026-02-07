@@ -1,8 +1,9 @@
 'use client';
 
 import { signOut, useSession } from 'next-auth/react';
-import { Bell, LogOut, User } from 'lucide-react';
+import { Bell, LogOut, User, HelpCircle } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
+import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -15,17 +16,32 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { notificationsApi } from '@/lib/api';
 import { LanguageSwitcher } from './language-switcher';
+import { useTourStore } from '@/lib/stores/use-tour-store';
 
 export function Header() {
   const { data: session } = useSession();
   const locale = useLocale();
   const t = useTranslations('common.header');
+  const pathname = usePathname();
+  const { startTour } = useTourStore();
+  const t_tour = useTranslations('tour.header');
 
   const { data: unreadCount } = useQuery({
     queryKey: ['notifications-count'],
     queryFn: () => notificationsApi.getUnreadCount(),
     refetchInterval: 30000,
   });
+
+  // Map pathname to tour ID
+  const getTourId = (): string | null => {
+    if (pathname.includes('/sales/invoices')) return 'sales_invoices';
+    if (pathname.includes('/sales/customers')) return 'sales_customers';
+    if (pathname.includes('/inventory/items')) return 'inventory_items';
+    if (pathname.includes('/accounting/journals')) return 'accounting_journals';
+    if (pathname.includes('/purchases/bills')) return 'purchases_bills';
+    if (pathname.includes('/purchases/vendors')) return 'purchases_vendors';
+    return null;
+  };
 
   return (
     <header className="bg-white dark:bg-card border-b border-gray-200 dark:border-border px-6 py-4">
@@ -37,6 +53,20 @@ export function Header() {
         </div>
         <div className="flex items-center gap-4">
           <LanguageSwitcher />
+          {getTourId() && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                const tourId = getTourId();
+                if (tourId) startTour(tourId);
+              }}
+              title={t_tour('helpTooltip')}
+              aria-label={t_tour('startTour')}
+            >
+              <HelpCircle className="h-5 w-5" />
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="relative" aria-label={t('notifications')}>
             <Bell className="h-5 w-5" />
             {(unreadCount?.data?.count ?? 0) > 0 && (

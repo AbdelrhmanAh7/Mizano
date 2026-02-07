@@ -191,4 +191,30 @@ export class LeadScoringController {
     );
     return { data: distribution };
   }
+
+  @Post('train')
+  @Permissions('crm.manage')
+  @ApiOperation({
+    summary: 'Train ML model for lead scoring using historical outcomes',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns training results including accuracy metrics',
+  })
+  async trainMLModel(@CurrentOrg() orgId: string) {
+    const result = await this.leadScoringService.trainMLModel(orgId);
+    return { data: result };
+  }
+
+  @Get('ml-status')
+  @Permissions('crm.view')
+  @ApiOperation({ summary: 'Get ML model status for lead scoring' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns ML model status and metadata',
+  })
+  async getMLModelStatus(@CurrentOrg() orgId: string) {
+    const status = await this.leadScoringService.getMLModelStatus(orgId);
+    return { data: status };
+  }
 }

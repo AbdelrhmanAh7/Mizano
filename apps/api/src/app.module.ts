@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import {
   I18nModule,
   AcceptLanguageResolver,
@@ -8,6 +11,7 @@ import {
   QueryResolver,
 } from 'nestjs-i18n';
 import * as path from 'path';
+import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -31,6 +35,7 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { ImportExportModule } from './modules/import-export/import-export.module';
 import { CurrencyModule } from './modules/currency/currency.module';
 import { AssetsModule } from './modules/assets/assets.module';
+import { UserPreferencesModule } from './modules/user-preferences/user-preferences.module';
 import { HealthModule } from './health/health.module';
 import { CacheModule } from './cache/cache.module';
 
@@ -39,6 +44,22 @@ import { CacheModule } from './cache/cache.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
+        {
+          name: 'short',
+          ttl: config.get('RATE_LIMIT_TTL', 1000),
+          limit: config.get('RATE_LIMIT_MAX', 10),
+        },
+        {
+          name: 'long',
+          ttl: 60000,
+          limit: config.get('RATE_LIMIT_AUTH_MAX', 5),
+        },
+      ],
     }),
     I18nModule.forRoot({
       fallbackLanguage: 'en',
@@ -53,6 +74,7 @@ import { CacheModule } from './cache/cache.module';
       ],
     }),
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -76,8 +98,19 @@ import { CacheModule } from './cache/cache.module';
     ImportExportModule,
     CurrencyModule,
     AssetsModule,
+    UserPreferencesModule,
     HealthModule,
     CacheModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter,
+    },
   ],
 })
 export class AppModule {}

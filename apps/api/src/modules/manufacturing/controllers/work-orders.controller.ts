@@ -68,10 +68,24 @@ export class WorkOrdersController {
     return this.workOrdersService.getProductionHistory(orgId, id);
   }
 
+  @Post(':id/complete')
+  @Permissions('manufacturing.edit')
+  @ApiOperation({ summary: 'Complete work order and record COGM' })
+  complete(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: { quantityProduced: number; notes?: string }) {
+    return this.workOrdersService.completeWorkOrder(orgId, id, dto);
+  }
+
   @Post(':id/cancel')
   @Permissions('manufacturing.edit')
   @ApiOperation({ summary: 'Cancel work order' })
   cancel(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: { reason: string }) {
     return this.workOrdersService.cancelWorkOrder(orgId, id, dto.reason);
+  }
+
+  @Delete(':id')
+  @Permissions('manufacturing.delete')
+  @ApiOperation({ summary: 'Delete work order' })
+  remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.workOrdersService.remove(orgId, id);
   }
 }

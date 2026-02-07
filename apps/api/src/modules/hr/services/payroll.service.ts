@@ -142,13 +142,138 @@ export class PayrollService {
       throw new BadRequestException('Payroll must be processed before marking as paid');
     }
 
-    return this.prisma.payrollRun.update({
-      where: { id: payrollRunId },
-      data: {
-        status: PayrollStatus.PAID,
-        paidAt: new Date(),
-      },
+    const totalGross = payrollRun.totalGross;
+    const totalNet = payrollRun.totalNet;
+    const totalDeductions = payrollRun.totalDeductions;
+
+    return this.prisma.$transaction(async (tx) => {
+      // Find salary expense account (EXPENSE type, name containing "Salary" or "Wages")
+      const salaryAccount = await tx.account.findFirst({
+        where: {
+          organizationId,
+          type: 'EXPENSE',
+          isActive: true,
+          OR: [
+            { name: { contains: 'Salary', mode: 'insensitive' } },
+            { name: { contains: 'Wages', mode: 'insensitive' } },
+            { code: { startsWith: '5' } },
+          ],
+        },
+      });
+
+      // Find cash/bank account (ASSET type)
+      const cashAccount = await tx.account.findFirst({
+        where: {
+          organizationId,
+          type: 'ASSET',
+          isActive: true,
+          OR: [
+            { name: { contains: 'Cash', mode: 'insensitive' } },
+            { name: { contains: 'Bank', mode: 'insensitive' } },
+            { code: { startsWith: '1' } },
+          ],
+        },
+      });
+
+      if (!salaryAccount || !cashAccount) {
+        throw new BadRequestException(
+          'Salary expense and cash/bank accounts must be configured before marking payroll as paid',
+        );
+      }
+
+      // Create payroll journal entry
+      const journalNumber = await this.generateJournalNumber(tx, organizationId);
+
+      const journalLines: Array<{
+        accountId: string;
+        debit: Decimal;
+        credit: Decimal;
+        description: string;
+      }> = [];
+
+      // Debit: Salary Expense (gross amount)
+      journalLines.push({
+        accountId: salaryAccount.id,
+        debit: totalGross,
+        credit: new Decimal(0),
+        description: `Salary expense - ${payrollRun.month}/${payrollRun.year}`,
+      });
+
+      // Credit: Cash/Bank (net amount paid to employees)
+      journalLines.push({
+        accountId: cashAccount.id,
+        debit: new Decimal(0),
+        credit: totalNet,
+        description: `Salary payment - ${payrollRun.month}/${payrollRun.year}`,
+      });
+
+      // Credit: Tax/Deductions payable (if deductions > 0)
+      if (totalDeductions.greaterThan(0)) {
+        // Try to find a tax payable / liability account
+        const liabilityAccount = await tx.account.findFirst({
+          where: {
+            organizationId,
+            type: 'LIABILITY',
+            isActive: true,
+            OR: [
+              { name: { contains: 'Tax', mode: 'insensitive' } },
+              { name: { contains: 'Payable', mode: 'insensitive' } },
+              { code: { startsWith: '2' } },
+            ],
+          },
+        });
+
+        if (liabilityAccount) {
+          journalLines.push({
+            accountId: liabilityAccount.id,
+            debit: new Decimal(0),
+            credit: totalDeductions,
+            description: `Payroll deductions/taxes - ${payrollRun.month}/${payrollRun.year}`,
+          });
+        } else {
+          // If no liability account, credit the full gross to cash
+          journalLines[1].credit = totalGross;
+          journalLines.splice(2); // Remove the deductions line
+        }
+      }
+
+      const journal = await tx.journal.create({
+        data: {
+          journalNumber,
+          date: new Date(),
+          reference: `PAY-${String(payrollRun.month).padStart(2, '0')}-${payrollRun.year}`,
+          notes: `Payroll for ${payrollRun.month}/${payrollRun.year}`,
+          isPosted: true,
+          organizationId,
+          lines: { create: journalLines },
+        },
+      });
+
+      // Update payroll run
+      return tx.payrollRun.update({
+        where: { id: payrollRunId },
+        data: {
+          status: PayrollStatus.PAID,
+          paidAt: new Date(),
+          journalId: journal.id,
+        },
+      });
     });
+  }
+
+  private async generateJournalNumber(tx: any, organizationId: string): Promise<string> {
+    const lastJournal = await tx.journal.findFirst({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      select: { journalNumber: true },
+    });
+
+    if (!lastJournal?.journalNumber) {
+      return 'JRN-001';
+    }
+
+    const lastNumber = parseInt(lastJournal.journalNumber.split('-')[1], 10);
+    return `JRN-${String(lastNumber + 1).padStart(3, '0')}`;
   }
 
   async getPayrollRuns(organizationId: string, query: { status?: string; year?: number }) {

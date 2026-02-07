@@ -101,6 +101,119 @@ export class BillsService {
     await this.prisma.bill.update({ where: { id: billId }, data: { balanceDue: new Decimal(Math.max(0, balanceDue)), status } });
   }
 
+  async checkDuplicate(
+    organizationId: string,
+    dto: { vendorId: string; billNumber?: string; amount?: number; date?: string },
+  ): Promise<{
+    isDuplicate: boolean;
+    existingBillId: string | null;
+    similarity: number;
+    matchType: 'exact_number' | 'amount_date' | 'none';
+  }> {
+    // Check 1: Exact bill number + vendor match
+    if (dto.billNumber) {
+      const exactMatch = await this.prisma.bill.findFirst({
+        where: {
+          organizationId,
+          vendorId: dto.vendorId,
+          billNumber: dto.billNumber,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+
+      if (exactMatch) {
+        return {
+          isDuplicate: true,
+          existingBillId: exactMatch.id,
+          similarity: 1.0,
+          matchType: 'exact_number',
+        };
+      }
+    }
+
+    // Check 2: Same vendor + similar amount + date within 3 days
+    if (dto.amount && dto.date) {
+      const targetDate = new Date(dto.date);
+      const dateFrom = new Date(targetDate);
+      dateFrom.setDate(dateFrom.getDate() - 3);
+      const dateTo = new Date(targetDate);
+      dateTo.setDate(dateTo.getDate() + 3);
+
+      const amountVariance = dto.amount * 0.01; // ±1%
+      const amountLow = dto.amount - amountVariance;
+      const amountHigh = dto.amount + amountVariance;
+
+      const amountMatch = await this.prisma.bill.findFirst({
+        where: {
+          organizationId,
+          vendorId: dto.vendorId,
+          deletedAt: null,
+          grandTotal: {
+            gte: new Decimal(amountLow),
+            lte: new Decimal(amountHigh),
+          },
+          date: {
+            gte: dateFrom,
+            lte: dateTo,
+          },
+        },
+        select: { id: true },
+      });
+
+      if (amountMatch) {
+        return {
+          isDuplicate: true,
+          existingBillId: amountMatch.id,
+          similarity: 0.9,
+          matchType: 'amount_date',
+        };
+      }
+    }
+
+    return {
+      isDuplicate: false,
+      existingBillId: null,
+      similarity: 0,
+      matchType: 'none',
+    };
+  }
+
+  async approve(organizationId: string, id: string) {
+    const bill = await this.prisma.bill.findFirst({
+      where: { id, organizationId, deletedAt: null },
+    });
+    if (!bill) throw new NotFoundException('Bill not found');
+    if (bill.status !== BillStatus.DRAFT) {
+      throw new BadRequestException('Only draft bills can be approved');
+    }
+
+    return this.prisma.bill.update({
+      where: { id },
+      data: { status: BillStatus.OPEN },
+      include: {
+        vendor: { select: { id: true, name: true } },
+        lines: true,
+      },
+    });
+  }
+
+  async remove(organizationId: string, id: string) {
+    const bill = await this.prisma.bill.findFirst({
+      where: { id, organizationId, deletedAt: null },
+    });
+    if (!bill) throw new NotFoundException('Bill not found');
+    if (bill.status !== BillStatus.DRAFT) {
+      throw new BadRequestException('Only draft bills can be deleted');
+    }
+
+    await this.prisma.bill.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+    return { message: 'Bill deleted successfully' };
+  }
+
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async markOverdueBills() {
     const today = new Date();

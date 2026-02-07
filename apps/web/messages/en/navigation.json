@@ -13,6 +13,7 @@
     "vendors": "Vendors",
     "expenses": "Expenses",
     "bills": "Bills",
+    "scanBill": "Scan Bill",
     "payments": "Payments",
     "credits": "Credits"
   },
@@ -35,6 +36,7 @@
     }
   },
   "banking": {
+    "title": "Banking",
     "accounts": {
       "title": "Bank Accounts"
     },
@@ -60,6 +62,7 @@
     "workOrders": "Work Orders"
   },
   "hr": {
+    "title": "HR",
     "employees": {
       "title": "Employees"
     },
@@ -70,7 +73,17 @@
       "title": "Payroll"
     }
   },
-  "crm": "CRM",
+  "tax": {
+    "title": "Tax",
+    "rates": "Tax Rates",
+    "vatReturns": "VAT Returns",
+    "payments": "Payments"
+  },
+  "crm": {
+    "title": "CRM",
+    "leads": "Leads",
+    "deals": "Deals"
+  },
   "reports": "Reports",
   "aiInsights": "AI Insights",
   "settings": "Settings",

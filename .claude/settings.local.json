@@ -35,7 +35,13 @@
       "Bash(uniq:*)",
       "Bash(pnpm --filter api exec prisma generate:*)",
       "Bash(pnpm exec tsc:*)",
-      "Bash(pnpm prisma migrate status:*)"
+      "Bash(pnpm prisma migrate status:*)",
+      "Bash(grep:*)",
+      "Bash(npx prisma validate:*)",
+      "Bash(echo:*)",
+      "Bash(xargs:*)",
+      "Bash(open:*)",
+      "Bash(python3:*)"
     ]
   }
 }

@@ -71,6 +71,17 @@ export class InvoicesController {
     return this.invoicesService.voidInvoice(orgId, id);
   }
 
+  @Post(':id/record-payment')
+  @Permissions('sales.edit')
+  @ApiOperation({ summary: 'Record payment for invoice' })
+  recordPayment(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: { amount: number; date: string; bankAccountId: string; reference?: string },
+  ) {
+    return this.invoicesService.recordPayment(orgId, id, dto);
+  }
+
   @Delete(':id')
   @Permissions('sales.delete')
   @ApiOperation({ summary: 'Delete invoice' })

@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { CountrySelect } from '@/components/ui/country-select';
+import { CitySelect } from '@/components/ui/city-select';
 import {
   Select,
   SelectContent,
@@ -182,10 +185,10 @@ export function VendorForm({
 
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
-              <Input
+              <PhoneInput
                 id="phone"
-                placeholder="+1 234 567 8900"
-                {...form.register('phone')}
+                value={form.watch('phone') || ''}
+                onChange={(val) => form.setValue('phone', val)}
               />
             </div>
           </div>
@@ -259,14 +262,29 @@ export function VendorForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="billingCity">City</Label>
-              <Input
-                id="billingCity"
-                placeholder="City"
-                {...form.register('billingAddress.city')}
+              <Label htmlFor="billingCountry">Country</Label>
+              <CountrySelect
+                id="billingCountry"
+                value={form.watch('billingAddress.country') || ''}
+                onValueChange={(val) => {
+                  form.setValue('billingAddress.country', val);
+                  form.setValue('billingAddress.city', '');
+                }}
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="billingCity">City</Label>
+              <CitySelect
+                id="billingCity"
+                value={form.watch('billingAddress.city') || ''}
+                onValueChange={(val) => form.setValue('billingAddress.city', val)}
+                country={form.watch('billingAddress.country') || ''}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="billingState">State/Province</Label>
               <Input
@@ -275,24 +293,13 @@ export function VendorForm({
                 {...form.register('billingAddress.state')}
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="billingPostalCode">Zip/Postal Code</Label>
               <Input
                 id="billingPostalCode"
                 placeholder="Postal code"
                 {...form.register('billingAddress.postalCode')}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="billingCountry">Country</Label>
-              <Input
-                id="billingCountry"
-                placeholder="Country"
-                {...form.register('billingAddress.country')}
               />
             </div>
           </div>

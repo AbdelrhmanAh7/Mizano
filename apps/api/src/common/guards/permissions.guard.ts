@@ -37,6 +37,11 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('Role not found');
     }
 
+    // Admin role bypasses all permission checks
+    if (role.name === 'Admin') {
+      return true;
+    }
+
     // Check if user has all required permissions
     for (const required of requiredPermissions) {
       const [module, action] = required.split('.');

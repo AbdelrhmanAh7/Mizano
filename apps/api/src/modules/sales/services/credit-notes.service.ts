@@ -123,6 +123,55 @@ export class CreditNotesService {
     return creditNote;
   }
 
+  async update(organizationId: string, id: string, dto: any) {
+    const creditNote = await this.findOne(organizationId, id);
+    const data: any = {};
+    if (dto.reason !== undefined) data.reason = dto.reason;
+    if (dto.date !== undefined) data.date = new Date(dto.date);
+
+    return this.prisma.creditNote.update({
+      where: { id },
+      data,
+      include: {
+        customer: { select: { id: true, name: true } },
+        invoice: { select: { id: true, invoiceNumber: true } },
+      },
+    });
+  }
+
+  async remove(organizationId: string, id: string) {
+    await this.findOne(organizationId, id);
+    await this.prisma.creditNote.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+    return { message: 'Credit note deleted' };
+  }
+
+  async apply(organizationId: string, id: string, invoiceId: string) {
+    const creditNote = await this.findOne(organizationId, id);
+    if (creditNote.appliedToInvoiceId) {
+      throw new BadRequestException('Credit note is already applied to an invoice');
+    }
+
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, organizationId, deletedAt: null },
+    });
+    if (!invoice) throw new BadRequestException('Invoice not found');
+
+    const updated = await this.prisma.creditNote.update({
+      where: { id },
+      data: { appliedToInvoiceId: invoiceId },
+      include: {
+        customer: { select: { id: true, name: true } },
+        invoice: { select: { id: true, invoiceNumber: true } },
+      },
+    });
+
+    await this.invoicesService.updateBalanceDue(invoiceId);
+    return updated;
+  }
+
   private async generateCreditNoteNumber(organizationId: string): Promise<string> {
     const last = await this.prisma.creditNote.findFirst({
       where: { organizationId },

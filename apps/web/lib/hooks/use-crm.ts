@@ -190,7 +190,7 @@ const dealsApi = {
     return response.data;
   },
   getByStage: async () => {
-    const response = await api.get('/crm/deals/by-stage');
+    const response = await api.get('/crm/deals/pipeline');
     return response.data;
   },
   create: async (data: CreateDealDto) => {
@@ -202,7 +202,7 @@ const dealsApi = {
     return response.data;
   },
   updateStage: async (id: string, stage: DealStage) => {
-    const response = await api.put(`/crm/deals/${id}/stage`, { stage });
+    const response = await api.post(`/crm/deals/${id}/stage`, { stage });
     return response.data;
   },
   delete: async (id: string) => {
