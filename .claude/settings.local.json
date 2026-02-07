@@ -41,7 +41,8 @@
       "Bash(echo:*)",
       "Bash(xargs:*)",
       "Bash(open:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(git push:*)"
     ]
   }
 }
