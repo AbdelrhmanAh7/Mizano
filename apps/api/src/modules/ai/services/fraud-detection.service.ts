@@ -197,6 +197,7 @@ export class FraudDetectionService {
   async getFraudAlerts(
     organizationId: string,
     resolved?: boolean,
+    limit?: number,
   ): Promise<any[]> {
     const where: any = { organizationId };
     if (resolved !== undefined) where.isResolved = resolved;
@@ -204,7 +205,7 @@ export class FraudDetectionService {
     return this.prisma.fraudAlert.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: limit || 100,
     });
   }
 

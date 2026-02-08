@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, UseGuards, ParseFloatPipe } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -27,7 +27,7 @@ export class DynamicPricingController {
   @ApiOperation({ summary: 'Get price suggestion for an item' })
   @ApiParam({ name: 'id', description: 'Item ID' })
   @ApiQuery({ name: 'targetMargin', required: false })
-  async getSuggestion(@CurrentOrg() orgId: string, @Param('id') itemId: string, @Query('targetMargin') targetMargin?: number) {
+  async getSuggestion(@CurrentOrg() orgId: string, @Param('id') itemId: string, @Query('targetMargin', new ParseFloatPipe({ optional: true })) targetMargin?: number) {
     const result = await this.pricingService.suggestPrice(orgId, itemId, targetMargin);
     return { data: result };
   }

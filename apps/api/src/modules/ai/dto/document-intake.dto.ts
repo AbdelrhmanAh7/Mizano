@@ -1,7 +1,7 @@
 import {
   IsString,
   IsOptional,
-  IsEnum,
+  IsIn,
   IsArray,
   IsNumber,
   IsObject,
@@ -25,7 +25,7 @@ export class ProcessDocumentDto {
     enum: ['BILL', 'INVOICE'],
     example: 'BILL',
   })
-  @IsEnum(['BILL', 'INVOICE'])
+  @IsIn(['BILL', 'INVOICE'])
   @IsOptional()
   forceType?: 'BILL' | 'INVOICE';
 }
@@ -77,7 +77,7 @@ export class ConfirmIntakeDto {
     enum: ['BILL', 'INVOICE'],
     example: 'BILL',
   })
-  @IsEnum(['BILL', 'INVOICE'])
+  @IsIn(['BILL', 'INVOICE'])
   type: 'BILL' | 'INVOICE';
 
   @ApiPropertyOptional({

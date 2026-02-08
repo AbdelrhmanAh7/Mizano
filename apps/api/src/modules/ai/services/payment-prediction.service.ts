@@ -3,6 +3,20 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { mean, standardDeviation } from '../utils/statistics.util';
 import { Decimal } from '@prisma/client/runtime/library';
 
+interface InvoiceWithCustomer {
+  id: string;
+  invoiceNumber: string;
+  customerId: string;
+  date: Date;
+  dueDate: Date;
+  grandTotal: Decimal;
+  customer: {
+    id: string;
+    name: string;
+    paymentTerms: number | null;
+  } | null;
+}
+
 export interface CustomerPaymentProfile {
   customerId: string;
   customerName: string;
@@ -234,26 +248,35 @@ export class PaymentPredictionService {
         status: { in: ['SENT', 'OVERDUE', 'PARTIALLY_PAID'] },
       },
       include: {
-        customer: { select: { id: true, name: true } },
+        customer: { select: { id: true, name: true, paymentTerms: true } },
       },
     });
 
     const priorityItems: CollectionPriorityItem[] = [];
 
+    // Pre-fetch customer data to avoid N+1 queries
+    const customerIds = [...new Set(invoices.map((i) => i.customerId))];
+    const profileByCustomer = new Map<string, CustomerPaymentProfile | null>();
+    const historyByCustomer = new Map<string, PaymentHistoryRecord[]>();
+
+    for (const customerId of customerIds) {
+      const [profile, history] = await Promise.all([
+        this.getCustomerPaymentProfile(organizationId, customerId),
+        this.getPaymentHistory(organizationId, customerId),
+      ]);
+      profileByCustomer.set(customerId, profile);
+      historyByCustomer.set(customerId, history);
+    }
+
     for (const invoice of invoices) {
-      // Get customer profile for risk assessment
-      const profile = await this.getCustomerPaymentProfile(
-        organizationId,
-        invoice.customerId,
-      );
+      const profile = profileByCustomer.get(invoice.customerId) || null;
 
       const dueDate = new Date(invoice.dueDate);
       const daysOverdue = Math.floor(
         (today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24),
       );
 
-      // Get prediction
-      const history = await this.getPaymentHistory(organizationId, invoice.customerId);
+      const history = historyByCustomer.get(invoice.customerId) || [];
       const prediction = this.calculatePrediction(invoice, history);
 
       // Calculate risk factor based on customer reliability
@@ -465,7 +488,7 @@ export class PaymentPredictionService {
    * Calculate prediction for an invoice
    */
   private calculatePrediction(
-    invoice: any,
+    invoice: InvoiceWithCustomer,
     history: PaymentHistoryRecord[],
   ): PaymentPrediction {
     const invoiceDate = new Date(invoice.date);
@@ -540,9 +563,14 @@ export class PaymentPredictionService {
       }
     }
 
-    // Ensure predicted date is not in the past
-    if (predictedDate < today) {
-      predictedDate = new Date(today);
+    // Ensure predicted date is not in the past (normalize to start-of-day for comparison)
+    const todayStart = new Date(today);
+    todayStart.setHours(0, 0, 0, 0);
+    const predictedStart = new Date(predictedDate);
+    predictedStart.setHours(0, 0, 0, 0);
+
+    if (predictedStart < todayStart) {
+      predictedDate = new Date(todayStart);
       predictedDate.setDate(predictedDate.getDate() + 3);
     }
 

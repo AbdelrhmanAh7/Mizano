@@ -51,7 +51,7 @@ export class FraudDetectionController {
     @CurrentOrg() orgId: string,
     @Query('limit') limit?: number,
   ) {
-    return this.fraudService.getFraudAlerts(orgId);
+    return this.fraudService.getFraudAlerts(orgId, undefined, limit);
   }
 
   @Post('scan')

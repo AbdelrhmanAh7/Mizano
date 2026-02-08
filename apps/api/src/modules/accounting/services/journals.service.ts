@@ -9,6 +9,7 @@ import { UpdateJournalDto } from '../dto/update-journal.dto';
 import { JournalQueryDto } from '../dto/journal-query.dto';
 import { OrganizationsService } from '../../organizations/organizations.service';
 import { Decimal } from '@prisma/client/runtime/library';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class JournalsService {
@@ -47,33 +48,19 @@ export class JournalsService {
       throw new BadRequestException('One or more accounts not found');
     }
 
-    // Generate journal number
-    const journalNumber = await this.generateJournalNumber(organizationId);
-
-    const journal = await this.prisma.journal.create({
-      data: {
-        journalNumber,
-        date: new Date(date),
-        reference,
-        notes,
-        organizationId,
-        lines: {
-          create: lines.map((line) => ({
-            accountId: line.accountId,
-            debit: new Decimal(line.debit || '0'),
-            credit: new Decimal(line.credit || '0'),
-            description: line.description,
-          })),
-        },
-      },
-      include: {
-        lines: {
-          include: {
-            account: {
-              select: { id: true, code: true, name: true, type: true },
-            },
-          },
-        },
+    // Generate journal number and create in a transaction with retry for race conditions
+    const journal = await this.createJournalWithRetry(organizationId, {
+      date: new Date(date),
+      reference,
+      notes,
+      organizationId,
+      lines: {
+        create: lines.map((line) => ({
+          accountId: line.accountId,
+          debit: new Decimal(line.debit || '0'),
+          credit: new Decimal(line.credit || '0'),
+          description: line.description,
+        })),
       },
     });
 
@@ -316,45 +303,29 @@ export class JournalsService {
     await this.checkLockDate(organizationId, journal.date);
     await this.checkLockDate(organizationId, reversalDate);
 
-    const reversalJournal = await this.prisma.$transaction(async (tx) => {
-      const journalNumber = await this.generateJournalNumberTx(tx, organizationId);
-
-      return tx.journal.create({
-        data: {
-          journalNumber,
-          date: reversalDate,
-          reference: `REV-${journal.journalNumber}`,
-          notes: `Reversal of ${journal.journalNumber}`,
-          isPosted: true,
-          reversalOfId: journal.id,
-          organizationId,
-          lines: {
-            create: journal.lines.map((line) => ({
-              accountId: line.accountId,
-              debit: line.credit,
-              credit: line.debit,
-              description: `Reversal: ${line.description || ''}`.trim(),
-            })),
-          },
-        },
-        include: {
-          lines: {
-            include: {
-              account: {
-                select: { id: true, code: true, name: true, type: true },
-              },
-            },
-          },
-        },
-      });
+    const reversalJournal = await this.createJournalWithRetry(organizationId, {
+      date: reversalDate,
+      reference: `REV-${journal.journalNumber}`,
+      notes: `Reversal of ${journal.journalNumber}`,
+      isPosted: true,
+      reversalOfId: journal.id,
+      organizationId,
+      lines: {
+        create: journal.lines.map((line) => ({
+          accountId: line.accountId,
+          debit: line.credit,
+          credit: line.debit,
+          description: `Reversal: ${line.description || ''}`.trim(),
+        })),
+      },
     });
 
     const totalDebit = reversalJournal.lines.reduce(
-      (sum, line) => sum + parseFloat(line.debit.toString()),
+      (sum: number, line: any) => sum + parseFloat(line.debit.toString()),
       0,
     );
     const totalCredit = reversalJournal.lines.reduce(
-      (sum, line) => sum + parseFloat(line.credit.toString()),
+      (sum: number, line: any) => sum + parseFloat(line.credit.toString()),
       0,
     );
 
@@ -365,7 +336,10 @@ export class JournalsService {
     };
   }
 
-  private async generateJournalNumberTx(tx: any, organizationId: string): Promise<string> {
+  private async generateJournalNumberTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<string> {
     const lastJournal = await tx.journal.findFirst({
       where: { organizationId },
       orderBy: { createdAt: 'desc' },
@@ -380,19 +354,42 @@ export class JournalsService {
     return `JRN-${String(lastNumber + 1).padStart(3, '0')}`;
   }
 
-  private async generateJournalNumber(organizationId: string): Promise<string> {
-    const lastJournal = await this.prisma.journal.findFirst({
-      where: { organizationId },
-      orderBy: { createdAt: 'desc' },
-      select: { journalNumber: true },
-    });
-
-    if (!lastJournal) {
-      return 'JRN-001';
+  /**
+   * Create a journal with retry logic for unique constraint conflicts on journalNumber.
+   */
+  private async createJournalWithRetry(
+    organizationId: string,
+    data: Record<string, any>,
+    maxRetries: number = 3,
+  ): Promise<any> {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const journalNumber = await this.generateJournalNumberTx(tx, organizationId);
+          return tx.journal.create({
+            data: { ...data, journalNumber } as any,
+            include: {
+              lines: {
+                include: {
+                  account: {
+                    select: { id: true, code: true, name: true, type: true },
+                  },
+                },
+              },
+            },
+          });
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002' &&
+          attempt < maxRetries - 1
+        ) {
+          continue;
+        }
+        throw error;
+      }
     }
-
-    const lastNumber = parseInt(lastJournal.journalNumber.split('-')[1], 10);
-    return `JRN-${String(lastNumber + 1).padStart(3, '0')}`;
   }
 
   private async checkLockDate(organizationId: string, transactionDate: Date) {

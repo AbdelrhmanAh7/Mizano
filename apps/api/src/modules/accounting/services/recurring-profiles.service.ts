@@ -350,13 +350,17 @@ export class RecurringProfilesService {
       };
     });
 
-    const grandTotal = subtotal + taxAmount;
+    const shippingAmount = parseFloat(templateData.shippingAmount || 0);
+    const grandTotal = subtotal + taxAmount + shippingAmount;
 
     // Calculate due date based on customer payment terms
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: templateData.customerId },
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: templateData.customerId, organizationId: profile.organizationId },
     });
-    const paymentTerms = customer?.paymentTerms || 30;
+    if (!customer) {
+      throw new NotFoundException(`Customer ${templateData.customerId} not found for this organization`);
+    }
+    const paymentTerms = customer.paymentTerms || 30;
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + paymentTerms);
 
@@ -368,7 +372,7 @@ export class RecurringProfilesService {
         dueDate,
         subtotal: new Decimal(subtotal),
         taxAmount: new Decimal(taxAmount),
-        shippingAmount: new Decimal(templateData.shippingAmount || 0),
+        shippingAmount: new Decimal(shippingAmount),
         grandTotal: new Decimal(grandTotal),
         balanceDue: new Decimal(grandTotal),
         notes: templateData.notes,
@@ -408,10 +412,13 @@ export class RecurringProfilesService {
 
     const grandTotal = subtotal + taxAmount;
 
-    const vendor = await this.prisma.vendor.findUnique({
-      where: { id: templateData.vendorId },
+    const vendor = await this.prisma.vendor.findFirst({
+      where: { id: templateData.vendorId, organizationId: profile.organizationId },
     });
-    const paymentTerms = vendor?.paymentTerms || 30;
+    if (!vendor) {
+      throw new NotFoundException(`Vendor ${templateData.vendorId} not found for this organization`);
+    }
+    const paymentTerms = vendor.paymentTerms || 30;
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + paymentTerms);
 

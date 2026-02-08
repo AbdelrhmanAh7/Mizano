@@ -63,12 +63,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     if (exception instanceof Prisma.PrismaClientValidationError) {
+      const isProduction = process.env.NODE_ENV === 'production';
       return {
         statusCode: HttpStatus.BAD_REQUEST,
         code: 'PRISMA_VALIDATION_ERROR',
         message: 'Database validation error',
         error: 'Validation Error',
-        details: { prismaError: exception.message.split('\n').slice(-2).join(' ').trim() },
+        details: isProduction
+          ? undefined
+          : { prismaError: exception.message.split('\n').slice(-2).join(' ').trim() },
         timestamp,
         path,
         requestId,

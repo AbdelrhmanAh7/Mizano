@@ -5,6 +5,9 @@ import {
   Param,
   Query,
   UseGuards,
+  DefaultValuePipe,
+  ParseIntPipe,
+  ParseFloatPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -54,9 +57,9 @@ export class ReorderPointsController {
   })
   getDeadStock(
     @CurrentOrg() orgId: string,
-    @Query('thresholdDays') thresholdDays?: number,
+    @Query('thresholdDays', new DefaultValuePipe(90), ParseIntPipe) thresholdDays: number,
   ) {
-    return this.reorderService.detectDeadStock(orgId, thresholdDays || 90);
+    return this.reorderService.detectDeadStock(orgId, thresholdDays);
   }
 
   @Get('item/:itemId')
@@ -75,14 +78,14 @@ export class ReorderPointsController {
   getItemReorderAnalysis(
     @CurrentOrg() orgId: string,
     @Param('itemId') itemId: string,
-    @Query('leadTimeDays') leadTimeDays?: number,
-    @Query('serviceLevel') serviceLevel?: number,
+    @Query('leadTimeDays', new DefaultValuePipe(7), ParseIntPipe) leadTimeDays: number,
+    @Query('serviceLevel', new DefaultValuePipe(0.95), ParseFloatPipe) serviceLevel: number,
   ) {
     return this.reorderService.calculateForItem(
       orgId,
       itemId,
-      leadTimeDays || 7,
-      serviceLevel || 0.95,
+      leadTimeDays,
+      serviceLevel,
     );
   }
 
