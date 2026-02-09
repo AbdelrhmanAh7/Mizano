@@ -1,12 +1,10 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateCustomerDto } from '../dto/create-customer.dto';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 @Injectable()
 export class CustomersService {
@@ -75,6 +73,30 @@ export class CustomersService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+    const { cursor, take = 50, search, sortBy = 'name', sortOrder = 'asc' } = query;
+
+    const where: any = { organizationId, deletedAt: null };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' as const } },
+        { email: { contains: search, mode: 'insensitive' as const } },
+        { phone: { contains: search, mode: 'insensitive' as const } },
+      ];
+    }
+
+    return cursorPaginate(
+      this.prisma.customer,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+      },
+    );
   }
 
   async findOne(organizationId: string, id: string) {

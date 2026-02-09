@@ -18,7 +18,10 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@modules/*": ["src/modules/*"],
+      "@common/*": ["src/common/*"],
+      "@prisma/*": ["src/prisma/*"]
     }
   },
   "include": ["src/**/*", "prisma/**/*"],

@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { billsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { billsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 export type BillStatus = 'DRAFT' | 'OPEN' | 'OVERDUE' | 'PARTIAL' | 'PAID' | 'VOID';
@@ -98,6 +99,20 @@ export function useBills(params?: BillParams) {
       const response = await billsApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all bills with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteBills(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Bill, Record<string, unknown>>({
+    queryKey: ['bills'],
+    fetchFn: async (p) => {
+      const response = await billsApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 
@@ -237,7 +252,9 @@ export function useDeleteBill() {
 /**
  * Get status badge variant
  */
-export function getStatusVariant(status: BillStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
+export function getStatusVariant(
+  status: BillStatus,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (status) {
     case 'DRAFT':
       return 'secondary';

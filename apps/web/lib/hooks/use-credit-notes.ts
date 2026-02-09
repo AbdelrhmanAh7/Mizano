@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { creditNotesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { creditNotesApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 export type CreditNoteType = 'REFUND' | 'APPLY_TO_INVOICE';
@@ -70,6 +71,20 @@ export function useCreditNotes(params?: CreditNoteParams) {
       const response = await creditNotesApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all credit notes with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteCreditNotes(params?: Record<string, unknown>) {
+  return useInfiniteTableData<CreditNote, Record<string, unknown>>({
+    queryKey: ['credit-notes'],
+    fetchFn: async (p) => {
+      const response = await creditNotesApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 

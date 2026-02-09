@@ -94,6 +94,12 @@ export class CategorizationPredictionResponse {
     accountName: string;
     confidence: number;
   }>;
+
+  @ApiProperty({
+    description: 'Prediction method used',
+    enum: ['ML', 'RULE_BASED', 'HYBRID'],
+  })
+  predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID';
 }
 
 export class CategorizationStatsResponse {

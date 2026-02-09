@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { accountsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { accountsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'INCOME' | 'EXPENSE';
@@ -62,6 +63,20 @@ export function useAccounts(params?: AccountParams) {
       const response = await accountsApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all accounts with cursor-based infinite scrolling
+ */
+export function useInfiniteAccounts(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Account, Record<string, unknown>>({
+    queryKey: ['accounts'],
+    fetchFn: async (p) => {
+      const response = await accountsApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 
@@ -260,7 +275,10 @@ export function getAccountTypeLabel(type: AccountType): string {
 /**
  * Flatten accounts tree for select dropdown
  */
-export function flattenAccountsTree(accounts: Account[], level = 0): Array<Account & { level: number }> {
+export function flattenAccountsTree(
+  accounts: Account[],
+  level = 0,
+): Array<Account & { level: number }> {
   const result: Array<Account & { level: number }> = [];
 
   for (const account of accounts) {

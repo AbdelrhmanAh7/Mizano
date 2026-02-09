@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
 import { AiFeature } from '@prisma/client';
+import { BoundedCache } from '../utils/bounded-cache.util';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const natural = require('natural');
@@ -115,11 +116,11 @@ const DEFAULT_TRAINING_DATA: Array<{ text: string; intent: ChatIntent }> = [
 export class ChatbotService {
   private readonly logger = new Logger(ChatbotService.name);
 
-  /** Per-org BayesClassifier instances */
-  private classifiers = new Map<string, any>();
+  /** Per-org BayesClassifier instances (bounded: max 50 orgs, 1h TTL) */
+  private classifiers = new BoundedCache<any>(50, 60 * 60 * 1000);
 
-  /** In-memory chat history: key = `${orgId}:${userId}` */
-  private chatHistory = new Map<string, ChatSession>();
+  /** In-memory chat history: key = `${orgId}:${userId}` (bounded: max 200 sessions, 30min TTL) */
+  private chatHistory = new BoundedCache<ChatSession>(200, 30 * 60 * 1000);
 
   constructor(
     private prisma: PrismaService,

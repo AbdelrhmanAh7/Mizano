@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { TransferStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { TransferCursorQueryDto } from '../dto/transfer-cursor-query.dto';
 
 @Injectable()
 export class TransfersService {
@@ -58,8 +60,19 @@ export class TransfersService {
     });
   }
 
-  async findAll(organizationId: string, query: PaginationDto & { status?: string; fromWarehouseId?: string; toWarehouseId?: string }) {
-    const { page = 1, limit = 20, sortBy = 'date', sortOrder = 'desc', status, fromWarehouseId, toWarehouseId } = query;
+  async findAll(
+    organizationId: string,
+    query: PaginationDto & { status?: string; fromWarehouseId?: string; toWarehouseId?: string },
+  ) {
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = 'date',
+      sortOrder = 'desc',
+      status,
+      fromWarehouseId,
+      toWarehouseId,
+    } = query;
     const where: any = { organizationId };
     if (status) where.status = status;
     if (fromWarehouseId) where.fromWarehouseId = fromWarehouseId;
@@ -85,6 +98,36 @@ export class TransfersService {
     return { data: transfers, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
+  async findAllCursor(organizationId: string, query: TransferCursorQueryDto) {
+    const {
+      cursor,
+      take,
+      sortBy = 'date',
+      sortOrder = 'desc',
+      status,
+      fromWarehouseId,
+      toWarehouseId,
+    } = query;
+    const where: any = { organizationId };
+    if (status) where.status = status;
+    if (fromWarehouseId) where.fromWarehouseId = fromWarehouseId;
+    if (toWarehouseId) where.toWarehouseId = toWarehouseId;
+    return cursorPaginate(
+      this.prisma.inventoryTransfer,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: {
+          fromWarehouse: { select: { id: true, name: true, code: true } },
+          toWarehouse: { select: { id: true, name: true, code: true } },
+          lines: { include: { item: { select: { id: true, name: true, sku: true } } } },
+        },
+      },
+    );
+  }
+
   async findOne(organizationId: string, id: string) {
     const transfer = await this.prisma.inventoryTransfer.findFirst({
       where: { id, organizationId },
@@ -103,7 +146,10 @@ export class TransfersService {
   async complete(organizationId: string, id: string) {
     const transfer = await this.findOne(organizationId, id);
 
-    if (transfer.status !== TransferStatus.PENDING && transfer.status !== TransferStatus.IN_TRANSIT) {
+    if (
+      transfer.status !== TransferStatus.PENDING &&
+      transfer.status !== TransferStatus.IN_TRANSIT
+    ) {
       throw new BadRequestException('Only pending or in-transit transfers can be completed');
     }
 
@@ -189,7 +235,10 @@ export class TransfersService {
   async cancel(organizationId: string, id: string) {
     const transfer = await this.findOne(organizationId, id);
 
-    if (transfer.status !== TransferStatus.PENDING && transfer.status !== TransferStatus.IN_TRANSIT) {
+    if (
+      transfer.status !== TransferStatus.PENDING &&
+      transfer.status !== TransferStatus.IN_TRANSIT
+    ) {
       throw new BadRequestException('Only pending or in-transit transfers can be cancelled');
     }
 

@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { Decimal } from '@prisma/client/runtime/library';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { BankTransactionCursorQueryDto } from '../dto/bank-transaction-cursor-query.dto';
 
 @Injectable()
 export class BankTransactionsService {
@@ -38,8 +40,18 @@ export class BankTransactionsService {
     return { imported: created.count };
   }
 
-  async findAll(organizationId: string, query: PaginationDto & { bankAccountId?: string; status?: string }) {
-    const { page = 1, limit = 50, sortBy = 'date', sortOrder = 'desc', bankAccountId, status } = query;
+  async findAll(
+    organizationId: string,
+    query: PaginationDto & { bankAccountId?: string; status?: string },
+  ) {
+    const {
+      page = 1,
+      limit = 50,
+      sortBy = 'date',
+      sortOrder = 'desc',
+      bankAccountId,
+      status,
+    } = query;
     const where: any = { organizationId };
     if (bankAccountId) where.bankAccountId = bankAccountId;
     if (status) where.status = status;
@@ -54,7 +66,27 @@ export class BankTransactionsService {
       }),
       this.prisma.bankTransaction.count({ where }),
     ]);
-    return { data: transactions, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return {
+      data: transactions,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async findAllCursor(organizationId: string, query: BankTransactionCursorQueryDto) {
+    const { cursor, take, sortBy = 'date', sortOrder = 'desc', bankAccountId, status } = query;
+    const where: any = { organizationId };
+    if (bankAccountId) where.bankAccountId = bankAccountId;
+    if (status) where.status = status;
+    return cursorPaginate(
+      this.prisma.bankTransaction,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: { bankAccount: { select: { id: true, name: true } } },
+      },
+    );
   }
 
   async findOne(organizationId: string, id: string) {

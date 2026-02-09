@@ -1,0 +1,51 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+**/dist
+
+# Next.js
+apps/web/.next/cache
+apps/web/.next/trace
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test & Coverage
+coverage
+**/coverage
+**/*.spec.ts
+**/*.test.ts
+**/test/
+apps/api/src/test/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# CI/Misc
+.husky
+.turbo
+**/.turbo
+.prettierrc
+.prettierignore
+commitlint.config.js

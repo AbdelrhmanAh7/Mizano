@@ -46,5 +46,10 @@ prisma/*.db-journal
 tmp
 temp
 
+# ML Models (large files, download separately)
+apps/api/ml-models/
+*.onnx
+*.tar
+
 # OS
 Thumbs.db

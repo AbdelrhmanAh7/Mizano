@@ -8,18 +8,42 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "db:generate": "pnpm --filter api prisma generate",
-    "db:push": "pnpm --filter api prisma db push",
-    "db:migrate": "pnpm --filter api prisma migrate dev",
-    "db:seed": "pnpm --filter api prisma db seed",
-    "db:studio": "pnpm --filter api prisma studio",
-    "clean": "turbo clean && rm -rf node_modules"
+    "db:generate": "pnpm --filter api exec prisma generate",
+    "db:push": "pnpm --filter api exec prisma db push",
+    "db:migrate": "pnpm --filter api exec prisma migrate dev",
+    "db:seed": "pnpm --filter api exec prisma db seed",
+    "db:studio": "pnpm --filter api exec prisma studio",
+    "clean": "turbo clean && rm -rf node_modules",
+    "prepare": "husky",
+    "lint:fix": "turbo lint",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "type-check": "turbo type-check"
+  },
+  "lint-staged": {
+    "apps/api/**/*.ts": [
+      "eslint --fix --cache",
+      "prettier --write"
+    ],
+    "apps/web/**/*.{ts,tsx}": [
+      "eslint --fix --cache",
+      "prettier --write"
+    ],
+    "packages/**/*.ts": [
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.4.1",
+    "@commitlint/config-conventional": "^20.4.1",
     "@types/node": "^20.11.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "prettier": "^3.2.4",
     "turbo": "^2.0.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.4.0"
   },
   "packageManager": "pnpm@8.14.0",
   "engines": {

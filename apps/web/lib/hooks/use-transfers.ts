@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { transfersApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 export type TransferStatus = 'PENDING' | 'IN_TRANSIT' | 'COMPLETED' | 'CANCELLED';
@@ -64,15 +65,6 @@ export interface CreateTransferData {
   }>;
 }
 
-// Transfers API
-const transfersApi = {
-  getAll: (params?: Record<string, any>) => api.get('/transfers', { params }),
-  getOne: (id: string) => api.get(`/transfers/${id}`),
-  create: (data: any) => api.post('/transfers', data),
-  complete: (id: string) => api.patch(`/transfers/${id}/complete`),
-  cancel: (id: string) => api.patch(`/transfers/${id}/cancel`),
-};
-
 /**
  * Hook to fetch all transfers
  */
@@ -83,6 +75,20 @@ export function useTransfers(params?: TransferParams) {
       const response = await transfersApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all transfers with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteTransfers(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Transfer, Record<string, unknown>>({
+    queryKey: ['transfers'],
+    fetchFn: async (p) => {
+      const response = await transfersApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 
@@ -195,7 +201,9 @@ export function useCancelTransfer() {
 /**
  * Get status badge variant
  */
-export function getStatusVariant(status: TransferStatus): 'default' | 'secondary' | 'outline' | 'destructive' {
+export function getStatusVariant(
+  status: TransferStatus,
+): 'default' | 'secondary' | 'outline' | 'destructive' {
   switch (status) {
     case 'PENDING':
       return 'secondary';

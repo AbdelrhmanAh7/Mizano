@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { invoicesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { invoicesApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 export type InvoiceStatus = 'DRAFT' | 'SENT' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'VOID';
@@ -100,6 +101,20 @@ export function useInvoices(params?: InvoiceParams) {
       const response = await invoicesApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all invoices with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteInvoices(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Invoice, Record<string, unknown>>({
+    queryKey: ['invoices'],
+    fetchFn: async (p) => {
+      const response = await invoicesApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 
@@ -303,7 +318,11 @@ export function getInvoiceStatusLabel(status: InvoiceStatus): string {
 /**
  * Calculate line amount
  */
-export function calculateLineAmount(quantity: string, rate: string, discountPercent: string = '0'): string {
+export function calculateLineAmount(
+  quantity: string,
+  rate: string,
+  discountPercent: string = '0',
+): string {
   const qty = parseFloat(quantity) || 0;
   const r = parseFloat(rate) || 0;
   const discount = parseFloat(discountPercent) || 0;
@@ -316,13 +335,13 @@ export function calculateLineAmount(quantity: string, rate: string, discountPerc
 export function calculateInvoiceTotals(
   lines: Array<{ amount: string; taxRateId?: string }>,
   taxRates: Array<{ id: string; rate: number }>,
-  shippingAmount: string = '0'
+  shippingAmount: string = '0',
 ): { subtotal: number; taxAmount: number; grandTotal: number } {
   const subtotal = lines.reduce((sum, line) => sum + (parseFloat(line.amount) || 0), 0);
 
   const taxAmount = lines.reduce((sum, line) => {
-    const taxRate = taxRates.find(t => t.id === line.taxRateId);
-    return sum + ((parseFloat(line.amount) || 0) * ((taxRate?.rate || 0) / 100));
+    const taxRate = taxRates.find((t) => t.id === line.taxRateId);
+    return sum + (parseFloat(line.amount) || 0) * ((taxRate?.rate || 0) / 100);
   }, 0);
 
   const shipping = parseFloat(shippingAmount) || 0;

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiFeature, AiFeedbackAction } from '@prisma/client';
 import { AiTrainingService } from './ai-training.service';
@@ -23,8 +24,9 @@ export interface FeedbackStats {
   correctionRate: number;
 }
 
-// Retraining thresholds per feature
+// Retraining thresholds per feature (0 = retraining disabled)
 const RETRAINING_THRESHOLDS: Record<AiFeature, number> = {
+  // Core financial
   CATEGORIZATION: 50,
   RECONCILIATION: 30,
   OCR_LAYOUT: 20,
@@ -35,28 +37,35 @@ const RETRAINING_THRESHOLDS: Record<AiFeature, number> = {
   PAYMENT_PREDICTION: 30,
   CASH_FLOW: 50,
   PATTERN_DETECTION: 30,
-  CHURN_PREDICTION: 0,
-  CLV_ANALYSIS: 0,
-  CROSS_SELL: 0,
-  DYNAMIC_PRICING: 0,
-  PIPELINE_FORECAST: 0,
-  FRAUD_DETECTION: 0,
-  COMPLIANCE_MONITORING: 0,
-  AUDIT_RISK: 0,
-  DOCUMENT_CLASSIFICATION: 0,
-  SENTIMENT_ANALYSIS: 0,
-  ENTITY_EXTRACTION: 0,
-  CONTRACT_ANALYSIS: 0,
-  EMPLOYEE_ATTRITION: 0,
-  COMPENSATION_BENCHMARK: 0,
-  SKILLS_GAP: 0,
-  QUALITY_PREDICTION: 0,
-  PREDICTIVE_MAINTENANCE: 0,
-  WORKFORCE_SCHEDULING: 0,
-  ROUTE_OPTIMIZATION: 0,
-  RESOURCE_OPTIMIZATION: 0,
-  CHATBOT: 0,
-  KNOWLEDGE_ASSISTANT: 0,
+  // Sales & CRM
+  CHURN_PREDICTION: 30,
+  CLV_ANALYSIS: 50,
+  CROSS_SELL: 40,
+  DYNAMIC_PRICING: 50,
+  PIPELINE_FORECAST: 30,
+  // Security
+  FRAUD_DETECTION: 20,
+  COMPLIANCE_MONITORING: 30,
+  AUDIT_RISK: 30,
+  // NLP & Documents
+  DOCUMENT_CLASSIFICATION: 30,
+  SENTIMENT_ANALYSIS: 50,
+  ENTITY_EXTRACTION: 30,
+  CONTRACT_ANALYSIS: 50,
+  // HR
+  EMPLOYEE_ATTRITION: 30,
+  COMPENSATION_BENCHMARK: 50,
+  SKILLS_GAP: 50,
+  QUALITY_PREDICTION: 40,
+  PREDICTIVE_MAINTENANCE: 40,
+  WORKFORCE_SCHEDULING: 50,
+  // Operations
+  ROUTE_OPTIMIZATION: 100,
+  RESOURCE_OPTIMIZATION: 100,
+  // Chat
+  CHATBOT: 50,
+  KNOWLEDGE_ASSISTANT: 50,
+  // Not implemented
   VOICE_COMMAND: 0,
 };
 
@@ -125,13 +134,19 @@ export class AiFeedbackService {
     organizationId: string,
     feature: AiFeature,
   ): Promise<{ shouldRetrain: boolean; correctionCount: number; threshold: number }> {
+    const threshold = RETRAINING_THRESHOLDS[feature];
+
+    // Features with threshold 0 have retraining disabled
+    if (threshold === 0) {
+      return { shouldRetrain: false, correctionCount: 0, threshold: 0 };
+    }
+
     const correctionCount =
       await this.trainingService.countCorrectionsSinceLastTraining(
         organizationId,
         feature,
       );
 
-    const threshold = RETRAINING_THRESHOLDS[feature] || 50;
     const shouldRetrain = correctionCount >= threshold;
 
     return { shouldRetrain, correctionCount, threshold };
@@ -402,10 +417,48 @@ export class AiFeedbackService {
   }
 
   /**
+   * Invalidate cached predictions when a new model is activated
+   */
+  @OnEvent('ai.model.activated')
+  async onModelActivated(payload: {
+    organizationId: string;
+    feature: AiFeature;
+    version: number;
+  }) {
+    this.logger.log(
+      `Model v${payload.version} activated for ${payload.feature} — invalidating prediction cache`,
+    );
+    await this.invalidatePredictionCache(
+      payload.organizationId,
+      payload.feature,
+    );
+  }
+
+  /**
+   * Clear all cached predictions for an org+feature
+   */
+  async invalidatePredictionCache(
+    organizationId: string,
+    feature: AiFeature,
+  ): Promise<{ deleted: number }> {
+    const result = await this.prisma.aiPrediction.deleteMany({
+      where: { organizationId, feature },
+    });
+
+    if (result.count > 0) {
+      this.logger.log(
+        `Invalidated ${result.count} cached predictions for ${feature} in org ${organizationId}`,
+      );
+    }
+
+    return { deleted: result.count };
+  }
+
+  /**
    * Get retraining threshold for a feature
    */
   getRetrainingThreshold(feature: AiFeature): number {
-    return RETRAINING_THRESHOLDS[feature] || 50;
+    return RETRAINING_THRESHOLDS[feature];
   }
 
   /**

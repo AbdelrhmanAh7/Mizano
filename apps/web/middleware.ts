@@ -32,26 +32,42 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check authentication for protected routes
-  const token = await getToken({ req: request });
   const locale = getLocale(pathname);
   const pathWithoutLocale = pathname.replace(/^\/(en|ar)/, '') || '/';
 
-  // If trying to access protected route without token, redirect to login
-  if (!isPublicPath(pathname) && !token) {
-    // Don't redirect if already going to login
+  // For public paths: only check token if we need to redirect authenticated users away
+  // This avoids expensive JWT verification for unauthenticated visitors on login/register
+  if (isPublicPath(pathname)) {
+    // Quick check: if no session cookie exists, skip token verification entirely
+    const sessionCookie = request.cookies.get('next-auth.session-token') || request.cookies.get('__Secure-next-auth.session-token');
+    if (!sessionCookie) {
+      return intlMiddleware(request);
+    }
+    // Has a cookie — verify token to redirect authenticated users to dashboard
+    const token = await getToken({ req: request });
+    if (token && !pathname.includes('/dashboard')) {
+      return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
+    }
+    return intlMiddleware(request);
+  }
+
+  // Root path: redirect based on auth state
+  if (pathWithoutLocale === '/') {
+    const token = await getToken({ req: request });
+    if (token) {
+      return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
+    } else {
+      return NextResponse.redirect(new URL(`/${locale}/login`, request.url));
+    }
+  }
+
+  // Protected routes: verify token
+  const token = await getToken({ req: request });
+  if (!token) {
     if (!pathname.includes('/login')) {
       const loginUrl = new URL(`/${locale}/login`, request.url);
       loginUrl.searchParams.set('callbackUrl', pathname);
       return NextResponse.redirect(loginUrl);
-    }
-  }
-
-  // If authenticated user tries to access login/register, redirect to dashboard
-  if (token && isPublicPath(pathname)) {
-    // Don't redirect if already going to dashboard
-    if (!pathname.includes('/dashboard')) {
-      return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
     }
   }
 

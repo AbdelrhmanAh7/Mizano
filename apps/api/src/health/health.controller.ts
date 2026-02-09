@@ -21,7 +21,7 @@ interface HealthCheckResponse {
   };
 }
 
-@SkipThrottle()
+@SkipThrottle({ short: true, long: true })
 @Controller('health')
 export class HealthController {
   constructor(

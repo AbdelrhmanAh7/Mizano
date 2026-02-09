@@ -9,6 +9,22 @@ export interface DashboardStats {
   expenses: number;
   netProfit: number;
   bankBalance: number;
+  totalReceivables: number;
+  totalPayables: number;
+  overdueInvoices: number;
+  overdueBills: number;
+  activeProjects: number;
+}
+
+export interface Trend {
+  value: number;
+  isPositive: boolean;
+}
+
+export interface DashboardTrends {
+  revenue: Trend;
+  expenses: Trend;
+  profit: Trend;
 }
 
 export interface ReceivablesPayables {
@@ -32,6 +48,26 @@ export interface ExpenseCategory {
 export interface RevenuePoint {
   month: string;
   revenue: number;
+  expenses?: number;
+  profit?: number;
+}
+
+export interface TopCustomer {
+  id: string;
+  name: string;
+  totalRevenue: number;
+  invoiceCount: number;
+}
+
+export interface BankBalancePoint {
+  month: string;
+  balance: number;
+}
+
+export interface InventoryValuePoint {
+  month: string;
+  value: number;
+  itemCount: number;
 }
 
 export interface AIAlert {
@@ -53,33 +89,309 @@ export interface RecentTransaction {
   link: string;
 }
 
-export interface DashboardData {
+const REFETCH_INTERVAL = 60000;
+
+export interface DashboardStatsResult {
   stats: DashboardStats;
+  trends: DashboardTrends;
   receivablesVsPayables: ReceivablesPayables;
-  cashFlowTrend: CashFlowPoint[];
-  topExpenses: ExpenseCategory[];
-  revenueTrend: RevenuePoint[];
   alerts: AIAlert[];
   recentTransactions: RecentTransaction[];
 }
 
 /**
- * Hook to fetch dashboard data
+ * Transform raw dashboard API response into the typed result.
+ * Shared between client-side hook and server-side prefetch.
+ */
+export function transformDashboardOverview(overview: any): DashboardStatsResult {
+  const now = new Date();
+
+  const bankBalanceTotal = Array.isArray(overview.bankBalances)
+    ? overview.bankBalances.reduce((sum: number, b: any) => sum + (b.systemBalance || 0), 0)
+    : 0;
+
+  // Build alerts from overview
+  const alerts: AIAlert[] = [];
+  if (overview.alerts?.overdueInvoices > 0) {
+    alerts.push({
+      id: 'overdue-invoices',
+      type: 'OVERDUE_INVOICE',
+      severity: 'error',
+      message: `${overview.alerts.overdueInvoices} overdue invoice(s) need attention`,
+      link: '/sales/invoices?status=OVERDUE',
+      createdAt: now.toISOString(),
+    });
+  }
+  if (overview.alerts?.overdueBills > 0) {
+    alerts.push({
+      id: 'overdue-bills',
+      type: 'OVERDUE_BILL',
+      severity: 'warning',
+      message: `${overview.alerts.overdueBills} overdue bill(s) need attention`,
+      link: '/purchases/bills?status=OVERDUE',
+      createdAt: now.toISOString(),
+    });
+  }
+
+  // Map recent activity
+  const recentTransactions: RecentTransaction[] = [];
+  if (Array.isArray(overview.recentActivity?.invoices)) {
+    for (const inv of overview.recentActivity.invoices) {
+      recentTransactions.push({
+        id: inv.id,
+        type: 'INVOICE',
+        reference: inv.invoiceNumber,
+        description: `Invoice to ${inv.customer?.name || 'Unknown'}`,
+        amount: parseFloat(inv.grandTotal?.toString() || inv.total?.toString() || '0'),
+        date: inv.createdAt,
+        link: `/sales/invoices/${inv.id}`,
+      });
+    }
+  }
+  if (Array.isArray(overview.recentActivity?.bills)) {
+    for (const bill of overview.recentActivity.bills) {
+      recentTransactions.push({
+        id: bill.id,
+        type: 'BILL',
+        reference: bill.billNumber,
+        description: `Bill from ${bill.vendor?.name || 'Unknown'}`,
+        amount: -parseFloat(bill.grandTotal?.toString() || bill.total?.toString() || '0'),
+        date: bill.createdAt,
+        link: `/purchases/bills/${bill.id}`,
+      });
+    }
+  }
+  recentTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return {
+    stats: {
+      revenue: overview.overview?.monthlyRevenue || 0,
+      expenses: overview.overview?.monthlyExpenses || 0,
+      netProfit: overview.overview?.monthlyProfit || 0,
+      bankBalance: bankBalanceTotal,
+      totalReceivables: overview.overview?.totalReceivables || 0,
+      totalPayables: overview.overview?.totalPayables || 0,
+      overdueInvoices: overview.alerts?.overdueInvoices || 0,
+      overdueBills: overview.alerts?.overdueBills || 0,
+      activeProjects: overview.alerts?.activeProjects || 0,
+    },
+    trends: {
+      revenue: overview.trends?.revenue || { value: 0, isPositive: true },
+      expenses: overview.trends?.expenses || { value: 0, isPositive: true },
+      profit: overview.trends?.profit || { value: 0, isPositive: true },
+    },
+    receivablesVsPayables: {
+      receivables: overview.overview?.totalReceivables || 0,
+      payables: overview.overview?.totalPayables || 0,
+    },
+    alerts,
+    recentTransactions,
+  };
+}
+
+/**
+ * KPI stats — fastest endpoint, renders first
+ */
+export function useDashboardStats(dateRange?: { from: Date; to: Date }) {
+  const startDate = dateRange?.from?.toISOString().split('T')[0];
+  const endDate = dateRange?.to?.toISOString().split('T')[0];
+
+  return useQuery({
+    queryKey: ['dashboard', 'stats', startDate, endDate],
+    queryFn: async (): Promise<DashboardStatsResult> => {
+      const params = new URLSearchParams();
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+      const qs = params.toString();
+      const res = await api.get(`/reports/dashboard${qs ? `?${qs}` : ''}`);
+      const overview = res.data?.data ?? res.data;
+      return transformDashboardOverview(overview);
+    },
+    refetchInterval: REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
+  });
+}
+
+/**
+ * Revenue chart data
+ */
+export function useDashboardRevenue() {
+  return useQuery({
+    queryKey: ['dashboard', 'revenue'],
+    queryFn: async (): Promise<RevenuePoint[]> => {
+      const res = await api.get('/reports/dashboard/revenue-chart?months=6');
+      const data = res.data?.data ?? res.data;
+      return Array.isArray(data)
+        ? data.map((r: any) => ({
+            month: r.month,
+            revenue: r.revenue || 0,
+            expenses: r.expenses || 0,
+            profit: r.profit || 0,
+          }))
+        : [];
+    },
+    refetchInterval: REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
+  });
+}
+
+/**
+ * Cash flow chart data
+ */
+export function useDashboardCashFlow() {
+  return useQuery({
+    queryKey: ['dashboard', 'cashflow'],
+    queryFn: async (): Promise<CashFlowPoint[]> => {
+      const res = await api.get('/reports/dashboard/cash-flow-chart?days=180');
+      const data = res.data?.data ?? res.data;
+      return aggregateCashFlowByMonth(Array.isArray(data) ? data : []);
+    },
+    refetchInterval: REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
+  });
+}
+
+/**
+ * Expenses by category
+ */
+export function useDashboardExpenses() {
+  return useQuery({
+    queryKey: ['dashboard', 'expenses'],
+    queryFn: async (): Promise<ExpenseCategory[]> => {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      const res = await api.get(`/reports/dashboard/expenses-by-category?startDate=${startOfMonth}&endDate=${endOfMonth}`);
+      const data = res.data?.data ?? res.data;
+      const expenseArray = Array.isArray(data) ? data : [];
+      const total = expenseArray.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
+      return expenseArray.slice(0, 5).map((e: any) => ({
+        name: e.category || 'Other',
+        amount: e.amount || 0,
+        percentage: total > 0 ? Math.round(((e.amount || 0) / total) * 100) : 0,
+      }));
+    },
+    refetchInterval: REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
+  });
+}
+
+/**
+ * Top customers
+ */
+export function useDashboardCustomers() {
+  return useQuery({
+    queryKey: ['dashboard', 'customers'],
+    queryFn: async (): Promise<TopCustomer[]> => {
+      const res = await api.get('/reports/dashboard/top-customers?limit=5');
+      const data = res.data?.data ?? res.data;
+      return Array.isArray(data)
+        ? data.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            totalRevenue: c.totalRevenue || 0,
+            invoiceCount: c.invoiceCount || 0,
+          }))
+        : [];
+    },
+    refetchInterval: REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
+  });
+}
+
+/**
+ * Bank balance trend
+ */
+export function useDashboardBanking() {
+  return useQuery({
+    queryKey: ['dashboard', 'banking'],
+    queryFn: async (): Promise<BankBalancePoint[]> => {
+      const res = await api.get('/reports/dashboard/bank-balance-trend?months=6');
+      const data = res.data?.data ?? res.data;
+      return Array.isArray(data)
+        ? data.map((b: any) => ({ month: b.month, balance: b.balance || 0 }))
+        : [];
+    },
+    refetchInterval: REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
+  });
+}
+
+/**
+ * Inventory value trend
+ */
+export function useDashboardInventory() {
+  return useQuery({
+    queryKey: ['dashboard', 'inventory'],
+    queryFn: async (): Promise<InventoryValuePoint[]> => {
+      const res = await api.get('/reports/dashboard/inventory-value-trend?months=6');
+      const data = res.data?.data ?? res.data;
+      return Array.isArray(data)
+        ? data.map((i: any) => ({ month: i.month, value: i.value || 0, itemCount: i.itemCount || 0 }))
+        : [];
+    },
+    refetchInterval: REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
+  });
+}
+
+/**
+ * Legacy combined hook — kept for backward compatibility.
+ * Uses all individual hooks internally.
  */
 export function useDashboard() {
-  return useQuery({
-    queryKey: ['dashboard'],
-    queryFn: async () => {
-      try {
-        const response = await api.get('/dashboard');
-        return response.data as DashboardData;
-      } catch (error) {
-        // Return mock data for development if API not available
-        return getMockDashboardData();
+  const statsQuery = useDashboardStats();
+  const revenueQuery = useDashboardRevenue();
+  const cashFlowQuery = useDashboardCashFlow();
+  const expensesQuery = useDashboardExpenses();
+  const customersQuery = useDashboardCustomers();
+  const bankingQuery = useDashboardBanking();
+  const inventoryQuery = useDashboardInventory();
+
+  const isLoading = statsQuery.isLoading;
+  const isRefetching = statsQuery.isRefetching || revenueQuery.isRefetching || cashFlowQuery.isRefetching;
+
+  const data = statsQuery.data
+    ? {
+        stats: statsQuery.data.stats,
+        receivablesVsPayables: statsQuery.data.receivablesVsPayables,
+        cashFlowTrend: cashFlowQuery.data || [],
+        topExpenses: expensesQuery.data || [],
+        revenueTrend: revenueQuery.data || [],
+        topCustomers: customersQuery.data || [],
+        bankBalanceTrend: bankingQuery.data || [],
+        inventoryValueTrend: inventoryQuery.data || [],
+        alerts: statsQuery.data.alerts,
+        recentTransactions: statsQuery.data.recentTransactions,
       }
-    },
-    refetchInterval: 60000, // Refresh every minute
-  });
+    : undefined;
+
+  return { data, isLoading, isRefetching };
+}
+
+/**
+ * Aggregate daily cash flow data into monthly buckets.
+ */
+function aggregateCashFlowByMonth(daily: any[]): CashFlowPoint[] {
+  const byMonth: Record<string, { inflow: number; outflow: number }> = {};
+  const monthFormatter = new Intl.DateTimeFormat('default', { month: 'short' });
+
+  for (const day of daily) {
+    const date = new Date(day.date);
+    const key = monthFormatter.format(date);
+    if (!byMonth[key]) {
+      byMonth[key] = { inflow: 0, outflow: 0 };
+    }
+    byMonth[key].inflow += day.cashIn || 0;
+    byMonth[key].outflow += day.cashOut || 0;
+  }
+
+  return Object.entries(byMonth).map(([month, data]) => ({
+    month,
+    inflow: data.inflow,
+    outflow: data.outflow,
+    net: data.inflow - data.outflow,
+  }));
 }
 
 /**
@@ -119,109 +431,4 @@ export function getAlertStyles(severity: AIAlert['severity']) {
     default:
       return { color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' };
   }
-}
-
-/**
- * Mock data for development
- */
-function getMockDashboardData(): DashboardData {
-  return {
-    stats: {
-      revenue: 125000,
-      expenses: 78000,
-      netProfit: 47000,
-      bankBalance: 234500,
-    },
-    receivablesVsPayables: {
-      receivables: 45000,
-      payables: 23000,
-    },
-    cashFlowTrend: [
-      { month: 'Aug', inflow: 42000, outflow: 35000, net: 7000 },
-      { month: 'Sep', inflow: 38000, outflow: 32000, net: 6000 },
-      { month: 'Oct', inflow: 45000, outflow: 38000, net: 7000 },
-      { month: 'Nov', inflow: 52000, outflow: 41000, net: 11000 },
-      { month: 'Dec', inflow: 48000, outflow: 45000, net: 3000 },
-      { month: 'Jan', inflow: 55000, outflow: 42000, net: 13000 },
-    ],
-    topExpenses: [
-      { name: 'Payroll', amount: 32000, percentage: 41 },
-      { name: 'Rent', amount: 15000, percentage: 19 },
-      { name: 'Marketing', amount: 12000, percentage: 15 },
-      { name: 'Utilities', amount: 8000, percentage: 10 },
-      { name: 'Other', amount: 11000, percentage: 14 },
-    ],
-    revenueTrend: [
-      { month: 'Aug', revenue: 18000 },
-      { month: 'Sep', revenue: 21000 },
-      { month: 'Oct', revenue: 19000 },
-      { month: 'Nov', revenue: 24000 },
-      { month: 'Dec', revenue: 22000 },
-      { month: 'Jan', revenue: 21000 },
-    ],
-    alerts: [
-      {
-        id: '1',
-        type: 'OVERDUE_INVOICE',
-        severity: 'error',
-        message: 'Invoice INV-0042 is 15 days overdue ($5,200)',
-        link: '/sales/invoices/1',
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        type: 'LOW_STOCK',
-        severity: 'warning',
-        message: 'Widget Pro is below reorder point (5 remaining)',
-        link: '/inventory/items/1',
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: '3',
-        type: 'OVERDUE_BILL',
-        severity: 'warning',
-        message: 'Bill BILL-0023 is due tomorrow ($2,100)',
-        link: '/purchases/bills/1',
-        createdAt: new Date().toISOString(),
-      },
-    ],
-    recentTransactions: [
-      {
-        id: '1',
-        type: 'INVOICE',
-        reference: 'INV-0055',
-        description: 'Invoice to ABC Corp',
-        amount: 4500,
-        date: new Date().toISOString(),
-        link: '/sales/invoices/1',
-      },
-      {
-        id: '2',
-        type: 'PAYMENT_RECEIVED',
-        reference: 'PAY-0034',
-        description: 'Payment from XYZ Ltd',
-        amount: 3200,
-        date: new Date(Date.now() - 86400000).toISOString(),
-        link: '/sales/payments/1',
-      },
-      {
-        id: '3',
-        type: 'EXPENSE',
-        reference: 'EXP-0089',
-        description: 'Office Supplies',
-        amount: -450,
-        date: new Date(Date.now() - 172800000).toISOString(),
-        link: '/purchases/expenses/1',
-      },
-      {
-        id: '4',
-        type: 'BILL',
-        reference: 'BILL-0028',
-        description: 'Monthly Rent',
-        amount: -5000,
-        date: new Date(Date.now() - 259200000).toISOString(),
-        link: '/purchases/bills/1',
-      },
-    ],
-  };
 }

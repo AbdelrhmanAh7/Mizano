@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Search, RefreshCw, Eye, Edit, Trash2, Play, Pause, Calendar } from 'lucide-react';
+import { Plus, RefreshCw, Eye, Edit, Trash2, Play, Pause, Calendar } from 'lucide-react';
+import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
@@ -13,14 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,8 +30,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
+import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
   useRecurringProfiles,
   useDeleteRecurringProfile,
@@ -50,23 +43,24 @@ import {
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { format } from 'date-fns';
 
-export default function RecurringProfilesPage() {
+function RecurringProfilesPageContent() {
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
+  const tableParams = useTableParams({ defaultSortBy: 'nextExecutionDate' });
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [profileToDelete, setProfileToDelete] = useState<RecurringProfile | null>(null);
 
   const { data: profilesData, isLoading, refetch } = useRecurringProfiles({
-    search: searchQuery || undefined,
+    ...tableParams.queryParams,
     isActive: selectedStatus === 'all' ? undefined : selectedStatus === 'active',
   });
   const deleteProfile = useDeleteRecurringProfile();
   const toggleProfile = useToggleRecurringProfile();
 
   const profiles = profilesData?.data || [];
+  const meta = profilesData?.meta;
 
   const canCreate = hasPermission('accounting.create');
   const canEdit = hasPermission('accounting.edit');
@@ -113,6 +107,139 @@ export default function RecurringProfilesPage() {
     }
   };
 
+  const columns: ColumnDef<RecurringProfile>[] = [
+    {
+      accessorKey: 'name',
+      header: () => (
+        <SortableHeader
+          label="Name"
+          columnId="name"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <div>
+          <span className="font-medium">{row.original.name}</span>
+          {row.original.description && (
+            <p className="text-sm text-muted-foreground truncate max-w-[200px]">
+              {row.original.description}
+            </p>
+          )}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'frequency',
+      header: 'Frequency',
+      cell: ({ row }) => (
+        <Badge variant="outline">
+          {getFrequencyLabel(row.original.frequency)}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'nextExecutionDate',
+      header: () => (
+        <SortableHeader
+          label="Next Execution"
+          columnId="nextExecutionDate"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          {format(new Date(row.original.nextExecutionDate), 'MMM d, yyyy')}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'autoPost',
+      header: 'Auto Post',
+      cell: ({ row }) => (
+        <Badge variant={row.original.autoPost ? 'default' : 'secondary'}>
+          {row.original.autoPost ? 'Yes' : 'No'}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'isActive',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge
+          className={
+            row.original.isActive
+              ? 'bg-green-100 text-green-800'
+              : 'bg-gray-100 text-gray-800'
+          }
+        >
+          {row.original.isActive ? 'Active' : 'Inactive'}
+        </Badge>
+      ),
+    },
+    {
+      id: 'actions',
+      header: '',
+      meta: { cellClassName: 'text-right' },
+      cell: ({ row }) => {
+        const profile = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                ...
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/accounting/recurring/${profile.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View
+                </Link>
+              </DropdownMenuItem>
+              {canEdit && (
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/accounting/recurring/${profile.id}/edit`}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleToggle(profile)}>
+                    {profile.isActive ? (
+                      <>
+                        <Pause className="mr-2 h-4 w-4" />
+                        Pause
+                      </>
+                    ) : (
+                      <>
+                        <Play className="mr-2 h-4 w-4" />
+                        Activate
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                </>
+              )}
+              {canDelete && (
+                <DropdownMenuItem
+                  onClick={() => handleDelete(profile)}
+                  className="text-red-600"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -139,15 +266,11 @@ export default function RecurringProfilesPage() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name or description..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+            <DataTableSearch
+              value={tableParams.search}
+              onChange={tableParams.setSearch}
+              placeholder="Search by name or description..."
+            />
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by status" />
@@ -171,130 +294,28 @@ export default function RecurringProfilesPage() {
           <CardTitle>Recurring Profiles</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : profiles.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No recurring profiles found</p>
-              {canCreate && (
+          <DataTable
+            columns={columns}
+            data={profiles}
+            page={meta?.page || 1}
+            totalPages={meta?.totalPages || 1}
+            total={meta?.total || 0}
+            limit={tableParams.limit}
+            onPageChange={tableParams.setPage}
+            onLimitChange={tableParams.setLimit}
+            isLoading={isLoading}
+            emptyMessage="No recurring profiles found"
+            emptyAction={
+              canCreate ? (
                 <Button asChild>
                   <Link href="/accounting/recurring/new">
                     <Plus className="mr-2 h-4 w-4" />
                     Create Your First Profile
                   </Link>
                 </Button>
-              )}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Frequency</TableHead>
-                  <TableHead>Next Execution</TableHead>
-                  <TableHead>Auto Post</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {profiles.map((profile: RecurringProfile) => (
-                  <TableRow key={profile.id}>
-                    <TableCell>
-                      <div>
-                        <span className="font-medium">{profile.name}</span>
-                        {profile.description && (
-                          <p className="text-sm text-muted-foreground truncate max-w-[200px]">
-                            {profile.description}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {getFrequencyLabel(profile.frequency)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        {format(new Date(profile.nextExecutionDate), 'MMM d, yyyy')}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={profile.autoPost ? 'default' : 'secondary'}>
-                        {profile.autoPost ? 'Yes' : 'No'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={
-                          profile.isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }
-                      >
-                        {profile.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            •••
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/accounting/recurring/${profile.id}`}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View
-                            </Link>
-                          </DropdownMenuItem>
-                          {canEdit && (
-                            <>
-                              <DropdownMenuItem asChild>
-                                <Link href={`/accounting/recurring/${profile.id}/edit`}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleToggle(profile)}>
-                                {profile.isActive ? (
-                                  <>
-                                    <Pause className="mr-2 h-4 w-4" />
-                                    Pause
-                                  </>
-                                ) : (
-                                  <>
-                                    <Play className="mr-2 h-4 w-4" />
-                                    Activate
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                          {canDelete && (
-                            <DropdownMenuItem
-                              onClick={() => handleDelete(profile)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+              ) : undefined
+            }
+          />
         </CardContent>
       </Card>
 
@@ -320,5 +341,13 @@ export default function RecurringProfilesPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function RecurringProfilesPage() {
+  return (
+    <Suspense>
+      <RecurringProfilesPageContent />
+    </Suspense>
   );
 }

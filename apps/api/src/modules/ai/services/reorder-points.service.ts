@@ -220,7 +220,7 @@ export class ReorderPointsService {
     failed: number;
     items: Array<{ itemId: string; status: ReorderStatus; needsReorder: boolean }>;
   }> {
-    // Get all GOODS items
+    // Get all GOODS items with needed fields
     const items = await this.prisma.item.findMany({
       where: {
         organizationId,
@@ -228,8 +228,15 @@ export class ReorderPointsService {
         isActive: true,
         deletedAt: null,
       },
-      select: { id: true },
+      select: { id: true, currentStock: true, costPrice: true, type: true },
     });
+
+    // Bulk-fetch all demand history for these items in one query
+    const demandMap = await this.getBulkDemandHistory(
+      organizationId,
+      items.map((i) => i.id),
+      90,
+    );
 
     let calculated = 0;
     let failed = 0;
@@ -241,10 +248,8 @@ export class ReorderPointsService {
 
     for (const item of items) {
       try {
-        const analysis = await this.calculateForItem(
-          organizationId,
-          item.id,
-        );
+        const dailySales = demandMap.get(item.id) || [];
+        const analysis = this.calculateForItemInMemory(item, dailySales);
         results.push({
           itemId: item.id,
           status: analysis.status,
@@ -281,15 +286,23 @@ export class ReorderPointsService {
         currentStock: true,
         reorderPoint: true,
         costPrice: true,
+        type: true,
         reorderAnalysis: true,
       },
     });
 
+    // Bulk-fetch demand history for all items
+    const demandMap = await this.getBulkDemandHistory(
+      organizationId,
+      items.map((i) => i.id),
+      90,
+    );
+
     const alerts: ReorderAlert[] = [];
 
     for (const item of items) {
-      // Calculate current analysis
-      const analysis = await this.calculateForItem(organizationId, item.id);
+      const dailySales = demandMap.get(item.id) || [];
+      const analysis = this.calculateForItemInMemory(item, dailySales);
 
       if (analysis.needsReorder) {
         alerts.push({
@@ -329,9 +342,6 @@ export class ReorderPointsService {
     organizationId: string,
     thresholdDays: number = this.DEAD_STOCK_DAYS,
   ): Promise<DeadStockItem[]> {
-    const thresholdDate = new Date();
-    thresholdDate.setDate(thresholdDate.getDate() - thresholdDays);
-
     // Get all GOODS items with stock > 0
     const items = await this.prisma.item.findMany({
       where: {
@@ -350,21 +360,18 @@ export class ReorderPointsService {
       },
     });
 
+    if (items.length === 0) return [];
+
+    // Bulk-fetch last sale dates for all items in one query
+    const lastSaleMap = await this.getBulkLastSaleDates(
+      organizationId,
+      items.map((i) => i.id),
+    );
+
     const deadStock: DeadStockItem[] = [];
 
     for (const item of items) {
-      // Get last sale date for this item
-      const lastSale = await this.prisma.inventoryMovement.findFirst({
-        where: {
-          organizationId,
-          itemId: item.id,
-          type: 'sale',
-        },
-        orderBy: { createdAt: 'desc' },
-        select: { createdAt: true },
-      });
-
-      const lastSaleDate = lastSale?.createdAt || null;
+      const lastSaleDate = lastSaleMap.get(item.id) || null;
       let daysSinceLastSale: number | null = null;
 
       if (lastSaleDate) {
@@ -419,27 +426,27 @@ export class ReorderPointsService {
         isActive: true,
         deletedAt: null,
       },
-      select: { id: true, currentStock: true, costPrice: true },
+      select: { id: true, currentStock: true, costPrice: true, type: true },
     });
+
+    if (items.length === 0) return { updated: 0 };
+
+    const itemIds = items.map((i) => i.id);
+
+    // Bulk-fetch all demand history and last sale dates (2 queries instead of 2N)
+    const [demandMap, lastSaleMap] = await Promise.all([
+      this.getBulkDemandHistory(organizationId, itemIds, 90),
+      this.getBulkLastSaleDates(organizationId, itemIds),
+    ]);
 
     let updated = 0;
 
     for (const item of items) {
       try {
-        const analysis = await this.calculateForItem(organizationId, item.id);
+        const dailySales = demandMap.get(item.id) || [];
+        const analysis = this.calculateForItemInMemory(item, dailySales);
 
-        // Get last sale date
-        const lastSale = await this.prisma.inventoryMovement.findFirst({
-          where: {
-            organizationId,
-            itemId: item.id,
-            type: 'sale',
-          },
-          orderBy: { createdAt: 'desc' },
-          select: { createdAt: true },
-        });
-
-        const lastSaleDate = lastSale?.createdAt || null;
+        const lastSaleDate = lastSaleMap.get(item.id) || null;
         let daysSinceLastSale: number | null = null;
         if (lastSaleDate) {
           daysSinceLastSale = Math.floor(
@@ -542,6 +549,132 @@ export class ReorderPointsService {
     }
 
     return Object.values(dailySales);
+  }
+
+  /**
+   * In-memory reorder calculation using pre-fetched data (no DB calls).
+   */
+  private calculateForItemInMemory(
+    item: { currentStock: number; costPrice: any; type: string },
+    dailySales: number[],
+    leadTimeDays: number = this.DEFAULT_LEAD_TIME_DAYS,
+    serviceLevel: number = this.DEFAULT_SERVICE_LEVEL,
+  ): ReorderCalculation {
+    if (item.type !== 'GOODS') {
+      return {
+        avgDailyDemand: 0, demandStdDev: 0, safetyStock: 0, reorderPoint: 0,
+        economicOrderQty: 0, daysOfStockRemaining: null, status: 'OK', needsReorder: false,
+      };
+    }
+
+    const { avgDailyDemand, demandStdDev, safetyStock, reorderPoint } =
+      this.calculateReorderPoint(dailySales, leadTimeDays, serviceLevel);
+
+    const annualDemand = avgDailyDemand * 365;
+    const holdingCostPerUnit = Number(item.costPrice) * this.HOLDING_COST_RATE;
+    const economicOrderQty = this.calculateEOQ(
+      annualDemand, this.DEFAULT_ORDERING_COST, holdingCostPerUnit,
+    );
+
+    const daysOfStockRemaining =
+      avgDailyDemand > 0 ? Math.floor(item.currentStock / avgDailyDemand) : null;
+
+    const status = this.determineStatus(
+      item.currentStock, reorderPoint, safetyStock, avgDailyDemand,
+    );
+
+    return {
+      avgDailyDemand, demandStdDev, safetyStock, reorderPoint,
+      economicOrderQty, daysOfStockRemaining, status,
+      needsReorder: item.currentStock <= reorderPoint,
+    };
+  }
+
+  /**
+   * Bulk-fetch demand history for multiple items in a single query.
+   * Returns a Map of itemId -> daily sales array.
+   */
+  private async getBulkDemandHistory(
+    organizationId: string,
+    itemIds: string[],
+    days: number = 90,
+  ): Promise<Map<string, number[]>> {
+    if (itemIds.length === 0) return new Map();
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    // Single query for ALL items' movements
+    const movements = await this.prisma.inventoryMovement.findMany({
+      where: {
+        organizationId,
+        itemId: { in: itemIds },
+        type: 'sale',
+        createdAt: { gte: startDate },
+      },
+      select: { itemId: true, quantity: true, createdAt: true },
+    });
+
+    // Group movements by itemId and day
+    const itemMovements = new Map<string, Map<string, number>>();
+
+    for (const mov of movements) {
+      if (!itemMovements.has(mov.itemId)) {
+        itemMovements.set(mov.itemId, new Map());
+      }
+      const dateKey = mov.createdAt.toISOString().split('T')[0];
+      const dayMap = itemMovements.get(mov.itemId)!;
+      dayMap.set(dateKey, (dayMap.get(dateKey) || 0) + Math.abs(parseFloat(mov.quantity.toString())));
+    }
+
+    // Build daily arrays for each item
+    const result = new Map<string, number[]>();
+    const dayKeys: string[] = [];
+    for (let i = 0; i < days; i++) {
+      const date = new Date(startDate);
+      date.setDate(date.getDate() + i);
+      dayKeys.push(date.toISOString().split('T')[0]);
+    }
+
+    for (const itemId of itemIds) {
+      const dayMap = itemMovements.get(itemId);
+      const dailySales = dayKeys.map((key) => dayMap?.get(key) || 0);
+      result.set(itemId, dailySales);
+    }
+
+    return result;
+  }
+
+  /**
+   * Bulk-fetch last sale dates for multiple items in a single query.
+   */
+  private async getBulkLastSaleDates(
+    organizationId: string,
+    itemIds: string[],
+  ): Promise<Map<string, Date>> {
+    if (itemIds.length === 0) return new Map();
+
+    // Fetch all sale movements ordered by date desc
+    const movements = await this.prisma.inventoryMovement.findMany({
+      where: {
+        organizationId,
+        itemId: { in: itemIds },
+        type: 'sale',
+      },
+      select: { itemId: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Keep only the most recent per item
+    const result = new Map<string, Date>();
+    for (const mov of movements) {
+      if (!result.has(mov.itemId)) {
+        result.set(mov.itemId, mov.createdAt);
+      }
+    }
+
+    return result;
   }
 
   /**

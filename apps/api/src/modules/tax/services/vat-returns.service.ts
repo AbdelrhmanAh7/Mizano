@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { VATReturnStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class VatReturnsService {
@@ -149,8 +149,13 @@ export class VatReturnsService {
     dto: { amount: number; date: string; paidFromAccountId: string; reference?: string },
   ) {
     const vatReturn = await this.findOne(organizationId, vatReturnId);
-    if (vatReturn.status !== VATReturnStatus.SUBMITTED && vatReturn.status !== VATReturnStatus.FILED) {
-      throw new BadRequestException('VAT return must be submitted or filed before recording payment');
+    if (
+      vatReturn.status !== VATReturnStatus.SUBMITTED &&
+      vatReturn.status !== VATReturnStatus.FILED
+    ) {
+      throw new BadRequestException(
+        'VAT return must be submitted or filed before recording payment',
+      );
     }
 
     // Check if payment already exists (one-to-one relationship)
@@ -243,6 +248,31 @@ export class VatReturnsService {
 
     await this.prisma.vATReturn.delete({ where: { id } });
     return { message: 'VAT return deleted' };
+  }
+
+  // === Bulk Operations ===
+
+  async bulkDelete(organizationId: string, ids: string[]) {
+    const result = await this.prisma.vATReturn.deleteMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        status: VATReturnStatus.DRAFT,
+      },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
+  async bulkSubmit(organizationId: string, ids: string[]) {
+    const result = await this.prisma.vATReturn.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        status: VATReturnStatus.CALCULATED,
+      },
+      data: { status: VATReturnStatus.SUBMITTED, submittedAt: new Date() },
+    });
+    return { submitted: result.count, total: ids.length };
   }
 
   private async lockPeriod(organizationId: string, start: Date, end: Date) {

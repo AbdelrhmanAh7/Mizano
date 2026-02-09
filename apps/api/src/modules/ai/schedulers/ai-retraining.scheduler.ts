@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AnomalyDetectionService } from '../services/anomaly-detection.service';
 import { ReorderPointsService } from '../services/reorder-points.service';
@@ -12,6 +13,8 @@ import { CashFlowPredictionService } from '../services/cash-flow-prediction.serv
 import { LeadScoringService } from '../services/lead-scoring.service';
 import { PatternDetectionService } from '../services/pattern-detection.service';
 import { AiAlertsService } from '../services/ai-alerts.service';
+import { AiTrainingService } from '../services/ai-training.service';
+import { ModelRegistryService } from '../services/model-registry.service';
 import { AiFeature } from '@prisma/client';
 
 @Injectable()
@@ -31,7 +34,28 @@ export class AiRetrainingScheduler {
     private leadScoringService: LeadScoringService,
     private patternDetectionService: PatternDetectionService,
     private aiAlertsService: AiAlertsService,
+    private trainingService: AiTrainingService,
+    private modelRegistryService: ModelRegistryService,
   ) {}
+
+  /**
+   * Listen for retraining events emitted by AiFeedbackService
+   * when correction threshold is met
+   */
+  @OnEvent('ai.retraining.needed')
+  async onRetrainingNeeded(payload: {
+    organizationId: string;
+    feature: AiFeature;
+    triggeredAt: Date;
+  }) {
+    this.logger.log(
+      `Received retraining event for ${payload.feature} in org ${payload.organizationId}`,
+    );
+    await this.triggerModelRetrainingWithRetry(
+      payload.organizationId,
+      payload.feature,
+    );
+  }
 
   /**
    * Daily anomaly scan - runs at 2 AM
@@ -111,10 +135,10 @@ export class AiRetrainingScheduler {
   }
 
   /**
-   * Check retraining thresholds every 6 hours
+   * Check retraining thresholds every 12 hours (at 6 AM and 6 PM)
    * Triggers model retraining when enough corrections are accumulated
    */
-  @Cron('0 */6 * * *')
+  @Cron('0 6,18 * * *')
   async checkRetrainingThresholds() {
     this.logger.log('Checking AI model retraining thresholds...');
 
@@ -131,6 +155,16 @@ export class AiRetrainingScheduler {
         'DEMAND_FORECAST',
         'PATTERN_DETECTION',
         'REORDER',
+        'ANOMALY',
+        'PAYMENT_PREDICTION',
+        'CASH_FLOW',
+        'OCR_LAYOUT',
+        'CHURN_PREDICTION',
+        'FRAUD_DETECTION',
+        'QUALITY_PREDICTION',
+        'DOCUMENT_CLASSIFICATION',
+        'PIPELINE_FORECAST',
+        'CLV_ANALYSIS',
       ];
 
       for (const org of organizations) {
@@ -142,11 +176,11 @@ export class AiRetrainingScheduler {
                 feature,
               );
 
-            if (needsRetraining) {
+            if (needsRetraining.shouldRetrain) {
               this.logger.log(
-                `Org ${org.id}: ${feature} needs retraining - triggering...`,
+                `Org ${org.id}: ${feature} needs retraining (${needsRetraining.correctionCount}/${needsRetraining.threshold} corrections) - triggering...`,
               );
-              await this.triggerModelRetraining(org.id, feature);
+              await this.triggerModelRetrainingWithRetry(org.id, feature);
             }
           } catch (error) {
             this.logger.error(
@@ -333,52 +367,6 @@ export class AiRetrainingScheduler {
   }
 
   /**
-   * Transaction Categorization retraining check - runs every 6 hours
-   * Retrains the Naive Bayes classifier when 50+ corrections are accumulated
-   */
-  @Cron('0 */6 * * *')
-  async checkCategorizationRetraining() {
-    this.logger.log('Checking transaction categorization retraining...');
-
-    try {
-      const organizations = await this.prisma.organization.findMany({
-        where: {},
-        select: { id: true, name: true },
-      });
-
-      for (const org of organizations) {
-        try {
-          const needsRetraining =
-            await this.feedbackService.checkRetrainingThreshold(
-              org.id,
-              'CATEGORIZATION',
-            );
-
-          if (needsRetraining) {
-            this.logger.log(
-              `Org ${org.name}: Retraining transaction categorizer...`,
-            );
-            const result = await this.categorizerService.train(org.id);
-            this.logger.log(
-              `Org ${org.name}: Categorizer trained - v${result.version}, accuracy: ${(result.accuracy * 100).toFixed(1)}%`,
-            );
-          }
-        } catch (error) {
-          this.logger.error(
-            `Error checking categorization retraining for org ${org.id}: ${error.message}`,
-          );
-        }
-      }
-
-      this.logger.log('Categorization retraining check completed');
-    } catch (error) {
-      this.logger.error(
-        `Categorization retraining check failed: ${error.message}`,
-      );
-    }
-  }
-
-  /**
    * Payment predictions update - runs every Sunday at 2 AM
    * Recalculates payment predictions for all outstanding invoices
    */
@@ -509,10 +497,10 @@ export class AiRetrainingScheduler {
   }
 
   /**
-   * Hourly AI alerts aggregation - runs every hour at :30
+   * AI alerts aggregation - runs every 4 hours at :30
    * Collects alerts from all AI services and creates unified notifications
    */
-  @Cron('30 * * * *')
+  @Cron('30 */4 * * *')
   async runHourlyAlertAggregation() {
     this.logger.log('Starting hourly AI alerts aggregation...');
 
@@ -698,6 +686,124 @@ export class AiRetrainingScheduler {
   }
 
   /**
+   * Weekly accuracy validation - runs every Monday at 1 AM
+   * Detects model degradation and triggers retraining proactively
+   */
+  @Cron('0 1 * * 1')
+  async runWeeklyAccuracyValidation() {
+    this.logger.log('Starting weekly accuracy validation...');
+
+    try {
+      const organizations = await this.prisma.organization.findMany({
+        where: {},
+        select: { id: true, name: true },
+      });
+
+      const trainableFeatures: AiFeature[] = [
+        'CATEGORIZATION',
+        'LEAD_SCORING',
+        'CHURN_PREDICTION',
+        'QUALITY_PREDICTION',
+      ];
+
+      for (const org of organizations) {
+        for (const feature of trainableFeatures) {
+          try {
+            const trend = await this.modelRegistryService.getAccuracyTrend(
+              org.id,
+              feature,
+            );
+
+            if (trend.degradationDetected) {
+              this.logger.warn(
+                `Org ${org.name}: ${feature} model degradation detected (trend: ${trend.trend}, current: ${((trend.currentAccuracy ?? 0) * 100).toFixed(1)}%, avg: ${(trend.avgAccuracy * 100).toFixed(1)}%) — triggering retraining`,
+              );
+              await this.triggerModelRetrainingWithRetry(org.id, feature);
+            }
+          } catch (error) {
+            this.logger.error(
+              `Error validating accuracy for ${org.id}/${feature}: ${error.message}`,
+            );
+          }
+        }
+      }
+
+      this.logger.log('Weekly accuracy validation completed');
+    } catch (error) {
+      this.logger.error(
+        `Weekly accuracy validation failed: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Trigger model retraining with retry and exponential backoff
+   */
+  private async triggerModelRetrainingWithRetry(
+    organizationId: string,
+    feature: AiFeature,
+    maxRetries: number = 3,
+  ): Promise<void> {
+    // Validate training data readiness before attempting
+    const readiness = await this.trainingService.validateTrainingReadiness(
+      organizationId,
+      feature,
+    );
+
+    if (!readiness.isReady) {
+      this.logger.warn(
+        `Skipping retraining for ${feature} in org ${organizationId}: ${readiness.warnings.join(', ')}`,
+      );
+      return;
+    }
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this.triggerModelRetraining(organizationId, feature);
+        this.logger.log(
+          `Model retraining succeeded for ${feature} in org ${organizationId} (attempt ${attempt})`,
+        );
+        return;
+      } catch (error) {
+        this.logger.error(
+          `Training attempt ${attempt}/${maxRetries} failed for ${feature} in org ${organizationId}: ${error.message}`,
+        );
+
+        if (attempt === maxRetries) {
+          // All retries exhausted — create alert insight for admins
+          try {
+            await this.prisma.aIInsight.create({
+              data: {
+                organizationId,
+                type: 'ALERT',
+                severity: 'high',
+                priority: 'HIGH',
+                title: `AI Model Training Failed: ${feature}`,
+                description: `The ${feature} model failed to retrain after ${maxRetries} attempts. Error: ${error.message}. Manual intervention may be required.`,
+                data: {
+                  feature,
+                  error: error.message,
+                  attempts: maxRetries,
+                  failedAt: new Date().toISOString(),
+                },
+              },
+            });
+          } catch (alertError) {
+            this.logger.error(
+              `Failed to create training failure alert: ${alertError.message}`,
+            );
+          }
+          return;
+        }
+
+        // Exponential backoff: 5s, 25s, 125s
+        const delayMs = Math.pow(5, attempt) * 1000;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  /**
    * Trigger model retraining for a specific feature
    */
   private async triggerModelRetraining(
@@ -708,57 +814,55 @@ export class AiRetrainingScheduler {
       `Model retraining triggered for org ${organizationId}, feature ${feature}`,
     );
 
-    try {
-      switch (feature) {
-        case 'CATEGORIZATION':
-          await this.categorizerService.train(organizationId);
-          break;
+    switch (feature) {
+      case 'CATEGORIZATION':
+        await this.categorizerService.train(organizationId);
+        break;
 
-        case 'PAYMENT_PREDICTION':
-          await this.paymentPredictionService.updatePredictions(organizationId);
-          break;
+      case 'PAYMENT_PREDICTION':
+        await this.paymentPredictionService.updatePredictions(organizationId);
+        break;
 
-        case 'DEMAND_FORECAST':
-          await this.demandForecastingService.forecastAllItems(organizationId);
-          break;
+      case 'DEMAND_FORECAST':
+        await this.demandForecastingService.forecastAllItems(organizationId);
+        break;
 
-        case 'CASH_FLOW':
-          await this.cashFlowPredictionService.dailyRecalculate(organizationId);
-          break;
+      case 'CASH_FLOW':
+        await this.cashFlowPredictionService.dailyRecalculate(organizationId);
+        break;
 
-        case 'LEAD_SCORING':
-          await this.leadScoringService.scoreAllLeads(organizationId);
-          break;
+      case 'LEAD_SCORING':
+        await this.leadScoringService.scoreAllLeads(organizationId);
+        break;
 
-        case 'PATTERN_DETECTION':
-          await this.patternDetectionService.analyzePatterns(organizationId);
-          break;
+      case 'PATTERN_DETECTION':
+        await this.patternDetectionService.analyzePatterns(organizationId);
+        break;
 
-        case 'REORDER':
-          await this.reorderService.updateItemReorderPoints(organizationId);
-          break;
+      case 'REORDER':
+        await this.reorderService.updateItemReorderPoints(organizationId);
+        break;
 
-        default:
-          // For other features, just mark training data as processed
-          await this.prisma.aiTrainingData.updateMany({
-            where: {
-              organizationId,
-              feature,
-              source: 'CORRECTION',
-            },
-            data: {
-              source: 'USER', // Change from CORRECTION to USER after processing
-            },
-          });
-      }
+      case 'ANOMALY':
+        await this.anomalyService.dailyAnomalyScan(organizationId);
+        break;
 
-      this.logger.log(
-        `Model retraining completed for org ${organizationId}, feature ${feature}`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Model retraining failed for org ${organizationId}, feature ${feature}: ${error.message}`,
-      );
+      case 'RECONCILIATION':
+        // Reconciliation learns from confirmed matches — no batch retrain
+        this.logger.log(
+          `Reconciliation patterns updated incrementally for org ${organizationId}`,
+        );
+        break;
+
+      default:
+        this.logger.log(
+          `No specific retraining handler for ${feature} in org ${organizationId}`,
+        );
+        break;
     }
+
+    this.logger.log(
+      `Model retraining completed for org ${organizationId}, feature ${feature}`,
+    );
   }
 }

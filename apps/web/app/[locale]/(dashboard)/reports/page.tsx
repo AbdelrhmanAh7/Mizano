@@ -1,17 +1,19 @@
 'use client';
 
-import Link from 'next/link';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  BarChart3,
-  PieChart,
-  TrendingUp,
-  FileText,
-  Users,
-  Building2,
-  Calculator,
-  ArrowRight,
+    ArrowRight,
+    BarChart3,
+    Building2,
+    Calculator,
+    FileText,
+    Package,
+    PieChart,
+    ShoppingCart,
+    TrendingUp,
+    Users,
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from 'next/link';
 
 const reportCategories = [
   {
@@ -53,6 +55,30 @@ const reportCategories = [
         description: 'Outstanding vendor bills',
         href: '/reports/ap-aging',
         icon: Building2,
+      },
+    ],
+  },
+  {
+    name: 'Sales & Purchase Reports',
+    description: 'Analyze sales and purchasing performance',
+    reports: [
+      {
+        name: 'Sales by Customer',
+        description: 'Revenue breakdown by customer',
+        href: '/reports/sales-by-customer',
+        icon: Users,
+      },
+      {
+        name: 'Sales by Item',
+        description: 'Revenue breakdown by product/item',
+        href: '/reports/sales-by-item',
+        icon: Package,
+      },
+      {
+        name: 'Purchases by Vendor',
+        description: 'Purchase breakdown by vendor',
+        href: '/reports/purchases-by-vendor',
+        icon: ShoppingCart,
       },
     ],
   },

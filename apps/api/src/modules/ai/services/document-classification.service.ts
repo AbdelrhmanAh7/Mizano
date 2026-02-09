@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
 import { AiFeature } from '@prisma/client';
+import { BoundedCache } from '../utils/bounded-cache.util';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const natural = require('natural');
@@ -129,8 +130,8 @@ const FILENAME_HINTS: Record<string, DocumentCategory> = {
 export class DocumentClassificationService {
   private readonly logger = new Logger(DocumentClassificationService.name);
 
-  /** In-memory cache of trained classifiers per organization */
-  private classifierCache = new Map<string, any>();
+  /** In-memory cache of trained classifiers per organization (bounded: max 50, 1h TTL) */
+  private classifierCache = new BoundedCache<any>(50, 60 * 60 * 1000);
 
   constructor(
     private prisma: PrismaService,

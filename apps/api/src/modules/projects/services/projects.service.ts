@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { ProjectStatus, BillingMethod } from '@prisma/client';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BillingMethod, ProjectStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class ProjectsService {
@@ -108,6 +108,32 @@ export class ProjectsService {
     return { message: 'Project deleted' };
   }
 
+  // === Bulk Operations ===
+
+  async bulkDelete(organizationId: string, ids: string[]) {
+    // Only delete projects without timesheet entries or invoices
+    const projects = await this.prisma.project.findMany({
+      where: { id: { in: ids }, organizationId },
+      include: { timesheetEntries: { take: 1 }, invoices: { take: 1 } },
+    });
+    const deletableIds = projects
+      .filter((p) => p.timesheetEntries.length === 0 && p.invoices.length === 0)
+      .map((p) => p.id);
+    await this.prisma.task.deleteMany({ where: { projectId: { in: deletableIds } } });
+    const result = await this.prisma.project.deleteMany({
+      where: { id: { in: deletableIds }, organizationId },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
+  async bulkUpdateStatus(organizationId: string, ids: string[], status: ProjectStatus) {
+    const result = await this.prisma.project.updateMany({
+      where: { id: { in: ids }, organizationId },
+      data: { status },
+    });
+    return { updated: result.count, total: ids.length };
+  }
+
   async getProjectProfitability(organizationId: string, id: string) {
     const project = await this.findOne(organizationId, id);
 
@@ -115,7 +141,10 @@ export class ProjectsService {
     const timesheetEntries = await this.prisma.timesheetEntry.findMany({
       where: { projectId: id, organizationId },
     });
-    const totalHours = timesheetEntries.reduce((sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()), 0);
+    const totalHours = timesheetEntries.reduce(
+      (sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()),
+      0,
+    );
 
     // Calculate revenue based on billing method
     let revenue = 0;
@@ -129,9 +158,14 @@ export class ProjectsService {
     const invoices = await this.prisma.invoice.findMany({
       where: { projectId: id, organizationId },
     });
-    const invoicedAmount = invoices.reduce((sum, inv) => sum + parseFloat((inv.total ?? inv.grandTotal).toString()), 0);
+    const invoicedAmount = invoices.reduce(
+      (sum, inv) => sum + parseFloat((inv.total ?? inv.grandTotal).toString()),
+      0,
+    );
     const paidAmount = invoices.reduce((sum, inv) => {
-      const paid = parseFloat((inv.total ?? inv.grandTotal).toString()) - parseFloat(inv.balanceDue.toString());
+      const paid =
+        parseFloat((inv.total ?? inv.grandTotal).toString()) -
+        parseFloat(inv.balanceDue.toString());
       return sum + paid;
     }, 0);
 
@@ -181,7 +215,11 @@ export class ProjectsService {
     };
   }
 
-  async createInvoiceFromProject(organizationId: string, projectId: string, dto: { startDate: string; endDate: string }) {
+  async createInvoiceFromProject(
+    organizationId: string,
+    projectId: string,
+    dto: { startDate: string; endDate: string },
+  ) {
     const project = await this.findOne(organizationId, projectId);
     if (!project.customerId) {
       throw new BadRequestException('Project has no customer assigned');
@@ -201,7 +239,10 @@ export class ProjectsService {
       throw new BadRequestException('No unbilled entries found for this period');
     }
 
-    const totalHours = entries.reduce((sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()), 0);
+    const totalHours = entries.reduce(
+      (sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()),
+      0,
+    );
     const hourlyRate = project.hourlyRate ? parseFloat(project.hourlyRate.toString()) : 0;
 
     // Generate invoice number

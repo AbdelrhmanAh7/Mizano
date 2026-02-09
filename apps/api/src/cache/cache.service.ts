@@ -1,16 +1,63 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Cache } from 'cache-manager';
+import Redis from 'ioredis';
 
 export interface CacheOptions {
   ttl?: number; // Time to live in seconds
   prefix?: string;
 }
 
+export interface CacheStats {
+  storeType: 'redis' | 'memory';
+  connected: boolean;
+  keyCount: number;
+  memoryUsage: string;
+  uptime: number;
+  hitRate: number;
+}
+
+export interface CacheKeyInfo {
+  key: string;
+  ttl: number; // remaining TTL in seconds, -1 = no expiry, -2 = key gone
+}
+
 @Injectable()
-export class CacheService {
+export class CacheService implements OnModuleInit {
   private readonly logger = new Logger(CacheService.name);
-  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
+  private redisClient: Redis | null = null;
+  private hits = 0;
+  private misses = 0;
+
+  constructor(
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private configService: ConfigService,
+  ) {}
+
+  async onModuleInit(): Promise<void> {
+    const redisUrl = this.configService.get<string>('REDIS_URL');
+    if (redisUrl) {
+      try {
+        this.redisClient = new Redis(redisUrl, {
+          maxRetriesPerRequest: 3,
+          lazyConnect: true,
+        });
+        await this.redisClient.connect();
+        this.logger.log('Redis client connected for cache operations');
+      } catch (error) {
+        this.logger.warn('Failed to connect direct Redis client; pattern operations unavailable');
+        this.redisClient = null;
+      }
+    }
+  }
+
+  /**
+   * Whether we have a direct Redis connection for advanced operations
+   */
+  get isRedisAvailable(): boolean {
+    return this.redisClient !== null && this.redisClient.status === 'ready';
+  }
 
   /**
    * Build a cache key with optional organization prefix
@@ -25,6 +72,11 @@ export class CacheService {
   async get<T>(key: string, organizationId?: string): Promise<T | null> {
     const cacheKey = this.buildKey(key, organizationId);
     const value = await this.cacheManager.get<T>(cacheKey);
+    if (value !== undefined && value !== null) {
+      this.hits++;
+    } else {
+      this.misses++;
+    }
     return value ?? null;
   }
 
@@ -50,20 +102,26 @@ export class CacheService {
   }
 
   /**
-   * Delete multiple keys matching a pattern (organization-scoped)
+   * Delete multiple keys matching a glob pattern (organization-scoped).
+   * Uses Redis SCAN for non-blocking iteration when Redis is available.
+   * Falls back to single key deletion for in-memory cache.
    */
-  async deletePattern(pattern: string, organizationId: string): Promise<void> {
-    // Note: Pattern deletion requires direct Redis access
-    // For cache-manager, we'd need to track keys manually or use Redis client directly
-    // This is a simplified version that deletes a specific key
-    const cacheKey = this.buildKey(pattern, organizationId);
-    await this.cacheManager.del(cacheKey);
+  async deletePattern(pattern: string, organizationId: string): Promise<number> {
+    const fullPattern = this.buildKey(pattern, organizationId);
+
+    if (this.isRedisAvailable) {
+      return this.scanAndDelete(fullPattern);
+    }
+
+    // Fallback: try to delete the exact key (no pattern matching in memory store)
+    await this.cacheManager.del(fullPattern);
+    return 1;
   }
 
   /**
-   * Get or set a value in cache
-   * If the key exists, return the cached value
-   * If not, call the factory function, cache the result, and return it
+   * Get or set a value in cache (cache-aside pattern).
+   * If the key exists, return the cached value.
+   * If not, call the factory function, cache the result, and return it.
    */
   async getOrSet<T>(
     key: string,
@@ -74,9 +132,11 @@ export class CacheService {
     const cached = await this.cacheManager.get<T>(cacheKey);
 
     if (cached !== undefined && cached !== null) {
+      this.hits++;
       return cached;
     }
 
+    this.misses++;
     const value = await factory();
     const ttl = options?.ttl ? options.ttl * 1000 : undefined;
     await this.cacheManager.set(cacheKey, value, ttl);
@@ -96,25 +156,166 @@ export class CacheService {
   }
 
   /**
-   * Clear all cache for an organization
+   * Clear all cache for an organization using SCAN + batch DEL.
+   * Returns the number of keys deleted.
    */
-  async clearOrganization(organizationId: string): Promise<void> {
-    // Note: This would require direct Redis access with SCAN command
-    // For now, we'll handle this at the application level
-    this.logger.log(`Cache clear requested for organization: ${organizationId}`);
+  async clearOrganization(organizationId: string): Promise<number> {
+    const pattern = `org:${organizationId}:*`;
+
+    if (this.isRedisAvailable) {
+      const count = await this.scanAndDelete(pattern);
+      this.logger.log(`Cleared ${count} cache keys for organization ${organizationId}`);
+      return count;
+    }
+
+    this.logger.warn(`Cannot clear organization cache without Redis; pattern: ${pattern}`);
+    return 0;
   }
 
   /**
    * Reset the entire cache (use with caution)
-   * Note: This uses store-specific reset if available, otherwise clears known keys
    */
   async reset(): Promise<void> {
-    // cache-manager v5+ uses stores array or store property
-    const cacheStore = (this.cacheManager as any).store || (this.cacheManager as any).stores?.[0];
-    if (cacheStore && typeof cacheStore.reset === 'function') {
-      await cacheStore.reset();
+    if (this.isRedisAvailable) {
+      await this.redisClient!.flushdb();
+      this.logger.log('Redis cache flushed via FLUSHDB');
+      return;
     }
-    // Fallback: log warning as full reset may not be supported
-    this.logger.warn('Cache reset requested - may require manual intervention for complete cache clear');
+
+    const cacheStore = (this.cacheManager as unknown as Record<string, unknown>).store;
+    if (cacheStore && typeof (cacheStore as Record<string, unknown>).reset === 'function') {
+      await (cacheStore as { reset: () => Promise<void> }).reset();
+    }
+    this.logger.warn(
+      'Cache reset requested — may require manual intervention for complete cache clear',
+    );
+  }
+
+  /**
+   * Get cache statistics (connection, key count, memory, hit rate)
+   */
+  async getStats(): Promise<CacheStats> {
+    const totalRequests = this.hits + this.misses;
+    const hitRate = totalRequests > 0 ? (this.hits / totalRequests) * 100 : 0;
+
+    if (this.isRedisAvailable) {
+      try {
+        const info = await this.redisClient!.info('memory');
+        const serverInfo = await this.redisClient!.info('server');
+        const keyCount = await this.redisClient!.dbsize();
+
+        const memoryMatch = info.match(/used_memory_human:(.+)/);
+        const uptimeMatch = serverInfo.match(/uptime_in_seconds:(\d+)/);
+
+        return {
+          storeType: 'redis',
+          connected: true,
+          keyCount,
+          memoryUsage: memoryMatch ? memoryMatch[1].trim() : 'unknown',
+          uptime: uptimeMatch ? parseInt(uptimeMatch[1], 10) : 0,
+          hitRate: Math.round(hitRate * 100) / 100,
+        };
+      } catch {
+        return {
+          storeType: 'redis',
+          connected: false,
+          keyCount: 0,
+          memoryUsage: '0B',
+          uptime: 0,
+          hitRate: Math.round(hitRate * 100) / 100,
+        };
+      }
+    }
+
+    return {
+      storeType: 'memory',
+      connected: true,
+      keyCount: 0, // in-memory store doesn't expose key count easily
+      memoryUsage: 'N/A',
+      uptime: 0,
+      hitRate: Math.round(hitRate * 100) / 100,
+    };
+  }
+
+  /**
+   * List cache keys for an organization (paginated via cursor-based SCAN).
+   * Returns up to `count` keys.
+   */
+  async getKeys(
+    organizationId: string,
+    cursor = '0',
+    count = 100,
+  ): Promise<{ keys: CacheKeyInfo[]; nextCursor: string }> {
+    if (!this.isRedisAvailable) {
+      return { keys: [], nextCursor: '0' };
+    }
+
+    const pattern = `org:${organizationId}:*`;
+    const [nextCursor, rawKeys] = await this.redisClient!.scan(
+      cursor,
+      'MATCH',
+      pattern,
+      'COUNT',
+      count,
+    );
+
+    const keys: CacheKeyInfo[] = [];
+    if (rawKeys.length > 0) {
+      const pipeline = this.redisClient!.pipeline();
+      for (const key of rawKeys) {
+        pipeline.ttl(key);
+      }
+      const ttls = await pipeline.exec();
+      for (let i = 0; i < rawKeys.length; i++) {
+        keys.push({
+          key: rawKeys[i],
+          ttl: (ttls?.[i]?.[1] as number) ?? -2,
+        });
+      }
+    }
+
+    return { keys, nextCursor };
+  }
+
+  /**
+   * Delete a single key by its full key name (admin use)
+   */
+  async deleteKey(fullKey: string): Promise<void> {
+    if (this.isRedisAvailable) {
+      await this.redisClient!.del(fullKey);
+    } else {
+      await this.cacheManager.del(fullKey);
+    }
+  }
+
+  // ─── Private Helpers ──────────────────────────────────
+
+  /**
+   * Non-blocking SCAN + batch DEL for a glob pattern.
+   * Returns total number of deleted keys.
+   */
+  private async scanAndDelete(pattern: string): Promise<number> {
+    if (!this.redisClient) return 0;
+
+    let cursor = '0';
+    let totalDeleted = 0;
+
+    do {
+      const [nextCursor, keys] = await this.redisClient.scan(
+        cursor,
+        'MATCH',
+        pattern,
+        'COUNT',
+        200,
+      );
+      cursor = nextCursor;
+
+      if (keys.length > 0) {
+        const deleted = await this.redisClient.del(...keys);
+        totalDeleted += deleted;
+      }
+    } while (cursor !== '0');
+
+    return totalDeleted;
   }
 }

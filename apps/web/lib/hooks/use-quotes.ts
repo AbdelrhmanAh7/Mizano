@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { quotesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { quotesApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 export type QuoteStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'INVOICED' | 'DECLINED' | 'EXPIRED';
@@ -92,6 +93,20 @@ export function useQuotes(params?: QuoteParams) {
       const response = await quotesApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all quotes with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteQuotes(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Quote, Record<string, unknown>>({
+    queryKey: ['quotes'],
+    fetchFn: async (p) => {
+      const response = await quotesApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 
@@ -352,7 +367,11 @@ export function getQuoteStatusLabel(status: QuoteStatus): string {
 /**
  * Calculate line amount
  */
-export function calculateLineAmount(quantity: string, rate: string, discountPercent: string = '0'): string {
+export function calculateLineAmount(
+  quantity: string,
+  rate: string,
+  discountPercent: string = '0',
+): string {
   const qty = parseFloat(quantity) || 0;
   const r = parseFloat(rate) || 0;
   const discount = parseFloat(discountPercent) || 0;

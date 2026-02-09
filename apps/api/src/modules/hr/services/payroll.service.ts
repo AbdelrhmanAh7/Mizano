@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PayrollStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class PayrollService {
@@ -71,12 +71,18 @@ export class PayrollService {
       const basicSalary = parseFloat(employee.basicSalary.toString());
 
       // Get allowances from employee profile (JSON field)
-      const allowancesJson = employee.allowances as Record<string, number> || {};
-      const totalAllowances = Object.values(allowancesJson).reduce((sum: number, val: number) => sum + (val || 0), 0);
+      const allowancesJson = (employee.allowances as Record<string, number>) || {};
+      const totalAllowances = Object.values(allowancesJson).reduce(
+        (sum: number, val: number) => sum + (val || 0),
+        0,
+      );
 
       // Get deductions from employee profile (JSON field)
-      const deductionsJson = employee.deductions as Record<string, number> || {};
-      const totalEmployeeDeductions = Object.values(deductionsJson).reduce((sum: number, val: number) => sum + (val || 0), 0);
+      const deductionsJson = (employee.deductions as Record<string, number>) || {};
+      const totalEmployeeDeductions = Object.values(deductionsJson).reduce(
+        (sum: number, val: number) => sum + (val || 0),
+        0,
+      );
 
       // Prorate based on days worked
       const workingDaysInMonth = 22;
@@ -341,5 +347,50 @@ export class PayrollService {
     await this.prisma.payslip.deleteMany({ where: { payrollRunId: id } });
     await this.prisma.payrollRun.delete({ where: { id } });
     return { message: 'Payroll run deleted' };
+  }
+
+  // === Bulk Operations ===
+
+  async bulkDelete(organizationId: string, ids: string[]) {
+    // Delete payslips first, then runs
+    await this.prisma.payslip.deleteMany({
+      where: {
+        payrollRun: { id: { in: ids }, organizationId, status: { not: PayrollStatus.PAID } },
+      },
+    });
+    const result = await this.prisma.payrollRun.deleteMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        status: { not: PayrollStatus.PAID },
+      },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
+  async bulkProcess(organizationId: string, ids: string[]) {
+    let processed = 0;
+    for (const id of ids) {
+      try {
+        await this.calculatePayroll(organizationId, id);
+        processed++;
+      } catch {
+        // Skip runs that can't be processed
+      }
+    }
+    return { processed, total: ids.length };
+  }
+
+  async bulkMarkPaid(organizationId: string, ids: string[]) {
+    let paid = 0;
+    for (const id of ids) {
+      try {
+        await this.markAsPaid(organizationId, id);
+        paid++;
+      } catch {
+        // Skip runs that can't be marked as paid
+      }
+    }
+    return { paid, total: ids.length };
   }
 }

@@ -1,32 +1,41 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
   Body,
-  Param,
-  Query,
-  UseGuards,
+  Controller,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
+  Param,
+  Post,
+  Put,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
-import { LeadsService, CreateLeadDto, UpdateLeadDto, LeadQueryDto } from '../services/leads.service';
-import { DealsService, CreateDealDto, UpdateDealDto, DealQueryDto } from '../services/deals.service';
-import { ActivitiesService, CreateActivityDto, ActivityQueryDto } from '../services/activities.service';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { DealStage } from '@prisma/client';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
-import { DealStage } from '@prisma/client';
+import {
+  ActivitiesService,
+  ActivityQueryDto,
+  CreateActivityDto,
+} from '../services/activities.service';
+import {
+  CreateDealDto,
+  DealQueryDto,
+  DealsService,
+  UpdateDealDto,
+} from '../services/deals.service';
+import {
+  CreateLeadDto,
+  LeadQueryDto,
+  LeadsService,
+  UpdateLeadDto,
+} from '../services/leads.service';
 
 @ApiTags('CRM')
 @ApiBearerAuth()
@@ -59,6 +68,13 @@ export class CrmController {
     return this.leadsService.findAll(orgId, query);
   }
 
+  @Get('leads/cursor')
+  @Permissions('crm.view')
+  @ApiOperation({ summary: 'Get leads with cursor-based pagination' })
+  findAllLeadsCursor(@CurrentOrg() orgId: string, @Query() query: CursorPaginationDto) {
+    return this.leadsService.findAllCursor(orgId, query);
+  }
+
   @Get('leads/stats')
   @Permissions('crm.view')
   @ApiOperation({ summary: 'Get lead statistics' })
@@ -78,11 +94,7 @@ export class CrmController {
   @Permissions('crm.edit')
   @ApiOperation({ summary: 'Update lead' })
   @ApiParam({ name: 'id', description: 'Lead ID' })
-  updateLead(
-    @CurrentOrg() orgId: string,
-    @Param('id') id: string,
-    @Body() dto: UpdateLeadDto,
-  ) {
+  updateLead(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateLeadDto) {
     return this.leadsService.update(orgId, id, dto);
   }
 
@@ -152,6 +164,13 @@ export class CrmController {
     return this.dealsService.findAll(orgId, query);
   }
 
+  @Get('deals/cursor')
+  @Permissions('crm.view')
+  @ApiOperation({ summary: 'Get deals with cursor-based pagination' })
+  findAllDealsCursor(@CurrentOrg() orgId: string, @Query() query: CursorPaginationDto) {
+    return this.dealsService.findAllCursor(orgId, query);
+  }
+
   @Get('deals/pipeline')
   @Permissions('crm.view')
   @ApiOperation({ summary: 'Get deals pipeline for Kanban view' })
@@ -178,11 +197,7 @@ export class CrmController {
   @Permissions('crm.edit')
   @ApiOperation({ summary: 'Update deal' })
   @ApiParam({ name: 'id', description: 'Deal ID' })
-  updateDeal(
-    @CurrentOrg() orgId: string,
-    @Param('id') id: string,
-    @Body() dto: UpdateDealDto,
-  ) {
+  updateDeal(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateDealDto) {
     return this.dealsService.update(orgId, id, dto);
   }
 
@@ -270,10 +285,7 @@ export class CrmController {
   @Get('activities/recent')
   @Permissions('crm.view')
   @ApiOperation({ summary: 'Get recent activities' })
-  getRecentActivities(
-    @CurrentOrg() orgId: string,
-    @Query('limit') limit?: number,
-  ) {
+  getRecentActivities(@CurrentOrg() orgId: string, @Query('limit') limit?: number) {
     return this.activitiesService.getRecentActivities(orgId, limit);
   }
 

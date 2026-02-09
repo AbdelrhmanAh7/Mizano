@@ -20,6 +20,36 @@ export interface TrainingDataOptions {
   endDate?: Date;
 }
 
+export interface TrainingReadiness {
+  isReady: boolean;
+  currentSamples: number;
+  minimumRequired: number;
+  labelDistribution: Record<string, number>;
+  warnings: string[];
+}
+
+// Minimum training samples required per feature before training
+const MINIMUM_TRAINING_SAMPLES: Partial<Record<AiFeature, number>> = {
+  CATEGORIZATION: 20,
+  RECONCILIATION: 15,
+  OCR_LAYOUT: 10,
+  DEMAND_FORECAST: 12,
+  LEAD_SCORING: 50,
+  ANOMALY: 10,
+  REORDER: 10,
+  PAYMENT_PREDICTION: 3,
+  CASH_FLOW: 5,
+  PATTERN_DETECTION: 3,
+  CHURN_PREDICTION: 30,
+  CLV_ANALYSIS: 30,
+  FRAUD_DETECTION: 50,
+  QUALITY_PREDICTION: 20,
+  DOCUMENT_CLASSIFICATION: 15,
+  PIPELINE_FORECAST: 20,
+};
+
+const DEFAULT_MIN_SAMPLES = 20;
+
 @Injectable()
 export class AiTrainingService {
   private readonly logger = new Logger(AiTrainingService.name);
@@ -295,5 +325,72 @@ export class AiTrainingService {
       },
       {} as Record<string, number>,
     );
+  }
+
+  /**
+   * Validate whether there is enough quality data to train a model
+   */
+  async validateTrainingReadiness(
+    organizationId: string,
+    feature: AiFeature,
+  ): Promise<TrainingReadiness> {
+    const minimumRequired =
+      MINIMUM_TRAINING_SAMPLES[feature] ?? DEFAULT_MIN_SAMPLES;
+    const warnings: string[] = [];
+
+    const [total, distribution] = await Promise.all([
+      this.prisma.aiTrainingData.count({
+        where: { organizationId, feature },
+      }),
+      this.getLabelDistribution(organizationId, feature),
+    ]);
+
+    // Check total sample count
+    if (total < minimumRequired) {
+      warnings.push(
+        `Insufficient training data: ${total}/${minimumRequired} samples`,
+      );
+      return {
+        isReady: false,
+        currentSamples: total,
+        minimumRequired,
+        labelDistribution: distribution,
+        warnings,
+      };
+    }
+
+    // Check label distribution balance
+    const labels = Object.entries(distribution);
+    if (labels.length > 0) {
+      const maxCount = Math.max(...labels.map(([, c]) => c));
+      const dominantPct = maxCount / total;
+
+      if (dominantPct > 0.9) {
+        warnings.push(
+          `Severe class imbalance: dominant class has ${(dominantPct * 100).toFixed(0)}% of samples`,
+        );
+      } else if (dominantPct > 0.8) {
+        warnings.push(
+          `Class imbalance warning: dominant class has ${(dominantPct * 100).toFixed(0)}% of samples`,
+        );
+      }
+
+      // Check minimum samples per class
+      const tooFew = labels.filter(([, c]) => c < 3);
+      if (tooFew.length > 0) {
+        warnings.push(
+          `${tooFew.length} class(es) have fewer than 3 samples: ${tooFew.map(([l]) => l).join(', ')}`,
+        );
+      }
+    }
+
+    // Still ready if warnings are non-fatal (total >= minimum)
+    return {
+      isReady: true,
+      currentSamples: total,
+      minimumRequired,
+      labelDistribution: distribution,
+      warnings,
+    };
   }
 }

@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { itemsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { itemsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 export type ItemType = 'GOODS' | 'SERVICE' | 'DIGITAL';
@@ -94,6 +95,20 @@ export function useItems(params?: ItemParams) {
       const response = await itemsApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all items with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteItems(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Item, Record<string, unknown>>({
+    queryKey: ['items'],
+    fetchFn: async (p) => {
+      const response = await itemsApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 
@@ -256,7 +271,11 @@ export function getTypeVariant(type: ItemType): 'default' | 'secondary' | 'outli
 /**
  * Get stock status
  */
-export function getStockStatus(item: Item): { status: 'ok' | 'low' | 'out'; label: string; color: string } {
+export function getStockStatus(item: Item): {
+  status: 'ok' | 'low' | 'out';
+  label: string;
+  color: string;
+} {
   if (!item.trackInventory) {
     return { status: 'ok', label: 'N/A', color: 'text-gray-500' };
   }

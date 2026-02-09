@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { WorkOrderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class WorkOrdersService {
@@ -71,7 +71,10 @@ export class WorkOrdersService {
 
   async update(organizationId: string, id: string, dto: any) {
     const workOrder = await this.findOne(organizationId, id);
-    if (workOrder.status === WorkOrderStatus.COMPLETED || workOrder.status === WorkOrderStatus.CANCELLED) {
+    if (
+      workOrder.status === WorkOrderStatus.COMPLETED ||
+      workOrder.status === WorkOrderStatus.CANCELLED
+    ) {
       throw new BadRequestException('Cannot update completed or cancelled work order');
     }
 
@@ -136,7 +139,10 @@ export class WorkOrdersService {
           organizationId,
         },
       });
-      const currentStock = movements.reduce((sum: number, m) => sum + parseFloat(m.quantity.toString()), 0);
+      const currentStock = movements.reduce(
+        (sum: number, m) => sum + parseFloat(m.quantity.toString()),
+        0,
+      );
 
       const shortfall = Math.max(0, requiredQty - currentStock);
       if (shortfall > 0) isAvailable = false;
@@ -152,7 +158,11 @@ export class WorkOrdersService {
     return { isAvailable, materials };
   }
 
-  async completeWorkOrder(organizationId: string, id: string, dto: { quantityProduced: number; notes?: string }) {
+  async completeWorkOrder(
+    organizationId: string,
+    id: string,
+    dto: { quantityProduced: number; notes?: string },
+  ) {
     const workOrder = await this.findOne(organizationId, id);
     if (workOrder.status !== WorkOrderStatus.IN_PROCESS) {
       throw new BadRequestException('Work order is not in process');
@@ -409,7 +419,11 @@ export class WorkOrdersService {
     });
   }
 
-  async recordProduction(organizationId: string, id: string, dto: { quantityProduced: number; notes?: string }) {
+  async recordProduction(
+    organizationId: string,
+    id: string,
+    dto: { quantityProduced: number; notes?: string },
+  ) {
     const workOrder = await this.findOne(organizationId, id);
     if (workOrder.status !== WorkOrderStatus.IN_PROCESS) {
       throw new BadRequestException('Work order is not in process');
@@ -491,6 +505,55 @@ export class WorkOrdersService {
     }
     await this.prisma.workOrder.delete({ where: { id } });
     return { message: 'Work order deleted' };
+  }
+
+  // === Bulk Operations ===
+
+  async bulkDelete(organizationId: string, ids: string[]) {
+    const result = await this.prisma.workOrder.deleteMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        status: WorkOrderStatus.DRAFT,
+      },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
+  async bulkStart(organizationId: string, ids: string[]) {
+    const result = await this.prisma.workOrder.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        status: WorkOrderStatus.DRAFT,
+      },
+      data: { status: WorkOrderStatus.IN_PROCESS, actualStartDate: new Date() },
+    });
+    return { started: result.count, total: ids.length };
+  }
+
+  async bulkComplete(organizationId: string, ids: string[]) {
+    const result = await this.prisma.workOrder.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        status: WorkOrderStatus.IN_PROCESS,
+      },
+      data: { status: WorkOrderStatus.COMPLETED, completedDate: new Date() },
+    });
+    return { completed: result.count, total: ids.length };
+  }
+
+  async bulkCancel(organizationId: string, ids: string[]) {
+    const result = await this.prisma.workOrder.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        status: { in: [WorkOrderStatus.DRAFT, WorkOrderStatus.IN_PROCESS] },
+      },
+      data: { status: WorkOrderStatus.CANCELLED },
+    });
+    return { cancelled: result.count, total: ids.length };
   }
 
   private async generateWorkOrderNumber(organizationId: string): Promise<string> {

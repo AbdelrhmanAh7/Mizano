@@ -1,11 +1,25 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // ============ Types ============
 
-export type LeadSource = 'FACEBOOK_ADS' | 'GOOGLE_ADS' | 'WEBSITE' | 'REFERRAL' | 'COLD_CALL' | 'TRADE_SHOW' | 'OTHER';
+export type LeadSource =
+  | 'FACEBOOK_ADS'
+  | 'GOOGLE_ADS'
+  | 'WEBSITE'
+  | 'REFERRAL'
+  | 'COLD_CALL'
+  | 'TRADE_SHOW'
+  | 'OTHER';
 export type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'UNQUALIFIED' | 'JUNK';
-export type DealStage = 'NEW' | 'MEETING_SCHEDULED' | 'PROPOSAL_SENT' | 'NEGOTIATION' | 'WON' | 'LOST';
+export type DealStage =
+  | 'NEW'
+  | 'MEETING_SCHEDULED'
+  | 'PROPOSAL_SENT'
+  | 'NEGOTIATION'
+  | 'WON'
+  | 'LOST';
 export type ActivityType = 'CALL' | 'EMAIL' | 'MEETING' | 'NOTE' | 'TASK';
 
 export interface Lead {
@@ -159,7 +173,10 @@ const leadsApi = {
     const response = await api.delete(`/crm/leads/${id}`);
     return response.data;
   },
-  convertToCustomer: async (id: string, options?: { createDeal?: boolean; dealName?: string; expectedAmount?: number }) => {
+  convertToCustomer: async (
+    id: string,
+    options?: { createDeal?: boolean; dealName?: string; expectedAmount?: number },
+  ) => {
     const response = await api.post(`/crm/leads/${id}/convert`, options);
     return response.data;
   },
@@ -258,6 +275,17 @@ export function useLeads(params?: {
   });
 }
 
+export function useInfiniteLeads(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Lead, Record<string, unknown>>({
+    queryKey: ['leads'],
+    fetchFn: async (p) => {
+      const response = await api.get('/crm/leads/cursor', { params: p });
+      return response.data;
+    },
+    params: params || {},
+  });
+}
+
 export function useLead(id: string) {
   return useQuery({
     queryKey: ['leads', id],
@@ -279,8 +307,7 @@ export function useCreateLead() {
 export function useUpdateLead() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateLeadDto }) =>
-      leadsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: UpdateLeadDto }) => leadsApi.update(id, data),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['leads', id] });
@@ -301,8 +328,13 @@ export function useDeleteLead() {
 export function useConvertLead() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, options }: { id: string; options?: { createDeal?: boolean; dealName?: string; expectedAmount?: number } }) =>
-      leadsApi.convertToCustomer(id, options),
+    mutationFn: ({
+      id,
+      options,
+    }: {
+      id: string;
+      options?: { createDeal?: boolean; dealName?: string; expectedAmount?: number };
+    }) => leadsApi.convertToCustomer(id, options),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
@@ -349,6 +381,17 @@ export function useDeals(params?: {
   });
 }
 
+export function useInfiniteDeals(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Deal, Record<string, unknown>>({
+    queryKey: ['deals'],
+    fetchFn: async (p) => {
+      const response = await api.get('/crm/deals/cursor', { params: p });
+      return response.data;
+    },
+    params: params || {},
+  });
+}
+
 export function useDeal(id: string) {
   return useQuery({
     queryKey: ['deals', id],
@@ -378,8 +421,7 @@ export function useCreateDeal() {
 export function useUpdateDeal() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateDealDto }) =>
-      dealsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: UpdateDealDto }) => dealsApi.update(id, data),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['deals'] });
       queryClient.invalidateQueries({ queryKey: ['deals', id] });
@@ -428,8 +470,7 @@ export function useMarkDealWon() {
 export function useMarkDealLost() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
-      dealsApi.markLost(id, reason),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => dealsApi.markLost(id, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deals'] });
       queryClient.invalidateQueries({ queryKey: ['pipeline-metrics'] });
@@ -588,7 +629,7 @@ export function getActivityTypeLabel(type: ActivityType): string {
 
 export function calculateWeightedValue(deals: Deal[]): number {
   return deals.reduce((sum, deal) => {
-    return sum + (deal.expectedAmount * deal.probability / 100);
+    return sum + (deal.expectedAmount * deal.probability) / 100;
   }, 0);
 }
 

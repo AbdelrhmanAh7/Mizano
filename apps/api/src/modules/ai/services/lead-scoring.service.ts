@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { LeadTier } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { BoundedCache } from '../utils/bounded-cache.util';
 import {
   defaultScoringConfig,
   ScoringConfig,
@@ -38,6 +39,7 @@ export interface LeadScoreResult {
   tier: LeadTier;
   conversionProbability: number;
   breakdown: ScoreBreakdown[];
+  predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID';
 }
 
 export interface HotLead {
@@ -122,8 +124,7 @@ export class LeadScoringService {
   private config: ScoringConfig = defaultScoringConfig;
   private readonly ML_BLEND_WEIGHT = 0.3; // 30% ML, 70% rule-based
   private readonly MIN_TRAINING_SAMPLES = 50;
-  private mlModelCache: Map<string, { model: LogisticRegressionModel; loadedAt: number }> = new Map();
-  private readonly ML_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+  private mlModelCache = new BoundedCache<LogisticRegressionModel>(50, 60 * 60 * 1000);
 
   constructor(
     private prisma: PrismaService,
@@ -171,6 +172,7 @@ export class LeadScoringService {
 
     // Blend with ML score if model available
     let mlProbability: number | null = null;
+    let predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID' = 'RULE_BASED';
     try {
       const mlModel = await this.loadMLModel(organizationId);
       if (mlModel) {
@@ -184,9 +186,10 @@ export class LeadScoringService {
         totalScore = Math.round(
           totalScore * (1 - this.ML_BLEND_WEIGHT) + mlScore * this.ML_BLEND_WEIGHT,
         );
+        predictionMethod = 'HYBRID';
       }
     } catch (error) {
-      this.logger.debug(`ML scoring fallback for lead ${leadId}: ${error.message}`);
+      this.logger.warn(`ML scoring failed for lead ${leadId}, falling back to rule-based: ${error.message}`);
     }
 
     // Determine tier
@@ -223,6 +226,7 @@ export class LeadScoringService {
       tier,
       conversionProbability,
       breakdown,
+      predictionMethod,
     };
   }
 
@@ -240,28 +244,25 @@ export class LeadScoringService {
 
     const counts = { hot: 0, warm: 0, cool: 0, cold: 0 };
     let processed = 0;
+    const BATCH_SIZE = 10;
 
-    for (const lead of leads) {
-      try {
-        const result = await this.scoreLead(organizationId, lead.id);
-        processed++;
+    // Process in parallel batches instead of sequentially
+    for (let i = 0; i < leads.length; i += BATCH_SIZE) {
+      const batch = leads.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map((lead) => this.scoreLead(organizationId, lead.id)),
+      );
 
-        switch (result.tier) {
-          case 'HOT':
-            counts.hot++;
-            break;
-          case 'WARM':
-            counts.warm++;
-            break;
-          case 'COOL':
-            counts.cool++;
-            break;
-          case 'COLD':
-            counts.cold++;
-            break;
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          processed++;
+          switch (result.value.tier) {
+            case 'HOT': counts.hot++; break;
+            case 'WARM': counts.warm++; break;
+            case 'COOL': counts.cool++; break;
+            case 'COLD': counts.cold++; break;
+          }
         }
-      } catch (error) {
-        this.logger.error(`Failed to score lead ${lead.id}: ${error}`);
       }
     }
 
@@ -383,6 +384,7 @@ export class LeadScoringService {
       engagementScore: score.engagementScore,
       conversionProbability: Number(score.conversionProbability),
       breakdown: [],
+      predictionMethod: 'RULE_BASED',
     });
   }
 
@@ -419,21 +421,33 @@ export class LeadScoringService {
 
     let updated = 0;
     let decayed = 0;
+    const BATCH_SIZE = 10;
 
-    for (const lead of leads) {
-      try {
-        const existingScore = await this.prisma.leadScore.findFirst({
-          where: { organizationId, leadId: lead.id },
-        });
+    // Pre-fetch all existing scores in one query
+    const existingScores = await this.prisma.leadScore.findMany({
+      where: { organizationId },
+      select: { leadId: true, totalScore: true },
+    });
+    const scoreMap = new Map(existingScores.map((s) => [s.leadId, s.totalScore]));
 
-        const newResult = await this.scoreLead(organizationId, lead.id);
-        updated++;
+    // Process in parallel batches
+    for (let i = 0; i < leads.length; i += BATCH_SIZE) {
+      const batch = leads.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map(async (lead) => {
+          const newResult = await this.scoreLead(organizationId, lead.id);
+          return { leadId: lead.id, newScore: newResult.totalScore };
+        }),
+      );
 
-        if (existingScore && newResult.totalScore < existingScore.totalScore) {
-          decayed++;
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          updated++;
+          const oldScore = scoreMap.get(result.value.leadId);
+          if (oldScore !== undefined && result.value.newScore < oldScore) {
+            decayed++;
+          }
         }
-      } catch (error) {
-        this.logger.error(`Failed to update score for lead ${lead.id}: ${error}`);
       }
     }
 
@@ -524,9 +538,9 @@ export class LeadScoringService {
       status: lead.status,
       createdAt: lead.createdAt,
       // Extended fields - these would come from custom fields or integrations
-      companySize: this.inferCompanySize(lead),
-      industry: this.inferIndustry(lead),
-      country: this.inferCountry(lead),
+      companySize: this.inferCompanySize(lead as unknown as Record<string, unknown>),
+      industry: this.inferIndustry(lead as unknown as Record<string, unknown>),
+      country: this.inferCountry(lead as unknown as Record<string, unknown>),
       estimatedBudget: 0,
       websiteVisits30d: 0,
       contentType: undefined,
@@ -578,7 +592,7 @@ export class LeadScoringService {
   /**
    * Get field value from lead data
    */
-  private getFieldValue(lead: LeadData, field: string): any {
+  private getFieldValue(lead: LeadData, field: string): string | number | boolean | undefined {
     switch (field) {
       case 'companySize':
         return lead.companySize;
@@ -609,7 +623,7 @@ export class LeadScoringService {
   /**
    * Evaluate a scoring condition
    */
-  private evaluateCondition(value: any, condition: ScoringCondition): boolean {
+  private evaluateCondition(value: string | number | boolean | undefined, condition: ScoringCondition): boolean {
     if (value === undefined || value === null) return false;
 
     switch (condition.operator) {
@@ -925,10 +939,10 @@ export class LeadScoringService {
   private async loadMLModel(
     organizationId: string,
   ): Promise<LogisticRegressionModel | null> {
-    // Check cache
+    // Check cache (BoundedCache handles TTL expiry)
     const cached = this.mlModelCache.get(organizationId);
-    if (cached && Date.now() - cached.loadedAt < this.ML_CACHE_TTL) {
-      return cached.model;
+    if (cached) {
+      return cached;
     }
 
     // Load from database
@@ -944,10 +958,7 @@ export class LeadScoringService {
       const model = deserializeModel(modelJson);
 
       // Cache it
-      this.mlModelCache.set(organizationId, {
-        model,
-        loadedAt: Date.now(),
-      });
+      this.mlModelCache.set(organizationId, model);
 
       return model;
     } catch (error) {
@@ -1011,37 +1022,38 @@ export class LeadScoringService {
   /**
    * Build LeadData from a Prisma lead record.
    */
-  private buildLeadDataFromRecord(lead: any): LeadData {
+  private buildLeadDataFromRecord(lead: Record<string, unknown>): LeadData {
+    const notes = lead.notes as string | null | undefined;
     return {
-      id: lead.id,
-      name: lead.leadName,
-      company: lead.companyName,
-      email: lead.email,
-      source: lead.source,
-      status: lead.status,
-      createdAt: lead.createdAt,
+      id: lead.id as string,
+      name: lead.leadName as string,
+      company: lead.companyName as string | null,
+      email: lead.email as string | null,
+      source: lead.source as string,
+      status: lead.status as string,
+      createdAt: lead.createdAt as Date,
       companySize: this.inferCompanySize(lead),
       industry: this.inferIndustry(lead),
       country: this.inferCountry(lead),
       estimatedBudget: 0,
       websiteVisits30d: 0,
       contentType: undefined,
-      demoRequested: lead.notes?.toLowerCase().includes('demo') || false,
+      demoRequested: notes?.toLowerCase().includes('demo') || false,
       trialStatus: undefined,
-      lastActivityAt: lead.updatedAt,
+      lastActivityAt: lead.updatedAt as Date,
     };
   }
 
   // Inference helpers (simplified - in production would use ML or lookup tables)
-  private inferCompanySize(lead: any): string | undefined {
+  private inferCompanySize(lead: Record<string, unknown>): string | undefined {
     return undefined;
   }
 
-  private inferIndustry(lead: any): string | undefined {
+  private inferIndustry(lead: Record<string, unknown>): string | undefined {
     return undefined;
   }
 
-  private inferCountry(lead: any): string | undefined {
+  private inferCountry(lead: Record<string, unknown>): string | undefined {
     return undefined;
   }
 }

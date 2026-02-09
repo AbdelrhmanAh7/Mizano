@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -19,7 +20,7 @@ interface CashFlowChartProps {
   currency?: string;
 }
 
-export function CashFlowChart({ data, currency = 'USD' }: CashFlowChartProps) {
+export const CashFlowChart = memo(function CashFlowChart({ data, currency = 'USD' }: CashFlowChartProps) {
   const t = useTranslations('common.dashboard.charts');
 
   return (
@@ -90,4 +91,4 @@ export function CashFlowChart({ data, currency = 'USD' }: CashFlowChartProps) {
       </CardContent>
     </Card>
   );
-}
+});

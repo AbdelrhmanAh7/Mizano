@@ -1,19 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Plus, Search, RefreshCw, Eye, Trash2, Filter, UserPlus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +11,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,21 +28,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import {
-  useLeads,
-  useDeleteLead,
   Lead,
-  LeadStatus,
   LeadSource,
+  LeadStatus,
+  getLeadSourceLabel,
   getLeadStatusColor,
   getLeadStatusLabel,
-  getLeadSourceLabel,
+  useDeleteLead,
+  useInfiniteLeads,
 } from '@/lib/hooks/use-crm';
 import { usePermissions } from '@/lib/hooks/use-permissions';
-import { format } from 'date-fns';
+import { useTableParams } from '@/lib/hooks/use-table-params';
+import { type ColumnDef } from '@tanstack/react-table';
+import { Eye, Plus, RefreshCw, Trash2, UserPlus } from 'lucide-react';
+import Link from 'next/link';
+import { Suspense, useState } from 'react';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
@@ -91,24 +83,31 @@ function ScoreBadge({ score }: { score?: { totalScore: number; tier: string } })
   );
 }
 
-export default function LeadsPage() {
+function LeadsPageContent() {
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
+  const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedSource, setSelectedSource] = useState('all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
-  const { data: leadsData, isLoading, refetch } = useLeads({
-    search: searchQuery || undefined,
+  const {
+    data: leads,
+    total,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useInfiniteLeads({
+    search: tableParams.search || undefined,
     status: selectedStatus !== 'all' ? (selectedStatus as LeadStatus) : undefined,
     source: selectedSource !== 'all' ? (selectedSource as LeadSource) : undefined,
+    page: tableParams.page,
   });
   const deleteLead = useDeleteLead();
-
-  const leads = leadsData?.data || [];
 
   const canCreate = hasPermission('crm.create');
   const canDelete = hasPermission('crm.delete');
@@ -135,15 +134,114 @@ export default function LeadsPage() {
     }
   };
 
+  const columns: ColumnDef<Lead>[] = [
+    {
+      accessorKey: 'leadName',
+      header: () => (
+        <SortableHeader
+          label="Name"
+          columnId="leadName"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <Link href={`/crm/leads/${row.original.id}`} className="font-medium hover:underline">
+          {row.original.leadName}
+        </Link>
+      ),
+    },
+    {
+      accessorKey: 'companyName',
+      header: 'Company',
+      cell: ({ row }) => row.original.companyName || '-',
+    },
+    {
+      accessorKey: 'email',
+      header: 'Email',
+      cell: ({ row }) =>
+        row.original.email ? (
+          <a href={`mailto:${row.original.email}`} className="text-blue-600 hover:underline">
+            {row.original.email}
+          </a>
+        ) : (
+          '-'
+        ),
+    },
+    {
+      accessorKey: 'source',
+      header: 'Source',
+      cell: ({ row }) => <Badge variant="outline">{getLeadSourceLabel(row.original.source)}</Badge>,
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge className={getLeadStatusColor(row.original.status)}>
+          {getLeadStatusLabel(row.original.status)}
+        </Badge>
+      ),
+    },
+    {
+      id: 'score',
+      header: 'Score',
+      cell: ({ row }) => <ScoreBadge score={row.original.score} />,
+    },
+    {
+      id: 'assignedTo',
+      header: 'Assigned To',
+      cell: ({ row }) => row.original.assignedTo?.name || '-',
+    },
+    {
+      id: 'actions',
+      header: '',
+      meta: { cellClassName: 'text-right' },
+      cell: ({ row }) => {
+        const lead = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                ...
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/crm/leads/${lead.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/crm/deals/new?leadId=${lead.id}`}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Create Deal
+                </Link>
+              </DropdownMenuItem>
+              {canDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleDelete(lead)} className="text-red-600">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
-          <p className="text-muted-foreground">
-            Track and manage your sales leads
-          </p>
+          <p className="text-muted-foreground">Track and manage your sales leads</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
@@ -161,15 +259,11 @@ export default function LeadsPage() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, company, or email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+            <DataTableSearch
+              value={tableParams.search}
+              onChange={tableParams.setSearch}
+              placeholder="Search by name, company, or email..."
+            />
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Status" />
@@ -207,111 +301,29 @@ export default function LeadsPage() {
           <CardTitle>All Leads</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : leads.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No leads found</p>
-              {canCreate && (
+          <DataTable
+            columns={columns}
+            data={leads}
+            total={total}
+            isLoading={isLoading}
+            enableVirtualization
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={() => fetchNextPage()}
+            enableColumnResizing
+            tableId="leads"
+            emptyMessage="No leads found"
+            emptyAction={
+              canCreate ? (
                 <Button asChild>
                   <Link href="/crm/leads/new">
                     <Plus className="mr-2 h-4 w-4" />
                     Create Your First Lead
                   </Link>
                 </Button>
-              )}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Assigned To</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {leads.map((lead: Lead) => (
-                  <TableRow key={lead.id}>
-                    <TableCell>
-                      <Link
-                        href={`/crm/leads/${lead.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {lead.leadName}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{lead.companyName || '-'}</TableCell>
-                    <TableCell>
-                      {lead.email ? (
-                        <a href={`mailto:${lead.email}`} className="text-blue-600 hover:underline">
-                          {lead.email}
-                        </a>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {getLeadSourceLabel(lead.source)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getLeadStatusColor(lead.status)}>
-                        {getLeadStatusLabel(lead.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <ScoreBadge score={lead.score} />
-                    </TableCell>
-                    <TableCell>
-                      {lead.assignedTo?.name || '-'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">...</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/crm/leads/${lead.id}`}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/crm/deals/new?leadId=${lead.id}`}>
-                              <UserPlus className="mr-2 h-4 w-4" />
-                              Create Deal
-                            </Link>
-                          </DropdownMenuItem>
-                          {canDelete && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(lead)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+              ) : undefined
+            }
+          />
         </CardContent>
       </Card>
 
@@ -321,8 +333,8 @@ export default function LeadsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Lead</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete lead &quot;{selectedLead?.leadName}&quot;?
-              This action cannot be undone.
+              Are you sure you want to delete lead &quot;{selectedLead?.leadName}&quot;? This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -334,5 +346,13 @@ export default function LeadsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function LeadsPage() {
+  return (
+    <Suspense>
+      <LeadsPageContent />
+    </Suspense>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { bankRulesApi } from '@/lib/api';
 import { toast } from 'sonner';
 
 export interface BankRule {
@@ -36,17 +36,6 @@ export interface BankRuleFilters {
   search?: string;
   isActive?: boolean;
 }
-
-// API functions
-const bankRulesApi = {
-  getAll: (params?: BankRuleFilters) => api.get('/bank-rules', { params }),
-  getOne: (id: string) => api.get(`/bank-rules/${id}`),
-  create: (data: any) => api.post('/bank-rules', data),
-  update: (id: string, data: any) => api.patch(`/bank-rules/${id}`, data),
-  delete: (id: string) => api.delete(`/bank-rules/${id}`),
-  test: (data: any) => api.post('/bank-rules/test', data),
-  reorder: (ids: string[]) => api.post('/bank-rules/reorder', { ids }),
-};
 
 // Hooks
 export function useBankRules(params?: BankRuleFilters) {

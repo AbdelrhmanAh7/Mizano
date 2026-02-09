@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { vendorsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { vendorsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 export interface VendorAddress {
@@ -92,6 +93,20 @@ export function useVendors(params?: VendorParams) {
       const response = await vendorsApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all vendors with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteVendors(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Vendor, Record<string, unknown>>({
+    queryKey: ['vendors'],
+    fetchFn: async (p) => {
+      const response = await vendorsApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 

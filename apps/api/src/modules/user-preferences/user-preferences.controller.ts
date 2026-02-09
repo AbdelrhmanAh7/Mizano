@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Put,
   Patch,
   Post,
   Body,
@@ -12,6 +13,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { UserPreferencesService } from './user-preferences.service';
 import { UpdateTourProgressDto } from './dto/update-tour-progress.dto';
+import { UpdateDashboardLayoutDto } from './dto/update-dashboard-layout.dto';
 import { UserPreferencesDto } from './dto/user-preferences.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, CurrentUserData } from '../../common/decorators';
@@ -33,6 +35,31 @@ export class UserPreferencesController {
   })
   async getUserPreferences(@CurrentUser() user: CurrentUserData) {
     return this.userPreferencesService.getUserPreferences(user.id);
+  }
+
+  @Get('dashboard-layout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get dashboard layout configuration' })
+  @ApiResponse({
+    status: 200,
+    description: 'Dashboard layout retrieved successfully',
+  })
+  async getDashboardLayout(@CurrentUser() user: CurrentUserData) {
+    return this.userPreferencesService.getDashboardLayout(user.id);
+  }
+
+  @Put('dashboard-layout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update dashboard layout configuration' })
+  @ApiResponse({
+    status: 200,
+    description: 'Dashboard layout updated successfully',
+  })
+  async updateDashboardLayout(
+    @CurrentUser() user: CurrentUserData,
+    @Body() body: UpdateDashboardLayoutDto,
+  ) {
+    return this.userPreferencesService.updateDashboardLayout(user.id, body);
   }
 
   @Patch('tour/:tourId')

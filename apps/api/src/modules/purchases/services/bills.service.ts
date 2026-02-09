@@ -1,19 +1,24 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { BillStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class BillsService {
   constructor(private prisma: PrismaService) {}
 
   async create(organizationId: string, dto: any) {
-    const vendor = await this.prisma.vendor.findFirst({ where: { id: dto.vendorId, organizationId, deletedAt: null } });
+    const vendor = await this.prisma.vendor.findFirst({
+      where: { id: dto.vendorId, organizationId, deletedAt: null },
+    });
     if (!vendor) throw new BadRequestException('Vendor not found');
 
-    let subtotal = 0, taxAmount = 0;
+    let subtotal = 0,
+      taxAmount = 0;
     const lines = dto.lines.map((line: any) => {
       const qty = parseFloat(line.quantity);
       const rate = parseFloat(line.rate);
@@ -69,6 +74,21 @@ export class BillsService {
     return { data: bills, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
+  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+    const { cursor, take = 50, sortBy = 'date', sortOrder = 'desc' } = query;
+    const where = { organizationId, deletedAt: null };
+    return cursorPaginate(
+      this.prisma.bill,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: { vendor: { select: { id: true, name: true } } },
+      },
+    );
+  }
+
   async findOne(organizationId: string, id: string) {
     const bill = await this.prisma.bill.findFirst({
       where: { id, organizationId, deletedAt: null },
@@ -79,7 +99,9 @@ export class BillsService {
   }
 
   async update(organizationId: string, id: string, dto: any) {
-    const bill = await this.prisma.bill.findFirst({ where: { id, organizationId, deletedAt: null } });
+    const bill = await this.prisma.bill.findFirst({
+      where: { id, organizationId, deletedAt: null },
+    });
     if (!bill) throw new NotFoundException('Bill not found');
     if (bill.status !== 'DRAFT') throw new BadRequestException('Only draft bills can be updated');
     return this.prisma.bill.update({ where: { id }, data: dto });
@@ -92,13 +114,19 @@ export class BillsService {
     });
     if (!bill) return;
 
-    const totalPayments = bill.billAllocations.reduce((sum, a) => sum + parseFloat(a.amount.toString()), 0);
+    const totalPayments = bill.billAllocations.reduce(
+      (sum, a) => sum + parseFloat(a.amount.toString()),
+      0,
+    );
     const balanceDue = parseFloat(bill.grandTotal.toString()) - totalPayments;
     let status = bill.status;
     if (balanceDue <= 0) status = BillStatus.PAID;
     else if (totalPayments > 0) status = BillStatus.PARTIALLY_PAID;
 
-    await this.prisma.bill.update({ where: { id: billId }, data: { balanceDue: new Decimal(Math.max(0, balanceDue)), status } });
+    await this.prisma.bill.update({
+      where: { id: billId },
+      data: { balanceDue: new Decimal(Math.max(0, balanceDue)), status },
+    });
   }
 
   async checkDuplicate(
@@ -218,8 +246,66 @@ export class BillsService {
   async markOverdueBills() {
     const today = new Date();
     await this.prisma.bill.updateMany({
-      where: { status: { in: [BillStatus.OPEN, BillStatus.PARTIALLY_PAID] }, dueDate: { lt: today }, deletedAt: null },
+      where: {
+        status: { in: [BillStatus.OPEN, BillStatus.PARTIALLY_PAID] },
+        dueDate: { lt: today },
+        deletedAt: null,
+      },
       data: { status: BillStatus.OVERDUE },
     });
+  }
+
+  // === Bulk Operations ===
+
+  async bulkDelete(organizationId: string, ids: string[]) {
+    const result = await this.prisma.bill.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        status: 'DRAFT',
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
+  async bulkOpen(organizationId: string, ids: string[]) {
+    const result = await this.prisma.bill.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        status: 'DRAFT',
+      },
+      data: { status: BillStatus.OPEN },
+    });
+    return { opened: result.count, total: ids.length };
+  }
+
+  async bulkApprove(organizationId: string, ids: string[]) {
+    const result = await this.prisma.bill.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        status: BillStatus.DRAFT,
+      },
+      data: { status: BillStatus.OPEN },
+    });
+    return { approved: result.count, total: ids.length };
+  }
+
+  async bulkPay(organizationId: string, ids: string[]) {
+    const result = await this.prisma.bill.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        status: { in: [BillStatus.OPEN, BillStatus.PARTIALLY_PAID, BillStatus.OVERDUE] },
+      },
+      data: { status: BillStatus.PAID, balanceDue: 0 },
+    });
+    return { paid: result.count, total: ids.length };
   }
 }

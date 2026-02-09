@@ -1,31 +1,95 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { format } from 'date-fns';
-import { Plus, Play, Eye, FileText, DollarSign, Users, CheckCircle2 } from 'lucide-react';
+import { DataTable, SortableHeader } from '@/components/data-table';
+import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { payrollApi } from '@/lib/api';
+import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  usePayrollRuns,
-  getPayrollStatusLabel,
-  getPayrollStatusColor,
-  formatCurrency,
+    formatCurrency,
+    getPayrollStatusColor,
+    getPayrollStatusLabel,
+    usePayrollRuns,
 } from '@/lib/hooks/use-hr';
+import { usePermissions } from '@/lib/hooks/use-permissions';
+import { useTableParams } from '@/lib/hooks/use-table-params';
+import { type ColumnDef } from '@tanstack/react-table';
+import { format } from 'date-fns';
+import { CheckCircle2, DollarSign, Eye, FileText, Play, Trash2, Users } from 'lucide-react';
+import Link from 'next/link';
+import { Suspense, useState } from 'react';
 
-export default function PayrollPage() {
-  const { data: payrollData, isLoading } = usePayrollRuns();
+function PayrollPageContent() {
+  const tableParams = useTableParams({ defaultSortBy: 'createdAt' });
+  const { hasPermission } = usePermissions();
+  const { data: payrollData, isLoading, refetch } = usePayrollRuns(tableParams.queryParams);
   const payrollRuns = payrollData?.data || [];
+  const meta = payrollData?.meta;
+
+  const canEdit = hasPermission('payroll.edit');
+  const canDelete = hasPermission('payroll.delete');
+
+  // Bulk action state
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkProcessOpen, setBulkProcessOpen] = useState(false);
+  const [bulkPayOpen, setBulkPayOpen] = useState(false);
+  const [bulkSelectedRows, setBulkSelectedRows] = useState<any[]>([]);
+
+  const bulkDeleteAction = useBulkAction({
+    mutationFn: (ids) => payrollApi.bulkDelete(ids).then((r) => r.data),
+    queryKeys: [['payroll-runs']],
+    successMessage: '{count} payroll runs deleted',
+  });
+
+  const bulkProcessAction = useBulkAction({
+    mutationFn: (ids) => payrollApi.bulkProcess(ids).then((r) => r.data),
+    queryKeys: [['payroll-runs']],
+    successMessage: '{count} payroll runs processed',
+  });
+
+  const bulkPayAction = useBulkAction({
+    mutationFn: (ids) => payrollApi.bulkPay(ids).then((r) => r.data),
+    queryKeys: [['payroll-runs']],
+    successMessage: '{count} payroll runs marked as paid',
+  });
+
+  const bulkActions = [
+    ...(canEdit
+      ? [
+          {
+            label: 'Process',
+            icon: Play,
+            onClick: (rows: any[]) => {
+              setBulkSelectedRows(rows);
+              setBulkProcessOpen(true);
+            },
+          },
+          {
+            label: 'Mark as Paid',
+            icon: DollarSign,
+            onClick: (rows: any[]) => {
+              setBulkSelectedRows(rows);
+              setBulkPayOpen(true);
+            },
+          },
+        ]
+      : []),
+    ...(canDelete
+      ? [
+          {
+            label: 'Delete',
+            icon: Trash2,
+            variant: 'destructive' as const,
+            onClick: (rows: any[]) => {
+              setBulkSelectedRows(rows);
+              setBulkDeleteOpen(true);
+            },
+          },
+        ]
+      : []),
+  ];
 
   // Calculate summary
   const totalPaid = payrollRuns
@@ -34,22 +98,87 @@ export default function PayrollPage() {
   const pendingRuns = payrollRuns.filter((p: any) => p.status === 'DRAFT').length;
   const confirmedRuns = payrollRuns.filter((p: any) => p.status === 'CONFIRMED').length;
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <div className="grid grid-cols-3 gap-4">
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-        </div>
-        <Skeleton className="h-96" />
-      </div>
-    );
-  }
+  const columns: ColumnDef<any>[] = [
+    {
+      id: 'period',
+      header: () => (
+        <SortableHeader
+          label="Period"
+          columnId="createdAt"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <span className="font-medium">
+          {format(new Date(row.original.year, row.original.month - 1), 'MMMM yyyy')}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'employeeCount',
+      header: 'Employees',
+      cell: ({ row }) => row.original.employeeCount || 0,
+    },
+    {
+      accessorKey: 'totalGross',
+      header: 'Gross Pay',
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      cell: ({ row }) => (
+        <span className="font-mono">{formatCurrency(row.original.totalGross || 0)}</span>
+      ),
+    },
+    {
+      accessorKey: 'totalDeductions',
+      header: 'Deductions',
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      cell: ({ row }) => (
+        <span className="font-mono text-red-600">
+          -{formatCurrency(row.original.totalDeductions || 0)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'totalNetPay',
+      header: 'Net Pay',
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      cell: ({ row }) => (
+        <span className="font-mono font-medium">
+          {formatCurrency(row.original.totalNetPay || 0)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge variant="outline" className={getPayrollStatusColor(row.original.status)}>
+          {getPayrollStatusLabel(row.original.status)}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Created',
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">
+          {format(new Date(row.original.createdAt), 'MMM d, yyyy')}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => (
+        <Button variant="ghost" size="sm" asChild>
+          <Link href={`/hr/payroll/${row.original.id}`}>
+            <Eye className="h-4 w-4" />
+          </Link>
+        </Button>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -57,9 +186,7 @@ export default function PayrollPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Payroll</h1>
-          <p className="text-muted-foreground">
-            Manage payroll runs and process employee salaries
-          </p>
+          <p className="text-muted-foreground">Manage payroll runs and process employee salaries</p>
         </div>
         <Button asChild>
           <Link href="/hr/payroll/run">
@@ -79,9 +206,7 @@ export default function PayrollPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Paid (YTD)</p>
-                <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(totalPaid)}
-                </p>
+                <p className="text-2xl font-bold font-mono">{formatCurrency(totalPaid)}</p>
               </div>
             </div>
           </CardContent>
@@ -128,84 +253,88 @@ export default function PayrollPage() {
       </div>
 
       {/* Payroll Runs Table */}
-      {payrollRuns.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">No payroll runs yet</h3>
-              <p className="text-muted-foreground">
-                Start by running your first payroll
-              </p>
-              <Button asChild className="mt-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Payroll History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DataTable
+            columns={columns}
+            data={payrollRuns}
+            page={meta?.page || 1}
+            totalPages={meta?.totalPages || 1}
+            total={meta?.total || 0}
+            limit={tableParams.limit}
+            onPageChange={tableParams.setPage}
+            onLimitChange={tableParams.setLimit}
+            isLoading={isLoading}
+            enableSelection
+            bulkActions={bulkActions}
+            emptyMessage="No payroll runs yet"
+            emptyAction={
+              <Button asChild>
                 <Link href="/hr/payroll/run">
                   <Play className="mr-2 h-4 w-4" />
                   Run Payroll
                 </Link>
               </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Payroll History</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Period</TableHead>
-                  <TableHead>Employees</TableHead>
-                  <TableHead className="text-right">Gross Pay</TableHead>
-                  <TableHead className="text-right">Deductions</TableHead>
-                  <TableHead className="text-right">Net Pay</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {payrollRuns.map((run: any) => (
-                  <TableRow key={run.id}>
-                    <TableCell className="font-medium">
-                      {format(new Date(run.year, run.month - 1), 'MMMM yyyy')}
-                    </TableCell>
-                    <TableCell>{run.employeeCount || 0}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(run.totalGross || 0)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-red-600">
-                      -{formatCurrency(run.totalDeductions || 0)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono font-medium">
-                      {formatCurrency(run.totalNetPay || 0)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={getPayrollStatusColor(run.status)}
-                      >
-                        {getPayrollStatusLabel(run.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {format(new Date(run.createdAt), 'MMM d, yyyy')}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/hr/payroll/${run.id}`}>
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+            }
+          />
+        </CardContent>
+      </Card>
+
+      {/* Bulk Action Dialogs */}
+      <BulkActionConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        action="delete"
+        count={bulkSelectedRows.length}
+        itemType="payroll runs"
+        description="Only draft payroll runs will be deleted."
+        destructive
+        isLoading={bulkDeleteAction.isLoading}
+        onConfirm={async () => {
+          await bulkDeleteAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkDeleteOpen(false);
+          refetch();
+        }}
+      />
+      <BulkActionConfirmDialog
+        open={bulkProcessOpen}
+        onOpenChange={setBulkProcessOpen}
+        action="process"
+        count={bulkSelectedRows.length}
+        itemType="payroll runs"
+        description="Draft payroll runs will be processed and calculations confirmed."
+        isLoading={bulkProcessAction.isLoading}
+        onConfirm={async () => {
+          await bulkProcessAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkProcessOpen(false);
+          refetch();
+        }}
+      />
+      <BulkActionConfirmDialog
+        open={bulkPayOpen}
+        onOpenChange={setBulkPayOpen}
+        action="mark as paid"
+        count={bulkSelectedRows.length}
+        itemType="payroll runs"
+        description="Confirmed payroll runs will be marked as paid."
+        isLoading={bulkPayAction.isLoading}
+        onConfirm={async () => {
+          await bulkPayAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkPayOpen(false);
+          refetch();
+        }}
+      />
     </div>
+  );
+}
+
+export default function PayrollPage() {
+  return (
+    <Suspense>
+      <PayrollPageContent />
+    </Suspense>
   );
 }

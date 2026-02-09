@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { paymentsMadeApi, billsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { billsApi, paymentsMadeApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 export interface BillAllocation {
@@ -83,6 +84,20 @@ export function usePaymentsMade(params?: PaymentMadeParams) {
       const response = await paymentsMadeApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all payments made with cursor-based pagination (virtual scroll)
+ */
+export function useInfinitePaymentsMade(params?: Record<string, unknown>) {
+  return useInfiniteTableData<PaymentMade, Record<string, unknown>>({
+    queryKey: ['payments-made'],
+    fetchFn: async (p) => {
+      const response = await paymentsMadeApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 

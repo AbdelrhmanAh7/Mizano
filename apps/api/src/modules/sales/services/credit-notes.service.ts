@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Decimal } from '@prisma/client/runtime/library';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
 import { CreateCreditNoteDto } from '../dto/create-credit-note.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { InvoicesService } from './invoices.service';
-import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class CreditNotesService {
@@ -15,13 +17,15 @@ export class CreditNotesService {
   ) {}
 
   async create(organizationId: string, createCreditNoteDto: CreateCreditNoteDto) {
-    const { customerId, invoiceId, date, reason, amount, type, appliedToInvoiceId } = createCreditNoteDto;
+    const { customerId, invoiceId, date, reason, amount, type, appliedToInvoiceId } =
+      createCreditNoteDto;
 
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, organizationId, deletedAt: null },
     });
     if (!invoice) throw new BadRequestException('Invoice not found');
-    if (invoice.customerId !== customerId) throw new BadRequestException('Invoice does not belong to this customer');
+    if (invoice.customerId !== customerId)
+      throw new BadRequestException('Invoice does not belong to this customer');
 
     // Get organization settings for default accounts
     const org = await this.prisma.organization.findUnique({
@@ -62,7 +66,12 @@ export class CreditNotesService {
 
     // Create accounting entry: Dr Sales Returns / Cr AR
     // If there's VAT involved, we also need to Dr VAT Payable
-    const journalLines: Array<{ accountId: string; debit: string; credit: string; description?: string }> = [
+    const journalLines: Array<{
+      accountId: string;
+      debit: string;
+      credit: string;
+      description?: string;
+    }> = [
       {
         accountId: org.defaultSalesReturnsAccountId,
         debit: creditAmount.toFixed(4),
@@ -111,7 +120,30 @@ export class CreditNotesService {
       this.prisma.creditNote.count({ where }),
     ]);
 
-    return { data: creditNotes, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return {
+      data: creditNotes,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+    const { cursor, take = 50, sortBy = 'date', sortOrder = 'desc' } = query;
+
+    const where: any = { organizationId, deletedAt: null };
+
+    return cursorPaginate(
+      this.prisma.creditNote,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: {
+          customer: { select: { id: true, name: true } },
+          invoice: { select: { id: true, invoiceNumber: true } },
+        },
+      },
+    );
   }
 
   async findOne(organizationId: string, id: string) {

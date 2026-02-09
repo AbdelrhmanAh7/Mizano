@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
+import type { Prisma } from '@prisma/client';
+import { getRiskLevel } from '../utils/risk-level.util';
 import {
   buildIsolationForest1D,
   isolationForestScore1D,
@@ -89,7 +91,7 @@ export class FraudDetectionService {
     weightSum += 0.1;
 
     const fraudScore = weightSum > 0 ? totalScore / weightSum : 0;
-    const riskLevel = this.getRiskLevel(fraudScore);
+    const riskLevel = getRiskLevel(fraudScore);
 
     return {
       entityType,
@@ -198,8 +200,8 @@ export class FraudDetectionService {
     organizationId: string,
     resolved?: boolean,
     limit?: number,
-  ): Promise<any[]> {
-    const where: any = { organizationId };
+  ) {
+    const where: Prisma.FraudAlertWhereInput = { organizationId };
     if (resolved !== undefined) where.isResolved = resolved;
 
     return this.prisma.fraudAlert.findMany({
@@ -653,7 +655,7 @@ export class FraudDetectionService {
         entityType: result.entityType,
         entityId: result.entityId,
         fraudScore: new Decimal(result.fraudScore),
-        signals: result.signals as any,
+        signals: result.signals as unknown as Prisma.InputJsonValue,
         velocityCheck: result.signals.some(
           (s) => s.signal === 'velocity' && s.triggered,
         ),
@@ -670,12 +672,4 @@ export class FraudDetectionService {
     });
   }
 
-  private getRiskLevel(
-    score: number,
-  ): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' {
-    if (score >= 0.8) return 'CRITICAL';
-    if (score >= 0.6) return 'HIGH';
-    if (score >= 0.4) return 'MEDIUM';
-    return 'LOW';
-  }
 }

@@ -439,6 +439,21 @@ enum RecurringType {
   EXPENSE
 }
 
+enum DeepSearchStatus {
+  PENDING
+  SCRAPING
+  ANALYZING
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+enum SuggestionCategory {
+  FEATURE_GAP
+  PERFORMANCE_UX
+  AI_CAPABILITY
+}
+
 // ============================================
 // ORGANIZATION & AUTH
 // ============================================
@@ -535,6 +550,9 @@ model Organization {
   employeeAiProfiles             EmployeeAiProfile[]
   fraudAlerts                    FraudAlert[]
   assetMaintenancePredictions    AssetMaintenancePrediction[]
+  deepSearchJobs                 DeepSearchJob[]
+  deepSearchSuggestions          DeepSearchSuggestion[]
+  searchHistories                SearchHistory[]
   deliveryChallans               DeliveryChallan[]
   exchangeRates       ExchangeRate[]
   emailLogs           EmailLog[]
@@ -627,6 +645,7 @@ model User {
   assignedDeals    Deal[]           @relation("DealAssignee")
   assignedTasks    Task[]           @relation("AssignedTasks")
   activityLogs     ActivityLog[]
+  searchHistories  SearchHistory[]
 
   @@unique([email, organizationId])
   @@index([organizationId])
@@ -760,6 +779,8 @@ model Journal {
   @@unique([journalNumber, organizationId])
   @@index([organizationId])
   @@index([date])
+  @@index([organizationId, deletedAt, date])
+  @@index([organizationId, isPosted, date])
   @@map("journals")
 }
 
@@ -777,6 +798,7 @@ model JournalLine {
 
   @@index([journalId])
   @@index([accountId])
+  @@index([accountId, journalId])
   @@map("journal_lines")
 }
 
@@ -891,6 +913,7 @@ model Quote {
   @@index([organizationId])
   @@index([customerId])
   @@index([status])
+  @@index([organizationId, deletedAt, status])
   @@map("quotes")
 }
 
@@ -956,6 +979,11 @@ model Invoice {
   @@index([customerId])
   @@index([status])
   @@index([dueDate])
+  @@index([organizationId, status])
+  @@index([organizationId, customerId])
+  @@index([organizationId, dueDate])
+  @@index([organizationId, deletedAt, status, date])
+  @@index([organizationId, deletedAt, balanceDue])
   @@map("invoices")
 }
 
@@ -1008,6 +1036,7 @@ model CreditNote {
   @@unique([creditNoteNumber, organizationId])
   @@index([organizationId])
   @@index([customerId])
+  @@index([organizationId, deletedAt])
   @@map("credit_notes")
 }
 
@@ -1034,6 +1063,7 @@ model PaymentReceived {
   @@unique([paymentNumber, organizationId])
   @@index([organizationId])
   @@index([customerId])
+  @@index([organizationId, deletedAt])
   @@map("payments_received")
 }
 
@@ -1123,6 +1153,10 @@ model Expense {
 
   @@index([organizationId])
   @@index([date])
+  @@index([organizationId, status])
+  @@index([organizationId, vendorId])
+  @@index([organizationId, deletedAt, date])
+  @@index([organizationId, deletedAt, status])
   @@map("expenses")
 }
 
@@ -1163,6 +1197,11 @@ model Bill {
   @@index([vendorId])
   @@index([status])
   @@index([dueDate])
+  @@index([organizationId, status])
+  @@index([organizationId, vendorId])
+  @@index([organizationId, dueDate])
+  @@index([organizationId, deletedAt, status, date])
+  @@index([organizationId, deletedAt, balanceDue])
   @@map("bills")
 }
 
@@ -1237,6 +1276,7 @@ model PaymentMade {
   @@unique([paymentNumber, organizationId])
   @@index([organizationId])
   @@index([vendorId])
+  @@index([organizationId, deletedAt])
   @@map("payments_made")
 }
 
@@ -1308,6 +1348,7 @@ model Item {
   @@unique([sku, organizationId])
   @@index([organizationId])
   @@index([type])
+  @@index([organizationId, deletedAt])
   @@map("items")
 }
 
@@ -1397,6 +1438,8 @@ model InventoryMovement {
   @@index([itemId])
   @@index([warehouseId])
   @@index([createdAt])
+  @@index([organizationId, itemId])
+  @@index([organizationId, itemId, type])
   @@map("inventory_movements")
 }
 
@@ -1626,6 +1669,8 @@ model BankTransaction {
   @@index([bankAccountId])
   @@index([status])
   @@index([date])
+  @@index([organizationId, status])
+  @@index([organizationId, bankAccountId, status])
   @@map("bank_transactions")
 }
 
@@ -2072,6 +2117,9 @@ model AuditLog {
   @@index([organizationId])
   @@index([entityType, entityId])
   @@index([createdAt])
+  @@index([organizationId, entityType, entityId])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, userId, createdAt])
   @@map("audit_logs")
 }
 
@@ -2900,4 +2948,78 @@ model AssetMaintenancePrediction {
   @@index([organizationId])
   @@index([assetId])
   @@map("asset_maintenance_predictions")
+}
+
+// ============================================
+// DEEP SEARCH AGENT
+// ============================================
+
+model DeepSearchJob {
+  id                String           @id @default(cuid())
+  status            DeepSearchStatus @default(PENDING)
+  progress          Int              @default(0)
+  progressMessage   String?
+  webSourcesScraped Int              @default(0)
+  codeFilesAnalyzed Int              @default(0)
+  suggestionsCount  Int              @default(0)
+  error             String?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  suggestions    DeepSearchSuggestion[]
+
+  @@index([organizationId, createdAt])
+  @@map("deep_search_jobs")
+}
+
+model DeepSearchSuggestion {
+  id          String             @id @default(cuid())
+  category    SuggestionCategory
+  title       String
+  description String             @db.Text
+  impact      String
+  effort      String
+  priority    Int
+  tags        String[]
+  sources     Json?
+  prompt      String             @db.Text
+  status      String             @default("pending")
+  createdAt   DateTime           @default(now())
+
+  job            DeepSearchJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobId          String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+
+  @@index([jobId])
+  @@index([organizationId, category])
+  @@map("deep_search_suggestions")
+}
+
+// ============================================
+// SEARCH HISTORY
+// ============================================
+
+model SearchHistory {
+  id          String   @id @default(cuid())
+  query       String
+  resultType  String?  // Entity type: customer, invoice, item, etc.
+  resultId    String?  // ID of the clicked result
+  resultTitle String?  // Display title of the clicked result
+  clickedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+
+  @@unique([organizationId, userId, query])
+  @@index([organizationId, userId, clickedAt])
+  @@map("search_histories")
 }

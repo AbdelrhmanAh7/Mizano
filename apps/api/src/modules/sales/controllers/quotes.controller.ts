@@ -1,12 +1,23 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { QuotesService } from '../services/quotes.service';
-import { CreateQuoteDto } from '../dto/create-quote.dto';
-import { UpdateQuoteDto } from '../dto/update-quote.dto';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { CreateQuoteDto } from '../dto/create-quote.dto';
+import { UpdateQuoteDto } from '../dto/update-quote.dto';
+import { QuotesService } from '../services/quotes.service';
 
 @ApiTags('Quotes')
 @ApiBearerAuth()
@@ -28,6 +39,13 @@ export class QuotesController {
     return this.quotesService.findAll(orgId, query);
   }
 
+  @Get('cursor')
+  @Permissions('sales.view')
+  @ApiOperation({ summary: 'List quotes with cursor-based pagination' })
+  findAllCursor(@CurrentOrg() orgId: string, @Query() query: CursorPaginationDto) {
+    return this.quotesService.findAllCursor(orgId, query);
+  }
+
   @Get(':id')
   @Permissions('sales.view')
   findOne(@CurrentOrg() orgId: string, @Param('id') id: string) {
@@ -36,7 +54,11 @@ export class QuotesController {
 
   @Patch(':id')
   @Permissions('sales.edit')
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() updateQuoteDto: UpdateQuoteDto) {
+  update(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Body() updateQuoteDto: UpdateQuoteDto,
+  ) {
     return this.quotesService.update(orgId, id, updateQuoteDto);
   }
 
@@ -72,5 +94,27 @@ export class QuotesController {
   @Permissions('sales.delete')
   remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.quotesService.remove(orgId, id);
+  }
+
+  // Bulk Operations
+  @Post('bulk-delete')
+  @Permissions('sales.delete')
+  @ApiOperation({ summary: 'Bulk delete draft quotes' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.quotesService.bulkDelete(orgId, dto.ids);
+  }
+
+  @Post('bulk-send')
+  @Permissions('sales.edit')
+  @ApiOperation({ summary: 'Bulk send quotes' })
+  bulkSend(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.quotesService.bulkSend(orgId, dto.ids);
+  }
+
+  @Post('bulk-decline')
+  @Permissions('sales.edit')
+  @ApiOperation({ summary: 'Bulk decline quotes' })
+  bulkDecline(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.quotesService.bulkDecline(orgId, dto.ids);
   }
 }

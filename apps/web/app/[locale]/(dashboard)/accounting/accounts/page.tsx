@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, Download, RefreshCw, Search } from 'lucide-react';
+import { Suspense, useState } from 'react';
+import { Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
@@ -23,6 +22,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
+import { DataTableSearch } from '@/components/data-table';
+import { useTableParams } from '@/lib/hooks/use-table-params';
 import { AccountTree } from '@/components/accounting/account-tree';
 import { AccountFormDialog } from '@/components/accounting/account-form-dialog';
 import {
@@ -35,11 +36,11 @@ import {
 } from '@/lib/hooks/use-accounts';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 
-export default function AccountsPage() {
+function AccountsPageContent() {
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
+  const tableParams = useTableParams({ defaultSortBy: 'code' });
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -62,9 +63,9 @@ export default function AccountsPage() {
     return accounts
       .filter((account) => {
         const matchesSearch =
-          !searchQuery ||
-          account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          account.code.toLowerCase().includes(searchQuery.toLowerCase());
+          !tableParams.search ||
+          account.name.toLowerCase().includes(tableParams.search.toLowerCase()) ||
+          account.code.toLowerCase().includes(tableParams.search.toLowerCase());
         const matchesType = selectedType === 'all' || account.type === selectedType;
         return matchesSearch && matchesType;
       })
@@ -159,15 +160,11 @@ export default function AccountsPage() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search accounts..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+            <DataTableSearch
+              value={tableParams.search}
+              onChange={tableParams.setSearch}
+              placeholder="Search accounts..."
+            />
             <Select value={selectedType} onValueChange={setSelectedType}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by type" />
@@ -239,5 +236,13 @@ export default function AccountsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function AccountsPage() {
+  return (
+    <Suspense>
+      <AccountsPageContent />
+    </Suspense>
   );
 }

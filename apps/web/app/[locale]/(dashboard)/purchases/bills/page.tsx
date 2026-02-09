@@ -1,20 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { format } from 'date-fns';
-import { Plus, Search, RefreshCw, Eye, Edit, Trash2, FileText, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { DateRangeValue } from '@/components/data-table';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  DataTable,
+  DataTableDateRangeFilter,
+  DataTableFacetedFilter,
+  DataTableSearch,
+  SortableHeader,
+} from '@/components/data-table';
+import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,54 +19,168 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
+
 import { useToast } from '@/components/ui/use-toast';
+import { billsApi } from '@/lib/api';
 import {
-  useBills,
-  useDeleteBill,
   Bill,
   BillStatus,
   formatCurrency,
-  getStatusVariant,
   getStatusText,
+  getStatusVariant,
+  useDeleteBill,
+  useInfiniteBills,
 } from '@/lib/hooks/use-bills';
+import { useBulkAction } from '@/lib/hooks/use-bulk-action';
+import { useExportAll } from '@/lib/hooks/use-export-all';
 import { usePermissions } from '@/lib/hooks/use-permissions';
+import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
+import { type ColumnDef } from '@tanstack/react-table';
+import { format } from 'date-fns';
+import {
+  CheckCircle,
+  DollarSign,
+  Edit,
+  Eye,
+  FolderOpen,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+} from 'lucide-react';
+import Link from 'next/link';
+import { Suspense, useState } from 'react';
 
-export default function BillsPage() {
+const BILL_STATUS_OPTIONS = [
+  { value: 'DRAFT', label: 'Draft' },
+  { value: 'OPEN', label: 'Open' },
+  { value: 'OVERDUE', label: 'Overdue' },
+  { value: 'PARTIAL', label: 'Partial' },
+  { value: 'PAID', label: 'Paid' },
+];
+
+function BillsPageContent() {
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
+  const { onExportAll } = useExportAll('bills', 'bills');
+  const tableParams = useTableParams({
+    defaultSortBy: 'date',
+    filterKeys: ['status', 'startDate', 'endDate'],
+    mode: 'virtual',
+  });
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [billToDelete, setBillToDelete] = useState<Bill | null>(null);
 
-  const { data: billsData, isLoading, refetch } = useBills({
-    search: searchQuery || undefined,
-    status: statusFilter !== 'all' ? (statusFilter as BillStatus) : undefined,
+  const {
+    data: bills,
+    total,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useInfiniteBills({
+    ...tableParams.queryParams,
+    status: (tableParams.filters.status as BillStatus) || undefined,
+    startDate: tableParams.filters.startDate || undefined,
+    endDate: tableParams.filters.endDate || undefined,
   });
-  const deleteBill = useDeleteBill();
 
-  const bills = billsData?.data || [];
+  const dateRange: DateRangeValue | undefined =
+    tableParams.filters.startDate && tableParams.filters.endDate
+      ? { from: new Date(tableParams.filters.startDate), to: new Date(tableParams.filters.endDate) }
+      : undefined;
+  const deleteBill = useDeleteBill();
 
   const canCreate = hasPermission('purchases.create');
   const canEdit = hasPermission('purchases.edit');
   const canDelete = hasPermission('purchases.delete');
+
+  // Bulk action state
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkOpenOpen, setBulkOpenOpen] = useState(false);
+  const [bulkApproveOpen, setBulkApproveOpen] = useState(false);
+  const [bulkPayOpen, setBulkPayOpen] = useState(false);
+  const [bulkSelectedRows, setBulkSelectedRows] = useState<Bill[]>([]);
+
+  const bulkDeleteAction = useBulkAction({
+    mutationFn: (ids) => billsApi.bulkDelete(ids).then((r) => r.data),
+    queryKeys: [['bills']],
+    successMessage: '{count} draft bills deleted',
+  });
+
+  const bulkOpenAction = useBulkAction({
+    mutationFn: (ids) => billsApi.bulkOpen(ids).then((r) => r.data),
+    queryKeys: [['bills']],
+    successMessage: '{count} bills opened',
+  });
+
+  const bulkApproveAction = useBulkAction({
+    mutationFn: (ids) => billsApi.bulkApprove(ids).then((r) => r.data),
+    queryKeys: [['bills']],
+    successMessage: '{count} bills approved',
+  });
+
+  const bulkPayAction = useBulkAction({
+    mutationFn: (ids) => billsApi.bulkPay(ids).then((r) => r.data),
+    queryKeys: [['bills']],
+    successMessage: '{count} bills marked as paid',
+  });
+
+  const bulkActions = [
+    ...(canEdit
+      ? [
+          {
+            label: 'Open',
+            icon: FolderOpen,
+            onClick: (rows: Bill[]) => {
+              setBulkSelectedRows(rows);
+              setBulkOpenOpen(true);
+            },
+          },
+          {
+            label: 'Approve',
+            icon: CheckCircle,
+            onClick: (rows: Bill[]) => {
+              setBulkSelectedRows(rows);
+              setBulkApproveOpen(true);
+            },
+          },
+          {
+            label: 'Mark as Paid',
+            icon: DollarSign,
+            onClick: (rows: Bill[]) => {
+              setBulkSelectedRows(rows);
+              setBulkPayOpen(true);
+            },
+          },
+        ]
+      : []),
+    ...(canDelete
+      ? [
+          {
+            label: 'Delete',
+            icon: Trash2,
+            variant: 'destructive' as const,
+            onClick: (rows: Bill[]) => {
+              setBulkSelectedRows(rows);
+              setBulkDeleteOpen(true);
+            },
+          },
+        ]
+      : []),
+  ];
 
   const handleDelete = (bill: Bill) => {
     setBillToDelete(bill);
@@ -90,8 +198,7 @@ export default function BillsPage() {
       } catch (error: any) {
         toast({
           title: 'Error',
-          description:
-            error.response?.data?.message || 'Failed to delete bill.',
+          description: error.response?.data?.message || 'Failed to delete bill.',
           variant: 'destructive',
         });
       }
@@ -100,15 +207,166 @@ export default function BillsPage() {
     }
   };
 
+  const columns: ColumnDef<Bill>[] = [
+    {
+      accessorKey: 'billNumber',
+      header: () => (
+        <SortableHeader
+          label="Bill #"
+          columnId="billNumber"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <Link
+          href={`/purchases/bills/${row.original.id}`}
+          className="font-mono font-medium text-blue-600 hover:underline"
+        >
+          {row.original.billNumber}
+        </Link>
+      ),
+    },
+    {
+      accessorKey: 'vendor.name',
+      header: 'Vendor',
+      cell: ({ row }) => {
+        const bill = row.original;
+        return bill.vendor ? (
+          <Link href={`/purchases/vendors/${bill.vendor.id}`} className="hover:underline">
+            {bill.vendor.name}
+          </Link>
+        ) : (
+          '-'
+        );
+      },
+    },
+    {
+      accessorKey: 'date',
+      header: () => (
+        <SortableHeader
+          label="Date"
+          columnId="date"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+    },
+    {
+      accessorKey: 'dueDate',
+      header: () => (
+        <SortableHeader
+          label="Due Date"
+          columnId="dueDate"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => {
+        const bill = row.original;
+        const isOverdue =
+          bill.status === 'OVERDUE' ||
+          (bill.status === 'OPEN' && new Date(bill.dueDate) < new Date());
+        return (
+          <span className={cn(isOverdue && 'text-red-600')}>
+            {format(new Date(bill.dueDate), 'MMM d, yyyy')}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge variant={getStatusVariant(row.original.status)}>
+          {getStatusText(row.original.status)}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'grandTotal',
+      header: () => (
+        <SortableHeader
+          label="Total"
+          columnId="grandTotal"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
+      cell: ({ row }) => formatCurrency(row.original.grandTotal, row.original.vendor?.currency),
+    },
+    {
+      accessorKey: 'balanceDue',
+      header: 'Balance Due',
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      cell: ({ row }) => {
+        const balanceDue = parseFloat(row.original.balanceDue || '0');
+        return (
+          <span
+            className={cn(
+              'font-mono font-medium',
+              balanceDue > 0 ? 'text-red-600' : 'text-green-600',
+            )}
+          >
+            {formatCurrency(balanceDue, row.original.vendor?.currency)}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      header: '',
+      meta: { cellClassName: 'text-right' },
+      cell: ({ row }) => {
+        const bill = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                ...
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/purchases/bills/${bill.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View
+                </Link>
+              </DropdownMenuItem>
+              {canEdit && bill.status === 'DRAFT' && (
+                <DropdownMenuItem asChild>
+                  <Link href={`/purchases/bills/${bill.id}/edit`}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {canDelete && bill.status === 'DRAFT' && (
+                <DropdownMenuItem onClick={() => handleDelete(bill)} className="text-red-600">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Bills</h1>
-          <p className="text-muted-foreground">
-            Manage vendor bills and track payables
-          </p>
+          <p className="text-muted-foreground">Manage vendor bills and track payables</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
@@ -134,28 +392,34 @@ export default function BillsPage() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by bill number or vendor..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="DRAFT">Draft</SelectItem>
-                <SelectItem value="OPEN">Open</SelectItem>
-                <SelectItem value="OVERDUE">Overdue</SelectItem>
-                <SelectItem value="PARTIAL">Partial</SelectItem>
-                <SelectItem value="PAID">Paid</SelectItem>
-              </SelectContent>
-            </Select>
+            <DataTableSearch
+              value={tableParams.search}
+              onChange={tableParams.setSearch}
+              placeholder="Search by bill number or vendor..."
+            />
+            <DataTableFacetedFilter
+              title="Status"
+              options={BILL_STATUS_OPTIONS}
+              selected={tableParams.filters.status ? [tableParams.filters.status] : []}
+              onSelectionChange={(values) =>
+                tableParams.setFilter('status', values[0] || undefined)
+              }
+              singleSelect
+            />
+            <DataTableDateRangeFilter
+              value={dateRange}
+              onChange={(range) => {
+                if (range) {
+                  tableParams.setFilters({
+                    startDate: format(range.from, 'yyyy-MM-dd'),
+                    endDate: format(range.to, 'yyyy-MM-dd'),
+                  });
+                } else {
+                  tableParams.setFilters({ startDate: undefined, endDate: undefined });
+                }
+              }}
+              placeholder="Date range"
+            />
             <Button variant="outline" size="icon" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -169,128 +433,35 @@ export default function BillsPage() {
           <CardTitle>All Bills</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : bills.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground mb-4">No bills found</p>
-              {canCreate && (
+          <DataTable
+            columns={columns}
+            data={bills}
+            total={total}
+            isLoading={isLoading}
+            enableVirtualization
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={() => fetchNextPage()}
+            enableColumnResizing
+            tableId="bills"
+            enableSelection
+            enableExport
+            enableColumnVisibility
+            exportFilename="bills"
+            onExportAll={onExportAll}
+            bulkActions={bulkActions}
+            emptyMessage="No bills found"
+            emptyAction={
+              canCreate ? (
                 <Button asChild>
                   <Link href="/purchases/bills/new">
                     <Plus className="mr-2 h-4 w-4" />
                     Create Your First Bill
                   </Link>
                 </Button>
-              )}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Bill #</TableHead>
-                  <TableHead>Vendor</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Balance Due</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {bills.map((bill: Bill) => {
-                  const balanceDue = parseFloat(bill.balanceDue || '0');
-                  const isOverdue = bill.status === 'OVERDUE' || (
-                    bill.status === 'OPEN' && new Date(bill.dueDate) < new Date()
-                  );
-
-                  return (
-                    <TableRow key={bill.id}>
-                      <TableCell>
-                        <Link
-                          href={`/purchases/bills/${bill.id}`}
-                          className="font-mono font-medium text-blue-600 hover:underline"
-                        >
-                          {bill.billNumber}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        {bill.vendor ? (
-                          <Link
-                            href={`/purchases/vendors/${bill.vendor.id}`}
-                            className="hover:underline"
-                          >
-                            {bill.vendor.name}
-                          </Link>
-                        ) : '-'}
-                      </TableCell>
-                      <TableCell>
-                        {format(new Date(bill.date), 'MMM d, yyyy')}
-                      </TableCell>
-                      <TableCell className={cn(isOverdue && 'text-red-600')}>
-                        {format(new Date(bill.dueDate), 'MMM d, yyyy')}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusVariant(bill.status)}>
-                          {getStatusText(bill.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatCurrency(bill.grandTotal, bill.vendor?.currency)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className={cn(
-                          'font-mono font-medium',
-                          balanceDue > 0 ? 'text-red-600' : 'text-green-600'
-                        )}>
-                          {formatCurrency(balanceDue, bill.vendor?.currency)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              •••
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/purchases/bills/${bill.id}`}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View
-                              </Link>
-                            </DropdownMenuItem>
-                            {canEdit && bill.status === 'DRAFT' && (
-                              <DropdownMenuItem asChild>
-                                <Link href={`/purchases/bills/${bill.id}/edit`}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
-                                </Link>
-                              </DropdownMenuItem>
-                            )}
-                            {canDelete && bill.status === 'DRAFT' && (
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(bill)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+              ) : undefined
+            }
+          />
         </CardContent>
       </Card>
 
@@ -300,21 +471,85 @@ export default function BillsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Bill</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete bill &quot;{billToDelete?.billNumber}&quot;?
-              This action cannot be undone.
+              Are you sure you want to delete bill &quot;{billToDelete?.billNumber}&quot;? This
+              action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Action Dialogs */}
+      <BulkActionConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        action="delete"
+        count={bulkSelectedRows.length}
+        itemType="bills"
+        description="Only draft bills will be deleted. Non-draft bills will be skipped."
+        destructive
+        isLoading={bulkDeleteAction.isLoading}
+        onConfirm={async () => {
+          await bulkDeleteAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkDeleteOpen(false);
+          refetch();
+        }}
+      />
+      <BulkActionConfirmDialog
+        open={bulkOpenOpen}
+        onOpenChange={setBulkOpenOpen}
+        action="open"
+        count={bulkSelectedRows.length}
+        itemType="bills"
+        description="Draft bills will be marked as open. This will create accounting entries."
+        isLoading={bulkOpenAction.isLoading}
+        onConfirm={async () => {
+          await bulkOpenAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkOpenOpen(false);
+          refetch();
+        }}
+      />
+      <BulkActionConfirmDialog
+        open={bulkApproveOpen}
+        onOpenChange={setBulkApproveOpen}
+        action="approve"
+        count={bulkSelectedRows.length}
+        itemType="bills"
+        description="Open bills will be approved for payment."
+        isLoading={bulkApproveAction.isLoading}
+        onConfirm={async () => {
+          await bulkApproveAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkApproveOpen(false);
+          refetch();
+        }}
+      />
+      <BulkActionConfirmDialog
+        open={bulkPayOpen}
+        onOpenChange={setBulkPayOpen}
+        action="mark as paid"
+        count={bulkSelectedRows.length}
+        itemType="bills"
+        description="Bills will be marked as fully paid with balance set to zero."
+        isLoading={bulkPayAction.isLoading}
+        onConfirm={async () => {
+          await bulkPayAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkPayOpen(false);
+          refetch();
+        }}
+      />
     </div>
+  );
+}
+
+export default function BillsPage() {
+  return (
+    <Suspense>
+      <BillsPageContent />
+    </Suspense>
   );
 }

@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { customersApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { customersApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 export interface CustomerAddress {
@@ -101,6 +102,20 @@ export function useCustomers(params?: CustomerParams) {
       const response = await customersApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all customers with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteCustomers(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Customer, Record<string, unknown>>({
+    queryKey: ['customers'],
+    fetchFn: async (p) => {
+      const response = await customersApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 
@@ -231,7 +246,7 @@ export function formatAddress(
   typeOrCity?: 'billing' | 'shipping' | string | null,
   state?: string | null,
   postalCode?: string | null,
-  country?: string | null
+  country?: string | null,
 ): string {
   // If first argument is a Customer object
   if (customerOrStreet && typeof customerOrStreet === 'object' && 'id' in customerOrStreet) {

@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { EmployeesService } from '../services/employees.service';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { EmployeeCursorQueryDto } from '../dto/employee-cursor-query.dto';
+import { EmployeesService } from '../services/employees.service';
 
 @ApiTags('Employees')
 @ApiBearerAuth()
@@ -23,8 +24,18 @@ export class EmployeesController {
   @Get()
   @Permissions('hr.view')
   @ApiOperation({ summary: 'Get all employees' })
-  findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto & { status?: string; department?: string }) {
+  findAll(
+    @CurrentOrg() orgId: string,
+    @Query() query: PaginationDto & { status?: string; department?: string },
+  ) {
     return this.employeesService.findAll(orgId, query);
+  }
+
+  @Get('cursor')
+  @Permissions('hr.view')
+  @ApiOperation({ summary: 'List employees with cursor-based pagination' })
+  findAllCursor(@CurrentOrg() orgId: string, @Query() query: EmployeeCursorQueryDto) {
+    return this.employeesService.findAllCursor(orgId, query);
   }
 
   @Get('summary')

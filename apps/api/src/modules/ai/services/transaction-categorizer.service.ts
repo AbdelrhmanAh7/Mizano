@@ -1,12 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiTrainingService } from './ai-training.service';
 import { AiFeedbackService } from './ai-feedback.service';
 import { ModelRegistryService } from './model-registry.service';
-import { AiFeature, AiTrainingSource } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import { AiTrainingSource } from '@prisma/client';
 import * as natural from 'natural';
+import { BoundedCache } from '../utils/bounded-cache.util';
 
 export interface CategorizationInput {
   description: string;
@@ -27,6 +27,7 @@ export interface CategorizationPrediction {
     accountName: string;
     confidence: number;
   }>;
+  predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID';
 }
 
 interface CategorizationModelData {
@@ -47,10 +48,7 @@ interface CachedClassifier {
 @Injectable()
 export class TransactionCategorizerService {
   private readonly logger = new Logger(TransactionCategorizerService.name);
-  private classifierCache = new Map<string, CachedClassifier>();
-
-  // Cache expiry time: 1 hour
-  private readonly CACHE_TTL_MS = 60 * 60 * 1000;
+  private classifierCache = new BoundedCache<CachedClassifier>(50, 60 * 60 * 1000);
 
   // Minimum samples required for prediction
   private readonly MIN_SAMPLES_FOR_PREDICTION = 20;
@@ -86,100 +84,104 @@ export class TransactionCategorizerService {
     });
 
     if (trainingData.length < this.MIN_SAMPLES_FOR_PREDICTION) {
-      this.logger.warn(
-        `Insufficient training data for org ${organizationId}: ${trainingData.length} samples`,
+      throw new BadRequestException(
+        `Insufficient training data: ${trainingData.length} samples found, minimum ${this.MIN_SAMPLES_FOR_PREDICTION} required. ` +
+        `Use the "Seed from History" button or categorize more transactions first.`,
       );
-      return { version: 0, accuracy: 0, sampleCount: trainingData.length };
     }
 
-    // 2. Create new classifier
-    const classifier = new natural.BayesClassifier();
+    try {
+      // 2. Create new classifier
+      const classifier = new natural.BayesClassifier();
 
-    // 3. Build vendor -> account frequency map
-    const vendorAccountMap: Record<string, { accountId: string; count: number }> = {};
-    const vocabulary = new Set<string>();
+      // 3. Build vendor -> account frequency map (pre-compute per-vendor counts)
+      const vendorAccountMap: Record<string, { accountId: string; count: number }> = {};
+      const vocabulary = new Set<string>();
 
-    // 4. Add documents to classifier
-    for (const record of trainingData) {
-      const input = record.inputData as unknown as CategorizationInput;
-      const accountId = record.label;
-
-      const featureText = this.buildFeatureText(input);
-      classifier.addDocument(featureText, accountId);
-
-      // Track vocabulary
-      featureText.split(' ').forEach((token) => vocabulary.add(token));
-
-      // Update vendor -> account map
-      if (input.vendorName) {
-        const normalizedVendor = this.normalizeText(input.vendorName);
-        if (!vendorAccountMap[normalizedVendor]) {
-          vendorAccountMap[normalizedVendor] = { accountId, count: 0 };
-        }
-        if (vendorAccountMap[normalizedVendor].accountId === accountId) {
-          vendorAccountMap[normalizedVendor].count++;
-        } else if (
-          vendorAccountMap[normalizedVendor].count === 0 ||
-          vendorAccountMap[normalizedVendor].count < trainingData.filter(
-            (d) =>
-              (d.inputData as any).vendorName &&
-              this.normalizeText((d.inputData as any).vendorName) === normalizedVendor &&
-              d.label === accountId,
-          ).length
-        ) {
-          vendorAccountMap[normalizedVendor] = {
-            accountId,
-            count: trainingData.filter(
-              (d) =>
-                (d.inputData as any).vendorName &&
-                this.normalizeText((d.inputData as any).vendorName) === normalizedVendor &&
-                d.label === accountId,
-            ).length,
-          };
+      // Pre-compute vendor+account frequency for O(n) instead of O(n²)
+      const vendorAccountCounts: Record<string, Record<string, number>> = {};
+      for (const record of trainingData) {
+        const input = record.inputData as unknown as CategorizationInput;
+        if (input.vendorName) {
+          const nv = this.normalizeText(input.vendorName);
+          if (!vendorAccountCounts[nv]) vendorAccountCounts[nv] = {};
+          vendorAccountCounts[nv][record.label] = (vendorAccountCounts[nv][record.label] || 0) + 1;
         }
       }
+
+      // Pick the most frequent account per vendor
+      for (const [vendor, accounts] of Object.entries(vendorAccountCounts)) {
+        let bestAccount = '';
+        let bestCount = 0;
+        for (const [accountId, count] of Object.entries(accounts)) {
+          if (count > bestCount) {
+            bestAccount = accountId;
+            bestCount = count;
+          }
+        }
+        vendorAccountMap[vendor] = { accountId: bestAccount, count: bestCount };
+      }
+
+      // 4. Add documents to classifier
+      for (const record of trainingData) {
+        const input = record.inputData as unknown as CategorizationInput;
+        const featureText = this.buildFeatureText(input);
+        classifier.addDocument(featureText, record.label);
+
+        // Track vocabulary
+        featureText.split(' ').forEach((token) => vocabulary.add(token));
+      }
+
+      // 5. Train the classifier
+      classifier.train();
+
+      // 6. Run cross-validation
+      const cvResult = await this.crossValidateInternal(trainingData, 5);
+
+      // 7. Serialize and save model
+      const modelData: CategorizationModelData = {
+        classifierJson: JSON.stringify(classifier),
+        vendorAccountMap,
+        vocabulary: Array.from(vocabulary),
+        sampleCount: trainingData.length,
+        lastTrainedAt: new Date().toISOString(),
+      };
+
+      const savedModel = await this.modelRegistry.saveModel(
+        organizationId,
+        'CATEGORIZATION',
+        modelData,
+        cvResult.avgAccuracy,
+        trainingData.length,
+      );
+
+      // 8. Update cache
+      this.classifierCache.set(organizationId, {
+        classifier,
+        vendorAccountMap,
+        version: savedModel.version,
+        loadedAt: new Date(),
+      });
+
+      this.logger.log(
+        `Categorization training completed for org ${organizationId}: v${savedModel.version}, accuracy=${cvResult.avgAccuracy.toFixed(2)}, samples=${trainingData.length}`,
+      );
+
+      return {
+        version: savedModel.version,
+        accuracy: cvResult.avgAccuracy,
+        sampleCount: trainingData.length,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      this.logger.error(
+        `Categorization training failed for org ${organizationId}: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Training failed: ${error.message}`,
+      );
     }
-
-    // 5. Train the classifier
-    classifier.train();
-
-    // 6. Run cross-validation
-    const cvResult = await this.crossValidateInternal(trainingData, 5);
-
-    // 7. Serialize and save model
-    const modelData: CategorizationModelData = {
-      classifierJson: JSON.stringify(classifier),
-      vendorAccountMap,
-      vocabulary: Array.from(vocabulary),
-      sampleCount: trainingData.length,
-      lastTrainedAt: new Date().toISOString(),
-    };
-
-    const savedModel = await this.modelRegistry.saveModel(
-      organizationId,
-      'CATEGORIZATION',
-      modelData,
-      cvResult.avgAccuracy,
-      trainingData.length,
-    );
-
-    // 8. Update cache
-    this.classifierCache.set(organizationId, {
-      classifier,
-      vendorAccountMap,
-      version: savedModel.version,
-      loadedAt: new Date(),
-    });
-
-    this.logger.log(
-      `Categorization training completed for org ${organizationId}: v${savedModel.version}, accuracy=${cvResult.avgAccuracy.toFixed(2)}, samples=${trainingData.length}`,
-    );
-
-    return {
-      version: savedModel.version,
-      accuracy: cvResult.avgAccuracy,
-      sampleCount: trainingData.length,
-    };
   }
 
   /**
@@ -201,6 +203,7 @@ export class TransactionCategorizerService {
         confidence: 0,
         predictionId: '',
         alternatives: [],
+        predictionMethod: 'RULE_BASED',
       };
     }
 
@@ -218,6 +221,7 @@ export class TransactionCategorizerService {
         confidence: 0,
         predictionId: '',
         alternatives: [],
+        predictionMethod: 'RULE_BASED',
       };
     }
 
@@ -304,6 +308,7 @@ export class TransactionCategorizerService {
       confidence: topConfidence,
       predictionId: prediction?.id || '',
       alternatives,
+      predictionMethod: 'ML',
     };
   }
 
@@ -358,9 +363,9 @@ export class TransactionCategorizerService {
    * Load model from database into memory
    */
   async loadModel(organizationId: string): Promise<boolean> {
-    // Check if already cached and not expired
+    // Check if already cached (BoundedCache handles TTL expiry)
     const cached = this.classifierCache.get(organizationId);
-    if (cached && Date.now() - cached.loadedAt.getTime() < this.CACHE_TTL_MS) {
+    if (cached) {
       return true;
     }
 

@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { journalsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { journalsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 export type JournalStatus = 'DRAFT' | 'POSTED' | 'VOIDED';
@@ -121,6 +122,20 @@ export function useJournals(params?: JournalParams) {
 
       return data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all journals with cursor-based infinite scrolling
+ */
+export function useInfiniteJournals(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Journal, Record<string, unknown>>({
+    queryKey: ['journals'],
+    fetchFn: async (p) => {
+      const response = await journalsApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 

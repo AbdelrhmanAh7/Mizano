@@ -1,19 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Plus, Search, RefreshCw, Eye, Edit, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { CustomerAIInsights } from '@/components/ai';
+import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { AutoTourTrigger } from '@/components/tour/auto-tour-trigger';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,38 +13,52 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import {
-  useCustomers,
-  useDeleteCustomer,
   Customer,
   formatCurrency,
   getBalanceColor,
+  useDeleteCustomer,
+  useInfiniteCustomers,
 } from '@/lib/hooks/use-customers';
+import { useExportAll } from '@/lib/hooks/use-export-all';
 import { usePermissions } from '@/lib/hooks/use-permissions';
+import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
+import { type ColumnDef } from '@tanstack/react-table';
+import { Edit, Eye, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { Suspense, useState } from 'react';
 
-export default function CustomersPage() {
+function CustomersPageContent() {
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
+  const { onExportAll } = useExportAll('customers', 'customers');
+  const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
 
-  const { data: customersData, isLoading, refetch } = useCustomers({
-    search: searchQuery || undefined,
+  const {
+    data: customers,
+    total,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useInfiniteCustomers({
+    ...tableParams.queryParams,
   });
   const deleteCustomer = useDeleteCustomer();
-
-  const customers = customersData?.data || [];
 
   const canCreate = hasPermission('sales.create');
   const canEdit = hasPermission('sales.edit');
@@ -88,19 +91,120 @@ export default function CustomersPage() {
     }
   };
 
+  const columns: ColumnDef<Customer>[] = [
+    {
+      accessorKey: 'name',
+      header: () => (
+        <SortableHeader
+          label="Name"
+          columnId="name"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => {
+        const customer = row.original;
+        return (
+          <div>
+            <Link href={`/sales/customers/${customer.id}`} className="font-medium hover:underline">
+              {customer.displayName || customer.name}
+            </Link>
+            {customer.displayName && customer.displayName !== customer.name && (
+              <p className="text-sm text-muted-foreground">{customer.name}</p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'email',
+      header: 'Email',
+      cell: ({ row }) => row.original.email || '-',
+    },
+    {
+      accessorKey: 'phone',
+      header: 'Phone',
+      cell: ({ row }) => row.original.phone || '-',
+    },
+    {
+      accessorKey: 'currency',
+      header: 'Currency',
+    },
+    {
+      accessorKey: 'outstandingBalance',
+      header: () => (
+        <SortableHeader
+          label="Outstanding Balance"
+          columnId="outstandingBalance"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      cell: ({ row }) => {
+        const balance = parseFloat(row.original.outstandingBalance || '0');
+        return (
+          <span className={cn('font-mono font-medium', getBalanceColor(balance))}>
+            {formatCurrency(balance, row.original.currency)}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      header: '',
+      meta: { cellClassName: 'text-right' },
+      cell: ({ row }) => {
+        const customer = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                ...
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/sales/customers/${customer.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View
+                </Link>
+              </DropdownMenuItem>
+              {canEdit && (
+                <DropdownMenuItem asChild>
+                  <Link href={`/sales/customers/${customer.id}/edit`}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {canDelete && (
+                <DropdownMenuItem onClick={() => handleDelete(customer)} className="text-red-600">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
+      <AutoTourTrigger tourId="sales_customers" />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
-          <p className="text-muted-foreground">
-            Manage your customer accounts and track balances
-          </p>
+          <p className="text-muted-foreground">Manage your customer accounts and track balances</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
-            <Button asChild>
+            <Button asChild data-tour="create-customer-btn">
               <Link href="/sales/customers/new">
                 <Plus className="mr-2 h-4 w-4" />
                 New Customer
@@ -110,19 +214,18 @@ export default function CustomersPage() {
         </div>
       </div>
 
+      {/* AI Customer Insights */}
+      <CustomerAIInsights />
+
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, email, or phone..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+            <DataTableSearch
+              value={tableParams.search}
+              onChange={tableParams.setSearch}
+              placeholder="Search by name, email, or phone..."
+            />
             <Button variant="outline" size="icon" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -131,113 +234,39 @@ export default function CustomersPage() {
       </Card>
 
       {/* Customers Table */}
-      <Card>
+      <Card data-tour="customer-list">
         <CardHeader>
           <CardTitle>All Customers</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : customers.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No customers found</p>
-              {canCreate && (
+          <DataTable
+            columns={columns}
+            data={customers}
+            total={total}
+            isLoading={isLoading}
+            enableVirtualization
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={() => fetchNextPage()}
+            enableColumnResizing
+            tableId="customers"
+            enableSelection
+            enableExport
+            enableColumnVisibility
+            exportFilename="customers"
+            onExportAll={onExportAll}
+            emptyMessage="No customers found"
+            emptyAction={
+              canCreate ? (
                 <Button asChild>
                   <Link href="/sales/customers/new">
                     <Plus className="mr-2 h-4 w-4" />
                     Add Your First Customer
                   </Link>
                 </Button>
-              )}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Currency</TableHead>
-                  <TableHead className="text-right">Outstanding Balance</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {customers.map((customer: Customer) => {
-                  const balance = parseFloat(customer.outstandingBalance || '0');
-
-                  return (
-                    <TableRow key={customer.id}>
-                      <TableCell>
-                        <Link
-                          href={`/sales/customers/${customer.id}`}
-                          className="font-medium hover:underline"
-                        >
-                          {customer.displayName || customer.name}
-                        </Link>
-                        {customer.displayName && customer.displayName !== customer.name && (
-                          <p className="text-sm text-muted-foreground">
-                            {customer.name}
-                          </p>
-                        )}
-                      </TableCell>
-                      <TableCell>{customer.email || '-'}</TableCell>
-                      <TableCell>{customer.phone || '-'}</TableCell>
-                      <TableCell>{customer.currency}</TableCell>
-                      <TableCell className="text-right">
-                        <span
-                          className={cn(
-                            'font-mono font-medium',
-                            getBalanceColor(balance)
-                          )}
-                        >
-                          {formatCurrency(balance, customer.currency)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              •••
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/sales/customers/${customer.id}`}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View
-                              </Link>
-                            </DropdownMenuItem>
-                            {canEdit && (
-                              <DropdownMenuItem asChild>
-                                <Link href={`/sales/customers/${customer.id}/edit`}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
-                                </Link>
-                              </DropdownMenuItem>
-                            )}
-                            {canDelete && (
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(customer)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+              ) : undefined
+            }
+          />
         </CardContent>
       </Card>
 
@@ -247,21 +276,26 @@ export default function CustomersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Customer</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete &quot;{customerToDelete?.name}&quot;? This
-              action cannot be undone.
+              Are you sure you want to delete &quot;{customerToDelete?.name}&quot;? This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function CustomersPage() {
+  return (
+    <Suspense>
+      <CustomersPageContent />
+    </Suspense>
   );
 }

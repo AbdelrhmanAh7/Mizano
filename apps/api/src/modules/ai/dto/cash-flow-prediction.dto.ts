@@ -132,6 +132,12 @@ export class CashFlowPredictionResponse {
     enum: ['high', 'medium', 'low'],
   })
   confidence: 'high' | 'medium' | 'low';
+
+  @ApiProperty({
+    description: 'Prediction method used',
+    enum: ['ML', 'RULE_BASED', 'HYBRID'],
+  })
+  predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID';
 }
 
 export class QuickForecastResponse {

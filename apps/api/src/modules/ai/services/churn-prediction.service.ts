@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
 import { Decimal } from '@prisma/client/runtime/library';
+import { getRiskLevel } from '../utils/risk-level.util';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { RandomForestClassifier } = require('ml-random-forest');
@@ -24,6 +25,7 @@ export interface ChurnPredictionResult {
   rfm: RFMFeatures;
   confidence: number;
   recommendation: string;
+  predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID';
 }
 
 export interface ChurnBatchResult {
@@ -70,14 +72,14 @@ export class ChurnPredictionService {
         const prediction = classifier.predict([features]);
         mlScore = prediction[0] === 1 ? 0.8 : 0.2;
       }
-    } catch {
-      // ML not available, use rule-based
+    } catch (error) {
+      this.logger.warn(`ML churn prediction failed for customer ${customerId}, falling back to rule-based: ${error.message}`);
     }
 
     const finalScore =
       mlScore !== null ? score * 0.7 + mlScore * 0.3 : score;
 
-    const riskLevel = this.getRiskLevel(finalScore);
+    const riskLevel = getRiskLevel(finalScore);
 
     // Store profile
     await this.prisma.customerAiProfile.upsert({
@@ -113,6 +115,7 @@ export class ChurnPredictionService {
       rfm,
       confidence: mlScore !== null ? 0.85 : 0.7,
       recommendation: this.getRecommendation(riskLevel, factors),
+      predictionMethod: mlScore !== null ? 'ML' : 'RULE_BASED',
     };
   }
 
@@ -127,21 +130,24 @@ export class ChurnPredictionService {
     let highRisk = 0;
     let mediumRisk = 0;
     let lowRisk = 0;
+    const BATCH_SIZE = 10;
 
-    for (const customer of customers) {
-      try {
-        const result = await this.predictChurnRisk(
-          organizationId,
-          customer.id,
-        );
-        if (result.riskLevel === 'CRITICAL' || result.riskLevel === 'HIGH')
-          highRisk++;
-        else if (result.riskLevel === 'MEDIUM') mediumRisk++;
-        else lowRisk++;
-      } catch (error) {
-        this.logger.warn(
-          `Failed to predict churn for customer ${customer.id}: ${error.message}`,
-        );
+    // Process in parallel batches instead of sequentially
+    for (let i = 0; i < customers.length; i += BATCH_SIZE) {
+      const batch = customers.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map((customer) =>
+          this.predictChurnRisk(organizationId, customer.id),
+        ),
+      );
+
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          if (result.value.riskLevel === 'CRITICAL' || result.value.riskLevel === 'HIGH')
+            highRisk++;
+          else if (result.value.riskLevel === 'MEDIUM') mediumRisk++;
+          else lowRisk++;
+        }
       }
     }
 
@@ -169,7 +175,7 @@ export class ChurnPredictionService {
       customerName: p.customer.name,
       email: p.customer.email,
       churnRisk: Number(p.churnRisk),
-      riskLevel: this.getRiskLevel(Number(p.churnRisk)),
+      riskLevel: getRiskLevel(Number(p.churnRisk)),
       factors: p.churnFactors,
       lastPurchaseDate: p.lastPurchaseDate,
       rfm: {
@@ -447,14 +453,6 @@ export class ChurnPredictionService {
     ];
   }
 
-  private getRiskLevel(
-    score: number,
-  ): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' {
-    if (score >= 0.8) return 'CRITICAL';
-    if (score >= 0.6) return 'HIGH';
-    if (score >= 0.4) return 'MEDIUM';
-    return 'LOW';
-  }
 
   private getRecommendation(
     riskLevel: string,

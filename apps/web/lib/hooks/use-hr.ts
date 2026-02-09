@@ -1,7 +1,8 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import api, { attendanceApi, departmentsApi, employeesApi, payrollApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 // Employee Types
@@ -79,36 +80,6 @@ export type EmployeeStatus = Employee['status'];
 export type AttendanceStatus = Attendance['status'];
 export type PayrollStatus = PayrollRun['status'];
 
-// API functions
-const employeesApi = {
-  getAll: (params?: any) => api.get('/employees', { params }),
-  getOne: (id: string) => api.get(`/employees/${id}`),
-  create: (data: any) => api.post('/employees', data),
-  update: (id: string, data: any) => api.patch(`/employees/${id}`, data),
-  delete: (id: string) => api.delete(`/employees/${id}`),
-};
-
-const attendanceApi = {
-  getAll: (params?: any) => api.get('/attendance', { params }),
-  mark: (data: any) => api.post('/attendance', data),
-  markBulk: (data: any) => api.post('/attendance/bulk', data),
-  update: (id: string, data: any) => api.patch(`/attendance/${id}`, data),
-};
-
-const payrollApi = {
-  getAll: (params?: any) => api.get('/payroll', { params }),
-  getOne: (id: string) => api.get(`/payroll/${id}`),
-  run: (data: { month: number; year: number }) => api.post('/payroll/run', data),
-  confirm: (id: string) => api.post(`/payroll/${id}/confirm`),
-  markPaid: (id: string) => api.post(`/payroll/${id}/mark-paid`),
-  getPayslip: (payrollId: string, payslipId: string) =>
-    api.get(`/payroll/${payrollId}/payslips/${payslipId}`),
-};
-
-const departmentsApi = {
-  getAll: () => api.get('/departments'),
-};
-
 // Employee Hooks
 export function useEmployees(params?: any) {
   return useQuery({
@@ -117,6 +88,17 @@ export function useEmployees(params?: any) {
       const response = await employeesApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+export function useInfiniteEmployees(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Employee, Record<string, unknown>>({
+    queryKey: ['employees'],
+    fetchFn: async (p) => {
+      const response = await employeesApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 
@@ -179,9 +161,10 @@ export function useDeleteEmployee() {
 // Attendance Hooks
 export function useAttendance(startDateOrParams?: string | any, endDate?: string) {
   // Support both (params) and (startDate, endDate) call signatures
-  const params = typeof startDateOrParams === 'string'
-    ? { startDate: startDateOrParams, endDate }
-    : startDateOrParams;
+  const params =
+    typeof startDateOrParams === 'string'
+      ? { startDate: startDateOrParams, endDate }
+      : startDateOrParams;
 
   return useQuery({
     queryKey: ['attendance', params],
@@ -411,8 +394,18 @@ export function formatCurrency(amount: string | number | null | undefined): stri
 
 export function getMonthName(month: number): string {
   const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   return months[month - 1] || '';
 }

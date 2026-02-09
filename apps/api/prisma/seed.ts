@@ -1,6 +1,7 @@
 import { PrismaClient, UserStatus, AccountType, InvoiceStatus, BillStatus, ItemType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { Decimal } from '@prisma/client/runtime/library';
+import { seedAiTrainingData } from './seed-ai-training';
 
 const prisma = new PrismaClient();
 const DEFAULT_PASSWORD = 'password123';
@@ -68,6 +69,27 @@ async function main() {
   });
 
   console.log('  ✓ 5 roles created');
+
+  // 2b. PERMISSIONS (Admin gets full access to all modules)
+  console.log('\n2b. Creating permissions...');
+  const allModules = [
+    'sales', 'purchases', 'accounting', 'inventory', 'banking',
+    'projects', 'manufacturing', 'hr', 'tax', 'crm', 'reports', 'settings',
+  ];
+  const allActions = ['view', 'create', 'edit', 'delete', 'export'];
+
+  for (const module of allModules) {
+    await prisma.permission.upsert({
+      where: { roleId_module: { roleId: admin.id, module } },
+      update: { actions: allActions },
+      create: {
+        roleId: admin.id,
+        module,
+        actions: allActions,
+      },
+    });
+  }
+  console.log(`  ✓ ${allModules.length} module permissions created for Admin`);
 
   // 3. USERS
   console.log('\n3. Creating users...');
@@ -255,6 +277,9 @@ async function main() {
     });
   }
   console.log(`  ✓ ${bills.length} bills created`);
+
+  // 12. AI TRAINING DATA
+  await seedAiTrainingData(prisma, orgId, accountMap, custMap, vendMap, itemMap, whMap);
 
   console.log('\n' + '='.repeat(60));
   console.log('✅ Seed completed successfully!');

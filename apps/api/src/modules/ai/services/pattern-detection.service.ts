@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
+import type { Prisma } from '@prisma/client';
 import {
   PatternStatus,
   SuggestionType,
@@ -236,8 +237,8 @@ export class PatternDetectionService {
       limit?: number;
       offset?: number;
     },
-  ): Promise<{ data: any[]; total: number }> {
-    const where: any = { organizationId };
+  ) {
+    const where: Prisma.TransactionPatternWhereInput = { organizationId };
 
     if (options?.status) {
       where.status = options.status;
@@ -275,7 +276,7 @@ export class PatternDetectionService {
   async getPendingSuggestions(
     organizationId: string,
     limit?: number,
-  ): Promise<any[]> {
+  ) {
     return this.prisma.patternSuggestion.findMany({
       where: {
         organizationId,
@@ -513,7 +514,7 @@ export class PatternDetectionService {
   /**
    * Get pattern details with all occurrences
    */
-  async getPatternDetails(organizationId: string, patternId: string): Promise<any> {
+  async getPatternDetails(organizationId: string, patternId: string) {
     const pattern = await this.prisma.transactionPattern.findFirst({
       where: { id: patternId, organizationId },
       include: {
@@ -775,18 +776,19 @@ export class PatternDetectionService {
    */
   private async createSuggestionForPattern(
     organizationId: string,
-    pattern: any,
+    pattern: Record<string, unknown>,
   ): Promise<void> {
-    const dates = pattern.occurrences?.map((o: any) => o.date) || [];
+    const occurrences = pattern.occurrences as Array<{ date: Date }> | undefined;
+    const dates = occurrences?.map((o) => o.date) || [];
     const frequencyAnalysis = dates.length >= 2 ? detectFrequency(dates) : null;
 
     await this.prisma.patternSuggestion.create({
       data: {
-        patternId: pattern.id,
+        patternId: pattern.id as string,
         suggestionType: SuggestionType.CREATE_RECURRING,
         suggestedFrequency: frequencyAnalysis?.frequency || 'MONTHLY',
-        suggestedAmount: pattern.amountCluster,
-        confidence: pattern.confidence,
+        suggestedAmount: pattern.amountCluster as Decimal,
+        confidence: pattern.confidence as Decimal,
         organizationId,
       },
     });

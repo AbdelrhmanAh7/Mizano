@@ -5,10 +5,14 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { BusinessRuleException } from '../exceptions/business-rule.exception';
+import { LoggerService } from '../../modules/logger/logger.service';
+import { LogLevel, LogSource } from '@mizano/shared-types';
 
 interface ErrorResponse {
   statusCode: number;
@@ -24,6 +28,10 @@ interface ErrorResponse {
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
+
+  constructor(
+    @Optional() @Inject(LoggerService) private readonly loggerService?: LoggerService,
+  ) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
@@ -261,8 +269,35 @@ export class AllExceptionsFilter implements ExceptionFilter {
         exception instanceof Error ? exception.stack : undefined,
         logContext,
       );
+      // Capture to logger module
+      this.loggerService?.capture({
+        level: LogLevel.ERROR,
+        source: LogSource.BACKEND,
+        message: response.message,
+        stack: exception instanceof Error ? exception.stack : undefined,
+        context: logContext,
+        url: response.path,
+        method: request.method,
+        statusCode: response.statusCode,
+        userAgent: request.headers['user-agent'],
+        userId: (request as any).user?.id,
+        organizationId: (request as any).user?.organizationId,
+      });
     } else if (response.statusCode >= 400) {
       this.logger.warn(`${response.code || 'ERROR'}: ${response.message}`, logContext);
+      // Capture warnings to logger module
+      this.loggerService?.capture({
+        level: LogLevel.WARN,
+        source: LogSource.BACKEND,
+        message: response.message,
+        context: logContext,
+        url: response.path,
+        method: request.method,
+        statusCode: response.statusCode,
+        userAgent: request.headers['user-agent'],
+        userId: (request as any).user?.id,
+        organizationId: (request as any).user?.organizationId,
+      });
     }
   }
 }

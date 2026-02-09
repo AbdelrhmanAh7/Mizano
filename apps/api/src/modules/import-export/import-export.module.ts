@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
-import { ImportController } from './controllers/import.controller';
-import { ExportController } from './controllers/export.controller';
-import { ImportService } from './services/import.service';
-import { ExportService } from './services/export.service';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { ExportController } from './controllers/export.controller';
+import { ImportController } from './controllers/import.controller';
+import { BulkExportService } from './services/bulk-export.service';
+import { ExportService } from './services/export.service';
+import { ImportService } from './services/import.service';
 
 @Module({
   imports: [
@@ -16,7 +17,7 @@ import { PrismaModule } from '../../prisma/prisma.module';
     }),
   ],
   controllers: [ImportController, ExportController],
-  providers: [ImportService, ExportService],
-  exports: [ImportService, ExportService],
+  providers: [ImportService, ExportService, BulkExportService],
+  exports: [ImportService, ExportService, BulkExportService],
 })
 export class ImportExportModule {}

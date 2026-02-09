@@ -23,17 +23,37 @@ async function bootstrap() {
   // Compression
   app.use(compression());
 
-  // Security headers (CSP disabled — this is a pure API server; Swagger UI needs inline styles/scripts)
+  const isProduction = configService.get('NODE_ENV') === 'production';
+
+  // Security headers
   app.use(
     helmet({
-      contentSecurityPolicy: false,
-      crossOriginEmbedderPolicy: false,
+      // Enable CSP in production; disable in dev for Swagger UI inline styles/scripts
+      contentSecurityPolicy: isProduction
+        ? {
+            directives: {
+              defaultSrc: ["'self'"],
+              scriptSrc: ["'self'"],
+              styleSrc: ["'self'", "'unsafe-inline'"],
+              imgSrc: ["'self'", 'data:', 'blob:'],
+              connectSrc: ["'self'"],
+              fontSrc: ["'self'"],
+              objectSrc: ["'none'"],
+              frameAncestors: ["'none'"],
+            },
+          }
+        : false,
+      crossOriginEmbedderPolicy: isProduction,
     }),
   );
 
   // CORS
+  const corsOrigin = configService.get<string>('CORS_ORIGIN');
+  if (!corsOrigin && isProduction) {
+    throw new Error('CORS_ORIGIN environment variable must be set in production');
+  }
   app.enableCors({
-    origin: configService.get('CORS_ORIGIN', 'http://localhost:3000'),
+    origin: corsOrigin || 'http://localhost:3000',
     credentials: true,
   });
 
@@ -52,15 +72,17 @@ async function bootstrap() {
   // API prefix
   app.setGlobalPrefix('api');
 
-  // Swagger documentation
-  const config = new DocumentBuilder()
-    .setTitle('Mizano ERP API')
-    .setDescription('AI-powered ERP system API documentation')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  // Swagger documentation (disabled in production)
+  if (!isProduction) {
+    const config = new DocumentBuilder()
+      .setTitle('Mizano ERP API')
+      .setDescription('AI-powered ERP system API documentation')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   // Graceful shutdown
   app.enableShutdownHooks();
@@ -69,7 +91,9 @@ async function bootstrap() {
   await app.listen(port);
 
   logger.log(`Mizano ERP API running on: http://localhost:${port}`);
-  logger.log(`API Documentation: http://localhost:${port}/api/docs`);
+  if (!isProduction) {
+    logger.log(`API Documentation: http://localhost:${port}/api/docs`);
+  }
 }
 
 bootstrap();

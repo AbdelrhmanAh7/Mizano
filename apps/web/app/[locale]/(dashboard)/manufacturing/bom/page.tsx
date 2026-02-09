@@ -1,19 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Search, RefreshCw, Eye, Edit, Trash2, Filter } from 'lucide-react';
+import { Plus, RefreshCw, Eye, Edit, Trash2, Filter } from 'lucide-react';
+import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,8 +31,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
+import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
   useBOMs,
   useDeleteBOM,
@@ -57,22 +50,23 @@ const STATUS_OPTIONS = [
   { value: 'INACTIVE', label: 'Inactive' },
 ];
 
-export default function BOMListPage() {
+function BOMListPageContent() {
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
+  const tableParams = useTableParams({ defaultSortBy: 'createdAt' });
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedBOM, setSelectedBOM] = useState<BOM | null>(null);
 
   const { data: bomsData, isLoading, refetch } = useBOMs({
-    search: searchQuery || undefined,
+    search: tableParams.search || undefined,
     status: selectedStatus !== 'all' ? selectedStatus : undefined,
   });
   const deleteBOM = useDeleteBOM();
 
   const boms = bomsData?.data || [];
+  const meta = bomsData?.meta;
 
   const canCreate = hasPermission('manufacturing.create');
   const canEdit = hasPermission('manufacturing.edit');
@@ -100,6 +94,112 @@ export default function BOMListPage() {
     }
   };
 
+  const columns: ColumnDef<BOM>[] = [
+    {
+      accessorKey: 'name',
+      header: () => (
+        <SortableHeader
+          label="Name"
+          columnId="name"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <Link
+          href={`/manufacturing/bom/${row.original.id}`}
+          className="font-medium hover:underline"
+        >
+          {row.original.name}
+        </Link>
+      ),
+    },
+    {
+      id: 'outputItem',
+      header: 'Output Item',
+      cell: ({ row }) => {
+        const bom = row.original;
+        return bom.outputItem ? (
+          <span>
+            <span className="text-xs text-muted-foreground">{bom.outputItem.code}</span>
+            {' '}{bom.outputItem.name}
+          </span>
+        ) : '-';
+      },
+    },
+    {
+      id: 'components',
+      header: 'Components',
+      meta: { headerClassName: 'text-center', cellClassName: 'text-center' },
+      cell: ({ row }) => row.original.components?.length || 0,
+    },
+    {
+      accessorKey: 'operationsCost',
+      header: 'Operations Cost',
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      cell: ({ row }) => (
+        <span className="font-mono">
+          {formatCurrency(row.original.operationsCost)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge className={getBOMStatusColor(row.original.status)}>
+          {getBOMStatusLabel(row.original.status)}
+        </Badge>
+      ),
+    },
+    {
+      id: 'actions',
+      header: '',
+      meta: { cellClassName: 'text-right' },
+      cell: ({ row }) => {
+        const bom = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                ...
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/manufacturing/bom/${bom.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View
+                </Link>
+              </DropdownMenuItem>
+              {canEdit && (
+                <DropdownMenuItem asChild>
+                  <Link href={`/manufacturing/bom/${bom.id}`}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {canDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => handleDelete(bom)}
+                    className="text-red-600"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -126,15 +226,11 @@ export default function BOMListPage() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name or item..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+            <DataTableSearch
+              value={tableParams.search}
+              onChange={tableParams.setSearch}
+              placeholder="Search by name or item..."
+            />
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger className="w-[180px]">
                 <Filter className="mr-2 h-4 w-4" />
@@ -161,108 +257,28 @@ export default function BOMListPage() {
           <CardTitle>All BOMs</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : boms.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No bills of materials found</p>
-              {canCreate && (
+          <DataTable
+            columns={columns}
+            data={boms}
+            page={meta?.page || 1}
+            totalPages={meta?.totalPages || 1}
+            total={meta?.total || 0}
+            limit={tableParams.limit}
+            onPageChange={tableParams.setPage}
+            onLimitChange={tableParams.setLimit}
+            isLoading={isLoading}
+            emptyMessage="No bills of materials found"
+            emptyAction={
+              canCreate ? (
                 <Button asChild>
                   <Link href="/manufacturing/bom/new">
                     <Plus className="mr-2 h-4 w-4" />
                     Create Your First BOM
                   </Link>
                 </Button>
-              )}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Output Item</TableHead>
-                  <TableHead className="text-center">Components</TableHead>
-                  <TableHead className="text-right">Operations Cost</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {boms.map((bom: BOM) => (
-                  <TableRow key={bom.id}>
-                    <TableCell>
-                      <Link
-                        href={`/manufacturing/bom/${bom.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {bom.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {bom.outputItem ? (
-                        <span>
-                          <span className="text-xs text-muted-foreground">{bom.outputItem.code}</span>
-                          {' '}{bom.outputItem.name}
-                        </span>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {bom.components?.length || 0}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(bom.operationsCost)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getBOMStatusColor(bom.status)}>
-                        {getBOMStatusLabel(bom.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            ...
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/manufacturing/bom/${bom.id}`}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View
-                            </Link>
-                          </DropdownMenuItem>
-                          {canEdit && (
-                            <DropdownMenuItem asChild>
-                              <Link href={`/manufacturing/bom/${bom.id}`}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </Link>
-                            </DropdownMenuItem>
-                          )}
-                          {canDelete && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(bom)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+              ) : undefined
+            }
+          />
         </CardContent>
       </Card>
 
@@ -288,5 +304,13 @@ export default function BOMListPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function BOMListPage() {
+  return (
+    <Suspense>
+      <BOMListPageContent />
+    </Suspense>
   );
 }

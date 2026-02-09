@@ -1,41 +1,36 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
   Body,
-  Param,
-  Query,
-  UseGuards,
+  Controller,
+  Delete,
+  Get,
   HttpCode,
   HttpStatus,
+  Param,
+  Post,
+  Put,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
-import { AssetsService } from '../services/assets.service';
-import { DepreciationService } from '../services/depreciation.service';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import {
-  CreateAssetDto,
-  UpdateAssetDto,
-  DisposeAssetDto,
-  AssetQueryDto,
-  AssetListResponse,
   AssetDetailResponse,
+  AssetListResponse,
+  AssetQueryDto,
   AssetResponse,
   AssetSummaryResponse,
-  DepreciationScheduleResponse,
+  CreateAssetDto,
   DepreciationRunResponse,
+  DepreciationScheduleResponse,
+  DisposeAssetDto,
+  UpdateAssetDto,
 } from '../dto/assets.dto';
+import { AssetsService } from '../services/assets.service';
+import { DepreciationService } from '../services/depreciation.service';
 
 @ApiTags('Fixed Assets')
 @ApiBearerAuth()
@@ -69,13 +64,18 @@ export class AssetsController {
     return this.assetsService.findAll(organizationId, query);
   }
 
+  @Get('cursor')
+  @Permissions('assets.view')
+  @ApiOperation({ summary: 'Get assets with cursor-based pagination' })
+  async findAllCursor(@CurrentOrg() organizationId: string, @Query() query: CursorPaginationDto) {
+    return this.assetsService.findAllCursor(organizationId, query);
+  }
+
   @Get('summary')
   @Permissions('assets.view')
   @ApiOperation({ summary: 'Get asset summary/statistics' })
   @ApiResponse({ status: 200, type: AssetSummaryResponse })
-  async getSummary(
-    @CurrentOrg() organizationId: string,
-  ): Promise<AssetSummaryResponse> {
+  async getSummary(@CurrentOrg() organizationId: string): Promise<AssetSummaryResponse> {
     return this.assetsService.getSummary(organizationId);
   }
 
@@ -86,10 +86,7 @@ export class AssetsController {
     @CurrentOrg() organizationId: string,
     @Query('months') months?: number,
   ) {
-    return this.depreciationService.getDepreciationForecast(
-      organizationId,
-      months || 12,
-    );
+    return this.depreciationService.getDepreciationForecast(organizationId, months || 12);
   }
 
   @Get(':id')
@@ -154,12 +151,7 @@ export class AssetsController {
     @Query('month') month?: number,
     @Query('year') year?: number,
   ): Promise<{ journalId: string; amount: number }> {
-    return this.depreciationService.runDepreciationForAsset(
-      organizationId,
-      assetId,
-      month,
-      year,
-    );
+    return this.depreciationService.runDepreciationForAsset(organizationId, assetId, month, year);
   }
 
   @Post('depreciation/run')
@@ -190,10 +182,7 @@ export class AssetsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete an asset (soft delete)' })
   @ApiParam({ name: 'id', description: 'Asset ID' })
-  async remove(
-    @CurrentOrg() organizationId: string,
-    @Param('id') assetId: string,
-  ): Promise<void> {
+  async remove(@CurrentOrg() organizationId: string, @Param('id') assetId: string): Promise<void> {
     return this.assetsService.remove(organizationId, assetId);
   }
 }

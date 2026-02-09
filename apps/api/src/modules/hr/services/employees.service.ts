@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { EmployeeCursorQueryDto } from '../dto/employee-cursor-query.dto';
 
 @Injectable()
 export class EmployeesService {
@@ -37,8 +39,18 @@ export class EmployeesService {
     });
   }
 
-  async findAll(organizationId: string, query: PaginationDto & { isActive?: boolean; department?: string }) {
-    const { page = 1, limit = 50, sortBy = 'name', sortOrder = 'asc', isActive, department } = query;
+  async findAll(
+    organizationId: string,
+    query: PaginationDto & { isActive?: boolean; department?: string },
+  ) {
+    const {
+      page = 1,
+      limit = 50,
+      sortBy = 'name',
+      sortOrder = 'asc',
+      isActive,
+      department,
+    } = query;
     const where: any = { organizationId };
     if (isActive !== undefined) where.isActive = isActive;
     if (department) where.department = department;
@@ -57,6 +69,14 @@ export class EmployeesService {
       data: employees,
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
+  }
+
+  async findAllCursor(organizationId: string, query: EmployeeCursorQueryDto) {
+    const { cursor, take, sortBy = 'name', sortOrder = 'asc', isActive, department } = query;
+    const where: any = { organizationId };
+    if (isActive !== undefined) where.isActive = isActive;
+    if (department) where.department = department;
+    return cursorPaginate(this.prisma.employee, where, { [sortBy]: sortOrder }, { cursor, take });
   }
 
   async findOne(organizationId: string, id: string) {

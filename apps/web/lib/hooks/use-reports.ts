@@ -1,7 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
 
 export interface DateRange {
   startDate: string;
@@ -121,29 +121,71 @@ export interface TrialBalanceReport {
   asOfDate: string;
 }
 
-// API functions
+// API functions — URLs aligned with backend controller routes
 const reportsApi = {
-  getProfitLoss: (params: DateRange) =>
-    api.get('/reports/profit-loss', { params }),
-  getBalanceSheet: (params: { asOfDate: string }) =>
-    api.get('/reports/balance-sheet', { params }),
-  getCashFlow: (params: DateRange) =>
-    api.get('/reports/cash-flow', { params }),
-  getARaging: (params?: { asOfDate?: string }) =>
-    api.get('/reports/ar-aging', { params }),
-  getAPAging: (params?: { asOfDate?: string }) =>
-    api.get('/reports/ap-aging', { params }),
+  getProfitLoss: (params: DateRange) => api.get('/reports/profit-and-loss', { params }),
+  getBalanceSheet: (params: { asOfDate: string }) => api.get('/reports/balance-sheet', { params }),
+  getCashFlow: (params: DateRange) => api.get('/reports/cash-flow', { params }),
+  getARaging: (params?: { asOfDate?: string }) => api.get('/reports/receivables-aging', { params }),
+  getAPAging: (params?: { asOfDate?: string }) => api.get('/reports/payables-aging', { params }),
   getGeneralLedger: (accountId: string, params: DateRange) =>
     api.get(`/reports/general-ledger/${accountId}`, { params }),
-  getTrialBalance: (params: { asOfDate: string }) =>
-    api.get('/reports/trial-balance', { params }),
-  getSalesByCustomer: (params: DateRange) =>
-    api.get('/reports/sales-by-customer', { params }),
-  getSalesByItem: (params: DateRange) =>
-    api.get('/reports/sales-by-item', { params }),
-  getPurchasesByVendor: (params: DateRange) =>
-    api.get('/reports/purchases-by-vendor', { params }),
+  getTrialBalance: (params: { asOfDate: string }) => api.get('/reports/trial-balance', { params }),
+  getSalesByCustomer: (params: DateRange) => api.get('/reports/sales-by-customer', { params }),
+  getSalesByItem: (params: DateRange) => api.get('/reports/sales-by-item', { params }),
+  getPurchasesByVendor: (params: DateRange) => api.get('/reports/purchases-by-vendor', { params }),
 };
+
+// --- New report interfaces ---
+export interface SalesByCustomerEntry {
+  customerId: string;
+  customerName: string;
+  invoiceCount: number;
+  totalAmount: number;
+  paidAmount: number;
+  balanceDue: number;
+}
+
+export interface SalesByCustomerReport {
+  entries: SalesByCustomerEntry[];
+  totalAmount: number;
+  totalPaid: number;
+  totalBalance: number;
+  period: DateRange;
+}
+
+export interface SalesByItemEntry {
+  itemId: string;
+  itemName: string;
+  sku: string;
+  quantitySold: number;
+  totalAmount: number;
+  averagePrice: number;
+}
+
+export interface SalesByItemReport {
+  entries: SalesByItemEntry[];
+  totalAmount: number;
+  totalQuantity: number;
+  period: DateRange;
+}
+
+export interface PurchasesByVendorEntry {
+  vendorId: string;
+  vendorName: string;
+  billCount: number;
+  totalAmount: number;
+  paidAmount: number;
+  balanceDue: number;
+}
+
+export interface PurchasesByVendorReport {
+  entries: PurchasesByVendorEntry[];
+  totalAmount: number;
+  totalPaid: number;
+  totalBalance: number;
+  period: DateRange;
+}
 
 // Hooks
 export function useProfitLossReport(params: DateRange) {
@@ -218,6 +260,41 @@ export function useTrialBalanceReport(asOfDate: string) {
       return response.data?.data || response.data;
     },
     enabled: !!asOfDate,
+  });
+}
+
+// --- New report hooks ---
+
+export function useSalesByCustomerReport(params: DateRange) {
+  return useQuery<SalesByCustomerReport>({
+    queryKey: ['reports', 'sales-by-customer', params],
+    queryFn: async () => {
+      const response = await reportsApi.getSalesByCustomer(params);
+      return response.data?.data || response.data;
+    },
+    enabled: !!params.startDate && !!params.endDate,
+  });
+}
+
+export function useSalesByItemReport(params: DateRange) {
+  return useQuery<SalesByItemReport>({
+    queryKey: ['reports', 'sales-by-item', params],
+    queryFn: async () => {
+      const response = await reportsApi.getSalesByItem(params);
+      return response.data?.data || response.data;
+    },
+    enabled: !!params.startDate && !!params.endDate,
+  });
+}
+
+export function usePurchasesByVendorReport(params: DateRange) {
+  return useQuery<PurchasesByVendorReport>({
+    queryKey: ['reports', 'purchases-by-vendor', params],
+    queryFn: async () => {
+      const response = await reportsApi.getPurchasesByVendor(params);
+      return response.data?.data || response.data;
+    },
+    enabled: !!params.startDate && !!params.endDate,
   });
 }
 

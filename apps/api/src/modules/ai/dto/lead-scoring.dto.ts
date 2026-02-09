@@ -60,6 +60,12 @@ export class LeadScoreResponse {
 
   @ApiProperty({ type: [ScoreBreakdownResponse] })
   breakdown: ScoreBreakdownResponse[];
+
+  @ApiProperty({
+    description: 'Prediction method used',
+    enum: ['ML', 'RULE_BASED', 'HYBRID'],
+  })
+  predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID';
 }
 
 export class HotLeadResponse {

@@ -1,7 +1,8 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { bankTransactionsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 export interface BankTransaction {
@@ -48,29 +49,6 @@ export interface TransactionFilters {
   search?: string;
 }
 
-// API functions
-const bankTransactionsApi = {
-  getAll: (params?: TransactionFilters) =>
-    api.get('/bank-transactions', { params }),
-  getOne: (id: string) => api.get(`/bank-transactions/${id}`),
-  getUnmatched: (bankAccountId: string) =>
-    api.get(`/bank-transactions/unmatched`, { params: { bankAccountId } }),
-  getSuggestedMatches: (id: string) =>
-    api.get(`/bank-transactions/${id}/suggested-matches`),
-  match: (id: string, data: { documentId: string; documentType: string }) =>
-    api.post(`/bank-transactions/${id}/match`, data),
-  unmatch: (id: string) => api.post(`/bank-transactions/${id}/unmatch`),
-  exclude: (id: string) => api.post(`/bank-transactions/${id}/exclude`),
-  createExpense: (id: string, data: any) =>
-    api.post(`/bank-transactions/${id}/create-expense`, data),
-  createTransfer: (id: string, data: any) =>
-    api.post(`/bank-transactions/${id}/create-transfer`, data),
-  import: (bankAccountId: string, data: FormData) =>
-    api.post(`/bank-transactions/import/${bankAccountId}`, data, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
-};
-
 // Hooks
 export function useBankTransactions(params?: TransactionFilters) {
   return useQuery({
@@ -79,6 +57,17 @@ export function useBankTransactions(params?: TransactionFilters) {
       const response = await bankTransactionsApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+export function useInfiniteBankTransactions(params?: Record<string, unknown>) {
+  return useInfiniteTableData<BankTransaction, Record<string, unknown>>({
+    queryKey: ['bank-transactions'],
+    fetchFn: async (p) => {
+      const response = await bankTransactionsApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 
@@ -119,8 +108,15 @@ export function useMatchTransaction() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, documentId, documentType }: { id: string; documentId: string; documentType: string }) =>
-      bankTransactionsApi.match(id, { documentId, documentType }),
+    mutationFn: ({
+      id,
+      documentId,
+      documentType,
+    }: {
+      id: string;
+      documentId: string;
+      documentType: string;
+    }) => bankTransactionsApi.match(id, { documentId, documentType }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });

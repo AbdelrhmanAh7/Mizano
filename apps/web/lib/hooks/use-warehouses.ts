@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { warehousesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
 // Types
@@ -55,16 +55,6 @@ export interface CreateWarehouseData {
 }
 
 export interface UpdateWarehouseData extends Partial<CreateWarehouseData> {}
-
-// Warehouses API
-const warehousesApi = {
-  getAll: (params?: Record<string, any>) => api.get('/warehouses', { params }),
-  getOne: (id: string) => api.get(`/warehouses/${id}`),
-  getStock: (id: string) => api.get(`/warehouses/${id}/stock`),
-  create: (data: any) => api.post('/warehouses', data),
-  update: (id: string, data: any) => api.patch(`/warehouses/${id}`, data),
-  delete: (id: string) => api.delete(`/warehouses/${id}`),
-};
 
 /**
  * Hook to fetch all warehouses

@@ -11,10 +11,26 @@ import {
   patternMatches,
 } from '../utils/text-similarity.util';
 
+/** A financial entity (Invoice, Bill, Expense, Payment) returned from Prisma. */
+type MatchableEntity = Record<string, unknown>;
+
+/** A bank transaction record from Prisma. */
+interface TransactionRecord {
+  id: string;
+  amount: Decimal;
+  description: string | null;
+  reference: string | null;
+  payee: string | null;
+  type: string;
+  date: Date;
+  bankAccountId: string;
+  [key: string]: unknown;
+}
+
 export interface MatchScore {
   entityType: 'invoice' | 'bill' | 'expense' | 'payment';
   entityId: string;
-  entity: any;
+  entity: MatchableEntity;
   totalScore: number;
   breakdown: {
     amountScore: number;
@@ -123,8 +139,8 @@ export class ReconciliationMatcherService {
    * Calculate match score between transaction and candidate
    */
   private calculateMatchScore(
-    transaction: any,
-    candidate: { entityType: string; entity: any },
+    transaction: TransactionRecord,
+    candidate: { entityType: string; entity: MatchableEntity },
   ): MatchScore {
     const matchReasons: string[] = [];
 
@@ -175,7 +191,7 @@ export class ReconciliationMatcherService {
 
     return {
       entityType: candidate.entityType as MatchScore['entityType'],
-      entityId: candidate.entity.id,
+      entityId: candidate.entity.id as string,
       entity: candidate.entity,
       totalScore,
       breakdown: {
@@ -303,8 +319,8 @@ export class ReconciliationMatcherService {
     transactionType: string,
     amount: number,
     date: Date,
-  ): Promise<Array<{ entityType: string; entity: any }>> {
-    const candidates: Array<{ entityType: string; entity: any }> = [];
+  ): Promise<Array<{ entityType: string; entity: MatchableEntity }>> {
+    const candidates: Array<{ entityType: string; entity: MatchableEntity }> = [];
 
     // Date range for candidates (90 days before and after)
     const startDate = new Date(date);
@@ -614,7 +630,7 @@ export class ReconciliationMatcherService {
   async applyRules(
     organizationId: string,
     transactionId: string,
-  ): Promise<{ matched: boolean; rule?: any; action?: any }> {
+  ) {
     const transaction = await this.prisma.bankTransaction.findFirst({
       where: { id: transactionId, organizationId },
     });
@@ -658,7 +674,7 @@ export class ReconciliationMatcherService {
    * Evaluate a rule condition against a transaction
    */
   private evaluateCondition(
-    transaction: any,
+    transaction: TransactionRecord,
     condition: BankRuleCondition,
   ): boolean {
     const fieldValue = this.getFieldValue(transaction, condition.field);
@@ -691,7 +707,7 @@ export class ReconciliationMatcherService {
   /**
    * Get field value from transaction
    */
-  private getFieldValue(transaction: any, field: string): any {
+  private getFieldValue(transaction: TransactionRecord, field: string): string | number {
     switch (field) {
       case 'description':
         return transaction.description || '';
@@ -704,7 +720,7 @@ export class ReconciliationMatcherService {
       case 'type':
         return transaction.type;
       default:
-        return transaction[field] || '';
+        return String(transaction[field] || '');
     }
   }
 
@@ -714,7 +730,7 @@ export class ReconciliationMatcherService {
   async getRules(
     organizationId: string,
     bankAccountId?: string,
-  ): Promise<any[]> {
+  ) {
     return this.prisma.bankRule.findMany({
       where: {
         organizationId,
@@ -770,7 +786,7 @@ export class ReconciliationMatcherService {
   async getLearnedPatterns(
     organizationId: string,
     minMatchCount: number = 1,
-  ): Promise<any[]> {
+  ) {
     return this.prisma.reconciliationPattern.findMany({
       where: {
         organizationId,

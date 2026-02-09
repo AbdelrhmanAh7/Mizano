@@ -1,34 +1,72 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
   Param,
+  Post,
   Query,
   Res,
   UseGuards,
-  BadRequestException,
 } from '@nestjs/common';
-import { Response } from 'express';
 import {
-  ApiTags,
   ApiBearerAuth,
   ApiOperation,
-  ApiResponse,
   ApiParam,
   ApiQuery,
+  ApiResponse,
+  ApiTags,
 } from '@nestjs/swagger';
-import { ExportService } from '../services/export.service';
-import { ImportEntityType, ExportFormat, ExportQueryDto } from '../dto/import-export.dto';
+import { Response } from 'express';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { ExportFormat, ImportEntityType } from '../dto/import-export.dto';
+import { BulkExportService } from '../services/bulk-export.service';
+import { ExportService } from '../services/export.service';
 
 @ApiTags('Export')
 @ApiBearerAuth()
 @Controller('export')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ExportController {
-  constructor(private readonly exportService: ExportService) {}
+  constructor(
+    private readonly exportService: ExportService,
+    private readonly bulkExportService: BulkExportService,
+  ) {}
+
+  @Post('bulk')
+  @Permissions('settings.view')
+  @ApiOperation({ summary: 'Export selected records by IDs' })
+  @ApiResponse({ status: 200, description: 'Export file' })
+  async bulkExport(
+    @Res() res: Response,
+    @CurrentOrg() orgId: string,
+    @Body() dto: { ids: string[]; entityType: string; format?: 'csv' | 'xlsx' },
+  ): Promise<void> {
+    if (!dto.ids || dto.ids.length === 0) {
+      throw new BadRequestException('No IDs provided');
+    }
+    if (!dto.entityType) {
+      throw new BadRequestException('Entity type is required');
+    }
+
+    const result = await this.bulkExportService.exportByIds(
+      orgId,
+      dto.ids,
+      dto.entityType,
+      dto.format || 'csv',
+    );
+
+    res.set({
+      'Content-Type': result.contentType,
+      'Content-Disposition': `attachment; filename="${result.filename}"`,
+      'Content-Length': result.buffer.length,
+    });
+
+    res.send(result.buffer);
+  }
 
   @Get(':entityType')
   @Permissions('settings.view')
@@ -37,8 +75,16 @@ export class ExportController {
   @ApiQuery({ name: 'format', enum: ExportFormat, required: false })
   @ApiQuery({ name: 'dateFrom', required: false, description: 'Filter from date (YYYY-MM-DD)' })
   @ApiQuery({ name: 'dateTo', required: false, description: 'Filter to date (YYYY-MM-DD)' })
-  @ApiQuery({ name: 'fields', required: false, description: 'Comma-separated list of fields to export' })
-  @ApiQuery({ name: 'includeDeleted', required: false, description: 'Include soft-deleted records' })
+  @ApiQuery({
+    name: 'fields',
+    required: false,
+    description: 'Comma-separated list of fields to export',
+  })
+  @ApiQuery({
+    name: 'includeDeleted',
+    required: false,
+    description: 'Include soft-deleted records',
+  })
   @ApiResponse({ status: 200, description: 'Export file' })
   async exportData(
     @Res() res: Response,

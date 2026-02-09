@@ -15,6 +15,7 @@ import {
   Plus,
   Trash2,
   Sparkles,
+  GraduationCap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,6 +53,7 @@ import {
 import { useVendors } from '@/lib/hooks/use-vendors';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { QuickTrainDialog } from '@/components/ai/ocr-training/quick-train-dialog';
 
 type Step = 'upload' | 'review' | 'creating';
 
@@ -80,6 +82,7 @@ export default function ScanBillPage() {
   const [notes, setNotes] = useState('');
   const [lineItems, setLineItems] = useState<EditableLineItem[]>([]);
   const [corrections, setCorrections] = useState<Record<string, any>>({});
+  const [showTrainDialog, setShowTrainDialog] = useState(false);
 
   // Mutations
   const processDocument = useDocumentIntakeProcess();
@@ -259,21 +262,56 @@ export default function ScanBillPage() {
     setLineItems((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Track corrections for vendor layout learning
+  const trackCorrection = (field: string, originalValue: any, newValue: any) => {
+    if (String(originalValue ?? '') !== String(newValue ?? '')) {
+      setCorrections((prev) => ({ ...prev, [field]: newValue }));
+    } else {
+      // Remove correction if reverted back to original
+      setCorrections((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  };
+
   const updateLineItem = (
     index: number,
     field: keyof EditableLineItem,
     value: string,
   ) => {
-    setLineItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
-    );
-  };
+    setLineItems((prev) => {
+      const updated = prev.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item,
+      );
 
-  // Track corrections for vendor layout learning
-  const trackCorrection = (field: string, originalValue: any, newValue: any) => {
-    if (originalValue !== newValue) {
-      setCorrections((prev) => ({ ...prev, [field]: newValue }));
-    }
+      // Track total/subtotal/tax corrections when line items change
+      if (intakeResult && (field === 'quantity' || field === 'rate' || field === 'taxRate')) {
+        const newSubtotal = updated.reduce(
+          (sum, item) => sum + (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0),
+          0,
+        );
+        const newTax = updated.reduce((sum, item) => {
+          const lt = (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0);
+          return sum + lt * ((parseFloat(item.taxRate) || 0) / 100);
+        }, 0);
+        const newTotal = newSubtotal + newTax;
+
+        // Compare computed values against AI-extracted values
+        if (intakeResult.extractedFields.subtotal !== null) {
+          trackCorrection('subtotal', intakeResult.extractedFields.subtotal, newSubtotal);
+        }
+        if (intakeResult.extractedFields.tax !== null) {
+          trackCorrection('tax', intakeResult.extractedFields.tax, newTax);
+        }
+        if (intakeResult.extractedFields.total !== null) {
+          trackCorrection('total', intakeResult.extractedFields.total, newTotal);
+        }
+      }
+
+      return updated;
+    });
   };
 
   // Calculate totals
@@ -559,10 +597,15 @@ export default function ScanBillPage() {
                     value={selectedVendorId}
                     onValueChange={(value) => {
                       setSelectedVendorId(value);
+                      // Track vendor name correction (use display name, not ID)
+                      const selectedVendor =
+                        intakeResult.vendorCandidates.find((c) => c.id === value) ||
+                        vendors.find((v: any) => v.id === value);
+                      const selectedName = selectedVendor?.displayName || selectedVendor?.name || value;
                       trackCorrection(
                         'vendorName',
-                        intakeResult.matchedVendor?.id,
-                        value,
+                        intakeResult.extractedFields.vendorName,
+                        selectedName,
                       );
                     }}
                   >
@@ -816,10 +859,20 @@ export default function ScanBillPage() {
 
               <div className="flex items-center gap-2">
                 {Object.keys(corrections).length > 0 && (
-                  <Badge variant="secondary">
-                    {Object.keys(corrections).length} correction(s) — AI will
-                    learn
-                  </Badge>
+                  <>
+                    <Badge variant="secondary">
+                      {Object.keys(corrections).length} correction(s) — AI will
+                      learn
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowTrainDialog(true)}
+                    >
+                      <GraduationCap className="h-4 w-4 mr-1" />
+                      Train OCR
+                    </Button>
+                  </>
                 )}
                 <Button
                   onClick={handleConfirm}
@@ -856,6 +909,31 @@ export default function ScanBillPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Quick Train Dialog */}
+      <QuickTrainDialog
+        open={showTrainDialog}
+        onOpenChange={setShowTrainDialog}
+        extractionResult={
+          intakeResult
+            ? {
+                date: intakeResult.extractedFields.date,
+                total: intakeResult.extractedFields.total,
+                subtotal: intakeResult.extractedFields.subtotal ?? null,
+                tax: intakeResult.extractedFields.tax ?? null,
+                invoiceNumber:
+                  intakeResult.extractedFields.documentNumber,
+                vendorName: intakeResult.extractedFields.vendorName,
+                lineItems: intakeResult.extractedFields.lineItems,
+                ocrConfidence: intakeResult.ocrConfidence,
+                rawText: intakeResult.rawText,
+                fieldConfidence: intakeResult.fieldConfidence,
+              }
+            : undefined
+        }
+        vendorId={selectedVendorId}
+        corrections={corrections}
+      />
     </div>
   );
 }

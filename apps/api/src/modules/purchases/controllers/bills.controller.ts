@@ -1,16 +1,36 @@
-import { Controller, Get, Post, Body, Patch, Delete, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { BillsService } from '../services/bills.service';
-import { CurrentOrg, Permissions } from '../../../common/decorators';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  CacheResponse,
+  CacheTTL,
+  CurrentOrg,
+  InvalidateCache,
+  Permissions,
+} from '../../../common/decorators';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import { CheckDuplicateBillDto } from '../dto/check-duplicate-bill.dto';
+import { BillsService } from '../services/bills.service';
 
 @ApiTags('Bills')
 @ApiBearerAuth()
 @Controller('bills')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseInterceptors(CacheInvalidationInterceptor)
 export class BillsController {
   constructor(private readonly billsService: BillsService) {}
 
@@ -23,6 +43,7 @@ export class BillsController {
 
   @Post()
   @Permissions('purchases.create')
+  @InvalidateCache('bills:*')
   @ApiOperation({ summary: 'Create a new bill' })
   create(@CurrentOrg() orgId: string, @Body() dto: any) {
     return this.billsService.create(orgId, dto);
@@ -30,9 +51,18 @@ export class BillsController {
 
   @Get()
   @Permissions('purchases.view')
+  @CacheResponse('bills:list')
+  @CacheTTL(120)
   @ApiOperation({ summary: 'Get all bills' })
   findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto) {
     return this.billsService.findAll(orgId, query);
+  }
+
+  @Get('cursor')
+  @Permissions('purchases.view')
+  @ApiOperation({ summary: 'List bills with cursor-based pagination' })
+  findAllCursor(@CurrentOrg() orgId: string, @Query() query: CursorPaginationDto) {
+    return this.billsService.findAllCursor(orgId, query);
   }
 
   @Get(':id')
@@ -44,6 +74,7 @@ export class BillsController {
 
   @Patch(':id')
   @Permissions('purchases.edit')
+  @InvalidateCache('bills:*')
   @ApiOperation({ summary: 'Update bill' })
   update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
     return this.billsService.update(orgId, id, dto);
@@ -51,6 +82,7 @@ export class BillsController {
 
   @Post(':id/approve')
   @Permissions('purchases.edit')
+  @InvalidateCache('bills:*')
   @ApiOperation({ summary: 'Approve bill' })
   approve(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.billsService.approve(orgId, id);
@@ -58,8 +90,42 @@ export class BillsController {
 
   @Delete(':id')
   @Permissions('purchases.delete')
+  @InvalidateCache('bills:*')
   @ApiOperation({ summary: 'Delete bill' })
   remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.billsService.remove(orgId, id);
+  }
+
+  // Bulk Operations
+  @Post('bulk-delete')
+  @Permissions('purchases.delete')
+  @InvalidateCache('bills:*')
+  @ApiOperation({ summary: 'Bulk delete draft bills' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.billsService.bulkDelete(orgId, dto.ids);
+  }
+
+  @Post('bulk-open')
+  @Permissions('purchases.edit')
+  @InvalidateCache('bills:*')
+  @ApiOperation({ summary: 'Bulk open draft bills' })
+  bulkOpen(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.billsService.bulkOpen(orgId, dto.ids);
+  }
+
+  @Post('bulk-approve')
+  @Permissions('purchases.edit')
+  @InvalidateCache('bills:*')
+  @ApiOperation({ summary: 'Bulk approve draft bills' })
+  bulkApprove(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.billsService.bulkApprove(orgId, dto.ids);
+  }
+
+  @Post('bulk-pay')
+  @Permissions('purchases.edit')
+  @InvalidateCache('bills:*')
+  @ApiOperation({ summary: 'Bulk mark bills as paid' })
+  bulkPay(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.billsService.bulkPay(orgId, dto.ids);
   }
 }

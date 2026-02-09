@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { PayrollService } from '../services/payroll.service';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { PayrollService } from '../services/payroll.service';
 
 @ApiTags('Payroll')
 @ApiBearerAuth()
@@ -66,5 +66,27 @@ export class PayrollController {
   @ApiOperation({ summary: 'Get employee payslips' })
   getEmployeePayslips(@CurrentOrg() orgId: string, @Param('employeeId') employeeId: string) {
     return this.payrollService.getEmployeePayslips(orgId, employeeId);
+  }
+
+  // Bulk Operations
+  @Post('runs/bulk-delete')
+  @Permissions('payroll.delete')
+  @ApiOperation({ summary: 'Bulk delete payroll runs' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.payrollService.bulkDelete(orgId, dto.ids);
+  }
+
+  @Post('runs/bulk-process')
+  @Permissions('payroll.create')
+  @ApiOperation({ summary: 'Bulk process payroll runs' })
+  bulkProcess(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.payrollService.bulkProcess(orgId, dto.ids);
+  }
+
+  @Post('runs/bulk-pay')
+  @Permissions('payroll.process')
+  @ApiOperation({ summary: 'Bulk mark payroll runs as paid' })
+  bulkPay(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.payrollService.bulkMarkPaid(orgId, dto.ids);
   }
 }

@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { WorkOrdersService } from '../services/work-orders.service';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { WorkOrdersService } from '../services/work-orders.service';
 
 @ApiTags('Work Orders')
 @ApiBearerAuth()
@@ -71,7 +71,11 @@ export class WorkOrdersController {
   @Post(':id/complete')
   @Permissions('manufacturing.edit')
   @ApiOperation({ summary: 'Complete work order and record COGM' })
-  complete(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: { quantityProduced: number; notes?: string }) {
+  complete(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: { quantityProduced: number; notes?: string },
+  ) {
     return this.workOrdersService.completeWorkOrder(orgId, id, dto);
   }
 
@@ -87,5 +91,34 @@ export class WorkOrdersController {
   @ApiOperation({ summary: 'Delete work order' })
   remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.workOrdersService.remove(orgId, id);
+  }
+
+  // Bulk Operations
+  @Post('bulk-delete')
+  @Permissions('manufacturing.delete')
+  @ApiOperation({ summary: 'Bulk delete draft work orders' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.workOrdersService.bulkDelete(orgId, dto.ids);
+  }
+
+  @Post('bulk-start')
+  @Permissions('manufacturing.edit')
+  @ApiOperation({ summary: 'Bulk start work orders' })
+  bulkStart(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.workOrdersService.bulkStart(orgId, dto.ids);
+  }
+
+  @Post('bulk-complete')
+  @Permissions('manufacturing.edit')
+  @ApiOperation({ summary: 'Bulk complete work orders' })
+  bulkComplete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.workOrdersService.bulkComplete(orgId, dto.ids);
+  }
+
+  @Post('bulk-cancel')
+  @Permissions('manufacturing.edit')
+  @ApiOperation({ summary: 'Bulk cancel work orders' })
+  bulkCancel(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.workOrdersService.bulkCancel(orgId, dto.ids);
   }
 }

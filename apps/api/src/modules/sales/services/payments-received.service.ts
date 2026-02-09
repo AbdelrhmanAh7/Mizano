@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Decimal } from '@prisma/client/runtime/library';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
 import { CreatePaymentReceivedDto } from '../dto/create-payment-received.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { InvoicesService } from './invoices.service';
-import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class PaymentsReceivedService {
@@ -15,7 +17,16 @@ export class PaymentsReceivedService {
   ) {}
 
   async create(organizationId: string, createPaymentReceivedDto: CreatePaymentReceivedDto) {
-    const { customerId, date, amount, paymentMode, depositToAccountId, reference, notes, allocations } = createPaymentReceivedDto;
+    const {
+      customerId,
+      date,
+      amount,
+      paymentMode,
+      depositToAccountId,
+      reference,
+      notes,
+      allocations,
+    } = createPaymentReceivedDto;
 
     // Verify customer
     const customer = await this.prisma.customer.findFirst({
@@ -34,7 +45,10 @@ export class PaymentsReceivedService {
       const invoice = await this.prisma.invoice.findFirst({
         where: { id: alloc.invoiceId, customerId, organizationId, deletedAt: null },
       });
-      if (!invoice) throw new BadRequestException(`Invoice ${alloc.invoiceId} not found or doesn't belong to customer`);
+      if (!invoice)
+        throw new BadRequestException(
+          `Invoice ${alloc.invoiceId} not found or doesn't belong to customer`,
+        );
     }
 
     // Get organization settings for default accounts
@@ -91,7 +105,12 @@ export class PaymentsReceivedService {
     });
 
     // Create accounting entry: Dr Bank/Cash / Cr AR
-    const journalLines: Array<{ accountId: string; debit: string; credit: string; description?: string }> = [
+    const journalLines: Array<{
+      accountId: string;
+      debit: string;
+      credit: string;
+      description?: string;
+    }> = [
       {
         accountId: depositToAccountId,
         debit: paymentAmount.toFixed(4),
@@ -138,6 +157,25 @@ export class PaymentsReceivedService {
     ]);
 
     return { data: payments, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+    const { cursor, take = 50, sortBy = 'date', sortOrder = 'desc' } = query;
+
+    const where: any = { organizationId, deletedAt: null };
+
+    return cursorPaginate(
+      this.prisma.paymentReceived,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: {
+          customer: { select: { id: true, name: true } },
+        },
+      },
+    );
   }
 
   async findOne(organizationId: string, id: string) {

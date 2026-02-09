@@ -1,7 +1,9 @@
-import { Module, Global } from '@nestjs/common';
 import { CacheModule as NestCacheModule } from '@nestjs/cache-manager';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { redisStore } from 'cache-manager-redis-yet';
+import { CacheAdminController } from './cache-admin.controller';
+import { CacheInvalidationListener } from './cache-invalidation.listener';
 import { CacheService } from './cache.service';
 
 @Global()
@@ -29,7 +31,8 @@ import { CacheService } from './cache.service';
       },
     }),
   ],
-  providers: [CacheService],
+  controllers: [CacheAdminController],
+  providers: [CacheService, CacheInvalidationListener],
   exports: [NestCacheModule, CacheService],
 })
 export class CacheModule {}

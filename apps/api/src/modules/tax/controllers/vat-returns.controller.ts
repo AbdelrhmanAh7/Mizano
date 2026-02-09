@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { VatReturnsService } from '../services/vat-returns.service';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { VatReturnsService } from '../services/vat-returns.service';
 
 @ApiTags('VAT Returns')
 @ApiBearerAuth()
@@ -29,7 +29,11 @@ export class VatReturnsController {
   @Get('summary')
   @Permissions('tax.view')
   @ApiOperation({ summary: 'Get VAT summary for period' })
-  getSummary(@CurrentOrg() orgId: string, @Query('startDate') startDate: string, @Query('endDate') endDate: string) {
+  getSummary(
+    @CurrentOrg() orgId: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
     return this.vatReturnsService.getVatSummary(orgId, startDate, endDate);
   }
 
@@ -70,5 +74,20 @@ export class VatReturnsController {
   @ApiOperation({ summary: 'Delete VAT return' })
   remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.vatReturnsService.deleteReturn(orgId, id);
+  }
+
+  // Bulk Operations
+  @Post('bulk-delete')
+  @Permissions('tax.delete')
+  @ApiOperation({ summary: 'Bulk delete draft VAT returns' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.vatReturnsService.bulkDelete(orgId, dto.ids);
+  }
+
+  @Post('bulk-submit')
+  @Permissions('tax.submit')
+  @ApiOperation({ summary: 'Bulk submit calculated VAT returns' })
+  bulkSubmit(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.vatReturnsService.bulkSubmit(orgId, dto.ids);
   }
 }

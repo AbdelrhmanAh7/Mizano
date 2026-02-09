@@ -1,51 +1,47 @@
 'use client';
 
-import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { localeDirections, type Locale } from '@/i18n/config';
+import { usePermissions } from '@/lib/hooks/use-permissions';
+import { cn } from '@/lib/utils';
+import {
+    Activity,
+    Banknote,
+    BarChart3,
+    Brain,
+    Briefcase,
+    Building2,
+    Calculator,
+    ChevronLeft,
+    ChevronRight,
+    ClipboardList,
+    Clock,
+    CreditCard,
+    DollarSign,
+    Factory,
+    FileText,
+    FlaskConical,
+    Landmark,
+    Layers,
+    LayoutDashboard,
+    Menu,
+    Package,
+    Percent,
+    Receipt,
+    Search,
+    Settings,
+    ShoppingCart,
+    Target,
+    UserCircle,
+    Users,
+    Warehouse,
+    Wrench
+} from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
-import { cn } from '@/lib/utils';
-import { usePermissions } from '@/lib/hooks/use-permissions';
-import { localeDirections, type Locale } from '@/i18n/config';
-import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-import {
-  LayoutDashboard,
-  Users,
-  FileText,
-  Package,
-  Building2,
-  Calculator,
-  Briefcase,
-  Clock,
-  BarChart3,
-  Settings,
-  Brain,
-  DollarSign,
-  Factory,
-  Receipt,
-  Menu,
-  ChevronLeft,
-  ChevronRight,
-  UserCircle,
-  Target,
-  CreditCard,
-  Banknote,
-  ShoppingCart,
-  Warehouse,
-  ArrowRightLeft,
-  ClipboardList,
-  Landmark,
-  Layers,
-  Wrench,
-  Percent,
-} from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 
 interface NavItem {
   nameKey: string;
@@ -102,7 +98,11 @@ const navigationConfig: NavItem[] = [
     children: [
       { nameKey: 'inventory.items.title', href: '/inventory/items', icon: Package },
       { nameKey: 'inventory.warehouses.title', href: '/inventory/warehouses', icon: Warehouse },
-      { nameKey: 'inventory.adjustments.title', href: '/inventory/adjustments', icon: ClipboardList },
+      {
+        nameKey: 'inventory.adjustments.title',
+        href: '/inventory/adjustments',
+        icon: ClipboardList,
+      },
     ],
   },
   {
@@ -170,6 +170,14 @@ const navigationConfig: NavItem[] = [
   },
   { nameKey: 'reports', href: '/reports', icon: BarChart3, permission: 'reports.view' },
   { nameKey: 'aiInsights', href: '/ai-insights', icon: Brain },
+  { nameKey: 'aiLab', href: '/ai-lab', icon: FlaskConical },
+  { nameKey: 'deepSearch', href: '/ai-lab/deep-search', icon: Search },
+  {
+    nameKey: 'performance',
+    href: '/settings/performance',
+    icon: Activity,
+    permission: 'settings.view',
+  },
   { nameKey: 'settings', href: '/settings', icon: Settings, permission: 'settings.view' },
 ];
 
@@ -183,15 +191,14 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
   const locale = useLocale();
   const t = useTranslations('navigation');
   const { hasPermission, isLoading } = usePermissions();
-  const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const direction = localeDirections[locale as Locale];
   const isRtl = direction === 'rtl';
 
   // Remove locale prefix from pathname for matching
   const pathnameWithoutLocale = pathname.replace(`/${locale}`, '') || '/';
 
-  // Auto-expand parent items based on current path
-  const getExpandedFromPath = () => {
+  // Initialize expanded items based on current path (lazy initializer, not a side effect)
+  const [expandedItems, setExpandedItems] = useState<string[]>(() => {
     const expanded: string[] = [];
     navigationConfig.forEach((item) => {
       if (item.children && pathnameWithoutLocale.startsWith(item.href)) {
@@ -199,35 +206,32 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
       }
     });
     return expanded;
-  };
-
-  // Initialize expanded items based on current path
-  useState(() => {
-    setExpandedItems(getExpandedFromPath());
   });
 
-  const toggleExpanded = (href: string) => {
+  const toggleExpanded = useCallback((href: string) => {
     setExpandedItems((prev) =>
-      prev.includes(href) ? prev.filter((h) => h !== href) : [...prev, href]
+      prev.includes(href) ? prev.filter((h) => h !== href) : [...prev, href],
     );
-  };
+  }, []);
 
   // Filter navigation based on permissions
-  const filteredNavigation = navigationConfig.filter((item) => {
-    if (!item.permission) return true;
-    if (isLoading) return false;
-    return hasPermission(item.permission);
-  });
-
-  const getTranslatedName = (nameKey: string): string => {
-    return t(nameKey);
-  };
+  const filteredNavigation = useMemo(
+    () =>
+      navigationConfig.filter((item) => {
+        if (!item.permission) return true;
+        if (isLoading) return false;
+        return hasPermission(item.permission);
+      }),
+    [hasPermission, isLoading],
+  );
 
   const renderNavItem = (item: NavItem, isChild = false) => {
-    const isActive = pathnameWithoutLocale === item.href || pathnameWithoutLocale.startsWith(item.href + '/');
+    const isActive =
+      pathnameWithoutLocale === item.href || pathnameWithoutLocale.startsWith(item.href + '/');
     const hasChildren = item.children && item.children.length > 0;
-    const isExpanded = expandedItems.includes(item.href) || pathnameWithoutLocale.startsWith(item.href);
-    const translatedName = getTranslatedName(item.nameKey);
+    const isExpanded =
+      expandedItems.includes(item.href) || pathnameWithoutLocale.startsWith(item.href);
+    const translatedName = t(item.nameKey);
 
     // Build locale-aware href
     const localizedHref = `/${locale}${item.href}`;
@@ -241,14 +245,16 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
               'w-full group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors',
               isActive || isExpanded
                 ? 'bg-muted text-foreground'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >
             <div className="flex items-center">
               <item.icon
                 className={cn(
                   'h-5 w-5 flex-shrink-0 me-3',
-                  isActive || isExpanded ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'
+                  isActive || isExpanded
+                    ? 'text-foreground'
+                    : 'text-muted-foreground group-hover:text-foreground',
                 )}
               />
               {translatedName}
@@ -257,7 +263,7 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
               className={cn(
                 'h-4 w-4 transition-transform',
                 isExpanded && 'rotate-90',
-                isRtl && !isExpanded && 'rotate-180'
+                isRtl && !isExpanded && 'rotate-180',
               )}
             />
           </button>
@@ -280,7 +286,7 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
           isChild && 'ps-6',
           isActive
             ? 'bg-primary text-primary-foreground'
-            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
         )}
         title={collapsed ? translatedName : undefined}
       >
@@ -288,7 +294,9 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
           className={cn(
             'h-5 w-5 flex-shrink-0',
             collapsed ? '' : 'me-3',
-            isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'
+            isActive
+              ? 'text-primary-foreground'
+              : 'text-muted-foreground group-hover:text-foreground',
           )}
         />
         {!collapsed && translatedName}
@@ -321,10 +329,7 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon"
-              className={cn(
-                'fixed top-4 z-40',
-                isRtl ? 'end-4' : 'start-4'
-              )}
+              className={cn('fixed top-4 z-40', isRtl ? 'end-4' : 'start-4')}
               aria-label={t('openMenu')}
             >
               <Menu className="h-6 w-6" />
@@ -346,15 +351,14 @@ export function Sidebar() {
       {/* Desktop sidebar */}
       <div className="hidden lg:flex lg:flex-shrink-0">
         <div
-          className={cn(
-            'flex flex-col transition-all duration-300',
-            collapsed ? 'w-16' : 'w-64'
-          )}
+          className={cn('flex flex-col transition-all duration-300', collapsed ? 'w-16' : 'w-64')}
         >
-          <div className={cn(
-            'flex flex-col flex-grow bg-card border-border overflow-y-auto',
-            isRtl ? 'border-s' : 'border-e'
-          )}>
+          <div
+            className={cn(
+              'flex flex-col flex-grow bg-card border-border overflow-y-auto',
+              isRtl ? 'border-s' : 'border-e',
+            )}
+          >
             <div className="flex items-center justify-between flex-shrink-0 px-4 py-5">
               {!collapsed && (
                 <span className="text-2xl font-bold text-primary">{tCommon('appName')}</span>
@@ -367,9 +371,15 @@ export function Sidebar() {
                 aria-label={collapsed ? t('expandSidebar') : t('collapseSidebar')}
               >
                 {collapsed ? (
-                  isRtl ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+                  isRtl ? (
+                    <ChevronLeft className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )
+                ) : isRtl ? (
+                  <ChevronRight className="h-4 w-4" />
                 ) : (
-                  isRtl ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-4 w-4" />
                 )}
               </Button>
             </div>

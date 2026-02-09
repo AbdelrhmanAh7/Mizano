@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { LeadSource, LeadStatus } from '@prisma/client';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { LeadStatus, LeadSource } from '@prisma/client';
 
 export interface CreateLeadDto {
   leadName: string;
@@ -81,6 +83,30 @@ export class LeadsService {
     ]);
 
     return { data, total };
+  }
+
+  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+    const where: Record<string, unknown> = { organizationId, deletedAt: null };
+
+    if (query.search) {
+      where.OR = [
+        { leadName: { contains: query.search, mode: 'insensitive' } },
+        { companyName: { contains: query.search, mode: 'insensitive' } },
+        { email: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const orderBy = { [query.sortBy || 'createdAt']: query.sortOrder || 'desc' };
+
+    return cursorPaginate(this.prisma.lead, where, orderBy, {
+      cursor: query.cursor,
+      take: query.take,
+      include: {
+        assignedTo: { select: { id: true, name: true, email: true } },
+        score: { select: { totalScore: true, tier: true } },
+        _count: { select: { deals: true, activities: true } },
+      },
+    });
   }
 
   async findOne(organizationId: string, id: string) {

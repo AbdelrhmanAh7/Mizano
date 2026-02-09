@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { vendorCreditsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { vendorCreditsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 export type VendorCreditStatus = 'OPEN' | 'APPLIED' | 'REFUNDED';
@@ -97,6 +98,20 @@ export function useVendorCredits(params?: VendorCreditParams) {
       const response = await vendorCreditsApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all vendor credits with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteVendorCredits(params?: Record<string, unknown>) {
+  return useInfiniteTableData<VendorCredit, Record<string, unknown>>({
+    queryKey: ['vendor-credits'],
+    fetchFn: async (p) => {
+      const response = await vendorCreditsApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 

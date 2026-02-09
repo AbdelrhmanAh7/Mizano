@@ -11,6 +11,10 @@
     "helpTooltip": "Get help with this page"
   },
   "tours": {
+    "dashboard": {
+      "title": "Dashboard Overview",
+      "description": "Get familiar with your financial dashboard"
+    },
     "salesInvoices": {
       "title": "Sales Invoices",
       "description": "Learn how to create and manage invoices"

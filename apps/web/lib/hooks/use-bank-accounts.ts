@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { bankAccountsApi } from '@/lib/api';
 import { toast } from 'sonner';
 
 export interface BankAccount {
@@ -32,20 +32,6 @@ export interface BankAccountFilters {
   type?: BankAccountType;
   isActive?: boolean;
 }
-
-// API functions
-const bankAccountsApi = {
-  getAll: (params?: BankAccountFilters) =>
-    api.get('/bank-accounts', { params }),
-  getOne: (id: string) => api.get(`/bank-accounts/${id}`),
-  create: (data: any) => api.post('/bank-accounts', data),
-  update: (id: string, data: any) => api.patch(`/bank-accounts/${id}`, data),
-  delete: (id: string) => api.delete(`/bank-accounts/${id}`),
-  getTransactions: (id: string, params?: any) =>
-    api.get(`/bank-accounts/${id}/transactions`, { params }),
-  getReconciliation: (id: string) =>
-    api.get(`/bank-accounts/${id}/reconciliation`),
-};
 
 // Hooks
 export function useBankAccounts(params?: BankAccountFilters) {

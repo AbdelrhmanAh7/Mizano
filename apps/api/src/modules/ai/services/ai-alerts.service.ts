@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AlertCategory, AlertPriority, AlertSource } from '@prisma/client';
+import { AlertCategory, AlertPriority, AlertSource, AIInsight, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 export interface UnifiedAlert {
@@ -20,7 +20,7 @@ export interface UnifiedAlert {
     id: string;
     name?: string;
   };
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   confidence?: number;
   expiresAt?: Date;
   createdAt: Date;
@@ -116,7 +116,7 @@ export class AiAlertsService {
                 title: alert.title,
                 description: alert.description,
                 priority: alert.priority,
-                data: alert.data as any,
+                data: alert.data as Prisma.InputJsonValue,
                 updatedAt: new Date(),
               },
             });
@@ -129,7 +129,7 @@ export class AiAlertsService {
               type: 'ALERT',
               title: alert.title,
               description: alert.description,
-              data: alert.data as any,
+              data: alert.data as Prisma.InputJsonValue,
               severity: this.mapPriorityToSeverity(alert.priority),
               category: alert.category,
               priority: alert.priority,
@@ -171,7 +171,7 @@ export class AiAlertsService {
     organizationId: string,
     options?: AlertQueryOptions,
   ): Promise<{ data: UnifiedAlert[]; total: number }> {
-    const where: any = {
+    const where: Prisma.AIInsightWhereInput = {
       organizationId,
       type: 'ALERT',
     };
@@ -333,7 +333,7 @@ export class AiAlertsService {
     organizationId: string,
     category?: AlertCategory,
   ): Promise<number> {
-    const where: any = {
+    const where: Prisma.AIInsightWhereInput = {
       organizationId,
       type: 'ALERT',
       isRead: false,
@@ -935,7 +935,7 @@ export class AiAlertsService {
     organizationId: string,
     source: AlertSource,
     entityId?: string,
-  ): Promise<any | null> {
+  ) {
     return this.prisma.aIInsight.findFirst({
       where: {
         organizationId,
@@ -971,26 +971,26 @@ export class AiAlertsService {
   /**
    * Map database record to UnifiedAlert
    */
-  private mapToUnifiedAlert(record: any): UnifiedAlert {
+  private mapToUnifiedAlert(record: AIInsight): UnifiedAlert {
     return {
       id: record.id,
-      category: record.category,
-      priority: record.priority,
-      source: record.aiSource,
+      category: record.category as AlertCategory,
+      priority: record.priority as AlertPriority,
+      source: record.aiSource as AlertSource,
       title: record.title,
       description: record.description,
-      impact: record.impact,
-      suggestedAction: record.suggestedAction,
-      actionUrl: record.actionUrl,
-      actionLabel: record.actionLabel,
+      impact: record.impact ?? undefined,
+      suggestedAction: record.suggestedAction ?? undefined,
+      actionUrl: record.actionUrl ?? undefined,
+      actionLabel: record.actionLabel ?? undefined,
       sourceEntity: record.sourceEntityId
         ? {
-            type: record.sourceEntityType,
+            type: record.sourceEntityType as string,
             id: record.sourceEntityId,
           }
         : undefined,
-      data: record.data,
-      expiresAt: record.expiresAt,
+      data: record.data as Record<string, unknown> | undefined,
+      expiresAt: record.expiresAt ?? undefined,
       createdAt: record.createdAt,
       isRead: record.isRead,
       isDismissed: record.isDismissed,

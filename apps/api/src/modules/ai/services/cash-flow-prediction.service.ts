@@ -30,6 +30,7 @@ export interface CashFlowPrediction {
     totalExpectedOutflows: number;
   };
   confidence: 'high' | 'medium' | 'low';
+  predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID';
 }
 
 export interface QuickForecast {
@@ -166,6 +167,7 @@ export class CashFlowPredictionService {
         totalExpectedOutflows: totals.expectedOutflows,
       },
       confidence,
+      predictionMethod: 'ML',
     };
   }
 

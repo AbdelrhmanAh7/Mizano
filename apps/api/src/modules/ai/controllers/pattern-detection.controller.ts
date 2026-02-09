@@ -51,7 +51,7 @@ export class PatternDetectionController {
   async getPatterns(
     @CurrentOrg() organizationId: string,
     @Query() query: PatternQueryDto,
-  ): Promise<PatternListResponse> {
+  ) {
     return this.patternService.getPatterns(organizationId, {
       status: query.status,
       entityType: query.entityType,
@@ -79,7 +79,7 @@ export class PatternDetectionController {
   async getPatternDetails(
     @CurrentOrg() organizationId: string,
     @Param('id') patternId: string,
-  ): Promise<PatternDetailsResponse> {
+  ) {
     return this.patternService.getPatternDetails(organizationId, patternId);
   }
 

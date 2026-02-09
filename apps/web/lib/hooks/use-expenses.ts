@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { expensesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { expensesApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 export interface Expense {
@@ -80,6 +81,20 @@ export function useExpenses(params?: ExpenseParams) {
       const response = await expensesApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all expenses with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteExpenses(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Expense, Record<string, unknown>>({
+    queryKey: ['expenses'],
+    fetchFn: async (p) => {
+      const response = await expensesApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 

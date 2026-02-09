@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Search, MoreHorizontal, Eye, Pencil, Trash2, Landmark, CreditCard, Wallet, PiggyBank } from 'lucide-react';
+import { Plus, MoreHorizontal, Eye, Pencil, Trash2, Landmark, CreditCard, Wallet, PiggyBank } from 'lucide-react';
+import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,8 +30,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
   useBankAccounts,
   useDeleteBankAccount,
@@ -42,27 +43,20 @@ import {
   BankAccountType,
 } from '@/lib/hooks/use-bank-accounts';
 
-const accountIcons: Record<BankAccountType, React.ComponentType<{ className?: string }>> = {
-  CHECKING: Landmark,
-  SAVINGS: PiggyBank,
-  CREDIT_CARD: CreditCard,
-  CASH: Wallet,
-  OTHER: Landmark,
-};
-
-export default function BankAccountsPage() {
-  const [search, setSearch] = useState('');
+function BankAccountsPageContent() {
+  const tableParams = useTableParams({ defaultSortBy: 'accountName' });
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data, isLoading } = useBankAccounts({
-    search,
+    ...tableParams.queryParams,
     type: typeFilter !== 'all' ? (typeFilter as BankAccountType) : undefined,
   });
 
   const deleteBankAccount = useDeleteBankAccount();
 
   const accounts: BankAccount[] = data?.data || [];
+  const meta = data?.meta;
 
   const handleDelete = async () => {
     if (deleteId) {
@@ -79,21 +73,126 @@ export default function BankAccountsPage() {
     return sum + (balance || 0);
   }, 0);
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-10 w-32" />
+  const columns: ColumnDef<BankAccount>[] = [
+    {
+      accessorKey: 'accountName',
+      header: () => (
+        <SortableHeader
+          label="Account Name"
+          columnId="accountName"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <div>
+          <Link
+            href={`/banking/accounts/${row.original.id}`}
+            className="font-medium hover:text-blue-600 hover:underline"
+          >
+            {row.original.accountName}
+          </Link>
+          {row.original.bankName && (
+            <p className="text-sm text-muted-foreground">
+              {row.original.bankName}
+            </p>
+          )}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-        </div>
-      </div>
-    );
-  }
+      ),
+    },
+    {
+      accessorKey: 'accountType',
+      header: 'Type',
+      cell: ({ row }) => (
+        <Badge variant="outline" className={getAccountTypeColor(row.original.accountType)}>
+          {getAccountTypeLabel(row.original.accountType)}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'accountNumber',
+      header: 'Account #',
+      meta: { cellClassName: 'font-mono text-sm text-muted-foreground' },
+      cell: ({ row }) =>
+        row.original.accountNumber
+          ? `.... ${row.original.accountNumber.slice(-4)}`
+          : '-',
+    },
+    {
+      accessorKey: 'currentBalance',
+      header: () => (
+        <SortableHeader
+          label="Balance"
+          columnId="currentBalance"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      cell: ({ row }) => {
+        const balance = typeof row.original.currentBalance === 'string'
+          ? parseFloat(row.original.currentBalance)
+          : row.original.currentBalance;
+        return (
+          <span className={cn(
+            'font-bold font-mono',
+            balance < 0 ? 'text-red-600' : 'text-green-600'
+          )}>
+            {formatCurrency(balance)}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'isActive',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge variant={row.original.isActive ? 'default' : 'secondary'}>
+          {row.original.isActive ? 'Active' : 'Inactive'}
+        </Badge>
+      ),
+    },
+    {
+      id: 'actions',
+      header: '',
+      meta: { cellClassName: 'w-12' },
+      cell: ({ row }) => {
+        const account = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/banking/accounts/${account.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/banking/accounts/${account.id}/edit`}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-red-600"
+                onClick={() => setDeleteId(account.id)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -131,15 +230,11 @@ export default function BankAccountsPage() {
 
       {/* Filters */}
       <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search accounts..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+        <DataTableSearch
+          value={tableParams.search}
+          onChange={tableParams.setSearch}
+          placeholder="Search accounts..."
+        />
         <Select value={typeFilter} onValueChange={setTypeFilter}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Type" />
@@ -155,113 +250,24 @@ export default function BankAccountsPage() {
         </Select>
       </div>
 
-      {/* Accounts Grid */}
-      {accounts.length === 0 ? (
-        <div className="text-center py-12">
-          <Landmark className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-semibold">No bank accounts</h3>
-          <p className="text-muted-foreground">
-            Add your first bank account to start tracking your finances.
-          </p>
-          <Button asChild className="mt-4">
+      {/* Table */}
+      <DataTable
+        columns={columns}
+        data={accounts}
+        page={meta?.page || 1}
+        totalPages={meta?.totalPages || 1}
+        total={meta?.total || 0}
+        limit={tableParams.limit}
+        onPageChange={tableParams.setPage}
+        onLimitChange={tableParams.setLimit}
+        isLoading={isLoading}
+        emptyMessage="No bank accounts"
+        emptyAction={
+          <Button asChild>
             <Link href="/banking/accounts/new">Add Bank Account</Link>
           </Button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {accounts.map((account) => {
-            const Icon = accountIcons[account.accountType] || Landmark;
-            const balance = typeof account.currentBalance === 'string'
-              ? parseFloat(account.currentBalance)
-              : account.currentBalance;
-
-            return (
-              <Card key={account.id} className={cn(!account.isActive && 'opacity-60')}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={cn('p-2 rounded-lg', getAccountTypeColor(account.accountType))}>
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base">
-                          <Link
-                            href={`/banking/accounts/${account.id}`}
-                            className="hover:text-blue-600 hover:underline"
-                          >
-                            {account.accountName}
-                          </Link>
-                        </CardTitle>
-                        {account.bankName && (
-                          <p className="text-sm text-muted-foreground">
-                            {account.bankName}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                          <Link href={`/banking/accounts/${account.id}`}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link href={`/banking/accounts/${account.id}/edit`}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => setDeleteId(account.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Badge variant="outline" className={getAccountTypeColor(account.accountType)}>
-                        {getAccountTypeLabel(account.accountType)}
-                      </Badge>
-                      {!account.isActive && (
-                        <Badge variant="outline" className="text-gray-500">
-                          Inactive
-                        </Badge>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Current Balance</p>
-                      <p className={cn(
-                        'text-2xl font-bold font-mono',
-                        balance < 0 ? 'text-red-600' : 'text-green-600'
-                      )}>
-                        {formatCurrency(balance)}
-                      </p>
-                    </div>
-                    {account.accountNumber && (
-                      <p className="text-sm text-muted-foreground font-mono">
-                        •••• {account.accountNumber.slice(-4)}
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+        }
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
@@ -285,5 +291,13 @@ export default function BankAccountsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function BankAccountsPage() {
+  return (
+    <Suspense>
+      <BankAccountsPageContent />
+    </Suspense>
   );
 }

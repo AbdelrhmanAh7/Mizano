@@ -1,71 +1,75 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Plus, Search, RefreshCw, Eye, Edit, Trash2, Send, FileText, Ban } from 'lucide-react';
+import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
+import { QuoteStatusBadge } from '@/components/sales/status-badge';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/components/ui/use-toast';
 import {
-  useQuotes,
-  useDeleteQuote,
-  useSendQuote,
-  useAcceptQuote,
-  useDeclineQuote,
-  useConvertToInvoice,
-  Quote,
-  QuoteStatus,
-} from '@/lib/hooks/use-quotes';
-import { usePermissions } from '@/lib/hooks/use-permissions';
-import { QuoteStatusBadge } from '@/components/sales/status-badge';
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { useToast } from '@/components/ui/use-toast';
+import { quotesApi } from '@/lib/api';
+import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { formatCurrency } from '@/lib/hooks/use-customers';
+import { usePermissions } from '@/lib/hooks/use-permissions';
+import {
+    Quote,
+    QuoteStatus,
+    useAcceptQuote,
+    useConvertToInvoice,
+    useDeclineQuote,
+    useDeleteQuote,
+    useInfiniteQuotes,
+    useSendQuote,
+} from '@/lib/hooks/use-quotes';
+import { useTableParams } from '@/lib/hooks/use-table-params';
+import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
+import { Ban, Edit, Eye, FileText, Plus, RefreshCw, Send, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { Suspense, useState } from 'react';
 
-export default function QuotesPage() {
+function QuotesPageContent() {
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
+  const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [quoteToDelete, setQuoteToDelete] = useState<Quote | null>(null);
 
-  const { data: quotesData, isLoading, refetch } = useQuotes({
-    search: searchQuery || undefined,
+  const {
+    data: quotes,
+    total,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useInfiniteQuotes({
+    ...tableParams.queryParams,
     status: selectedStatus !== 'all' ? (selectedStatus as QuoteStatus) : undefined,
   });
 
@@ -75,11 +79,74 @@ export default function QuotesPage() {
   const declineQuote = useDeclineQuote();
   const convertToInvoice = useConvertToInvoice();
 
-  const quotes = quotesData?.data || [];
-
   const canCreate = hasPermission('sales.create');
   const canEdit = hasPermission('sales.edit');
   const canDelete = hasPermission('sales.delete');
+
+  // Bulk action state
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkSendOpen, setBulkSendOpen] = useState(false);
+  const [bulkDeclineOpen, setBulkDeclineOpen] = useState(false);
+  const [bulkSelectedRows, setBulkSelectedRows] = useState<Quote[]>([]);
+
+  const bulkDeleteAction = useBulkAction({
+    mutationFn: (ids) => quotesApi.bulkDelete(ids).then((r) => r.data),
+    queryKeys: [['quotes']],
+    successMessage: '{count} draft quotes deleted',
+  });
+
+  const bulkSendAction = useBulkAction({
+    mutationFn: (ids) => quotesApi.bulkSend(ids).then((r) => r.data),
+    queryKeys: [['quotes']],
+    successMessage: '{count} quotes sent',
+  });
+
+  const bulkDeclineAction = useBulkAction({
+    mutationFn: (ids) => quotesApi.bulkDecline(ids).then((r) => r.data),
+    queryKeys: [['quotes']],
+    successMessage: '{count} quotes declined',
+  });
+
+  const bulkActions = [
+    ...(canEdit
+      ? [
+          {
+            label: 'Send',
+            icon: Send,
+            onClick: (rows: Quote[]) => {
+              setBulkSelectedRows(rows);
+              setBulkSendOpen(true);
+            },
+          },
+        ]
+      : []),
+    ...(canEdit
+      ? [
+          {
+            label: 'Decline',
+            icon: Ban,
+            variant: 'outline' as const,
+            onClick: (rows: Quote[]) => {
+              setBulkSelectedRows(rows);
+              setBulkDeclineOpen(true);
+            },
+          },
+        ]
+      : []),
+    ...(canDelete
+      ? [
+          {
+            label: 'Delete',
+            icon: Trash2,
+            variant: 'destructive' as const,
+            onClick: (rows: Quote[]) => {
+              setBulkSelectedRows(rows);
+              setBulkDeleteOpen(true);
+            },
+          },
+        ]
+      : []),
+  ];
 
   const handleDelete = (quote: Quote) => {
     setQuoteToDelete(quote);
@@ -171,15 +238,161 @@ export default function QuotesPage() {
     }
   };
 
+  const columns: ColumnDef<Quote>[] = [
+    {
+      accessorKey: 'quoteNumber',
+      header: () => (
+        <SortableHeader
+          label="Quote #"
+          columnId="quoteNumber"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <Link href={`/sales/quotes/${row.original.id}`} className="font-medium hover:underline">
+          {row.original.quoteNumber}
+        </Link>
+      ),
+    },
+    {
+      accessorKey: 'customer.name',
+      header: 'Customer',
+      cell: ({ row }) => row.original.customer?.displayName || row.original.customer?.name || '-',
+    },
+    {
+      accessorKey: 'date',
+      header: () => (
+        <SortableHeader
+          label="Date"
+          columnId="date"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+    },
+    {
+      accessorKey: 'expiryDate',
+      header: () => (
+        <SortableHeader
+          label="Expiry"
+          columnId="expiryDate"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => format(new Date(row.original.expiryDate), 'MMM d, yyyy'),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => <QuoteStatusBadge status={row.original.status} />,
+    },
+    {
+      accessorKey: 'grandTotal',
+      header: () => (
+        <SortableHeader
+          label="Amount"
+          columnId="grandTotal"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
+      cell: ({ row }) =>
+        formatCurrency(
+          parseFloat(row.original.grandTotal || '0'),
+          row.original.customer?.currency || 'USD',
+        ),
+    },
+    {
+      id: 'actions',
+      header: '',
+      meta: { cellClassName: 'text-right' },
+      cell: ({ row }) => {
+        const quote = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                ...
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/sales/quotes/${quote.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View
+                </Link>
+              </DropdownMenuItem>
+
+              {canEdit && quote.status === 'DRAFT' && (
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/sales/quotes/${quote.id}/edit`}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleSend(quote)}>
+                    <Send className="mr-2 h-4 w-4" />
+                    Mark as Sent
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {canEdit && quote.status === 'SENT' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleAccept(quote)}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Mark as Accepted
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleDecline(quote)}>
+                    <Ban className="mr-2 h-4 w-4" />
+                    Mark as Declined
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {canEdit && quote.status === 'ACCEPTED' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleConvert(quote)}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Convert to Invoice
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {canDelete && quote.status === 'DRAFT' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleDelete(quote)} className="text-red-600">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Quotes</h1>
-          <p className="text-muted-foreground">
-            Create and manage estimates for your customers
-          </p>
+          <p className="text-muted-foreground">Create and manage estimates for your customers</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
@@ -197,15 +410,11 @@ export default function QuotesPage() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by quote number or customer..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+            <DataTableSearch
+              value={tableParams.search}
+              onChange={tableParams.setSearch}
+              placeholder="Search by quote number or customer..."
+            />
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by status" />
@@ -233,140 +442,31 @@ export default function QuotesPage() {
           <CardTitle>All Quotes</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : quotes.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No quotes found</p>
-              {canCreate && (
+          <DataTable
+            columns={columns}
+            data={quotes}
+            total={total}
+            isLoading={isLoading}
+            enableVirtualization
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={() => fetchNextPage()}
+            enableColumnResizing
+            tableId="quotes"
+            enableSelection
+            bulkActions={bulkActions}
+            emptyMessage="No quotes found"
+            emptyAction={
+              canCreate ? (
                 <Button asChild>
                   <Link href="/sales/quotes/new">
                     <Plus className="mr-2 h-4 w-4" />
                     Create Your First Quote
                   </Link>
                 </Button>
-              )}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Quote #</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Expiry</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {quotes.map((quote: Quote) => (
-                  <TableRow key={quote.id}>
-                    <TableCell>
-                      <Link
-                        href={`/sales/quotes/${quote.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {quote.quoteNumber}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {quote.customer?.displayName || quote.customer?.name || '-'}
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(quote.date), 'MMM d, yyyy')}
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(quote.expiryDate), 'MMM d, yyyy')}
-                    </TableCell>
-                    <TableCell>
-                      <QuoteStatusBadge status={quote.status} />
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(
-                        parseFloat(quote.grandTotal || '0'),
-                        quote.customer?.currency || 'USD'
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            •••
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/sales/quotes/${quote.id}`}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View
-                            </Link>
-                          </DropdownMenuItem>
-
-                          {canEdit && quote.status === 'DRAFT' && (
-                            <>
-                              <DropdownMenuItem asChild>
-                                <Link href={`/sales/quotes/${quote.id}/edit`}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleSend(quote)}>
-                                <Send className="mr-2 h-4 w-4" />
-                                Mark as Sent
-                              </DropdownMenuItem>
-                            </>
-                          )}
-
-                          {canEdit && quote.status === 'SENT' && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleAccept(quote)}>
-                                <FileText className="mr-2 h-4 w-4" />
-                                Mark as Accepted
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDecline(quote)}>
-                                <Ban className="mr-2 h-4 w-4" />
-                                Mark as Declined
-                              </DropdownMenuItem>
-                            </>
-                          )}
-
-                          {canEdit && quote.status === 'ACCEPTED' && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleConvert(quote)}>
-                                <FileText className="mr-2 h-4 w-4" />
-                                Convert to Invoice
-                              </DropdownMenuItem>
-                            </>
-                          )}
-
-                          {canDelete && quote.status === 'DRAFT' && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(quote)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+              ) : undefined
+            }
+          />
         </CardContent>
       </Card>
 
@@ -376,21 +476,72 @@ export default function QuotesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Quote</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete &quot;{quoteToDelete?.quoteNumber}&quot;?
-              This action cannot be undone.
+              Are you sure you want to delete &quot;{quoteToDelete?.quoteNumber}&quot;? This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Action Dialogs */}
+      <BulkActionConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        action="delete"
+        count={bulkSelectedRows.length}
+        itemType="quotes"
+        description="Only draft quotes will be deleted. Non-draft quotes will be skipped."
+        destructive
+        isLoading={bulkDeleteAction.isLoading}
+        onConfirm={async () => {
+          await bulkDeleteAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkDeleteOpen(false);
+          refetch();
+        }}
+      />
+      <BulkActionConfirmDialog
+        open={bulkSendOpen}
+        onOpenChange={setBulkSendOpen}
+        action="send"
+        count={bulkSelectedRows.length}
+        itemType="quotes"
+        description="Draft quotes will be marked as sent."
+        isLoading={bulkSendAction.isLoading}
+        onConfirm={async () => {
+          await bulkSendAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkSendOpen(false);
+          refetch();
+        }}
+      />
+      <BulkActionConfirmDialog
+        open={bulkDeclineOpen}
+        onOpenChange={setBulkDeclineOpen}
+        action="decline"
+        count={bulkSelectedRows.length}
+        itemType="quotes"
+        description="Sent quotes will be marked as declined."
+        destructive
+        isLoading={bulkDeclineAction.isLoading}
+        onConfirm={async () => {
+          await bulkDeclineAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkDeclineOpen(false);
+          refetch();
+        }}
+      />
     </div>
+  );
+}
+
+export default function QuotesPage() {
+  return (
+    <Suspense>
+      <QuotesPageContent />
+    </Suspense>
   );
 }

@@ -55,6 +55,12 @@ export class AttritionPredictionDto {
 
   @ApiProperty({ description: 'Recommended action to reduce attrition risk' })
   recommendation: string;
+
+  @ApiProperty({
+    description: 'Prediction method used',
+    enum: ['ML', 'RULE_BASED', 'HYBRID'],
+  })
+  predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID';
 }
 
 export class FlightRiskDto {

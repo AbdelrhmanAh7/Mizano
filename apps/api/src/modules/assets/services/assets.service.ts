@@ -1,22 +1,10 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { AssetStatus, DepreciationMethod } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import {
-  AssetStatus,
-  AssetType,
-  DepreciationMethod,
-} from '@prisma/client';
-import {
-  CreateAssetDto,
-  UpdateAssetDto,
-  DisposeAssetDto,
-  AssetQueryDto,
-} from '../dto/assets.dto';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { AssetQueryDto, CreateAssetDto, DisposeAssetDto, UpdateAssetDto } from '../dto/assets.dto';
 
 @Injectable()
 export class AssetsService {
@@ -27,10 +15,7 @@ export class AssetsService {
   /**
    * Create a new asset with depreciation schedule
    */
-  async create(
-    organizationId: string,
-    dto: CreateAssetDto,
-  ): Promise<any> {
+  async create(organizationId: string, dto: CreateAssetDto): Promise<any> {
     // Generate asset number
     const assetNumber = await this.generateAssetNumber(organizationId);
 
@@ -134,6 +119,31 @@ export class AssetsService {
   }
 
   /**
+   * Get all assets with cursor-based pagination
+   */
+  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+    const where: Record<string, unknown> = {
+      organizationId,
+      deletedAt: null,
+    };
+
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { assetNumber: { contains: query.search, mode: 'insensitive' } },
+        { description: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const orderBy = { [query.sortBy || 'createdAt']: query.sortOrder || 'desc' };
+
+    return cursorPaginate(this.prisma.asset, where, orderBy, {
+      cursor: query.cursor,
+      take: query.take,
+    });
+  }
+
+  /**
    * Get asset by ID with depreciation schedule
    */
   async findOne(organizationId: string, assetId: string): Promise<any> {
@@ -163,11 +173,7 @@ export class AssetsService {
   /**
    * Update an asset
    */
-  async update(
-    organizationId: string,
-    assetId: string,
-    dto: UpdateAssetDto,
-  ): Promise<any> {
+  async update(organizationId: string, assetId: string, dto: UpdateAssetDto): Promise<any> {
     const asset = await this.prisma.asset.findFirst({
       where: { id: assetId, organizationId, deletedAt: null },
     });
@@ -181,9 +187,7 @@ export class AssetsService {
     }
 
     // If useful life or salvage value changed, recalculate schedule
-    const needsRecalc =
-      dto.usefulLifeYears !== undefined ||
-      dto.salvageValue !== undefined;
+    const needsRecalc = dto.usefulLifeYears !== undefined || dto.salvageValue !== undefined;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const updatedAsset = await tx.asset.update({
@@ -191,9 +195,7 @@ export class AssetsService {
         data: {
           name: dto.name,
           description: dto.description,
-          salvageValue: dto.salvageValue !== undefined
-            ? new Decimal(dto.salvageValue)
-            : undefined,
+          salvageValue: dto.salvageValue !== undefined ? new Decimal(dto.salvageValue) : undefined,
           usefulLifeYears: dto.usefulLifeYears,
         },
         include: {
@@ -213,11 +215,7 @@ export class AssetsService {
         });
 
         // Regenerate schedule from current position
-        await this.regenerateScheduleFromCurrent(
-          tx,
-          updatedAsset,
-          organizationId,
-        );
+        await this.regenerateScheduleFromCurrent(tx, updatedAsset, organizationId);
       }
 
       return updatedAsset;
@@ -229,11 +227,7 @@ export class AssetsService {
   /**
    * Dispose an asset (sell or write off)
    */
-  async dispose(
-    organizationId: string,
-    assetId: string,
-    dto: DisposeAssetDto,
-  ): Promise<any> {
+  async dispose(organizationId: string, assetId: string, dto: DisposeAssetDto): Promise<any> {
     const asset = await this.prisma.asset.findFirst({
       where: { id: assetId, organizationId, deletedAt: null },
       include: {
@@ -296,10 +290,7 @@ export class AssetsService {
   /**
    * Get depreciation schedule for an asset
    */
-  async getDepreciationSchedule(
-    organizationId: string,
-    assetId: string,
-  ): Promise<any[]> {
+  async getDepreciationSchedule(organizationId: string, assetId: string): Promise<any[]> {
     const asset = await this.prisma.asset.findFirst({
       where: { id: assetId, organizationId, deletedAt: null },
     });
@@ -347,14 +338,8 @@ export class AssetsService {
     return {
       totalAssets: assets.length,
       activeAssets: activeAssets.length,
-      totalPurchaseValue: activeAssets.reduce(
-        (sum, a) => sum + a.purchasePrice.toNumber(),
-        0,
-      ),
-      totalBookValue: activeAssets.reduce(
-        (sum, a) => sum + a.currentBookValue.toNumber(),
-        0,
-      ),
+      totalPurchaseValue: activeAssets.reduce((sum, a) => sum + a.purchasePrice.toNumber(), 0),
+      totalBookValue: activeAssets.reduce((sum, a) => sum + a.currentBookValue.toNumber(), 0),
       totalAccumulatedDepreciation: activeAssets.reduce(
         (sum, a) => sum + a.accumulatedDepreciation.toNumber(),
         0,
@@ -443,7 +428,7 @@ export class AssetsService {
         monthlyAmount = depreciableAmount / totalMonths;
       } else {
         // Declining balance (double declining)
-        const annualRate = (2 / usefulLifeYears);
+        const annualRate = 2 / usefulLifeYears;
         monthlyAmount = Math.max(0, (bookValue * annualRate) / 12);
 
         // Don't depreciate below salvage value
@@ -516,10 +501,7 @@ export class AssetsService {
     const endYear = purchaseDate.getFullYear() + asset.usefulLifeYears;
 
     const depreciableAmount = currentBookValue - asset.salvageValue.toNumber();
-    const remainingMonths = this.monthsBetween(
-      startMonth, startYear,
-      endMonth, endYear
-    );
+    const remainingMonths = this.monthsBetween(startMonth, startYear, endMonth, endYear);
 
     if (remainingMonths <= 0 || depreciableAmount <= 0) return;
 
@@ -558,8 +540,10 @@ export class AssetsService {
   }
 
   private monthsBetween(
-    startMonth: number, startYear: number,
-    endMonth: number, endYear: number
+    startMonth: number,
+    startYear: number,
+    endMonth: number,
+    endYear: number,
   ): number {
     return (endYear - startYear) * 12 + (endMonth - startMonth);
   }

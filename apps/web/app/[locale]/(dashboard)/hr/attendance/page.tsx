@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isWeekend } from 'date-fns';
 import { ChevronLeft, ChevronRight, UserCheck, Clock, CalendarOff } from 'lucide-react';
+import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -15,7 +16,6 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { DataTable } from '@/components/data-table';
 import { cn } from '@/lib/utils';
 import {
   useEmployees,
@@ -36,7 +37,7 @@ import {
 
 const attendanceStatuses: AttendanceStatus[] = ['PRESENT', 'ABSENT', 'LEAVE', 'HALF_DAY'];
 
-export default function AttendancePage() {
+function AttendancePageContent() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -86,19 +87,101 @@ export default function AttendancePage() {
 
   const isLoading = employeesLoading || attendanceLoading;
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
-        <div className="grid grid-cols-3 gap-4">
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-        </div>
-        <Skeleton className="h-96" />
-      </div>
-    );
-  }
+  // Columns for the selected date details table
+  const detailColumns: ColumnDef<any>[] = [
+    {
+      accessorKey: 'firstName',
+      header: 'Employee',
+      cell: ({ row }) => {
+        const employee = row.original;
+        return (
+          <div className="flex items-center gap-2">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="text-xs">
+                {employee.firstName[0]}
+                {employee.lastName[0]}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-medium">
+                {employee.firstName} {employee.lastName}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {employee.jobTitle}
+              </p>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const att = getAttendanceForDay(row.original.id, selectedDate);
+        return att ? (
+          <Badge
+            variant="outline"
+            className={getAttendanceStatusColor(att.status)}
+          >
+            {getAttendanceStatusLabel(att.status)}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">Not marked</span>
+        );
+      },
+    },
+    {
+      id: 'checkIn',
+      header: 'Check In',
+      cell: ({ row }) => {
+        const att = getAttendanceForDay(row.original.id, selectedDate);
+        return att?.checkIn ? format(new Date(att.checkIn), 'HH:mm') : '-';
+      },
+    },
+    {
+      id: 'checkOut',
+      header: 'Check Out',
+      cell: ({ row }) => {
+        const att = getAttendanceForDay(row.original.id, selectedDate);
+        return att?.checkOut ? format(new Date(att.checkOut), 'HH:mm') : '-';
+      },
+    },
+    {
+      id: 'notes',
+      header: 'Notes',
+      cell: ({ row }) => {
+        const att = getAttendanceForDay(row.original.id, selectedDate);
+        return att?.notes || '-';
+      },
+    },
+    {
+      id: 'action',
+      header: 'Action',
+      cell: ({ row }) => {
+        const att = getAttendanceForDay(row.original.id, selectedDate);
+        return (
+          <Select
+            value={att?.status || ''}
+            onValueChange={(value: AttendanceStatus) =>
+              handleStatusChange(row.original.id, selectedDate, value)
+            }
+          >
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Mark" />
+            </SelectTrigger>
+            <SelectContent>
+              {attendanceStatuses.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {getAttendanceStatusLabel(status)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -204,7 +287,7 @@ export default function AttendancePage() {
         </Card>
       </div>
 
-      {/* Calendar View */}
+      {/* Calendar View - kept as manual Table due to dynamic date columns */}
       <Card>
         <CardHeader>
           <CardTitle>Attendance Calendar</CardTitle>
@@ -307,85 +390,12 @@ export default function AttendancePage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Employee</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Check In</TableHead>
-                <TableHead>Check Out</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead>Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {employees.map((employee: any) => {
-                const att = getAttendanceForDay(employee.id, selectedDate);
-                return (
-                  <TableRow key={employee.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs">
-                            {employee.firstName[0]}
-                            {employee.lastName[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">
-                            {employee.firstName} {employee.lastName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {employee.jobTitle}
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {att ? (
-                        <Badge
-                          variant="outline"
-                          className={getAttendanceStatusColor(att.status)}
-                        >
-                          {getAttendanceStatusLabel(att.status)}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">Not marked</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {att?.checkIn ? format(new Date(att.checkIn), 'HH:mm') : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {att?.checkOut ? format(new Date(att.checkOut), 'HH:mm') : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {att?.notes || '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={att?.status || ''}
-                        onValueChange={(value: AttendanceStatus) =>
-                          handleStatusChange(employee.id, selectedDate, value)
-                        }
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue placeholder="Mark" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {attendanceStatuses.map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {getAttendanceStatusLabel(status)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={detailColumns}
+            data={employees}
+            isLoading={isLoading}
+            emptyMessage="No employees found"
+          />
         </CardContent>
       </Card>
 
@@ -409,5 +419,13 @@ export default function AttendancePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AttendancePage() {
+  return (
+    <Suspense>
+      <AttendancePageContent />
+    </Suspense>
   );
 }

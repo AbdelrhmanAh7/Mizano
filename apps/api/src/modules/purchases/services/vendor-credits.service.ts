@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class VendorCreditsService {
@@ -63,6 +65,25 @@ export class VendorCreditsService {
       data,
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
+  }
+
+  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+    const { cursor, take = 50, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+    const where = { organizationId, deletedAt: null };
+    return cursorPaginate(
+      this.prisma.vendorCredit,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: {
+          vendor: { select: { id: true, name: true } },
+          bill: { select: { id: true, billNumber: true } },
+          appliedToBill: { select: { id: true, billNumber: true } },
+        },
+      },
+    );
   }
 
   async findOne(organizationId: string, id: string) {

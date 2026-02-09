@@ -1,38 +1,70 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes } from '@nestjs/swagger';
-import { BankTransactionsService } from '../services/bank-transactions.service';
-import { BankStatementImportService } from '../services/bank-statement-import.service';
-import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  CacheResponse,
+  CacheTTL,
+  CurrentOrg,
+  InvalidateCache,
+  Permissions,
+} from '../../../common/decorators';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { BankTransactionCursorQueryDto } from '../dto/bank-transaction-cursor-query.dto';
+import { BankStatementImportService } from '../services/bank-statement-import.service';
+import { BankTransactionsService } from '../services/bank-transactions.service';
 
 @ApiTags('Bank Transactions')
 @ApiBearerAuth()
 @Controller('bank-transactions')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseInterceptors(CacheInvalidationInterceptor)
 export class BankTransactionsController {
   constructor(
     private readonly bankTransactionsService: BankTransactionsService,
     private readonly bankStatementImportService: BankStatementImportService,
   ) {}
 
-  @Post() @Permissions('banking.create')
+  @Post()
+  @Permissions('banking.create')
+  @InvalidateCache('bank-transactions:*', 'bank-accounts:*')
   @ApiOperation({ summary: 'Create/Import bank transaction' })
-  create(@CurrentOrg() orgId: string, @Body() dto: any) { return this.bankTransactionsService.create(orgId, dto); }
+  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+    return this.bankTransactionsService.create(orgId, dto);
+  }
 
-  @Post('import') @Permissions('banking.create')
+  @Post('import')
+  @Permissions('banking.create')
+  @InvalidateCache('bank-transactions:*', 'bank-accounts:*')
   @ApiOperation({ summary: 'Bulk import transactions' })
-  bulkImport(@CurrentOrg() orgId: string, @Body() dto: { bankAccountId: string; transactions: any[] }) {
+  bulkImport(
+    @CurrentOrg() orgId: string,
+    @Body() dto: { bankAccountId: string; transactions: any[] },
+  ) {
     return this.bankTransactionsService.bulkImport(orgId, dto.bankAccountId, dto.transactions);
   }
 
   @Post('import-statement')
   @Permissions('banking.create')
+  @InvalidateCache('bank-transactions:*', 'bank-accounts:*')
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Import bank statement file (CSV/XLSX/OFX/QFX) with auto-detection and deduplication' })
+  @ApiOperation({
+    summary: 'Import bank statement file (CSV/XLSX/OFX/QFX) with auto-detection and deduplication',
+  })
   async importStatement(
     @CurrentOrg() orgId: string,
     @UploadedFile() file: Express.Multer.File,
@@ -59,11 +91,27 @@ export class BankTransactionsController {
     );
   }
 
-  @Get() @Permissions('banking.view')
-  findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto & { bankAccountId?: string; status?: string }) {
+  @Get()
+  @Permissions('banking.view')
+  @CacheResponse('bank-transactions:list')
+  @CacheTTL(120)
+  findAll(
+    @CurrentOrg() orgId: string,
+    @Query() query: PaginationDto & { bankAccountId?: string; status?: string },
+  ) {
     return this.bankTransactionsService.findAll(orgId, query);
   }
 
-  @Get(':id') @Permissions('banking.view')
-  findOne(@CurrentOrg() orgId: string, @Param('id') id: string) { return this.bankTransactionsService.findOne(orgId, id); }
+  @Get('cursor')
+  @Permissions('banking.view')
+  @ApiOperation({ summary: 'List bank transactions with cursor-based pagination' })
+  findAllCursor(@CurrentOrg() orgId: string, @Query() query: BankTransactionCursorQueryDto) {
+    return this.bankTransactionsService.findAllCursor(orgId, query);
+  }
+
+  @Get(':id')
+  @Permissions('banking.view')
+  findOne(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.bankTransactionsService.findOne(orgId, id);
+  }
 }

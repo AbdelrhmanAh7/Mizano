@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DealStage } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 export interface CreateDealDto {
   dealName: string;
@@ -76,9 +78,7 @@ export class DealsService {
     if (query.leadId) where.leadId = query.leadId;
 
     if (query.search) {
-      where.OR = [
-        { dealName: { contains: query.search, mode: 'insensitive' } },
-      ];
+      where.OR = [{ dealName: { contains: query.search, mode: 'insensitive' } }];
     }
 
     const [data, total] = await Promise.all([
@@ -98,6 +98,27 @@ export class DealsService {
     ]);
 
     return { data, total };
+  }
+
+  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+    const where: Record<string, unknown> = { organizationId, deletedAt: null };
+
+    if (query.search) {
+      where.OR = [{ dealName: { contains: query.search, mode: 'insensitive' } }];
+    }
+
+    const orderBy = { [query.sortBy || 'createdAt']: query.sortOrder || 'desc' };
+
+    return cursorPaginate(this.prisma.deal, where, orderBy, {
+      cursor: query.cursor,
+      take: query.take,
+      include: {
+        customer: { select: { id: true, name: true } },
+        lead: { select: { id: true, leadName: true } },
+        assignedTo: { select: { id: true, name: true } },
+        _count: { select: { activities: true } },
+      },
+    });
   }
 
   async findOne(organizationId: string, id: string) {
@@ -127,7 +148,8 @@ export class DealsService {
     if (dto.dealName !== undefined) data.dealName = dto.dealName;
     if (dto.expectedAmount !== undefined) data.expectedAmount = new Decimal(dto.expectedAmount);
     if (dto.probability !== undefined) data.probability = dto.probability;
-    if (dto.expectedCloseDate !== undefined) data.expectedCloseDate = new Date(dto.expectedCloseDate);
+    if (dto.expectedCloseDate !== undefined)
+      data.expectedCloseDate = new Date(dto.expectedCloseDate);
     if (dto.customerId !== undefined) data.customerId = dto.customerId;
     if (dto.leadId !== undefined) data.leadId = dto.leadId;
     if (dto.assignedToId !== undefined) data.assignedToId = dto.assignedToId;
@@ -171,11 +193,7 @@ export class DealsService {
     return { message: 'Deal deleted' };
   }
 
-  async markWon(
-    organizationId: string,
-    id: string,
-    options?: { createQuote?: boolean },
-  ) {
+  async markWon(organizationId: string, id: string, options?: { createQuote?: boolean }) {
     const deal = await this.findOne(organizationId, id);
 
     if (deal.stage === DealStage.WON) {
@@ -287,10 +305,7 @@ export class DealsService {
         orderBy: { expectedAmount: 'desc' },
       });
 
-      const totalValue = deals.reduce(
-        (sum, d) => sum + d.expectedAmount.toNumber(),
-        0,
-      );
+      const totalValue = deals.reduce((sum, d) => sum + d.expectedAmount.toNumber(), 0);
       const weightedValue = deals.reduce(
         (sum, d) => sum + d.expectedAmount.toNumber() * (d.probability / 100),
         0,
@@ -314,11 +329,7 @@ export class DealsService {
   async getDealStats(organizationId: string) {
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const startOfQuarter = new Date(
-      today.getFullYear(),
-      Math.floor(today.getMonth() / 3) * 3,
-      1,
-    );
+    const startOfQuarter = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3, 1);
 
     const [wonThisMonth, lostThisMonth, openDeals, wonThisQuarter] = await Promise.all([
       this.prisma.deal.aggregate({
@@ -363,9 +374,8 @@ export class DealsService {
 
     // Win rate
     const totalClosed = (wonThisMonth._count?.id || 0) + (lostThisMonth._count?.id || 0);
-    const winRate = totalClosed > 0
-      ? Math.round(((wonThisMonth._count?.id || 0) / totalClosed) * 1000) / 10
-      : 0;
+    const winRate =
+      totalClosed > 0 ? Math.round(((wonThisMonth._count?.id || 0) / totalClosed) * 1000) / 10 : 0;
 
     // Weighted pipeline value
     const pipelineDeals = await this.prisma.deal.findMany({

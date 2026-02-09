@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { mean, standardDeviation } from '../utils/statistics.util';
 import { Decimal } from '@prisma/client/runtime/library';
+import { BoundedCache } from '../utils/bounded-cache.util';
 
 interface InvoiceWithCustomer {
   id: string;
@@ -75,8 +76,8 @@ interface PaymentHistoryRecord {
 export class PaymentPredictionService {
   private readonly logger = new Logger(PaymentPredictionService.name);
 
-  // Cache for customer profiles (cleared on update)
-  private profileCache = new Map<string, CustomerPaymentProfile>();
+  // Cache for customer profiles (bounded: max 200 profiles, 30min TTL)
+  private profileCache = new BoundedCache<CustomerPaymentProfile>(200, 30 * 60 * 1000);
 
   // Minimum history for statistical prediction
   private readonly MIN_HISTORY_FOR_STATISTICAL = 3;

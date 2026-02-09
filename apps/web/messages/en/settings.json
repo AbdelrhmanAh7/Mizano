@@ -148,5 +148,85 @@
       "system": "System"
     },
     "language": "Language"
+  },
+  "performance": {
+    "title": "Database Performance",
+    "description": "Monitor query performance, connection health, and optimization opportunities",
+    "resetMetrics": "Reset Metrics",
+    "health": {
+      "dbStatus": "Database Status",
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "readReplica": "Read Replica",
+      "active": "Active",
+      "notConfigured": "Not configured",
+      "connectionPool": "Connection Pool",
+      "maxConnections": "Max connections",
+      "uptime": "Uptime",
+      "sinceRestart": "Since last restart"
+    },
+    "stats": {
+      "totalQueries": "Total Queries",
+      "avgResponse": "Avg Response",
+      "p95Latency": "P95 Latency",
+      "slowQueries": "Slow Queries"
+    },
+    "distribution": {
+      "title": "Query Distribution by Model",
+      "description": "Number of queries per database model"
+    },
+    "trend": {
+      "title": "Response Time Trend",
+      "description": "Average query duration over time"
+    },
+    "slowQueries": {
+      "title": "Slow Queries",
+      "description": "Queries exceeding duration threshold",
+      "timestamp": "Timestamp",
+      "model": "Model",
+      "action": "Action",
+      "duration": "Duration",
+      "noQueries": "No queries above threshold"
+    },
+    "recommendations": {
+      "title": "Index Recommendations",
+      "description": "AI-powered suggestions based on query patterns",
+      "noRecommendations": "No recommendations yet",
+      "impact": "Impact"
+    },
+    "empty": {
+      "title": "No query metrics collected yet",
+      "description": "Metrics will appear as database queries are executed"
+    }
+  },
+  "cache": {
+    "title": "Cache Management",
+    "description": "Monitor and manage API response caching",
+    "storeType": "Store Type",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "totalKeys": "Total Keys",
+    "memoryUsage": "Memory Usage",
+    "hitRate": "Hit Rate",
+    "good": "Good",
+    "fair": "Fair",
+    "low": "Low",
+    "cachedKeys": "Cached Keys",
+    "filterKeys": "Filter keys...",
+    "noKeys": "No cached keys",
+    "noKeysDescription": "There are no cache entries for your organization. Cache entries are automatically created when you access dashboards, reports, and list views.",
+    "refresh": "Refresh",
+    "flushAll": "Flush All",
+    "flushConfirmTitle": "Flush all cache?",
+    "flushConfirmDescription": "This will remove all cached responses for your organization. Subsequent requests will be slower until the cache rebuilds. This action cannot be undone.",
+    "cancel": "Cancel",
+    "flushCache": "Flush Cache",
+    "howItWorks": "How Caching Works",
+    "dashboardReports": "Dashboard & Reports",
+    "dashboardReportsDescription": "Cached for 5–10 minutes. Automatically invalidated when accounting entries, invoices, bills, or bank transactions are modified.",
+    "accountLists": "Account Lists & Trees",
+    "accountListsDescription": "Cached for 10 minutes. Chart of Accounts rarely changes, so longer TTL provides significant performance improvement.",
+    "salesPurchases": "Sales & Purchases Lists",
+    "salesPurchasesDescription": "Cached for 2 minutes. Short TTL ensures data freshness for frequently-changing transactional data."
   }
 }

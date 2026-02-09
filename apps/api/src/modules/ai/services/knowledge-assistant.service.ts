@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
 import { AiFeature } from '@prisma/client';
 import { findBestMatch } from '../utils/text-similarity.util';
+import { BoundedCache } from '../utils/bounded-cache.util';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const natural = require('natural');
@@ -53,11 +54,11 @@ interface IndexedDocument {
 export class KnowledgeAssistantService {
   private readonly logger = new Logger(KnowledgeAssistantService.name);
 
-  /** Per-org TF-IDF instance (rebuilt from stored documents). */
-  private tfidfInstances = new Map<string, any>();
+  /** Per-org TF-IDF instance (bounded: max 50, 2h TTL). */
+  private tfidfInstances = new BoundedCache<any>(50, 2 * 60 * 60 * 1000);
 
-  /** Per-org list of indexed documents (parallel to TF-IDF addDocument order). */
-  private documentMaps = new Map<string, IndexedDocument[]>();
+  /** Per-org list of indexed documents (bounded: max 50, 2h TTL). */
+  private documentMaps = new BoundedCache<IndexedDocument[]>(50, 2 * 60 * 60 * 1000);
 
   constructor(
     private prisma: PrismaService,

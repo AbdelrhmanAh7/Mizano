@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
 import { Decimal } from '@prisma/client/runtime/library';
+import { getRiskLevel } from '../utils/risk-level.util';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { RandomForestClassifier } = require('ml-random-forest');
@@ -27,6 +28,7 @@ export interface AttritionPredictionResult {
   factors: AttritionFactor[];
   confidence: number;
   recommendation: string;
+  predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID';
 }
 
 export interface FlightRiskEmployee {
@@ -103,8 +105,8 @@ export class EmployeeAttritionService {
         mlScore = prediction[0] === 1 ? 0.8 : 0.2;
       }
     } catch (error) {
-      this.logger.debug(
-        `ML prediction fallback for employee ${employeeId}: ${error.message}`,
+      this.logger.warn(
+        `ML attrition prediction failed for employee ${employeeId}, falling back to rule-based: ${error.message}`,
       );
     }
 
@@ -115,7 +117,7 @@ export class EmployeeAttritionService {
           mlScore * this.ML_BLEND_WEIGHT
         : ruleScore;
 
-    const riskLevel = this.getRiskLevel(finalScore);
+    const riskLevel = getRiskLevel(finalScore);
     const confidence = mlScore !== null ? 0.85 : 0.7;
 
     // Store result in EmployeeAiProfile
@@ -143,6 +145,7 @@ export class EmployeeAttritionService {
       factors,
       confidence,
       recommendation: this.getRecommendation(riskLevel, factors),
+      predictionMethod: mlScore !== null ? 'HYBRID' : 'RULE_BASED',
     };
   }
 
@@ -180,7 +183,7 @@ export class EmployeeAttritionService {
         department: profile.employee.department,
         jobTitle: profile.employee.jobTitle,
         attritionRisk: risk,
-        riskLevel: this.getRiskLevel(risk),
+        riskLevel: getRiskLevel(risk),
         factors: (profile.attritionFactors as unknown as AttritionFactor[]) || [],
       };
     });
@@ -604,17 +607,6 @@ export class EmployeeAttritionService {
     ];
   }
 
-  /**
-   * Map a numeric risk score to a risk level.
-   */
-  private getRiskLevel(
-    score: number,
-  ): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' {
-    if (score >= 0.8) return 'CRITICAL';
-    if (score >= 0.6) return 'HIGH';
-    if (score >= 0.4) return 'MEDIUM';
-    return 'LOW';
-  }
 
   /**
    * Generate a recommendation based on risk level and contributing factors.

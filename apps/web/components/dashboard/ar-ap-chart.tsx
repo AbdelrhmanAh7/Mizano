@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -19,7 +20,7 @@ interface ARAPChartProps {
   currency?: string;
 }
 
-export function ARAPChart({ data, currency = 'USD' }: ARAPChartProps) {
+export const ARAPChart = memo(function ARAPChart({ data, currency = 'USD' }: ARAPChartProps) {
   const t = useTranslations('common.dashboard.charts');
 
   const chartData = [
@@ -85,4 +86,4 @@ export function ARAPChart({ data, currency = 'USD' }: ARAPChartProps) {
       </CardContent>
     </Card>
   );
-}
+});

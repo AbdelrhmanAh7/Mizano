@@ -50,6 +50,9 @@ export interface ExtractionAndMatchResult {
   matches: MatchedEntity[];
 }
 
+/** Type for a compromise NLP document */
+type NlpDocument = ReturnType<typeof nlp>;
+
 /** Minimum similarity threshold for entity matching */
 const MATCH_THRESHOLD = 0.6;
 
@@ -192,7 +195,7 @@ export class EntityExtractionService {
   /**
    * Extract person names using compromise NLP.
    */
-  private extractPeople(doc: any, originalText: string): ExtractedEntity[] {
+  private extractPeople(doc: NlpDocument, originalText: string): ExtractedEntity[] {
     const people: ExtractedEntity[] = [];
     const found = doc.people().out('array') as string[];
 
@@ -215,7 +218,7 @@ export class EntityExtractionService {
    * Extract organization names using compromise NLP.
    */
   private extractOrganizations(
-    doc: any,
+    doc: NlpDocument,
     originalText: string,
   ): ExtractedEntity[] {
     const orgs: ExtractedEntity[] = [];
@@ -239,7 +242,7 @@ export class EntityExtractionService {
   /**
    * Extract dates using compromise NLP.
    */
-  private extractDates(doc: any, originalText: string): ExtractedEntity[] {
+  private extractDates(doc: NlpDocument, originalText: string): ExtractedEntity[] {
     const dates: ExtractedEntity[] = [];
     const found = doc.dates().out('array') as string[];
 
@@ -278,7 +281,7 @@ export class EntityExtractionService {
   /**
    * Extract place names using compromise NLP.
    */
-  private extractPlaces(doc: any, originalText: string): ExtractedEntity[] {
+  private extractPlaces(doc: NlpDocument, originalText: string): ExtractedEntity[] {
     const places: ExtractedEntity[] = [];
     const found = doc.places().out('array') as string[];
 

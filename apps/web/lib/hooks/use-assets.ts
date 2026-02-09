@@ -1,9 +1,16 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // ============ Types ============
 
-export type AssetType = 'ELECTRONICS' | 'FURNITURE' | 'VEHICLES' | 'MACHINERY' | 'BUILDINGS' | 'OTHER';
+export type AssetType =
+  | 'ELECTRONICS'
+  | 'FURNITURE'
+  | 'VEHICLES'
+  | 'MACHINERY'
+  | 'BUILDINGS'
+  | 'OTHER';
 export type DepreciationMethod = 'STRAIGHT_LINE' | 'DECLINING_BALANCE';
 export type AssetStatus = 'ACTIVE' | 'DISPOSED' | 'FULLY_DEPRECIATED';
 
@@ -144,6 +151,17 @@ export function useAssets(params?: {
   });
 }
 
+export function useInfiniteAssets(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Asset, Record<string, unknown>>({
+    queryKey: ['assets'],
+    fetchFn: async (p) => {
+      const response = await api.get('/assets/cursor', { params: p });
+      return response.data;
+    },
+    params: params || {},
+  });
+}
+
 export function useAsset(id: string) {
   return useQuery({
     queryKey: ['assets', id],
@@ -166,8 +184,7 @@ export function useCreateAsset() {
 export function useUpdateAsset() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateAssetDto }) =>
-      assetsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: UpdateAssetDto }) => assetsApi.update(id, data),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       queryClient.invalidateQueries({ queryKey: ['assets', id] });
@@ -297,9 +314,9 @@ export function calculateRemainingLife(asset: Asset): number {
   endDate.setFullYear(endDate.getFullYear() + asset.usefulLifeYears);
 
   const today = new Date();
-  const remainingMonths = Math.max(0,
-    (endDate.getFullYear() - today.getFullYear()) * 12 +
-    (endDate.getMonth() - today.getMonth())
+  const remainingMonths = Math.max(
+    0,
+    (endDate.getFullYear() - today.getFullYear()) * 12 + (endDate.getMonth() - today.getMonth()),
   );
 
   return remainingMonths;

@@ -16,7 +16,6 @@ import { EntityExtractionService } from './entity-extraction.service';
 import { AiFeedbackService } from './ai-feedback.service';
 import { extractTextFromPdf } from '../utils/pdf-extractor.util';
 import {
-  findBestMatch,
   levenshteinSimilarity,
   normalizeText,
 } from '../utils/text-similarity.util';
@@ -163,8 +162,8 @@ export class DocumentIntakeService {
 
         if (pdfResult.isNativeText) {
           rawText = pdfResult.text;
-          // Still run OCR pattern extraction on the text for structured field parsing
-          ocrResult = this.parseFieldsFromText(rawText);
+          // Reuse OcrService extraction logic (native PDF text = 85% confidence)
+          ocrResult = this.ocrService.buildExtractionResult(rawText, 85);
         } else {
           // Scanned PDF — fall through to OCR
           ocrResult = await this.ocrService.extractFromImage(
@@ -218,6 +217,15 @@ export class DocumentIntakeService {
         organizationId,
         entityResult.matches,
       );
+
+    // Step 4b: Apply vendor-specific learned hints to improve extraction
+    if (matchedVendor && ocrResult) {
+      ocrResult = await this.ocrService.applyVendorHints(
+        organizationId,
+        matchedVendor.id,
+        ocrResult,
+      );
+    }
 
     // Step 5: Duplicate check
     let duplicateWarning: DocumentIntakeResult['duplicateWarning'] = null;
@@ -641,153 +649,6 @@ export class DocumentIntakeService {
     return results
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, topN);
-  }
-
-  /**
-   * Parse structured invoice fields from plain text (for native PDFs).
-   * Reuses the same regex patterns as OcrService.
-   */
-  private parseFieldsFromText(text: string): ExtractedInvoiceData {
-    const lines = text.split('\n').filter((l) => l.trim());
-    const fieldConfidence: Record<string, number> = {};
-
-    // Date patterns
-    const datePatterns = [
-      /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/,
-      /(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/,
-      /(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})/i,
-    ];
-
-    let date: string | null = null;
-    for (const pattern of datePatterns) {
-      const match = text.match(pattern);
-      if (match) {
-        date = match[0];
-        fieldConfidence['date'] = 0.8;
-        break;
-      }
-    }
-    if (!date) fieldConfidence['date'] = 0;
-
-    // Total
-    const totalPatterns = [
-      /(?:grand\s*)?total[\s:$€£¥]*([0-9,]+\.?\d*)/i,
-      /amount\s*(?:due|payable)[\s:$€£¥]*([0-9,]+\.?\d*)/i,
-      /balance\s*(?:due)?[\s:$€£¥]*([0-9,]+\.?\d*)/i,
-    ];
-    let total: number | null = null;
-    for (const pattern of totalPatterns) {
-      const match = text.match(pattern);
-      if (match) {
-        total = parseFloat(match[1].replace(/,/g, '')) || null;
-        fieldConfidence['total'] = 0.85;
-        break;
-      }
-    }
-    if (total === null) fieldConfidence['total'] = 0;
-
-    // Subtotal
-    let subtotal: number | null = null;
-    const subtotalMatch = text.match(
-      /sub.?total[\s:$€£¥]*([0-9,]+\.?\d*)/i,
-    );
-    if (subtotalMatch) {
-      subtotal = parseFloat(subtotalMatch[1].replace(/,/g, '')) || null;
-      fieldConfidence['subtotal'] = 0.75;
-    } else {
-      fieldConfidence['subtotal'] = 0;
-    }
-
-    // Tax
-    let tax: number | null = null;
-    const taxMatch = text.match(
-      /(?:tax|vat|gst)[\s:$€£¥]*([0-9,]+\.?\d*)/i,
-    );
-    if (taxMatch) {
-      tax = parseFloat(taxMatch[1].replace(/,/g, '')) || null;
-      fieldConfidence['tax'] = 0.7;
-    } else {
-      fieldConfidence['tax'] = 0;
-    }
-
-    // Invoice number
-    let invoiceNumber: string | null = null;
-    const invoicePatterns = [
-      /inv(?:oice)?[\s#:]*([A-Z0-9\-]+)/i,
-      /bill[\s#:]*([A-Z0-9\-]+)/i,
-      /ref(?:erence)?[\s#:]*([A-Z0-9\-]+)/i,
-      /#\s*([A-Z0-9\-]{3,})/i,
-    ];
-    for (const pattern of invoicePatterns) {
-      const match = text.match(pattern);
-      if (match && match[1].trim().length >= 3) {
-        invoiceNumber = match[1].trim();
-        fieldConfidence['invoiceNumber'] = 0.9;
-        break;
-      }
-    }
-    if (!invoiceNumber) fieldConfidence['invoiceNumber'] = 0;
-
-    // Vendor name (first meaningful line)
-    let vendorName: string | null = null;
-    const headerLines = lines.slice(0, 5).filter((l) => {
-      const trimmed = l.trim();
-      if (/^\d+[\/\-\.]\d+[\/\-\.]\d+$/.test(trimmed)) return false;
-      if (/^[\d\s,.$€£¥]+$/.test(trimmed)) return false;
-      if (trimmed.length < 3) return false;
-      return /[a-zA-Z\u0600-\u06FF]{2,}/.test(trimmed);
-    });
-    if (headerLines.length > 0) {
-      vendorName = headerLines[0].trim();
-      fieldConfidence['vendorName'] = 0.6;
-    } else {
-      fieldConfidence['vendorName'] = 0;
-    }
-
-    // Line items (simplified parsing)
-    const lineItems: ExtractedInvoiceData['lineItems'] = [];
-    const lineItemPattern =
-      /(.+?)\s+(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:,\d{3})*(?:\.\d+)?)/i;
-    const simplePattern =
-      /(.+?)\s+(\d+(?:,\d{3})*(?:\.\d+)?)\s+(\d+(?:,\d{3})*(?:\.\d+)?)\s+(\d+(?:,\d{3})*(?:\.\d+)?)/;
-
-    for (const line of lines) {
-      let match = line.match(lineItemPattern);
-      if (match) {
-        const qty = parseFloat(match[2]);
-        const price = parseFloat(match[3].replace(/,/g, ''));
-        lineItems.push({
-          description: match[1].trim(),
-          quantity: qty,
-          unitPrice: price,
-          total: qty * price,
-        });
-        continue;
-      }
-      match = line.match(simplePattern);
-      if (match) {
-        lineItems.push({
-          description: match[1].trim(),
-          quantity: parseFloat(match[2].replace(/,/g, '')),
-          unitPrice: parseFloat(match[3].replace(/,/g, '')),
-          total: parseFloat(match[4].replace(/,/g, '')),
-        });
-      }
-    }
-    fieldConfidence['lineItems'] = lineItems.length > 0 ? 0.65 : 0;
-
-    return {
-      date,
-      total,
-      subtotal,
-      tax,
-      invoiceNumber,
-      vendorName,
-      lineItems,
-      ocrConfidence: 0.85, // Native PDF text is higher confidence than OCR
-      rawText: text,
-      fieldConfidence,
-    };
   }
 
   /**

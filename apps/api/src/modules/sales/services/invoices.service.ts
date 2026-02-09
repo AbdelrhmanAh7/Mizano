@@ -1,16 +1,14 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { InvoiceStatus } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
-import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
+import { InvoiceCursorQueryDto } from '../dto/invoice-cursor-query.dto';
 import { InvoiceQueryDto } from '../dto/invoice-query.dto';
-import { InvoiceStatus } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
 
 @Injectable()
 export class InvoicesService {
@@ -160,6 +158,51 @@ export class InvoicesService {
     };
   }
 
+  async findAllCursor(organizationId: string, query: InvoiceCursorQueryDto) {
+    const {
+      cursor,
+      take = 50,
+      search,
+      sortBy = 'date',
+      sortOrder = 'desc',
+      status,
+      customerId,
+      dateFrom,
+      dateTo,
+    } = query;
+
+    const where: any = { organizationId, deletedAt: null };
+
+    if (search) {
+      where.OR = [
+        { invoiceNumber: { contains: search, mode: 'insensitive' } },
+        { customer: { name: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    if (status) where.status = status;
+    if (customerId) where.customerId = customerId;
+
+    if (dateFrom || dateTo) {
+      where.date = {};
+      if (dateFrom) where.date.gte = new Date(dateFrom);
+      if (dateTo) where.date.lte = new Date(dateTo);
+    }
+
+    return cursorPaginate(
+      this.prisma.invoice,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: {
+          customer: { select: { id: true, name: true, email: true } },
+        },
+      },
+    );
+  }
+
   async findOne(organizationId: string, id: string) {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id, organizationId, deletedAt: null },
@@ -224,7 +267,9 @@ export class InvoicesService {
         return { ...line, amount: lineTotal.toFixed(4) };
       });
 
-      const shipping = parseFloat(updateInvoiceDto.shippingAmount || invoice.shippingAmount.toString());
+      const shipping = parseFloat(
+        updateInvoiceDto.shippingAmount || invoice.shippingAmount.toString(),
+      );
       const grandTotal = subtotal + taxAmount + shipping;
 
       // Delete existing lines and create new ones
@@ -299,7 +344,12 @@ export class InvoicesService {
     const taxAmount = parseFloat(invoice.taxAmount.toString());
     const shippingAmount = parseFloat(invoice.shippingAmount.toString());
 
-    const journalLines: Array<{ accountId: string; debit: string; credit: string; description?: string }> = [
+    const journalLines: Array<{
+      accountId: string;
+      debit: string;
+      credit: string;
+      description?: string;
+    }> = [
       {
         accountId: org.defaultArAccountId,
         debit: grandTotal.toFixed(4),
@@ -507,6 +557,61 @@ export class InvoicesService {
       },
       data: { status: InvoiceStatus.OVERDUE },
     });
+  }
+
+  // === Bulk Operations ===
+
+  async bulkDelete(organizationId: string, ids: string[]) {
+    // Only draft invoices can be deleted
+    const result = await this.prisma.invoice.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        status: 'DRAFT',
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
+  async bulkSend(organizationId: string, ids: string[]) {
+    const result = await this.prisma.invoice.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        status: 'DRAFT',
+      },
+      data: { status: InvoiceStatus.SENT },
+    });
+    return { sent: result.count, total: ids.length };
+  }
+
+  async bulkVoid(organizationId: string, ids: string[]) {
+    const result = await this.prisma.invoice.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        status: { in: ['DRAFT', 'SENT'] },
+      },
+      data: { status: InvoiceStatus.VOID },
+    });
+    return { voided: result.count, total: ids.length };
+  }
+
+  async bulkPay(organizationId: string, ids: string[]) {
+    const result = await this.prisma.invoice.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        status: { in: [InvoiceStatus.SENT, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE] },
+      },
+      data: { status: InvoiceStatus.PAID, balanceDue: 0 },
+    });
+    return { paid: result.count, total: ids.length };
   }
 
   private async generateInvoiceNumber(organizationId: string): Promise<string> {

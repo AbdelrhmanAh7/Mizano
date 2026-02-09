@@ -1,14 +1,16 @@
 import {
+  BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
-  ConflictException,
-  BadRequestException,
 } from '@nestjs/common';
+import { AccountType } from '@prisma/client';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateAccountDto } from '../dto/create-account.dto';
 import { UpdateAccountDto } from '../dto/update-account.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
-import { AccountType } from '@prisma/client';
 
 @Injectable()
 export class AccountsService {
@@ -94,6 +96,27 @@ export class AccountsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+    const { cursor, take, search, sortBy = 'code', sortOrder = 'asc' } = query;
+    const where: any = { organizationId };
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    return cursorPaginate(
+      this.prisma.account,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: { parent: { select: { id: true, code: true, name: true } } },
+      },
+    );
   }
 
   async getTree(organizationId: string) {
@@ -239,7 +262,10 @@ export class AccountsService {
     organizationId: string,
     industry: 'services' | 'retail' | 'construction',
   ) {
-    const templates: Record<string, Array<{ code: string; name: string; type: AccountType; parentId: null }>> = {
+    const templates: Record<
+      string,
+      Array<{ code: string; name: string; type: AccountType; parentId: null }>
+    > = {
       services: this.getServicesCOA(),
       retail: this.getRetailCOA(),
       construction: this.getConstructionCOA(),
@@ -360,8 +386,18 @@ export class AccountsService {
       { code: '4010', name: 'In-Store Sales', type: AccountType.INCOME, parentId: null },
       { code: '4020', name: 'Online Sales', type: AccountType.INCOME, parentId: null },
       { code: '4030', name: 'Wholesale Sales', type: AccountType.INCOME, parentId: null },
-      { code: '4100', name: 'Shipping & Handling Income', type: AccountType.INCOME, parentId: null },
-      { code: '4200', name: 'Sales Returns & Allowances', type: AccountType.INCOME, parentId: null },
+      {
+        code: '4100',
+        name: 'Shipping & Handling Income',
+        type: AccountType.INCOME,
+        parentId: null,
+      },
+      {
+        code: '4200',
+        name: 'Sales Returns & Allowances',
+        type: AccountType.INCOME,
+        parentId: null,
+      },
       { code: '4300', name: 'Sales Discounts', type: AccountType.INCOME, parentId: null },
       { code: '4900', name: 'Other Income', type: AccountType.INCOME, parentId: null },
 
@@ -369,7 +405,12 @@ export class AccountsService {
       { code: '5000', name: 'Cost of Goods Sold', type: AccountType.EXPENSE, parentId: null },
       { code: '5100', name: 'Merchandise Purchases', type: AccountType.EXPENSE, parentId: null },
       { code: '5200', name: 'Freight-In', type: AccountType.EXPENSE, parentId: null },
-      { code: '5300', name: 'Purchase Returns & Allowances', type: AccountType.EXPENSE, parentId: null },
+      {
+        code: '5300',
+        name: 'Purchase Returns & Allowances',
+        type: AccountType.EXPENSE,
+        parentId: null,
+      },
       { code: '5400', name: 'Purchase Discounts', type: AccountType.EXPENSE, parentId: null },
       { code: '5500', name: 'Inventory Shrinkage', type: AccountType.EXPENSE, parentId: null },
 
@@ -381,7 +422,12 @@ export class AccountsService {
       { code: '6110', name: 'Utilities', type: AccountType.EXPENSE, parentId: null },
       { code: '6200', name: 'Marketing & Advertising', type: AccountType.EXPENSE, parentId: null },
       { code: '6210', name: 'Store Displays', type: AccountType.EXPENSE, parentId: null },
-      { code: '6300', name: 'Credit Card Processing Fees', type: AccountType.EXPENSE, parentId: null },
+      {
+        code: '6300',
+        name: 'Credit Card Processing Fees',
+        type: AccountType.EXPENSE,
+        parentId: null,
+      },
       { code: '6400', name: 'Shipping & Delivery', type: AccountType.EXPENSE, parentId: null },
       { code: '6500', name: 'Store Supplies', type: AccountType.EXPENSE, parentId: null },
       { code: '6600', name: 'Depreciation Expense', type: AccountType.EXPENSE, parentId: null },
@@ -409,8 +455,18 @@ export class AccountsService {
       { code: '1420', name: 'Vehicles', type: AccountType.ASSET, parentId: null },
       { code: '1430', name: 'Small Tools & Equipment', type: AccountType.ASSET, parentId: null },
       { code: '1500', name: 'Office Equipment', type: AccountType.ASSET, parentId: null },
-      { code: '1600', name: 'Accumulated Depreciation - Equipment', type: AccountType.ASSET, parentId: null },
-      { code: '1610', name: 'Accumulated Depreciation - Vehicles', type: AccountType.ASSET, parentId: null },
+      {
+        code: '1600',
+        name: 'Accumulated Depreciation - Equipment',
+        type: AccountType.ASSET,
+        parentId: null,
+      },
+      {
+        code: '1610',
+        name: 'Accumulated Depreciation - Vehicles',
+        type: AccountType.ASSET,
+        parentId: null,
+      },
 
       // Liabilities (2xxx)
       { code: '2000', name: 'Accounts Payable', type: AccountType.LIABILITY, parentId: null },
@@ -451,7 +507,12 @@ export class AccountsService {
       { code: '5140', name: 'Plumbing Materials', type: AccountType.EXPENSE, parentId: null },
       { code: '5150', name: 'HVAC Materials', type: AccountType.EXPENSE, parentId: null },
       { code: '5200', name: 'Subcontractor Costs', type: AccountType.EXPENSE, parentId: null },
-      { code: '5210', name: 'Electrical Subcontractors', type: AccountType.EXPENSE, parentId: null },
+      {
+        code: '5210',
+        name: 'Electrical Subcontractors',
+        type: AccountType.EXPENSE,
+        parentId: null,
+      },
       { code: '5220', name: 'Plumbing Subcontractors', type: AccountType.EXPENSE, parentId: null },
       { code: '5230', name: 'HVAC Subcontractors', type: AccountType.EXPENSE, parentId: null },
       { code: '5240', name: 'Roofing Subcontractors', type: AccountType.EXPENSE, parentId: null },
@@ -460,16 +521,31 @@ export class AccountsService {
       { code: '5500', name: 'Job Site Expenses', type: AccountType.EXPENSE, parentId: null },
 
       // Operating Expenses (6xxx)
-      { code: '6000', name: 'Salaries - Office & Admin', type: AccountType.EXPENSE, parentId: null },
+      {
+        code: '6000',
+        name: 'Salaries - Office & Admin',
+        type: AccountType.EXPENSE,
+        parentId: null,
+      },
       { code: '6010', name: 'Employee Benefits', type: AccountType.EXPENSE, parentId: null },
       { code: '6020', name: 'Payroll Taxes', type: AccountType.EXPENSE, parentId: null },
       { code: '6100', name: 'Office Rent', type: AccountType.EXPENSE, parentId: null },
       { code: '6110', name: 'Utilities', type: AccountType.EXPENSE, parentId: null },
       { code: '6200', name: 'Vehicle Expense', type: AccountType.EXPENSE, parentId: null },
       { code: '6210', name: 'Fuel', type: AccountType.EXPENSE, parentId: null },
-      { code: '6220', name: 'Vehicle Repairs & Maintenance', type: AccountType.EXPENSE, parentId: null },
+      {
+        code: '6220',
+        name: 'Vehicle Repairs & Maintenance',
+        type: AccountType.EXPENSE,
+        parentId: null,
+      },
       { code: '6300', name: 'Equipment Maintenance', type: AccountType.EXPENSE, parentId: null },
-      { code: '6400', name: 'Insurance - General Liability', type: AccountType.EXPENSE, parentId: null },
+      {
+        code: '6400',
+        name: 'Insurance - General Liability',
+        type: AccountType.EXPENSE,
+        parentId: null,
+      },
       { code: '6410', name: 'Insurance - Workers Comp', type: AccountType.EXPENSE, parentId: null },
       { code: '6420', name: 'Insurance - Vehicle', type: AccountType.EXPENSE, parentId: null },
       { code: '6500', name: 'Bonding Expense', type: AccountType.EXPENSE, parentId: null },

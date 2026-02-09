@@ -5,7 +5,7 @@
  */
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { LogisticRegression } = require('ml-logistic-regression');
+const LogisticRegression = require('ml-logistic-regression');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { Matrix } = require('ml-matrix');
 

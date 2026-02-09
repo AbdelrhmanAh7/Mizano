@@ -1,43 +1,112 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Plus, LayoutGrid, List, DollarSign, TrendingUp, Target, Clock } from 'lucide-react';
+import { PipelineForecastCard } from '@/components/ai';
+import { KanbanBoard } from '@/components/crm/kanban-board';
+import { DataTable, SortableHeader } from '@/components/data-table';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  useDeals,
-  usePipelineMetrics,
   Deal,
+  formatCurrency,
   getDealStageColor,
   getDealStageLabel,
-  formatCurrency,
+  useInfiniteDeals,
+  usePipelineMetrics,
 } from '@/lib/hooks/use-crm';
 import { usePermissions } from '@/lib/hooks/use-permissions';
-import { KanbanBoard } from '@/components/crm/kanban-board';
+import { useTableParams } from '@/lib/hooks/use-table-params';
+import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
+import { Clock, DollarSign, LayoutGrid, List, Plus, Target, TrendingUp } from 'lucide-react';
+import Link from 'next/link';
+import { Suspense, useState } from 'react';
 
-export default function DealsPage() {
+function DealsPageContent() {
   const { hasPermission } = usePermissions();
+  const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
   const [view, setView] = useState<'kanban' | 'table'>('kanban');
 
-  const { data: dealsData, isLoading } = useDeals();
+  const {
+    data: deals,
+    total,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useInfiniteDeals({
+    search: tableParams.search || undefined,
+    page: tableParams.page,
+  });
   const { data: metricsData } = usePipelineMetrics();
-
-  const deals = dealsData?.data || [];
   const metrics = metricsData?.data || metricsData;
 
   const canCreate = hasPermission('crm.create');
+
+  const columns: ColumnDef<Deal>[] = [
+    {
+      accessorKey: 'dealName',
+      header: () => (
+        <SortableHeader
+          label="Deal Name"
+          columnId="dealName"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <Link href={`/crm/deals/${row.original.id}`} className="font-medium hover:underline">
+          {row.original.dealName}
+        </Link>
+      ),
+    },
+    {
+      accessorKey: 'stage',
+      header: 'Stage',
+      cell: ({ row }) => (
+        <Badge className={getDealStageColor(row.original.stage)}>
+          {getDealStageLabel(row.original.stage)}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'expectedAmount',
+      header: () => (
+        <SortableHeader
+          label="Amount"
+          columnId="expectedAmount"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      cell: ({ row }) => (
+        <span className="font-mono">{formatCurrency(row.original.expectedAmount)}</span>
+      ),
+    },
+    {
+      accessorKey: 'probability',
+      header: 'Probability',
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      cell: ({ row }) => `${row.original.probability}%`,
+    },
+    {
+      accessorKey: 'expectedCloseDate',
+      header: 'Expected Close',
+      cell: ({ row }) =>
+        row.original.expectedCloseDate
+          ? format(new Date(row.original.expectedCloseDate), 'MMM d, yyyy')
+          : '-',
+    },
+    {
+      id: 'assignedTo',
+      header: 'Assigned To',
+      cell: ({ row }) => row.original.assignedTo?.name || '-',
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -45,9 +114,7 @@ export default function DealsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Deals Pipeline</h1>
-          <p className="text-muted-foreground">
-            Manage your sales deals and track pipeline
-          </p>
+          <p className="text-muted-foreground">Manage your sales deals and track pipeline</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center border rounded-md">
@@ -117,86 +184,73 @@ export default function DealsPage() {
                 <Clock className="h-4 w-4" />
                 Conversion Rate
               </div>
-              <div className="text-2xl font-bold">
-                {(metrics.conversionRate || 0).toFixed(1)}%
-              </div>
+              <div className="text-2xl font-bold">{(metrics.conversionRate || 0).toFixed(1)}%</div>
             </CardContent>
           </Card>
         </div>
       )}
 
+      {/* AI Pipeline Forecast */}
+      <PipelineForecastCard />
+
       {/* Content */}
-      {isLoading ? (
-        <div className="space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </div>
-      ) : deals.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground mb-4">No deals yet</p>
-            {canCreate && (
-              <Button asChild>
-                <Link href="/crm/deals/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Your First Deal
-                </Link>
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : view === 'kanban' ? (
-        <KanbanBoard deals={deals} />
+      {view === 'kanban' ? (
+        isLoading ? (
+          <DataTable columns={columns} data={[]} isLoading={true} emptyMessage="No deals yet" />
+        ) : deals.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-muted-foreground mb-4">No deals yet</p>
+              {canCreate && (
+                <Button asChild>
+                  <Link href="/crm/deals/new">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Your First Deal
+                  </Link>
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <KanbanBoard deals={deals} />
+        )
       ) : (
         <Card>
           <CardContent className="pt-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Deal Name</TableHead>
-                  <TableHead>Stage</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Probability</TableHead>
-                  <TableHead>Expected Close</TableHead>
-                  <TableHead>Assigned To</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {deals.map((deal: Deal) => (
-                  <TableRow key={deal.id}>
-                    <TableCell>
-                      <Link
-                        href={`/crm/deals/${deal.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {deal.dealName}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getDealStageColor(deal.stage)}>
-                        {getDealStageLabel(deal.stage)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(deal.expectedAmount)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {deal.probability}%
-                    </TableCell>
-                    <TableCell>
-                      {deal.expectedCloseDate
-                        ? format(new Date(deal.expectedCloseDate), 'MMM d, yyyy')
-                        : '-'}
-                    </TableCell>
-                    <TableCell>{deal.assignedTo?.name || '-'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable
+              columns={columns}
+              data={deals}
+              total={total}
+              isLoading={isLoading}
+              enableVirtualization
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              onLoadMore={() => fetchNextPage()}
+              enableColumnResizing
+              tableId="deals"
+              emptyMessage="No deals yet"
+              emptyAction={
+                canCreate ? (
+                  <Button asChild>
+                    <Link href="/crm/deals/new">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Your First Deal
+                    </Link>
+                  </Button>
+                ) : undefined
+              }
+            />
           </CardContent>
         </Card>
       )}
     </div>
+  );
+}
+
+export default function DealsPage() {
+  return (
+    <Suspense>
+      <DealsPageContent />
+    </Suspense>
   );
 }

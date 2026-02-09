@@ -14,6 +14,7 @@ import {
   ApiResponse,
   ApiQuery,
 } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -24,6 +25,7 @@ import { ChatMessageDto, ChatResponseDto, ChatHistoryItemDto } from '../dto/chat
 
 @ApiTags('AI - Chatbot')
 @ApiBearerAuth()
+@SkipThrottle({ short: true, long: true })
 @Controller('ai/chatbot')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ChatbotController {

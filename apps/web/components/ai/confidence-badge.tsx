@@ -99,7 +99,7 @@ export function ConfidenceBadge({
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild>{badge}</TooltipTrigger>
+        <TooltipTrigger asChild><span className="inline-flex">{badge}</span></TooltipTrigger>
         <TooltipContent>
           <div className="space-y-1">
             <div className="font-medium">{config.label} Confidence</div>

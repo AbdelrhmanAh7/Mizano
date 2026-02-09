@@ -388,7 +388,77 @@ export class PdfService {
     return this.htmlToPdf(html);
   }
 
+  // ============ Profit & Loss PDF ============
+
+  async generateProfitAndLossPdf(organizationId: string, startDate: string, endDate: string): Promise<Buffer> {
+    const org = await this.getOrganizationInfo(organizationId);
+    const primaryColor = org.primaryColor || '#3B82F6';
+    const currency = org.currency || 'SAR';
+    const journalLines = await this.prisma.journalLine.findMany({
+      where: { journal: { organizationId, isPosted: true, deletedAt: null, date: { gte: new Date(startDate), lte: new Date(endDate) } } },
+      include: { account: { select: { name: true, type: true, subType: true, code: true } } },
+    });
+    const acctBal: Record<string, Record<string, { code: string; balance: number }>> = {};
+    for (const line of journalLines) {
+      const { type, name, code } = line.account;
+      const debit = parseFloat(line.debit.toString()), credit = parseFloat(line.credit.toString());
+      if (!acctBal[type]) acctBal[type] = {};
+      if (!acctBal[type][name]) acctBal[type][name] = { code, balance: 0 };
+      if (type === 'REVENUE' || type === 'INCOME') acctBal[type][name].balance += credit - debit;
+      else if (type === 'EXPENSE') acctBal[type][name].balance += debit - credit;
+    }
+    const revAccts = { ...(acctBal['REVENUE'] || {}), ...(acctBal['INCOME'] || {}) };
+    let totalRev = 0;
+    const revRows = Object.entries(revAccts).sort((a, b) => a[1].code.localeCompare(b[1].code)).map(([n, d]) => { totalRev += d.balance; return `<tr style="border-bottom:1px solid #E5E7EB"><td style="padding:8px 10px;font-size:12px;padding-left:30px">${d.code} - ${n}</td><td style="padding:8px 10px;text-align:right;font-size:12px">${formatCurrency(d.balance, currency)}</td></tr>`; }).join('');
+    let totalExp = 0;
+    const expRows = Object.entries(acctBal['EXPENSE'] || {}).sort((a, b) => a[1].code.localeCompare(b[1].code)).map(([n, d]) => { totalExp += d.balance; return `<tr style="border-bottom:1px solid #E5E7EB"><td style="padding:8px 10px;font-size:12px;padding-left:30px">${d.code} - ${n}</td><td style="padding:8px 10px;text-align:right;font-size:12px">${formatCurrency(d.balance, currency)}</td></tr>`; }).join('');
+    const net = totalRev - totalExp;
+    return this.htmlToPdf(this.generateReportHtml(org, primaryColor, currency, { title: 'PROFIT & LOSS STATEMENT', subtitle: `${formatDate(startDate)} - ${formatDate(endDate)}`, sections: [{ heading: 'Revenue', rows: revRows, totalLabel: 'Total Revenue', totalAmount: totalRev }, { heading: 'Expenses', rows: expRows, totalLabel: 'Total Expenses', totalAmount: totalExp }], bottomBar: { label: `Net ${net >= 0 ? 'Profit' : 'Loss'}`, amount: Math.abs(net) } }));
+  }
+
+  // ============ Balance Sheet PDF ============
+
+  async generateBalanceSheetPdf(organizationId: string, asOfDate: string): Promise<Buffer> {
+    const org = await this.getOrganizationInfo(organizationId);
+    const pc = org.primaryColor || '#3B82F6';
+    const cur = org.currency || 'SAR';
+    const lines = await this.prisma.journalLine.findMany({ where: { journal: { organizationId, isPosted: true, deletedAt: null, date: { lte: new Date(asOfDate) } } }, include: { account: { select: { name: true, type: true, code: true } } } });
+    const sec: Record<string, Record<string, { code: string; balance: number }>> = {};
+    for (const l of lines) { const { type, name, code } = l.account; const d = parseFloat(l.debit.toString()), c = parseFloat(l.credit.toString()); if (!sec[type]) sec[type] = {}; if (!sec[type][name]) sec[type][name] = { code, balance: 0 }; sec[type][name].balance += type === 'ASSET' ? d - c : c - d; }
+    const totRev = Object.values(sec['REVENUE'] || {}).reduce((s, a) => s + a.balance, 0) + Object.values(sec['INCOME'] || {}).reduce((s, a) => s + a.balance, 0);
+    const totExp = Object.values(sec['EXPENSE'] || {}).reduce((s, a) => s + a.balance, 0);
+    const re = totRev + totExp;
+    const br = (accts: Record<string, { code: string; balance: number }>) => { let t = 0; const r = Object.entries(accts).sort((a, b) => a[1].code.localeCompare(b[1].code)).map(([n, d]) => { t += d.balance; return `<tr style="border-bottom:1px solid #E5E7EB"><td style="padding:8px 10px;font-size:12px;padding-left:30px">${d.code} - ${n}</td><td style="padding:8px 10px;text-align:right;font-size:12px">${formatCurrency(d.balance, cur)}</td></tr>`; }).join(''); return { rows: r, total: t }; };
+    const a = br(sec['ASSET'] || {}), li = br(sec['LIABILITY'] || {}), eq = br(sec['EQUITY'] || {});
+    const eqR = (eq.rows || '') + `<tr style="border-bottom:1px solid #E5E7EB"><td style="padding:8px 10px;font-size:12px;padding-left:30px;font-style:italic">Retained Earnings</td><td style="padding:8px 10px;text-align:right;font-size:12px">${formatCurrency(re, cur)}</td></tr>`;
+    return this.htmlToPdf(this.generateReportHtml(org, pc, cur, { title: 'BALANCE SHEET', subtitle: `As of ${formatDate(asOfDate)}`, sections: [{ heading: 'Assets', rows: a.rows, totalLabel: 'Total Assets', totalAmount: a.total }, { heading: 'Liabilities', rows: li.rows, totalLabel: 'Total Liabilities', totalAmount: li.total }, { heading: 'Equity', rows: eqR, totalLabel: 'Total Equity', totalAmount: eq.total + re }], bottomBar: { label: 'Total Liabilities & Equity', amount: li.total + eq.total + re } }));
+  }
+
+  // ============ Aging Report PDF ============
+
+  async generateAgingReportPdf(organizationId: string, type: 'receivables' | 'payables', asOfDate?: string): Promise<Buffer> {
+    const org = await this.getOrganizationInfo(organizationId);
+    const pc = org.primaryColor || '#3B82F6', cur = org.currency || 'SAR';
+    const ref = asOfDate ? new Date(asOfDate) : new Date();
+    const cat = (due: Date, amt: number) => { const d = Math.floor((ref.getTime() - due.getTime()) / 86400000); if (d <= 0) return { current: amt }; if (d <= 30) return { days1to30: amt }; if (d <= 60) return { days31to60: amt }; if (d <= 90) return { days61to90: amt }; return { over90: amt }; };
+    const eb = () => ({ current: 0, days1to30: 0, days31to60: 0, days61to90: 0, over90: 0, total: 0 });
+    const grp: Record<string, ReturnType<typeof eb>> = {}, tot = eb();
+    if (type === 'receivables') { const inv = await this.prisma.invoice.findMany({ where: { organizationId, deletedAt: null, balanceDue: { gt: 0 } }, include: { customer: { select: { name: true } } } }); for (const i of inv) { const n = i.customer.name, b = parseFloat(i.balanceDue.toString()); if (!grp[n]) grp[n] = eb(); for (const [k, v] of Object.entries(cat(i.dueDate, b))) { (grp[n] as any)[k] += v; (tot as any)[k] += v; } grp[n].total += b; tot.total += b; } }
+    else { const bills = await this.prisma.bill.findMany({ where: { organizationId, deletedAt: null, balanceDue: { gt: 0 } }, include: { vendor: { select: { name: true } } } }); for (const bl of bills) { const n = bl.vendor.name, b = parseFloat(bl.balanceDue.toString()); if (!grp[n]) grp[n] = eb(); for (const [k, v] of Object.entries(cat(bl.dueDate, b))) { (grp[n] as any)[k] += v; (tot as any)[k] += v; } grp[n].total += b; tot.total += b; } }
+    const ti = type === 'receivables' ? 'ACCOUNTS RECEIVABLE AGING' : 'ACCOUNTS PAYABLE AGING';
+    const la = type === 'receivables' ? 'Customer' : 'Vendor';
+    const fc = (v: number) => formatCurrency(v, cur);
+    const rw = Object.entries(grp).sort((a, b) => b[1].total - a[1].total).map(([n, b]) => `<tr style="border-bottom:1px solid #E5E7EB"><td style="padding:8px 10px;font-size:11px">${n}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.current)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.days1to30)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.days31to60)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.days61to90)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.over90)}</td><td style="padding:8px 10px;text-align:right;font-size:11px;font-weight:bold">${fc(b.total)}</td></tr>`).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${ti}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111827;line-height:1.5}.container{max-width:800px;margin:0 auto;padding:40px}</style></head><body><div class="container"><div style="margin-bottom:30px">${org.logoUrl ? `<img src="${org.logoUrl}" style="max-height:60px"/>` : ''}<h1 style="color:${pc};margin:10px 0 5px 0;font-size:24px">${org.name}</h1>${org.address ? `<p style="color:#6B7280;font-size:12px">${org.address}</p>` : ''}</div><div style="text-align:center;margin-bottom:30px"><h2 style="font-size:24px;color:${pc}">${ti}</h2><p style="color:#6B7280;font-size:14px">As of ${formatDate(ref)}</p></div><table style="width:100%;border-collapse:collapse;margin-bottom:20px"><thead><tr style="background:${pc};color:white"><th style="padding:10px;text-align:left;font-size:11px">${la}</th><th style="padding:10px;text-align:right;font-size:11px">Current</th><th style="padding:10px;text-align:right;font-size:11px">1-30</th><th style="padding:10px;text-align:right;font-size:11px">31-60</th><th style="padding:10px;text-align:right;font-size:11px">61-90</th><th style="padding:10px;text-align:right;font-size:11px">90+</th><th style="padding:10px;text-align:right;font-size:11px">Total</th></tr></thead><tbody>${rw || `<tr><td colspan="7" style="padding:10px;text-align:center;color:#6B7280">No outstanding ${type}</td></tr>`}</tbody><tfoot><tr style="background:#F3F4F6;font-weight:bold"><td style="padding:10px">Total</td><td style="padding:10px;text-align:right">${fc(tot.current)}</td><td style="padding:10px;text-align:right">${fc(tot.days1to30)}</td><td style="padding:10px;text-align:right">${fc(tot.days31to60)}</td><td style="padding:10px;text-align:right">${fc(tot.days61to90)}</td><td style="padding:10px;text-align:right">${fc(tot.over90)}</td><td style="padding:10px;text-align:right">${fc(tot.total)}</td></tr></tfoot></table><div style="margin-top:40px;text-align:center"><p style="color:#9CA3AF;font-size:10px">Generated automatically.</p></div></div></body></html>`;
+    return this.htmlToPdf(html);
+  }
+
   // ============ Helper Methods ============
+
+  private generateReportHtml(org: OrganizationInfo, pc: string, cur: string, r: { title: string; subtitle: string; sections: Array<{ heading: string; rows: string; totalLabel: string; totalAmount: number }>; bottomBar: { label: string; amount: number } }): string {
+    const sh = r.sections.map((s) => `<table style="width:100%;border-collapse:collapse;margin-bottom:10px;margin-top:20px"><thead><tr style="background:${pc};color:white"><th style="padding:10px;text-align:left;font-size:12px">${s.heading}</th><th style="padding:10px;text-align:right;font-size:12px">Amount</th></tr></thead><tbody>${s.rows || `<tr><td colspan="2" style="padding:10px;color:#6B7280">No ${s.heading.toLowerCase()} recorded</td></tr>`}<tr style="background:#F3F4F6;font-weight:bold"><td style="padding:10px;font-size:13px">${s.totalLabel}</td><td style="padding:10px;text-align:right;font-size:13px">${formatCurrency(s.totalAmount, cur)}</td></tr></tbody></table>`).join('');
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${r.title}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111827;line-height:1.5}.container{max-width:800px;margin:0 auto;padding:40px}</style></head><body><div class="container"><div style="margin-bottom:30px">${org.logoUrl ? `<img src="${org.logoUrl}" style="max-height:60px"/>` : ''}<h1 style="color:${pc};margin:10px 0 5px 0;font-size:24px">${org.name}</h1>${org.address ? `<p style="color:#6B7280;font-size:12px">${org.address}</p>` : ''}</div><div style="text-align:center;margin-bottom:30px"><h2 style="font-size:24px;color:${pc}">${r.title}</h2><p style="color:#6B7280;font-size:14px">${r.subtitle}</p></div>${sh}<div style="background:${pc};color:white;padding:15px;border-radius:8px;margin-top:20px"><div style="display:flex;justify-content:space-between"><span style="font-weight:bold;font-size:16px">${r.bottomBar.label}</span><span style="font-weight:bold;font-size:18px">${formatCurrency(r.bottomBar.amount, cur)}</span></div></div><div style="margin-top:40px;text-align:center"><p style="color:#9CA3AF;font-size:10px">Generated automatically.</p>${org.footerText ? `<p style="color:#9CA3AF;font-size:10px">${org.footerText}</p>` : ''}</div></div></body></html>`;
+  }
 
   private async getOrganizationInfo(organizationId: string): Promise<OrganizationInfo> {
     const org = await this.prisma.organization.findUnique({

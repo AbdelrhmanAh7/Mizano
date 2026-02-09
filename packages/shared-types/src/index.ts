@@ -1959,3 +1959,61 @@ export interface ApiErrorResponse {
   timestamp: string;
   path: string;
 }
+
+// ============================================
+// LOGGER TYPES
+// ============================================
+export * from './logger.types';
+
+// ============================================
+// GLOBAL SEARCH
+// ============================================
+
+export enum SearchEntityType {
+  CUSTOMER = 'customer',
+  VENDOR = 'vendor',
+  INVOICE = 'invoice',
+  BILL = 'bill',
+  ITEM = 'item',
+  EMPLOYEE = 'employee',
+  PROJECT = 'project',
+  LEAD = 'lead',
+  DEAL = 'deal',
+  QUOTE = 'quote',
+  EXPENSE = 'expense',
+}
+
+export interface GlobalSearchResult {
+  id: string;
+  type: string;
+  title: string;
+  subtitle?: string;
+  href: string;
+  score: number;
+}
+
+export interface GlobalSearchGroup {
+  type: string;
+  label: string;
+  results: GlobalSearchResult[];
+}
+
+export interface GlobalSearchResponse {
+  data: GlobalSearchResult[];
+  groups: GlobalSearchGroup[];
+  query: string;
+  totalResults: number;
+}
+
+export interface SearchHistoryEntry {
+  id: string;
+  query: string;
+  resultType: string | null;
+  resultId: string | null;
+  resultTitle: string | null;
+  clickedAt: string;
+}
+
+export interface SearchHistoryResponse {
+  data: SearchHistoryEntry[];
+}

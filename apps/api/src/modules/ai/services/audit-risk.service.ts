@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
+import { getRiskLevel } from '../utils/risk-level.util';
 import {
   buildIsolationForest1D,
   isolationForestScore1D,
@@ -85,7 +86,7 @@ export class AuditRiskService {
     const finalScore =
       mlScore !== null ? score * 0.6 + mlScore * 0.4 : score;
 
-    const riskLevel = this.getRiskLevel(finalScore);
+    const riskLevel = getRiskLevel(finalScore);
 
     return {
       entityType,
@@ -106,21 +107,24 @@ export class AuditRiskService {
     let mediumRisk = 0;
     let lowRisk = 0;
 
-    for (const entityId of entityIds) {
-      try {
-        const result = await this.scoreEntity(
-          organizationId,
-          entityType,
-          entityId,
-        );
-        if (result.riskLevel === 'CRITICAL' || result.riskLevel === 'HIGH')
-          highRisk++;
-        else if (result.riskLevel === 'MEDIUM') mediumRisk++;
-        else lowRisk++;
-      } catch (error) {
-        this.logger.warn(
-          `Failed to score ${entityType} ${entityId}: ${error.message}`,
-        );
+    const BATCH_SIZE = 10;
+
+    // Process in parallel batches instead of sequentially
+    for (let i = 0; i < entityIds.length; i += BATCH_SIZE) {
+      const batch = entityIds.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(
+        batch.map((entityId) =>
+          this.scoreEntity(organizationId, entityType, entityId),
+        ),
+      );
+
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          if (result.value.riskLevel === 'CRITICAL' || result.value.riskLevel === 'HIGH')
+            highRisk++;
+          else if (result.value.riskLevel === 'MEDIUM') mediumRisk++;
+          else lowRisk++;
+        }
       }
     }
 
@@ -138,6 +142,7 @@ export class AuditRiskService {
     limit: number = 20,
   ): Promise<AuditRiskResult[]> {
     const results: AuditRiskResult[] = [];
+    const BATCH_SIZE = 10;
 
     for (const entityType of ['journal', 'invoice', 'bill', 'expense']) {
       const entityIds = await this.getEntityIds(
@@ -145,18 +150,20 @@ export class AuditRiskService {
         entityType,
         50,
       );
-      for (const entityId of entityIds) {
-        try {
-          const result = await this.scoreEntity(
-            organizationId,
-            entityType,
-            entityId,
-          );
-          if (result.riskScore >= 0.5) {
-            results.push(result);
+
+      // Process in parallel batches
+      for (let i = 0; i < entityIds.length; i += BATCH_SIZE) {
+        const batch = entityIds.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.allSettled(
+          batch.map((entityId) =>
+            this.scoreEntity(organizationId, entityType, entityId),
+          ),
+        );
+
+        for (const result of batchResults) {
+          if (result.status === 'fulfilled' && result.value.riskScore >= 0.5) {
+            results.push(result.value);
           }
-        } catch {
-          continue;
         }
       }
     }
@@ -676,12 +683,4 @@ export class AuditRiskService {
     }
   }
 
-  private getRiskLevel(
-    score: number,
-  ): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' {
-    if (score >= 0.8) return 'CRITICAL';
-    if (score >= 0.6) return 'HIGH';
-    if (score >= 0.4) return 'MEDIUM';
-    return 'LOW';
-  }
 }

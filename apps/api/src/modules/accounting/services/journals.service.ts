@@ -1,15 +1,13 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateJournalDto } from '../dto/create-journal.dto';
-import { UpdateJournalDto } from '../dto/update-journal.dto';
-import { JournalQueryDto } from '../dto/journal-query.dto';
-import { OrganizationsService } from '../../organizations/organizations.service';
-import { Decimal } from '@prisma/client/runtime/library';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { OrganizationsService } from '../../organizations/organizations.service';
+import { CreateJournalDto } from '../dto/create-journal.dto';
+import { JournalCursorQueryDto } from '../dto/journal-cursor-query.dto';
+import { JournalQueryDto } from '../dto/journal-query.dto';
+import { UpdateJournalDto } from '../dto/update-journal.dto';
 
 @Injectable()
 export class JournalsService {
@@ -25,14 +23,8 @@ export class JournalsService {
     await this.checkLockDate(organizationId, new Date(date));
 
     // Validate debits = credits
-    const totalDebit = lines.reduce(
-      (sum, line) => sum + parseFloat(line.debit || '0'),
-      0,
-    );
-    const totalCredit = lines.reduce(
-      (sum, line) => sum + parseFloat(line.credit || '0'),
-      0,
-    );
+    const totalDebit = lines.reduce((sum, line) => sum + parseFloat(line.debit || '0'), 0);
+    const totalCredit = lines.reduce((sum, line) => sum + parseFloat(line.credit || '0'), 0);
 
     if (Math.abs(totalDebit - totalCredit) > 0.0001) {
       throw new BadRequestException('Total debits must equal total credits');
@@ -147,6 +139,37 @@ export class JournalsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async findAllCursor(organizationId: string, query: JournalCursorQueryDto) {
+    const { cursor, take, search, sortBy = 'date', sortOrder = 'desc', dateFrom, dateTo } = query;
+    const where: any = { organizationId, deletedAt: null };
+    if (search) {
+      where.OR = [
+        { journalNumber: { contains: search, mode: 'insensitive' } },
+        { reference: { contains: search, mode: 'insensitive' } },
+        { notes: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (dateFrom || dateTo) {
+      where.date = {};
+      if (dateFrom) where.date.gte = new Date(dateFrom);
+      if (dateTo) where.date.lte = new Date(dateTo);
+    }
+    return cursorPaginate(
+      this.prisma.journal,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: {
+          lines: {
+            include: { account: { select: { id: true, code: true, name: true, type: true } } },
+          },
+        },
+      },
+    );
   }
 
   async findOne(organizationId: string, id: string) {
@@ -400,5 +423,34 @@ export class JournalsService {
         `This period is locked. Transactions before ${lockDate.toISOString().split('T')[0]} cannot be modified.`,
       );
     }
+  }
+
+  // === Bulk Operations ===
+
+  async bulkDelete(organizationId: string, ids: string[]) {
+    // Only unposted journals can be deleted
+    const result = await this.prisma.journal.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        isPosted: false,
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
+  async bulkPost(organizationId: string, ids: string[]) {
+    const result = await this.prisma.journal.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        isPosted: false,
+      },
+      data: { isPosted: true },
+    });
+    return { posted: result.count, total: ids.length };
   }
 }

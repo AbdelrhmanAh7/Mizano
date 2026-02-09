@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { QuoteStatus } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateQuoteDto } from '../dto/create-quote.dto';
 import { UpdateQuoteDto } from '../dto/update-quote.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
-import { QuoteStatus } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class QuotesService {
@@ -18,7 +20,8 @@ export class QuotesService {
     });
     if (!customer) throw new BadRequestException('Customer not found');
 
-    let subtotal = 0, taxAmount = 0;
+    let subtotal = 0,
+      taxAmount = 0;
     const calculatedLines = lines.map((line) => {
       const qty = parseFloat(line.quantity);
       const rate = parseFloat(line.rate);
@@ -84,6 +87,32 @@ export class QuotesService {
     return { data: quotes, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
+  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+    const { cursor, take = 50, search, sortBy = 'date', sortOrder = 'desc' } = query;
+
+    const where: any = { organizationId, deletedAt: null };
+
+    if (search) {
+      where.OR = [
+        { quoteNumber: { contains: search, mode: 'insensitive' } },
+        { customer: { name: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    return cursorPaginate(
+      this.prisma.quote,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: {
+          customer: { select: { id: true, name: true } },
+        },
+      },
+    );
+  }
+
   async findOne(organizationId: string, id: string) {
     const quote = await this.prisma.quote.findFirst({
       where: { id, organizationId, deletedAt: null },
@@ -94,9 +123,12 @@ export class QuotesService {
   }
 
   async update(organizationId: string, id: string, updateQuoteDto: UpdateQuoteDto) {
-    const quote = await this.prisma.quote.findFirst({ where: { id, organizationId, deletedAt: null } });
+    const quote = await this.prisma.quote.findFirst({
+      where: { id, organizationId, deletedAt: null },
+    });
     if (!quote) throw new NotFoundException('Quote not found');
-    if (quote.status !== QuoteStatus.DRAFT) throw new BadRequestException('Only draft quotes can be updated');
+    if (quote.status !== QuoteStatus.DRAFT)
+      throw new BadRequestException('Only draft quotes can be updated');
 
     const { customerId, lines, date, expiryDate, ...restData } = updateQuoteDto;
     return this.prisma.quote.update({
@@ -116,7 +148,8 @@ export class QuotesService {
       include: { lines: true },
     });
     if (!quote) throw new NotFoundException('Quote not found');
-    if (quote.status !== QuoteStatus.ACCEPTED) throw new BadRequestException('Only accepted quotes can be converted');
+    if (quote.status !== QuoteStatus.ACCEPTED)
+      throw new BadRequestException('Only accepted quotes can be converted');
 
     const invoiceNumber = await this.generateInvoiceNumber(organizationId);
     const dueDate = new Date();
@@ -203,7 +236,9 @@ export class QuotesService {
   }
 
   async remove(organizationId: string, id: string) {
-    const quote = await this.prisma.quote.findFirst({ where: { id, organizationId, deletedAt: null } });
+    const quote = await this.prisma.quote.findFirst({
+      where: { id, organizationId, deletedAt: null },
+    });
     if (!quote) throw new NotFoundException('Quote not found');
     await this.prisma.quote.update({ where: { id }, data: { deletedAt: new Date() } });
     return { message: 'Quote deleted successfully' };
@@ -218,6 +253,47 @@ export class QuotesService {
     if (!last) return 'EST-001';
     const num = parseInt(last.quoteNumber.split('-')[1], 10);
     return `EST-${String(num + 1).padStart(3, '0')}`;
+  }
+
+  // === Bulk Operations ===
+
+  async bulkDelete(organizationId: string, ids: string[]) {
+    const result = await this.prisma.quote.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        status: QuoteStatus.DRAFT,
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
+  async bulkSend(organizationId: string, ids: string[]) {
+    const result = await this.prisma.quote.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        status: QuoteStatus.DRAFT,
+      },
+      data: { status: QuoteStatus.SENT },
+    });
+    return { sent: result.count, total: ids.length };
+  }
+
+  async bulkDecline(organizationId: string, ids: string[]) {
+    const result = await this.prisma.quote.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        status: QuoteStatus.SENT,
+      },
+      data: { status: QuoteStatus.DECLINED },
+    });
+    return { declined: result.count, total: ids.length };
   }
 
   private async generateInvoiceNumber(organizationId: string): Promise<string> {

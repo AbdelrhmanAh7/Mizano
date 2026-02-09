@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { TransfersService } from '../services/transfers.service';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { TransferCursorQueryDto } from '../dto/transfer-cursor-query.dto';
+import { TransfersService } from '../services/transfers.service';
 
 @ApiTags('Inventory Transfers')
 @ApiBearerAuth()
@@ -23,8 +24,19 @@ export class TransfersController {
   @Get()
   @Permissions('inventory.view')
   @ApiOperation({ summary: 'List stock transfers' })
-  findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto & { status?: string; fromWarehouseId?: string; toWarehouseId?: string }) {
+  findAll(
+    @CurrentOrg() orgId: string,
+    @Query()
+    query: PaginationDto & { status?: string; fromWarehouseId?: string; toWarehouseId?: string },
+  ) {
     return this.transfersService.findAll(orgId, query);
+  }
+
+  @Get('cursor')
+  @Permissions('inventory.view')
+  @ApiOperation({ summary: 'List transfers with cursor-based pagination' })
+  findAllCursor(@CurrentOrg() orgId: string, @Query() query: TransferCursorQueryDto) {
+    return this.transfersService.findAllCursor(orgId, query);
   }
 
   @Get(':id')

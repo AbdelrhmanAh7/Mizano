@@ -1,18 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, Eye, MapPin, Star } from 'lucide-react';
+import { Plus, MoreHorizontal, Pencil, Trash2, Eye, MapPin, Star } from 'lucide-react';
+import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,7 +22,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
   useWarehouses,
   useDeleteWarehouse,
@@ -38,14 +31,15 @@ import {
   Warehouse,
 } from '@/lib/hooks/use-warehouses';
 
-export default function WarehousesPage() {
-  const [search, setSearch] = useState('');
+function WarehousesPageContent() {
+  const tableParams = useTableParams({ defaultSortBy: 'name' });
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const { data, isLoading } = useWarehouses({ search });
+  const { data, isLoading } = useWarehouses({ ...tableParams.queryParams });
   const deleteWarehouse = useDeleteWarehouse();
 
   const warehouses: Warehouse[] = data?.data || [];
+  const meta = data?.meta;
 
   const handleDelete = async () => {
     if (deleteId) {
@@ -54,17 +48,105 @@ export default function WarehousesPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-10 w-32" />
+  const columns: ColumnDef<Warehouse>[] = [
+    {
+      accessorKey: 'name',
+      header: () => (
+        <SortableHeader
+          label="Name"
+          columnId="name"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/inventory/warehouses/${row.original.id}`}
+            className="font-medium hover:text-blue-600 hover:underline"
+          >
+            {row.original.name}
+          </Link>
+          {row.original.isDefault && (
+            <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+          )}
         </div>
-        <Skeleton className="h-96" />
-      </div>
-    );
-  }
+      ),
+    },
+    {
+      accessorKey: 'code',
+      header: 'Code',
+      meta: { cellClassName: 'font-mono text-sm' },
+      cell: ({ row }) => row.original.code || '-',
+    },
+    {
+      id: 'location',
+      header: 'Location',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <MapPin className="h-4 w-4" />
+          <span className="truncate max-w-[200px]">
+            {formatWarehouseAddress(row.original)}
+          </span>
+        </div>
+      ),
+    },
+    {
+      id: 'items',
+      header: 'Items',
+      cell: ({ row }) => (
+        <span>{row.original._count?.stockLevels || 0} items</span>
+      ),
+    },
+    {
+      accessorKey: 'isActive',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge variant={row.original.isActive ? 'default' : 'secondary'}>
+          {row.original.isActive ? 'Active' : 'Inactive'}
+        </Badge>
+      ),
+    },
+    {
+      id: 'actions',
+      header: '',
+      meta: { cellClassName: 'w-12' },
+      cell: ({ row }) => {
+        const warehouse = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/inventory/warehouses/${warehouse.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Stock
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/inventory/warehouses/${warehouse.id}?edit=true`}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-red-600"
+                onClick={() => setDeleteId(warehouse.id)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -86,109 +168,31 @@ export default function WarehousesPage() {
 
       {/* Search */}
       <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search warehouses..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+        <DataTableSearch
+          value={tableParams.search}
+          onChange={tableParams.setSearch}
+          placeholder="Search warehouses..."
+        />
       </div>
 
       {/* Table */}
-      {warehouses.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">No warehouses found</p>
-          <Button asChild className="mt-4">
+      <DataTable
+        columns={columns}
+        data={warehouses}
+        page={meta?.page || 1}
+        totalPages={meta?.totalPages || 1}
+        total={meta?.total || 0}
+        limit={tableParams.limit}
+        onPageChange={tableParams.setPage}
+        onLimitChange={tableParams.setLimit}
+        isLoading={isLoading}
+        emptyMessage="No warehouses found"
+        emptyAction={
+          <Button asChild>
             <Link href="/inventory/warehouses/new">Create your first warehouse</Link>
           </Button>
-        </div>
-      ) : (
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {warehouses.map((warehouse) => (
-                <TableRow key={warehouse.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href={`/inventory/warehouses/${warehouse.id}`}
-                        className="font-medium hover:text-blue-600 hover:underline"
-                      >
-                        {warehouse.name}
-                      </Link>
-                      {warehouse.isDefault && (
-                        <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {warehouse.code || '-'}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <MapPin className="h-4 w-4" />
-                      <span className="truncate max-w-[200px]">
-                        {formatWarehouseAddress(warehouse)}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {warehouse._count?.stockLevels || 0} items
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={warehouse.isActive ? 'default' : 'secondary'}>
-                      {warehouse.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                          <Link href={`/inventory/warehouses/${warehouse.id}`}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Stock
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link href={`/inventory/warehouses/${warehouse.id}?edit=true`}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => setDeleteId(warehouse.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+        }
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
@@ -212,5 +216,13 @@ export default function WarehousesPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function WarehousesPage() {
+  return (
+    <Suspense>
+      <WarehousesPageContent />
+    </Suspense>
   );
 }
