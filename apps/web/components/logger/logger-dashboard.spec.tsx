@@ -128,8 +128,8 @@ jest.mock('@/components/ui/dropdown-menu', () => ({
 }));
 
 // Mock hooks
-const mockUseLogger = {
-  logs: [],
+const mockUseLogger: any = {
+  logs: [] as any[],
   stats: {
     totalErrors: 0,
     totalWarnings: 0,
@@ -140,7 +140,7 @@ const mockUseLogger = {
     byCategory: {},
   },
   filter: {},
-  selectedIds: [],
+  selectedIds: [] as string[],
   isOpen: true,
   logsLoading: false,
   isClearing: false,
