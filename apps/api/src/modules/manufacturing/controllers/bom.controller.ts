@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { BomService } from '../services/bom.service';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
@@ -7,7 +18,7 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 
 @ApiTags('Bill of Materials')
 @ApiBearerAuth()
-@Controller('bom')
+@Controller('manufacturing/bom')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class BomController {
   constructor(private readonly bomService: BomService) {}
@@ -33,7 +44,7 @@ export class BomController {
     return this.bomService.findOne(orgId, id);
   }
 
-  @Put(':id')
+  @Patch(':id')
   @Permissions('manufacturing.edit')
   @ApiOperation({ summary: 'Update BOM' })
   update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
@@ -50,7 +61,11 @@ export class BomController {
   @Get(':id/requirements')
   @Permissions('manufacturing.view')
   @ApiOperation({ summary: 'Calculate material requirements' })
-  calculateRequirements(@CurrentOrg() orgId: string, @Param('id') id: string, @Query('quantity') quantity: string) {
+  calculateRequirements(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Query('quantity') quantity: string,
+  ) {
     return this.bomService.calculateMaterialRequirements(orgId, id, parseFloat(quantity || '1'));
   }
 

@@ -56,12 +56,13 @@ class MockMatrix {
 }
 
 jest.mock('ml-logistic-regression', () => ({
-  LogisticRegression: MockLogisticRegression,
-}), { virtual: true });
+  default: MockLogisticRegression,
+  __esModule: true,
+}));
 
 jest.mock('ml-matrix', () => ({
   Matrix: MockMatrix,
-}), { virtual: true });
+}));
 
 import {
   trainLogisticRegression,
@@ -98,9 +99,7 @@ describe('logistic-regression.util', () => {
     });
 
     it('should throw for mismatched lengths', () => {
-      expect(() =>
-        trainLogisticRegression([[1, 2]], [1, 0]),
-      ).toThrow();
+      expect(() => trainLogisticRegression([[1, 2]], [1, 0])).toThrow();
     });
 
     it('should train and return model with metrics', () => {

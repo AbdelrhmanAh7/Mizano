@@ -54,7 +54,7 @@ export default function EditAssetPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" aria-label="Go back" asChild>
           <Link href={`/assets/${id}`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -70,7 +70,9 @@ export default function EditAssetPage() {
           name: asset.name,
           description: asset.description || '',
           assetType: asset.assetType,
-          purchaseDate: asset.purchaseDate ? format(new Date(asset.purchaseDate), 'yyyy-MM-dd') : '',
+          purchaseDate: asset.purchaseDate
+            ? format(new Date(asset.purchaseDate), 'yyyy-MM-dd')
+            : '',
           purchasePrice: String(asset.purchasePrice),
           salvageValue: String(asset.salvageValue || 0),
           usefulLifeMonths: String(asset.usefulLifeMonths),

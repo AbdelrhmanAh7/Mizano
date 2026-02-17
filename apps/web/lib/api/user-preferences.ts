@@ -13,21 +13,10 @@ export interface UserPreferences {
 }
 
 export const userPreferencesApi = {
-  get: async (): Promise<{ data: UserPreferences }> => {
-    const response = await api.get('/user/preferences');
-    return response.data;
-  },
+  get: (params?: Record<string, unknown>) => api.get('/user/preferences', { params }),
 
-  updateTour: async (
-    tourId: string,
-    data: { completed: boolean; currentStep?: number }
-  ): Promise<{ data: UserPreferences }> => {
-    const response = await api.patch(`/user/preferences/tour/${tourId}`, data);
-    return response.data;
-  },
+  updateTour: (tourId: string, data: { completed: boolean; currentStep?: number }) =>
+    api.patch(`/user/preferences/tour/${tourId}`, data),
 
-  dismissTour: async (tourId: string): Promise<{ data: UserPreferences }> => {
-    const response = await api.post(`/user/preferences/tour/${tourId}/dismiss`);
-    return response.data;
-  },
+  dismissTour: (tourId: string) => api.post(`/user/preferences/tour/${tourId}/dismiss`),
 };

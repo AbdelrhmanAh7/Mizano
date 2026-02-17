@@ -56,7 +56,9 @@
       "Bash(git commit:*)",
       "Bash(npx eslint:*)",
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWxjZTZ3Y3IwMDBicnVreGhkZ3hxb2FkIiwiZW1haWwiOiJhZG1pbkBtaXphbm8uY29tIiwibmFtZSI6IkFkbWluIFVzZXIiLCJvcmdhbml6YXRpb25JZCI6InNlZWQtb3JnLTAwMSIsInJvbGVJZCI6ImNtbGNlNnc5bDAwMDFydWt4YWNkMHp5OWoiLCJpYXQiOjE3NzA2MDU0MTgsImV4cCI6MTc3MDYwNjMxOH0.4rqgrRuZE1se7uRV5T6UdsDXgf18g3FtILuwmG_Nadg\":*)",
-      "Bash(pnpm --filter web build:*)"
+      "Bash(pnpm --filter web build:*)",
+      "Bash(node -e:*)",
+      "Bash(npx jest:*)"
     ]
   }
 }

@@ -51,5 +51,11 @@ apps/api/ml-models/
 *.onnx
 *.tar
 
+# Generated reports
+kpi-reports/
+
 # OS
 Thumbs.db
+
+# Test-data
+test-data/

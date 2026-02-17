@@ -6,17 +6,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-    useAllOrganizationSettings,
-    useUpdateFinancialSettings,
-    useUpdateLockDate,
+  useAllOrganizationSettings,
+  useUpdateFinancialSettings,
+  useUpdateLockDate,
 } from '@/lib/hooks/use-all-settings';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
@@ -104,7 +104,7 @@ export default function FinancialSettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label="Go back">
           <Link href="/settings">
             <ArrowLeft className="h-4 w-4" />
           </Link>

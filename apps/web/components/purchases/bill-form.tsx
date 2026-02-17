@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -26,9 +26,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Bill, BillLine } from '@/lib/hooks/use-bills';
+import { Bill } from '@/lib/hooks/use-bills';
 import { useVendors, Vendor } from '@/lib/hooks/use-vendors';
-import { cn } from '@/lib/utils';
 
 const lineSchema = z.object({
   itemId: z.string().optional(),
@@ -101,7 +100,7 @@ export function BillForm({
   const vendors = vendorsData?.data || [];
 
   // Filter accounts
-  const expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
+  const _expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
 
   const form = useForm<BillFormData>({
     resolver: zodResolver(billSchema),
@@ -244,39 +243,25 @@ export function BillForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.vendorId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.vendorId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.vendorId.message}</p>
               )}
             </div>
 
             {/* Date */}
             <div className="space-y-2">
               <Label htmlFor="date">Bill Date *</Label>
-              <Input
-                id="date"
-                type="date"
-                {...form.register('date')}
-              />
+              <Input id="date" type="date" {...form.register('date')} />
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.date.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
               )}
             </div>
 
             {/* Due Date */}
             <div className="space-y-2">
               <Label htmlFor="dueDate">Due Date *</Label>
-              <Input
-                id="dueDate"
-                type="date"
-                {...form.register('dueDate')}
-              />
+              <Input id="dueDate" type="date" {...form.register('dueDate')} />
               {form.formState.errors.dueDate && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.dueDate.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.dueDate.message}</p>
               )}
             </div>
           </div>
@@ -288,7 +273,9 @@ export function BillForm({
                 <Label htmlFor="projectId">Project (Optional)</Label>
                 <Select
                   value={form.watch('projectId') || ''}
-                  onValueChange={(value) => form.setValue('projectId', value === 'none' ? '' : value)}
+                  onValueChange={(value) =>
+                    form.setValue('projectId', value === 'none' ? '' : value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select project" />
@@ -392,9 +379,7 @@ export function BillForm({
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${lineAmount.toFixed(2)}
-                    </TableCell>
+                    <TableCell className="text-right font-mono">${lineAmount.toFixed(2)}</TableCell>
                     <TableCell>
                       {fields.length > 1 && (
                         <Button
@@ -403,6 +388,7 @@ export function BillForm({
                           size="icon"
                           className="h-8 w-8"
                           onClick={() => remove(index)}
+                          aria-label="Delete line item"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -451,11 +437,7 @@ export function BillForm({
           <CardTitle>Notes</CardTitle>
         </CardHeader>
         <CardContent>
-          <Textarea
-            {...form.register('notes')}
-            placeholder="Add notes or terms..."
-            rows={3}
-          />
+          <Textarea {...form.register('notes')} placeholder="Add notes or terms..." rows={3} />
         </CardContent>
       </Card>
 
@@ -465,11 +447,7 @@ export function BillForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? 'Saving...'
-            : isEditing
-            ? 'Update Bill'
-            : 'Create Bill'}
+          {isSubmitting ? 'Saving...' : isEditing ? 'Update Bill' : 'Create Bill'}
         </Button>
       </div>
     </form>

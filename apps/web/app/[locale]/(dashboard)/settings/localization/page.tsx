@@ -4,16 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-    useAllOrganizationSettings,
-    useUpdateLocalizationSettings,
+  useAllOrganizationSettings,
+  useUpdateLocalizationSettings,
 } from '@/lib/hooks/use-all-settings';
 import { ArrowLeft, Globe, Save } from 'lucide-react';
 import Link from 'next/link';
@@ -104,7 +104,7 @@ export default function LocalizationSettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label="Go back">
           <Link href="/settings">
             <ArrowLeft className="h-4 w-4" />
           </Link>

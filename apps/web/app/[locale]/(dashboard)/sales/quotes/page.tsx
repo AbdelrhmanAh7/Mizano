@@ -4,30 +4,30 @@ import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-ta
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
 import { QuoteStatusBadge } from '@/components/sales/status-badge';
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { quotesApi } from '@/lib/api';
@@ -35,14 +35,14 @@ import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { formatCurrency } from '@/lib/hooks/use-customers';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import {
-    Quote,
-    QuoteStatus,
-    useAcceptQuote,
-    useConvertToInvoice,
-    useDeclineQuote,
-    useDeleteQuote,
-    useInfiniteQuotes,
-    useSendQuote,
+  Quote,
+  QuoteStatus,
+  useAcceptQuote,
+  useConvertToInvoice,
+  useDeclineQuote,
+  useDeleteQuote,
+  useInfiniteQuotes,
+  useSendQuote,
 } from '@/lib/hooks/use-quotes';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
@@ -429,7 +429,12 @@ function QuotesPageContent() {
                 <SelectItem value="EXPIRED">Expired</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon" onClick={() => refetch()}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              aria-label="Refresh quotes"
+            >
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>

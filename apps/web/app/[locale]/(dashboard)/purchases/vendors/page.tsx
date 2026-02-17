@@ -220,7 +220,12 @@ function VendorsPageContent() {
               onChange={tableParams.setSearch}
               placeholder="Search by name, email, or phone..."
             />
-            <Button variant="outline" size="icon" onClick={() => refetch()}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              aria-label="Refresh vendors"
+            >
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>

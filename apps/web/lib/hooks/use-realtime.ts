@@ -62,8 +62,12 @@ export function useRealtime() {
   const queryClient = useQueryClient();
   const { data: session } = useSession();
 
+  // Stabilize dependencies to avoid unnecessary reconnects on session object reference changes
+  const orgId = session?.user?.organizationId;
+  const userId = session?.user?.id;
+
   useEffect(() => {
-    if (!session?.user) return;
+    if (!userId) return;
 
     const socket = io(`${WS_URL}/events`, {
       transports: ['websocket'],
@@ -73,7 +77,6 @@ export function useRealtime() {
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      const orgId = session.user.organizationId;
       if (orgId) {
         socket.emit('join-org', orgId);
       }
@@ -99,14 +102,17 @@ export function useRealtime() {
     });
 
     socket.on('disconnect', (reason) => {
-      console.warn('[Realtime] WebSocket disconnected:', reason);
+      // Only warn for unexpected disconnects, not client-initiated cleanup
+      if (reason !== 'io client disconnect') {
+        console.warn('[Realtime] WebSocket disconnected:', reason);
+      }
     });
 
     return () => {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [session, queryClient]);
+  }, [orgId, userId, queryClient]);
 
   return socketRef;
 }

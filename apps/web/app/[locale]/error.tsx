@@ -20,7 +20,7 @@ export default function LocaleError({
       <div className="max-w-md w-full text-center space-y-4 p-6">
         <div className="flex justify-center">
           <div className="rounded-full bg-red-100 dark:bg-red-900/20 p-3">
-            <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+            <AlertCircle className="h-8 w-8 text-destructive" />
           </div>
         </div>
         <h1 className="text-2xl font-bold">Something went wrong</h1>

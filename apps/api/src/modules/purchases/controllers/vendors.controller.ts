@@ -15,6 +15,7 @@ import {
   CacheResponse,
   CacheTTL,
   CurrentOrg,
+  HttpCache,
   InvalidateCache,
   Permissions,
 } from '../../../common/decorators';
@@ -44,6 +45,7 @@ export class VendorsController {
   @Permissions('purchases.view')
   @CacheResponse('vendors:list')
   @CacheTTL(120)
+  @HttpCache('short')
   findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto) {
     return this.vendorsService.findAll(orgId, query);
   }

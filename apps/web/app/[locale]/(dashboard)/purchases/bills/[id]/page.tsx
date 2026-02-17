@@ -77,9 +77,8 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
 
   const grandTotal = parseFloat(bill.grandTotal);
   const balanceDue = parseFloat(bill.balanceDue);
-  const isOverdue = bill.status === 'OVERDUE' || (
-    bill.status === 'OPEN' && new Date(bill.dueDate) < new Date()
-  );
+  const isOverdue =
+    bill.status === 'OVERDUE' || (bill.status === 'OPEN' && new Date(bill.dueDate) < new Date());
   const currency = bill.vendor?.currency || 'USD';
 
   return (
@@ -87,23 +86,17 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/purchases/bills">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight font-mono">
-                {bill.billNumber}
-              </h1>
-              <Badge variant={getStatusVariant(bill.status)}>
-                {getStatusText(bill.status)}
-              </Badge>
+              <h1 className="text-3xl font-bold tracking-tight font-mono">{bill.billNumber}</h1>
+              <Badge variant={getStatusVariant(bill.status)}>{getStatusText(bill.status)}</Badge>
             </div>
-            <p className="text-muted-foreground">
-              From {bill.vendor?.name}
-            </p>
+            <p className="text-muted-foreground">From {bill.vendor?.name}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -149,15 +142,15 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Balance Due
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Balance Due</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={cn(
-              'text-2xl font-bold font-mono',
-              balanceDue > 0 ? 'text-red-600' : 'text-green-600'
-            )}>
+            <div
+              className={cn(
+                'text-2xl font-bold font-mono',
+                balanceDue > 0 ? 'text-red-600' : 'text-green-600',
+              )}
+            >
               {formatCurrency(balanceDue, currency)}
             </div>
           </CardContent>
@@ -165,33 +158,22 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Bill Date
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Bill Date</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {format(new Date(bill.date), 'MMM d, yyyy')}
-            </div>
+            <div className="text-2xl font-bold">{format(new Date(bill.date), 'MMM d, yyyy')}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Due Date
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Due Date</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={cn(
-              'text-2xl font-bold',
-              isOverdue && 'text-red-600'
-            )}>
+            <div className={cn('text-2xl font-bold', isOverdue && 'text-red-600')}>
               {format(new Date(bill.dueDate), 'MMM d, yyyy')}
             </div>
-            {isOverdue && (
-              <p className="text-sm text-red-600">Overdue</p>
-            )}
+            {isOverdue && <p className="text-sm text-red-600">Overdue</p>}
           </CardContent>
         </Card>
       </div>
@@ -227,9 +209,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
                           <div>
                             <p className="font-medium">{line.description}</p>
                             {line.item && (
-                              <p className="text-sm text-muted-foreground">
-                                SKU: {line.item.sku}
-                              </p>
+                              <p className="text-sm text-muted-foreground">SKU: {line.item.sku}</p>
                             )}
                           </div>
                         </TableCell>
@@ -267,7 +247,9 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
                     <>
                       <div className="flex justify-between text-sm text-muted-foreground">
                         <span>Paid</span>
-                        <span className="font-mono">{formatCurrency(grandTotal - balanceDue, currency)}</span>
+                        <span className="font-mono">
+                          {formatCurrency(grandTotal - balanceDue, currency)}
+                        </span>
                       </div>
                       <div className="flex justify-between text-lg font-bold text-red-600">
                         <span>Balance Due</span>
@@ -279,9 +261,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
               </div>
             </>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              No line items
-            </div>
+            <div className="text-center py-8 text-muted-foreground">No line items</div>
           )}
         </CardContent>
       </Card>
@@ -306,15 +286,11 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
         <CardContent>
           <div className="flex flex-wrap gap-3">
             <Button variant="outline" asChild>
-              <Link href={`/purchases/vendors/${bill.vendorId}`}>
-                View Vendor
-              </Link>
+              <Link href={`/purchases/vendors/${bill.vendorId}`}>View Vendor</Link>
             </Button>
             {bill.projectId && (
               <Button variant="outline" asChild>
-                <Link href={`/projects/${bill.projectId}`}>
-                  View Project
-                </Link>
+                <Link href={`/projects/${bill.projectId}`}>View Project</Link>
               </Button>
             )}
           </div>

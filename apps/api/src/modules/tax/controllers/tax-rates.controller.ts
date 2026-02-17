@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { TaxRatesService } from '../services/tax-rates.service';
-import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { CurrentOrg, HttpCache, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 
@@ -21,6 +21,7 @@ export class TaxRatesController {
 
   @Get()
   @Permissions('tax.view')
+  @HttpCache('static')
   @ApiOperation({ summary: 'Get all tax rates' })
   findAll(@CurrentOrg() orgId: string, @Query() query: { type?: string; isActive?: boolean }) {
     return this.taxRatesService.findAll(orgId, query);

@@ -59,9 +59,10 @@ export function BOMForm({ bom }: BOMFormProps) {
             itemId: c.itemId,
             quantity: c.quantity,
           })),
-          operationsCost: typeof bom.operationsCost === 'string'
-            ? parseFloat(bom.operationsCost)
-            : bom.operationsCost,
+          operationsCost:
+            typeof bom.operationsCost === 'string'
+              ? parseFloat(bom.operationsCost)
+              : bom.operationsCost,
           isActive: bom.isActive,
         }
       : {
@@ -110,15 +111,9 @@ export function BOMForm({ bom }: BOMFormProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">BOM Name *</Label>
-              <Input
-                id="name"
-                placeholder="Wooden Chair Assembly"
-                {...form.register('name')}
-              />
+              <Input id="name" placeholder="Wooden Chair Assembly" {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.name.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
 
@@ -141,9 +136,7 @@ export function BOMForm({ bom }: BOMFormProps) {
                 </SelectContent>
               </Select>
               {form.formState.errors.outputItemId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.outputItemId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.outputItemId.message}</p>
               )}
             </div>
           </div>
@@ -159,9 +152,7 @@ export function BOMForm({ bom }: BOMFormProps) {
                 placeholder="1"
                 {...form.register('outputQuantity', { valueAsNumber: true })}
               />
-              <p className="text-xs text-muted-foreground">
-                Quantity produced per production run
-              </p>
+              <p className="text-xs text-muted-foreground">Quantity produced per production run</p>
               {form.formState.errors.outputQuantity && (
                 <p className="text-sm text-red-500">
                   {form.formState.errors.outputQuantity.message}
@@ -202,9 +193,7 @@ export function BOMForm({ bom }: BOMFormProps) {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Components (Raw Materials)</CardTitle>
-              <CardDescription>
-                Add the items required to produce this product
-              </CardDescription>
+              <CardDescription>Add the items required to produce this product</CardDescription>
             </div>
             <Button
               type="button"
@@ -234,9 +223,7 @@ export function BOMForm({ bom }: BOMFormProps) {
                   <div className="col-span-7">
                     <Select
                       value={form.watch(`components.${index}.itemId`) || ''}
-                      onValueChange={(value) =>
-                        form.setValue(`components.${index}.itemId`, value)
-                      }
+                      onValueChange={(value) => form.setValue(`components.${index}.itemId`, value)}
                       disabled={itemsLoading}
                     >
                       <SelectTrigger>
@@ -269,6 +256,7 @@ export function BOMForm({ bom }: BOMFormProps) {
                       size="icon"
                       onClick={() => remove(index)}
                       disabled={fields.length === 1}
+                      aria-label="Remove component"
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
@@ -278,9 +266,7 @@ export function BOMForm({ bom }: BOMFormProps) {
             </div>
           )}
           {form.formState.errors.components && (
-            <p className="text-sm text-red-500 mt-2">
-              {form.formState.errors.components.message}
-            </p>
+            <p className="text-sm text-red-500 mt-2">{form.formState.errors.components.message}</p>
           )}
         </CardContent>
       </Card>

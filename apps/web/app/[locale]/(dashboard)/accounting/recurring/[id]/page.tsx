@@ -104,7 +104,7 @@ export default function RecurringProfileDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/accounting/recurring">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -136,7 +136,7 @@ export default function RecurringProfileDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/accounting/recurring">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -146,17 +146,13 @@ export default function RecurringProfileDetailPage() {
               <h1 className="text-3xl font-bold tracking-tight">{profile.name}</h1>
               <Badge
                 className={
-                  profile.isActive
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-gray-100 text-gray-800'
+                  profile.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                 }
               >
                 {profile.isActive ? 'Active' : 'Inactive'}
               </Badge>
             </div>
-            <p className="text-muted-foreground">
-              {profile.description || 'No description'}
-            </p>
+            <p className="text-muted-foreground">{profile.description || 'No description'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -184,10 +180,7 @@ export default function RecurringProfileDetailPage() {
             </>
           )}
           {canDelete && (
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
+            <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </Button>
@@ -205,15 +198,11 @@ export default function RecurringProfileDetailPage() {
             <div>
               <dt className="text-sm font-medium text-muted-foreground">Frequency</dt>
               <dd className="mt-1">
-                <Badge variant="outline">
-                  {getFrequencyLabel(profile.frequency)}
-                </Badge>
+                <Badge variant="outline">{getFrequencyLabel(profile.frequency)}</Badge>
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">
-                Next Execution
-              </dt>
+              <dt className="text-sm font-medium text-muted-foreground">Next Execution</dt>
               <dd className="mt-1 flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 {format(new Date(profile.nextExecutionDate), 'MMMM d, yyyy')}
@@ -232,9 +221,7 @@ export default function RecurringProfileDetailPage() {
               <dd className="mt-1">
                 <Badge
                   className={
-                    profile.isActive
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
+                    profile.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                   }
                 >
                   {profile.isActive ? 'Active' : 'Inactive'}
@@ -243,17 +230,11 @@ export default function RecurringProfileDetailPage() {
             </div>
             <div>
               <dt className="text-sm font-medium text-muted-foreground">Created</dt>
-              <dd className="mt-1">
-                {format(new Date(profile.createdAt), 'MMM d, yyyy')}
-              </dd>
+              <dd className="mt-1">{format(new Date(profile.createdAt), 'MMM d, yyyy')}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">
-                Last Modified
-              </dt>
-              <dd className="mt-1">
-                {format(new Date(profile.updatedAt), 'MMM d, yyyy')}
-              </dd>
+              <dt className="text-sm font-medium text-muted-foreground">Last Modified</dt>
+              <dd className="mt-1">{format(new Date(profile.updatedAt), 'MMM d, yyyy')}</dd>
             </div>
           </dl>
         </CardContent>
@@ -316,16 +297,13 @@ export default function RecurringProfileDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Recurring Profile</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this recurring profile? This action
-              cannot be undone. Previously created journals will not be affected.
+              Are you sure you want to delete this recurring profile? This action cannot be undone.
+              Previously created journals will not be affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

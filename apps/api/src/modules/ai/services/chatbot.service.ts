@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { AiTrainingService } from './ai-training.service';
+import { AiFeedbackService } from './ai-feedback.service';
 import { ModelRegistryService } from './model-registry.service';
 import { AiFeature } from '@prisma/client';
 import { BoundedCache } from '../utils/bounded-cache.util';
@@ -125,6 +128,9 @@ export class ChatbotService {
   constructor(
     private prisma: PrismaService,
     private modelRegistry: ModelRegistryService,
+    private trainingService: AiTrainingService,
+    private feedbackService: AiFeedbackService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -139,24 +145,18 @@ export class ChatbotService {
     userId: string,
     message: string,
   ): Promise<ChatResponse> {
-    this.logger.log(
-      `Processing message for user ${userId} in org ${organizationId}`,
-    );
+    this.logger.log(`Processing message for user ${userId} in org ${organizationId}`);
 
     // Ensure the classifier is trained
     const classifier = await this.getOrTrainClassifier(organizationId);
 
     // Classify intent
-    const classifications = classifier.getClassifications(
-      message.toLowerCase(),
-    );
+    const classifications = classifier.getClassifications(message.toLowerCase());
     const topClassification = classifications[0];
     const intent: ChatIntent = topClassification
       ? (topClassification.label as ChatIntent)
       : 'unknown';
-    const confidence: number = topClassification
-      ? topClassification.value
-      : 0;
+    const confidence: number = topClassification ? topClassification.value : 0;
 
     // Extract entities from the user message
     const entities = this.extractEntities(message);
@@ -166,25 +166,13 @@ export class ChatbotService {
 
     switch (intent) {
       case 'invoice_status':
-        response = await this.handleInvoiceStatus(
-          organizationId,
-          entities,
-          confidence,
-        );
+        response = await this.handleInvoiceStatus(organizationId, entities, confidence);
         break;
       case 'account_balance':
-        response = await this.handleAccountBalance(
-          organizationId,
-          entities,
-          confidence,
-        );
+        response = await this.handleAccountBalance(organizationId, entities, confidence);
         break;
       case 'payment_reminder':
-        response = await this.handlePaymentReminder(
-          organizationId,
-          entities,
-          confidence,
-        );
+        response = await this.handlePaymentReminder(organizationId, entities, confidence);
         break;
       case 'create_invoice':
         response = this.handleCreateInvoice(entities, confidence);
@@ -203,6 +191,20 @@ export class ChatbotService {
         break;
     }
 
+    // Store prediction for feedback tracking
+    try {
+      await this.feedbackService.storePrediction(
+        organizationId,
+        'CHATBOT',
+        { message, userId },
+        { intent: response.intent, response: response.response },
+        response.confidence,
+        1,
+      );
+    } catch (error) {
+      this.logger.warn(`Failed to store chat prediction: ${error.message}`);
+    }
+
     // Persist history
     this.addToHistory(organizationId, userId, message, response);
 
@@ -212,11 +214,7 @@ export class ChatbotService {
   /**
    * Retrieve recent chat history for a user.
    */
-  getHistory(
-    organizationId: string,
-    userId: string,
-    limit: number = 50,
-  ): ChatMessage[] {
+  getHistory(organizationId: string, userId: string, limit: number = 50): ChatMessage[] {
     const key = `${organizationId}:${userId}`;
     const session = this.chatHistory.get(key);
     if (!session) {
@@ -231,9 +229,45 @@ export class ChatbotService {
   clearHistory(organizationId: string, userId: string): void {
     const key = `${organizationId}:${userId}`;
     this.chatHistory.delete(key);
-    this.logger.log(
-      `Cleared chat history for user ${userId} in org ${organizationId}`,
+    this.logger.log(`Cleared chat history for user ${userId} in org ${organizationId}`);
+  }
+
+  /**
+   * Record user feedback on a chatbot response.
+   * If the response was not helpful or the intent was wrong, it is stored
+   * as a correction and may trigger classifier retraining when the threshold is reached.
+   */
+  async recordChatFeedback(
+    organizationId: string,
+    sessionId: string,
+    messageId: string,
+    wasHelpful: boolean,
+    correctedIntent?: string,
+  ): Promise<void> {
+    const label = correctedIntent || (wasHelpful ? 'helpful' : 'not_helpful');
+
+    await this.trainingService.addTrainingData(
+      organizationId,
+      'CHATBOT',
+      { sessionId, messageId },
+      label,
+      wasHelpful && !correctedIntent ? 'USER' : 'CORRECTION',
     );
+
+    if (!wasHelpful || correctedIntent) {
+      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
+        organizationId,
+        'CHATBOT',
+      );
+
+      if (shouldRetrain) {
+        this.logger.log(`Chatbot retraining threshold reached for org ${organizationId}`);
+        this.eventEmitter.emit('ai.retraining.needed', {
+          organizationId,
+          feature: 'CHATBOT',
+        });
+      }
+    }
   }
 
   /**
@@ -301,9 +335,7 @@ export class ChatbotService {
         sampleCount,
       );
     } catch (error) {
-      this.logger.warn(
-        `Failed to persist chatbot model metadata: ${error}`,
-      );
+      this.logger.warn(`Failed to persist chatbot model metadata: ${error}`);
     }
 
     this.logger.log(
@@ -366,9 +398,11 @@ export class ChatbotService {
       entities.push({ type: 'customer', value: orgName, raw: orgName });
     }
 
-    // Dates via compromise
-    const dates: string[] = doc.dates().out('array');
-    for (const d of dates) {
+    // Extract dates via regex instead of compromise plugin (compromise core has no .dates())
+    const dateRegex =
+      /\b(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s*\d{2,4}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4})\b/gi;
+    const dateMatches = message.match(dateRegex) || [];
+    for (const d of dateMatches) {
       entities.push({ type: 'date', value: d, raw: d });
     }
 
@@ -403,11 +437,7 @@ export class ChatbotService {
         confidence,
         response:
           'I can look up an invoice for you. Could you provide the invoice number? For example: "What is the status of INV-001?"',
-        suggestions: [
-          'Check invoice INV-001',
-          'Show overdue invoices',
-          'List recent invoices',
-        ],
+        suggestions: ['Check invoice INV-001', 'Show overdue invoices', 'List recent invoices'],
       };
     }
 
@@ -427,11 +457,7 @@ export class ChatbotService {
         intent: 'invoice_status',
         confidence,
         response: `I could not find invoice ${invoiceEntity.value} in your records. Please double-check the invoice number.`,
-        suggestions: [
-          'Show recent invoices',
-          'Search by customer name',
-          'Create new invoice',
-        ],
+        suggestions: ['Show recent invoices', 'Search by customer name', 'Create new invoice'],
       };
     }
 
@@ -495,11 +521,7 @@ export class ChatbotService {
         intent: 'account_balance',
         confidence,
         response: `I could not find an account matching "${accountEntity.value}". Please check the account name or code.`,
-        suggestions: [
-          'Show all accounts',
-          'Balance of Cash',
-          'Balance of Accounts Receivable',
-        ],
+        suggestions: ['Show all accounts', 'Balance of Cash', 'Balance of Accounts Receivable'],
       };
     }
 
@@ -560,25 +582,16 @@ export class ChatbotService {
     });
 
     if (overdueInvoices.length === 0) {
-      const qualifier = customerEntity
-        ? ` for ${customerEntity.value}`
-        : '';
+      const qualifier = customerEntity ? ` for ${customerEntity.value}` : '';
       return {
         intent: 'payment_reminder',
         confidence,
         response: `Great news! There are no overdue invoices${qualifier}.`,
-        suggestions: [
-          'Show all invoices',
-          'Check account balance',
-          'Generate aging report',
-        ],
+        suggestions: ['Show all invoices', 'Check account balance', 'Generate aging report'],
       };
     }
 
-    const totalOverdue = overdueInvoices.reduce(
-      (sum, inv) => sum + Number(inv.balanceDue),
-      0,
-    );
+    const totalOverdue = overdueInvoices.reduce((sum, inv) => sum + Number(inv.balanceDue), 0);
 
     const lines = overdueInvoices.map(
       (inv) =>
@@ -600,18 +613,11 @@ export class ChatbotService {
           dueDate: inv.dueDate,
         })),
       },
-      suggestions: [
-        'Send payment reminders',
-        'Generate AR aging report',
-        'Check specific invoice',
-      ],
+      suggestions: ['Send payment reminders', 'Generate AR aging report', 'Check specific invoice'],
     };
   }
 
-  private handleCreateInvoice(
-    entities: ChatEntity[],
-    confidence: number,
-  ): ChatResponse {
+  private handleCreateInvoice(entities: ChatEntity[], confidence: number): ChatResponse {
     const customerEntity = entities.find((e) => e.type === 'customer');
     const amountEntity = entities.find((e) => e.type === 'amount');
 
@@ -633,11 +639,7 @@ export class ChatbotService {
         amount: amountEntity?.value ?? null,
         requiresConfirmation: true,
       },
-      suggestions: [
-        'Go to create invoice page',
-        'Show recent invoices',
-        'List customers',
-      ],
+      suggestions: ['Go to create invoice page', 'Show recent invoices', 'List customers'],
     };
   }
 
@@ -653,12 +655,7 @@ export class ChatbotService {
         '- **AP Aging** — outstanding vendor payables\n' +
         '- **Cash Flow** — cash inflows and outflows\n' +
         '- **General Ledger** — detailed journal entries',
-      suggestions: [
-        'Show Profit & Loss',
-        'Show Balance Sheet',
-        'Show AR Aging',
-        'Show Cash Flow',
-      ],
+      suggestions: ['Show Profit & Loss', 'Show Balance Sheet', 'Show AR Aging', 'Show Cash Flow'],
     };
   }
 
@@ -674,11 +671,7 @@ export class ChatbotService {
       intent: 'greeting',
       confidence,
       response,
-      suggestions: [
-        'Check overdue invoices',
-        'Show account balance',
-        'Help',
-      ],
+      suggestions: ['Check overdue invoices', 'Show account balance', 'Help'],
     };
   }
 
@@ -710,12 +703,7 @@ export class ChatbotService {
       response:
         "I'm sorry, I didn't quite understand that. Could you rephrase your request? " +
         'You can ask me about invoices, payments, account balances, or reports.',
-      suggestions: [
-        'Help',
-        'Check invoice status',
-        'Show overdue invoices',
-        'Account balance',
-      ],
+      suggestions: ['Help', 'Check invoice status', 'Show overdue invoices', 'Account balance'],
     };
   }
 

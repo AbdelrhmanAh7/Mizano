@@ -13,14 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
-import {
-  Brain,
-  BarChart3,
-  Shield,
-  Zap,
-  Eye,
-  EyeOff,
-} from 'lucide-react';
+import { Brain, BarChart3, Shield, Zap, Eye, EyeOff } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -124,9 +117,7 @@ function LoginForm() {
         </div>
 
         <div className="relative z-10">
-          <h1 className="text-4xl font-bold text-white tracking-tight">
-            {tCommon('appName')}
-          </h1>
+          <h1 className="text-4xl font-bold text-white tracking-tight">{tCommon('appName')}</h1>
           <p className="mt-2 text-blue-100 text-lg">{t('brandTagline')}</p>
         </div>
 
@@ -137,21 +128,15 @@ function LoginForm() {
                 <feature.icon className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h3 className="text-white font-semibold text-sm">
-                  {t(feature.titleKey)}
-                </h3>
-                <p className="text-blue-100 text-sm mt-0.5">
-                  {t(feature.descKey)}
-                </p>
+                <h3 className="text-white font-semibold text-sm">{t(feature.titleKey)}</h3>
+                <p className="text-blue-100 text-sm mt-0.5">{t(feature.descKey)}</p>
               </div>
             </div>
           ))}
         </div>
 
         <div className="relative z-10">
-          <p className="text-blue-200 text-xs">
-            {t('brandFooter')}
-          </p>
+          <p className="text-blue-200 text-xs">{t('brandFooter')}</p>
         </div>
       </div>
 
@@ -159,9 +144,7 @@ function LoginForm() {
       <div className="flex-1 flex flex-col">
         {/* Top bar */}
         <div className="flex items-center justify-between p-6">
-          <span className="lg:hidden text-2xl font-bold text-primary">
-            {tCommon('appName')}
-          </span>
+          <span className="lg:hidden text-2xl font-bold text-primary">{tCommon('appName')}</span>
           <div className="ms-auto">
             <LanguageSwitcher />
           </div>
@@ -186,9 +169,7 @@ function LoginForm() {
                   {...register('email')}
                   className="h-11"
                 />
-                {errors.email && (
-                  <p className="text-sm text-destructive">{tValidation('email')}</p>
-                )}
+                {errors.email && <p className="text-sm text-destructive">{tValidation('email')}</p>}
               </div>
 
               <div className="space-y-2">
@@ -209,6 +190,7 @@ function LoginForm() {
                     className="absolute end-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground"
                     onClick={() => setShowPassword(!showPassword)}
                     tabIndex={-1}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>

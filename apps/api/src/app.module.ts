@@ -9,6 +9,7 @@ import * as path from 'path';
 import { CacheModule } from './cache/cache.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { CacheResponseInterceptor } from './common/interceptors/cache-response.interceptor';
+import { HttpCacheInterceptor } from './common/interceptors/http-cache.interceptor';
 import { HealthModule } from './health/health.module';
 import { AccountingModule } from './modules/accounting/accounting.module';
 import { AiModule } from './modules/ai/ai.module';
@@ -118,6 +119,10 @@ import { PrismaModule } from './prisma/prisma.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: CacheResponseInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: HttpCacheInterceptor,
     },
   ],
 })

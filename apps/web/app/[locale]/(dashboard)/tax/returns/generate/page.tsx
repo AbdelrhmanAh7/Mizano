@@ -54,7 +54,7 @@ export default function GenerateVATReturnPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label="Go back">
           <Link href="/tax/returns">
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -70,9 +70,7 @@ export default function GenerateVATReturnPage() {
       <Card className="max-w-2xl">
         <CardHeader>
           <CardTitle>Period Selection</CardTitle>
-          <CardDescription>
-            Choose the period for the VAT return calculation
-          </CardDescription>
+          <CardDescription>Choose the period for the VAT return calculation</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Quick Quarter Selection */}
@@ -80,12 +78,7 @@ export default function GenerateVATReturnPage() {
             <Label>Quick Select Quarter</Label>
             <div className="flex gap-2">
               {[1, 2, 3, 4].map((q) => (
-                <Button
-                  key={q}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setQuarter(q)}
-                >
+                <Button key={q} variant="outline" size="sm" onClick={() => setQuarter(q)}>
                   Q{q} {now.getFullYear()}
                 </Button>
               ))}
@@ -115,8 +108,8 @@ export default function GenerateVATReturnPage() {
           </div>
 
           <p className="text-sm text-muted-foreground">
-            The system will calculate Output VAT from sales invoices and credit notes,
-            and Input VAT from purchase bills and expenses within this period.
+            The system will calculate Output VAT from sales invoices and credit notes, and Input VAT
+            from purchase bills and expenses within this period.
           </p>
 
           <div className="flex justify-end gap-3">

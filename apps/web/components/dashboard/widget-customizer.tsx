@@ -30,16 +30,19 @@ export function WidgetCustomizer() {
   return (
     <Sheet open={isEditing} onOpenChange={handleClose}>
       <SheetTrigger asChild>
-        <Button variant="outline" size="icon" title="Customize Dashboard">
+        <Button
+          variant="outline"
+          size="icon"
+          title="Customize Dashboard"
+          aria-label="Customize dashboard"
+        >
           <LayoutDashboard className="h-4 w-4" />
         </Button>
       </SheetTrigger>
       <SheetContent>
         <SheetHeader>
           <SheetTitle>Customize Dashboard</SheetTitle>
-          <SheetDescription>
-            Show, hide, and reorder dashboard widgets.
-          </SheetDescription>
+          <SheetDescription>Show, hide, and reorder dashboard widgets.</SheetDescription>
         </SheetHeader>
         <ScrollArea className="h-[calc(100vh-240px)] mt-6 pr-4">
           <div className="space-y-3">
@@ -62,6 +65,7 @@ export function WidgetCustomizer() {
                     className="h-7 w-7"
                     disabled={index === 0}
                     onClick={() => moveWidget(widget.id, 'up')}
+                    aria-label="Move widget up"
                   >
                     <ArrowUp className="h-3 w-3" />
                   </Button>
@@ -71,6 +75,7 @@ export function WidgetCustomizer() {
                     className="h-7 w-7"
                     disabled={index === sorted.length - 1}
                     onClick={() => moveWidget(widget.id, 'down')}
+                    aria-label="Move widget down"
                   >
                     <ArrowDown className="h-3 w-3" />
                   </Button>

@@ -47,11 +47,12 @@ interface LineItemsFormProps {
 export function calculateLineAmount(
   quantity: string | number,
   rate: string | number,
-  discountPercent?: string | number
+  discountPercent?: string | number,
 ): string {
   const qty = typeof quantity === 'string' ? parseFloat(quantity) || 0 : quantity;
   const unitRate = typeof rate === 'string' ? parseFloat(rate) || 0 : rate;
-  const discount = typeof discountPercent === 'string' ? parseFloat(discountPercent) || 0 : discountPercent || 0;
+  const discount =
+    typeof discountPercent === 'string' ? parseFloat(discountPercent) || 0 : discountPercent || 0;
 
   const amount = qty * unitRate * (1 - discount / 100);
   return amount.toFixed(2);
@@ -62,7 +63,7 @@ export function calculateLineAmount(
  */
 export function calculateLineTotals(
   lines: LineItem[],
-  taxRates?: TaxRate[]
+  taxRates?: TaxRate[],
 ): {
   subtotal: number;
   totalDiscount: number;
@@ -195,7 +196,7 @@ export function LineItemsForm({
   // Calculate column span based on visible columns
   const baseColumns = 4; // Item/Description, Qty, Rate, Amount
   const extraColumns = (showDiscount ? 1 : 0) + (showTax ? 1 : 0) + 1; // +1 for actions
-  const totalColumns = baseColumns + extraColumns;
+  const _totalColumns = baseColumns + extraColumns;
 
   return (
     <Card>
@@ -210,8 +211,12 @@ export function LineItemsForm({
       </CardHeader>
       <CardContent>
         {/* Table Header */}
-        <div className="grid gap-2 mb-2 text-sm font-medium text-muted-foreground"
-             style={{ gridTemplateColumns: `3fr 1fr 1fr ${showDiscount ? '1fr ' : ''}${showTax ? '1.5fr ' : ''}1fr 0.5fr` }}>
+        <div
+          className="grid gap-2 mb-2 text-sm font-medium text-muted-foreground"
+          style={{
+            gridTemplateColumns: `3fr 1fr 1fr ${showDiscount ? '1fr ' : ''}${showTax ? '1.5fr ' : ''}1fr 0.5fr`,
+          }}
+        >
           <div>Item / Description</div>
           <div className="text-right">Qty</div>
           <div className="text-right">Rate</div>
@@ -227,7 +232,9 @@ export function LineItemsForm({
             <div
               key={field.id}
               className="grid gap-2 items-center"
-              style={{ gridTemplateColumns: `3fr 1fr 1fr ${showDiscount ? '1fr ' : ''}${showTax ? '1.5fr ' : ''}1fr 0.5fr` }}
+              style={{
+                gridTemplateColumns: `3fr 1fr 1fr ${showDiscount ? '1fr ' : ''}${showTax ? '1.5fr ' : ''}1fr 0.5fr`,
+              }}
             >
               {/* Item/Description */}
               <div className="space-y-1">
@@ -324,6 +331,7 @@ export function LineItemsForm({
                 onClick={() => removeLine(index)}
                 disabled={fields.length <= 1}
                 className="h-9 w-9"
+                aria-label="Remove line item"
               >
                 <Trash2 className="h-4 w-4 text-muted-foreground hover:text-red-500" />
               </Button>

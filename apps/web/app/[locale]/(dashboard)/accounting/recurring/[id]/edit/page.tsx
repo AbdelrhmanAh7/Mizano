@@ -9,10 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { RecurringProfileForm } from '@/components/accounting/recurring-profile-form';
 import { useAccountsTree } from '@/lib/hooks/use-accounts';
-import {
-  useRecurringProfile,
-  useUpdateRecurringProfile,
-} from '@/lib/hooks/use-recurring-profiles';
+import { useRecurringProfile, useUpdateRecurringProfile } from '@/lib/hooks/use-recurring-profiles';
 
 export default function EditRecurringProfilePage() {
   const params = useParams();
@@ -63,7 +60,7 @@ export default function EditRecurringProfilePage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/accounting/recurring">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -90,16 +87,14 @@ export default function EditRecurringProfilePage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label="Go back">
           <Link href={`/accounting/recurring/${profileId}`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Edit {profile.name}</h1>
-          <p className="text-muted-foreground">
-            Update the recurring profile details
-          </p>
+          <p className="text-muted-foreground">Update the recurring profile details</p>
         </div>
       </div>
 

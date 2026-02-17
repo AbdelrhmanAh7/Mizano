@@ -1,15 +1,15 @@
 'use client';
 
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,30 +17,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
 import {
-    useCacheKeys,
-    useCacheStats,
-    useDeleteCachePattern,
-    useFlushCache,
+  useCacheKeys,
+  useCacheStats,
+  useDeleteCachePattern,
+  useFlushCache,
 } from '@/lib/hooks/use-cache';
 import {
-    Activity,
-    ArrowLeft,
-    Clock,
-    Database,
-    HardDrive,
-    Key,
-    RefreshCw,
-    Search,
-    Trash2,
-    Zap,
+  Activity,
+  ArrowLeft,
+  Clock,
+  Database,
+  HardDrive,
+  Key,
+  RefreshCw,
+  Search,
+  Trash2,
+  Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -144,7 +144,7 @@ export function CacheManagement() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link href="/settings">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" aria-label="Go back">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
@@ -375,6 +375,7 @@ export function CacheManagement() {
                               onClick={() => deletePatternMutation.mutate(label)}
                               disabled={deletePatternMutation.isPending}
                               title="Delete this key"
+                              aria-label="Delete cache key"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

@@ -15,6 +15,7 @@ import {
   CacheResponse,
   CacheTTL,
   CurrentOrg,
+  HttpCache,
   InvalidateCache,
   Permissions,
 } from '../../../common/decorators';
@@ -47,6 +48,7 @@ export class InvoicesController {
   @Permissions('sales.view')
   @CacheResponse('invoices:list')
   @CacheTTL(120)
+  @HttpCache('short')
   @ApiOperation({ summary: 'Get all invoices' })
   findAll(@CurrentOrg() orgId: string, @Query() query: InvoiceQueryDto) {
     return this.invoicesService.findAll(orgId, query);

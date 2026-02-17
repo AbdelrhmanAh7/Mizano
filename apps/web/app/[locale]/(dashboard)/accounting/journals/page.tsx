@@ -331,7 +331,12 @@ function JournalsPageContent() {
               }}
               placeholder="Date range"
             />
-            <Button variant="outline" size="icon" onClick={() => refetch()}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              aria-label="Refresh journals"
+            >
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>

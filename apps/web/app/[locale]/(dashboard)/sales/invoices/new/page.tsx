@@ -49,16 +49,14 @@ export default function NewInvoicePage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label="Go back">
           <Link href="/sales/invoices">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">New Invoice</h1>
-          <p className="text-muted-foreground">
-            Create a new invoice for a customer
-          </p>
+          <p className="text-muted-foreground">Create a new invoice for a customer</p>
         </div>
       </div>
 

@@ -3,7 +3,17 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Edit, Trash2, Mail, Phone, MapPin, FileText, Receipt, CreditCard } from 'lucide-react';
+import {
+  ArrowLeft,
+  Edit,
+  Trash2,
+  Mail,
+  Phone,
+  MapPin,
+  FileText,
+  Receipt,
+  CreditCard,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -99,7 +109,7 @@ export default function CustomerDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/sales/customers">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -131,7 +141,7 @@ export default function CustomerDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/sales/customers">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -155,10 +165,7 @@ export default function CustomerDetailPage() {
             </Button>
           )}
           {canDelete && (
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
+            <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </Button>
@@ -182,12 +189,7 @@ export default function CustomerDetailPage() {
             <Card>
               <CardContent className="pt-6">
                 <div className="text-sm text-muted-foreground">Outstanding Balance</div>
-                <div
-                  className={cn(
-                    'text-2xl font-bold font-mono',
-                    getBalanceColor(balance)
-                  )}
-                >
+                <div className={cn('text-2xl font-bold font-mono', getBalanceColor(balance))}>
                   {formatCurrency(balance, customer.currency)}
                 </div>
               </CardContent>
@@ -219,9 +221,7 @@ export default function CustomerDetailPage() {
                   <div className="flex items-start gap-3">
                     <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
-                      <dt className="text-sm font-medium text-muted-foreground">
-                        Email
-                      </dt>
+                      <dt className="text-sm font-medium text-muted-foreground">Email</dt>
                       <dd>
                         <a
                           href={`mailto:${customer.email}`}
@@ -237,14 +237,9 @@ export default function CustomerDetailPage() {
                   <div className="flex items-start gap-3">
                     <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
-                      <dt className="text-sm font-medium text-muted-foreground">
-                        Phone
-                      </dt>
+                      <dt className="text-sm font-medium text-muted-foreground">Phone</dt>
                       <dd>
-                        <a
-                          href={`tel:${customer.phone}`}
-                          className="hover:underline"
-                        >
+                        <a href={`tel:${customer.phone}`} className="hover:underline">
                           {customer.phone}
                         </a>
                       </dd>
@@ -252,15 +247,11 @@ export default function CustomerDetailPage() {
                   </div>
                 )}
                 <div>
-                  <dt className="text-sm font-medium text-muted-foreground">
-                    Currency
-                  </dt>
+                  <dt className="text-sm font-medium text-muted-foreground">Currency</dt>
                   <dd>{customer.currency}</dd>
                 </div>
                 <div>
-                  <dt className="text-sm font-medium text-muted-foreground">
-                    Payment Terms
-                  </dt>
+                  <dt className="text-sm font-medium text-muted-foreground">Payment Terms</dt>
                   <dd>{customer.paymentTerms ? `Net ${customer.paymentTerms} days` : 'Not set'}</dd>
                 </div>
               </dl>
@@ -324,9 +315,7 @@ export default function CustomerDetailPage() {
                 Recent Invoices
               </CardTitle>
               <Button asChild size="sm">
-                <Link href={`/sales/invoices/new?customerId=${customerId}`}>
-                  Create Invoice
-                </Link>
+                <Link href={`/sales/invoices/new?customerId=${customerId}`}>Create Invoice</Link>
               </Button>
             </CardHeader>
             <CardContent>
@@ -360,23 +349,15 @@ export default function CustomerDetailPage() {
                         <TableCell>
                           {format(new Date(invoice.invoiceDate), 'MMM d, yyyy')}
                         </TableCell>
-                        <TableCell>
-                          {format(new Date(invoice.dueDate), 'MMM d, yyyy')}
-                        </TableCell>
+                        <TableCell>{format(new Date(invoice.dueDate), 'MMM d, yyyy')}</TableCell>
                         <TableCell>
                           <InvoiceStatusBadge status={invoice.status} />
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(
-                            parseFloat(invoice.grandTotal || '0'),
-                            customer.currency
-                          )}
+                          {formatCurrency(parseFloat(invoice.grandTotal || '0'), customer.currency)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(
-                            parseFloat(invoice.balanceDue || '0'),
-                            customer.currency
-                          )}
+                          {formatCurrency(parseFloat(invoice.balanceDue || '0'), customer.currency)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -396,9 +377,7 @@ export default function CustomerDetailPage() {
                 Recent Payments
               </CardTitle>
               <Button asChild size="sm">
-                <Link href={`/sales/payments/new?customerId=${customerId}`}>
-                  Record Payment
-                </Link>
+                <Link href={`/sales/payments/new?customerId=${customerId}`}>Record Payment</Link>
               </Button>
             </CardHeader>
             <CardContent>
@@ -434,10 +413,7 @@ export default function CustomerDetailPage() {
                         <TableCell>{payment.paymentMode?.replace('_', ' ')}</TableCell>
                         <TableCell>{payment.reference || '-'}</TableCell>
                         <TableCell className="text-right font-mono text-green-600">
-                          {formatCurrency(
-                            parseFloat(payment.amount || '0'),
-                            customer.currency
-                          )}
+                          {formatCurrency(parseFloat(payment.amount || '0'), customer.currency)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -460,16 +436,12 @@ export default function CustomerDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Customer</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this customer? This action cannot
-              be undone.
+              Are you sure you want to delete this customer? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

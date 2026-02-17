@@ -130,9 +130,7 @@ function AccountsPageContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Chart of Accounts</h1>
-          <p className="text-muted-foreground">
-            Manage your organization&apos;s account structure
-          </p>
+          <p className="text-muted-foreground">Manage your organization&apos;s account structure</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && accounts.length === 0 && (
@@ -179,7 +177,12 @@ function AccountsPageContent() {
                 <SelectItem value="EXPENSE">Expenses</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon" onClick={() => refetch()}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              aria-label="Refresh accounts"
+            >
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
@@ -220,16 +223,12 @@ function AccountsPageContent() {
             <AlertDialogTitle>Delete Account</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete &quot;{accountToDelete?.name}&quot;? This action
-              cannot be undone. Accounts with transactions or child accounts cannot be
-              deleted.
+              cannot be undone. Accounts with transactions or child accounts cannot be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

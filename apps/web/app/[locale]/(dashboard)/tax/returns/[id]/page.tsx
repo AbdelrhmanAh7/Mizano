@@ -150,7 +150,7 @@ export default function VATReturnDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/tax/returns">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -171,9 +171,8 @@ export default function VATReturnDetailPage() {
     );
   }
 
-  const netVat = typeof vatReturn.netVat === 'string'
-    ? parseFloat(vatReturn.netVat)
-    : vatReturn.netVat;
+  const netVat =
+    typeof vatReturn.netVat === 'string' ? parseFloat(vatReturn.netVat) : vatReturn.netVat;
   const isDraft = vatReturn.status === 'DRAFT';
   const isFiled = vatReturn.status === 'FILED';
 
@@ -182,16 +181,14 @@ export default function VATReturnDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/tax/returns">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
-                VAT Return
-              </h1>
+              <h1 className="text-3xl font-bold tracking-tight">VAT Return</h1>
               <Badge className={getVATReturnStatusColor(vatReturn.status)}>
                 {getVATReturnStatusLabel(vatReturn.status)}
               </Badge>
@@ -210,19 +207,18 @@ export default function VATReturnDetailPage() {
             </Button>
           )}
           {canEdit && isFiled && (
-            <Button onClick={() => {
-              setPaymentAmount(String(netVat > 0 ? netVat : 0));
-              setPaymentDialogOpen(true);
-            }}>
+            <Button
+              onClick={() => {
+                setPaymentAmount(String(netVat > 0 ? netVat : 0));
+                setPaymentDialogOpen(true);
+              }}
+            >
               <CreditCard className="mr-2 h-4 w-4" />
               Record Payment
             </Button>
           )}
           {canDelete && isDraft && (
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
+            <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </Button>
@@ -250,9 +246,7 @@ export default function VATReturnDetailPage() {
               <ArrowDownLeft className="h-4 w-4" />
               Input VAT (Purchases)
             </div>
-            <div className="text-2xl font-bold font-mono">
-              {formatCurrency(vatReturn.inputVat)}
-            </div>
+            <div className="text-2xl font-bold font-mono">{formatCurrency(vatReturn.inputVat)}</div>
           </CardContent>
         </Card>
 
@@ -262,10 +256,12 @@ export default function VATReturnDetailPage() {
               <DollarSign className="h-4 w-4" />
               {netVat >= 0 ? 'Net Payable' : 'Net Refundable'}
             </div>
-            <div className={cn(
-              'text-2xl font-bold font-mono',
-              netVat > 0 ? 'text-red-600' : 'text-green-600'
-            )}>
+            <div
+              className={cn(
+                'text-2xl font-bold font-mono',
+                netVat > 0 ? 'text-red-600' : 'text-green-600',
+              )}
+            >
               {formatCurrency(Math.abs(netVat))}
             </div>
           </CardContent>
@@ -278,9 +274,7 @@ export default function VATReturnDetailPage() {
               Filed Date
             </div>
             <div className="text-lg font-bold">
-              {vatReturn.filedAt
-                ? format(new Date(vatReturn.filedAt), 'MMM d, yyyy')
-                : 'Not filed'}
+              {vatReturn.filedAt ? format(new Date(vatReturn.filedAt), 'MMM d, yyyy') : 'Not filed'}
             </div>
           </CardContent>
         </Card>
@@ -292,15 +286,13 @@ export default function VATReturnDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>File VAT Return</AlertDialogTitle>
             <AlertDialogDescription>
-              Filing this return will lock all transactions within the period.
-              This action cannot be undone.
+              Filing this return will lock all transactions within the period. This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmFile}>
-              File Return
-            </AlertDialogAction>
+            <AlertDialogAction onClick={confirmFile}>File Return</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -310,9 +302,7 @@ export default function VATReturnDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Record VAT Payment</DialogTitle>
-            <DialogDescription>
-              Record the payment made for this VAT return
-            </DialogDescription>
+            <DialogDescription>Record the payment made for this VAT return</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -369,10 +359,7 @@ export default function VATReturnDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

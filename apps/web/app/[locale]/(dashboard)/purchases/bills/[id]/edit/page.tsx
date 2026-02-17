@@ -74,9 +74,7 @@ export default function EditBillPage({ params }: EditBillPageProps) {
   if (bill.status !== 'DRAFT') {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">
-          Only draft bills can be edited
-        </p>
+        <p className="text-muted-foreground">Only draft bills can be edited</p>
         <Button asChild className="mt-4">
           <Link href={`/purchases/bills/${id}`}>View Bill</Link>
         </Button>
@@ -88,16 +86,14 @@ export default function EditBillPage({ params }: EditBillPageProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label="Go back">
           <Link href={`/purchases/bills/${id}`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Edit Bill</h1>
-          <p className="text-muted-foreground">
-            Update bill {bill.billNumber}
-          </p>
+          <p className="text-muted-foreground">Update bill {bill.billNumber}</p>
         </div>
       </div>
 

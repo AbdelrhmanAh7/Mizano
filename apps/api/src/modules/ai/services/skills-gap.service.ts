@@ -1,5 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { AiTrainingService } from './ai-training.service';
+import { AiFeedbackService } from './ai-feedback.service';
 import { ModelRegistryService } from './model-registry.service';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -102,6 +105,9 @@ export class SkillsGapService {
   constructor(
     private prisma: PrismaService,
     private modelRegistry: ModelRegistryService,
+    private trainingService: AiTrainingService,
+    private feedbackService: AiFeedbackService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -109,10 +115,7 @@ export class SkillsGapService {
    * Compares their EmployeeAiProfile.skillsProfile against the department role template.
    * Returns gaps (where required > current), match score, and recommendations.
    */
-  async analyzeEmployeeGap(
-    organizationId: string,
-    employeeId: string,
-  ): Promise<EmployeeGapResult> {
+  async analyzeEmployeeGap(organizationId: string, employeeId: string): Promise<EmployeeGapResult> {
     const employee = await this.prisma.employee.findFirst({
       where: {
         id: employeeId,
@@ -184,7 +187,7 @@ export class SkillsGapService {
       },
     });
 
-    return {
+    const result: EmployeeGapResult = {
       employeeId: employee.id,
       name: employee.name,
       department: employee.department,
@@ -194,6 +197,22 @@ export class SkillsGapService {
       matchScore,
       recommendations,
     };
+
+    // Store prediction for feedback tracking
+    try {
+      await this.feedbackService.storePrediction(
+        organizationId,
+        'SKILLS_GAP',
+        { employeeId },
+        { gaps, matchScore, recommendations },
+        matchScore,
+        1,
+      );
+    } catch (error) {
+      this.logger.warn(`Failed to store skills gap prediction: ${error.message}`);
+    }
+
+    return result;
   }
 
   /**
@@ -225,19 +244,13 @@ export class SkillsGapService {
     }
 
     // Aggregate gaps across all employees
-    const gapAggregation = new Map<
-      string,
-      { totalGap: number; count: number }
-    >();
+    const gapAggregation = new Map<string, { totalGap: number; count: number }>();
     let totalMatchScore = 0;
     let analyzedCount = 0;
 
     for (const emp of employees) {
       try {
-        const result = await this.analyzeEmployeeGap(
-          organizationId,
-          emp.id,
-        );
+        const result = await this.analyzeEmployeeGap(organizationId, emp.id);
         totalMatchScore += result.matchScore;
         analyzedCount++;
 
@@ -254,9 +267,7 @@ export class SkillsGapService {
           }
         }
       } catch (error) {
-        this.logger.warn(
-          `Failed to analyze gap for employee ${emp.id}: ${error.message}`,
-        );
+        this.logger.warn(`Failed to analyze gap for employee ${emp.id}: ${error.message}`);
       }
     }
 
@@ -274,8 +285,7 @@ export class SkillsGapService {
         return b.avgGap - a.avgGap;
       });
 
-    const overallReadiness =
-      analyzedCount > 0 ? totalMatchScore / analyzedCount : 0;
+    const overallReadiness = analyzedCount > 0 ? totalMatchScore / analyzedCount : 0;
 
     return {
       department,
@@ -289,18 +299,13 @@ export class SkillsGapService {
    * Get a complete inventory of all skills across the organization.
    * Returns each skill with the count of employees who have it and average proficiency.
    */
-  async getSkillsInventory(
-    organizationId: string,
-  ): Promise<SkillInventoryEntry[]> {
+  async getSkillsInventory(organizationId: string): Promise<SkillInventoryEntry[]> {
     const profiles = await this.prisma.employeeAiProfile.findMany({
       where: { organizationId },
       select: { skillsProfile: true },
     });
 
-    const skillAggregation = new Map<
-      string,
-      { total: number; count: number; max: number }
-    >();
+    const skillAggregation = new Map<string, { total: number; count: number; max: number }>();
 
     for (const profile of profiles) {
       const skills = (profile.skillsProfile as Record<string, number>) || {};
@@ -323,9 +328,7 @@ export class SkillsGapService {
       }
     }
 
-    const inventory: SkillInventoryEntry[] = Array.from(
-      skillAggregation.entries(),
-    )
+    const inventory: SkillInventoryEntry[] = Array.from(skillAggregation.entries())
       .map(([skill, data]) => ({
         skill,
         employeeCount: data.count,
@@ -365,9 +368,7 @@ export class SkillsGapService {
     // Filter to active employees with skills data
     const validProfiles = profiles.filter(
       (p) =>
-        p.employee.status === 'ACTIVE' &&
-        p.employee.isActive === true &&
-        p.skillsProfile !== null,
+        p.employee.status === 'ACTIVE' && p.employee.isActive === true && p.skillsProfile !== null,
     );
 
     if (validProfiles.length === 0) {
@@ -378,9 +379,7 @@ export class SkillsGapService {
     const skillDimensions = Object.keys(requiredSkills);
 
     // Build the target vector (what we are looking for)
-    const targetVector = skillDimensions.map(
-      (skill) => requiredSkills[skill] || 0,
-    );
+    const targetVector = skillDimensions.map((skill) => requiredSkills[skill] || 0);
 
     // Build feature matrix and labels for all employees
     const featureMatrix: number[][] = [];
@@ -405,10 +404,7 @@ export class SkillsGapService {
     if (featureMatrix.length < 2) {
       // Not enough data for KNN, return direct match scores
       return employeeData.map((emp) => {
-        const { matchScore, missingSkills } = this.calculateDirectMatch(
-          emp.skills,
-          requiredSkills,
-        );
+        const { matchScore, missingSkills } = this.calculateDirectMatch(emp.skills, requiredSkills);
         return {
           employeeId: emp.employeeId,
           name: emp.name,
@@ -436,10 +432,7 @@ export class SkillsGapService {
 
     // Calculate direct match scores for all employees and rank
     const results: RoleMatchResult[] = employeeData.map((emp) => {
-      const { matchScore, missingSkills } = this.calculateDirectMatch(
-        emp.skills,
-        requiredSkills,
-      );
+      const { matchScore, missingSkills } = this.calculateDirectMatch(emp.skills, requiredSkills);
       return {
         employeeId: emp.employeeId,
         name: emp.name,
@@ -455,15 +448,54 @@ export class SkillsGapService {
     return results.slice(0, k);
   }
 
+  /**
+   * Record user feedback on a skills gap analysis.
+   * If the user provides adjustedGaps, it is stored as a correction
+   * and may trigger model retraining when the threshold is reached.
+   */
+  async recordSkillsGapFeedback(
+    organizationId: string,
+    employeeId: string,
+    wasCorrect: boolean,
+    adjustedGaps?: any,
+  ): Promise<void> {
+    const label = wasCorrect
+      ? 'correct'
+      : adjustedGaps
+        ? JSON.stringify(adjustedGaps)
+        : 'incorrect';
+
+    await this.trainingService.addTrainingData(
+      organizationId,
+      'SKILLS_GAP',
+      { employeeId },
+      label,
+      wasCorrect ? 'USER' : 'CORRECTION',
+    );
+
+    if (!wasCorrect) {
+      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
+        organizationId,
+        'SKILLS_GAP',
+      );
+
+      if (shouldRetrain) {
+        this.logger.log(`Skills gap retraining threshold reached for org ${organizationId}`);
+        this.eventEmitter.emit('ai.retraining.needed', {
+          organizationId,
+          feature: 'SKILLS_GAP',
+        });
+      }
+    }
+  }
+
   // ─── PRIVATE HELPERS ───
 
   /**
    * Get the required skills template for a department.
    * Falls back to the default template if no specific one exists.
    */
-  private getRequiredSkills(
-    department: string | null,
-  ): Record<string, number> {
+  private getRequiredSkills(department: string | null): Record<string, number> {
     if (!department) return { ...DEFAULT_TEMPLATE };
 
     // Try exact match first, then case-insensitive

@@ -2,7 +2,7 @@
  * Tests for LoggerDashboard component.
  */
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 
 // Mock shared types
@@ -31,10 +31,26 @@ jest.mock('@mizano/shared-types', () => ({
 jest.mock('lucide-react', () => {
   const icons: Record<string, React.FC<{ className?: string }>> = {};
   const iconNames = [
-    'Bug', 'AlertTriangle', 'Trash2', 'Copy', 'Check', 'CheckCheck',
-    'X', 'Filter', 'RefreshCw', 'ChevronDown', 'ChevronRight',
-    'Server', 'Monitor', 'Brain', 'Sparkles', 'ClipboardCopy',
-    'ShieldCheck', 'Eye', 'EyeOff', 'Search',
+    'Bug',
+    'AlertTriangle',
+    'Trash2',
+    'Copy',
+    'Check',
+    'CheckCheck',
+    'X',
+    'Filter',
+    'RefreshCw',
+    'ChevronDown',
+    'ChevronRight',
+    'Server',
+    'Monitor',
+    'Brain',
+    'Sparkles',
+    'ClipboardCopy',
+    'ShieldCheck',
+    'Eye',
+    'EyeOff',
+    'Search',
   ];
   for (const name of iconNames) {
     icons[name] = ({ className }: { className?: string }) => (
@@ -65,7 +81,7 @@ jest.mock('@/components/ui/card', () => ({
 }));
 
 jest.mock('@/components/ui/sheet', () => ({
-  Sheet: ({ children, open }: any) => open ? <div data-testid="sheet">{children}</div> : null,
+  Sheet: ({ children, open }: any) => (open ? <div data-testid="sheet">{children}</div> : null),
   SheetContent: ({ children }: any) => <div data-testid="sheet-content">{children}</div>,
   SheetHeader: ({ children }: any) => <div>{children}</div>,
   SheetTitle: ({ children }: any) => <h2>{children}</h2>,
@@ -114,7 +130,9 @@ jest.mock('@/components/ui/dropdown-menu', () => ({
   DropdownMenu: ({ children }: any) => <div>{children}</div>,
   DropdownMenuContent: ({ children }: any) => <div>{children}</div>,
   DropdownMenuItem: ({ children, onClick, className }: any) => (
-    <button onClick={onClick} className={className}>{children}</button>
+    <button onClick={onClick} className={className}>
+      {children}
+    </button>
   ),
   DropdownMenuSeparator: () => <hr />,
   DropdownMenuTrigger: ({ children }: any) => <div>{children}</div>,

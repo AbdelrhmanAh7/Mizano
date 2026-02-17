@@ -134,11 +134,7 @@ export function JournalForm({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
           <Label htmlFor="date">Date *</Label>
-          <Input
-            id="date"
-            type="date"
-            {...form.register('date')}
-          />
+          <Input id="date" type="date" {...form.register('date')} />
           {form.formState.errors.date && (
             <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
           )}
@@ -146,20 +142,12 @@ export function JournalForm({
 
         <div className="space-y-2">
           <Label htmlFor="reference">Reference</Label>
-          <Input
-            id="reference"
-            placeholder="e.g., INV-001"
-            {...form.register('reference')}
-          />
+          <Input id="reference" placeholder="e.g., INV-001" {...form.register('reference')} />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="notes">Notes</Label>
-          <Input
-            id="notes"
-            placeholder="Optional notes"
-            {...form.register('notes')}
-          />
+          <Input id="notes" placeholder="Optional notes" {...form.register('notes')} />
         </div>
       </div>
 
@@ -247,6 +235,7 @@ export function JournalForm({
                     onClick={() => removeLine(index)}
                     disabled={fields.length <= 2}
                     className="h-8 w-8"
+                    aria-label="Remove journal line"
                   >
                     <Trash2 className="h-4 w-4 text-muted-foreground hover:text-red-500" />
                   </Button>
@@ -280,9 +269,7 @@ export function JournalForm({
               <div
                 className={cn(
                   'flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium',
-                  isBalanced
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-red-100 text-red-800'
+                  isBalanced ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800',
                 )}
               >
                 {isBalanced ? (
@@ -293,7 +280,8 @@ export function JournalForm({
                 ) : (
                   <>
                     <X className="h-4 w-4" />
-                    Unbalanced (Difference: {formatJournalAmount(Math.abs(totalDebit - totalCredit))})
+                    Unbalanced (Difference:{' '}
+                    {formatJournalAmount(Math.abs(totalDebit - totalCredit))})
                   </>
                 )}
               </div>

@@ -8,24 +8,24 @@ Mizano is an AI-powered ERP system (Autonomous Accounting Platform) designed for
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | Next.js 14 (App Router), React 18, TypeScript |
-| Backend | NestJS 10, TypeScript (strict mode) |
-| Database | PostgreSQL 16 + Prisma ORM |
-| Cache/Queue | Redis + BullMQ |
-| UI | shadcn/ui + Tailwind CSS + Radix UI + Lucide icons |
-| State | TanStack Query (server), Zustand (client) |
-| Forms | React Hook Form + Zod |
-| Charts | Recharts |
-| Auth | NextAuth.js (frontend) + JWT with refresh tokens (backend) |
-| Monorepo | Turborepo + pnpm workspaces |
+| Layer       | Technology                                                 |
+| ----------- | ---------------------------------------------------------- |
+| Frontend    | Next.js 14 (App Router), React 18, TypeScript              |
+| Backend     | NestJS 10, TypeScript (strict mode)                        |
+| Database    | PostgreSQL 16 + Prisma ORM                                 |
+| Cache/Queue | Redis + BullMQ                                             |
+| UI          | shadcn/ui + Tailwind CSS + Radix UI + Lucide icons         |
+| State       | TanStack Query (server), Zustand (client)                  |
+| Forms       | React Hook Form + Zod                                      |
+| Charts      | Recharts                                                   |
+| Auth        | NextAuth.js (frontend) + JWT with refresh tokens (backend) |
+| Monorepo    | Turborepo + pnpm workspaces                                |
 
 ## Quick Commands
 
 ```bash
 # Development
-pnpm dev              # Start all apps (web: 3001, api: 3000)
+pnpm dev              # Start all apps (web: 5001, api: 6000)
 pnpm build            # Build all packages
 pnpm lint             # Lint all packages
 
@@ -45,7 +45,7 @@ docker-compose up -d  # Start PostgreSQL + Redis
 ```
 mizano/
 ├── apps/
-│   ├── web/                    # Next.js frontend (port 3001)
+│   ├── web/                    # Next.js frontend (port 5001)
 │   │   ├── app/
 │   │   │   ├── (auth)/         # Login, register pages
 │   │   │   ├── (dashboard)/    # Protected pages
@@ -56,7 +56,7 @@ mizano/
 │   │   └── lib/
 │   │       ├── api/            # API client functions
 │   │       └── hooks/          # React Query hooks
-│   └── api/                    # NestJS backend (port 3000)
+│   └── api/                    # NestJS backend (port 6000)
 │       ├── src/
 │       │   ├── modules/        # Business domain modules
 │       │   ├── common/         # Shared utilities
@@ -94,6 +94,7 @@ mizano/
 - Auto-generate document numbers: INV-XXX, EST-XXX, JRN-XXX, BILL-XXX
 
 **Response Format:**
+
 ```typescript
 // Success
 { data: T, meta?: { page, limit, total, totalPages } }
@@ -120,20 +121,20 @@ mizano/
 
 ## Business Domain Modules
 
-| Module | Path | Key Entities |
-|--------|------|--------------|
-| Accounting | `modules/accounting/` | Accounts, Journals, RecurringProfiles |
-| Sales | `modules/sales/` | Customers, Quotes, Invoices, CreditNotes, PaymentsReceived |
-| Purchases | `modules/purchases/` | Vendors, Bills, Expenses, VendorCredits, PaymentsMade |
-| Inventory | `modules/inventory/` | Items, Warehouses, Movements, Adjustments, PriceLists |
-| Banking | `modules/banking/` | BankAccounts, BankTransactions, BankRules |
-| HR | `modules/hr/` | Employees, Attendance, PayrollRuns, Payslips |
-| Manufacturing | `modules/manufacturing/` | BOMs, WorkOrders |
-| Projects | `modules/projects/` | Projects, Tasks, TimesheetEntries |
-| Tax | `modules/tax/` | TaxRates, VATReturns, VATPayments |
-| CRM | `modules/crm/` | Leads, Deals |
-| Reports | `modules/reports/` | P&L, Balance Sheet, AR/AP Aging |
-| AI | `modules/ai/` | AIInsights, reconciliation, forecasting |
+| Module        | Path                     | Key Entities                                               |
+| ------------- | ------------------------ | ---------------------------------------------------------- |
+| Accounting    | `modules/accounting/`    | Accounts, Journals, RecurringProfiles                      |
+| Sales         | `modules/sales/`         | Customers, Quotes, Invoices, CreditNotes, PaymentsReceived |
+| Purchases     | `modules/purchases/`     | Vendors, Bills, Expenses, VendorCredits, PaymentsMade      |
+| Inventory     | `modules/inventory/`     | Items, Warehouses, Movements, Adjustments, PriceLists      |
+| Banking       | `modules/banking/`       | BankAccounts, BankTransactions, BankRules                  |
+| HR            | `modules/hr/`            | Employees, Attendance, PayrollRuns, Payslips               |
+| Manufacturing | `modules/manufacturing/` | BOMs, WorkOrders                                           |
+| Projects      | `modules/projects/`      | Projects, Tasks, TimesheetEntries                          |
+| Tax           | `modules/tax/`           | TaxRates, VATReturns, VATPayments                          |
+| CRM           | `modules/crm/`           | Leads, Deals                                               |
+| Reports       | `modules/reports/`       | P&L, Balance Sheet, AR/AP Aging                            |
+| AI            | `modules/ai/`            | AIInsights, reconciliation, forecasting                    |
 
 ## Common Patterns
 
@@ -198,13 +199,13 @@ if (!totalDebits.equals(totalCredits)) {
 Copy `.env.example` to `.env` and configure:
 
 ```bash
-DATABASE_URL="postgresql://mizano:mizano_secret@localhost:5432/mizano_db"
-REDIS_URL="redis://localhost:6379"
+DATABASE_URL="postgresql://mizano:mizano_secret@localhost:5435/mizano_db"
+REDIS_URL="redis://localhost:6380"
 JWT_SECRET="your-secret"
 JWT_REFRESH_SECRET="your-refresh-secret"
 NEXTAUTH_SECRET="your-nextauth-secret"
-NEXTAUTH_URL="http://localhost:3000"
-API_URL="http://localhost:3001"
+NEXTAUTH_URL="http://localhost:5001"
+API_URL="http://localhost:6000"
 ```
 
 ## Code Quality Checklist

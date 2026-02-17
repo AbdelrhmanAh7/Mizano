@@ -50,7 +50,19 @@ export interface AvailableCommand {
  */
 const VERB_ACTION_MAP: Record<VoiceAction, string[]> = {
   CREATE: ['create', 'make', 'add', 'generate', 'draft', 'new', 'build'],
-  READ: ['show', 'get', 'find', 'list', 'check', 'view', 'display', 'look', 'search', 'what', 'fetch'],
+  READ: [
+    'show',
+    'get',
+    'find',
+    'list',
+    'check',
+    'view',
+    'display',
+    'look',
+    'search',
+    'what',
+    'fetch',
+  ],
   UPDATE: ['update', 'edit', 'change', 'modify', 'set', 'adjust', 'correct'],
   DELETE: ['delete', 'remove', 'cancel', 'void', 'discard'],
 };
@@ -264,10 +276,7 @@ export class VoiceCommandService {
   /**
    * Map extracted nouns (and raw text) to an entity type.
    */
-  private resolveEntityType(
-    nouns: string[],
-    lowerText: string,
-  ): VoiceEntityType | null {
+  private resolveEntityType(nouns: string[], lowerText: string): VoiceEntityType | null {
     // Check nouns first
     for (const noun of nouns) {
       const normalised = noun.toLowerCase().trim();
@@ -319,10 +328,12 @@ export class VoiceCommandService {
       }
     }
 
-    // Dates via compromise
-    const dateValues: string[] = doc.dates().out('array');
-    if (dateValues.length > 0) {
-      params.date = dateValues[0];
+    // Extract dates via regex instead of compromise plugin (compromise core has no .dates())
+    const dateRegex =
+      /\b(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s*\d{2,4}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4})\b/gi;
+    const dateMatches = text.match(dateRegex) || [];
+    if (dateMatches.length > 0) {
+      params.date = dateMatches[0];
     }
 
     // People / organisation names via compromise
@@ -640,9 +651,7 @@ export class VoiceCommandService {
     };
   }
 
-  private readReport(
-    parameters: Record<string, any>,
-  ): CommandExecutionResult {
+  private readReport(parameters: Record<string, any>): CommandExecutionResult {
     const reportType = parameters.reportType ?? 'unknown';
     const reportNames: Record<string, string> = {
       pl: 'Profit & Loss',

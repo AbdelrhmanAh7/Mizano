@@ -15,6 +15,7 @@ import {
   CacheResponse,
   CacheTTL,
   CurrentOrg,
+  HttpCache,
   InvalidateCache,
   Permissions,
 } from '../../../common/decorators';
@@ -47,6 +48,7 @@ export class JournalsController {
   @Permissions('accounting.view')
   @CacheResponse('journals:list')
   @CacheTTL(120)
+  @HttpCache('short')
   @ApiOperation({ summary: 'Get all journal entries' })
   findAll(@CurrentOrg() orgId: string, @Query() query: JournalQueryDto) {
     return this.journalsService.findAll(orgId, query);

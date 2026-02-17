@@ -1,5 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { AiTrainingService } from './ai-training.service';
+import { AiFeedbackService } from './ai-feedback.service';
 import { ModelRegistryService } from './model-registry.service';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -70,6 +73,9 @@ export class CompensationBenchmarkService {
   constructor(
     private prisma: PrismaService,
     private modelRegistry: ModelRegistryService,
+    private trainingService: AiTrainingService,
+    private feedbackService: AiFeedbackService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -103,14 +109,10 @@ export class CompensationBenchmarkService {
     }
 
     const salary = Number(employee.basicSalary);
-    const departmentStats = await this.getDepartmentStats(
-      organizationId,
-      employee.department,
-    );
+    const departmentStats = await this.getDepartmentStats(organizationId, employee.department);
 
     // Calculate compensation index
-    const compensationIndex =
-      departmentStats.median > 0 ? salary / departmentStats.median : 1.0;
+    const compensationIndex = departmentStats.median > 0 ? salary / departmentStats.median : 1.0;
 
     // Determine status
     let status: 'underpaid' | 'fair' | 'overpaid';
@@ -137,13 +139,9 @@ export class CompensationBenchmarkService {
       },
     });
 
-    const recommendation = this.getRecommendation(
-      status,
-      compensationIndex,
-      employee.department,
-    );
+    const recommendation = this.getRecommendation(status, compensationIndex, employee.department);
 
-    return {
+    const result: EmployeeBenchmarkResult = {
       employeeId: employee.id,
       name: employee.name,
       department: employee.department,
@@ -154,15 +152,29 @@ export class CompensationBenchmarkService {
       status,
       recommendation,
     };
+
+    // Store prediction for feedback tracking
+    try {
+      await this.feedbackService.storePrediction(
+        organizationId,
+        'COMPENSATION_BENCHMARK',
+        { employeeId },
+        { compensationIndex, status, recommendation },
+        compensationIndex > 0 ? Math.min(1, 1 - Math.abs(1 - compensationIndex)) : 0,
+        1,
+      );
+    } catch (error) {
+      this.logger.warn(`Failed to store benchmark prediction: ${error.message}`);
+    }
+
+    return result;
   }
 
   /**
    * Get benchmark statistics for each department in the organization.
    * Returns median, p25, p75, average salary, and outlier count per department.
    */
-  async getDepartmentBenchmarks(
-    organizationId: string,
-  ): Promise<DepartmentBenchmark[]> {
+  async getDepartmentBenchmarks(organizationId: string): Promise<DepartmentBenchmark[]> {
     const employees = await this.getActiveEmployees(organizationId);
 
     // Group by department
@@ -190,9 +202,7 @@ export class CompensationBenchmarkService {
       const iqr = p75 - p25;
       const lowerBound = p25 - 1.5 * iqr;
       const upperBound = p75 + 1.5 * iqr;
-      const outlierCount = sorted.filter(
-        (s) => s < lowerBound || s > upperBound,
-      ).length;
+      const outlierCount = sorted.filter((s) => s < lowerBound || s > upperBound).length;
 
       benchmarks.push({
         department,
@@ -294,9 +304,7 @@ export class CompensationBenchmarkService {
    * Get a histogram of salary ranges across the entire organization.
    * Groups into dynamic buckets (e.g., 0-2000, 2000-4000, etc.).
    */
-  async getSalaryDistribution(
-    organizationId: string,
-  ): Promise<SalaryDistribution> {
+  async getSalaryDistribution(organizationId: string): Promise<SalaryDistribution> {
     const employees = await this.getActiveEmployees(organizationId);
 
     if (employees.length === 0) {
@@ -308,9 +316,7 @@ export class CompensationBenchmarkService {
       };
     }
 
-    const salaries = employees
-      .map((e) => Number(e.basicSalary))
-      .sort((a, b) => a - b);
+    const salaries = employees.map((e) => Number(e.basicSalary)).sort((a, b) => a - b);
 
     const overallMedian = ss.median(salaries);
     const overallMean = ss.mean(salaries);
@@ -332,27 +338,19 @@ export class CompensationBenchmarkService {
 
     // Create buckets
     const bucketStart = Math.floor(minSalary / bucketSize) * bucketSize;
-    const bucketEnd =
-      Math.ceil((maxSalary + 1) / bucketSize) * bucketSize;
+    const bucketEnd = Math.ceil((maxSalary + 1) / bucketSize) * bucketSize;
 
     const buckets: SalaryBucket[] = [];
-    for (
-      let start = bucketStart;
-      start < bucketEnd;
-      start += bucketSize
-    ) {
+    for (let start = bucketStart; start < bucketEnd; start += bucketSize) {
       const end = start + bucketSize;
-      const count = salaries.filter(
-        (s) => s >= start && s < end,
-      ).length;
+      const count = salaries.filter((s) => s >= start && s < end).length;
 
       buckets.push({
         range: `${this.formatCurrency(start)}-${this.formatCurrency(end)}`,
         min: start,
         max: end,
         count,
-        percentage:
-          employees.length > 0 ? (count / employees.length) * 100 : 0,
+        percentage: employees.length > 0 ? (count / employees.length) * 100 : 0,
       });
     }
 
@@ -362,6 +360,49 @@ export class CompensationBenchmarkService {
       overallMedian,
       overallMean,
     };
+  }
+
+  /**
+   * Record user feedback on a compensation benchmark result.
+   * If the user provides an adjustedRatio, it is stored as a correction
+   * and may trigger model retraining when the threshold is reached.
+   */
+  async recordBenchmarkFeedback(
+    organizationId: string,
+    employeeId: string,
+    wasCorrect: boolean,
+    adjustedRatio?: number,
+  ): Promise<void> {
+    const label = wasCorrect
+      ? 'correct'
+      : adjustedRatio !== undefined
+        ? String(adjustedRatio)
+        : 'incorrect';
+
+    await this.trainingService.addTrainingData(
+      organizationId,
+      'COMPENSATION_BENCHMARK',
+      { employeeId },
+      label,
+      wasCorrect ? 'USER' : 'CORRECTION',
+    );
+
+    if (!wasCorrect) {
+      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
+        organizationId,
+        'COMPENSATION_BENCHMARK',
+      );
+
+      if (shouldRetrain) {
+        this.logger.log(
+          `Compensation benchmark retraining threshold reached for org ${organizationId}`,
+        );
+        this.eventEmitter.emit('ai.retraining.needed', {
+          organizationId,
+          feature: 'COMPENSATION_BENCHMARK',
+        });
+      }
+    }
   }
 
   // ─── PRIVATE HELPERS ───
@@ -411,9 +452,7 @@ export class CompensationBenchmarkService {
       return { median: 0, p25: 0, p75: 0, min: 0, max: 0, count: 0 };
     }
 
-    const salaries = employees
-      .map((e) => Number(e.basicSalary))
-      .sort((a, b) => a - b);
+    const salaries = employees.map((e) => Number(e.basicSalary)).sort((a, b) => a - b);
 
     return {
       median: ss.median(salaries),

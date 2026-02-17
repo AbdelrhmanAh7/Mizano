@@ -3,6 +3,9 @@ import { ChurnPredictionService } from './churn-prediction.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
+import { AiFeedbackService } from './ai-feedback.service';
+import { AiTrainingService } from './ai-training.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Decimal } from '@prisma/client/runtime/library';
 
 describe('ChurnPredictionService', () => {
@@ -51,6 +54,18 @@ describe('ChurnPredictionService', () => {
         ChurnPredictionService,
         { provide: PrismaService, useValue: prisma },
         { provide: ModelRegistryService, useValue: modelRegistry },
+        {
+          provide: AiFeedbackService,
+          useValue: {
+            storePrediction: jest.fn().mockResolvedValue({}),
+            checkRetrainingThreshold: jest.fn().mockResolvedValue({ shouldRetrain: false }),
+          },
+        },
+        {
+          provide: AiTrainingService,
+          useValue: { addTrainingData: jest.fn().mockResolvedValue({}) },
+        },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 
@@ -64,9 +79,9 @@ describe('ChurnPredictionService', () => {
     it('should throw error when customer not found', async () => {
       prisma.customer.findFirst.mockResolvedValue(null as any);
 
-      await expect(
-        service.predictChurnRisk(orgId, 'non-existent'),
-      ).rejects.toThrow('Customer non-existent not found');
+      await expect(service.predictChurnRisk(orgId, 'non-existent')).rejects.toThrow(
+        'Customer non-existent not found',
+      );
     });
 
     it('should return high churn risk for customer with no recent purchases', async () => {
@@ -266,7 +281,9 @@ describe('ChurnPredictionService', () => {
           customerId: 'cust-001',
           customer: { id: 'cust-001', name: 'At Risk Customer', email: 'risk@test.com' },
           churnRisk: new Decimal('0.75'),
-          churnFactors: [{ factor: 'recency', impact: 0.35, description: 'No purchase in 6+ months' }],
+          churnFactors: [
+            { factor: 'recency', impact: 0.35, description: 'No purchase in 6+ months' },
+          ],
           lastPurchaseDate: new Date('2023-06-01'),
           rfmRecency: 200,
           rfmFrequency: 2,

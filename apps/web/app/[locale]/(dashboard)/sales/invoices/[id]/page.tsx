@@ -141,7 +141,7 @@ export default function InvoiceDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/sales/invoices">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -181,16 +181,14 @@ export default function InvoiceDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/sales/invoices">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
-                {invoice.invoiceNumber}
-              </h1>
+              <h1 className="text-3xl font-bold tracking-tight">{invoice.invoiceNumber}</h1>
               <InvoiceStatusBadge status={invoice.status} />
             </div>
             {invoice.customer && (
@@ -237,10 +235,7 @@ export default function InvoiceDetailPage() {
             </Button>
           )}
           {canDelete && isDraft && (
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
+            <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </Button>
@@ -256,9 +251,7 @@ export default function InvoiceDetailPage() {
               <DollarSign className="h-4 w-4" />
               Grand Total
             </div>
-            <div className="text-2xl font-bold font-mono">
-              {formatCurrency(grandTotal)}
-            </div>
+            <div className="text-2xl font-bold font-mono">{formatCurrency(grandTotal)}</div>
           </CardContent>
         </Card>
 
@@ -280,12 +273,7 @@ export default function InvoiceDetailPage() {
               <DollarSign className="h-4 w-4" />
               Balance Due
             </div>
-            <div
-              className={cn(
-                'text-2xl font-bold font-mono',
-                balanceDue > 0 && 'text-red-600'
-              )}
-            >
+            <div className={cn('text-2xl font-bold font-mono', balanceDue > 0 && 'text-red-600')}>
               {formatCurrency(balanceDue)}
             </div>
           </CardContent>
@@ -297,12 +285,7 @@ export default function InvoiceDetailPage() {
               <Calendar className="h-4 w-4" />
               Due Date
             </div>
-            <div
-              className={cn(
-                'text-2xl font-bold',
-                isOverdue && 'text-red-600'
-              )}
-            >
+            <div className={cn('text-2xl font-bold', isOverdue && 'text-red-600')}>
               {format(new Date(invoice.dueDate), 'MMM d, yyyy')}
             </div>
           </CardContent>
@@ -461,15 +444,11 @@ export default function InvoiceDetailPage() {
             <CardContent className="space-y-4">
               <div>
                 <div className="text-sm text-muted-foreground">Invoice Date</div>
-                <div className="font-medium">
-                  {format(new Date(invoice.date), 'MMMM d, yyyy')}
-                </div>
+                <div className="font-medium">{format(new Date(invoice.date), 'MMMM d, yyyy')}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Due Date</div>
-                <div
-                  className={cn('font-medium', isOverdue && 'text-red-600')}
-                >
+                <div className={cn('font-medium', isOverdue && 'text-red-600')}>
                   {format(new Date(invoice.dueDate), 'MMMM d, yyyy')}
                   {isOverdue && ' (Overdue)'}
                 </div>
@@ -576,9 +555,7 @@ export default function InvoiceDetailPage() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      {creditNote.date
-                        ? format(new Date(creditNote.date), 'MMM d, yyyy')
-                        : '-'}
+                      {creditNote.date ? format(new Date(creditNote.date), 'MMM d, yyyy') : '-'}
                     </TableCell>
                     <TableCell className="text-right font-mono text-orange-600">
                       {formatCurrency(creditNote.amount || '0')}
@@ -597,16 +574,13 @@ export default function InvoiceDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete invoice &quot;{invoice.invoiceNumber}&quot;?
-              This action cannot be undone.
+              Are you sure you want to delete invoice &quot;{invoice.invoiceNumber}&quot;? This
+              action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -625,9 +599,7 @@ export default function InvoiceDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSend}>
-              Send Invoice
-            </AlertDialogAction>
+            <AlertDialogAction onClick={confirmSend}>Send Invoice</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -638,16 +610,13 @@ export default function InvoiceDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Void Invoice</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to void invoice &quot;{invoice.invoiceNumber}&quot;?
-              This action cannot be undone.
+              Are you sure you want to void invoice &quot;{invoice.invoiceNumber}&quot;? This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmVoid}
-              className="bg-orange-600 hover:bg-orange-700"
-            >
+            <AlertDialogAction onClick={confirmVoid} className="bg-orange-600 hover:bg-orange-700">
               Void Invoice
             </AlertDialogAction>
           </AlertDialogFooter>

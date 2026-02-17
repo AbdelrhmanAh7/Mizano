@@ -47,16 +47,14 @@ export default function NewQuotePage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label="Go back">
           <Link href="/sales/quotes">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">New Quote</h1>
-          <p className="text-muted-foreground">
-            Create a new estimate for your customer
-          </p>
+          <p className="text-muted-foreground">Create a new estimate for your customer</p>
         </div>
       </div>
 

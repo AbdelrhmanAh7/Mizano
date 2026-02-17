@@ -5,18 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import {
-    useAllOrganizationSettings,
-    useUpdateGeneralSettings
-} from '@/lib/hooks/use-all-settings';
+import { useAllOrganizationSettings, useUpdateGeneralSettings } from '@/lib/hooks/use-all-settings';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, Building2, Save } from 'lucide-react';
 import Link from 'next/link';
@@ -124,7 +121,7 @@ export default function OrganizationSettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label="Go back">
           <Link href="/settings">
             <ArrowLeft className="h-4 w-4" />
           </Link>

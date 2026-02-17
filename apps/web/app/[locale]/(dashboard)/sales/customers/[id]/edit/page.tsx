@@ -55,7 +55,7 @@ export default function EditCustomerPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/sales/customers">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -72,16 +72,14 @@ export default function EditCustomerPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label="Go back">
           <Link href={`/sales/customers/${customerId}`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Edit Customer</h1>
-          <p className="text-muted-foreground">
-            Update {customer.displayName || customer.name}
-          </p>
+          <p className="text-muted-foreground">Update {customer.displayName || customer.name}</p>
         </div>
       </div>
 

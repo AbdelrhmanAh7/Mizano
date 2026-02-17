@@ -41,7 +41,7 @@ export function getRiskLevelLabel(riskLevel: 'low' | 'medium' | 'high' | string)
  * Get color class based on confidence score (0-1)
  */
 export function getConfidenceColor(confidence: number | null): string {
-  if (confidence === null || confidence === undefined) return 'text-gray-400';
+  if (confidence === null || confidence === undefined) return 'text-muted-foreground';
   if (confidence >= 0.8) return 'text-green-600';
   if (confidence >= 0.6) return 'text-yellow-600';
   return 'text-red-600';

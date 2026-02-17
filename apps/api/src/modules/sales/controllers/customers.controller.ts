@@ -15,6 +15,7 @@ import {
   CacheResponse,
   CacheTTL,
   CurrentOrg,
+  HttpCache,
   InvalidateCache,
   Permissions,
 } from '../../../common/decorators';
@@ -47,6 +48,7 @@ export class CustomersController {
   @Permissions('sales.view')
   @CacheResponse('customers:list')
   @CacheTTL(120)
+  @HttpCache('short')
   @ApiOperation({ summary: 'Get all customers' })
   findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto) {
     return this.customersService.findAll(orgId, query);

@@ -1,14 +1,12 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Bug,
   AlertTriangle,
   Trash2,
-  Copy,
   Check,
   CheckCheck,
-  X,
   Filter,
   RefreshCw,
   ChevronDown,
@@ -19,20 +17,12 @@ import {
   Sparkles,
   ClipboardCopy,
   ShieldCheck,
-  Eye,
   EyeOff,
   Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import {
   Dialog,
   DialogContent,
@@ -53,21 +43,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useLogger } from '@/lib/hooks/use-logger';
 import { useGlobalErrorCapture } from '@/lib/hooks/use-global-error-capture';
-import {
-  LogEntry,
-  LogLevel,
-  LogSource,
-  LogCategory,
-  LogStatus,
-} from '@mizano/shared-types';
+import { LogEntry, LogLevel, LogSource, LogStatus } from '@mizano/shared-types';
 
 // ---- Helper components ----
 
@@ -93,14 +72,28 @@ function SourceIcon({ source }: { source: LogSource }) {
 
 function StatusBadge({ status }: { status: LogStatus }) {
   const variants: Record<LogStatus, { label: string; className: string }> = {
-    [LogStatus.OPEN]: { label: 'Open', className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' },
-    [LogStatus.FIXED]: { label: 'Fixed', className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
-    [LogStatus.IGNORED]: { label: 'Ignored', className: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
-    [LogStatus.TEST_COVERED]: { label: 'Test Covered', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' },
+    [LogStatus.OPEN]: {
+      label: 'Open',
+      className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    },
+    [LogStatus.FIXED]: {
+      label: 'Fixed',
+      className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    },
+    [LogStatus.IGNORED]: {
+      label: 'Ignored',
+      className: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+    },
+    [LogStatus.TEST_COVERED]: {
+      label: 'Test Covered',
+      className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    },
   };
   const v = variants[status];
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${v.className}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${v.className}`}
+    >
       {v.label}
     </span>
   );
@@ -179,9 +172,7 @@ function LogRow({
                 {log.method && <span className="text-blue-500">{log.method} </span>}
                 {log.url}
               </span>
-              {log.statusCode && (
-                <span className="ml-2 text-red-500">[{log.statusCode}]</span>
-              )}
+              {log.statusCode && <span className="ml-2 text-red-500">[{log.statusCode}]</span>}
             </div>
           )}
           {log.stack && (
@@ -209,7 +200,8 @@ function LogRow({
               <span className="text-muted-foreground">Files: </span>
               {log.filePaths.map((fp, i) => (
                 <span key={i} className="font-mono text-blue-500">
-                  {fp}{i < log.filePaths!.length - 1 ? ', ' : ''}
+                  {fp}
+                  {i < log.filePaths!.length - 1 ? ', ' : ''}
                 </span>
               ))}
             </div>
@@ -262,7 +254,8 @@ function PromptDialog({
             <DialogTitle>Claude Fix Prompt</DialogTitle>
           </div>
           <DialogDescription>
-            Copy this prompt and paste it into Claude (or any AI assistant) to get fixes with test coverage for the selected errors.
+            Copy this prompt and paste it into Claude (or any AI assistant) to get fixes with test
+            coverage for the selected errors.
           </DialogDescription>
         </DialogHeader>
 
@@ -273,9 +266,7 @@ function PromptDialog({
         </ScrollArea>
 
         <div className="flex items-center justify-between pt-2">
-          <p className="text-xs text-muted-foreground">
-            {prompt.length} characters
-          </p>
+          <p className="text-xs text-muted-foreground">{prompt.length} characters</p>
           <Button onClick={handleCopy} className="min-w-[140px]">
             {copied ? (
               <>
@@ -368,6 +359,7 @@ export function LoggerDashboard() {
             <Button
               variant="outline"
               size="icon"
+              aria-label="Toggle error logger"
               className="fixed bottom-20 right-4 z-50 h-12 w-12 rounded-full shadow-lg border-2 transition-all hover:scale-105"
               onClick={toggle}
               style={{
@@ -375,8 +367,8 @@ export function LoggerDashboard() {
                   errorCount > 0
                     ? 'hsl(var(--destructive))'
                     : warnCount > 0
-                    ? '#eab308'
-                    : 'hsl(var(--border))',
+                      ? '#eab308'
+                      : 'hsl(var(--border))',
               }}
             >
               <Bug className="h-5 w-5" />
@@ -395,10 +387,7 @@ export function LoggerDashboard() {
 
       {/* Side panel */}
       <Sheet open={isOpen} onOpenChange={setOpen}>
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-2xl p-0 flex flex-col"
-        >
+        <SheetContent side="right" className="w-full sm:max-w-2xl p-0 flex flex-col">
           {/* Header */}
           <div className="p-4 border-b space-y-3">
             <div className="flex items-center justify-between">
@@ -407,7 +396,13 @@ export function LoggerDashboard() {
                 <SheetTitle>Error Logger</SheetTitle>
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" onClick={refetch} title="Refresh">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={refetch}
+                  title="Refresh"
+                  aria-label="Refresh"
+                >
                   <RefreshCw className="h-4 w-4" />
                 </Button>
               </div>
@@ -504,9 +499,7 @@ export function LoggerDashboard() {
                     </DropdownMenuCheckboxItem>
                   ))}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={resetFilter}>
-                    Clear Filters
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={resetFilter}>Clear Filters</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -515,17 +508,11 @@ export function LoggerDashboard() {
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Checkbox
-                  checked={
-                    logs.length > 0 && selectedIds.length === logs.length
-                  }
-                  onCheckedChange={(checked) =>
-                    checked ? selectAll() : deselectAll()
-                  }
+                  checked={logs.length > 0 && selectedIds.length === logs.length}
+                  onCheckedChange={(checked) => (checked ? selectAll() : deselectAll())}
                 />
                 <span>
-                  {selectedIds.length > 0
-                    ? `${selectedIds.length} selected`
-                    : 'Select all'}
+                  {selectedIds.length > 0 ? `${selectedIds.length} selected` : 'Select all'}
                 </span>
               </div>
 
@@ -597,10 +584,7 @@ export function LoggerDashboard() {
                         Mark as Ignored
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={clearSelected}
-                        className="text-destructive"
-                      >
+                      <DropdownMenuItem onClick={clearSelected} className="text-destructive">
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete Selected
                       </DropdownMenuItem>
@@ -612,7 +596,11 @@ export function LoggerDashboard() {
               <div className="ml-auto">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 text-xs text-muted-foreground"
+                    >
                       <Trash2 className="h-3 w-3" />
                       Clear
                     </Button>
@@ -621,10 +609,7 @@ export function LoggerDashboard() {
                     <DropdownMenuItem onClick={clearResolved}>
                       Clear Fixed & Test Covered
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={clearAll}
-                      className="text-destructive"
-                    >
+                    <DropdownMenuItem onClick={clearAll} className="text-destructive">
                       Clear All Logs
                     </DropdownMenuItem>
                   </DropdownMenuContent>

@@ -15,6 +15,7 @@ import {
   CacheResponse,
   CacheTTL,
   CurrentOrg,
+  HttpCache,
   InvalidateCache,
   Permissions,
 } from '../../../common/decorators';
@@ -66,6 +67,7 @@ export class AccountsController {
   @Permissions('accounting.view')
   @CacheResponse('accounts:list')
   @CacheTTL(600)
+  @HttpCache('static')
   @ApiOperation({ summary: 'Get all accounts (flat list)' })
   findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto) {
     return this.accountsService.findAll(orgId, query);

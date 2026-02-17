@@ -80,15 +80,13 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/purchases/expenses">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Expense Details
-            </h1>
+            <h1 className="text-3xl font-bold tracking-tight">Expense Details</h1>
             <p className="text-muted-foreground">
               {format(new Date(expense.date), 'MMMM d, yyyy')}
             </p>
@@ -106,16 +104,12 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete Expense</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to delete this expense? This action
-                  cannot be undone.
+                  Are you sure you want to delete this expense? This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  className="bg-red-600 hover:bg-red-700"
-                >
+                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
                   Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -128,45 +122,31 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Amount
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Amount</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">
-              {formatCurrency(amount)}
-            </div>
+            <div className="text-2xl font-bold font-mono">{formatCurrency(amount)}</div>
             {taxAmount > 0 && (
-              <p className="text-sm text-muted-foreground">
-                + {formatCurrency(taxAmount)} tax
-              </p>
+              <p className="text-sm text-muted-foreground">+ {formatCurrency(taxAmount)} tax</p>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono text-red-600">
-              {formatCurrency(total)}
-            </div>
+            <div className="text-2xl font-bold font-mono text-red-600">{formatCurrency(total)}</div>
             {expense.taxInclusive && taxAmount > 0 && (
-              <p className="text-sm text-muted-foreground">
-                Tax inclusive
-              </p>
+              <p className="text-sm text-muted-foreground">Tax inclusive</p>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Category
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Category</CardTitle>
           </CardHeader>
           <CardContent>
             <Badge variant="secondary" className="text-base">
@@ -203,7 +183,9 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
                   >
                     {expense.vendor.name}
                   </Link>
-                ) : '-'}
+                ) : (
+                  '-'
+                )}
               </p>
             </div>
 

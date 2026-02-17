@@ -57,16 +57,14 @@ export default function NewPaymentMadePage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label="Go back">
           <Link href="/purchases/payments">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Record Payment</h1>
-          <p className="text-muted-foreground">
-            Record a payment made to a vendor
-          </p>
+          <p className="text-muted-foreground">Record a payment made to a vendor</p>
         </div>
       </div>
 

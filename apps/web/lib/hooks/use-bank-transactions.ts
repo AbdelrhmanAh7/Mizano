@@ -218,7 +218,7 @@ export function getStatusColor(status: TransactionStatus): string {
 }
 
 export function getConfidenceColor(confidence: number | null): string {
-  if (confidence === null) return 'text-gray-400';
+  if (confidence === null) return 'text-muted-foreground';
   if (confidence >= 80) return 'text-green-600';
   if (confidence >= 50) return 'text-yellow-600';
   return 'text-red-600';

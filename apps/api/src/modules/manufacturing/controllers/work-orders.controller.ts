@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -7,7 +18,7 @@ import { WorkOrdersService } from '../services/work-orders.service';
 
 @ApiTags('Work Orders')
 @ApiBearerAuth()
-@Controller('work-orders')
+@Controller('manufacturing/work-orders')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class WorkOrdersController {
   constructor(private readonly workOrdersService: WorkOrdersService) {}
@@ -33,7 +44,7 @@ export class WorkOrdersController {
     return this.workOrdersService.findOne(orgId, id);
   }
 
-  @Put(':id')
+  @Patch(':id')
   @Permissions('manufacturing.edit')
   @ApiOperation({ summary: 'Update work order' })
   update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {

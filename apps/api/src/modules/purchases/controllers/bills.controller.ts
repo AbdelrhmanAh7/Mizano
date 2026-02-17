@@ -15,6 +15,7 @@ import {
   CacheResponse,
   CacheTTL,
   CurrentOrg,
+  HttpCache,
   InvalidateCache,
   Permissions,
 } from '../../../common/decorators';
@@ -53,6 +54,7 @@ export class BillsController {
   @Permissions('purchases.view')
   @CacheResponse('bills:list')
   @CacheTTL(120)
+  @HttpCache('short')
   @ApiOperation({ summary: 'Get all bills' })
   findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto) {
     return this.billsService.findAll(orgId, query);

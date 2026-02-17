@@ -1,6 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
+import { AiFeedbackService } from './ai-feedback.service';
+import { AiTrainingService } from './ai-training.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { getRiskLevel } from '../utils/risk-level.util';
 
@@ -64,6 +67,9 @@ export class EmployeeAttritionService {
   constructor(
     private prisma: PrismaService,
     private modelRegistry: ModelRegistryService,
+    private feedbackService: AiFeedbackService,
+    private trainingService: AiTrainingService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -82,20 +88,13 @@ export class EmployeeAttritionService {
       throw new NotFoundException(`Employee ${employeeId} not found`);
     }
 
-    const features = await this.extractAttritionFeatures(
-      organizationId,
-      employeeId,
-    );
-    const { score: ruleScore, factors } =
-      this.calculateRuleBasedScore(features);
+    const features = await this.extractAttritionFeatures(organizationId, employeeId);
+    const { score: ruleScore, factors } = this.calculateRuleBasedScore(features);
 
     // Try ML prediction
     let mlScore: number | null = null;
     try {
-      const model = await this.modelRegistry.loadActiveModel(
-        organizationId,
-        'EMPLOYEE_ATTRITION',
-      );
+      const model = await this.modelRegistry.loadActiveModel(organizationId, 'EMPLOYEE_ATTRITION');
       if (model?.modelData) {
         const classifier = RandomForestClassifier.load(model.modelData);
         const featureVector = this.featuresToVector(features);
@@ -113,8 +112,7 @@ export class EmployeeAttritionService {
     // Blend scores: 60% rule-based + 40% ML when available
     const finalScore =
       mlScore !== null
-        ? ruleScore * (1 - this.ML_BLEND_WEIGHT) +
-          mlScore * this.ML_BLEND_WEIGHT
+        ? ruleScore * (1 - this.ML_BLEND_WEIGHT) + mlScore * this.ML_BLEND_WEIGHT
         : ruleScore;
 
     const riskLevel = getRiskLevel(finalScore);
@@ -137,7 +135,7 @@ export class EmployeeAttritionService {
       },
     });
 
-    return {
+    const result: AttritionPredictionResult = {
       employeeId,
       employeeName: employee.name,
       attritionRisk: finalScore,
@@ -147,15 +145,24 @@ export class EmployeeAttritionService {
       recommendation: this.getRecommendation(riskLevel, factors),
       predictionMethod: mlScore !== null ? 'HYBRID' : 'RULE_BASED',
     };
+
+    // Store prediction for feedback tracking
+    await this.feedbackService.storePrediction(
+      organizationId,
+      'EMPLOYEE_ATTRITION',
+      { employeeId },
+      { attritionRisk: finalScore, riskLevel },
+      confidence,
+      0,
+    );
+
+    return result;
   }
 
   /**
    * Get top flight-risk employees (attritionRisk >= 0.5), sorted by risk descending.
    */
-  async getFlightRisk(
-    organizationId: string,
-    limit: number = 20,
-  ): Promise<FlightRiskEmployee[]> {
+  async getFlightRisk(organizationId: string, limit: number = 20): Promise<FlightRiskEmployee[]> {
     const profiles = await this.prisma.employeeAiProfile.findMany({
       where: {
         organizationId,
@@ -192,9 +199,7 @@ export class EmployeeAttritionService {
   /**
    * Batch predict attrition for all active employees in the organization.
    */
-  async predictAll(
-    organizationId: string,
-  ): Promise<AttritionBatchResult> {
+  async predictAll(organizationId: string): Promise<AttritionBatchResult> {
     const employees = await this.prisma.employee.findMany({
       where: { organizationId, status: 'ACTIVE', isActive: true },
       select: { id: true },
@@ -206,10 +211,7 @@ export class EmployeeAttritionService {
 
     for (const employee of employees) {
       try {
-        const result = await this.predictAttrition(
-          organizationId,
-          employee.id,
-        );
+        const result = await this.predictAttrition(organizationId, employee.id);
         if (result.riskLevel === 'CRITICAL' || result.riskLevel === 'HIGH') {
           highRisk++;
         } else if (result.riskLevel === 'MEDIUM') {
@@ -237,9 +239,7 @@ export class EmployeeAttritionService {
    * TERMINATED status = 1 (left), ACTIVE with 1+ year tenure = 0 (stayed).
    * Requires minimum 30 samples. Uses 80/20 train/test split.
    */
-  async trainModel(
-    organizationId: string,
-  ): Promise<AttritionTrainingResult> {
+  async trainModel(organizationId: string): Promise<AttritionTrainingResult> {
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
@@ -288,16 +288,11 @@ export class EmployeeAttritionService {
 
     for (const sample of allSamples) {
       try {
-        const featureSet = await this.extractAttritionFeatures(
-          organizationId,
-          sample.id,
-        );
+        const featureSet = await this.extractAttritionFeatures(organizationId, sample.id);
         features.push(this.featuresToVector(featureSet));
         labels.push(sample.label);
       } catch (error) {
-        this.logger.debug(
-          `Skipping employee ${sample.id} for training: ${error.message}`,
-        );
+        this.logger.debug(`Skipping employee ${sample.id} for training: ${error.message}`);
         continue;
       }
     }
@@ -328,8 +323,7 @@ export class EmployeeAttritionService {
     for (let i = 0; i < testLabels.length; i++) {
       if (predictions[i] === testLabels[i]) correct++;
     }
-    const accuracy =
-      testLabels.length > 0 ? correct / testLabels.length : 0;
+    const accuracy = testLabels.length > 0 ? correct / testLabels.length : 0;
 
     // Save model via registry
     const saved = await this.modelRegistry.saveModel(
@@ -351,6 +345,50 @@ export class EmployeeAttritionService {
       sampleCount: features.length,
       message: `Model trained with ${features.length} samples (accuracy: ${(accuracy * 100).toFixed(1)}%)`,
     };
+  }
+
+  /**
+   * Record user feedback on an attrition prediction.
+   */
+  async recordAttritionFeedback(
+    organizationId: string,
+    employeeId: string,
+    wasCorrect: boolean,
+    actualLeft?: boolean,
+  ): Promise<void> {
+    const label =
+      actualLeft !== undefined
+        ? actualLeft
+          ? 'LEFT'
+          : 'STAYED'
+        : wasCorrect
+          ? 'CORRECT'
+          : 'INCORRECT';
+
+    await this.trainingService.addTrainingData(
+      organizationId,
+      'EMPLOYEE_ATTRITION',
+      { employeeId },
+      label,
+      wasCorrect ? 'USER' : 'CORRECTION',
+    );
+
+    if (!wasCorrect) {
+      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
+        organizationId,
+        'EMPLOYEE_ATTRITION',
+      );
+
+      if (shouldRetrain) {
+        this.logger.log(
+          `Attrition prediction retraining threshold reached for org ${organizationId}`,
+        );
+        this.eventEmitter.emit('ai.retraining.needed', {
+          organizationId,
+          feature: 'EMPLOYEE_ATTRITION',
+        });
+      }
+    }
   }
 
   // ─── PRIVATE HELPERS ───
@@ -445,9 +483,7 @@ export class EmployeeAttritionService {
 
     if (departmentEmployees.length === 0) return 1.0;
 
-    const salaries = departmentEmployees
-      .map((e) => Number(e.basicSalary))
-      .sort((a, b) => a - b);
+    const salaries = departmentEmployees.map((e) => Number(e.basicSalary)).sort((a, b) => a - b);
 
     const midIndex = Math.floor(salaries.length / 2);
     const median =
@@ -530,8 +566,7 @@ export class EmployeeAttritionService {
       factors.push({
         factor: 'significantly_underpaid',
         impact: 0.3,
-        description:
-          'Salary is significantly below department median (< 70%)',
+        description: 'Salary is significantly below department median (< 70%)',
       });
     } else if (features.salaryRatio < 0.85) {
       score += 0.2;
@@ -555,8 +590,7 @@ export class EmployeeAttritionService {
       factors.push({
         factor: 'high_absence',
         impact: 0.25,
-        description:
-          'High absence rate (> 20%) in last 3 months - possible disengagement',
+        description: 'High absence rate (> 20%) in last 3 months - possible disengagement',
       });
     } else if (features.absenceRate > 0.1) {
       score += 0.15;
@@ -580,8 +614,7 @@ export class EmployeeAttritionService {
       factors.push({
         factor: 'high_dept_turnover',
         impact: 0.2,
-        description:
-          'Department has high turnover (> 30%) - contagion effect likely',
+        description: 'Department has high turnover (> 30%) - contagion effect likely',
       });
     } else if (features.departmentTurnover > 0.15) {
       score += 0.1;
@@ -607,14 +640,10 @@ export class EmployeeAttritionService {
     ];
   }
 
-
   /**
    * Generate a recommendation based on risk level and contributing factors.
    */
-  private getRecommendation(
-    riskLevel: string,
-    factors: AttritionFactor[],
-  ): string {
+  private getRecommendation(riskLevel: string, factors: AttritionFactor[]): string {
     const topFactor = factors.length > 0 ? factors[0].factor : '';
 
     switch (riskLevel) {

@@ -8,6 +8,9 @@ import { PaddleOcrService } from './paddle-ocr.service';
 
 export interface ExtractedInvoiceData {
   date: string | null;
+  dueDate: string | null;
+  paymentTerms: string | null;
+  currency: string | null;
   total: number | null;
   subtotal: number | null;
   tax: number | null;
@@ -107,11 +110,7 @@ export class OcrService {
     const metadata = await sharp(imageBuffer).metadata();
     const width = metadata.width || 0;
 
-    let pipeline = sharp(imageBuffer)
-      .grayscale()
-      .normalize()
-      .median(3)
-      .sharpen({ sigma: 1.0 });
+    let pipeline = sharp(imageBuffer).grayscale().normalize().median(3).sharpen({ sigma: 1.0 });
 
     // Upscale small images (Tesseract works best at ~300 DPI / 2000-3000px wide)
     if (width > 0 && width < 1500) {
@@ -129,17 +128,11 @@ export class OcrService {
   /**
    * More aggressive preprocessing for retry passes on difficult images.
    */
-  private async preprocessImageAggressive(
-    imageBuffer: Buffer,
-  ): Promise<Buffer> {
+  private async preprocessImageAggressive(imageBuffer: Buffer): Promise<Buffer> {
     const metadata = await sharp(imageBuffer).metadata();
     const width = metadata.width || 0;
 
-    let pipeline = sharp(imageBuffer)
-      .grayscale()
-      .normalize()
-      .median(5)
-      .sharpen({ sigma: 1.5 });
+    let pipeline = sharp(imageBuffer).grayscale().normalize().median(5).sharpen({ sigma: 1.5 });
 
     if (width > 0 && width < 1500) {
       pipeline = pipeline.resize({ width: 2500, withoutEnlargement: false });
@@ -163,19 +156,13 @@ export class OcrService {
     language: string,
     psm: Tesseract.PSM = Tesseract.PSM.SINGLE_BLOCK,
   ): Promise<{ text: string; confidence: number }> {
-    const worker = await Tesseract.createWorker(
-      language,
-      Tesseract.OEM.LSTM_ONLY,
-      {
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            this.logger.debug(
-              `OCR progress: ${Math.round(m.progress * 100)}%`,
-            );
-          }
-        },
+    const worker = await Tesseract.createWorker(language, Tesseract.OEM.LSTM_ONLY, {
+      logger: (m) => {
+        if (m.status === 'recognizing text') {
+          this.logger.debug(`OCR progress: ${Math.round(m.progress * 100)}%`);
+        }
       },
-    );
+    });
 
     try {
       await worker.setParameters({
@@ -204,9 +191,7 @@ export class OcrService {
     imageBuffer: Buffer,
     language: string = 'eng+ara',
   ): Promise<ExtractedInvoiceData> {
-    this.logger.log(
-      'Starting OCR extraction with hybrid Tesseract → PaddleOCR pipeline',
-    );
+    this.logger.log('Starting OCR extraction with hybrid Tesseract → PaddleOCR pipeline');
 
     try {
       // ─── Phase 1: Fast Tesseract.js Passes ─────────────────────────
@@ -222,20 +207,14 @@ export class OcrService {
       // Pass 1: Preprocessed image + PSM SINGLE_BLOCK (best for structured invoices)
       try {
         const preprocessed = await this.preprocessImage(imageBuffer);
-        const result = await this.performOcr(
-          preprocessed,
-          language,
-          Tesseract.PSM.SINGLE_BLOCK,
-        );
+        const result = await this.performOcr(preprocessed, language, Tesseract.PSM.SINGLE_BLOCK);
         this.logger.log(
           `[Tesseract] Pass 1 (preprocessed+PSM6): confidence=${result.confidence.toFixed(1)}%`,
         );
         attempts.push({ ...result, label: 'Tesseract:preprocessed+PSM6' });
 
         if (result.confidence >= 85) {
-          this.logger.log(
-            `✓ High confidence result from Tesseract, using it directly`,
-          );
+          this.logger.log(`✓ High confidence result from Tesseract, using it directly`);
           return this.buildExtractionResult(result.text, result.confidence);
         }
       } catch (error) {
@@ -245,20 +224,14 @@ export class OcrService {
       // Pass 2: Preprocessed image + PSM SINGLE_COLUMN
       try {
         const preprocessed = await this.preprocessImage(imageBuffer);
-        const result = await this.performOcr(
-          preprocessed,
-          language,
-          Tesseract.PSM.SINGLE_COLUMN,
-        );
+        const result = await this.performOcr(preprocessed, language, Tesseract.PSM.SINGLE_COLUMN);
         this.logger.log(
           `[Tesseract] Pass 2 (preprocessed+PSM4): confidence=${result.confidence.toFixed(1)}%`,
         );
         attempts.push({ ...result, label: 'Tesseract:preprocessed+PSM4' });
 
         if (result.confidence >= 85) {
-          this.logger.log(
-            `✓ High confidence result from Tesseract, using it directly`,
-          );
+          this.logger.log(`✓ High confidence result from Tesseract, using it directly`);
           return this.buildExtractionResult(result.text, result.confidence);
         }
       } catch (error) {
@@ -273,20 +246,14 @@ export class OcrService {
 
       // ─── Phase 2: PaddleOCR Fallback (if available and needed) ─────
 
-      if (
-        this.paddleOcrService.available() &&
-        (!bestTesseract || bestTesseract.confidence < 85)
-      ) {
+      if (this.paddleOcrService.available() && (!bestTesseract || bestTesseract.confidence < 85)) {
         this.logger.log(
           `[PaddleOCR] Tesseract confidence low (${bestTesseract?.confidence.toFixed(1) || 0}%), trying PaddleOCR...`,
         );
 
         try {
           const paddleLanguage = language.includes('ara') ? 'arabic' : 'en';
-          const paddleResult = await this.paddleOcrService.extractText(
-            imageBuffer,
-            paddleLanguage,
-          );
+          const paddleResult = await this.paddleOcrService.extractText(imageBuffer, paddleLanguage);
 
           const paddleConfidencePercent = paddleResult.confidence * 100;
           this.logger.log(
@@ -300,26 +267,16 @@ export class OcrService {
           });
 
           // Use PaddleOCR if it's better than Tesseract
-          if (
-            !bestTesseract ||
-            paddleConfidencePercent > bestTesseract.confidence
-          ) {
-            this.logger.log(
-              `✓ PaddleOCR produced better result, using it`,
-            );
-            return this.buildExtractionResult(
-              paddleResult.text,
-              paddleConfidencePercent,
-            );
+          if (!bestTesseract || paddleConfidencePercent > bestTesseract.confidence) {
+            this.logger.log(`✓ PaddleOCR produced better result, using it`);
+            return this.buildExtractionResult(paddleResult.text, paddleConfidencePercent);
           }
         } catch (error) {
           this.logger.warn(`[PaddleOCR] Extraction failed: ${error.message}`);
           // Fall through to use best Tesseract result
         }
       } else if (!this.paddleOcrService.available()) {
-        this.logger.debug(
-          `PaddleOCR models not available, using Tesseract-only mode`,
-        );
+        this.logger.debug(`PaddleOCR models not available, using Tesseract-only mode`);
       }
 
       // ─── Phase 3: Additional Tesseract Passes (if still needed) ────
@@ -327,8 +284,7 @@ export class OcrService {
       if (!bestTesseract || bestTesseract.confidence < 70) {
         // Pass 3: Aggressive preprocessing + PSM AUTO
         try {
-          const aggressivePreprocessed =
-            await this.preprocessImageAggressive(imageBuffer);
+          const aggressivePreprocessed = await this.preprocessImageAggressive(imageBuffer);
           const result = await this.performOcr(
             aggressivePreprocessed,
             language,
@@ -344,11 +300,7 @@ export class OcrService {
 
         // Pass 4: Original image (no preprocessing) + PSM AUTO (fallback)
         try {
-          const result = await this.performOcr(
-            imageBuffer,
-            language,
-            Tesseract.PSM.AUTO,
-          );
+          const result = await this.performOcr(imageBuffer, language, Tesseract.PSM.AUTO);
           this.logger.log(
             `[Tesseract] Pass 4 (original+PSM3): confidence=${result.confidence.toFixed(1)}%`,
           );
@@ -364,9 +316,7 @@ export class OcrService {
         throw new Error('All OCR passes failed');
       }
 
-      const best = attempts.reduce((a, b) =>
-        a.confidence > b.confidence ? a : b,
-      );
+      const best = attempts.reduce((a, b) => (a.confidence > b.confidence ? a : b));
       this.logger.log(
         `Best OCR result: ${best.label} with confidence ${best.confidence.toFixed(1)}%`,
       );
@@ -382,16 +332,22 @@ export class OcrService {
    * Build extraction result from raw OCR text. Public so DocumentIntakeService
    * can reuse it for native PDF text (avoids duplicating regex logic).
    */
-  buildExtractionResult(
-    rawText: string,
-    ocrConfidencePercent: number,
-  ): ExtractedInvoiceData {
+  buildExtractionResult(rawText: string, ocrConfidencePercent: number): ExtractedInvoiceData {
     const ocrConfidence = ocrConfidencePercent / 100;
     const lines = rawText.split('\n').filter((l) => l.trim());
     const fieldConfidence: Record<string, number> = {};
 
     const date = this.extractDate(rawText);
     fieldConfidence['date'] = date ? 0.8 : 0;
+
+    const dueDate = this.extractDueDate(rawText, date);
+    fieldConfidence['dueDate'] = dueDate ? 0.8 : 0;
+
+    const paymentTerms = this.extractPaymentTerms(rawText);
+    fieldConfidence['paymentTerms'] = paymentTerms ? 0.85 : 0;
+
+    const currency = this.extractCurrency(rawText);
+    fieldConfidence['currency'] = currency ? 0.9 : 0;
 
     const total = this.extractTotal(rawText);
     fieldConfidence['total'] = total !== null ? 0.85 : 0;
@@ -411,8 +367,21 @@ export class OcrService {
     const lineItems = this.extractLineItems(lines);
     fieldConfidence['lineItems'] = lineItems.length > 0 ? 0.65 : 0;
 
+    // If we have due date from payment terms but no explicit due date
+    if (!dueDate && paymentTerms && date) {
+      const calculatedDue = this.calculateDueDateFromTerms(date, paymentTerms);
+      if (calculatedDue) {
+        fieldConfidence['dueDate'] = 0.7; // slightly lower confidence for calculated
+      }
+    }
+
     return {
       date,
+      dueDate:
+        dueDate ||
+        (paymentTerms && date ? this.calculateDueDateFromTerms(date, paymentTerms) : null),
+      paymentTerms,
+      currency,
       total,
       subtotal,
       tax,
@@ -452,8 +421,7 @@ export class OcrService {
     }
 
     // Strategy 2: Look for "Date" label followed by date value
-    const simpleDateLabel =
-      /\bdate\b[\s:]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i;
+    const simpleDateLabel = /\bdate\b[\s:]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i;
     const simpleLabelMatch = text.match(simpleDateLabel);
     if (simpleLabelMatch) {
       try {
@@ -484,6 +452,164 @@ export class OcrService {
     }
 
     return null;
+  }
+
+  /**
+   * Extract due date from text, separate from invoice date.
+   */
+  private extractDueDate(text: string, invoiceDate: string | null): string | null {
+    const dueDatePatterns = [
+      /(?:due\s*date|payment\s*due|payable\s*by|pay\s*before|date\s*due)[\s:]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
+      /(?:due\s*date|payment\s*due|payable\s*by)[\s:]+(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{4})/i,
+      /(?:due\s*date|payment\s*due|payable\s*by)[\s:]+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2},?\s+\d{4})/i,
+      /(?:due\s*date|payment\s*due|payable\s*by)[\s:]+(\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/i,
+      /(?:تاريخ\s*الاستحقاق|موعد\s*السداد)[\s:]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
+    ];
+
+    for (const pattern of dueDatePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        try {
+          const parsed = this.parseDate(match[1]);
+          // Ensure due date is different from invoice date
+          if (parsed !== invoiceDate) {
+            return parsed;
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    // Check for "Due in X days" relative format
+    const relativeMatch = text.match(/due\s*(?:in|within)\s*(\d+)\s*days?/i);
+    if (relativeMatch && invoiceDate) {
+      const days = parseInt(relativeMatch[1], 10);
+      return this.addDaysToDate(invoiceDate, days);
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract payment terms from text (Net 30, Net 60, etc.)
+   */
+  private extractPaymentTerms(text: string): string | null {
+    const termsPatterns = [
+      /(?:payment\s*terms?|terms?)[\s:]+\s*(net\s*\d+)/i,
+      /(?:payment\s*terms?|terms?)[\s:]+\s*(\d+\s*days?\s*net)/i,
+      /(?:payment\s*terms?|terms?)[\s:]+\s*(due\s*(?:on|upon)\s*receipt)/i,
+      /(?:payment\s*terms?|terms?)[\s:]+\s*(cod|cash\s*on\s*delivery)/i,
+      /(?:payment\s*terms?|terms?)[\s:]+\s*(eia|end\s*of\s*month)/i,
+      /\b(net\s*(?:7|10|14|15|20|21|30|45|60|90|120))\b/i,
+      /\b(due\s*(?:on|upon)\s*receipt)\b/i,
+      /(?:شروط\s*الدفع)[\s:]+(.+?)(?:\n|$)/i,
+    ];
+
+    for (const pattern of termsPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        return match[1].trim().toUpperCase().replace(/\s+/g, ' ');
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract currency from text (symbol or code).
+   */
+  private extractCurrency(text: string): string | null {
+    // Check for explicit currency codes near amounts
+    const currencyCodePattern = /(?:currency|عملة)[\s:]+\s*([A-Z]{3})/i;
+    const codeMatch = text.match(currencyCodePattern);
+    if (codeMatch) {
+      return codeMatch[1].toUpperCase();
+    }
+
+    // Count currency symbol/code occurrences to determine dominant currency
+    const currencyMap: Record<string, string> = {
+      $: 'USD',
+      '€': 'EUR',
+      '£': 'GBP',
+      '¥': 'JPY',
+      '﷼': 'SAR',
+      '₹': 'INR',
+      '₽': 'RUB',
+      '₩': 'KRW',
+    };
+
+    const codePatterns: Record<string, RegExp> = {
+      USD: /\bUSD\b|\bUS\$/gi,
+      EUR: /\bEUR\b/gi,
+      GBP: /\bGBP\b/gi,
+      SAR: /\bSAR\b/gi,
+      AED: /\bAED\b/gi,
+      EGP: /\bEGP\b/gi,
+      QAR: /\bQAR\b/gi,
+      BHD: /\bBHD\b/gi,
+      KWD: /\bKWD\b/gi,
+      OMR: /\bOMR\b/gi,
+      JPY: /\bJPY\b/gi,
+      INR: /\bINR\b/gi,
+    };
+
+    const counts: Record<string, number> = {};
+
+    // Count symbol occurrences
+    for (const [symbol, code] of Object.entries(currencyMap)) {
+      const count = (text.match(new RegExp(`\\${symbol}`, 'g')) || []).length;
+      if (count > 0) {
+        counts[code] = (counts[code] || 0) + count;
+      }
+    }
+
+    // Count code occurrences
+    for (const [code, pattern] of Object.entries(codePatterns)) {
+      const count = (text.match(pattern) || []).length;
+      if (count > 0) {
+        counts[code] = (counts[code] || 0) + count;
+      }
+    }
+
+    // Return the most frequent currency
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return sorted.length > 0 ? sorted[0][0] : null;
+  }
+
+  /**
+   * Calculate due date from invoice date and payment terms.
+   */
+  private calculateDueDateFromTerms(invoiceDate: string, terms: string): string | null {
+    const netMatch = terms.match(/NET\s*(\d+)/i);
+    if (netMatch) {
+      return this.addDaysToDate(invoiceDate, parseInt(netMatch[1], 10));
+    }
+
+    if (/DUE\s*(ON|UPON)\s*RECEIPT/i.test(terms)) {
+      return invoiceDate;
+    }
+
+    if (/COD|CASH\s*ON\s*DELIVERY/i.test(terms)) {
+      return invoiceDate;
+    }
+
+    if (/END\s*OF\s*MONTH|EOM/i.test(terms)) {
+      const d = new Date(invoiceDate);
+      d.setMonth(d.getMonth() + 1, 0); // last day of current month
+      return d.toISOString().split('T')[0];
+    }
+
+    return null;
+  }
+
+  /**
+   * Add days to an ISO date string, returning ISO date.
+   */
+  private addDaysToDate(isoDate: string, days: number): string {
+    const d = new Date(isoDate);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0];
   }
 
   /**
@@ -770,17 +896,13 @@ export class OcrService {
       }
     }
 
-    return bestCandidate && bestCandidate.score >= 0
-      ? bestCandidate.text
-      : null;
+    return bestCandidate && bestCandidate.score >= 0 ? bestCandidate.text : null;
   }
 
   /**
    * Extract line items from invoice.
    */
-  private extractLineItems(
-    lines: string[],
-  ): Array<{
+  private extractLineItems(lines: string[]): Array<{
     description: string;
     quantity: number;
     unitPrice: number;
@@ -793,13 +915,38 @@ export class OcrService {
       total: number;
     }> = [];
 
-    const lineItemPattern =
-      /(.+?)\s+(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:,\d{3})*(?:\.\d+)?)/i;
+    // Strategy 1: Find table header and extract column-aligned data
+    const headerIndex = this.findTableHeaderIndex(lines);
+    if (headerIndex >= 0) {
+      const headerItems = this.extractFromTableStructure(lines, headerIndex);
+      if (headerItems.length > 0) {
+        return this.validateLineItems(headerItems);
+      }
+    }
+
+    // Strategy 2: Pattern-based extraction (qty×price format)
+    const lineItemPattern = /(.+?)\s+(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:,\d{3})*(?:\.\d+)?)/i;
+    // Strategy 3: 4-column pattern (description qty price total)
     const simplePattern =
       /(.+?)\s+(\d+(?:,\d{3})*(?:\.\d+)?)\s+(\d+(?:,\d{3})*(?:\.\d+)?)\s+(\d+(?:,\d{3})*(?:\.\d+)?)/;
+    // Strategy 4: Tab-separated columns
+    const tabPattern =
+      /^(.+?)\t(\d+(?:\.\d+)?)\t(\d+(?:,\d{3})*(?:\.\d+)?)\t(\d+(?:,\d{3})*(?:\.\d+)?)$/;
 
     for (const line of lines) {
-      let match = line.match(lineItemPattern);
+      let match = line.match(tabPattern);
+      if (match) {
+        const [, description, qty, price, total] = match;
+        items.push({
+          description: description.trim(),
+          quantity: parseFloat(qty.replace(/,/g, '')),
+          unitPrice: this.parseAmount(price),
+          total: this.parseAmount(total),
+        });
+        continue;
+      }
+
+      match = line.match(lineItemPattern);
       if (match) {
         const [, description, qty, price] = match;
         const quantity = parseFloat(qty);
@@ -825,7 +972,142 @@ export class OcrService {
       }
     }
 
+    return this.validateLineItems(items);
+  }
+
+  /**
+   * Find the index of the table header row containing column labels.
+   */
+  private findTableHeaderIndex(lines: string[]): number {
+    const headerKeywords = [
+      /\bdescription\b/i,
+      /\bitem\b/i,
+      /\bparticular/i,
+      /\bqty\b/i,
+      /\bquantity\b/i,
+      /\bunit\s*price\b/i,
+      /\brate\b/i,
+      /\bprice\b/i,
+      /\btotal\b/i,
+      /\bamount\b/i,
+    ];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // A header row should contain at least 3 of these keywords
+      const matchCount = headerKeywords.filter((kw) => kw.test(line)).length;
+      if (matchCount >= 3) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * Extract line items using table structure detection from header position.
+   */
+  private extractFromTableStructure(
+    lines: string[],
+    headerIndex: number,
+  ): Array<{ description: string; quantity: number; unitPrice: number; total: number }> {
+    const items: Array<{
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      total: number;
+    }> = [];
+    const headerLine = lines[headerIndex];
+
+    // Detect column positions from header keywords
+    const descCol = this.findColumnPosition(headerLine, /description|item|particular/i);
+    const qtyCol = this.findColumnPosition(headerLine, /qty|quantity/i);
+    const priceCol = this.findColumnPosition(headerLine, /unit\s*price|rate|price/i);
+    const totalCol = this.findColumnPosition(headerLine, /total|amount/i);
+
+    // Stop keywords that indicate end of line items
+    const stopKeywords =
+      /\b(subtotal|sub[\s-]*total|total|tax|vat|gst|discount|shipping|grand\s*total|net\s*amount|balance)\b/i;
+
+    // Process rows after header
+    for (let i = headerIndex + 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line || line.length < 3) continue;
+
+      // Stop if we hit summary rows
+      if (stopKeywords.test(line)) break;
+
+      // Skip separator lines (dashes, equals, etc.)
+      if (/^[\-=_]{3,}$/.test(line)) continue;
+
+      // Try to extract numbers from the line
+      const numbers = this.extractNumbersFromLine(line);
+      if (numbers.length >= 2) {
+        // Assume last number is total, second-to-last is price, etc.
+        const total = numbers[numbers.length - 1];
+        const unitPrice = numbers.length >= 3 ? numbers[numbers.length - 2] : total;
+        const quantity = numbers.length >= 3 ? numbers[numbers.length - 3] : 1;
+
+        // Description is everything before the first number
+        const firstNumMatch = line.match(/\d+(?:,\d{3})*(?:\.\d+)?/);
+        const description = firstNumMatch ? line.substring(0, firstNumMatch.index).trim() : line;
+
+        if (description && total > 0) {
+          items.push({
+            description: description.replace(/[\|│]$/g, '').trim(),
+            quantity: quantity,
+            unitPrice: unitPrice,
+            total: total,
+          });
+        }
+      }
+    }
+
     return items;
+  }
+
+  /**
+   * Find approximate column start position for a keyword in the header.
+   */
+  private findColumnPosition(headerLine: string, keyword: RegExp): number {
+    const match = headerLine.match(keyword);
+    return match ? headerLine.indexOf(match[0]) : -1;
+  }
+
+  /**
+   * Extract all numeric values from a line.
+   */
+  private extractNumbersFromLine(line: string): number[] {
+    const numbers: number[] = [];
+    const numPattern = /\d+(?:,\d{3})*(?:\.\d+)?/g;
+    let match: RegExpExecArray | null;
+    while ((match = numPattern.exec(line)) !== null) {
+      const val = this.parseAmount(match[0]);
+      if (val > 0) {
+        numbers.push(val);
+      }
+    }
+    return numbers;
+  }
+
+  /**
+   * Validate extracted line items: qty × unitPrice ≈ total (within 2% tolerance).
+   */
+  private validateLineItems(
+    items: Array<{ description: string; quantity: number; unitPrice: number; total: number }>,
+  ): Array<{ description: string; quantity: number; unitPrice: number; total: number }> {
+    return items.map((item) => {
+      const computed = item.quantity * item.unitPrice;
+      const tolerance = Math.max(0.02 * item.total, 0.01); // 2% or 1 cent
+
+      if (Math.abs(computed - item.total) > tolerance && computed > 0) {
+        // If qty × price doesn't match total, trust total and recalculate unitPrice
+        return {
+          ...item,
+          unitPrice: item.quantity > 0 ? item.total / item.quantity : item.unitPrice,
+        };
+      }
+      return item;
+    });
   }
 
   /**
@@ -946,12 +1228,26 @@ export class OcrService {
     const fieldPositions = (existing?.fieldPositions as any) || {};
 
     // Store all corrected fields
-    const fieldsToLearn = ['date', 'total', 'subtotal', 'tax', 'invoiceNumber', 'vendorName'] as const;
+    const fieldsToLearn = [
+      'date',
+      'total',
+      'subtotal',
+      'tax',
+      'invoiceNumber',
+      'vendorName',
+    ] as const;
     for (const field of fieldsToLearn) {
-      if (corrections[field] !== undefined && corrections[field] !== null && corrections[field] !== '') {
+      if (
+        corrections[field] !== undefined &&
+        corrections[field] !== null &&
+        corrections[field] !== ''
+      ) {
         fieldPositions[field] = {
           value: corrections[field],
-          pattern: typeof corrections[field] === 'string' ? corrections[field] : String(corrections[field]),
+          pattern:
+            typeof corrections[field] === 'string'
+              ? corrections[field]
+              : String(corrections[field]),
           learned: true,
         };
       }
@@ -983,10 +1279,7 @@ export class OcrService {
   /**
    * Get vendor layout hints.
    */
-  async getVendorLayoutHints(
-    organizationId: string,
-    vendorId: string,
-  ): Promise<any | null> {
+  async getVendorLayoutHints(organizationId: string, vendorId: string): Promise<any | null> {
     const layout = await this.prisma.vendorOcrLayout.findUnique({
       where: {
         organizationId_vendorId: {
@@ -1040,17 +1333,10 @@ export class OcrService {
       }
 
       const contextBefore =
-        position > 0
-          ? rawText.slice(Math.max(0, position - 40), position).trim()
-          : '';
+        position > 0 ? rawText.slice(Math.max(0, position - 40), position).trim() : '';
       const contextAfter =
         position >= 0
-          ? rawText
-              .slice(
-                position + anchorValue.length,
-                position + anchorValue.length + 40,
-              )
-              .trim()
+          ? rawText.slice(position + anchorValue.length, position + anchorValue.length + 40).trim()
           : '';
 
       if (!fieldPositions[field]) {
@@ -1118,10 +1404,7 @@ export class OcrService {
 
         for (let i = 0; i <= rawText.length - searchTerm.length; i++) {
           const candidate = rawText.slice(i, i + searchTerm.length);
-          const sim = levenshteinSimilarity(
-            searchTerm.toLowerCase(),
-            candidate.toLowerCase(),
-          );
+          const sim = levenshteinSimilarity(searchTerm.toLowerCase(), candidate.toLowerCase());
           if (sim > bestSim && sim >= 0.7) {
             bestSim = sim;
             bestPos = i + searchTerm.length;
@@ -1140,24 +1423,18 @@ export class OcrService {
 
           // Fallback: try to re-extract from raw text
           const afterContext = rawText.slice(bestPos, bestPos + 50).trim();
-          const numberMatch = afterContext.match(
-            /^[\s:$€£¥]*([0-9,]+\.?\d*)/,
-          );
+          const numberMatch = afterContext.match(/^[\s:$€£¥]*([0-9,]+\.?\d*)/);
           if (numberMatch) {
             return {
               value: numberMatch[1].replace(/,/g, ''),
               confidence: 0.85,
             };
           }
-          const dateMatch = afterContext.match(
-            /^[\s:]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/,
-          );
+          const dateMatch = afterContext.match(/^[\s:]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/);
           if (dateMatch) {
             return { value: dateMatch[1], confidence: 0.85 };
           }
-          const textMatch = afterContext.match(
-            /^[\s:#]*([A-Z0-9\-]{3,20})/i,
-          );
+          const textMatch = afterContext.match(/^[\s:#]*([A-Z0-9\-]{3,20})/i);
           if (textMatch) {
             return { value: textMatch[1], confidence: 0.8 };
           }
@@ -1184,7 +1461,9 @@ export class OcrService {
     }
 
     this.logger.debug(
-      `Applying vendor hints for ${vendorId}: ${Object.keys(hints).filter((k) => (hints as any)[k]?.learned).join(', ')}`,
+      `Applying vendor hints for ${vendorId}: ${Object.keys(hints)
+        .filter((k) => (hints as any)[k]?.learned)
+        .join(', ')}`,
     );
 
     for (const [field, hint] of Object.entries(hints)) {

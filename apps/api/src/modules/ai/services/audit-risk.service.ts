@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
+import { AiFeedbackService } from './ai-feedback.service';
+import { AiTrainingService } from './ai-training.service';
 import { getRiskLevel } from '../utils/risk-level.util';
-import {
-  buildIsolationForest1D,
-  isolationForestScore1D,
-} from '../utils/isolation-forest.util';
+import { buildIsolationForest1D, isolationForestScore1D } from '../utils/isolation-forest.util';
 import {
   trainLogisticRegression,
   predictProbability,
@@ -39,6 +39,9 @@ export class AuditRiskService {
   constructor(
     private prisma: PrismaService,
     private modelRegistry: ModelRegistryService,
+    private feedbackService: AiFeedbackService,
+    private trainingService: AiTrainingService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async scoreEntity(
@@ -46,11 +49,7 @@ export class AuditRiskService {
     entityType: string,
     entityId: string,
   ): Promise<AuditRiskResult> {
-    const features = await this.extractFeatures(
-      organizationId,
-      entityType,
-      entityId,
-    );
+    const features = await this.extractFeatures(organizationId, entityType, entityId);
     if (!features) {
       return {
         entityType,
@@ -65,30 +64,21 @@ export class AuditRiskService {
     // Try ML prediction first
     let mlScore: number | null = null;
     try {
-      const model = await this.modelRegistry.loadActiveModel(
-        organizationId,
-        'AUDIT_RISK',
-      );
+      const model = await this.modelRegistry.loadActiveModel(organizationId, 'AUDIT_RISK');
       if (model?.modelData) {
-        const deserialized = deserializeModel(
-          JSON.stringify(model.modelData),
-        );
-        mlScore = predictProbability(
-          deserialized,
-          features.vector,
-        );
+        const deserialized = deserializeModel(JSON.stringify(model.modelData));
+        mlScore = predictProbability(deserialized, features.vector);
       }
     } catch {
       // ML not available, use rule-based
     }
 
     const { score, factors } = this.ruleBasedScore(features);
-    const finalScore =
-      mlScore !== null ? score * 0.6 + mlScore * 0.4 : score;
+    const finalScore = mlScore !== null ? score * 0.6 + mlScore * 0.4 : score;
 
     const riskLevel = getRiskLevel(finalScore);
 
-    return {
+    const result: AuditRiskResult = {
       entityType,
       entityId,
       riskScore: Math.round(finalScore * 1000) / 1000,
@@ -96,12 +86,21 @@ export class AuditRiskService {
       factors,
       confidence: mlScore !== null ? 0.85 : 0.65,
     };
+
+    // Store prediction for feedback tracking
+    await this.feedbackService.storePrediction(
+      organizationId,
+      'AUDIT_RISK',
+      { entityType, entityId },
+      { riskScore: result.riskScore, riskLevel },
+      result.confidence,
+      0,
+    );
+
+    return result;
   }
 
-  async batchScore(
-    organizationId: string,
-    entityType: string,
-  ): Promise<AuditRiskBatchResult> {
+  async batchScore(organizationId: string, entityType: string): Promise<AuditRiskBatchResult> {
     const entityIds = await this.getEntityIds(organizationId, entityType);
     let highRisk = 0;
     let mediumRisk = 0;
@@ -113,9 +112,7 @@ export class AuditRiskService {
     for (let i = 0; i < entityIds.length; i += BATCH_SIZE) {
       const batch = entityIds.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(
-        batch.map((entityId) =>
-          this.scoreEntity(organizationId, entityType, entityId),
-        ),
+        batch.map((entityId) => this.scoreEntity(organizationId, entityType, entityId)),
       );
 
       for (const result of results) {
@@ -145,19 +142,13 @@ export class AuditRiskService {
     const BATCH_SIZE = 10;
 
     for (const entityType of ['journal', 'invoice', 'bill', 'expense']) {
-      const entityIds = await this.getEntityIds(
-        organizationId,
-        entityType,
-        50,
-      );
+      const entityIds = await this.getEntityIds(organizationId, entityType, 50);
 
       // Process in parallel batches
       for (let i = 0; i < entityIds.length; i += BATCH_SIZE) {
         const batch = entityIds.slice(i, i + BATCH_SIZE);
         const batchResults = await Promise.allSettled(
-          batch.map((entityId) =>
-            this.scoreEntity(organizationId, entityType, entityId),
-          ),
+          batch.map((entityId) => this.scoreEntity(organizationId, entityType, entityId)),
         );
 
         for (const result of batchResults) {
@@ -168,14 +159,46 @@ export class AuditRiskService {
       }
     }
 
-    return results
-      .sort((a, b) => b.riskScore - a.riskScore)
-      .slice(0, limit);
+    return results.sort((a, b) => b.riskScore - a.riskScore).slice(0, limit);
   }
 
-  async trainModel(
+  /**
+   * Record user feedback on an audit risk score.
+   */
+  async recordAuditFeedback(
     organizationId: string,
-  ): Promise<{
+    entityType: string,
+    entityId: string,
+    wasCorrect: boolean,
+    actualRisk?: string,
+  ): Promise<void> {
+    const label = actualRisk || (wasCorrect ? 'CORRECT' : 'INCORRECT');
+
+    await this.trainingService.addTrainingData(
+      organizationId,
+      'AUDIT_RISK',
+      { entityType, entityId },
+      label,
+      wasCorrect ? 'USER' : 'CORRECTION',
+    );
+
+    if (!wasCorrect) {
+      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
+        organizationId,
+        'AUDIT_RISK',
+      );
+
+      if (shouldRetrain) {
+        this.logger.log(`Audit risk retraining threshold reached for org ${organizationId}`);
+        this.eventEmitter.emit('ai.retraining.needed', {
+          organizationId,
+          feature: 'AUDIT_RISK',
+        });
+      }
+    }
+  }
+
+  async trainModel(organizationId: string): Promise<{
     version: number;
     accuracy: number;
     sampleCount: number;
@@ -228,18 +251,14 @@ export class AuditRiskService {
       };
     }
 
-    const result = trainLogisticRegression(
-      features,
-      labels,
-      [
-        'amount_normalized',
-        'corrections_count',
-        'weekend_flag',
-        'round_number_flag',
-        'deviation_from_avg',
-        'amount_anomaly',
-      ],
-    );
+    const result = trainLogisticRegression(features, labels, [
+      'amount_normalized',
+      'corrections_count',
+      'weekend_flag',
+      'round_number_flag',
+      'deviation_from_avg',
+      'amount_anomaly',
+    ]);
 
     const serialized = serializeModel(result.model);
     const saved = await this.modelRegistry.saveModel(
@@ -266,13 +285,13 @@ export class AuditRiskService {
     try {
       switch (entityType) {
         case 'journal':
-          return this.extractJournalFeatures(organizationId, entityId);
+          return await this.extractJournalFeatures(organizationId, entityId);
         case 'invoice':
-          return this.extractInvoiceFeatures(organizationId, entityId);
+          return await this.extractInvoiceFeatures(organizationId, entityId);
         case 'bill':
-          return this.extractBillFeatures(organizationId, entityId);
+          return await this.extractBillFeatures(organizationId, entityId);
         case 'expense':
-          return this.extractExpenseFeatures(organizationId, entityId);
+          return await this.extractExpenseFeatures(organizationId, entityId);
         default:
           return null;
       }
@@ -308,12 +327,9 @@ export class AuditRiskService {
       take: 500,
     });
 
-    const amounts = allJournals.map((j) =>
-      j.lines.reduce((sum, l) => sum + Number(l.debit), 0),
-    );
+    const amounts = allJournals.map((j) => j.lines.reduce((sum, l) => sum + Number(l.debit), 0));
     const avgAmount = amounts.length > 0 ? mean(amounts) : 0;
-    const stdAmount =
-      amounts.length > 1 ? standardDeviation(amounts) : 1;
+    const stdAmount = amounts.length > 1 ? standardDeviation(amounts) : 1;
     const amount = journal.lines.reduce((sum, l) => sum + Number(l.debit), 0);
 
     // Amount anomaly using Isolation Forest
@@ -341,8 +357,7 @@ export class AuditRiskService {
     const isRound = amount % 1000 === 0 && amount > 0 ? 1 : 0;
 
     // Deviation from average
-    const deviation =
-      stdAmount > 0 ? Math.abs(zScoreWithStats(amount, avgAmount, stdAmount)) : 0;
+    const deviation = stdAmount > 0 ? Math.abs(zScoreWithStats(amount, avgAmount, stdAmount)) : 0;
 
     const raw = {
       amount_normalized: avgAmount > 0 ? amount / avgAmount : 0,
@@ -387,8 +402,7 @@ export class AuditRiskService {
 
     const amounts = allInvoices.map((i) => Number(i.grandTotal));
     const avgAmount = amounts.length > 0 ? mean(amounts) : 0;
-    const stdAmount =
-      amounts.length > 1 ? standardDeviation(amounts) : 1;
+    const stdAmount = amounts.length > 1 ? standardDeviation(amounts) : 1;
     const amount = Number(invoice.grandTotal);
 
     let amountAnomaly = 0;
@@ -409,8 +423,7 @@ export class AuditRiskService {
     const dayOfWeek = invoice.date.getDay();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6 ? 1 : 0;
     const isRound = amount % 1000 === 0 && amount > 0 ? 1 : 0;
-    const deviation =
-      stdAmount > 0 ? Math.abs(zScoreWithStats(amount, avgAmount, stdAmount)) : 0;
+    const deviation = stdAmount > 0 ? Math.abs(zScoreWithStats(amount, avgAmount, stdAmount)) : 0;
 
     const raw = {
       amount_normalized: avgAmount > 0 ? amount / avgAmount : 0,
@@ -452,8 +465,7 @@ export class AuditRiskService {
 
     const amounts = allBills.map((b) => Number(b.grandTotal));
     const avgAmount = amounts.length > 0 ? mean(amounts) : 0;
-    const stdAmount =
-      amounts.length > 1 ? standardDeviation(amounts) : 1;
+    const stdAmount = amounts.length > 1 ? standardDeviation(amounts) : 1;
     const amount = Number(bill.grandTotal);
 
     let amountAnomaly = 0;
@@ -474,8 +486,7 @@ export class AuditRiskService {
     const dayOfWeek = bill.date.getDay();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6 ? 1 : 0;
     const isRound = amount % 1000 === 0 && amount > 0 ? 1 : 0;
-    const deviation =
-      stdAmount > 0 ? Math.abs(zScoreWithStats(amount, avgAmount, stdAmount)) : 0;
+    const deviation = stdAmount > 0 ? Math.abs(zScoreWithStats(amount, avgAmount, stdAmount)) : 0;
 
     const raw = {
       amount_normalized: avgAmount > 0 ? amount / avgAmount : 0,
@@ -517,8 +528,7 @@ export class AuditRiskService {
 
     const amounts = allExpenses.map((e) => Number(e.amount));
     const avgAmount = amounts.length > 0 ? mean(amounts) : 0;
-    const stdAmount =
-      amounts.length > 1 ? standardDeviation(amounts) : 1;
+    const stdAmount = amounts.length > 1 ? standardDeviation(amounts) : 1;
     const amount = Number(expense.amount);
 
     let amountAnomaly = 0;
@@ -539,8 +549,7 @@ export class AuditRiskService {
     const dayOfWeek = expense.date.getDay();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6 ? 1 : 0;
     const isRound = amount % 1000 === 0 && amount > 0 ? 1 : 0;
-    const deviation =
-      stdAmount > 0 ? Math.abs(zScoreWithStats(amount, avgAmount, stdAmount)) : 0;
+    const deviation = stdAmount > 0 ? Math.abs(zScoreWithStats(amount, avgAmount, stdAmount)) : 0;
 
     const raw = {
       amount_normalized: avgAmount > 0 ? amount / avgAmount : 0,
@@ -554,10 +563,10 @@ export class AuditRiskService {
     return { vector: Object.values(raw), raw };
   }
 
-  private ruleBasedScore(features: {
-    vector: number[];
-    raw: Record<string, number>;
-  }): { score: number; factors: AuditRiskResult['factors'] } {
+  private ruleBasedScore(features: { vector: number[]; raw: Record<string, number> }): {
+    score: number;
+    factors: AuditRiskResult['factors'];
+  } {
     const factors: AuditRiskResult['factors'] = [];
     let score = 0;
     const r = features.raw;
@@ -682,5 +691,4 @@ export class AuditRiskService {
         return [];
     }
   }
-
 }

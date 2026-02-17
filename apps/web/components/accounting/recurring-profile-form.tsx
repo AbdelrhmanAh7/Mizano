@@ -19,7 +19,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Account, flattenAccountsTree } from '@/lib/hooks/use-accounts';
-import { RecurringProfile, RecurringFrequency, getFrequencyLabel } from '@/lib/hooks/use-recurring-profiles';
+import { RecurringProfile, RecurringFrequency } from '@/lib/hooks/use-recurring-profiles';
 import { calculateJournalTotals, formatJournalAmount } from '@/lib/hooks/use-journals';
 
 const profileLineSchema = z.object({
@@ -153,11 +153,7 @@ export function RecurringProfileForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Profile Name *</Label>
-              <Input
-                id="name"
-                placeholder="e.g., Monthly Rent"
-                {...form.register('name')}
-              />
+              <Input id="name" placeholder="e.g., Monthly Rent" {...form.register('name')} />
               {form.formState.errors.name && (
                 <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
@@ -186,11 +182,7 @@ export function RecurringProfileForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="startDate">Start Date *</Label>
-              <Input
-                id="startDate"
-                type="date"
-                {...form.register('startDate')}
-              />
+              <Input id="startDate" type="date" {...form.register('startDate')} />
               {form.formState.errors.startDate && (
                 <p className="text-sm text-red-500">{form.formState.errors.startDate.message}</p>
               )}
@@ -303,6 +295,7 @@ export function RecurringProfileForm({
                     onClick={() => removeLine(index)}
                     disabled={fields.length <= 2}
                     className="h-8 w-8"
+                    aria-label="Remove journal line"
                   >
                     <Trash2 className="h-4 w-4 text-muted-foreground hover:text-red-500" />
                   </Button>
@@ -336,9 +329,7 @@ export function RecurringProfileForm({
               <div
                 className={cn(
                   'flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium',
-                  isBalanced
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-red-100 text-red-800'
+                  isBalanced ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800',
                 )}
               >
                 {isBalanced ? (
@@ -349,7 +340,8 @@ export function RecurringProfileForm({
                 ) : (
                   <>
                     <X className="h-4 w-4" />
-                    Unbalanced (Difference: {formatJournalAmount(Math.abs(totalDebit - totalCredit))})
+                    Unbalanced (Difference:{' '}
+                    {formatJournalAmount(Math.abs(totalDebit - totalCredit))})
                   </>
                 )}
               </div>

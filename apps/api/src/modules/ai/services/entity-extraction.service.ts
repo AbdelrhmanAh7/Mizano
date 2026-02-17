@@ -11,14 +11,7 @@ nlp.plugin(compromiseDates);
 /**
  * Types of entities that can be extracted from text.
  */
-export type EntityType =
-  | 'person'
-  | 'organization'
-  | 'date'
-  | 'place'
-  | 'money'
-  | 'email'
-  | 'phone';
+export type EntityType = 'person' | 'organization' | 'date' | 'place' | 'money' | 'email' | 'phone';
 
 export interface ExtractedEntity {
   text: string;
@@ -58,8 +51,7 @@ const MATCH_THRESHOLD = 0.6;
 
 /** Regex patterns for structured entity extraction */
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-const PHONE_REGEX =
-  /(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?)?\d{3,4}[\s.-]?\d{3,4}/g;
+const PHONE_REGEX = /(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?)?\d{3,4}[\s.-]?\d{3,4}/g;
 const MONEY_REGEX =
   /(?:[$\u00A3\u20AC\u00A5]|USD|EUR|GBP|SAR|AED|EGP)\s?[\d,]+(?:\.\d{1,2})?|[\d,]+(?:\.\d{1,2})?\s?(?:USD|EUR|GBP|SAR|AED|EGP|dollars?|pounds?|euros?)/gi;
 
@@ -109,10 +101,7 @@ export class EntityExtractionService {
    * against existing Customer and Vendor records in the database.
    * Uses fuzzy string matching via `findBestMatch` from text-similarity util.
    */
-  async extractAndMatch(
-    organizationId: string,
-    text: string,
-  ): Promise<ExtractionAndMatchResult> {
+  async extractAndMatch(organizationId: string, text: string): Promise<ExtractionAndMatchResult> {
     const entities = this.extractEntities(text);
     const matches: MatchedEntity[] = [];
 
@@ -133,23 +122,13 @@ export class EntityExtractionService {
 
     // Match extracted people against customers and vendors
     for (const person of entities.people) {
-      const customerMatch = this.matchEntity(
-        person,
-        customerNames,
-        customers,
-        'customer',
-      );
+      const customerMatch = this.matchEntity(person, customerNames, customers, 'customer');
       if (customerMatch) {
         matches.push(customerMatch);
         continue;
       }
 
-      const vendorMatch = this.matchEntity(
-        person,
-        vendorNames,
-        vendors,
-        'vendor',
-      );
+      const vendorMatch = this.matchEntity(person, vendorNames, vendors, 'vendor');
       if (vendorMatch) {
         matches.push(vendorMatch);
       }
@@ -157,23 +136,13 @@ export class EntityExtractionService {
 
     // Match extracted organizations against customers and vendors
     for (const org of entities.organizations) {
-      const customerMatch = this.matchEntity(
-        org,
-        customerNames,
-        customers,
-        'customer',
-      );
+      const customerMatch = this.matchEntity(org, customerNames, customers, 'customer');
       if (customerMatch) {
         matches.push(customerMatch);
         continue;
       }
 
-      const vendorMatch = this.matchEntity(
-        org,
-        vendorNames,
-        vendors,
-        'vendor',
-      );
+      const vendorMatch = this.matchEntity(org, vendorNames, vendors, 'vendor');
       if (vendorMatch) {
         matches.push(vendorMatch);
       }
@@ -217,10 +186,7 @@ export class EntityExtractionService {
   /**
    * Extract organization names using compromise NLP.
    */
-  private extractOrganizations(
-    doc: NlpDocument,
-    originalText: string,
-  ): ExtractedEntity[] {
+  private extractOrganizations(doc: NlpDocument, originalText: string): ExtractedEntity[] {
     const orgs: ExtractedEntity[] = [];
     const found = doc.organizations().out('array') as string[];
 
@@ -240,11 +206,13 @@ export class EntityExtractionService {
   }
 
   /**
-   * Extract dates using compromise NLP.
+   * Extract dates using regex (compromise core has no .dates() plugin).
    */
   private extractDates(doc: NlpDocument, originalText: string): ExtractedEntity[] {
     const dates: ExtractedEntity[] = [];
-    const found = doc.dates().out('array') as string[];
+    const dateRegex =
+      /\b(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s*\d{2,4}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4})\b/gi;
+    const found: string[] = originalText.match(dateRegex) || [];
 
     for (const dateStr of found) {
       const trimmed = dateStr.trim();
@@ -259,8 +227,7 @@ export class EntityExtractionService {
     }
 
     // Also extract ISO-style dates via regex that compromise might miss
-    const isoDateRegex =
-      /\b\d{4}[-/]\d{1,2}[-/]\d{1,2}\b|\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b/g;
+    const isoDateRegex = /\b\d{4}[-/]\d{1,2}[-/]\d{1,2}\b|\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b/g;
     let match: RegExpExecArray | null;
     while ((match = isoDateRegex.exec(originalText)) !== null) {
       const dateText = match[0];
@@ -405,10 +372,7 @@ export class EntityExtractionService {
   /**
    * Find the start and end position of a substring in the original text.
    */
-  private findPosition(
-    text: string,
-    substring: string,
-  ): { start?: number; end?: number } {
+  private findPosition(text: string, substring: string): { start?: number; end?: number } {
     const index = text.indexOf(substring);
     if (index === -1) {
       // Try case-insensitive search

@@ -5,18 +5,18 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import {
-    CreditNote,
-    CreditNoteType,
-    getCreditNoteTypeColor,
-    getCreditNoteTypeLabel,
-    useInfiniteCreditNotes,
+  CreditNote,
+  CreditNoteType,
+  getCreditNoteTypeColor,
+  getCreditNoteTypeLabel,
+  useInfiniteCreditNotes,
 } from '@/lib/hooks/use-credit-notes';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
@@ -205,7 +205,12 @@ function CreditNotesPageContent() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon" onClick={() => refetch()}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              aria-label="Refresh credit notes"
+            >
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>

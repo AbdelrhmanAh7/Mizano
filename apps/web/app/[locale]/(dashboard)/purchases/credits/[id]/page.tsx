@@ -91,7 +91,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
 
   const unpaidBills = billsData?.data || [];
   const bankAccounts = (accountsData?.data || []).filter(
-    (a: any) => a.code.startsWith('1') // Asset accounts
+    (a: any) => a.code.startsWith('1'), // Asset accounts
   );
 
   const handleApplyToBill = async () => {
@@ -138,24 +138,20 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/purchases/credits">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight font-mono">
-                {credit.creditNumber}
-              </h1>
+              <h1 className="text-3xl font-bold tracking-tight font-mono">{credit.creditNumber}</h1>
               <Badge variant={getStatusVariant(credit.status)}>
                 {getStatusText(credit.status)}
               </Badge>
               <Badge variant="outline">{getTypeText(credit.type)}</Badge>
             </div>
-            <p className="text-muted-foreground">
-              Credit from {credit.vendor?.name}
-            </p>
+            <p className="text-muted-foreground">Credit from {credit.vendor?.name}</p>
           </div>
         </div>
 
@@ -172,9 +168,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Apply Credit to Bill</DialogTitle>
-                  <DialogDescription>
-                    Select a bill to apply this credit against.
-                  </DialogDescription>
+                  <DialogDescription>Select a bill to apply this credit against.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
@@ -223,9 +217,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Record Refund</DialogTitle>
-                  <DialogDescription>
-                    Record a refund received from the vendor.
-                  </DialogDescription>
+                  <DialogDescription>Record a refund received from the vendor.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
@@ -293,9 +285,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Date</p>
-                <p className="text-2xl font-bold">
-                  {format(new Date(credit.date), 'MMM d, yyyy')}
-                </p>
+                <p className="text-2xl font-bold">{format(new Date(credit.date), 'MMM d, yyyy')}</p>
               </div>
             </div>
           </CardContent>
@@ -379,21 +369,15 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-mono">
-                  {formatCurrency(credit.subtotal, currency)}
-                </span>
+                <span className="font-mono">{formatCurrency(credit.subtotal, currency)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Tax</span>
-                <span className="font-mono">
-                  {formatCurrency(credit.taxAmount, currency)}
-                </span>
+                <span className="font-mono">{formatCurrency(credit.taxAmount, currency)}</span>
               </div>
               <div className="flex justify-between text-lg font-semibold border-t pt-3">
                 <span>Total</span>
-                <span className="font-mono">
-                  {formatCurrency(credit.total, currency)}
-                </span>
+                <span className="font-mono">{formatCurrency(credit.total, currency)}</span>
               </div>
               <div className="flex justify-between text-lg border-t pt-3">
                 <span className="text-muted-foreground">Balance Remaining</span>
@@ -427,19 +411,13 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
               <TableBody>
                 {credit.lines.map((line) => (
                   <TableRow key={line.id}>
-                    <TableCell>
-                      {line.item?.name || line.account?.name || '-'}
-                    </TableCell>
+                    <TableCell>{line.item?.name || line.account?.name || '-'}</TableCell>
                     <TableCell>{line.description || '-'}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {line.quantity}
-                    </TableCell>
+                    <TableCell className="text-right font-mono">{line.quantity}</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatCurrency(line.rate, currency)}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {line.taxRate}%
-                    </TableCell>
+                    <TableCell className="text-right font-mono">{line.taxRate}%</TableCell>
                     <TableCell className="text-right font-mono font-medium">
                       {formatCurrency(line.amount, currency)}
                     </TableCell>

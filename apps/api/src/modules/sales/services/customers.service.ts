@@ -56,13 +56,29 @@ export class CustomersService {
       this.prisma.customer.count({ where }),
     ]);
 
-    // Calculate outstanding balance for each customer
-    const customersWithBalance = await Promise.all(
-      customers.map(async (customer) => {
-        const outstandingBalance = await this.calculateOutstandingBalance(customer.id);
-        return { ...customer, outstandingBalance };
-      }),
+    // Batch balance calculation: single groupBy query instead of N+1
+    const customerIds = customers.map((c) => c.id);
+    const balances =
+      customerIds.length > 0
+        ? await this.prisma.invoice.groupBy({
+            by: ['customerId'],
+            where: {
+              customerId: { in: customerIds },
+              deletedAt: null,
+              status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] },
+            },
+            _sum: { balanceDue: true },
+          })
+        : [];
+
+    const balanceMap = new Map(
+      balances.map((b) => [b.customerId, b._sum.balanceDue?.toFixed(4) ?? '0.0000']),
     );
+
+    const customersWithBalance = customers.map((customer) => ({
+      ...customer,
+      outstandingBalance: balanceMap.get(customer.id) ?? '0.0000',
+    }));
 
     return {
       data: customersWithBalance,

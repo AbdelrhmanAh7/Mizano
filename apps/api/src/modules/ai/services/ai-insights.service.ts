@@ -12,7 +12,13 @@ interface RawInsight {
   actions?: string[];
 }
 
-export type InsightType = 'ANOMALY' | 'TREND' | 'RECOMMENDATION' | 'FORECAST' | 'ALERT' | 'OPPORTUNITY';
+export type InsightType =
+  | 'ANOMALY'
+  | 'TREND'
+  | 'RECOMMENDATION'
+  | 'FORECAST'
+  | 'ALERT'
+  | 'OPPORTUNITY';
 export type InsightPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type InsightStatus = 'NEW' | 'VIEWED' | 'DISMISSED' | 'ACTIONED';
 
@@ -330,10 +336,11 @@ export class AiInsightsService {
       _sum: { amount: true },
     });
     const cashOut =
-      parseFloat(paymentsMade._sum.amount?.toString() || '0') + parseFloat(expenses._sum.amount?.toString() || '0');
+      parseFloat(paymentsMade._sum.amount?.toString() || '0') +
+      parseFloat(expenses._sum.amount?.toString() || '0');
 
     const netCashFlow = cashIn - cashOut;
-    const burnRate = cashOut / (today.getDate());
+    const burnRate = cashOut / today.getDate();
 
     const bankBalance = await this.getTotalBankBalance(organizationId);
     const daysOfCash = burnRate > 0 ? Math.floor(bankBalance / burnRate) : 999;
@@ -425,7 +432,9 @@ export class AiInsightsService {
       _sum: { amount: true },
     });
 
-    const lastExpenseMap = new Map(lastExpenses.map((e) => [e.accountId, parseFloat(e._sum.amount?.toString() || '0')]));
+    const lastExpenseMap = new Map(
+      lastExpenses.map((e) => [e.accountId, parseFloat(e._sum.amount?.toString() || '0')]),
+    );
 
     const anomalies = [];
     for (const expense of currentExpenses) {
@@ -473,10 +482,13 @@ export class AiInsightsService {
       include: { allocations: true },
     });
 
-    const customerPaymentDays: Record<string, { name: string; days: number[]; avgDays: number }> = {};
+    const customerPaymentDays: Record<string, { name: string; days: number[]; avgDays: number }> =
+      {};
 
     for (const invoice of paidInvoices) {
-      const invoicePayments = payments.filter((p) => p.allocations.some((a) => a.invoiceId === invoice.id));
+      const invoicePayments = payments.filter((p) =>
+        p.allocations.some((a) => a.invoiceId === invoice.id),
+      );
 
       for (const payment of invoicePayments) {
         const daysToPay = Math.floor(
@@ -484,7 +496,11 @@ export class AiInsightsService {
         );
 
         if (!customerPaymentDays[invoice.customerId]) {
-          customerPaymentDays[invoice.customerId] = { name: invoice.customer.name, days: [], avgDays: 0 };
+          customerPaymentDays[invoice.customerId] = {
+            name: invoice.customer.name,
+            days: [],
+            avgDays: 0,
+          };
         }
         customerPaymentDays[invoice.customerId].days.push(daysToPay);
       }
@@ -566,10 +582,18 @@ export class AiInsightsService {
       budgetUsed: number;
     }> = [];
     for (const project of projects) {
-      const hoursLogged = project.timesheetEntries.reduce((sum: number, t: { duration: Decimal }) => sum + parseFloat(t.duration.toString()), 0);
-      const avgTaskRate = project.tasks.length > 0
-        ? project.tasks.reduce((sum: number, t: { ratePerHour: Decimal }) => sum + parseFloat(t.ratePerHour.toString()), 0) / project.tasks.length
-        : 0;
+      const hoursLogged = project.timesheetEntries.reduce(
+        (sum: number, t: { duration: Decimal }) => sum + parseFloat(t.duration.toString()),
+        0,
+      );
+      const avgTaskRate =
+        project.tasks.length > 0
+          ? project.tasks.reduce(
+              (sum: number, t: { ratePerHour: Decimal }) =>
+                sum + parseFloat(t.ratePerHour.toString()),
+              0,
+            ) / project.tasks.length
+          : 0;
       const estimatedRevenue = hoursLogged * avgTaskRate;
       const budget = project.budgetAmount ? parseFloat(project.budgetAmount.toString()) : 0;
 
@@ -596,6 +620,188 @@ export class AiInsightsService {
       };
     }
     return null;
+  }
+
+  /**
+   * Get model performance report for monitoring dashboard.
+   * Returns per-model accuracy trends, correction rates, confidence distribution, and data volume.
+   */
+  async getModelPerformanceReport(organizationId: string): Promise<{
+    models: Array<{
+      feature: string;
+      latestVersion: number;
+      accuracy: number;
+      sampleCount: number;
+      status: string;
+      trainedAt: string | null;
+      correctionRate: number;
+      totalPredictions: number;
+      totalFeedback: number;
+      acceptedCount: number;
+      rejectedCount: number;
+      correctedCount: number;
+      avgConfidence: number;
+      confidenceDistribution: { low: number; medium: number; high: number };
+      trainingDataCount: number;
+      lastRetrainedAt: string | null;
+      daysSinceRetrain: number | null;
+    }>;
+    summary: {
+      totalModels: number;
+      activeModels: number;
+      avgAccuracy: number;
+      avgCorrectionRate: number;
+      modelsNeedingRetrain: number;
+      totalPredictions: number;
+      totalFeedback: number;
+    };
+  }> {
+    // Get all models (latest version per feature)
+    const allModels = await this.prisma.aiModel.findMany({
+      where: { organizationId },
+      orderBy: [{ feature: 'asc' }, { version: 'desc' }],
+    });
+
+    // Deduplicate to latest version per feature
+    const latestModels = new Map<string, (typeof allModels)[0]>();
+    for (const model of allModels) {
+      if (!latestModels.has(model.feature)) {
+        latestModels.set(model.feature, model);
+      }
+    }
+
+    // Get feedback counts grouped by feature and action
+    const feedbackCounts = await this.prisma.aiFeedback.groupBy({
+      by: ['feature', 'userAction'],
+      where: { organizationId },
+      _count: { id: true },
+    });
+
+    // Get prediction stats grouped by feature
+    const predictionStats = await this.prisma.aiPrediction.groupBy({
+      by: ['feature'],
+      where: { organizationId },
+      _count: { id: true },
+      _avg: { confidence: true },
+    });
+
+    // Get training data counts
+    const trainingCounts = await this.prisma.aiTrainingData.groupBy({
+      by: ['feature'],
+      where: { organizationId },
+      _count: { id: true },
+    });
+
+    // Build per-feature feedback map
+    const feedbackMap = new Map<
+      string,
+      { accepted: number; rejected: number; corrected: number }
+    >();
+    for (const fb of feedbackCounts) {
+      if (!feedbackMap.has(fb.feature)) {
+        feedbackMap.set(fb.feature, { accepted: 0, rejected: 0, corrected: 0 });
+      }
+      const entry = feedbackMap.get(fb.feature)!;
+      if (fb.userAction === 'ACCEPTED') entry.accepted = fb._count.id;
+      else if (fb.userAction === 'REJECTED') entry.rejected = fb._count.id;
+      else if (fb.userAction === 'CORRECTED') entry.corrected = fb._count.id;
+    }
+
+    // Build per-feature prediction map
+    const predMap = new Map<string, { count: number; avgConfidence: number }>();
+    for (const ps of predictionStats) {
+      predMap.set(ps.feature, {
+        count: ps._count.id,
+        avgConfidence: parseFloat(ps._avg.confidence?.toString() || '0'),
+      });
+    }
+
+    // Build per-feature training data map
+    const trainMap = new Map<string, number>();
+    for (const tc of trainingCounts) {
+      trainMap.set(tc.feature, tc._count.id);
+    }
+
+    // Get confidence distribution per feature
+    const confidenceDistributions = new Map<
+      string,
+      { low: number; medium: number; high: number }
+    >();
+    const allPredictions = await this.prisma.aiPrediction.findMany({
+      where: { organizationId },
+      select: { feature: true, confidence: true },
+    });
+
+    for (const p of allPredictions) {
+      if (!confidenceDistributions.has(p.feature)) {
+        confidenceDistributions.set(p.feature, { low: 0, medium: 0, high: 0 });
+      }
+      const dist = confidenceDistributions.get(p.feature)!;
+      const conf = parseFloat(p.confidence.toString());
+      if (conf < 0.6) dist.low++;
+      else if (conf < 0.85) dist.medium++;
+      else dist.high++;
+    }
+
+    const now = Date.now();
+    const models = Array.from(latestModels.entries()).map(([feature, model]) => {
+      const fb = feedbackMap.get(feature) || { accepted: 0, rejected: 0, corrected: 0 };
+      const pred = predMap.get(feature) || { count: 0, avgConfidence: 0 };
+      const totalFeedback = fb.accepted + fb.rejected + fb.corrected;
+      const correctionRate = totalFeedback > 0 ? (fb.corrected + fb.rejected) / totalFeedback : 0;
+      const trainedAt = model.trainedAt ? model.trainedAt.toISOString() : null;
+      const daysSinceRetrain = model.trainedAt
+        ? Math.floor((now - model.trainedAt.getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+
+      return {
+        feature,
+        latestVersion: model.version,
+        accuracy: parseFloat(model.accuracy.toString()),
+        sampleCount: model.sampleCount,
+        status: model.status,
+        trainedAt,
+        correctionRate: Math.round(correctionRate * 1000) / 1000,
+        totalPredictions: pred.count,
+        totalFeedback,
+        acceptedCount: fb.accepted,
+        rejectedCount: fb.rejected,
+        correctedCount: fb.corrected,
+        avgConfidence: Math.round(pred.avgConfidence * 1000) / 1000,
+        confidenceDistribution: confidenceDistributions.get(feature) || {
+          low: 0,
+          medium: 0,
+          high: 0,
+        },
+        trainingDataCount: trainMap.get(feature) || 0,
+        lastRetrainedAt: trainedAt,
+        daysSinceRetrain,
+      };
+    });
+
+    const activeModels = models.filter((m) => m.status === 'ACTIVE');
+    const avgAccuracy =
+      activeModels.length > 0
+        ? activeModels.reduce((sum, m) => sum + m.accuracy, 0) / activeModels.length
+        : 0;
+    const avgCorrectionRate =
+      models.length > 0 ? models.reduce((sum, m) => sum + m.correctionRate, 0) / models.length : 0;
+    const modelsNeedingRetrain = models.filter(
+      (m) => m.daysSinceRetrain !== null && m.daysSinceRetrain > 30,
+    ).length;
+
+    return {
+      models,
+      summary: {
+        totalModels: models.length,
+        activeModels: activeModels.length,
+        avgAccuracy: Math.round(avgAccuracy * 10000) / 10000,
+        avgCorrectionRate: Math.round(avgCorrectionRate * 1000) / 1000,
+        modelsNeedingRetrain,
+        totalPredictions: models.reduce((sum, m) => sum + m.totalPredictions, 0),
+        totalFeedback: models.reduce((sum, m) => sum + m.totalFeedback, 0),
+      },
+    };
   }
 
   private async getTotalBankBalance(organizationId: string) {

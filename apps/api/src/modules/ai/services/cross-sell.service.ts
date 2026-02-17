@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
+import { AiFeedbackService } from './ai-feedback.service';
+import { AiTrainingService } from './ai-training.service';
 
 export interface Recommendation {
   itemId: string;
@@ -25,6 +28,9 @@ export class CrossSellService {
   constructor(
     private prisma: PrismaService,
     private modelRegistry: ModelRegistryService,
+    private feedbackService: AiFeedbackService,
+    private trainingService: AiTrainingService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async getRecommendations(
@@ -33,23 +39,17 @@ export class CrossSellService {
     limit: number = 5,
   ): Promise<Recommendation[]> {
     // Get items this customer has purchased
-    const purchasedItems = await this.getCustomerPurchasedItems(
-      organizationId,
-      customerId,
-    );
+    const purchasedItems = await this.getCustomerPurchasedItems(organizationId, customerId);
 
     if (purchasedItems.length === 0) {
       return [];
     }
 
     // Load co-occurrence matrix
-    const model = await this.modelRegistry.loadActiveModel(
-      organizationId,
-      'CROSS_SELL',
-    );
+    const model = await this.modelRegistry.loadActiveModel(organizationId, 'CROSS_SELL');
 
-    const coMatrix: Record<string, Record<string, number>> =
-      model?.modelData?.coOccurrenceMatrix || {};
+    const coMatrix: Record<string, Record<string, number>> = model?.modelData?.coOccurrenceMatrix ||
+    {};
 
     // Find recommended items
     const scores = new Map<string, number>();
@@ -79,13 +79,27 @@ export class CrossSellService {
     });
     const itemMap = new Map(items.map((i) => [i.id, i.name]));
 
-    return sorted.map(([itemId, score]) => ({
+    const recommendations = sorted.map(([itemId, score]) => ({
       itemId,
       itemName: itemMap.get(itemId) || 'Unknown',
       score: Math.min(1, score / 10),
       reason: reasons.get(itemId) || 'Related item',
       coOccurrenceCount: counts.get(itemId) || 0,
     }));
+
+    // Store prediction for feedback tracking
+    if (recommendations.length > 0) {
+      await this.feedbackService.storePrediction(
+        organizationId,
+        'CROSS_SELL',
+        { customerId, purchasedItems },
+        { recommendations: recommendations.map((r) => r.itemId) },
+        recommendations[0].score,
+        0,
+      );
+    }
+
+    return recommendations;
   }
 
   async getUpsellRecommendations(
@@ -93,10 +107,7 @@ export class CrossSellService {
     customerId: string,
     limit: number = 5,
   ): Promise<Recommendation[]> {
-    const purchasedItems = await this.getCustomerPurchasedItems(
-      organizationId,
-      customerId,
-    );
+    const purchasedItems = await this.getCustomerPurchasedItems(organizationId, customerId);
 
     if (purchasedItems.length === 0) return [];
 
@@ -106,9 +117,7 @@ export class CrossSellService {
       select: { id: true, sellingPrice: true, type: true },
     });
 
-    const maxPrice = Math.max(
-      ...purchased.map((p) => Number(p.sellingPrice)),
-    );
+    const maxPrice = Math.max(...purchased.map((p) => Number(p.sellingPrice)));
 
     // Find higher-priced alternatives
     const upsells = await this.prisma.item.findMany({
@@ -152,9 +161,7 @@ export class CrossSellService {
     let itemPairs = 0;
 
     for (const invoice of invoices) {
-      const itemIds = invoice.lines
-        .map((l) => l.itemId)
-        .filter((id): id is string => id !== null);
+      const itemIds = invoice.lines.map((l) => l.itemId).filter((id): id is string => id !== null);
       const uniqueItems = [...new Set(itemIds)];
 
       // Build co-occurrence pairs
@@ -188,15 +195,47 @@ export class CrossSellService {
     return { itemPairs, totalTransactions: invoices.length };
   }
 
+  /**
+   * Record user feedback on a cross-sell recommendation.
+   */
+  async recordRecommendationFeedback(
+    organizationId: string,
+    customerId: string,
+    recommendedItemId: string,
+    wasAccepted: boolean,
+  ): Promise<void> {
+    const label = wasAccepted ? 'ACCEPTED' : 'REJECTED';
+
+    await this.trainingService.addTrainingData(
+      organizationId,
+      'CROSS_SELL',
+      { customerId, recommendedItemId },
+      label,
+      wasAccepted ? 'USER' : 'CORRECTION',
+    );
+
+    if (!wasAccepted) {
+      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
+        organizationId,
+        'CROSS_SELL',
+      );
+
+      if (shouldRetrain) {
+        this.logger.log(`Cross-sell retraining threshold reached for org ${organizationId}`);
+        this.eventEmitter.emit('ai.retraining.needed', {
+          organizationId,
+          feature: 'CROSS_SELL',
+        });
+      }
+    }
+  }
+
   async getFrequentlyBoughtTogether(
     organizationId: string,
     itemId: string,
     limit: number = 5,
   ): Promise<ItemAssociation[]> {
-    const model = await this.modelRegistry.loadActiveModel(
-      organizationId,
-      'CROSS_SELL',
-    );
+    const model = await this.modelRegistry.loadActiveModel(organizationId, 'CROSS_SELL');
 
     if (!model?.modelData?.coOccurrenceMatrix) {
       return [];
@@ -222,8 +261,7 @@ export class CrossSellService {
       itemName: itemMap.get(id) || 'Unknown',
       associationScore: Math.min(1, (count as number) / 10),
       coOccurrenceCount: count as number,
-      supportPercentage:
-        ((count as number) / totalTransactions) * 100,
+      supportPercentage: ((count as number) / totalTransactions) * 100,
     }));
   }
 
@@ -244,8 +282,6 @@ export class CrossSellService {
       distinct: ['itemId'],
     });
 
-    return lines
-      .map((l) => l.itemId)
-      .filter((id): id is string => id !== null);
+    return lines.map((l) => l.itemId).filter((id): id is string => id !== null);
   }
 }

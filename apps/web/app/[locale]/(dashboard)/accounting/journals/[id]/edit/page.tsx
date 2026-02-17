@@ -60,7 +60,7 @@ export default function EditJournalPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/accounting/journals">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -87,7 +87,7 @@ export default function EditJournalPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href={`/accounting/journals/${journalId}`}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -114,18 +114,14 @@ export default function EditJournalPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label="Go back">
           <Link href={`/accounting/journals/${journalId}`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Edit {journal.journalNumber}
-          </h1>
-          <p className="text-muted-foreground">
-            Update the journal entry details
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">Edit {journal.journalNumber}</h1>
+          <p className="text-muted-foreground">Update the journal entry details</p>
         </div>
       </div>
 

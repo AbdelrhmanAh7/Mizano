@@ -106,10 +106,7 @@ export class AiAlertsService {
 
         if (existing) {
           // Update existing alert if content changed
-          if (
-            existing.title !== alert.title ||
-            existing.description !== alert.description
-          ) {
+          if (existing.title !== alert.title || existing.description !== alert.description) {
             await this.prisma.aIInsight.update({
               where: { id: existing.id },
               data: {
@@ -268,10 +265,7 @@ export class AiAlertsService {
   /**
    * Get critical alerts only
    */
-  async getCriticalAlerts(
-    organizationId: string,
-    limit: number = 5,
-  ): Promise<UnifiedAlert[]> {
+  async getCriticalAlerts(organizationId: string, limit: number = 5): Promise<UnifiedAlert[]> {
     const alerts = await this.prisma.aIInsight.findMany({
       where: {
         organizationId,
@@ -329,10 +323,7 @@ export class AiAlertsService {
   /**
    * Mark all alerts as read
    */
-  async markAllAsRead(
-    organizationId: string,
-    category?: AlertCategory,
-  ): Promise<number> {
+  async markAllAsRead(organizationId: string, category?: AlertCategory): Promise<number> {
     const where: Prisma.AIInsightWhereInput = {
       organizationId,
       type: 'ALERT',
@@ -381,11 +372,7 @@ export class AiAlertsService {
   /**
    * Record action taken on alert
    */
-  async recordAction(
-    organizationId: string,
-    alertId: string,
-    action: string,
-  ): Promise<void> {
+  async recordAction(organizationId: string, alertId: string, action: string): Promise<void> {
     const alert = await this.prisma.aIInsight.findFirst({
       where: { id: alertId, organizationId },
     });
@@ -440,14 +427,185 @@ export class AiAlertsService {
     return expired.count;
   }
 
+  /**
+   * Check AI model health and generate accuracy alerts.
+   * Call this periodically (e.g., daily from scheduler) to detect:
+   * - Model accuracy below threshold
+   * - High correction rate (users frequently correcting AI)
+   * - Stale training data (no retrain in 30+ days)
+   */
+  async checkModelAccuracy(
+    organizationId: string,
+    options?: {
+      accuracyThreshold?: number; // default 0.7
+      correctionRateThreshold?: number; // default 0.3
+      staleDays?: number; // default 30
+    },
+  ): Promise<{ alertsCreated: number; modelsChecked: number }> {
+    const accuracyThreshold = options?.accuracyThreshold ?? 0.7;
+    const correctionRateThreshold = options?.correctionRateThreshold ?? 0.3;
+    const staleDays = options?.staleDays ?? 30;
+    let alertsCreated = 0;
+
+    // Get latest model per feature
+    const allModels = await this.prisma.aiModel.findMany({
+      where: { organizationId, status: 'ACTIVE' },
+      orderBy: [{ feature: 'asc' }, { version: 'desc' }],
+    });
+
+    const latestModels = new Map<string, (typeof allModels)[0]>();
+    for (const model of allModels) {
+      if (!latestModels.has(model.feature)) {
+        latestModels.set(model.feature, model);
+      }
+    }
+
+    // Get correction rates from feedback
+    const feedbackCounts = await this.prisma.aiFeedback.groupBy({
+      by: ['feature', 'userAction'],
+      where: { organizationId },
+      _count: { id: true },
+    });
+
+    const feedbackMap = new Map<string, { total: number; corrections: number }>();
+    for (const fb of feedbackCounts) {
+      if (!feedbackMap.has(fb.feature)) {
+        feedbackMap.set(fb.feature, { total: 0, corrections: 0 });
+      }
+      const entry = feedbackMap.get(fb.feature)!;
+      entry.total += fb._count.id;
+      if (fb.userAction === 'CORRECTED' || fb.userAction === 'REJECTED') {
+        entry.corrections += fb._count.id;
+      }
+    }
+
+    const now = Date.now();
+
+    for (const [feature, model] of latestModels) {
+      const accuracy = parseFloat(model.accuracy.toString());
+      const fb = feedbackMap.get(feature);
+      const correctionRate = fb && fb.total > 0 ? fb.corrections / fb.total : 0;
+      const daysSinceRetrain = model.trainedAt
+        ? Math.floor((now - model.trainedAt.getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+
+      // Alert 1: Low accuracy
+      if (accuracy > 0 && accuracy < accuracyThreshold) {
+        const existingAlert = await this.findExistingAlert(
+          organizationId,
+          AlertSource.ANOMALY,
+          `ai-accuracy-${feature}`,
+        );
+        if (!existingAlert) {
+          await this.prisma.aIInsight.create({
+            data: {
+              type: 'ALERT',
+              title: `AI Model Accuracy Below Threshold: ${feature}`,
+              description: `The ${feature} model accuracy is ${(accuracy * 100).toFixed(1)}%, below the ${(accuracyThreshold * 100).toFixed(0)}% threshold. Consider retraining with more data.`,
+              severity: accuracy < 0.5 ? 'critical' : 'warning',
+              category: AlertCategory.FINANCIAL,
+              priority: accuracy < 0.5 ? AlertPriority.CRITICAL : AlertPriority.HIGH,
+              aiSource: AlertSource.ANOMALY,
+              sourceEntityType: 'ai_model',
+              sourceEntityId: `ai-accuracy-${feature}`,
+              impact: `${feature} predictions may be unreliable`,
+              suggestedAction: 'Retrain the model with corrected data or review training samples',
+              actionUrl: '/settings/ai',
+              actionLabel: 'AI Settings',
+              data: {
+                feature,
+                accuracy,
+                threshold: accuracyThreshold,
+                modelVersion: model.version,
+              } as any,
+              organizationId,
+            },
+          });
+          alertsCreated++;
+        }
+      }
+
+      // Alert 2: High correction rate
+      if (fb && fb.total >= 10 && correctionRate > correctionRateThreshold) {
+        const existingAlert = await this.findExistingAlert(
+          organizationId,
+          AlertSource.ANOMALY,
+          `ai-corrections-${feature}`,
+        );
+        if (!existingAlert) {
+          await this.prisma.aIInsight.create({
+            data: {
+              type: 'ALERT',
+              title: `High Correction Rate: ${feature}`,
+              description: `Users corrected ${(correctionRate * 100).toFixed(0)}% of ${feature} predictions (${fb.corrections}/${fb.total}). The model may need retraining.`,
+              severity: correctionRate > 0.5 ? 'critical' : 'warning',
+              category: AlertCategory.FINANCIAL,
+              priority: correctionRate > 0.5 ? AlertPriority.HIGH : AlertPriority.MEDIUM,
+              aiSource: AlertSource.ANOMALY,
+              sourceEntityType: 'ai_model',
+              sourceEntityId: `ai-corrections-${feature}`,
+              impact: `${feature} suggestions are frequently wrong`,
+              suggestedAction: 'Review recent corrections and retrain the model',
+              actionUrl: '/settings/ai',
+              actionLabel: 'AI Settings',
+              data: {
+                feature,
+                correctionRate,
+                totalFeedback: fb.total,
+                corrections: fb.corrections,
+              } as any,
+              organizationId,
+            },
+          });
+          alertsCreated++;
+        }
+      }
+
+      // Alert 3: Stale training data
+      if (daysSinceRetrain !== null && daysSinceRetrain > staleDays) {
+        const existingAlert = await this.findExistingAlert(
+          organizationId,
+          AlertSource.ANOMALY,
+          `ai-stale-${feature}`,
+        );
+        if (!existingAlert) {
+          await this.prisma.aIInsight.create({
+            data: {
+              type: 'ALERT',
+              title: `Stale Model: ${feature}`,
+              description: `The ${feature} model hasn't been retrained in ${daysSinceRetrain} days. Newer data may improve accuracy.`,
+              severity: 'info',
+              category: AlertCategory.FINANCIAL,
+              priority: daysSinceRetrain > 60 ? AlertPriority.MEDIUM : AlertPriority.LOW,
+              aiSource: AlertSource.ANOMALY,
+              sourceEntityType: 'ai_model',
+              sourceEntityId: `ai-stale-${feature}`,
+              impact: 'Model may not reflect recent patterns',
+              suggestedAction: 'Trigger a model retrain from AI Settings',
+              actionUrl: '/settings/ai',
+              actionLabel: 'AI Settings',
+              data: {
+                feature,
+                daysSinceRetrain,
+                lastTrainedAt: model.trainedAt?.toISOString(),
+              } as any,
+              organizationId,
+            },
+          });
+          alertsCreated++;
+        }
+      }
+    }
+
+    return { alertsCreated, modelsChecked: latestModels.size };
+  }
+
   // ============ Private Alert Collection Methods ============
 
   /**
    * Get financial alerts from cash flow predictions and anomalies
    */
-  private async getFinancialAlerts(
-    organizationId: string,
-  ): Promise<UnifiedAlert[]> {
+  private async getFinancialAlerts(organizationId: string): Promise<UnifiedAlert[]> {
     const alerts: UnifiedAlert[] = [];
 
     // Cash flow alerts
@@ -552,9 +710,7 @@ export class AiAlertsService {
   /**
    * Get collection alerts from payment predictions
    */
-  private async getCollectionAlerts(
-    organizationId: string,
-  ): Promise<UnifiedAlert[]> {
+  private async getCollectionAlerts(organizationId: string): Promise<UnifiedAlert[]> {
     const alerts: UnifiedAlert[] = [];
 
     // Overdue invoices
@@ -613,9 +769,7 @@ export class AiAlertsService {
   /**
    * Get inventory alerts from reorder points and demand forecasting
    */
-  private async getInventoryAlerts(
-    organizationId: string,
-  ): Promise<UnifiedAlert[]> {
+  private async getInventoryAlerts(organizationId: string): Promise<UnifiedAlert[]> {
     const alerts: UnifiedAlert[] = [];
 
     // Low stock alerts
@@ -629,8 +783,7 @@ export class AiAlertsService {
     });
 
     for (const analysis of reorderAlerts) {
-      const priority =
-        analysis.status === 'CRITICAL' ? AlertPriority.HIGH : AlertPriority.MEDIUM;
+      const priority = analysis.status === 'CRITICAL' ? AlertPriority.HIGH : AlertPriority.MEDIUM;
 
       alerts.push({
         id: `reorder-${analysis.id}`,
@@ -789,9 +942,7 @@ export class AiAlertsService {
   /**
    * Get compliance alerts
    */
-  private async getComplianceAlerts(
-    organizationId: string,
-  ): Promise<UnifiedAlert[]> {
+  private async getComplianceAlerts(organizationId: string): Promise<UnifiedAlert[]> {
     const alerts: UnifiedAlert[] = [];
 
     // VAT return deadlines
@@ -906,7 +1057,8 @@ export class AiAlertsService {
         category: AlertCategory.HR,
         priority,
         source: AlertSource.PAYROLL,
-        title: anomaly.type === 'OVERTIME' ? 'Overtime Anomaly Detected' : 'Payroll Anomaly Detected',
+        title:
+          anomaly.type === 'OVERTIME' ? 'Overtime Anomaly Detected' : 'Payroll Anomaly Detected',
         description: anomaly.description,
         suggestedAction: 'Review and verify the data',
         sourceEntity: {
@@ -931,11 +1083,7 @@ export class AiAlertsService {
   /**
    * Find existing alert to avoid duplicates
    */
-  private async findExistingAlert(
-    organizationId: string,
-    source: AlertSource,
-    entityId?: string,
-  ) {
+  private async findExistingAlert(organizationId: string, source: AlertSource, entityId?: string) {
     return this.prisma.aIInsight.findFirst({
       where: {
         organizationId,

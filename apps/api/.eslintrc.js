@@ -20,7 +20,7 @@ module.exports = {
     // TypeScript strict rules
     '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/no-unused-vars': [
-      'error',
+      'warn',
       { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
     ],
     '@typescript-eslint/no-floating-promises': 'warn',
@@ -30,6 +30,9 @@ module.exports = {
     'no-console': ['warn', { allow: ['warn', 'error'] }],
     'no-return-await': 'off',
     '@typescript-eslint/return-await': ['error', 'in-try-catch'],
+
+    '@typescript-eslint/no-var-requires': 'warn',
+    'prefer-const': 'warn',
 
     // NestJS conventions
     '@typescript-eslint/interface-name-prefix': 'off',

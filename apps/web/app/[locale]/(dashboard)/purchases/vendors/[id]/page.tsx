@@ -53,16 +53,15 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
   }
 
   const balance = parseFloat(vendor.outstandingBalance || '0');
-  const paymentTermsLabel = vendor.paymentTerms === 0
-    ? 'Due on Receipt'
-    : `Net ${vendor.paymentTerms}`;
+  const paymentTermsLabel =
+    vendor.paymentTerms === 0 ? 'Due on Receipt' : `Net ${vendor.paymentTerms}`;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/purchases/vendors">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -99,9 +98,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
             <div className={cn('text-2xl font-bold font-mono', getBalanceColor(balance))}>
               {formatCurrency(balance, vendor.currency)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Amount you owe to this vendor
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Amount you owe to this vendor</p>
           </CardContent>
         </Card>
 
@@ -114,24 +111,18 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{paymentTermsLabel}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Default payment terms for bills
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Default payment terms for bills</p>
           </CardContent>
         </Card>
 
         {/* Currency */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Currency
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Currency</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{vendor.currency}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Default transaction currency
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Default transaction currency</p>
           </CardContent>
         </Card>
       </div>
@@ -147,10 +138,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
             {vendor.email && (
               <div className="flex items-center gap-3">
                 <Mail className="h-4 w-4 text-muted-foreground" />
-                <a
-                  href={`mailto:${vendor.email}`}
-                  className="text-blue-600 hover:underline"
-                >
+                <a href={`mailto:${vendor.email}`} className="text-blue-600 hover:underline">
                   {vendor.email}
                 </a>
               </div>
@@ -158,10 +146,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
             {vendor.phone && (
               <div className="flex items-center gap-3">
                 <Phone className="h-4 w-4 text-muted-foreground" />
-                <a
-                  href={`tel:${vendor.phone}`}
-                  className="text-blue-600 hover:underline"
-                >
+                <a href={`tel:${vendor.phone}`} className="text-blue-600 hover:underline">
                   {vendor.phone}
                 </a>
               </div>
@@ -216,19 +201,13 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
         <CardContent>
           <div className="flex flex-wrap gap-3">
             <Button variant="outline" asChild>
-              <Link href={`/purchases/bills/new?vendorId=${vendor.id}`}>
-                Create Bill
-              </Link>
+              <Link href={`/purchases/bills/new?vendorId=${vendor.id}`}>Create Bill</Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href={`/purchases/expenses/new?vendorId=${vendor.id}`}>
-                Record Expense
-              </Link>
+              <Link href={`/purchases/expenses/new?vendorId=${vendor.id}`}>Record Expense</Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href={`/purchases/payments/new?vendorId=${vendor.id}`}>
-                Record Payment
-              </Link>
+              <Link href={`/purchases/payments/new?vendorId=${vendor.id}`}>Record Payment</Link>
             </Button>
           </div>
         </CardContent>

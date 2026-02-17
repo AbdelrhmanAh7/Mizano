@@ -52,7 +52,11 @@ function RecurringProfilesPageContent() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [profileToDelete, setProfileToDelete] = useState<RecurringProfile | null>(null);
 
-  const { data: profilesData, isLoading, refetch } = useRecurringProfiles({
+  const {
+    data: profilesData,
+    isLoading,
+    refetch,
+  } = useRecurringProfiles({
     ...tableParams.queryParams,
     isActive: selectedStatus === 'all' ? undefined : selectedStatus === 'active',
   });
@@ -134,9 +138,7 @@ function RecurringProfilesPageContent() {
       accessorKey: 'frequency',
       header: 'Frequency',
       cell: ({ row }) => (
-        <Badge variant="outline">
-          {getFrequencyLabel(row.original.frequency)}
-        </Badge>
+        <Badge variant="outline">{getFrequencyLabel(row.original.frequency)}</Badge>
       ),
     },
     {
@@ -172,9 +174,7 @@ function RecurringProfilesPageContent() {
       cell: ({ row }) => (
         <Badge
           className={
-            row.original.isActive
-              ? 'bg-green-100 text-green-800'
-              : 'bg-gray-100 text-gray-800'
+            row.original.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
           }
         >
           {row.original.isActive ? 'Active' : 'Inactive'}
@@ -225,10 +225,7 @@ function RecurringProfilesPageContent() {
                 </>
               )}
               {canDelete && (
-                <DropdownMenuItem
-                  onClick={() => handleDelete(profile)}
-                  className="text-red-600"
-                >
+                <DropdownMenuItem onClick={() => handleDelete(profile)} className="text-red-600">
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
                 </DropdownMenuItem>
@@ -246,9 +243,7 @@ function RecurringProfilesPageContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Recurring Journals</h1>
-          <p className="text-muted-foreground">
-            Automate journal entries with recurring profiles
-          </p>
+          <p className="text-muted-foreground">Automate journal entries with recurring profiles</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
@@ -281,7 +276,12 @@ function RecurringProfilesPageContent() {
                 <SelectItem value="inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon" onClick={() => refetch()}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              aria-label="Refresh recurring profiles"
+            >
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
@@ -331,10 +331,7 @@ function RecurringProfilesPageContent() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -82,16 +82,14 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/sales/delivery-challans">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
-                {challan.challanNumber}
-              </h1>
+              <h1 className="text-3xl font-bold tracking-tight">{challan.challanNumber}</h1>
               <Badge variant="outline" className={getChallanStatusColor(challan.status)}>
                 {getChallanStatusLabel(challan.status)}
               </Badge>
@@ -103,15 +101,10 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
         </div>
         <div className="flex gap-2">
           {canIssueChallan(challan) && (
-            <Button onClick={() => issueChallan.mutate(challan.id)}>
-              Issue Challan
-            </Button>
+            <Button onClick={() => issueChallan.mutate(challan.id)}>Issue Challan</Button>
           )}
           {canMarkReturned(challan) && (
-            <Button
-              variant="outline"
-              onClick={() => markReturned.mutate(challan.id)}
-            >
+            <Button variant="outline" onClick={() => markReturned.mutate(challan.id)}>
               Mark Returned
             </Button>
           )}
@@ -132,10 +125,7 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
+                  <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
                     Delete
                   </AlertDialogAction>
                 </AlertDialogFooter>

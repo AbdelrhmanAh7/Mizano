@@ -13,10 +13,7 @@ interface LocaleLayoutProps {
   params: Promise<{ locale: string }>;
 }
 
-export default async function LocaleLayout({
-  children,
-  params,
-}: LocaleLayoutProps) {
+export default async function LocaleLayout({ children, params }: LocaleLayoutProps) {
   const { locale } = await params;
 
   // Validate locale
@@ -29,6 +26,11 @@ export default async function LocaleLayout({
 
   return (
     <div lang={locale} dir={direction} className="font-sans antialiased">
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `document.documentElement.lang="${locale}";document.documentElement.dir="${direction}";`,
+        }}
+      />
       <NextIntlClientProvider messages={messages}>
         <Providers>{children}</Providers>
       </NextIntlClientProvider>

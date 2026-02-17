@@ -49,7 +49,7 @@ export default function CreditNoteDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/sales/credit-notes">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -77,16 +77,14 @@ export default function CreditNoteDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/sales/credit-notes">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
-                {creditNote.creditNoteNumber}
-              </h1>
+              <h1 className="text-3xl font-bold tracking-tight">{creditNote.creditNoteNumber}</h1>
               <Badge className={getCreditNoteTypeColor(creditNote.type)}>
                 {getCreditNoteTypeLabel(creditNote.type)}
               </Badge>
@@ -135,9 +133,7 @@ export default function CreditNoteDetailPage() {
               <FileText className="h-4 w-4" />
               Type
             </div>
-            <div className="text-xl font-bold">
-              {getCreditNoteTypeLabel(creditNote.type)}
-            </div>
+            <div className="text-xl font-bold">{getCreditNoteTypeLabel(creditNote.type)}</div>
           </CardContent>
         </Card>
       </div>
@@ -205,9 +201,7 @@ export default function CreditNoteDetailPage() {
                 {creditNote.invoice.grandTotal && (
                   <div>
                     <div className="text-sm text-muted-foreground">Invoice Total</div>
-                    <div className="font-mono">
-                      {formatCurrency(creditNote.invoice.grandTotal)}
-                    </div>
+                    <div className="font-mono">{formatCurrency(creditNote.invoice.grandTotal)}</div>
                   </div>
                 )}
               </>

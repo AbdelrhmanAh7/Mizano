@@ -162,7 +162,7 @@ const DATE_LABEL_KEYWORDS: Record<string, string[]> = {
   'start date': ['effective date', 'commencement date', 'start date', 'begins on'],
   'end date': ['expiration date', 'end date', 'expires on', 'terminates on', 'valid until'],
   'renewal date': ['renewal date', 'renews on', 'auto-renew date'],
-  'deadline': ['deadline', 'due by', 'no later than', 'submission date'],
+  deadline: ['deadline', 'due by', 'no later than', 'submission date'],
 };
 
 @Injectable()
@@ -182,13 +182,8 @@ export class ContractAnalysisService {
    * Perform a full analysis of a contract text.
    * Extracts parties, dates, key terms, and classifies all clauses.
    */
-  async analyzeContract(
-    organizationId: string,
-    text: string,
-  ): Promise<ContractAnalysisResult> {
-    this.logger.log(
-      `Analyzing contract for org ${organizationId} (${text.length} chars)`,
-    );
+  async analyzeContract(organizationId: string, text: string): Promise<ContractAnalysisResult> {
+    this.logger.log(`Analyzing contract for org ${organizationId} (${text.length} chars)`);
 
     const [parties, dates, keyTerms, clauses] = await Promise.all([
       Promise.resolve(this.extractParties(text)),
@@ -226,14 +221,16 @@ export class ContractAnalysisService {
 
   /**
    * Extract important dates from contract text.
-   * Uses compromise NLP .dates() plus regex patterns for labeled dates.
+   * Uses regex-based date extraction plus keyword patterns for labeled dates.
    */
   extractDates(text: string): ContractDate[] {
     const dates: ContractDate[] = [];
 
-    // Use compromise to extract dates
+    // Extract dates via regex instead of compromise plugin (compromise core has no .dates())
     const doc = nlp(text);
-    const nlpDates = doc.dates().out('array') as string[];
+    const dateRegex =
+      /\b(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s*\d{2,4}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4})\b/gi;
+    const nlpDates: string[] = text.match(dateRegex) || [];
 
     for (const dateStr of nlpDates) {
       const label = this.inferDateLabel(text, dateStr);
@@ -352,9 +349,7 @@ export class ContractAnalysisService {
         description:
           'No confidentiality or non-disclosure terms found. Sensitive information may not be protected.',
       });
-      recommendations.push(
-        'Consider adding confidentiality provisions or a separate NDA.',
-      );
+      recommendations.push('Consider adding confidentiality provisions or a separate NDA.');
       riskScore += 15;
     }
 
@@ -373,9 +368,7 @@ export class ContractAnalysisService {
 
     // Check for penalty clauses (not missing, but presence adds risk)
     if (obligations.summary.penalty > 0) {
-      const penaltyClauses = obligations.clauses.filter(
-        (c) => c.type === 'penalty',
-      );
+      const penaltyClauses = obligations.clauses.filter((c) => c.type === 'penalty');
       factors.push({
         factor: 'Penalty clauses present',
         severity: 'medium',
@@ -404,9 +397,7 @@ export class ContractAnalysisService {
           description:
             'Contract contains automatic renewal terms. Ensure you track renewal dates to avoid unintended extensions.',
         });
-        recommendations.push(
-          'Set a calendar reminder before the renewal notice deadline.',
-        );
+        recommendations.push('Set a calendar reminder before the renewal notice deadline.');
         riskScore += 5;
       }
     }
@@ -417,12 +408,9 @@ export class ContractAnalysisService {
       factors.push({
         factor: 'Very short contract',
         severity: 'medium',
-        description:
-          'The contract is unusually short and may lack important provisions.',
+        description: 'The contract is unusually short and may lack important provisions.',
       });
-      recommendations.push(
-        'Review whether all necessary terms and conditions are covered.',
-      );
+      recommendations.push('Review whether all necessary terms and conditions are covered.');
       riskScore += 10;
     }
 
@@ -509,18 +497,42 @@ export class ContractAnalysisService {
 
     // Filter out very short terms and common stop words
     const stopWords = new Set([
-      'the', 'and', 'for', 'that', 'this', 'with', 'from', 'shall',
-      'will', 'not', 'any', 'all', 'are', 'was', 'were', 'been',
-      'have', 'has', 'had', 'but', 'its', 'may', 'can', 'such',
-      'which', 'their', 'other', 'each', 'than', 'upon', 'into',
+      'the',
+      'and',
+      'for',
+      'that',
+      'this',
+      'with',
+      'from',
+      'shall',
+      'will',
+      'not',
+      'any',
+      'all',
+      'are',
+      'was',
+      'were',
+      'been',
+      'have',
+      'has',
+      'had',
+      'but',
+      'its',
+      'may',
+      'can',
+      'such',
+      'which',
+      'their',
+      'other',
+      'each',
+      'than',
+      'upon',
+      'into',
     ]);
 
     return terms
       .filter(
-        (t) =>
-          t.term.length > 2 &&
-          !stopWords.has(t.term.toLowerCase()) &&
-          !/^\d+$/.test(t.term),
+        (t) => t.term.length > 2 && !stopWords.has(t.term.toLowerCase()) && !/^\d+$/.test(t.term),
       )
       .slice(0, 20)
       .map((t) => ({
@@ -557,10 +569,7 @@ export class ContractAnalysisService {
     }
 
     // Confidence: if multiple keywords match, confidence is higher
-    const confidence =
-      bestType === 'general'
-        ? 0.1
-        : Math.min(0.5 + bestScore * 0.5, 1.0);
+    const confidence = bestType === 'general' ? 0.1 : Math.min(0.5 + bestScore * 0.5, 1.0);
 
     return {
       text: sentence,

@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { AiTrainingService } from './ai-training.service';
+import { AiFeedbackService } from './ai-feedback.service';
 import { ModelRegistryService } from './model-registry.service';
 import { AiFeature } from '@prisma/client';
 import { findBestMatch } from '../utils/text-similarity.util';
@@ -63,6 +66,9 @@ export class KnowledgeAssistantService {
   constructor(
     private prisma: PrismaService,
     private modelRegistry: ModelRegistryService,
+    private trainingService: AiTrainingService,
+    private feedbackService: AiFeedbackService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -78,9 +84,7 @@ export class KnowledgeAssistantService {
     query: string,
     limit: number = 10,
   ): Promise<KnowledgeSearchResponse> {
-    this.logger.log(
-      `Searching knowledge base in org ${organizationId}: "${query}"`,
-    );
+    this.logger.log(`Searching knowledge base in org ${organizationId}: "${query}"`);
 
     // Ensure the index is loaded
     await this.ensureIndex(organizationId);
@@ -106,8 +110,7 @@ export class KnowledgeAssistantService {
     const scored = documents.map((doc, idx) => {
       // Normalise TF-IDF score to 0-1 range
       const maxTfidf = Math.max(...tfidfScores, 1);
-      const tfidfNorm =
-        maxTfidf > 0 ? (tfidfScores[idx] ?? 0) / maxTfidf : 0;
+      const tfidfNorm = maxTfidf > 0 ? (tfidfScores[idx] ?? 0) / maxTfidf : 0;
 
       // String similarity bonus (0-0.3 range)
       let similarityBonus = 0;
@@ -115,11 +118,7 @@ export class KnowledgeAssistantService {
         similarityBonus = bestMatchResult.similarity * 0.3;
       } else {
         // Calculate individual similarity for secondary matches
-        const individualMatch = findBestMatch(
-          query,
-          [`${doc.title} ${doc.text}`],
-          0,
-        );
+        const individualMatch = findBestMatch(query, [`${doc.title} ${doc.text}`], 0);
         similarityBonus = individualMatch.similarity * 0.2;
       }
 
@@ -141,7 +140,25 @@ export class KnowledgeAssistantService {
       .sort((a, b) => b.relevanceScore - a.relevanceScore)
       .slice(0, limit);
 
-    return { results: sorted, totalResults: sorted.length };
+    const searchResponse = { results: sorted, totalResults: sorted.length };
+
+    // Store prediction for feedback tracking
+    if (sorted.length > 0) {
+      try {
+        await this.feedbackService.storePrediction(
+          organizationId,
+          'KNOWLEDGE_ASSISTANT',
+          { query },
+          { resultIds: sorted.map((r) => r.id), topScore: sorted[0].relevanceScore },
+          sorted[0].relevanceScore,
+          1,
+        );
+      } catch (error) {
+        this.logger.warn(`Failed to store search prediction: ${error.message}`);
+      }
+    }
+
+    return searchResponse;
   }
 
   /**
@@ -210,14 +227,10 @@ export class KnowledgeAssistantService {
         documents.length,
       );
     } catch (error) {
-      this.logger.warn(
-        `Failed to persist knowledge index metadata: ${error}`,
-      );
+      this.logger.warn(`Failed to persist knowledge index metadata: ${error}`);
     }
 
-    this.logger.log(
-      `Indexed ${documents.length} documents for org ${organizationId}`,
-    );
+    this.logger.log(`Indexed ${documents.length} documents for org ${organizationId}`);
 
     return { indexed: documents.length, totalDocuments: insights.length };
   }
@@ -278,9 +291,7 @@ export class KnowledgeAssistantService {
    * Fully rebuild the search index for an organization.
    * Clears the existing in-memory index and re-indexes from the database.
    */
-  async rebuildIndex(
-    organizationId: string,
-  ): Promise<IndexResult> {
+  async rebuildIndex(organizationId: string): Promise<IndexResult> {
     this.logger.log(`Rebuilding knowledge index for org ${organizationId}`);
 
     // Clear existing in-memory state
@@ -288,6 +299,45 @@ export class KnowledgeAssistantService {
     this.documentMaps.delete(organizationId);
 
     return this.indexDocuments(organizationId);
+  }
+
+  /**
+   * Record user feedback on a knowledge search result.
+   * Stores whether the result was helpful; if not, it is treated as a
+   * correction and may trigger index retraining when the threshold is reached.
+   */
+  async recordSearchFeedback(
+    organizationId: string,
+    query: string,
+    resultId: string,
+    wasHelpful: boolean,
+  ): Promise<void> {
+    const label = wasHelpful ? 'helpful' : 'not_helpful';
+
+    await this.trainingService.addTrainingData(
+      organizationId,
+      'KNOWLEDGE_ASSISTANT',
+      { query, resultId },
+      label,
+      wasHelpful ? 'USER' : 'CORRECTION',
+    );
+
+    if (!wasHelpful) {
+      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
+        organizationId,
+        'KNOWLEDGE_ASSISTANT',
+      );
+
+      if (shouldRetrain) {
+        this.logger.log(
+          `Knowledge assistant retraining threshold reached for org ${organizationId}`,
+        );
+        this.eventEmitter.emit('ai.retraining.needed', {
+          organizationId,
+          feature: 'KNOWLEDGE_ASSISTANT',
+        });
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------

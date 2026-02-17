@@ -14,10 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  usePaymentReceived,
-  getPaymentModeLabel,
-} from '@/lib/hooks/use-payments-received';
+import { usePaymentReceived, getPaymentModeLabel } from '@/lib/hooks/use-payments-received';
 import { PaymentModeBadge } from '@/components/sales/status-badge';
 import { format } from 'date-fns';
 
@@ -57,7 +54,7 @@ export default function PaymentReceivedDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/sales/payments">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -85,16 +82,14 @@ export default function PaymentReceivedDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/sales/payments">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
-                {payment.paymentNumber}
-              </h1>
+              <h1 className="text-3xl font-bold tracking-tight">{payment.paymentNumber}</h1>
               <PaymentModeBadge mode={payment.paymentMode} />
             </div>
             {payment.customer && (
@@ -141,9 +136,7 @@ export default function PaymentReceivedDetailPage() {
               <CreditCard className="h-4 w-4" />
               Payment Mode
             </div>
-            <div className="text-xl font-bold">
-              {getPaymentModeLabel(payment.paymentMode)}
-            </div>
+            <div className="text-xl font-bold">{getPaymentModeLabel(payment.paymentMode)}</div>
           </CardContent>
         </Card>
 
@@ -266,7 +259,7 @@ export default function PaymentReceivedDetailPage() {
                     <TableCell className="text-right font-mono">
                       {formatCurrency(
                         parseFloat(allocation.invoice?.balanceDue || '0') +
-                          parseFloat(allocation.amount || '0')
+                          parseFloat(allocation.amount || '0'),
                       )}
                     </TableCell>
                     <TableCell className="text-right font-mono text-green-600 font-semibold">

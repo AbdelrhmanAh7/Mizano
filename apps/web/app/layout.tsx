@@ -24,13 +24,9 @@ export const viewport: Viewport = {
 
 // Root layout - must have html/body tags
 // Locale layout sets lang/dir attributes via a wrapper div
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${notoArabic.variable} font-sans antialiased`}>
         {children}
       </body>

@@ -5,9 +5,11 @@
  */
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const LogisticRegression = require('ml-logistic-regression');
+const LogisticRegressionModule = require('ml-logistic-regression');
+const LogisticRegression = LogisticRegressionModule.default || LogisticRegressionModule;
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { Matrix } = require('ml-matrix');
+const MatrixModule = require('ml-matrix');
+const { Matrix } = MatrixModule.default ? MatrixModule.default : MatrixModule;
 
 export interface LogisticRegressionModel {
   classifier: any;
@@ -103,17 +105,10 @@ export function trainLogisticRegression(
   }
 
   const precision =
-    truePositives + falsePositives > 0
-      ? truePositives / (truePositives + falsePositives)
-      : 0;
+    truePositives + falsePositives > 0 ? truePositives / (truePositives + falsePositives) : 0;
   const recall =
-    truePositives + falseNegatives > 0
-      ? truePositives / (truePositives + falseNegatives)
-      : 0;
-  const f1Score =
-    precision + recall > 0
-      ? (2 * precision * recall) / (precision + recall)
-      : 0;
+    truePositives + falseNegatives > 0 ? truePositives / (truePositives + falseNegatives) : 0;
+  const f1Score = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
 
   const model: LogisticRegressionModel = {
     classifier,
@@ -134,10 +129,7 @@ export function trainLogisticRegression(
  * @param features Feature array for a single data point
  * @returns Probability between 0 and 1
  */
-export function predictProbability(
-  model: LogisticRegressionModel,
-  features: number[],
-): number {
+export function predictProbability(model: LogisticRegressionModel, features: number[]): number {
   const means = model.classifier._normMeans as number[];
   const stds = model.classifier._normStds as number[];
 
@@ -177,10 +169,7 @@ export function predictProbability(
  * @param features Feature array for a single data point
  * @returns 0 or 1
  */
-export function predictClass(
-  model: LogisticRegressionModel,
-  features: number[],
-): number {
+export function predictClass(model: LogisticRegressionModel, features: number[]): number {
   const prob = predictProbability(model, features);
   return prob >= 0.5 ? 1 : 0;
 }
@@ -255,8 +244,7 @@ function normalizeFeatures(features: number[][]): {
     means.push(m);
 
     const squaredDiffs = column.map((v) => Math.pow(v - m, 2));
-    const variance =
-      squaredDiffs.reduce((a, b) => a + b, 0) / Math.max(column.length - 1, 1);
+    const variance = squaredDiffs.reduce((a, b) => a + b, 0) / Math.max(column.length - 1, 1);
     stds.push(Math.sqrt(variance));
   }
 

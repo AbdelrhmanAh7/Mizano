@@ -62,6 +62,7 @@ export function ChatWidget() {
         onClick={() => setIsOpen(true)}
         className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50"
         size="icon"
+        aria-label="Open AI assistant"
       >
         <MessageSquare className="h-6 w-6" />
       </Button>
@@ -85,10 +86,16 @@ export function ChatWidget() {
             size="icon"
             onClick={handleClearHistory}
             disabled={clearHistory.isPending}
+            aria-label="Clear chat history"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsOpen(false)}
+            aria-label="Close chat"
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -123,10 +130,7 @@ export function ChatWidget() {
           {/* Latest response metadata (intent + confidence) */}
           {!sendMessage.isPending && lastResponse?.intent && (
             <div className="flex items-center gap-2 ml-8">
-              <Badge
-                variant="outline"
-                className={`text-xs ${getIntentColor(lastResponse.intent)}`}
-              >
+              <Badge variant="outline" className={`text-xs ${getIntentColor(lastResponse.intent)}`}>
                 {lastResponse.intent}
               </Badge>
               {lastResponse.confidence != null && (
@@ -169,7 +173,12 @@ export function ChatWidget() {
             placeholder="Ask about your business..."
             disabled={sendMessage.isPending}
           />
-          <Button onClick={handleSend} disabled={!message.trim() || sendMessage.isPending} size="icon">
+          <Button
+            onClick={handleSend}
+            disabled={!message.trim() || sendMessage.isPending}
+            size="icon"
+            aria-label="Send message"
+          >
             {sendMessage.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (

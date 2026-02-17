@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
+import { AiFeedbackService } from './ai-feedback.service';
+import { AiTrainingService } from './ai-training.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { getRiskLevel } from '../utils/risk-level.util';
 
@@ -42,6 +45,9 @@ export class ChurnPredictionService {
   constructor(
     private prisma: PrismaService,
     private modelRegistry: ModelRegistryService,
+    private feedbackService: AiFeedbackService,
+    private trainingService: AiTrainingService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async predictChurnRisk(
@@ -62,10 +68,7 @@ export class ChurnPredictionService {
     // Try ML prediction
     let mlScore: number | null = null;
     try {
-      const model = await this.modelRegistry.loadActiveModel(
-        organizationId,
-        'CHURN_PREDICTION',
-      );
+      const model = await this.modelRegistry.loadActiveModel(organizationId, 'CHURN_PREDICTION');
       if (model?.modelData) {
         const classifier = RandomForestClassifier.load(model.modelData);
         const features = this.rfmToFeatureVector(rfm);
@@ -73,11 +76,12 @@ export class ChurnPredictionService {
         mlScore = prediction[0] === 1 ? 0.8 : 0.2;
       }
     } catch (error) {
-      this.logger.warn(`ML churn prediction failed for customer ${customerId}, falling back to rule-based: ${error.message}`);
+      this.logger.warn(
+        `ML churn prediction failed for customer ${customerId}, falling back to rule-based: ${error.message}`,
+      );
     }
 
-    const finalScore =
-      mlScore !== null ? score * 0.7 + mlScore * 0.3 : score;
+    const finalScore = mlScore !== null ? score * 0.7 + mlScore * 0.3 : score;
 
     const riskLevel = getRiskLevel(finalScore);
 
@@ -92,9 +96,8 @@ export class ChurnPredictionService {
         rfmRecency: rfm.recency,
         rfmFrequency: rfm.frequency,
         rfmMonetary: new Decimal(rfm.monetary),
-        lastPurchaseDate: rfm.recency < 99999
-          ? new Date(Date.now() - rfm.recency * 86400000)
-          : null,
+        lastPurchaseDate:
+          rfm.recency < 99999 ? new Date(Date.now() - rfm.recency * 86400000) : null,
       },
       update: {
         churnRisk: new Decimal(finalScore),
@@ -106,7 +109,7 @@ export class ChurnPredictionService {
       },
     });
 
-    return {
+    const result: ChurnPredictionResult = {
       customerId,
       customerName: customer.name,
       churnRisk: finalScore,
@@ -117,11 +120,21 @@ export class ChurnPredictionService {
       recommendation: this.getRecommendation(riskLevel, factors),
       predictionMethod: mlScore !== null ? 'ML' : 'RULE_BASED',
     };
+
+    // Store prediction for feedback tracking
+    await this.feedbackService.storePrediction(
+      organizationId,
+      'CHURN_PREDICTION',
+      { customerId, rfm },
+      { churnRisk: finalScore, riskLevel },
+      result.confidence,
+      0,
+    );
+
+    return result;
   }
 
-  async predictAllCustomers(
-    organizationId: string,
-  ): Promise<ChurnBatchResult> {
+  async predictAllCustomers(organizationId: string): Promise<ChurnBatchResult> {
     const customers = await this.prisma.customer.findMany({
       where: { organizationId, deletedAt: null },
       select: { id: true },
@@ -136,9 +149,7 @@ export class ChurnPredictionService {
     for (let i = 0; i < customers.length; i += BATCH_SIZE) {
       const batch = customers.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(
-        batch.map((customer) =>
-          this.predictChurnRisk(organizationId, customer.id),
-        ),
+        batch.map((customer) => this.predictChurnRisk(organizationId, customer.id)),
       );
 
       for (const result of results) {
@@ -159,10 +170,7 @@ export class ChurnPredictionService {
     };
   }
 
-  async getHighRiskCustomers(
-    organizationId: string,
-    limit: number = 20,
-  ): Promise<any[]> {
+  async getHighRiskCustomers(organizationId: string, limit: number = 20): Promise<any[]> {
     const profiles = await this.prisma.customerAiProfile.findMany({
       where: { organizationId, churnRisk: { gte: 0.5 } },
       orderBy: { churnRisk: 'desc' },
@@ -186,9 +194,7 @@ export class ChurnPredictionService {
     }));
   }
 
-  async trainModel(
-    organizationId: string,
-  ): Promise<{
+  async trainModel(organizationId: string): Promise<{
     version: number;
     accuracy: number;
     sampleCount: number;
@@ -205,10 +211,7 @@ export class ChurnPredictionService {
 
     for (const customer of customers) {
       try {
-        const rfm = await this.extractRFMFeatures(
-          organizationId,
-          customer.id,
-        );
+        const rfm = await this.extractRFMFeatures(organizationId, customer.id);
         // Label: churned if no purchase in 90+ days and had previous purchases
         const churned = rfm.frequency > 0 && rfm.recency > 90 ? 1 : 0;
         features.push(this.rfmToFeatureVector(rfm));
@@ -261,6 +264,48 @@ export class ChurnPredictionService {
     };
   }
 
+  /**
+   * Record user feedback on a churn prediction.
+   */
+  async recordChurnFeedback(
+    organizationId: string,
+    customerId: string,
+    wasChurnCorrect: boolean,
+    actualChurn?: boolean,
+  ): Promise<void> {
+    const label =
+      actualChurn !== undefined
+        ? actualChurn
+          ? 'CHURNED'
+          : 'RETAINED'
+        : wasChurnCorrect
+          ? 'CORRECT'
+          : 'INCORRECT';
+
+    await this.trainingService.addTrainingData(
+      organizationId,
+      'CHURN_PREDICTION',
+      { customerId },
+      label,
+      wasChurnCorrect ? 'USER' : 'CORRECTION',
+    );
+
+    if (!wasChurnCorrect) {
+      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
+        organizationId,
+        'CHURN_PREDICTION',
+      );
+
+      if (shouldRetrain) {
+        this.logger.log(`Churn prediction retraining threshold reached for org ${organizationId}`);
+        this.eventEmitter.emit('ai.retraining.needed', {
+          organizationId,
+          feature: 'CHURN_PREDICTION',
+        });
+      }
+    }
+  }
+
   private async extractRFMFeatures(
     organizationId: string,
     customerId: string,
@@ -298,14 +343,9 @@ export class ChurnPredictionService {
     }
 
     const now = Date.now();
-    const recency = Math.floor(
-      (now - invoices[0].date.getTime()) / 86400000,
-    );
+    const recency = Math.floor((now - invoices[0].date.getTime()) / 86400000);
     const frequency = invoices.length;
-    const monetary = invoices.reduce(
-      (sum, inv) => sum + Number(inv.grandTotal),
-      0,
-    );
+    const monetary = invoices.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
     const avgOrderValue = monetary / frequency;
 
     // Payment timeliness: avg (payment date proxy - dueDate) in days
@@ -314,23 +354,18 @@ export class ChurnPredictionService {
     let timelinessCount = 0;
     for (const inv of invoices) {
       if (inv.status === 'PAID' && inv.dueDate) {
-        const diff =
-          (inv.updatedAt.getTime() - inv.dueDate.getTime()) / 86400000;
+        const diff = (inv.updatedAt.getTime() - inv.dueDate.getTime()) / 86400000;
         timelinessSum += diff;
         timelinessCount++;
       }
     }
-    const paymentTimeliness =
-      timelinessCount > 0 ? timelinessSum / timelinessCount : 0;
+    const paymentTimeliness = timelinessCount > 0 ? timelinessSum / timelinessCount : 0;
 
     // Purchase trend: simple slope of monthly totals
     const monthlyTotals = new Map<string, number>();
     for (const inv of invoices) {
       const key = `${inv.date.getFullYear()}-${inv.date.getMonth()}`;
-      monthlyTotals.set(
-        key,
-        (monthlyTotals.get(key) || 0) + Number(inv.grandTotal),
-      );
+      monthlyTotals.set(key, (monthlyTotals.get(key) || 0) + Number(inv.grandTotal));
     }
     const monthValues = Array.from(monthlyTotals.values());
     let purchaseTrend = 0;
@@ -357,11 +392,8 @@ export class ChurnPredictionService {
     };
   }
 
-  private calculateChurnScore(
-    rfm: RFMFeatures,
-  ): { score: number; factors: any[] } {
-    const factors: { factor: string; impact: number; description: string }[] =
-      [];
+  private calculateChurnScore(rfm: RFMFeatures): { score: number; factors: any[] } {
+    const factors: { factor: string; impact: number; description: string }[] = [];
     let score = 0;
 
     // Recency factor (0-0.35)
@@ -453,11 +485,7 @@ export class ChurnPredictionService {
     ];
   }
 
-
-  private getRecommendation(
-    riskLevel: string,
-    factors: any[],
-  ): string {
+  private getRecommendation(riskLevel: string, factors: any[]): string {
     switch (riskLevel) {
       case 'CRITICAL':
         return 'Immediate outreach required. Schedule a personal call or meeting.';

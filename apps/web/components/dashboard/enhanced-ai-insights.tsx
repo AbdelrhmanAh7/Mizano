@@ -24,13 +24,14 @@ import {
   type InsightPriority,
 } from '@/lib/hooks/use-ai-insights';
 
-const typeConfig: Record<
-  InsightType,
-  { icon: React.ElementType; color: string; bg: string }
-> = {
+const typeConfig: Record<InsightType, { icon: React.ElementType; color: string; bg: string }> = {
   ANOMALY: { icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-950' },
   TREND: { icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950' },
-  RECOMMENDATION: { icon: Lightbulb, color: 'text-yellow-600', bg: 'bg-yellow-50 dark:bg-yellow-950' },
+  RECOMMENDATION: {
+    icon: Lightbulb,
+    color: 'text-yellow-600',
+    bg: 'bg-yellow-50 dark:bg-yellow-950',
+  },
   FORECAST: { icon: Eye, color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-950' },
   ALERT: { icon: Bell, color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-950' },
   OPPORTUNITY: { icon: Target, color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-950' },
@@ -50,10 +51,7 @@ function InsightCard({ insight }: { insight: AIInsight }) {
 
   return (
     <div
-      className={cn(
-        'flex items-start gap-3 p-3 rounded-lg border transition-colors',
-        config.bg,
-      )}
+      className={cn('flex items-start gap-3 p-3 rounded-lg border transition-colors', config.bg)}
     >
       <div className={cn('mt-0.5', config.color)}>
         <Icon className="h-4 w-4" />
@@ -73,9 +71,7 @@ function InsightCard({ insight }: { insight: AIInsight }) {
             </span>
           )}
         </div>
-        <p className="text-xs text-muted-foreground line-clamp-2">
-          {insight.description}
-        </p>
+        <p className="text-xs text-muted-foreground line-clamp-2">{insight.description}</p>
         {insight.recommendation && (
           <p className="text-xs text-foreground/80 mt-1 line-clamp-1">
             <ChevronRight className="inline h-3 w-3 rtl:rotate-180" />
@@ -88,6 +84,7 @@ function InsightCard({ insight }: { insight: AIInsight }) {
         size="icon"
         className="shrink-0 h-6 w-6"
         onClick={() => dismiss.mutate(insight.id)}
+        aria-label="Dismiss insight"
       >
         <X className="h-3 w-3" />
       </Button>
@@ -98,7 +95,11 @@ function InsightCard({ insight }: { insight: AIInsight }) {
 export const EnhancedAIInsights = memo(function EnhancedAIInsights() {
   const { data, isLoading } = useAIInsights({ limit: 5, status: 'NEW' });
 
-  const insights: AIInsight[] = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+  const insights: AIInsight[] = Array.isArray(data?.data)
+    ? data.data
+    : Array.isArray(data)
+      ? data
+      : [];
 
   if (isLoading) {
     return (

@@ -163,7 +163,7 @@ export default function QuoteDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/sales/quotes">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -194,16 +194,14 @@ export default function QuoteDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/sales/quotes">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
-                {quote.quoteNumber}
-              </h1>
+              <h1 className="text-3xl font-bold tracking-tight">{quote.quoteNumber}</h1>
               <QuoteStatusBadge status={quote.status} />
             </div>
             <p className="text-muted-foreground">
@@ -245,10 +243,7 @@ export default function QuoteDetailPage() {
             </Button>
           )}
           {canDelete && quote.status === 'DRAFT' && (
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
+            <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </Button>
@@ -264,26 +259,16 @@ export default function QuoteDetailPage() {
         <CardContent>
           <dl className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">
-                Quote Number
-              </dt>
+              <dt className="text-sm font-medium text-muted-foreground">Quote Number</dt>
               <dd className="text-lg font-semibold">{quote.quoteNumber}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">
-                Quote Date
-              </dt>
-              <dd className="text-lg">
-                {format(new Date(quote.date), 'MMMM d, yyyy')}
-              </dd>
+              <dt className="text-sm font-medium text-muted-foreground">Quote Date</dt>
+              <dd className="text-lg">{format(new Date(quote.date), 'MMMM d, yyyy')}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">
-                Expiry Date
-              </dt>
-              <dd className="text-lg">
-                {format(new Date(quote.expiryDate), 'MMMM d, yyyy')}
-              </dd>
+              <dt className="text-sm font-medium text-muted-foreground">Expiry Date</dt>
+              <dd className="text-lg">{format(new Date(quote.expiryDate), 'MMMM d, yyyy')}</dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-muted-foreground">Customer</dt>
@@ -298,17 +283,13 @@ export default function QuoteDetailPage() {
             </div>
             {quote.reference && (
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">
-                  Reference
-                </dt>
+                <dt className="text-sm font-medium text-muted-foreground">Reference</dt>
                 <dd className="text-lg">{quote.reference}</dd>
               </div>
             )}
             {quote.subject && (
               <div className="col-span-full">
-                <dt className="text-sm font-medium text-muted-foreground">
-                  Subject
-                </dt>
+                <dt className="text-sm font-medium text-muted-foreground">Subject</dt>
                 <dd className="text-lg">{quote.subject}</dd>
               </div>
             )}
@@ -336,25 +317,17 @@ export default function QuoteDetailPage() {
               {lines.map((line, index) => (
                 <TableRow key={index}>
                   <TableCell>
-                    {line.item?.name && (
-                      <span className="font-medium">{line.item.name}</span>
-                    )}
+                    {line.item?.name && <span className="font-medium">{line.item.name}</span>}
                     {line.description && (
-                      <p className="text-sm text-muted-foreground">
-                        {line.description}
-                      </p>
+                      <p className="text-sm text-muted-foreground">{line.description}</p>
                     )}
                   </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {line.quantity}
-                  </TableCell>
+                  <TableCell className="text-right font-mono">{line.quantity}</TableCell>
                   <TableCell className="text-right font-mono">
                     {formatCurrency(parseFloat(line.rate), currency)}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {parseFloat(line.discountPercent || '0') > 0
-                      ? `${line.discountPercent}%`
-                      : '-'}
+                    {parseFloat(line.discountPercent || '0') > 0 ? `${line.discountPercent}%` : '-'}
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {formatCurrency(parseFloat(line.amount), currency)}
@@ -435,16 +408,12 @@ export default function QuoteDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Quote</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this quote? This action cannot be
-              undone.
+              Are you sure you want to delete this quote? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -457,15 +426,13 @@ export default function QuoteDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Convert to Invoice</AlertDialogTitle>
             <AlertDialogDescription>
-              This will create a new invoice from this quote. The quote will be
-              marked as invoiced. Do you want to proceed?
+              This will create a new invoice from this quote. The quote will be marked as invoiced.
+              Do you want to proceed?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConvert}>
-              Convert to Invoice
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleConvert}>Convert to Invoice</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

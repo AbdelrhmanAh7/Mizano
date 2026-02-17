@@ -13,7 +13,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { RolesService } from './roles.service';
 import { CreateRoleDto, UpdateRoleDto, AssignRoleDto } from './dto';
 import { JwtAuthGuard, PermissionsGuard } from '../../common/guards';
-import { CurrentOrg, Permissions } from '../../common/decorators';
+import { CurrentOrg, HttpCache, Permissions } from '../../common/decorators';
 
 @ApiTags('Roles')
 @ApiBearerAuth()
@@ -25,10 +25,7 @@ export class RolesController {
   @Post()
   @ApiOperation({ summary: 'Create a new role' })
   @Permissions('settings.create')
-  create(
-    @CurrentOrg() organizationId: string,
-    @Body() createRoleDto: CreateRoleDto,
-  ) {
+  create(@CurrentOrg() organizationId: string, @Body() createRoleDto: CreateRoleDto) {
     return this.rolesService.create(organizationId, createRoleDto);
   }
 
@@ -40,6 +37,7 @@ export class RolesController {
   @ApiQuery({ name: 'sortBy', required: false, type: String })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
   @Permissions('settings.view')
+  @HttpCache('static')
   findAll(
     @CurrentOrg() organizationId: string,
     @Query('page') page?: number,
@@ -60,10 +58,7 @@ export class RolesController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a role by ID' })
   @Permissions('settings.view')
-  findOne(
-    @CurrentOrg() organizationId: string,
-    @Param('id') id: string,
-  ) {
+  findOne(@CurrentOrg() organizationId: string, @Param('id') id: string) {
     return this.rolesService.findOne(organizationId, id);
   }
 
@@ -81,10 +76,7 @@ export class RolesController {
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a role' })
   @Permissions('settings.delete')
-  remove(
-    @CurrentOrg() organizationId: string,
-    @Param('id') id: string,
-  ) {
+  remove(@CurrentOrg() organizationId: string, @Param('id') id: string) {
     return this.rolesService.remove(organizationId, id);
   }
 
@@ -98,10 +90,7 @@ export class RolesController {
   @Post('assign')
   @ApiOperation({ summary: 'Assign a role to a user' })
   @Permissions('users.edit')
-  assignRole(
-    @CurrentOrg() organizationId: string,
-    @Body() assignRoleDto: AssignRoleDto,
-  ) {
+  assignRole(@CurrentOrg() organizationId: string, @Body() assignRoleDto: AssignRoleDto) {
     return this.rolesService.assignRole(organizationId, assignRoleDto);
   }
 }

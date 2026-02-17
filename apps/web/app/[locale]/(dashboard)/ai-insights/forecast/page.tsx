@@ -86,16 +86,14 @@ export default function CashFlowForecastPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" aria-label="Go back" asChild>
             <Link href="/ai-insights">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Cash Flow Forecast</h1>
-            <p className="text-muted-foreground">
-              AI-powered prediction of future cash flows
-            </p>
+            <p className="text-muted-foreground">AI-powered prediction of future cash flows</p>
           </div>
         </div>
         <Select value={days.toString()} onValueChange={(v) => setDays(parseInt(v))}>
@@ -147,8 +145,11 @@ export default function CashFlowForecastPage() {
         <Card className={netCashFlow >= 0 ? 'bg-green-50' : 'bg-red-50'}>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Net Cash Flow</p>
-            <p className={`text-2xl font-bold font-mono ${netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {netCashFlow >= 0 ? '+' : ''}{formatCurrency(netCashFlow)}
+            <p
+              className={`text-2xl font-bold font-mono ${netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}
+            >
+              {netCashFlow >= 0 ? '+' : ''}
+              {formatCurrency(netCashFlow)}
             </p>
           </CardContent>
         </Card>
@@ -160,9 +161,7 @@ export default function CashFlowForecastPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Ending Balance</p>
-                <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(endingBalance)}
-                </p>
+                <p className="text-2xl font-bold font-mono">{formatCurrency(endingBalance)}</p>
               </div>
             </div>
           </CardContent>
@@ -178,8 +177,9 @@ export default function CashFlowForecastPage() {
               <div>
                 <p className="font-semibold text-yellow-800">Cash Flow Warning</p>
                 <p className="text-sm text-yellow-700">
-                  Your projected cash balance may drop to {formatCurrency(lowestBalance)} during this period.
-                  Consider delaying non-essential expenses or accelerating receivables collection.
+                  Your projected cash balance may drop to {formatCurrency(lowestBalance)} during
+                  this period. Consider delaying non-essential expenses or accelerating receivables
+                  collection.
                 </p>
               </div>
             </div>
@@ -242,9 +242,7 @@ export default function CashFlowForecastPage() {
       <Card>
         <CardHeader>
           <CardTitle>Cash Inflows vs Outflows</CardTitle>
-          <CardDescription>
-            Daily predicted cash movements
-          </CardDescription>
+          <CardDescription>Daily predicted cash movements</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
@@ -256,9 +254,7 @@ export default function CashFlowForecastPage() {
                   tick={{ fontSize: 12 }}
                   tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                 />
-                <Tooltip
-                  formatter={(value: number) => formatCurrency(value)}
-                />
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 <Legend />
                 <Line
                   type="monotone"

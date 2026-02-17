@@ -4,7 +4,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PaymentReceivedForm, PaymentReceivedFormData } from '@/components/sales/payment-received-form';
+import {
+  PaymentReceivedForm,
+  PaymentReceivedFormData,
+} from '@/components/sales/payment-received-form';
 import { useCreatePaymentReceived } from '@/lib/hooks/use-payments-received';
 
 export default function NewPaymentReceivedPage() {
@@ -47,16 +50,14 @@ export default function NewPaymentReceivedPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label="Go back">
           <Link href="/sales/payments">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Record Payment</h1>
-          <p className="text-muted-foreground">
-            Record a payment received from a customer
-          </p>
+          <p className="text-muted-foreground">Record a payment received from a customer</p>
         </div>
       </div>
 

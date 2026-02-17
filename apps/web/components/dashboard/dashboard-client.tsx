@@ -17,7 +17,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { RecentTransactions } from '@/components/dashboard/recent-transactions';
 import { DateRangePicker } from '@/components/dashboard/date-range-picker';
@@ -32,7 +32,6 @@ import {
   useDashboardCustomers,
   useDashboardBanking,
   useDashboardInventory,
-  formatCompactCurrency,
 } from '@/lib/hooks/use-dashboard';
 import { useDashboardFilters } from '@/lib/stores/use-dashboard-filters';
 import { useDashboardLayout } from '@/lib/stores/use-dashboard-layout';
@@ -55,7 +54,8 @@ function ChartSkeleton() {
 }
 
 const CashFlowChart = dynamic(
-  () => import('@/components/dashboard/cash-flow-chart').then((m) => ({ default: m.CashFlowChart })),
+  () =>
+    import('@/components/dashboard/cash-flow-chart').then((m) => ({ default: m.CashFlowChart })),
   { ssr: false, loading: () => <ChartSkeleton /> },
 );
 const RevenueChart = dynamic(
@@ -71,27 +71,45 @@ const ExpensesPie = dynamic(
   { ssr: false, loading: () => <ChartSkeleton /> },
 );
 const ProfitMarginChart = dynamic(
-  () => import('@/components/dashboard/profit-margin-chart').then((m) => ({ default: m.ProfitMarginChart })),
+  () =>
+    import('@/components/dashboard/profit-margin-chart').then((m) => ({
+      default: m.ProfitMarginChart,
+    })),
   { ssr: false, loading: () => <ChartSkeleton /> },
 );
 const TopCustomersChart = dynamic(
-  () => import('@/components/dashboard/top-customers-chart').then((m) => ({ default: m.TopCustomersChart })),
+  () =>
+    import('@/components/dashboard/top-customers-chart').then((m) => ({
+      default: m.TopCustomersChart,
+    })),
   { ssr: false, loading: () => <ChartSkeleton /> },
 );
 const BankBalanceChart = dynamic(
-  () => import('@/components/dashboard/bank-balance-chart').then((m) => ({ default: m.BankBalanceChart })),
+  () =>
+    import('@/components/dashboard/bank-balance-chart').then((m) => ({
+      default: m.BankBalanceChart,
+    })),
   { ssr: false, loading: () => <ChartSkeleton /> },
 );
 const InventoryValueChart = dynamic(
-  () => import('@/components/dashboard/inventory-value-chart').then((m) => ({ default: m.InventoryValueChart })),
+  () =>
+    import('@/components/dashboard/inventory-value-chart').then((m) => ({
+      default: m.InventoryValueChart,
+    })),
   { ssr: false, loading: () => <ChartSkeleton /> },
 );
 const CashFlowForecastChart = dynamic(
-  () => import('@/components/dashboard/cash-flow-forecast-chart').then((m) => ({ default: m.CashFlowForecastChart })),
+  () =>
+    import('@/components/dashboard/cash-flow-forecast-chart').then((m) => ({
+      default: m.CashFlowForecastChart,
+    })),
   { ssr: false, loading: () => <ChartSkeleton /> },
 );
 const RevenueForecastChart = dynamic(
-  () => import('@/components/dashboard/revenue-forecast-chart').then((m) => ({ default: m.RevenueForecastChart })),
+  () =>
+    import('@/components/dashboard/revenue-forecast-chart').then((m) => ({
+      default: m.RevenueForecastChart,
+    })),
   { ssr: false, loading: () => <ChartSkeleton /> },
 );
 
@@ -132,7 +150,7 @@ export function DashboardClient() {
 
   const { widgets, loadFromServer } = useDashboardLayout();
   const sortedWidgets = [...widgets].sort((a, b) => a.order - b.order);
-  const isVisible = (id: string) => widgets.find((w) => w.id === id)?.visible ?? true;
+  const _isVisible = (id: string) => widgets.find((w) => w.id === id)?.visible ?? true;
 
   // Load dashboard layout from server on mount
   useEffect(() => {
@@ -155,7 +173,11 @@ export function DashboardClient() {
 
       case 'kpi-row-1':
         return (
-          <div key={widgetId} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-tour="dashboard-stats">
+          <div
+            key={widgetId}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+            data-tour="dashboard-stats"
+          >
             {statsLoading ? (
               Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
             ) : (
@@ -174,7 +196,11 @@ export function DashboardClient() {
                   icon={TrendingDown}
                   iconColor="text-red-600"
                   iconBgColor="bg-red-100"
-                  trend={trends?.expenses ? { ...trends.expenses, isPositive: !trends.expenses.isPositive } : undefined}
+                  trend={
+                    trends?.expenses
+                      ? { ...trends.expenses, isPositive: !trends.expenses.isPositive }
+                      : undefined
+                  }
                 />
                 <StatCard
                   title={t('stats.netProfit')}
@@ -219,7 +245,9 @@ export function DashboardClient() {
                 />
                 <StatCard
                   title={t('stats.overdueAmount')}
-                  value={(statsData?.stats.overdueInvoices || 0) + (statsData?.stats.overdueBills || 0)}
+                  value={
+                    (statsData?.stats.overdueInvoices || 0) + (statsData?.stats.overdueBills || 0)
+                  }
                   icon={AlertTriangle}
                   iconColor="text-red-600"
                   iconBgColor="bg-red-100"
@@ -248,7 +276,11 @@ export function DashboardClient() {
 
       case 'cash-flow-revenue':
         return (
-          <div key={widgetId} className="grid grid-cols-1 lg:grid-cols-2 gap-6" data-tour="dashboard-charts">
+          <div
+            key={widgetId}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+            data-tour="dashboard-charts"
+          >
             <div className="relative">
               {cashFlowData ? <CashFlowChart data={cashFlowData} /> : <ChartSkeleton />}
               <div className="absolute top-4 end-4">
@@ -359,7 +391,13 @@ export function DashboardClient() {
         <div className="flex items-center gap-2">
           <DateRangePicker />
           <WidgetCustomizer />
-          <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isRefetching}>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={isRefetching}
+            aria-label="Refresh dashboard"
+          >
             <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
           </Button>
         </div>

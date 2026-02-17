@@ -1,6 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
+import { AiFeedbackService } from './ai-feedback.service';
+import { AiTrainingService } from './ai-training.service';
 import { Decimal } from '@prisma/client/runtime/library';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -49,6 +52,9 @@ export class QualityPredictionService {
   constructor(
     private prisma: PrismaService,
     private modelRegistry: ModelRegistryService,
+    private feedbackService: AiFeedbackService,
+    private trainingService: AiTrainingService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -75,10 +81,7 @@ export class QualityPredictionService {
     let confidence: number;
 
     // Try ML prediction first
-    const model = await this.modelRegistry.loadActiveModel(
-      organizationId,
-      'QUALITY_PREDICTION',
-    );
+    const model = await this.modelRegistry.loadActiveModel(organizationId, 'QUALITY_PREDICTION');
 
     if (model) {
       try {
@@ -114,7 +117,7 @@ export class QualityPredictionService {
     const factors = this.identifyRiskFactors(features);
     const recommendations = this.generateRecommendations(riskLevel, features, factors);
 
-    return {
+    const result: QualityPrediction = {
       workOrderId,
       defectRisk: Math.round(defectRisk * 1000) / 1000,
       riskLevel,
@@ -122,15 +125,24 @@ export class QualityPredictionService {
       confidence: Math.round(confidence * 100) / 100,
       recommendations,
     };
+
+    // Store prediction for feedback tracking
+    await this.feedbackService.storePrediction(
+      organizationId,
+      'QUALITY_PREDICTION',
+      { workOrderId },
+      { defectRisk: result.defectRisk, riskLevel },
+      result.confidence,
+      0,
+    );
+
+    return result;
   }
 
   /**
    * Get historical quality metrics for a BOM
    */
-  async getBomQualityMetrics(
-    organizationId: string,
-    bomId: string,
-  ): Promise<BomQualityMetrics> {
+  async getBomQualityMetrics(organizationId: string, bomId: string): Promise<BomQualityMetrics> {
     const bom = await this.prisma.bOM.findFirst({
       where: { id: bomId, organizationId },
       select: { id: true, name: true },
@@ -164,16 +176,14 @@ export class QualityPredictionService {
 
       if (wo.completedDate && wo.actualStartDate) {
         const days =
-          (wo.completedDate.getTime() - wo.actualStartDate.getTime()) /
-          (1000 * 60 * 60 * 24);
+          (wo.completedDate.getTime() - wo.actualStartDate.getTime()) / (1000 * 60 * 60 * 24);
         totalCompletionDays += days;
         completedWithDates++;
       }
     }
 
     const defectRate = totalProduced > 0 ? totalWaste / (totalProduced + totalWaste) : 0;
-    const avgCompletionDays =
-      completedWithDates > 0 ? totalCompletionDays / completedWithDates : 0;
+    const avgCompletionDays = completedWithDates > 0 ? totalCompletionDays / completedWithDates : 0;
 
     return {
       bomId,
@@ -205,10 +215,7 @@ export class QualityPredictionService {
       orderBy: { completedDate: 'asc' },
     });
 
-    const monthlyData = new Map<
-      string,
-      { produced: number; waste: number; count: number }
-    >();
+    const monthlyData = new Map<string, { produced: number; waste: number; count: number }>();
 
     for (const wo of workOrders) {
       if (!wo.completedDate) continue;
@@ -304,10 +311,7 @@ export class QualityPredictionService {
       if (!bomProductionRates.has(wo.bomId)) {
         bomProductionRates.set(wo.bomId, []);
       }
-      const totalProduced = wo.productionEntries.reduce(
-        (sum, e) => sum + e.quantityProduced,
-        0,
-      );
+      const totalProduced = wo.productionEntries.reduce((sum, e) => sum + e.quantityProduced, 0);
       const rate = wo.quantity > 0 ? totalProduced / wo.quantity : 0;
       bomProductionRates.get(wo.bomId)!.push(rate);
     }
@@ -374,14 +378,22 @@ export class QualityPredictionService {
         if (predictions[i] === testLabels[i]) correct++;
       }
     }
-    const accuracy =
-      testFeatures.length > 0 ? correct / testFeatures.length : 0.5;
+    const accuracy = testFeatures.length > 0 ? correct / testFeatures.length : 0.5;
 
     // Save model
     const { version } = await this.modelRegistry.saveModel(
       organizationId,
       'QUALITY_PREDICTION',
-      { tree: classifier.toJSON(), featureNames: ['batchSize', 'bomComplexity', 'historicalDefectRate', 'dayOfWeek', 'productionRateVariance'] },
+      {
+        tree: classifier.toJSON(),
+        featureNames: [
+          'batchSize',
+          'bomComplexity',
+          'historicalDefectRate',
+          'dayOfWeek',
+          'productionRateVariance',
+        ],
+      },
       accuracy,
       features.length,
     );
@@ -395,6 +407,48 @@ export class QualityPredictionService {
       sampleCount: features.length,
       version,
     };
+  }
+
+  /**
+   * Record user feedback on a quality prediction.
+   */
+  async recordQualityFeedback(
+    organizationId: string,
+    workOrderId: string,
+    wasCorrect: boolean,
+    actualDefects?: number,
+  ): Promise<void> {
+    const label =
+      actualDefects !== undefined
+        ? `DEFECTS_${actualDefects}`
+        : wasCorrect
+          ? 'CORRECT'
+          : 'INCORRECT';
+
+    await this.trainingService.addTrainingData(
+      organizationId,
+      'QUALITY_PREDICTION',
+      { workOrderId },
+      label,
+      wasCorrect ? 'USER' : 'CORRECTION',
+    );
+
+    if (!wasCorrect) {
+      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
+        organizationId,
+        'QUALITY_PREDICTION',
+      );
+
+      if (shouldRetrain) {
+        this.logger.log(
+          `Quality prediction retraining threshold reached for org ${organizationId}`,
+        );
+        this.eventEmitter.emit('ai.retraining.needed', {
+          organizationId,
+          feature: 'QUALITY_PREDICTION',
+        });
+      }
+    }
   }
 
   // ── Private helpers ──────────────────────────────────────────────
@@ -467,8 +521,7 @@ export class QualityPredictionService {
     if (completionRates.length > 1) {
       const avg = completionRates.reduce((a, b) => a + b, 0) / completionRates.length;
       productionRateVariance =
-        completionRates.reduce((sum, r) => sum + Math.pow(r - avg, 2), 0) /
-        completionRates.length;
+        completionRates.reduce((sum, r) => sum + Math.pow(r - avg, 2), 0) / completionRates.length;
     }
 
     return {
@@ -590,7 +643,9 @@ export class QualityPredictionService {
     const recommendations: string[] = [];
 
     if (riskLevel === 'HIGH') {
-      recommendations.push('Consider splitting this work order into smaller batches to reduce risk');
+      recommendations.push(
+        'Consider splitting this work order into smaller batches to reduce risk',
+      );
       recommendations.push('Schedule additional quality inspection checkpoints during production');
     }
 
@@ -613,9 +668,7 @@ export class QualityPredictionService {
     }
 
     if (features.batchSize > 500) {
-      recommendations.push(
-        'Large batch size - implement in-process sampling at regular intervals',
-      );
+      recommendations.push('Large batch size - implement in-process sampling at regular intervals');
     }
 
     if (features.dayOfWeek === 0 || features.dayOfWeek === 6) {
@@ -625,7 +678,9 @@ export class QualityPredictionService {
     }
 
     if (riskLevel === 'LOW' && recommendations.length === 0) {
-      recommendations.push('No significant risk factors identified - proceed with standard quality controls');
+      recommendations.push(
+        'No significant risk factors identified - proceed with standard quality controls',
+      );
     }
 
     return recommendations;

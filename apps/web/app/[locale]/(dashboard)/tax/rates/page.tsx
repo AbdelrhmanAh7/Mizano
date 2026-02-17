@@ -98,9 +98,7 @@ export default function TaxRatesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Tax Rates</h1>
-          <p className="text-muted-foreground">
-            Manage tax rates for invoices and bills
-          </p>
+          <p className="text-muted-foreground">Manage tax rates for invoices and bills</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
@@ -155,17 +153,17 @@ export default function TaxRatesPage() {
                       {formatPercentage(rate.rate)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        {getTaxRateTypeLabel(rate.type)}
-                      </Badge>
+                      <Badge variant="outline">{getTaxRateTypeLabel(rate.type)}</Badge>
                     </TableCell>
                     <TableCell>
                       {rate.account ? (
                         <span className="text-sm">
-                          <span className="text-muted-foreground">{rate.account.code}</span>
-                          {' '}{rate.account.name}
+                          <span className="text-muted-foreground">{rate.account.code}</span>{' '}
+                          {rate.account.name}
                         </span>
-                      ) : '-'}
+                      ) : (
+                        '-'
+                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       {rate.isDefault && (
@@ -173,10 +171,13 @@ export default function TaxRatesPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge className={rate.isActive
-                        ? 'bg-green-100 text-green-800 border-green-200'
-                        : 'bg-gray-100 text-gray-800 border-gray-200'
-                      }>
+                      <Badge
+                        className={
+                          rate.isActive
+                            ? 'bg-green-100 text-green-800 border-green-200'
+                            : 'bg-gray-100 text-gray-800 border-gray-200'
+                        }
+                      >
                         {rate.isActive ? 'Active' : 'Inactive'}
                       </Badge>
                     </TableCell>
@@ -187,6 +188,7 @@ export default function TaxRatesPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleEdit(rate)}
+                            aria-label="Edit tax rate"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -196,6 +198,7 @@ export default function TaxRatesPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDelete(rate)}
+                            aria-label="Delete tax rate"
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -214,17 +217,12 @@ export default function TaxRatesPage() {
       <Dialog open={formDialogOpen} onOpenChange={setFormDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {editingRate ? 'Edit Tax Rate' : 'New Tax Rate'}
-            </DialogTitle>
+            <DialogTitle>{editingRate ? 'Edit Tax Rate' : 'New Tax Rate'}</DialogTitle>
             <DialogDescription>
               {editingRate ? 'Update the tax rate details below.' : 'Create a new tax rate.'}
             </DialogDescription>
           </DialogHeader>
-          <TaxRateForm
-            taxRate={editingRate}
-            onSuccess={() => setFormDialogOpen(false)}
-          />
+          <TaxRateForm taxRate={editingRate} onSuccess={() => setFormDialogOpen(false)} />
         </DialogContent>
       </Dialog>
 
@@ -234,16 +232,13 @@ export default function TaxRatesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Tax Rate</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete tax rate &quot;{selectedRate?.name}&quot;?
-              This action cannot be undone.
+              Are you sure you want to delete tax rate &quot;{selectedRate?.name}&quot;? This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
