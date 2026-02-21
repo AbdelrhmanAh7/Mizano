@@ -1,43 +1,43 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import { useEffect } from 'react';
-import {
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  Wallet,
-  RefreshCw,
-  Receipt,
-  CreditCard,
-  AlertTriangle,
-  FolderKanban,
-  ExternalLink,
-} from 'lucide-react';
-import { useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { StatCard } from '@/components/dashboard/stat-card';
-import { RecentTransactions } from '@/components/dashboard/recent-transactions';
-import { DateRangePicker } from '@/components/dashboard/date-range-picker';
 import { AIBusinessPulse } from '@/components/dashboard/ai-business-pulse';
+import { DateRangePicker } from '@/components/dashboard/date-range-picker';
 import { EnhancedAIInsights } from '@/components/dashboard/enhanced-ai-insights';
+import { RecentTransactions } from '@/components/dashboard/recent-transactions';
+import { StatCard } from '@/components/dashboard/stat-card';
 import { WidgetCustomizer } from '@/components/dashboard/widget-customizer';
+import { AutoTourTrigger } from '@/components/tour/auto-tour-trigger';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Link } from '@/i18n/routing';
 import {
-  useDashboardStats,
-  useDashboardRevenue,
-  useDashboardCashFlow,
-  useDashboardExpenses,
-  useDashboardCustomers,
   useDashboardBanking,
+  useDashboardCashFlow,
+  useDashboardCustomers,
+  useDashboardExpenses,
   useDashboardInventory,
+  useDashboardRevenue,
+  useDashboardStats,
 } from '@/lib/hooks/use-dashboard';
 import { useDashboardFilters } from '@/lib/stores/use-dashboard-filters';
 import { useDashboardLayout } from '@/lib/stores/use-dashboard-layout';
 import { useQueryClient } from '@tanstack/react-query';
-import { AutoTourTrigger } from '@/components/tour/auto-tour-trigger';
-import { Link } from '@/i18n/routing';
+import {
+  AlertTriangle,
+  CreditCard,
+  DollarSign,
+  ExternalLink,
+  FolderKanban,
+  Receipt,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import dynamic from 'next/dynamic';
+import { useEffect } from 'react';
 
 // Lazy-load chart components — Recharts (~200KB) only loads when needed
 function ChartSkeleton() {

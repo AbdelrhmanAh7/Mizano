@@ -12,13 +12,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiConsumes,
-  ApiBody,
-} from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -32,27 +26,7 @@ import {
   OcrBatchTrainingDto,
   OcrVendorHistoryQueryDto,
 } from '../dto/ocr-training.dto';
-
-const FILE_FILTER = (req: any, file: Express.Multer.File, cb: any) => {
-  const allowedMimes = [
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'image/webp',
-    'image/tiff',
-    'application/pdf',
-  ];
-  if (allowedMimes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(
-      new BadRequestException(
-        'Invalid file type. Allowed: JPEG, PNG, GIF, WebP, TIFF, PDF',
-      ),
-      false,
-    );
-  }
-};
+import { createOcrFileFilter } from '../utils/file-upload.util';
 
 @ApiTags('AI - OCR Training')
 @ApiBearerAuth()
@@ -70,7 +44,7 @@ export class OcrTrainingController {
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: 15 * 1024 * 1024 },
-      fileFilter: FILE_FILTER,
+      fileFilter: createOcrFileFilter(),
     }),
   )
   @ApiOperation({ summary: 'Extract fields from an image for training (no bill created)' })
@@ -97,12 +71,7 @@ export class OcrTrainingController {
 
     const language = dto.language || 'eng+ara';
     const result = dto.vendorId
-      ? await this.ocrService.extractWithVendorHints(
-          orgId,
-          dto.vendorId,
-          file.buffer,
-          language,
-        )
+      ? await this.ocrService.extractWithVendorHints(orgId, dto.vendorId, file.buffer, language)
       : await this.ocrService.extractFromImage(file.buffer, language);
 
     return { data: result };
@@ -111,10 +80,7 @@ export class OcrTrainingController {
   @Post('submit')
   @Permissions('ai.manage')
   @ApiOperation({ summary: 'Submit corrections for OCR layout learning' })
-  async submitCorrections(
-    @CurrentOrg() orgId: string,
-    @Body() dto: OcrTrainingSubmitDto,
-  ) {
+  async submitCorrections(@CurrentOrg() orgId: string, @Body() dto: OcrTrainingSubmitDto) {
     // 1. Enhanced layout learning with context patterns
     await this.ocrService.learnLayoutEnhanced(
       orgId,
@@ -173,7 +139,7 @@ export class OcrTrainingController {
   @UseInterceptors(
     FilesInterceptor('files', 10, {
       limits: { fileSize: 15 * 1024 * 1024 },
-      fileFilter: FILE_FILTER,
+      fileFilter: createOcrFileFilter(),
     }),
   )
   @ApiOperation({ summary: 'Batch extract fields from multiple images' })
@@ -208,12 +174,7 @@ export class OcrTrainingController {
     for (const file of files) {
       try {
         const extraction = dto.vendorId
-          ? await this.ocrService.extractWithVendorHints(
-              orgId,
-              dto.vendorId,
-              file.buffer,
-              language,
-            )
+          ? await this.ocrService.extractWithVendorHints(orgId, dto.vendorId, file.buffer, language)
           : await this.ocrService.extractFromImage(file.buffer, language);
 
         results.push({
@@ -244,41 +205,40 @@ export class OcrTrainingController {
     const limit = query.limit || 20;
     const offset = query.offset || 0;
 
-    const [layout, vendor, feedbackRecords, trainingDataCount] =
-      await Promise.all([
-        this.prisma.vendorOcrLayout.findUnique({
-          where: {
-            organizationId_vendorId: { organizationId: orgId, vendorId },
-          },
-        }),
-        this.prisma.vendor.findFirst({
-          where: { id: vendorId, organizationId: orgId },
-          select: { id: true, displayName: true, name: true },
-        }),
-        this.prisma.aiFeedback.findMany({
-          where: {
-            organizationId: orgId,
-            feature: 'OCR_LAYOUT',
-            inputData: { path: ['vendorId'], equals: vendorId },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: limit,
-          skip: offset,
-          select: {
-            id: true,
-            createdAt: true,
-            aiSuggestion: true,
-            userAnswer: true,
-            userAction: true,
-          },
-        }),
-        this.prisma.aiTrainingData.count({
-          where: {
-            organizationId: orgId,
-            feature: 'OCR_LAYOUT',
-          },
-        }),
-      ]);
+    const [layout, vendor, feedbackRecords, trainingDataCount] = await Promise.all([
+      this.prisma.vendorOcrLayout.findUnique({
+        where: {
+          organizationId_vendorId: { organizationId: orgId, vendorId },
+        },
+      }),
+      this.prisma.vendor.findFirst({
+        where: { id: vendorId, organizationId: orgId },
+        select: { id: true, displayName: true, name: true },
+      }),
+      this.prisma.aiFeedback.findMany({
+        where: {
+          organizationId: orgId,
+          feature: 'OCR_LAYOUT',
+          inputData: { path: ['vendorId'], equals: vendorId },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+        select: {
+          id: true,
+          createdAt: true,
+          aiSuggestion: true,
+          userAnswer: true,
+          userAction: true,
+        },
+      }),
+      this.prisma.aiTrainingData.count({
+        where: {
+          organizationId: orgId,
+          feature: 'OCR_LAYOUT',
+        },
+      }),
+    ]);
 
     return {
       data: {
@@ -324,8 +284,7 @@ export class OcrTrainingController {
     const totalLayouts = layouts.length;
     const activeLayouts = layouts.filter((l) => l.sampleCount >= 3).length;
     const totalSamples = layouts.reduce((sum, l) => sum + l.sampleCount, 0);
-    const avgSampleCount =
-      totalLayouts > 0 ? Math.round(totalSamples / totalLayouts) : 0;
+    const avgSampleCount = totalLayouts > 0 ? Math.round(totalSamples / totalLayouts) : 0;
 
     return {
       data: {

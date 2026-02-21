@@ -4,8 +4,8 @@
  * "Missing Description" warnings.
  */
 
-import React from 'react';
 import { render, screen } from '@testing-library/react';
+import React from 'react';
 
 // Mock cmdk with sub-components
 jest.mock('cmdk', () => {
@@ -52,21 +52,19 @@ jest.mock(
 import { CommandDialog } from './command';
 
 describe('CommandDialog', () => {
-  it('renders with aria-describedby={undefined} to suppress Radix warning', () => {
+  it('renders with aria-describedby pointing to the description element', () => {
     render(
       <CommandDialog open={true} onOpenChange={() => {}}>
         <div>Test content</div>
       </CommandDialog>,
     );
 
-    // The DialogContent renders via a portal, so we need to look in the document body
     const dialogContent = document.querySelector('[role="dialog"]');
     expect(dialogContent).toBeTruthy();
 
-    // aria-describedby should not be set (undefined suppresses the Radix UI warning)
-    // When aria-describedby={undefined} is passed, the attribute is either absent or explicitly undefined
+    // aria-describedby should be set (pointing to the DialogDescription element)
     const describedBy = dialogContent?.getAttribute('aria-describedby');
-    expect(describedBy).toBeNull();
+    expect(describedBy).toBeTruthy();
   });
 
   it('renders with a screen-reader-only title for accessibility', () => {
@@ -82,15 +80,16 @@ describe('CommandDialog', () => {
     expect(title.className).toContain('sr-only');
   });
 
-  it('does not render a DialogDescription element', () => {
+  it('renders a visually-hidden DialogDescription for accessibility', () => {
     render(
       <CommandDialog open={true} onOpenChange={() => {}}>
         <div>Test content</div>
       </CommandDialog>,
     );
 
-    // "Search commands" text should NOT be in the document (removed in favor of aria-describedby={undefined})
-    expect(screen.queryByText('Search commands')).not.toBeInTheDocument();
+    const description = screen.getByText('Search and execute commands');
+    expect(description).toBeInTheDocument();
+    expect(description.className).toContain('sr-only');
   });
 
   it('renders children inside the dialog', () => {

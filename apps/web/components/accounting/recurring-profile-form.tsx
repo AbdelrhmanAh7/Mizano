@@ -1,14 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Plus, Trash2, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -16,11 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
 import { Account, flattenAccountsTree } from '@/lib/hooks/use-accounts';
-import { RecurringProfile, RecurringFrequency } from '@/lib/hooks/use-recurring-profiles';
 import { calculateJournalTotals, formatJournalAmount } from '@/lib/hooks/use-journals';
+import { RecurringFrequency, RecurringProfile } from '@/lib/hooks/use-recurring-profiles';
+import { cn } from '@/lib/utils';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Check, Plus, Trash2, X } from 'lucide-react';
+import { useEffect } from 'react';
+import { useFieldArray, useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 const profileLineSchema = z.object({
   accountId: z.string().min(1, 'Account is required'),

@@ -3,6 +3,10 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import * as Tesseract from 'tesseract.js';
 import * as sharp from 'sharp';
+import { execFile } from 'child_process';
+import { promises as fsPromises } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { levenshteinSimilarity } from '../utils/text-similarity.util';
 import { PaddleOcrService } from './paddle-ocr.service';
 
@@ -77,6 +81,15 @@ export class OcrService {
     /\bGroup\b/i,
     /\bTrading\b/i,
     /\bEnterprises?\b/i,
+    // Arabic company suffixes
+    /ذ\.?م\.?م/, // ذ.م.م (LLC)
+    /ش\.?م\.?م/, // ش.م.م (Joint-stock)
+    /مؤسسة/, // مؤسسة (Establishment)
+    /شركة/, // شركة (Company)
+    /للتجارة/, // للتجارة (Trading)
+    /للتكنولوجيا/, // للتكنولوجيا (Technology)
+    /للمقاولات/, // للمقاولات (Contracting)
+    /للخدمات/, // للخدمات (Services)
   ];
 
   // Labels that precede vendor names
@@ -100,27 +113,115 @@ export class OcrService {
     private paddleOcrService: PaddleOcrService,
   ) {}
 
+  // ─── HEIC Conversion ───────────────────────────────────────────────
+
+  /**
+   * Convert HEIC/HEIF image to JPEG buffer using macOS sips (fallback).
+   * Sharp's libvips may not have libheif codec compiled in.
+   */
+  private async convertHeicToJpeg(imageBuffer: Buffer): Promise<Buffer> {
+    // First try sharp (works if libheif codec is available)
+    try {
+      return await sharp(imageBuffer).jpeg({ quality: 95 }).toBuffer();
+    } catch {
+      // Fallback: use macOS sips command
+      this.logger.debug('Sharp cannot decode HEIC, falling back to macOS sips');
+    }
+
+    const tmpIn = join(tmpdir(), `ocr-heic-${Date.now()}.heic`);
+    const tmpOut = join(tmpdir(), `ocr-heic-${Date.now()}.jpg`);
+
+    try {
+      await fsPromises.writeFile(tmpIn, imageBuffer);
+      await new Promise<void>((resolve, reject) => {
+        execFile('sips', ['-s', 'format', 'jpeg', tmpIn, '--out', tmpOut], (err) => {
+          if (err) reject(new Error(`sips conversion failed: ${err.message}`));
+          else resolve();
+        });
+      });
+      return await fsPromises.readFile(tmpOut);
+    } finally {
+      await fsPromises.unlink(tmpIn).catch(() => {});
+      await fsPromises.unlink(tmpOut).catch(() => {});
+    }
+  }
+
+  /**
+   * Detect if a buffer is HEIC/HEIF format by checking magic bytes.
+   */
+  private isHeicFormat(buffer: Buffer): boolean {
+    // HEIF/HEIC files have 'ftyp' at offset 4 and 'heic'/'heix'/'hevc'/'mif1' after
+    if (buffer.length < 12) return false;
+    const ftyp = buffer.toString('ascii', 4, 8);
+    if (ftyp !== 'ftyp') return false;
+    const brand = buffer.toString('ascii', 8, 12);
+    return ['heic', 'heix', 'hevc', 'mif1'].includes(brand);
+  }
+
+  /**
+   * Ensure image buffer is in a format sharp can process (convert HEIC if needed).
+   * Also applies EXIF auto-rotation for phone photos.
+   */
+  private async ensureProcessableImage(imageBuffer: Buffer): Promise<Buffer> {
+    let buf = imageBuffer;
+
+    // Convert HEIC to JPEG if needed
+    if (this.isHeicFormat(buf)) {
+      this.logger.debug('HEIC format detected, converting to JPEG');
+      buf = await this.convertHeicToJpeg(buf);
+    }
+
+    // Auto-rotate based on EXIF orientation (critical for phone photos)
+    buf = await sharp(buf).rotate().toBuffer();
+
+    return buf;
+  }
+
   // ─── Image Preprocessing ───────────────────────────────────────────
+
+  /**
+   * Detect if text is primarily Arabic script.
+   */
+  private isArabicText(text: string): boolean {
+    const arabicChars = (text.match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/g) || []).length;
+    const latinChars = (text.match(/[a-zA-Z]/g) || []).length;
+    return arabicChars > latinChars;
+  }
 
   /**
    * Preprocess image to maximize OCR accuracy.
    * Pipeline: grayscale -> normalize contrast -> noise reduction -> sharpen -> resize -> binarize
    */
-  private async preprocessImage(imageBuffer: Buffer): Promise<Buffer> {
+  private async preprocessImage(
+    imageBuffer: Buffer,
+    options?: { arabicMode?: boolean; threshold?: number },
+  ): Promise<Buffer> {
     const metadata = await sharp(imageBuffer).metadata();
     const width = metadata.width || 0;
+    const arabicMode = options?.arabicMode ?? false;
+    const thresholdValue = options?.threshold ?? (arabicMode ? 120 : 140);
 
-    let pipeline = sharp(imageBuffer).grayscale().normalize().median(3).sharpen({ sigma: 1.0 });
+    let pipeline = sharp(imageBuffer).grayscale().normalize();
+
+    // Arabic text: skip median filter (blurs thin Arabic strokes)
+    if (!arabicMode) {
+      pipeline = pipeline.median(3);
+    }
+
+    pipeline = pipeline.sharpen({ sigma: arabicMode ? 0.8 : 1.0 });
 
     // Upscale small images (Tesseract works best at ~300 DPI / 2000-3000px wide)
+    // Arabic needs larger target for fine detail
+    const targetWidth = arabicMode ? 3000 : 2000;
     if (width > 0 && width < 1500) {
-      pipeline = pipeline.resize({ width: 2000, withoutEnlargement: false });
+      pipeline = pipeline.resize({ width: targetWidth, withoutEnlargement: false });
     } else if (width > 4000) {
       pipeline = pipeline.resize({ width: 3000 });
     }
 
     // Binarize: pure black & white. Most impactful step for OCR.
-    pipeline = pipeline.threshold(140);
+    // Arabic needs lower threshold to preserve diacritics
+    pipeline = pipeline.threshold(thresholdValue);
 
     return pipeline.png().toBuffer();
   }
@@ -128,11 +229,23 @@ export class OcrService {
   /**
    * More aggressive preprocessing for retry passes on difficult images.
    */
-  private async preprocessImageAggressive(imageBuffer: Buffer): Promise<Buffer> {
+  private async preprocessImageAggressive(
+    imageBuffer: Buffer,
+    options?: { arabicMode?: boolean },
+  ): Promise<Buffer> {
     const metadata = await sharp(imageBuffer).metadata();
     const width = metadata.width || 0;
+    const arabicMode = options?.arabicMode ?? false;
 
-    let pipeline = sharp(imageBuffer).grayscale().normalize().median(5).sharpen({ sigma: 1.5 });
+    let pipeline = sharp(imageBuffer).grayscale().normalize();
+
+    if (!arabicMode) {
+      pipeline = pipeline.median(5);
+    } else {
+      pipeline = pipeline.median(1);
+    }
+
+    pipeline = pipeline.sharpen({ sigma: 1.5 });
 
     if (width > 0 && width < 1500) {
       pipeline = pipeline.resize({ width: 2500, withoutEnlargement: false });
@@ -141,9 +254,122 @@ export class OcrService {
     }
 
     // Lower threshold: more text survives binarization (better for faded documents)
-    pipeline = pipeline.threshold(110);
+    pipeline = pipeline.threshold(arabicMode ? 100 : 110);
 
     return pipeline.png().toBuffer();
+  }
+
+  // ─── OCR Text Normalization ─────────────────────────────────────────
+
+  /**
+   * Normalize OCR text to fix common recognition errors.
+   * Applied between raw OCR output and field extraction.
+   */
+  private normalizeOcrText(text: string): string {
+    let normalized = text;
+
+    // Remove stray Unicode directional marks that confuse regex
+    normalized = normalized.replace(
+      /[\u200E\u200F\u200B\u200C\u200D\u202A-\u202E\u2066-\u2069\uFEFF]/g,
+      '',
+    );
+
+    // Normalize Arabic numerals to Western
+    const arabicNumerals: Record<string, string> = {
+      '\u0660': '0',
+      '\u0661': '1',
+      '\u0662': '2',
+      '\u0663': '3',
+      '\u0664': '4',
+      '\u0665': '5',
+      '\u0666': '6',
+      '\u0667': '7',
+      '\u0668': '8',
+      '\u0669': '9',
+    };
+    for (const [arabic, western] of Object.entries(arabicNumerals)) {
+      normalized = normalized.replace(new RegExp(arabic, 'g'), western);
+    }
+
+    // Fix OCR letter→digit confusion in numeric contexts (amounts, totals, etc.)
+    // General O→0 replacement in number-like contexts: replace O with 0 when surrounded by digits/commas
+    // e.g., "6,6OO.OO" → "6,600.00", "5,5OO.OO" → "5,500.00", "4,OOO.OO" → "4,000.00"
+    normalized = normalized.replace(/(\d[\d,]*(?:[O0][\d,O]*)*)\.((?:[O0]){2})/g, (match) =>
+      match.replace(/O/g, '0'),
+    );
+    // Also handle O mixed with digits before decimal: "6,6OO" → "6,600"
+    normalized = normalized.replace(/(\d,[\dO]{3})/g, (match) => match.replace(/O/g, '0'));
+    // Fix O→0 within amount-like contexts: digit followed by O in number patterns
+    normalized = normalized.replace(/(\d[\d,]*)[oO]([\d,]*\.\d{2})/g, '$10$2');
+    // Fix `l` or `I` as `1` in amounts: l,500.00 → 1,500.00
+    normalized = normalized.replace(/(?<![a-zA-Z])[lI]([\d,]+\.\d{2})/g, '1$1');
+
+    // Fix garbled "INVOICE" variants
+    normalized = normalized.replace(/lNV[O0]lCE/gi, 'INVOICE');
+    normalized = normalized.replace(/1NV[O0]1CE/gi, 'INVOICE');
+    normalized = normalized.replace(/lNVOICE/gi, 'INVOICE');
+    normalized = normalized.replace(/INV0ICE/gi, 'INVOICE');
+
+    // Fix garbled "TOTAL" variants
+    normalized = normalized.replace(/T[O0]TAL/gi, 'TOTAL');
+    normalized = normalized.replace(/TOTA[l1]/gi, 'TOTAL');
+    normalized = normalized.replace(/T0TA1/gi, 'TOTAL');
+
+    // Fix OCR garbling of / as | or \ in dates
+    normalized = normalized.replace(/(\d{1,2})[|\\](\d{1,2})[|\\](\d{2,4})/g, '$1/$2/$3');
+
+    // Fix split words (common in OCR): rejoin words broken by single space in middle
+    // e.g., "Consult ing" → "Consulting", "Desc ription" → "Description"
+    normalized = normalized.replace(/\b([A-Z][a-z]{2,})\s([a-z]{2,})\b/g, (match, p1, p2) => {
+      const combined = p1 + p2;
+      // Only rejoin if the combined word is commonly known
+      const commonWords = [
+        'consulting',
+        'description',
+        'services',
+        'software',
+        'development',
+        'maintenance',
+        'shipping',
+        'delivery',
+        'handling',
+        'processing',
+        'certificate',
+        'subscription',
+        'installation',
+        'international',
+        'management',
+        'engineering',
+        'construction',
+        'transportation',
+      ];
+      if (commonWords.includes(combined.toLowerCase())) {
+        return combined;
+      }
+      return match;
+    });
+
+    // Arabic comma as decimal separator: ،  (U+060C)
+    normalized = normalized.replace(/(\d)\u060C(\d{2})\b/g, '$1.$2');
+
+    // Fix space-as-decimal in amount contexts (e.g., "24 95" → "24.95")
+    // Only apply on lines that contain total/tax/vat/amount/subtotal keywords
+    normalized = normalized
+      .split('\n')
+      .map((line) => {
+        if (/total|tax|vat|amount|subtotal|aed|sar|usd|eur/i.test(line)) {
+          // Replace space-as-decimal but NOT when preceded by a decimal point
+          // e.g., "24 95" → "24.95" but "499.00 24" should NOT become "499.00.24"
+          return line.replace(/(?<!\.\d*)(?<=\s|^)(\d{1,6}) (\d{2})(?=\s|$)/g, '$1.$2');
+        }
+        return line;
+      })
+      .join('\n');
+
+    // Collapse multiple spaces
+    normalized = normalized.replace(/ {2,}/g, ' ');
+
+    return normalized;
   }
 
   // ─── OCR Engine ────────────────────────────────────────────────────
@@ -186,6 +412,7 @@ export class OcrService {
   /**
    * Extract data from an invoice image using hybrid OCR approach.
    * Strategy: Try Tesseract.js first (fast), fall back to PaddleOCR (accurate) if needed.
+   * Handles HEIC/HEIF format conversion and EXIF auto-rotation.
    */
   async extractFromImage(
     imageBuffer: Buffer,
@@ -194,6 +421,9 @@ export class OcrService {
     this.logger.log('Starting OCR extraction with hybrid Tesseract → PaddleOCR pipeline');
 
     try {
+      // ─── Phase 0: Ensure processable format (HEIC→JPEG, EXIF rotate) ─
+      const processableBuffer = await this.ensureProcessableImage(imageBuffer);
+
       // ─── Phase 1: Fast Tesseract.js Passes ─────────────────────────
 
       interface OcrAttempt {
@@ -203,15 +433,19 @@ export class OcrService {
       }
 
       const attempts: OcrAttempt[] = [];
+      let detectedArabic = false;
 
-      // Pass 1: Preprocessed image + PSM SINGLE_BLOCK (best for structured invoices)
+      // Pass 1: Standard preprocessed image + PSM SINGLE_BLOCK
       try {
-        const preprocessed = await this.preprocessImage(imageBuffer);
+        const preprocessed = await this.preprocessImage(processableBuffer);
         const result = await this.performOcr(preprocessed, language, Tesseract.PSM.SINGLE_BLOCK);
         this.logger.log(
           `[Tesseract] Pass 1 (preprocessed+PSM6): confidence=${result.confidence.toFixed(1)}%`,
         );
         attempts.push({ ...result, label: 'Tesseract:preprocessed+PSM6' });
+
+        // Detect if content is primarily Arabic for subsequent passes
+        detectedArabic = this.isArabicText(result.text);
 
         if (result.confidence >= 85) {
           this.logger.log(`✓ High confidence result from Tesseract, using it directly`);
@@ -221,9 +455,37 @@ export class OcrService {
         this.logger.warn(`[Tesseract] Pass 1 failed: ${error}`);
       }
 
+      // Pass 1b: If Arabic detected, try Arabic-optimized preprocessing
+      if (detectedArabic) {
+        try {
+          const arabicPreprocessed = await this.preprocessImage(processableBuffer, {
+            arabicMode: true,
+          });
+          const result = await this.performOcr(
+            arabicPreprocessed,
+            language,
+            Tesseract.PSM.SINGLE_BLOCK,
+          );
+          this.logger.log(
+            `[Tesseract] Pass 1b (arabic+PSM6): confidence=${result.confidence.toFixed(1)}%`,
+          );
+          attempts.push({ ...result, label: 'Tesseract:arabic+PSM6' });
+
+          if (result.confidence >= 85) {
+            this.logger.log(`✓ High confidence Arabic-optimized result`);
+            const normalized = this.normalizeOcrText(result.text);
+            return this.buildExtractionResult(normalized, result.confidence);
+          }
+        } catch (error) {
+          this.logger.warn(`[Tesseract] Pass 1b (arabic) failed: ${error}`);
+        }
+      }
+
       // Pass 2: Preprocessed image + PSM SINGLE_COLUMN
       try {
-        const preprocessed = await this.preprocessImage(imageBuffer);
+        const preprocessed = await this.preprocessImage(processableBuffer, {
+          arabicMode: detectedArabic,
+        });
         const result = await this.performOcr(preprocessed, language, Tesseract.PSM.SINGLE_COLUMN);
         this.logger.log(
           `[Tesseract] Pass 2 (preprocessed+PSM4): confidence=${result.confidence.toFixed(1)}%`,
@@ -253,7 +515,10 @@ export class OcrService {
 
         try {
           const paddleLanguage = language.includes('ara') ? 'arabic' : 'en';
-          const paddleResult = await this.paddleOcrService.extractText(imageBuffer, paddleLanguage);
+          const paddleResult = await this.paddleOcrService.extractText(
+            processableBuffer,
+            paddleLanguage,
+          );
 
           const paddleConfidencePercent = paddleResult.confidence * 100;
           this.logger.log(
@@ -284,7 +549,9 @@ export class OcrService {
       if (!bestTesseract || bestTesseract.confidence < 70) {
         // Pass 3: Aggressive preprocessing + PSM AUTO
         try {
-          const aggressivePreprocessed = await this.preprocessImageAggressive(imageBuffer);
+          const aggressivePreprocessed = await this.preprocessImageAggressive(processableBuffer, {
+            arabicMode: detectedArabic,
+          });
           const result = await this.performOcr(
             aggressivePreprocessed,
             language,
@@ -300,13 +567,39 @@ export class OcrService {
 
         // Pass 4: Original image (no preprocessing) + PSM AUTO (fallback)
         try {
-          const result = await this.performOcr(imageBuffer, language, Tesseract.PSM.AUTO);
+          const result = await this.performOcr(processableBuffer, language, Tesseract.PSM.AUTO);
           this.logger.log(
             `[Tesseract] Pass 4 (original+PSM3): confidence=${result.confidence.toFixed(1)}%`,
           );
           attempts.push({ ...result, label: 'Tesseract:original+PSM3' });
         } catch (error) {
           this.logger.warn(`[Tesseract] Pass 4 failed: ${error}`);
+        }
+
+        // Pass 5: Try different thresholds if Arabic mode
+        if (detectedArabic) {
+          for (const threshold of [100, 160]) {
+            try {
+              const threshPreprocessed = await this.preprocessImage(processableBuffer, {
+                arabicMode: true,
+                threshold,
+              });
+              const result = await this.performOcr(
+                threshPreprocessed,
+                language,
+                Tesseract.PSM.SINGLE_BLOCK,
+              );
+              this.logger.log(
+                `[Tesseract] Pass 5 (arabic-thresh${threshold}+PSM6): confidence=${result.confidence.toFixed(1)}%`,
+              );
+              attempts.push({
+                ...result,
+                label: `Tesseract:arabic-thresh${threshold}+PSM6`,
+              });
+            } catch (error) {
+              this.logger.warn(`[Tesseract] Pass 5 (threshold=${threshold}) failed: ${error}`);
+            }
+          }
         }
       }
 
@@ -334,31 +627,33 @@ export class OcrService {
    */
   buildExtractionResult(rawText: string, ocrConfidencePercent: number): ExtractedInvoiceData {
     const ocrConfidence = ocrConfidencePercent / 100;
-    const lines = rawText.split('\n').filter((l) => l.trim());
+    // Normalize OCR text before field extraction
+    const normalizedText = this.normalizeOcrText(rawText);
+    const lines = normalizedText.split('\n').filter((l) => l.trim());
     const fieldConfidence: Record<string, number> = {};
 
-    const date = this.extractDate(rawText);
+    const date = this.extractDate(normalizedText);
     fieldConfidence['date'] = date ? 0.8 : 0;
 
-    const dueDate = this.extractDueDate(rawText, date);
+    const dueDate = this.extractDueDate(normalizedText, date);
     fieldConfidence['dueDate'] = dueDate ? 0.8 : 0;
 
-    const paymentTerms = this.extractPaymentTerms(rawText);
+    const paymentTerms = this.extractPaymentTerms(normalizedText);
     fieldConfidence['paymentTerms'] = paymentTerms ? 0.85 : 0;
 
-    const currency = this.extractCurrency(rawText);
+    const currency = this.extractCurrency(normalizedText);
     fieldConfidence['currency'] = currency ? 0.9 : 0;
 
-    const total = this.extractTotal(rawText);
+    const total = this.extractTotal(normalizedText);
     fieldConfidence['total'] = total !== null ? 0.85 : 0;
 
-    const subtotal = this.extractSubtotal(rawText);
+    const subtotal = this.extractSubtotal(normalizedText);
     fieldConfidence['subtotal'] = subtotal !== null ? 0.75 : 0;
 
-    const tax = this.extractTax(rawText);
+    const tax = this.extractTax(normalizedText);
     fieldConfidence['tax'] = tax !== null ? 0.7 : 0;
 
-    const invoiceNumber = this.extractInvoiceNumber(rawText);
+    const invoiceNumber = this.extractInvoiceNumber(normalizedText);
     fieldConfidence['invoiceNumber'] = invoiceNumber ? 0.9 : 0;
 
     const vendorName = this.extractVendorName(lines);
@@ -407,6 +702,9 @@ export class OcrService {
       /(?:invoice\s*date|date\s*of\s*issue|bill\s*date)[\s:]+(\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/i,
       /(?:invoice\s*date|date\s*of\s*issue|bill\s*date)[\s:]+((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2},?\s+\d{4})/i,
       /(?:تاريخ\s*الفاتورة|التاريخ)[\s:]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i,
+      /(?:تاريخ\s*الفاتورة|التاريخ)[\s:]+(\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/i,
+      // Arabic date label: تاريخ followed by a date (common in Saudi invoices)
+      /تاريخ[\s:]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/,
     ];
 
     for (const pattern of labeledPatterns) {
@@ -438,6 +736,8 @@ export class OcrService {
       /(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})/i,
       /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{1,2}),?\s+(\d{4})/i,
       /(\d{1,2})[\/\-](Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\/\-](\d{4})/i,
+      // Spaced date: DD MM YYYY (e.g., "03 12 2025" from garbled OCR)
+      /\b(\d{1,2})\s+(\d{1,2})\s+(\d{4})\b/,
     ];
 
     for (const pattern of genericPatterns) {
@@ -543,8 +843,8 @@ export class OcrService {
       USD: /\bUSD\b|\bUS\$/gi,
       EUR: /\bEUR\b/gi,
       GBP: /\bGBP\b/gi,
-      SAR: /\bSAR\b/gi,
-      AED: /\bAED\b/gi,
+      SAR: /\bSAR\b|\bSR\b/gi,
+      AED: /\bAED\b|\bAED(?=\d)/gi,
       EGP: /\bEGP\b/gi,
       QAR: /\bQAR\b/gi,
       BHD: /\bBHD\b/gi,
@@ -570,6 +870,32 @@ export class OcrService {
       if (count > 0) {
         counts[code] = (counts[code] || 0) + count;
       }
+    }
+
+    // Arabic currency name detection
+    const arabicCurrencyMap: Record<string, RegExp> = {
+      SAR: /ريال|سعودي/gi,
+      AED: /درهم|إماراتي/gi,
+      EGP: /جنيه|مصري/gi,
+      KWD: /دينار\s*كويتي/gi,
+      BHD: /دينار\s*بحريني/gi,
+      QAR: /ريال\s*قطري/gi,
+      OMR: /ريال\s*عماني/gi,
+    };
+
+    for (const [code, pattern] of Object.entries(arabicCurrencyMap)) {
+      const count = (text.match(pattern) || []).length;
+      if (count > 0) {
+        counts[code] = (counts[code] || 0) + count;
+      }
+    }
+
+    // Contextual detection: known bank names imply currency
+    if (/\bRAK\s*BANK\b|\bRAKBANK\b/i.test(text)) {
+      counts['AED'] = (counts['AED'] || 0) + 5; // Strong signal
+    }
+    if (/\bالراجحي\b|\bالأهلي\b|\bSABB\b|\bAlRajhi\b/i.test(text)) {
+      counts['SAR'] = (counts['SAR'] || 0) + 5;
     }
 
     // Return the most frequent currency
@@ -631,20 +957,20 @@ export class OcrService {
       dec: '12',
     };
 
+    // Try YYYY/MM/DD format first (more specific, avoids misinterpreting as DD/MM/YY)
+    let match = dateStr.match(/(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
+    if (match) {
+      const [, year, month, day] = match;
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
     // Try DD/MM/YYYY format
-    let match = dateStr.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+    match = dateStr.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
     if (match) {
       let [, day, month, year] = match;
       if (year.length === 2) {
         year = (parseInt(year, 10) > 50 ? '19' : '20') + year;
       }
-      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    }
-
-    // Try YYYY/MM/DD format
-    match = dateStr.match(/(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
-    if (match) {
-      const [, year, month, day] = match;
       return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     }
 
@@ -668,6 +994,13 @@ export class OcrService {
       return `${year}-${month}-${day.padStart(2, '0')}`;
     }
 
+    // Try DD MM YYYY (space-separated, from garbled OCR)
+    match = dateStr.match(/(\d{1,2})\s+(\d{1,2})\s+(\d{4})/);
+    if (match) {
+      const [, day, month, year] = match;
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
     throw new Error('Could not parse date');
   }
 
@@ -677,11 +1010,20 @@ export class OcrService {
   private extractTotal(text: string): number | null {
     // Strategy 1: Labeled total patterns (highest priority)
     const totalPatterns = [
-      /grand\s*total[\s:$€£¥]*?(\d[\d,]*\.?\d*)/i,
+      /grand\s*total(?:\s*\([^)]*\))?[\s:$€£¥]*(\d[\d,]*\.?\d*)/i,
       /(?:total|amount|balance)\s*(?:due|payable|outstanding)[\s:$€£¥]*?(\d[\d,]*\.?\d*)/i,
       /total\s*amount[\s:$€£¥]*?(\d[\d,]*\.?\d*)/i,
       /net\s*(?:amount|total)[\s:$€£¥]*?(\d[\d,]*\.?\d*)/i,
+      /total\s*\(?aed\)?[\s:]*(\d[\d,]*\.?\d*)/i,
+      /total\s*\(?sar\)?[\s:]*(\d[\d,]*\.?\d*)/i,
       /(?:المبلغ\s*الإجمالي|المجموع\s*الكلي|الإجمالي|المجموع)[\s:]*(\d[\d,]*\.?\d*)/i,
+      /(?:الاجمالي\s*النهائي|الاجمالي\s*\(?شامل|الإجمالي\s*\(?شامل)[\s:)]*(\d[\d,]*\.?\d*)/i,
+      /(?:الاجمالي)[\s:]*(\d[\d,]*\.?\d*)/i,
+      /(?:المبلغ\s*المستحق|صافي\s*الفاتورة)[\s:]*(\d[\d,]*\.?\d*)/i,
+      /total\s*amt\s*inclusive[\s\w]*[\s:]*(\d[\d,]*\.?\d*)/i,
+      /net\s*amt\s*to\s*pay[\s:]*(\d[\d,]*\.?\d*)/i,
+      // Garbled OCR variants (must NOT match sub-total)
+      /(?:^|[^b])(?:t[o0]tal|tota[l1])\s+amount[\s:$€£¥]*?(\d[\d,]*\.?\d*)/im,
     ];
 
     for (const pattern of totalPatterns) {
@@ -701,12 +1043,47 @@ export class OcrService {
     for (const line of lines) {
       // Must contain "total" but NOT "subtotal"
       if (/total/i.test(line) && !/sub.?total/i.test(line)) {
-        const amounts = line.match(/(\d[\d,]*\.\d{2})/g);
-        if (amounts && amounts.length > 0) {
-          // Take the last amount on the line (invoices list subtotal first, then total)
-          const lastAmount = this.parseAmount(amounts[amounts.length - 1]);
-          if (lastAmount > 0 && lastAmount < 100_000_000) {
-            lastTotalAmount = lastAmount;
+        // Collect all amounts: explicit decimals AND decimal-inferred
+        const candidateAmounts: number[] = [];
+
+        // Amounts with explicit decimal point
+        const decimalAmounts = line.match(/(\d[\d,]*\.\d{2})/g);
+        if (decimalAmounts) {
+          for (const a of decimalAmounts) {
+            const val = this.parseAmount(a);
+            if (val > 0 && val < 100_000_000) candidateAmounts.push(val);
+          }
+        }
+
+        // Also check for decimal-less numbers and infer decimal from context
+        const hasDecimalAmounts = decimalAmounts && decimalAmounts.length > 0;
+        if (hasDecimalAmounts) {
+          const rawNumbers = line.match(/\b(\d{4,})\b/g);
+          if (rawNumbers) {
+            for (const raw of rawNumbers) {
+              // Skip if this number is already captured as a decimal amount
+              if (decimalAmounts?.some((d) => d.replace(/[.,]/g, '').includes(raw))) continue;
+              const inferred = this.inferDecimalFromContext(raw, line);
+              if (inferred > 0 && inferred < 100_000_000) {
+                candidateAmounts.push(inferred);
+              }
+            }
+          }
+        } else {
+          // No decimal amounts on line at all — try raw numbers
+          const rawNumbers = line.match(/\b(\d{3,})\b/g);
+          if (rawNumbers) {
+            for (const raw of rawNumbers) {
+              candidateAmounts.push(parseFloat(raw.replace(/,/g, '')));
+            }
+          }
+        }
+
+        // Pick the largest candidate as the total
+        if (candidateAmounts.length > 0) {
+          const maxAmount = Math.max(...candidateAmounts);
+          if (maxAmount > 0 && maxAmount < 100_000_000) {
+            lastTotalAmount = maxAmount;
           }
         }
       }
@@ -723,6 +1100,16 @@ export class OcrService {
       return subtotal + tax;
     }
 
+    // Strategy 4: For minimal/receipt-like text (<10 non-empty lines),
+    // find a triplet where a = b + c (total = subtotal + tax)
+    const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
+    if (nonEmptyLines.length < 10) {
+      const tripletTotal = this.extractTotalFromTriplet(text);
+      if (tripletTotal !== null) {
+        return tripletTotal;
+      }
+    }
+
     return null;
   }
 
@@ -735,6 +1122,13 @@ export class OcrService {
       /amount\s*(?:before\s*(?:tax|vat))[\s:$€£¥]*(\d[\d,]*\.?\d*)/i,
       /taxable\s*amount[\s:$€£¥]*(\d[\d,]*\.?\d*)/i,
       /المبلغ\s*(?:قبل\s*الضريبة|الخاضع)[\s:]*(\d[\d,]*\.?\d*)/i,
+      /المجموع\s*(?:الفرعي|قبل\s*الضريبة)[\s:]*(\d[\d,]*\.?\d*)/i,
+      /(?:الاجمالي|الإجمالي)\s*(?:قبل\s*الضريبة|الفرعي|المستحق)[\s:]*(\d[\d,]*\.?\d*)/i,
+      /total\s*(?:before|without|excl\.?|subject\s*to)\s*(?:tax|vat)[\s:]*(\d[\d,]*\.?\d*)/i,
+      /total\s*(?:w\/o|wo)\s*vat[\s:]*(\d[\d,]*\.?\d*)/i,
+      /total\s*amount\s*\(?pre[\s-]*tax\)?[\s:]*(\d[\d,]*\.?\d*)/i,
+      /net\s*amount[\s:]*(\d[\d,]*\.?\d*)/i,
+      /gross\s*amt[\s:]*(\d[\d,]*\.?\d*)/i,
     ];
 
     for (const pattern of patterns) {
@@ -745,6 +1139,32 @@ export class OcrService {
       }
     }
 
+    // Strategy 2: On "Total" summary lines with 2+ amounts, the first is often subtotal
+    // E.g., "Total  499.00  24.95  523.95" → subtotal=499.00
+    // Or:   "Total  499.00  24.95  52395" (decimal-less total) → subtotal=499.00
+    const lines = text.split('\n');
+    for (const line of lines) {
+      if (/^total\b/i.test(line.trim()) && !/sub.?total/i.test(line)) {
+        const amounts = line.match(/(\d[\d,]*\.\d{2})/g);
+        if (amounts && amounts.length >= 2) {
+          const first = this.parseAmount(amounts[0]);
+          const second = this.parseAmount(amounts[1]);
+          // First is subtotal if it's larger than second (second is tax)
+          // and first + second makes a reasonable total
+          if (first > 0 && first > second && first + second > 0) {
+            return first;
+          }
+        }
+      }
+    }
+
+    // Fallback: triplet detection for minimal invoices
+    const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
+    if (nonEmptyLines.length < 10) {
+      const tripletSubtotal = this.extractSubtotalFromTriplet(text);
+      if (tripletSubtotal !== null) return tripletSubtotal;
+    }
+
     return null;
   }
 
@@ -752,22 +1172,67 @@ export class OcrService {
    * Extract tax amount from text.
    */
   private extractTax(text: string): number | null {
-    const patterns = [
-      /vat\s*(?:amount)?[\s:$€£¥]*(\d[\d,]*\.?\d*)/i,
-      /(?:vat|tax)\s*\(?\s*\d+\.?\d*\s*%\s*\)?\s*[:$€£¥]*\s*(\d[\d,]*\.?\d*)/i,
-      /tax\s*(?:amount)?[\s:$€£¥]*(\d[\d,]*\.?\d*)/i,
-      /gst[\s:$€£¥]*(\d[\d,]*\.?\d*)/i,
-      /hst[\s:$€£¥]*(\d[\d,]*\.?\d*)/i,
-      /ضريبة\s*القيمة\s*المضافة[\s:]*(\d[\d,]*\.?\d*)/i,
-      /ضريبة[\s:]*(\d[\d,]*\.?\d*)/i,
-    ];
+    // Use line-level matching to avoid crossing line boundaries
+    const lines = text.split('\n');
 
-    for (const pattern of patterns) {
-      const match = text.match(pattern);
-      if (match) {
-        const amount = this.parseAmount(match[1]);
-        if (amount > 0 && amount < 10_000_000) return amount;
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      // Skip header-only lines (column titles like "Tax Amount")
+      if (/^(tax|vat)\s*(amount|details|summary)\s*$/i.test(trimmedLine)) continue;
+
+      // Skip total/subtotal lines to avoid misextracting subtotal as tax
+      // e.g., "Total Before Tax: 19.13", "Total Excl. VAT: 260.88"
+      if (/^(?:sub[\s-]?total|grand\s*total|net\s*total)/i.test(trimmedLine)) continue;
+      if (/^total\b/i.test(trimmedLine) && !/^total\s+(?:vat|tax)\b/i.test(trimmedLine)) continue;
+      if (/^(?:الاجمالي|الإجمالي|المجموع|صافي)(?:\s|$)/.test(trimmedLine)) continue;
+
+      const patterns = [
+        /vat[^\S\n]*(?:amount)?[^\S\n:$€£¥]*[:$€£¥]+[^\S\n]*(\d[\d,]*\.?\d*)/i,
+        /(?:vat|tax)[^\S\n]*\(?\s*\d+\.?\d*\s*%\s*\)?[^\S\n:$€£¥]*[:$€£¥]*[^\S\n]*(\d[\d,]*\.?\d*)/i,
+        // "Tax (CURRENCY): amount" format (e.g., "Tax (SAR): 4.44")
+        /(?:vat|tax)\s*\([^)]*\)\s*[:]\s*(\d[\d,]*\.?\d*)/i,
+        /tax[^\S\n]*(?:amount)?[^\S\n:$€£¥]*[:$€£¥]*[^\S\n]*(\d[\d,]*\.?\d+)/i,
+        /vat[^\S\n]*amount[^\S\n]*(?:@[^\S\n]*\d+%[^\S\n]*)?\(?(?:aed|sar)\)?[^\S\n:]*(\d[\d,]*\.?\d*)/i,
+        // "Standard Rate (5%)" format from tax summaries: last number is the tax amount
+        /standard\s*rate\s*\(\d+\.?\d*%\)\s+[\d,.]+\s+(\d[\d,]*\.\d{2})/i,
+        /gst[^\S\n:$€£¥]*[:$€£¥]*[^\S\n]*(\d[\d,]*\.?\d*)/i,
+        /hst[^\S\n:$€£¥]*[:$€£¥]*[^\S\n]*(\d[\d,]*\.?\d*)/i,
+        /ضريبة\s*القيمة\s*المضافة[^:\n]*[:]\s*(\d[\d,]*\.?\d*)/i,
+        /ضريبة[\s:]*(\d[\d,]*\.?\d+)/i,
+        /ضريبة\s*مبلغ[\s:]*(\d[\d,]*\.?\d*)/i,
+      ];
+
+      for (const pattern of patterns) {
+        const match = line.match(pattern);
+        if (match) {
+          const amount = this.parseAmount(match[1]);
+          if (amount > 0 && amount < 10_000_000) return amount;
+        }
       }
+    }
+
+    // Strategy 2: On "Total" summary lines with 2+ amounts, the second is often tax
+    // E.g., "Total  499.00  24.95  523.95" → tax=24.95
+    // Or:   "Total  499.00  24.95  52395" (decimal-less total) → tax=24.95
+    for (const line of lines) {
+      if (/^total\b/i.test(line.trim()) && !/sub.?total/i.test(line)) {
+        const amounts = line.match(/(\d[\d,]*\.\d{2})/g);
+        if (amounts && amounts.length >= 2) {
+          const first = this.parseAmount(amounts[0]);
+          const second = this.parseAmount(amounts[1]);
+          // Second is tax if it's smaller than first (subtotal > tax)
+          if (second > 0 && second < first) {
+            return second;
+          }
+        }
+      }
+    }
+
+    // Fallback: triplet detection for minimal invoices
+    const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
+    if (nonEmptyLines.length < 10) {
+      const tripletTax = this.extractTaxFromTriplet(text);
+      if (tripletTax !== null) return tripletTax;
     }
 
     return null;
@@ -779,8 +1244,8 @@ export class OcrService {
   private extractInvoiceNumber(text: string): string | null {
     // Strategy 1: Keyword-labeled patterns (highest priority)
     const labeledPatterns = [
-      /invoice\s*(?:no|number|#|num)\.?\s*[:;]?\s*([A-Z0-9][\w\-\/]{2,30})/i,
-      /inv\.?\s*(?:no|#)?\.?\s*[:;]?\s*([A-Z0-9][\w\-\/]{2,30})/i,
+      /invoice\s*(?:no|number|#|num|id)\.?\s*[:;]?\s*([A-Z0-9][\w\-\/]{2,30})/i,
+      /\binv\.?\s*(?:no|#)\.?\s*[:;]?\s*([A-Z0-9][\w\-\/]{2,30})/i,
       /bill\s*(?:no|number|#)\.?\s*[:;]?\s*([A-Z0-9][\w\-\/]{2,30})/i,
       /document\s*(?:no|number|#)\.?\s*[:;]?\s*([A-Z0-9][\w\-\/]{2,30})/i,
       /reference\s*(?:no|number|#)?\.?\s*[:;]?\s*([A-Z0-9][\w\-\/]{2,30})/i,
@@ -793,10 +1258,24 @@ export class OcrService {
       const match = text.match(pattern);
       if (match) {
         const num = match[1].trim();
-        // Reject TRN/TIN/VAT registration numbers (10+ pure digits)
-        if (/^\d{10,}$/.test(num)) continue;
-        // Reject phone numbers
-        if (/^\+?\d{7,}$/.test(num)) continue;
+        // Reject pure-digit numbers that also appear as TRN/VAT/tax registration
+        if (/^\d{10,}$/.test(num)) {
+          const escaped = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const isTrn = new RegExp(
+            `(?:TRN|TIN|VAT\\s*(?:No|Number|Reg)|tax\\s*(?:reg|registration)|الرقم\\s*الضريبي)\\s*[:;.]?\\s*${escaped}`,
+            'i',
+          ).test(text);
+          if (isTrn) continue;
+        }
+        // Reject phone numbers (7-9 digits with optional +) only if also labeled as phone
+        if (/^\+?\d{7,9}$/.test(num)) {
+          const escapedNum = num.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const isPhone = new RegExp(
+            `(?:tel|phone|mobile|fax|هاتف|جوال)\\s*[:;.]?\\s*${escapedNum}`,
+            'i',
+          ).test(text);
+          if (isPhone) continue;
+        }
         if (num.length >= 3 && num.length <= 30) {
           return num;
         }
@@ -816,6 +1295,12 @@ export class OcrService {
     const standaloneMatch = text.match(/\b([A-Z]{2,5}[-\/]\d{3,10})\b/i);
     if (standaloneMatch) {
       return standaloneMatch[1];
+    }
+
+    // Strategy 4: Single-letter prefix with digits-dash-digits (e.g., S20251018-9014)
+    const singleLetterMatch = text.match(/\b([A-Z]\d{6,}[-\/]\d{3,})\b/i);
+    if (singleLetterMatch) {
+      return singleLetterMatch[1];
     }
 
     return null;
@@ -839,7 +1324,8 @@ export class OcrService {
     }
 
     // Strategy 2: Score the first 8 lines
-    const headerLines = lines.slice(0, 8);
+    // Scan up to 12 lines (Arabic invoices often have more header content)
+    const headerLines = lines.slice(0, 12);
     let bestCandidate: { text: string; score: number } | null = null;
 
     for (let i = 0; i < headerLines.length; i++) {
@@ -896,7 +1382,31 @@ export class OcrService {
       }
     }
 
-    return bestCandidate && bestCandidate.score >= 0 ? bestCandidate.text : null;
+    if (bestCandidate && bestCandidate.score >= 0) {
+      return this.cleanVendorName(bestCandidate.text);
+    }
+    return null;
+  }
+
+  /**
+   * Clean vendor name by trimming date fragments, phone numbers, and other noise.
+   */
+  private cleanVendorName(name: string): string {
+    let cleaned = name;
+
+    // Remove trailing date patterns like "Date: 12/2023" or "Date: 01/01/2024"
+    cleaned = cleaned.replace(/\s*\bDate\b\s*[:;]?\s*\d{1,2}\/\d{2,4}.*/i, '');
+
+    // Remove trailing phone/fax numbers
+    cleaned = cleaned.replace(/\s*\b(?:Tel|Fax|Phone|Mobile)\b\s*[:;]?\s*[\d\s\-+()]+$/i, '');
+
+    // Remove trailing email addresses
+    cleaned = cleaned.replace(/\s*\S+@\S+\.\S+\s*$/i, '');
+
+    // Remove trailing TRN/TIN numbers
+    cleaned = cleaned.replace(/\s*\b(?:TRN|TIN)\b\s*[:;]?\s*\d+$/i, '');
+
+    return cleaned.trim();
   }
 
   /**
@@ -933,7 +1443,14 @@ export class OcrService {
     const tabPattern =
       /^(.+?)\t(\d+(?:\.\d+)?)\t(\d+(?:,\d{3})*(?:\.\d+)?)\t(\d+(?:,\d{3})*(?:\.\d+)?)$/;
 
+    // Stop keywords: skip lines that are summary rows, not line items
+    const summaryPattern =
+      /\b(subtotal|sub[\s-]*total|grand\s*total|net\s*(?:amount|total)|balance\s*due|amount\s*due|tax\s*summary)\b/i;
+
     for (const line of lines) {
+      // Skip summary/total lines
+      if (summaryPattern.test(line)) continue;
+
       let match = line.match(tabPattern);
       if (match) {
         const [, description, qty, price, total] = match;
@@ -963,6 +1480,8 @@ export class OcrService {
       match = line.match(simplePattern);
       if (match) {
         const [, description, qty, price, total] = match;
+        // Skip if description looks like a summary line
+        if (/\b(total|tax|vat|gst)\b/i.test(description)) continue;
         items.push({
           description: description.trim(),
           quantity: parseFloat(qty.replace(/,/g, '')),
@@ -998,6 +1517,16 @@ export class OcrService {
       const matchCount = headerKeywords.filter((kw) => kw.test(line)).length;
       if (matchCount >= 3) {
         return i;
+      }
+
+      // Multi-line header: merge with next line and check again
+      // (e.g., Transit Hub: "# Item & Description Qty Rate Taxable" + "Amount Tax Amount")
+      if (i + 1 < lines.length) {
+        const merged = line + ' ' + lines[i + 1];
+        const mergedCount = headerKeywords.filter((kw) => kw.test(merged)).length;
+        if (mergedCount >= 3) {
+          return i + 1; // Return the second line so extraction starts after both header lines
+        }
       }
     }
     return -1;
@@ -1128,6 +1657,123 @@ export class OcrService {
     }
 
     return parseFloat(cleaned) || 0;
+  }
+
+  /**
+   * Infer decimal point in a raw number when context suggests it's missing.
+   * E.g., "52395" on a line with "499.00" → 523.95 (insert decimal 2 from right).
+   */
+  private inferDecimalFromContext(rawNumber: string, contextLine: string): number {
+    const parsed = parseFloat(rawNumber.replace(/,/g, ''));
+    // Only infer if the raw number has no decimal point and is at least 4 digits
+    if (!rawNumber.includes('.') && rawNumber.replace(/,/g, '').length >= 4) {
+      // Check if other numbers on the same line have .XX format
+      const otherAmounts = contextLine.match(/\d[\d,]*\.\d{2}/g);
+      if (otherAmounts && otherAmounts.length > 0) {
+        return parsed / 100;
+      }
+    }
+    return parsed;
+  }
+
+  /**
+   * Extract all numeric amounts from text (for triplet detection).
+   */
+  private extractAllAmounts(text: string): number[] {
+    const amounts: number[] = [];
+    const pattern = /\b(\d[\d,]*(?:\.\d{1,2})?)\b/g;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      const val = this.parseAmount(match[1]);
+      if (val > 0 && val < 100_000_000) {
+        // Deduplicate exact values
+        if (!amounts.includes(val)) {
+          amounts.push(val);
+        }
+      }
+    }
+    return amounts;
+  }
+
+  /**
+   * For minimal invoices: find triplet where a = b + c (total = subtotal + tax).
+   * Returns the largest value (total) or null.
+   */
+  private extractTotalFromTriplet(text: string): number | null {
+    const amounts = this.extractAllAmounts(text);
+    if (amounts.length < 3) return null;
+
+    // Sort descending so we try the largest value first as "total"
+    const sorted = [...amounts].sort((a, b) => b - a);
+
+    for (const candidate of sorted) {
+      // Try to find two other amounts that sum to this candidate
+      for (let i = 0; i < amounts.length; i++) {
+        for (let j = i + 1; j < amounts.length; j++) {
+          if (amounts[i] !== candidate && amounts[j] !== candidate) {
+            if (Math.abs(candidate - (amounts[i] + amounts[j])) < 0.02) {
+              if (candidate > 0 && candidate < 100_000_000) {
+                return candidate;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * For minimal invoices: extract subtotal from triplet detection.
+   * Returns the middle value (subtotal) from a triplet where a = b + c.
+   */
+  private extractSubtotalFromTriplet(text: string): number | null {
+    const amounts = this.extractAllAmounts(text);
+    if (amounts.length < 3) return null;
+
+    const sorted = [...amounts].sort((a, b) => b - a);
+
+    for (const candidate of sorted) {
+      for (let i = 0; i < amounts.length; i++) {
+        for (let j = i + 1; j < amounts.length; j++) {
+          if (amounts[i] !== candidate && amounts[j] !== candidate) {
+            if (Math.abs(candidate - (amounts[i] + amounts[j])) < 0.02) {
+              // Return the larger of the two addends (subtotal > tax)
+              return Math.max(amounts[i], amounts[j]);
+            }
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * For minimal invoices: extract tax from triplet detection.
+   * Returns the smallest value (tax) from a triplet where a = b + c.
+   */
+  private extractTaxFromTriplet(text: string): number | null {
+    const amounts = this.extractAllAmounts(text);
+    if (amounts.length < 3) return null;
+
+    const sorted = [...amounts].sort((a, b) => b - a);
+
+    for (const candidate of sorted) {
+      for (let i = 0; i < amounts.length; i++) {
+        for (let j = i + 1; j < amounts.length; j++) {
+          if (amounts[i] !== candidate && amounts[j] !== candidate) {
+            if (Math.abs(candidate - (amounts[i] + amounts[j])) < 0.02) {
+              // Return the smaller of the two addends (tax < subtotal)
+              return Math.min(amounts[i], amounts[j]);
+            }
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   // ─── Duplicate Detection ───────────────────────────────────────────

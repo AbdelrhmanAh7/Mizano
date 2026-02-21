@@ -1,28 +1,28 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
 import {
-  Bug,
   AlertTriangle,
-  Trash2,
+  Brain,
+  Bug,
   Check,
   CheckCheck,
-  Filter,
-  RefreshCw,
   ChevronDown,
   ChevronRight,
-  Server,
-  Monitor,
-  Brain,
-  Sparkles,
   ClipboardCopy,
-  ShieldCheck,
   EyeOff,
+  Filter,
+  Monitor,
+  RefreshCw,
   Search,
+  Server,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useCallback, useState } from 'react';
 
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -32,20 +32,20 @@ import {
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useLogger } from '@/lib/hooks/use-logger';
 import { useGlobalErrorCapture } from '@/lib/hooks/use-global-error-capture';
+import { useLogger } from '@/lib/hooks/use-logger';
 import { LogEntry, LogLevel, LogSource, LogStatus } from '@mizano/shared-types';
 
 // ---- Helper components ----

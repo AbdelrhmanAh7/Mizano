@@ -1,33 +1,40 @@
 import { extractTextFromPdf } from './pdf-extractor.util';
 
-// Mock pdf-parse module
+// Mock pdf-parse module with v2 API: { PDFParse } named export
 jest.mock('pdf-parse', () => {
-  return jest.fn().mockImplementation((buffer: Buffer) => {
-    const text = buffer.toString('utf-8');
-    // Simulate pdf-parse behavior
-    if (text.includes('NATIVE_PDF')) {
-      return Promise.resolve({
-        text: 'Invoice #12345\nDate: 2024-01-15\nTotal: $1,234.56\nVendor: Acme Corp\n' +
-              'Subtotal: $1,100.00\nTax: $134.56\nItems:\n- Widget A x 10 @ $100\n- Widget B x 1 @ $100',
-        numpages: 1,
-      });
+  class MockPDFParse {
+    private text: string;
+    private total: number;
+
+    constructor(uint8: Uint8Array) {
+      const content = Buffer.from(uint8).toString('utf-8');
+
+      if (content.includes('NATIVE_PDF')) {
+        this.text =
+          'Invoice #12345\nDate: 2024-01-15\nTotal: $1,234.56\nVendor: Acme Corp\n' +
+          'Subtotal: $1,100.00\nTax: $134.56\nItems:\n- Widget A x 10 @ $100\n- Widget B x 1 @ $100';
+        this.total = 1;
+      } else if (content.includes('SCANNED_PDF')) {
+        this.text = '';
+        this.total = 1;
+      } else if (content.includes('MULTI_PAGE')) {
+        this.text =
+          'Page 1 content here with enough text to pass the threshold. ' +
+          'This is a multi-page document with significant content on each page. ' +
+          'Page 2 content continues here with more information about the invoice.';
+        this.total = 2;
+      } else {
+        this.text = '';
+        this.total = 0;
+      }
     }
-    if (text.includes('SCANNED_PDF')) {
-      return Promise.resolve({
-        text: '', // Scanned PDFs have no embedded text
-        numpages: 1,
-      });
+
+    async getText() {
+      return { text: this.text, total: this.total, pages: this.total };
     }
-    if (text.includes('MULTI_PAGE')) {
-      return Promise.resolve({
-        text: 'Page 1 content here with enough text to pass the threshold. ' +
-              'This is a multi-page document with significant content on each page. ' +
-              'Page 2 content continues here with more information about the invoice.',
-        numpages: 2,
-      });
-    }
-    return Promise.resolve({ text: '', numpages: 0 });
-  });
+  }
+
+  return { PDFParse: MockPDFParse };
 });
 
 describe('pdf-extractor.util', () => {

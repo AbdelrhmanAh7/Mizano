@@ -1,8 +1,7 @@
 'use client';
 
-import { useFieldArray, Control, UseFormWatch, UseFormSetValue } from 'react-hook-form';
-import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -11,8 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useActiveItems, Item } from '@/lib/hooks/use-items';
+import { Item, useActiveItems } from '@/lib/hooks/use-items';
+import { Plus, Trash2 } from 'lucide-react';
+import { Control, useFieldArray, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 
 export interface LineItem {
   itemId?: string;

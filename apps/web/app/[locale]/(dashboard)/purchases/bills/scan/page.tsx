@@ -111,7 +111,7 @@ export default function ScanBillPage() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp', '.tiff'],
+      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp', '.tiff', '.heic', '.heif'],
       'application/pdf': ['.pdf'],
     },
     maxSize: 15 * 1024 * 1024, // 15MB
@@ -252,10 +252,7 @@ export default function ScanBillPage() {
   // ---------------------------------------------------------------------------
 
   const addLineItem = () => {
-    setLineItems((prev) => [
-      ...prev,
-      { description: '', quantity: '1', rate: '0', taxRate: '0' },
-    ]);
+    setLineItems((prev) => [...prev, { description: '', quantity: '1', rate: '0', taxRate: '0' }]);
   };
 
   const removeLineItem = (index: number) => {
@@ -276,15 +273,9 @@ export default function ScanBillPage() {
     }
   };
 
-  const updateLineItem = (
-    index: number,
-    field: keyof EditableLineItem,
-    value: string,
-  ) => {
+  const updateLineItem = (index: number, field: keyof EditableLineItem, value: string) => {
     setLineItems((prev) => {
-      const updated = prev.map((item, i) =>
-        i === index ? { ...item, [field]: value } : item,
-      );
+      const updated = prev.map((item, i) => (i === index ? { ...item, [field]: value } : item));
 
       // Track total/subtotal/tax corrections when line items change
       if (intakeResult && (field === 'quantity' || field === 'rate' || field === 'taxRate')) {
@@ -320,8 +311,7 @@ export default function ScanBillPage() {
   }, 0);
 
   const taxTotal = lineItems.reduce((sum, item) => {
-    const lineTotal =
-      (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0);
+    const lineTotal = (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0);
     return sum + lineTotal * ((parseFloat(item.taxRate) || 0) / 100);
   }, 0);
 
@@ -354,17 +344,11 @@ export default function ScanBillPage() {
 
       {/* Step indicator */}
       <div className="flex items-center gap-2 text-sm">
-        <Badge variant={step === 'upload' ? 'default' : 'secondary'}>
-          1. Upload
-        </Badge>
+        <Badge variant={step === 'upload' ? 'default' : 'secondary'}>1. Upload</Badge>
         <ArrowRight className="h-4 w-4 text-muted-foreground" />
-        <Badge variant={step === 'review' ? 'default' : 'secondary'}>
-          2. Review & Edit
-        </Badge>
+        <Badge variant={step === 'review' ? 'default' : 'secondary'}>2. Review & Edit</Badge>
         <ArrowRight className="h-4 w-4 text-muted-foreground" />
-        <Badge variant={step === 'creating' ? 'default' : 'secondary'}>
-          3. Create Bill
-        </Badge>
+        <Badge variant={step === 'creating' ? 'default' : 'secondary'}>3. Create Bill</Badge>
       </div>
 
       {/* Step 1: Upload */}
@@ -388,9 +372,7 @@ export default function ScanBillPage() {
                   <input {...getInputProps()} />
                   <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <p className="text-base font-medium">
-                    {isDragActive
-                      ? 'Drop the file here...'
-                      : 'Drag & drop an invoice or bill'}
+                    {isDragActive ? 'Drop the file here...' : 'Drag & drop an invoice or bill'}
                   </p>
                   <p className="text-sm text-muted-foreground mt-2">
                     or click to browse (JPEG, PNG, PDF up to 15MB)
@@ -517,20 +499,13 @@ export default function ScanBillPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
                 Document
-                <ConfidenceBadge
-                  confidence={intakeResult.ocrConfidence}
-                  size="sm"
-                />
+                <ConfidenceBadge confidence={intakeResult.ocrConfidence} size="sm" />
               </CardTitle>
             </CardHeader>
             <CardContent>
               {preview ? (
                 <div className="aspect-[3/4] bg-muted rounded-lg overflow-hidden mb-4">
-                  <img
-                    src={preview}
-                    alt="Document"
-                    className="w-full h-full object-contain"
-                  />
+                  <img src={preview} alt="Document" className="w-full h-full object-contain" />
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center aspect-[3/4] bg-muted rounded-lg mb-4">
@@ -547,9 +522,7 @@ export default function ScanBillPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Classification</span>
-                  <span>
-                    {Math.round(intakeResult.classificationConfidence * 100)}%
-                  </span>
+                  <span>{Math.round(intakeResult.classificationConfidence * 100)}%</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">OCR Confidence</span>
@@ -569,8 +542,8 @@ export default function ScanBillPage() {
                 <AlertDescription>
                   This document may already exist in the system (
                   {intakeResult.duplicateWarning.matchType} match,{' '}
-                  {Math.round(intakeResult.duplicateWarning.similarity * 100)}%
-                  similarity). Please verify before creating.
+                  {Math.round(intakeResult.duplicateWarning.similarity * 100)}% similarity). Please
+                  verify before creating.
                 </AlertDescription>
               </Alert>
             )}
@@ -587,9 +560,8 @@ export default function ScanBillPage() {
                     Vendor *
                     {intakeResult.matchedVendor && (
                       <Badge variant="secondary" className="ml-2 text-xs">
-                        AI suggested:{' '}
-                        {Math.round(intakeResult.matchedVendor.similarity * 100)}
-                        % match
+                        AI suggested: {Math.round(intakeResult.matchedVendor.similarity * 100)}%
+                        match
                       </Badge>
                     )}
                   </Label>
@@ -601,7 +573,8 @@ export default function ScanBillPage() {
                       const selectedVendor =
                         intakeResult.vendorCandidates.find((c) => c.id === value) ||
                         vendors.find((v: any) => v.id === value);
-                      const selectedName = selectedVendor?.displayName || selectedVendor?.name || value;
+                      const selectedName =
+                        selectedVendor?.displayName || selectedVendor?.name || value;
                       trackCorrection(
                         'vendorName',
                         intakeResult.extractedFields.vendorName,
@@ -617,10 +590,7 @@ export default function ScanBillPage() {
                       {intakeResult.vendorCandidates.length > 0 && (
                         <>
                           {intakeResult.vendorCandidates.map((candidate) => (
-                            <SelectItem
-                              key={`ai-${candidate.id}`}
-                              value={candidate.id}
-                            >
+                            <SelectItem key={`ai-${candidate.id}`} value={candidate.id}>
                               {candidate.name} ({Math.round(candidate.similarity * 100)}% match)
                             </SelectItem>
                           ))}
@@ -647,9 +617,7 @@ export default function ScanBillPage() {
                   <div className="space-y-2">
                     <Label>
                       Bill Number
-                      <FieldConfidence
-                        confidence={intakeResult.fieldConfidence?.invoiceNumber}
-                      />
+                      <FieldConfidence confidence={intakeResult.fieldConfidence?.invoiceNumber} />
                     </Label>
                     <Input
                       value={documentNumber}
@@ -669,20 +637,14 @@ export default function ScanBillPage() {
                   <div className="space-y-2">
                     <Label>
                       Date *
-                      <FieldConfidence
-                        confidence={intakeResult.fieldConfidence?.date}
-                      />
+                      <FieldConfidence confidence={intakeResult.fieldConfidence?.date} />
                     </Label>
                     <Input
                       type="date"
                       value={date}
                       onChange={(e) => {
                         setDate(e.target.value);
-                        trackCorrection(
-                          'date',
-                          intakeResult.extractedFields.date,
-                          e.target.value,
-                        );
+                        trackCorrection('date', intakeResult.extractedFields.date, e.target.value);
                       }}
                     />
                   </div>
@@ -717,9 +679,7 @@ export default function ScanBillPage() {
                 <CardTitle className="text-lg flex items-center justify-between">
                   <span>
                     Line Items
-                    <FieldConfidence
-                      confidence={intakeResult.fieldConfidence?.lineItems}
-                    />
+                    <FieldConfidence confidence={intakeResult.fieldConfidence?.lineItems} />
                   </span>
                   <Button variant="outline" size="sm" onClick={addLineItem}>
                     <Plus className="h-4 w-4 mr-1" />
@@ -742,20 +702,13 @@ export default function ScanBillPage() {
                   <TableBody>
                     {lineItems.map((item, index) => {
                       const lineTotal =
-                        (parseFloat(item.quantity) || 0) *
-                        (parseFloat(item.rate) || 0);
+                        (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0);
                       return (
                         <TableRow key={index}>
                           <TableCell>
                             <Input
                               value={item.description}
-                              onChange={(e) =>
-                                updateLineItem(
-                                  index,
-                                  'description',
-                                  e.target.value,
-                                )
-                              }
+                              onChange={(e) => updateLineItem(index, 'description', e.target.value)}
                               placeholder="Description"
                             />
                           </TableCell>
@@ -763,13 +716,7 @@ export default function ScanBillPage() {
                             <Input
                               type="number"
                               value={item.quantity}
-                              onChange={(e) =>
-                                updateLineItem(
-                                  index,
-                                  'quantity',
-                                  e.target.value,
-                                )
-                              }
+                              onChange={(e) => updateLineItem(index, 'quantity', e.target.value)}
                               className="w-20"
                               min="0"
                               step="0.01"
@@ -779,9 +726,7 @@ export default function ScanBillPage() {
                             <Input
                               type="number"
                               value={item.rate}
-                              onChange={(e) =>
-                                updateLineItem(index, 'rate', e.target.value)
-                              }
+                              onChange={(e) => updateLineItem(index, 'rate', e.target.value)}
                               className="w-28"
                               min="0"
                               step="0.01"
@@ -791,13 +736,7 @@ export default function ScanBillPage() {
                             <Input
                               type="number"
                               value={item.taxRate}
-                              onChange={(e) =>
-                                updateLineItem(
-                                  index,
-                                  'taxRate',
-                                  e.target.value,
-                                )
-                              }
+                              onChange={(e) => updateLineItem(index, 'taxRate', e.target.value)}
                               className="w-20"
                               min="0"
                               step="0.01"
@@ -841,8 +780,7 @@ export default function ScanBillPage() {
                     </div>
                     {intakeResult.extractedFields.total && (
                       <p className="text-xs text-muted-foreground text-right">
-                        AI extracted total:{' '}
-                        {intakeResult.extractedFields.total.toFixed(2)}
+                        AI extracted total: {intakeResult.extractedFields.total.toFixed(2)}
                       </p>
                     )}
                   </div>
@@ -861,14 +799,9 @@ export default function ScanBillPage() {
                 {Object.keys(corrections).length > 0 && (
                   <>
                     <Badge variant="secondary">
-                      {Object.keys(corrections).length} correction(s) — AI will
-                      learn
+                      {Object.keys(corrections).length} correction(s) — AI will learn
                     </Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowTrainDialog(true)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => setShowTrainDialog(true)}>
                       <GraduationCap className="h-4 w-4 mr-1" />
                       Train OCR
                     </Button>
@@ -903,9 +836,7 @@ export default function ScanBillPage() {
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
             <p className="text-lg font-medium">Creating your bill...</p>
-            <p className="text-sm text-muted-foreground">
-              This will only take a moment
-            </p>
+            <p className="text-sm text-muted-foreground">This will only take a moment</p>
           </CardContent>
         </Card>
       )}
@@ -921,8 +852,7 @@ export default function ScanBillPage() {
                 total: intakeResult.extractedFields.total,
                 subtotal: intakeResult.extractedFields.subtotal ?? null,
                 tax: intakeResult.extractedFields.tax ?? null,
-                invoiceNumber:
-                  intakeResult.extractedFields.documentNumber,
+                invoiceNumber: intakeResult.extractedFields.documentNumber,
                 vendorName: intakeResult.extractedFields.vendorName,
                 lineItems: intakeResult.extractedFields.lineItems,
                 ocrConfidence: intakeResult.ocrConfidence,
@@ -948,13 +878,7 @@ function FieldConfidence({ confidence }: { confidence?: number }) {
 
   const pct = Math.round(confidence * 100);
   const color =
-    confidence >= 0.8
-      ? 'text-green-600'
-      : confidence >= 0.6
-        ? 'text-yellow-600'
-        : 'text-red-600';
+    confidence >= 0.8 ? 'text-green-600' : confidence >= 0.6 ? 'text-yellow-600' : 'text-red-600';
 
-  return (
-    <span className={cn('ml-1 text-xs font-normal', color)}>({pct}%)</span>
-  );
+  return <span className={cn('ml-1 text-xs font-normal', color)}>({pct}%)</span>;
 }

@@ -22,6 +22,7 @@ import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { DocumentIntakeService } from '../services/document-intake.service';
 import { ProcessDocumentDto, ConfirmIntakeDto } from '../dto/document-intake.dto';
+import { createOcrFileFilter } from '../utils/file-upload.util';
 
 @ApiTags('AI - Document Intake')
 @ApiBearerAuth()
@@ -37,26 +38,7 @@ export class DocumentIntakeController {
       limits: {
         fileSize: 15 * 1024 * 1024, // 15MB limit
       },
-      fileFilter: (req, file, cb) => {
-        const allowedMimes = [
-          'image/jpeg',
-          'image/png',
-          'image/gif',
-          'image/webp',
-          'image/tiff',
-          'application/pdf',
-        ];
-        if (allowedMimes.includes(file.mimetype)) {
-          cb(null, true);
-        } else {
-          cb(
-            new BadRequestException(
-              'Invalid file type. Allowed: JPEG, PNG, GIF, WebP, TIFF, PDF',
-            ),
-            false,
-          );
-        }
-      },
+      fileFilter: createOcrFileFilter(),
     }),
   )
   @ApiOperation({
@@ -146,10 +128,7 @@ export class DocumentIntakeController {
     },
   })
   @ApiResponse({ status: 400, description: 'Missing required fields (vendor/customer)' })
-  async confirmDocument(
-    @CurrentOrg() orgId: string,
-    @Body() dto: ConfirmIntakeDto,
-  ) {
+  async confirmDocument(@CurrentOrg() orgId: string, @Body() dto: ConfirmIntakeDto) {
     const result = await this.intakeService.confirmAndCreate(orgId, dto);
     return { data: result };
   }

@@ -22,6 +22,7 @@ import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { OcrService } from '../services/ocr.service';
 import { OcrExtractDto, OcrLearnDto, DuplicateCheckDto } from '../dto/ocr-extract.dto';
+import { createOcrFileFilter } from '../utils/file-upload.util';
 
 @ApiTags('AI')
 @ApiBearerAuth()
@@ -37,21 +38,7 @@ export class OcrController {
       limits: {
         fileSize: 10 * 1024 * 1024, // 10MB limit
       },
-      fileFilter: (req, file, cb) => {
-        const allowedMimes = [
-          'image/jpeg',
-          'image/png',
-          'image/gif',
-          'image/webp',
-          'image/tiff',
-          'application/pdf',
-        ];
-        if (allowedMimes.includes(file.mimetype)) {
-          cb(null, true);
-        } else {
-          cb(new BadRequestException('Invalid file type. Allowed: JPEG, PNG, GIF, WebP, TIFF, PDF'), false);
-        }
-      },
+      fileFilter: createOcrFileFilter(),
     }),
   )
   @ApiOperation({ summary: 'Extract invoice/bill fields from an image' })
@@ -139,8 +126,7 @@ export class OcrController {
     if (dto.total !== undefined) corrections.total = dto.total;
     if (dto.subtotal !== undefined) corrections.subtotal = dto.subtotal;
     if (dto.tax !== undefined) corrections.tax = dto.tax;
-    if (dto.invoiceNumber !== undefined)
-      corrections.invoiceNumber = dto.invoiceNumber;
+    if (dto.invoiceNumber !== undefined) corrections.invoiceNumber = dto.invoiceNumber;
     if (dto.vendorName !== undefined) corrections.vendorName = dto.vendorName;
 
     await this.ocrService.learnLayout(orgId, dto.vendorId, corrections);
@@ -176,10 +162,7 @@ export class OcrController {
       },
     },
   })
-  async checkDuplicate(
-    @CurrentOrg() orgId: string,
-    @Body() dto: DuplicateCheckDto,
-  ) {
+  async checkDuplicate(@CurrentOrg() orgId: string, @Body() dto: DuplicateCheckDto) {
     const result = await this.ocrService.checkDuplicate(
       orgId,
       dto.vendorId ?? null,

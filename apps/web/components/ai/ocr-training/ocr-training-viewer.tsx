@@ -2,15 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { useDropzone } from 'react-dropzone';
-import {
-  Upload,
-  Loader2,
-  FileText,
-  X,
-  Check,
-  Sparkles,
-  RotateCcw,
-} from 'lucide-react';
+import { Upload, Loader2, FileText, X, Check, Sparkles, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -80,9 +72,7 @@ export function OcrTrainingViewer({
   const [internalFile, setInternalFile] = useState<File | null>(null);
   const [internalPreview, setInternalPreview] = useState<string | null>(null);
   const [internalVendorId, setInternalVendorId] = useState('');
-  const [correctedFields, setCorrectedFields] = useState<Record<string, any>>(
-    {},
-  );
+  const [correctedFields, setCorrectedFields] = useState<Record<string, any>>({});
 
   // Mutations
   const extractMutation = useOcrTrainingExtract();
@@ -96,7 +86,8 @@ export function OcrTrainingViewer({
   const file = externalFile || internalFile;
   const preview = externalPreview || internalPreview;
   const vendorId = externalVendorId || internalVendorId;
-  const result = externalResult || (extractMutation.data?.data as OcrTrainingExtractResult | undefined);
+  const result =
+    externalResult || (extractMutation.data?.data as OcrTrainingExtractResult | undefined);
   const isExtracting = externalExtracting || extractMutation.isPending;
   const isSubmitting = externalSubmitting || submitMutation.isPending;
 
@@ -137,7 +128,7 @@ export function OcrTrainingViewer({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp', '.tiff'],
+      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp', '.tiff', '.heic', '.heif'],
       'application/pdf': ['.pdf'],
     },
     maxSize: 15 * 1024 * 1024,
@@ -167,8 +158,7 @@ export function OcrTrainingViewer({
         toast({
           variant: 'destructive',
           title: 'Extraction failed',
-          description:
-            error.response?.data?.message || 'Failed to extract data',
+          description: error.response?.data?.message || 'Failed to extract data',
         });
       },
     });
@@ -229,9 +219,7 @@ export function OcrTrainingViewer({
         toast({
           variant: 'destructive',
           title: 'Submission failed',
-          description:
-            error.response?.data?.message ||
-            'Failed to submit training data',
+          description: error.response?.data?.message || 'Failed to submit training data',
         });
       },
     });
@@ -341,19 +329,13 @@ export function OcrTrainingViewer({
                 <p className="text-sm font-medium">
                   {isDragActive ? 'Drop here...' : 'Upload bill image'}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  JPEG, PNG, PDF up to 15MB
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, PDF up to 15MB</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {preview ? (
                   <div className="relative aspect-[3/4] bg-muted rounded-lg overflow-hidden">
-                    <img
-                      src={preview}
-                      alt="Document"
-                      className="w-full h-full object-contain"
-                    />
+                    <img src={preview} alt="Document" className="w-full h-full object-contain" />
                     {!externalFile && (
                       <Button
                         variant="secondary"
@@ -368,28 +350,19 @@ export function OcrTrainingViewer({
                 ) : (
                   <div className="relative flex flex-col items-center justify-center aspect-[3/4] bg-muted rounded-lg">
                     <FileText className="h-12 w-12 text-muted-foreground mb-2" />
-                    <p className="text-xs font-medium">
-                      {file?.name || 'PDF Document'}
-                    </p>
+                    <p className="text-xs font-medium">{file?.name || 'PDF Document'}</p>
                   </div>
                 )}
 
                 {result && (
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">OCR Confidence</span>
-                    <ConfidenceBadge
-                      confidence={result.ocrConfidence}
-                      size="sm"
-                    />
+                    <ConfidenceBadge confidence={result.ocrConfidence} size="sm" />
                   </div>
                 )}
 
                 {!result && !isExtracting && (
-                  <Button
-                    onClick={handleExtract}
-                    className="w-full"
-                    size="sm"
-                  >
+                  <Button onClick={handleExtract} className="w-full" size="sm">
                     <Sparkles className="h-4 w-4 mr-1" />
                     Extract
                   </Button>
@@ -421,10 +394,7 @@ export function OcrTrainingViewer({
                 <pre className="text-xs whitespace-pre-wrap font-mono leading-relaxed">
                   {highlightSegments.map((segment, i) =>
                     segment.highlighted ? (
-                      <mark
-                        key={i}
-                        className="bg-yellow-200 dark:bg-yellow-900 rounded px-0.5"
-                      >
+                      <mark key={i} className="bg-yellow-200 dark:bg-yellow-900 rounded px-0.5">
                         {segment.text}
                       </mark>
                     ) : (
@@ -455,10 +425,8 @@ export function OcrTrainingViewer({
             </CardHeader>
             <CardContent className="space-y-3">
               {EDITABLE_FIELDS.map(({ key, label, type }) => {
-                const original =
-                  originalValues[key as keyof typeof originalValues];
-                const current =
-                  currentValues[key as keyof typeof currentValues];
+                const original = originalValues[key as keyof typeof originalValues];
+                const current = currentValues[key as keyof typeof currentValues];
                 const isCorrected = key in correctedFields;
                 const confidence = result.fieldConfidence?.[key];
 
@@ -495,10 +463,7 @@ export function OcrTrainingViewer({
                             size="sm"
                             className="h-5 w-5 p-0"
                             onClick={() =>
-                              handleFieldChange(
-                                key,
-                                original === null ? '' : original,
-                              )
+                              handleFieldChange(key, original === null ? '' : original)
                             }
                           >
                             <RotateCcw className="h-3 w-3" />
@@ -530,9 +495,7 @@ export function OcrTrainingViewer({
                       step={type === 'number' ? '0.01' : undefined}
                     />
                     {isCorrected && original !== null && (
-                      <p className="text-xs text-muted-foreground">
-                        Original: {String(original)}
-                      </p>
+                      <p className="text-xs text-muted-foreground">Original: {String(original)}</p>
                     )}
                   </div>
                 );
@@ -547,13 +510,10 @@ export function OcrTrainingViewer({
                   <ul className="text-xs text-muted-foreground mt-1 space-y-0.5">
                     {result.lineItems.slice(0, 3).map((item, i) => (
                       <li key={i} className="truncate">
-                        {item.description} &mdash; {item.quantity} x{' '}
-                        {item.unitPrice.toFixed(2)}
+                        {item.description} &mdash; {item.quantity} x {item.unitPrice.toFixed(2)}
                       </li>
                     ))}
-                    {result.lineItems.length > 3 && (
-                      <li>+{result.lineItems.length - 3} more...</li>
-                    )}
+                    {result.lineItems.length > 3 && <li>+{result.lineItems.length - 3} more...</li>}
                   </ul>
                 </div>
               )}
@@ -585,9 +545,7 @@ export function OcrTrainingViewer({
                 )}
               </div>
               {!vendorId && correctionCount > 0 && (
-                <p className="text-xs text-destructive">
-                  Select a vendor to submit corrections.
-                </p>
+                <p className="text-xs text-destructive">Select a vendor to submit corrections.</p>
               )}
             </CardContent>
           </Card>
