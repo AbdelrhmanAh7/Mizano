@@ -19,9 +19,7 @@ export function standardDeviation(values: number[]): number {
   if (values.length < 2) return 0;
   const avg = mean(values);
   const squaredDiffs = values.map((v) => Math.pow(v - avg, 2));
-  return Math.sqrt(
-    squaredDiffs.reduce((sum, d) => sum + d, 0) / (values.length - 1),
-  );
+  return Math.sqrt(squaredDiffs.reduce((sum, d) => sum + d, 0) / (values.length - 1));
 }
 
 /**
@@ -47,11 +45,7 @@ export function zScore(value: number, values: number[]): number {
 /**
  * Calculate the z-score using pre-computed mean and standard deviation
  */
-export function zScoreWithStats(
-  value: number,
-  avg: number,
-  stdDev: number,
-): number {
+export function zScoreWithStats(value: number, avg: number, stdDev: number): number {
   if (stdDev === 0) return 0;
   return (value - avg) / stdDev;
 }
@@ -119,11 +113,7 @@ export function interquartileRange(values: number[]): {
  * @param values Array of historical values
  * @param multiplier IQR multiplier (default 1.5 for standard outliers, 3 for extreme outliers)
  */
-export function isOutlierIQR(
-  value: number,
-  values: number[],
-  multiplier: number = 1.5,
-): boolean {
+export function isOutlierIQR(value: number, values: number[], multiplier: number = 1.5): boolean {
   const { q1, q3, iqr } = interquartileRange(values);
   const lowerBound = q1 - multiplier * iqr;
   const upperBound = q3 + multiplier * iqr;
@@ -177,8 +167,7 @@ export function getZValueForServiceLevel(serviceLevel: number): number {
     .sort((a, b) => a - b);
   for (let i = 0; i < keys.length - 1; i++) {
     if (serviceLevel >= keys[i] && serviceLevel <= keys[i + 1]) {
-      const ratio =
-        (serviceLevel - keys[i]) / (keys[i + 1] - keys[i]);
+      const ratio = (serviceLevel - keys[i]) / (keys[i + 1] - keys[i]);
       return zTable[keys[i]] + ratio * (zTable[keys[i + 1]] - zTable[keys[i]]);
     }
   }
@@ -192,10 +181,7 @@ export function getZValueForServiceLevel(serviceLevel: number): number {
  * @param values Array of values
  * @param period Number of periods to average
  */
-export function simpleMovingAverage(
-  values: number[],
-  period: number,
-): number[] {
+export function simpleMovingAverage(values: number[], period: number): number[] {
   if (values.length < period) return [];
   const result: number[] = [];
   for (let i = period - 1; i < values.length; i++) {
@@ -210,10 +196,7 @@ export function simpleMovingAverage(
  * @param values Array of values
  * @param period Number of periods (used to calculate smoothing factor)
  */
-export function exponentialMovingAverage(
-  values: number[],
-  period: number,
-): number[] {
+export function exponentialMovingAverage(values: number[], period: number): number[] {
   if (values.length === 0) return [];
   const k = 2 / (period + 1);
   const result: number[] = [values[0]];
@@ -300,11 +283,7 @@ export function linearRegression(
 /**
  * Predict future value using linear regression
  */
-export function predictLinear(
-  x: number[],
-  y: number[],
-  futureX: number,
-): number {
+export function predictLinear(x: number[], y: number[], futureX: number): number {
   const { slope, intercept } = linearRegression(x, y);
   return slope * futureX + intercept;
 }

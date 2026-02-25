@@ -131,25 +131,15 @@ export function ItemForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Item Name *</Label>
-              <Input
-                id="name"
-                placeholder="Enter item name"
-                {...form.register('name')}
-              />
+              <Input id="name" placeholder="Enter item name" {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.name.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="sku">SKU</Label>
-              <Input
-                id="sku"
-                placeholder="Stock Keeping Unit"
-                {...form.register('sku')}
-              />
+              <Input id="sku" placeholder="Stock Keeping Unit" {...form.register('sku')} />
             </div>
           </div>
 
@@ -170,9 +160,7 @@ export function ItemForm({
                     <SelectItem key={option.value} value={option.value}>
                       <div>
                         <div className="font-medium">{option.label}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {option.description}
-                        </div>
+                        <div className="text-xs text-muted-foreground">{option.description}</div>
                       </div>
                     </SelectItem>
                   ))}
@@ -275,9 +263,7 @@ export function ItemForm({
               <div className="flex items-center gap-2">
                 <Switch
                   checked={watchTrackInventory}
-                  onCheckedChange={(checked) =>
-                    form.setValue('trackInventory', checked)
-                  }
+                  onCheckedChange={(checked) => form.setValue('trackInventory', checked)}
                 />
                 <Label>Track Inventory</Label>
               </div>
@@ -322,9 +308,7 @@ export function ItemForm({
                     placeholder="20"
                     {...form.register('reorderQuantity', { valueAsNumber: true })}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Suggested quantity to reorder
-                  </p>
+                  <p className="text-xs text-muted-foreground">Suggested quantity to reorder</p>
                 </div>
               </div>
             </CardContent>
@@ -356,9 +340,7 @@ export function ItemForm({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Used when selling this item
-              </p>
+              <p className="text-xs text-muted-foreground">Used when selling this item</p>
             </div>
 
             <div className="space-y-2">
@@ -378,9 +360,7 @@ export function ItemForm({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Used when purchasing this item
-              </p>
+              <p className="text-xs text-muted-foreground">Used when purchasing this item</p>
             </div>
 
             {watchTrackInventory && (
@@ -388,9 +368,7 @@ export function ItemForm({
                 <Label htmlFor="inventoryAccountId">Inventory Account</Label>
                 <Select
                   value={form.watch('inventoryAccountId') || ''}
-                  onValueChange={(value) =>
-                    form.setValue('inventoryAccountId', value)
-                  }
+                  onValueChange={(value) => form.setValue('inventoryAccountId', value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select account" />
@@ -403,9 +381,7 @@ export function ItemForm({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Used for inventory valuation
-                </p>
+                <p className="text-xs text-muted-foreground">Used for inventory valuation</p>
               </div>
             )}
           </div>
@@ -418,11 +394,7 @@ export function ItemForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? 'Saving...'
-            : isEditing
-            ? 'Update Item'
-            : 'Create Item'}
+          {isSubmitting ? 'Saving...' : isEditing ? 'Update Item' : 'Create Item'}
         </Button>
       </div>
     </form>

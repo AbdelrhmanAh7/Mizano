@@ -116,12 +116,12 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     );
   }
 
-  const budget = typeof project.budgetAmount === 'string'
-    ? parseFloat(project.budgetAmount)
-    : project.budgetAmount;
-  const billed = typeof project.totalBilled === 'string'
-    ? parseFloat(project.totalBilled)
-    : project.totalBilled;
+  const budget =
+    typeof project.budgetAmount === 'string'
+      ? parseFloat(project.budgetAmount)
+      : project.budgetAmount;
+  const billed =
+    typeof project.totalBilled === 'string' ? parseFloat(project.totalBilled) : project.totalBilled;
   const progress = budget > 0 ? Math.min((billed / budget) * 100, 100) : 0;
 
   const completedTasks = tasks.filter((t) => t.status === 'COMPLETED').length;
@@ -140,10 +140,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
-              <Badge
-                variant="outline"
-                className={getProjectStatusColor(project.status)}
-              >
+              <Badge variant="outline" className={getProjectStatusColor(project.status)}>
                 {getProjectStatusLabel(project.status)}
               </Badge>
             </div>
@@ -171,16 +168,13 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete Project</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to delete this project? All tasks and time
-                  entries will also be deleted.
+                  Are you sure you want to delete this project? All tasks and time entries will also
+                  be deleted.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  className="bg-red-600 hover:bg-red-700"
-                >
+                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
                   Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -199,9 +193,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Hours</p>
-                <p className="text-2xl font-bold font-mono">
-                  {formatHours(project.totalHours)}
-                </p>
+                <p className="text-2xl font-bold font-mono">{formatHours(project.totalHours)}</p>
               </div>
             </div>
           </CardContent>
@@ -215,9 +207,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Billed</p>
-                <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(billed)}
-                </p>
+                <p className="text-2xl font-bold font-mono">{formatCurrency(billed)}</p>
               </div>
             </div>
           </CardContent>
@@ -271,10 +261,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
               ) : (
                 <div className="space-y-2">
                   {tasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="flex items-center gap-4 p-4 border rounded-lg"
-                    >
+                    <div key={task.id} className="flex items-center gap-4 p-4 border rounded-lg">
                       <button
                         onClick={() => handleToggleTaskStatus(task)}
                         className="flex-shrink-0"
@@ -289,15 +276,13 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                         <p
                           className={cn(
                             'font-medium',
-                            task.status === 'COMPLETED' && 'line-through text-muted-foreground'
+                            task.status === 'COMPLETED' && 'line-through text-muted-foreground',
                           )}
                         >
                           {task.name}
                         </p>
                         {task.description && (
-                          <p className="text-sm text-muted-foreground">
-                            {task.description}
-                          </p>
+                          <p className="text-sm text-muted-foreground">{task.description}</p>
                         )}
                       </div>
                       <div className="flex items-center gap-4">
@@ -309,9 +294,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                             Billable
                           </Badge>
                         )}
-                        <span className="text-sm font-mono">
-                          {formatHours(task.actualHours)}
-                        </span>
+                        <span className="text-sm font-mono">{formatHours(task.actualHours)}</span>
                         <Button
                           size="sm"
                           variant="ghost"
@@ -366,9 +349,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                   <TableBody>
                     {timeEntries.map((entry) => (
                       <TableRow key={entry.id}>
-                        <TableCell>
-                          {format(new Date(entry.date), 'MMM d, yyyy')}
-                        </TableCell>
+                        <TableCell>{format(new Date(entry.date), 'MMM d, yyyy')}</TableCell>
                         <TableCell>{entry.task?.name || '-'}</TableCell>
                         <TableCell className="max-w-[200px] truncate">
                           {entry.description || '-'}
@@ -441,24 +422,18 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Budget Amount</span>
                   <span className="font-mono">
-                    {project.budgetType === 'COST'
-                      ? formatCurrency(budget)
-                      : formatHours(budget)}
+                    {project.budgetType === 'COST' ? formatCurrency(budget) : formatHours(budget)}
                   </span>
                 </div>
                 {project.hourlyRate && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Hourly Rate</span>
-                    <span className="font-mono">
-                      {formatCurrency(project.hourlyRate)}/hr
-                    </span>
+                    <span className="font-mono">{formatCurrency(project.hourlyRate)}/hr</span>
                   </div>
                 )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total Billed</span>
-                  <span className="font-mono text-green-600">
-                    {formatCurrency(billed)}
-                  </span>
+                  <span className="font-mono text-green-600">{formatCurrency(billed)}</span>
                 </div>
               </CardContent>
             </Card>

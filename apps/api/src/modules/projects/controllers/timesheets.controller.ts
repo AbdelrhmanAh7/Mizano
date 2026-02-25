@@ -22,7 +22,11 @@ export class TimesheetsController {
   @Post('timer/start')
   @Permissions('timesheets.create')
   @ApiOperation({ summary: 'Start timer' })
-  startTimer(@CurrentOrg() orgId: string, @CurrentUser() user: any, @Body() dto: { projectId: string; taskId?: string; description?: string }) {
+  startTimer(
+    @CurrentOrg() orgId: string,
+    @CurrentUser() user: any,
+    @Body() dto: { projectId: string; taskId?: string; description?: string },
+  ) {
     return this.timesheetsService.startTimer(orgId, user.id, dto);
   }
 
@@ -45,7 +49,14 @@ export class TimesheetsController {
   @ApiOperation({ summary: 'Get timesheet entries' })
   findAll(
     @CurrentOrg() orgId: string,
-    @Query() query: { userId?: string; projectId?: string; startDate?: string; endDate?: string; isBilled?: boolean },
+    @Query()
+    query: {
+      userId?: string;
+      projectId?: string;
+      startDate?: string;
+      endDate?: string;
+      isBilled?: boolean;
+    },
   ) {
     return this.timesheetsService.findAll(orgId, query);
   }
@@ -53,7 +64,11 @@ export class TimesheetsController {
   @Get('weekly-summary')
   @Permissions('timesheets.view')
   @ApiOperation({ summary: 'Get weekly summary' })
-  getWeeklySummary(@CurrentOrg() orgId: string, @CurrentUser() user: any, @Query('weekStart') weekStart: string) {
+  getWeeklySummary(
+    @CurrentOrg() orgId: string,
+    @CurrentUser() user: any,
+    @Query('weekStart') weekStart: string,
+  ) {
     return this.timesheetsService.getWeeklySummary(orgId, user.id, weekStart);
   }
 

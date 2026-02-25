@@ -5,26 +5,26 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
-    formatCurrency,
-    getStatusText,
-    getStatusVariant,
-    getTypeText,
-    useInfiniteVendorCredits,
-    VendorCredit,
+  formatCurrency,
+  getStatusText,
+  getStatusVariant,
+  getTypeText,
+  useInfiniteVendorCredits,
+  VendorCredit,
 } from '@/lib/hooks/use-vendor-credits';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';

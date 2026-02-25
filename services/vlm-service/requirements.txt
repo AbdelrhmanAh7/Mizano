@@ -1,0 +1,16 @@
+# ── PyTorch (installed separately in Dockerfile for layer caching) ──
+torch>=2.1.0
+# ── ML / Vision ────────────────────────────────────────────────────
+transformers>=4.45.0
+autoawq>=0.2.0
+qwen-vl-utils>=0.0.8
+accelerate>=0.34.0
+# ── Web framework ──────────────────────────────────────────────────
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+# ── Utilities ──────────────────────────────────────────────────────
+Pillow>=10.0.0
+pdf2image>=1.17.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0

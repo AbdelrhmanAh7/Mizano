@@ -45,14 +45,14 @@ describe('PaymentsReceivedService', () => {
       amount: '1000',
       paymentMode: 'BANK_TRANSFER' as any,
       depositToAccountId: 'bank-acc-001',
-      allocations: [
-        { invoiceId: 'inv-1', amount: '1000' },
-      ],
+      allocations: [{ invoiceId: 'inv-1', amount: '1000' }],
     };
 
     it('should create a payment and generate payment number PMT-001', async () => {
       prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
-      prisma.invoice.findFirst.mockResolvedValue(createMockInvoice({ customerId: 'cust-test-001' }) as any);
+      prisma.invoice.findFirst.mockResolvedValue(
+        createMockInvoice({ customerId: 'cust-test-001' }) as any,
+      );
       prisma.organization.findUnique.mockResolvedValue({
         defaultArAccountId: 'ar-acc-001',
       } as any);
@@ -68,7 +68,13 @@ describe('PaymentsReceivedService', () => {
         paymentNumber: 'PMT-001',
         amount: dec('1000'),
         customer: { id: 'cust-test-001', name: 'Test Customer' },
-        allocations: [{ invoiceId: 'inv-1', amount: dec('1000'), invoice: { id: 'inv-1', invoiceNumber: 'INV-001' } }],
+        allocations: [
+          {
+            invoiceId: 'inv-1',
+            amount: dec('1000'),
+            invoice: { id: 'inv-1', invoiceNumber: 'INV-001' },
+          },
+        ],
       };
       prisma.paymentReceived.create.mockResolvedValue(mockPayment as any);
 
@@ -80,7 +86,9 @@ describe('PaymentsReceivedService', () => {
 
     it('should auto-increment payment numbers', async () => {
       prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
-      prisma.invoice.findFirst.mockResolvedValue(createMockInvoice({ customerId: 'cust-test-001' }) as any);
+      prisma.invoice.findFirst.mockResolvedValue(
+        createMockInvoice({ customerId: 'cust-test-001' }) as any,
+      );
       prisma.organization.findUnique.mockResolvedValue({
         defaultArAccountId: 'ar-acc-001',
       } as any);
@@ -110,9 +118,7 @@ describe('PaymentsReceivedService', () => {
       const mismatchDto = {
         ...validDto,
         amount: '1000',
-        allocations: [
-          { invoiceId: 'inv-1', amount: '500' },
-        ],
+        allocations: [{ invoiceId: 'inv-1', amount: '500' }],
       };
 
       prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
@@ -125,9 +131,7 @@ describe('PaymentsReceivedService', () => {
     it('should reject when customer not found', async () => {
       prisma.customer.findFirst.mockResolvedValue(null);
 
-      await expect(service.create(ORG_ID, validDto)).rejects.toThrow(
-        'Customer not found',
-      );
+      await expect(service.create(ORG_ID, validDto)).rejects.toThrow('Customer not found');
     });
 
     it('should reject when invoice does not belong to customer', async () => {
@@ -136,14 +140,14 @@ describe('PaymentsReceivedService', () => {
       // But invoice not found for this customer
       prisma.invoice.findFirst.mockResolvedValue(null);
 
-      await expect(service.create(ORG_ID, validDto)).rejects.toThrow(
-        /Invoice .* not found/,
-      );
+      await expect(service.create(ORG_ID, validDto)).rejects.toThrow(/Invoice .* not found/);
     });
 
     it('should reject when default AR account is not configured', async () => {
       prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
-      prisma.invoice.findFirst.mockResolvedValue(createMockInvoice({ customerId: 'cust-test-001' }) as any);
+      prisma.invoice.findFirst.mockResolvedValue(
+        createMockInvoice({ customerId: 'cust-test-001' }) as any,
+      );
       prisma.organization.findUnique.mockResolvedValue({
         defaultArAccountId: null,
       } as any);
@@ -155,7 +159,9 @@ describe('PaymentsReceivedService', () => {
 
     it('should reject when deposit account is inactive', async () => {
       prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
-      prisma.invoice.findFirst.mockResolvedValue(createMockInvoice({ customerId: 'cust-test-001' }) as any);
+      prisma.invoice.findFirst.mockResolvedValue(
+        createMockInvoice({ customerId: 'cust-test-001' }) as any,
+      );
       prisma.organization.findUnique.mockResolvedValue({
         defaultArAccountId: 'ar-acc-001',
       } as any);
@@ -168,7 +174,9 @@ describe('PaymentsReceivedService', () => {
 
     it('should create a balanced double-entry journal (Dr Bank, Cr AR)', async () => {
       prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
-      prisma.invoice.findFirst.mockResolvedValue(createMockInvoice({ customerId: 'cust-test-001' }) as any);
+      prisma.invoice.findFirst.mockResolvedValue(
+        createMockInvoice({ customerId: 'cust-test-001' }) as any,
+      );
       prisma.organization.findUnique.mockResolvedValue({
         defaultArAccountId: 'ar-acc-001',
       } as any);
@@ -218,7 +226,9 @@ describe('PaymentsReceivedService', () => {
       };
 
       prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
-      prisma.invoice.findFirst.mockResolvedValue(createMockInvoice({ customerId: 'cust-test-001' }) as any);
+      prisma.invoice.findFirst.mockResolvedValue(
+        createMockInvoice({ customerId: 'cust-test-001' }) as any,
+      );
       prisma.organization.findUnique.mockResolvedValue({
         defaultArAccountId: 'ar-acc-001',
       } as any);
@@ -245,7 +255,9 @@ describe('PaymentsReceivedService', () => {
 
     it('should store payment amount as Decimal', async () => {
       prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
-      prisma.invoice.findFirst.mockResolvedValue(createMockInvoice({ customerId: 'cust-test-001' }) as any);
+      prisma.invoice.findFirst.mockResolvedValue(
+        createMockInvoice({ customerId: 'cust-test-001' }) as any,
+      );
       prisma.organization.findUnique.mockResolvedValue({
         defaultArAccountId: 'ar-acc-001',
       } as any);
@@ -288,9 +300,7 @@ describe('PaymentsReceivedService', () => {
     it('should throw NotFoundException when payment not found', async () => {
       prisma.paymentReceived.findFirst.mockResolvedValue(null);
 
-      await expect(service.findOne(ORG_ID, 'nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.findOne(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
 
     it('should filter by organizationId and exclude soft-deleted', async () => {

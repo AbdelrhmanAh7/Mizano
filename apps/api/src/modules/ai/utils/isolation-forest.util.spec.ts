@@ -15,10 +15,7 @@ describe('isolation-forest.util', () => {
     });
 
     it('should build forest with specified number of trees', () => {
-      const data = Array.from({ length: 100 }, () => [
-        Math.random() * 100,
-        Math.random() * 100,
-      ]);
+      const data = Array.from({ length: 100 }, () => [Math.random() * 100, Math.random() * 100]);
       const forest = buildIsolationForest(data, 50);
       expect(forest.trees).toHaveLength(50);
     });
@@ -71,9 +68,7 @@ describe('isolation-forest.util', () => {
     });
 
     it('should return score between 0 and 1', () => {
-      const data = Array.from({ length: 100 }, () => [
-        Math.random() * 100,
-      ]);
+      const data = Array.from({ length: 100 }, () => [Math.random() * 100]);
       const forest = buildIsolationForest(data, 50);
 
       const score = isolationForestScore([50], forest);

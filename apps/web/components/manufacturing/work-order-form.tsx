@@ -80,10 +80,7 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
   const selectedBomId = form.watch('bomId');
   const selectedQuantity = form.watch('quantity');
 
-  const { data: requirementsData } = useBOMRequirements(
-    selectedBomId,
-    selectedQuantity || 1
-  );
+  const { data: requirementsData } = useBOMRequirements(selectedBomId, selectedQuantity || 1);
   const requirements = requirementsData?.data || [];
 
   const handleSubmit = async (data: WorkOrderFormData) => {
@@ -137,9 +134,7 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
                 </SelectContent>
               </Select>
               {form.formState.errors.bomId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.bomId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.bomId.message}</p>
               )}
             </div>
 
@@ -153,9 +148,7 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
                 {...form.register('quantity', { valueAsNumber: true })}
               />
               {form.formState.errors.quantity && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.quantity.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.quantity.message}</p>
               )}
             </div>
           </div>
@@ -163,25 +156,15 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="startDate">Start Date *</Label>
-              <Input
-                id="startDate"
-                type="date"
-                {...form.register('startDate')}
-              />
+              <Input id="startDate" type="date" {...form.register('startDate')} />
               {form.formState.errors.startDate && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.startDate.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.startDate.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="dueDate">Due Date</Label>
-              <Input
-                id="dueDate"
-                type="date"
-                {...form.register('dueDate')}
-              />
+              <Input id="dueDate" type="date" {...form.register('dueDate')} />
             </div>
           </div>
 
@@ -210,9 +193,7 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
                 </span>
               )}
             </CardTitle>
-            <CardDescription>
-              Materials needed based on BOM and production quantity
-            </CardDescription>
+            <CardDescription>Materials needed based on BOM and production quantity</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>

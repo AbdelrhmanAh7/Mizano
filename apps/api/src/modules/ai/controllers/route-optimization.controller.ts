@@ -1,18 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -40,14 +27,8 @@ export class RouteOptimizationController {
     description: 'Returns optimized route with estimated savings',
     type: OptimizedRouteDto,
   })
-  async optimizeRoute(
-    @CurrentOrg() orgId: string,
-    @Body() body: OptimizeRouteDto,
-  ) {
-    const result = await this.routeOptimizationService.optimizeRoute(
-      orgId,
-      body.deliveryIds,
-    );
+  async optimizeRoute(@CurrentOrg() orgId: string, @Body() body: OptimizeRouteDto) {
+    const result = await this.routeOptimizationService.optimizeRoute(orgId, body.deliveryIds);
     return { data: result };
   }
 
@@ -60,14 +41,8 @@ export class RouteOptimizationController {
     description: 'Returns delivery time estimate',
     type: DeliveryEstimateDto,
   })
-  async estimateDelivery(
-    @CurrentOrg() orgId: string,
-    @Param('deliveryId') deliveryId: string,
-  ) {
-    const result = await this.routeOptimizationService.estimateDelivery(
-      orgId,
-      deliveryId,
-    );
+  async estimateDelivery(@CurrentOrg() orgId: string, @Param('deliveryId') deliveryId: string) {
+    const result = await this.routeOptimizationService.estimateDelivery(orgId, deliveryId);
     return { data: result };
   }
 
@@ -79,9 +54,7 @@ export class RouteOptimizationController {
     description: 'Returns route analytics data',
     type: RouteAnalyticsDto,
   })
-  async getRouteAnalytics(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: RouteAnalyticsDto }> {
+  async getRouteAnalytics(@CurrentOrg() orgId: string): Promise<{ data: RouteAnalyticsDto }> {
     const result = await this.routeOptimizationService.getRouteAnalytics(orgId);
     return { data: result };
   }

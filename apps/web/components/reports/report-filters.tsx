@@ -4,11 +4,7 @@ import { useState } from 'react';
 import { format, startOfMonth, endOfMonth, startOfYear, subMonths, subYears } from 'date-fns';
 import { CalendarIcon, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -130,8 +126,7 @@ export function ReportFilters({
                     mode="single"
                     selected={dateRange.startDate}
                     onSelect={(date) =>
-                      date &&
-                      onDateRangeChange({ ...dateRange, startDate: date })
+                      date && onDateRangeChange({ ...dateRange, startDate: date })
                     }
                     initialFocus
                   />
@@ -149,9 +144,7 @@ export function ReportFilters({
                   <Calendar
                     mode="single"
                     selected={dateRange.endDate}
-                    onSelect={(date) =>
-                      date && onDateRangeChange({ ...dateRange, endDate: date })
-                    }
+                    onSelect={(date) => date && onDateRangeChange({ ...dateRange, endDate: date })}
                     initialFocus
                   />
                 </PopoverContent>

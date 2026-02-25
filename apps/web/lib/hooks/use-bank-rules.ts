@@ -78,8 +78,7 @@ export function useUpdateBankRule() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
-      bankRulesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: any }) => bankRulesApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-rules'] });
       toast.success('Bank rule updated successfully');

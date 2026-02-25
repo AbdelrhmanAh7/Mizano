@@ -183,8 +183,13 @@ export function useImportData() {
 
 export function useExportData() {
   return useMutation({
-    mutationFn: ({ entityType, options }: { entityType: ImportEntityType; options?: ExportOptions }) =>
-      importExportApi.exportData(entityType, options),
+    mutationFn: ({
+      entityType,
+      options,
+    }: {
+      entityType: ImportEntityType;
+      options?: ExportOptions;
+    }) => importExportApi.exportData(entityType, options),
   });
 }
 
@@ -273,7 +278,7 @@ export function downloadBlob(blob: Blob, filename: string) {
 
 export function generateSuggestedMappings(
   headers: string[],
-  fieldDefinitions: FieldDefinition[]
+  fieldDefinitions: FieldDefinition[],
 ): ColumnMapping[] {
   const mappings: ColumnMapping[] = [];
 
@@ -320,7 +325,7 @@ function getDefaultTransform(fieldType: string): ColumnMapping['transform'] {
 export function validateRow(
   row: Record<string, any>,
   mappings: ColumnMapping[],
-  fieldDefinitions: FieldDefinition[]
+  fieldDefinitions: FieldDefinition[],
 ): ValidationError[] {
   const errors: ValidationError[] = [];
 

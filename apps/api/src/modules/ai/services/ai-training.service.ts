@@ -76,9 +76,7 @@ export class AiTrainingService {
       },
     });
 
-    this.logger.debug(
-      `Added training data for ${feature} in org ${organizationId}`,
-    );
+    this.logger.debug(`Added training data for ${feature} in org ${organizationId}`);
 
     return { id: record.id };
   }
@@ -334,8 +332,7 @@ export class AiTrainingService {
     organizationId: string,
     feature: AiFeature,
   ): Promise<TrainingReadiness> {
-    const minimumRequired =
-      MINIMUM_TRAINING_SAMPLES[feature] ?? DEFAULT_MIN_SAMPLES;
+    const minimumRequired = MINIMUM_TRAINING_SAMPLES[feature] ?? DEFAULT_MIN_SAMPLES;
     const warnings: string[] = [];
 
     const [total, distribution] = await Promise.all([
@@ -347,9 +344,7 @@ export class AiTrainingService {
 
     // Check total sample count
     if (total < minimumRequired) {
-      warnings.push(
-        `Insufficient training data: ${total}/${minimumRequired} samples`,
-      );
+      warnings.push(`Insufficient training data: ${total}/${minimumRequired} samples`);
       return {
         isReady: false,
         currentSamples: total,

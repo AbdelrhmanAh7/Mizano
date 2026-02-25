@@ -53,7 +53,7 @@ async function bootstrap() {
     throw new Error('CORS_ORIGIN environment variable must be set in production');
   }
   app.enableCors({
-    origin: corsOrigin || 'http://localhost:3000',
+    origin: corsOrigin || 'http://localhost:5001',
     credentials: true,
   });
 
@@ -87,7 +87,7 @@ async function bootstrap() {
   // Graceful shutdown
   app.enableShutdownHooks();
 
-  const port = configService.get('PORT', 3000);
+  const port = configService.get('API_PORT') || configService.get('PORT', 6001);
   await app.listen(port);
 
   logger.log(`Mizano ERP API running on: http://localhost:${port}`);

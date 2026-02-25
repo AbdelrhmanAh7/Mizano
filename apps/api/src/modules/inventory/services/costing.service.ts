@@ -124,12 +124,15 @@ export class CostingService {
     });
 
     // Group by item
-    const itemMap = new Map<string, {
-      itemName: string;
-      sku: string;
-      totalQuantity: Decimal;
-      totalValue: Decimal;
-    }>();
+    const itemMap = new Map<
+      string,
+      {
+        itemName: string;
+        sku: string;
+        totalQuantity: Decimal;
+        totalValue: Decimal;
+      }
+    >();
 
     for (const layer of layers) {
       const existing = itemMap.get(layer.itemId);
@@ -183,7 +186,12 @@ export class CostingService {
     itemId: string,
     warehouseId?: string,
   ): Promise<{ avgCostPerUnit: Decimal; totalQuantity: Decimal; totalValue: Decimal }> {
-    const where: { organizationId: string; itemId: string; warehouseId?: string; quantity: { gt: Decimal } } = {
+    const where: {
+      organizationId: string;
+      itemId: string;
+      warehouseId?: string;
+      quantity: { gt: Decimal };
+    } = {
       organizationId,
       itemId,
       quantity: { gt: new Decimal(0) },
@@ -200,9 +208,7 @@ export class CostingService {
       totalValue = totalValue.add(layer.quantity.mul(layer.costPerUnit));
     }
 
-    const avgCostPerUnit = totalQuantity.gt(0)
-      ? totalValue.div(totalQuantity)
-      : new Decimal(0);
+    const avgCostPerUnit = totalQuantity.gt(0) ? totalValue.div(totalQuantity) : new Decimal(0);
 
     return { avgCostPerUnit, totalQuantity, totalValue };
   }

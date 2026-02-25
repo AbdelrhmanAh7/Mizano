@@ -68,9 +68,7 @@ export default function NewItemPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">New Item</h1>
-          <p className="text-muted-foreground">
-            Add a new product or service
-          </p>
+          <p className="text-muted-foreground">Add a new product or service</p>
         </div>
       </div>
 

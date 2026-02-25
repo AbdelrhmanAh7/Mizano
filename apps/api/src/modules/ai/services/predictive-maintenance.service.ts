@@ -1,10 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
-import {
-  holtWinters,
-  simpleExponentialSmoothing,
-} from '../utils/holt-winters.util';
+import { holtWinters, simpleExponentialSmoothing } from '../utils/holt-winters.util';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ss = require('simple-statistics');
@@ -81,8 +78,7 @@ export class PredictiveMaintenanceService {
     // Depreciation progression
     const purchasePrice = Number(asset.purchasePrice);
     const accumulatedDepreciation = Number(asset.accumulatedDepreciation);
-    const depreciationRatio =
-      purchasePrice > 0 ? accumulatedDepreciation / purchasePrice : 1;
+    const depreciationRatio = purchasePrice > 0 ? accumulatedDepreciation / purchasePrice : 1;
 
     // Book value ratio
     const currentBookValue = Number(asset.currentBookValue);
@@ -94,10 +90,7 @@ export class PredictiveMaintenanceService {
     // Health score calculation
     const healthScore = Math.max(
       0,
-      Math.min(
-        1,
-        1 - (ageRatio * 0.4 + depreciationRatio * 0.4 + maintenanceFlag * 0.2),
-      ),
+      Math.min(1, 1 - (ageRatio * 0.4 + depreciationRatio * 0.4 + maintenanceFlag * 0.2)),
     );
     const riskScore = 1 - healthScore;
 
@@ -131,8 +124,7 @@ export class PredictiveMaintenanceService {
         }
 
         // Find when book value approaches salvage value or health drops below 0.2
-        const lastScheduleDate =
-          depreciationSchedule[depreciationSchedule.length - 1];
+        const lastScheduleDate = depreciationSchedule[depreciationSchedule.length - 1];
         const startDate = new Date(lastScheduleDate.year, lastScheduleDate.month - 1, 1);
 
         for (let i = 0; i < forecasts.length; i++) {
@@ -231,9 +223,7 @@ export class PredictiveMaintenanceService {
   /**
    * Get all assets needing maintenance attention (riskScore >= 0.5)
    */
-  async getMaintenanceSchedule(
-    organizationId: string,
-  ): Promise<MaintenanceScheduleEntry[]> {
+  async getMaintenanceSchedule(organizationId: string): Promise<MaintenanceScheduleEntry[]> {
     const predictions = await this.prisma.assetMaintenancePrediction.findMany({
       where: {
         organizationId,
@@ -292,13 +282,9 @@ export class PredictiveMaintenanceService {
 
       const purchasePrice = Number(asset.purchasePrice);
       const accumulatedDepreciation = Number(asset.accumulatedDepreciation);
-      const depreciationRatio =
-        purchasePrice > 0 ? accumulatedDepreciation / purchasePrice : 1;
+      const depreciationRatio = purchasePrice > 0 ? accumulatedDepreciation / purchasePrice : 1;
 
-      const healthScore = Math.max(
-        0,
-        Math.min(1, 1 - (ageRatio * 0.4 + depreciationRatio * 0.4)),
-      );
+      const healthScore = Math.max(0, Math.min(1, 1 - (ageRatio * 0.4 + depreciationRatio * 0.4)));
 
       return {
         assetId: asset.id,
@@ -397,10 +383,7 @@ export class PredictiveMaintenanceService {
   /**
    * Get existing prediction ID for upsert, or generate a new cuid
    */
-  private async getExistingPredictionId(
-    organizationId: string,
-    assetId: string,
-  ): Promise<string> {
+  private async getExistingPredictionId(organizationId: string, assetId: string): Promise<string> {
     const existing = await this.prisma.assetMaintenancePrediction.findFirst({
       where: { organizationId, assetId },
       select: { id: true },

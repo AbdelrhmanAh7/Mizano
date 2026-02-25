@@ -77,12 +77,16 @@ export interface HolidayConfig {
 // ============ API Functions ============
 
 const demandForecastApi = {
-  getDemandForecast: async (itemId: string, horizon?: number, params?: {
-    alpha?: number;
-    beta?: number;
-    gamma?: number;
-    seasonLength?: number;
-  }) => {
+  getDemandForecast: async (
+    itemId: string,
+    horizon?: number,
+    params?: {
+      alpha?: number;
+      beta?: number;
+      gamma?: number;
+      seasonLength?: number;
+    },
+  ) => {
     const response = await api.get(`/ai/demand-forecast/item/${itemId}`, {
       params: { horizon, ...params },
     });
@@ -115,7 +119,7 @@ const demandForecastApi = {
 export function useItemDemandForecast(
   itemId: string,
   horizon?: number,
-  params?: { alpha?: number; beta?: number; gamma?: number; seasonLength?: number }
+  params?: { alpha?: number; beta?: number; gamma?: number; seasonLength?: number },
 ) {
   return useQuery({
     queryKey: ['ai-demand-forecast', itemId, horizon, params],
@@ -183,7 +187,9 @@ export function getForecastConfidenceLabel(confidence: 'high' | 'medium' | 'low'
   return labels[confidence];
 }
 
-export function getForecastMethodLabel(method: 'holt-winters' | 'double-exponential' | 'simple-exponential'): string {
+export function getForecastMethodLabel(
+  method: 'holt-winters' | 'double-exponential' | 'simple-exponential',
+): string {
   const labels = {
     'holt-winters': 'Holt-Winters (Seasonal)',
     'double-exponential': 'Double Exponential (Trending)',
@@ -196,7 +202,9 @@ export function formatMAPE(mape: number): string {
   return `${mape.toFixed(1)}% error`;
 }
 
-export function getSeasonalPatternLabel(pattern: 'seasonal' | 'trending' | 'stable' | 'volatile'): string {
+export function getSeasonalPatternLabel(
+  pattern: 'seasonal' | 'trending' | 'stable' | 'volatile',
+): string {
   const labels = {
     seasonal: 'Seasonal Pattern',
     trending: 'Trending Pattern',
@@ -206,7 +214,9 @@ export function getSeasonalPatternLabel(pattern: 'seasonal' | 'trending' | 'stab
   return labels[pattern];
 }
 
-export function getSeasonalPatternIcon(pattern: 'seasonal' | 'trending' | 'stable' | 'volatile'): string {
+export function getSeasonalPatternIcon(
+  pattern: 'seasonal' | 'trending' | 'stable' | 'volatile',
+): string {
   const icons = {
     seasonal: '🔄',
     trending: '📈',

@@ -22,16 +22,12 @@ describe('holt-winters.util', () => {
 
   describe('holtWinters', () => {
     it('should throw error for insufficient data', () => {
-      expect(() => holtWinters([1, 2, 3], 6, { seasonLength: 12 })).toThrow(
-        /Insufficient data/,
-      );
+      expect(() => holtWinters([1, 2, 3], 6, { seasonLength: 12 })).toThrow(/Insufficient data/);
     });
 
     it('should require at least 2x season length', () => {
       const shortData = Array(23).fill(100);
-      expect(() =>
-        holtWinters(shortData, 6, { seasonLength: 12 }),
-      ).toThrow();
+      expect(() => holtWinters(shortData, 6, { seasonLength: 12 })).toThrow();
     });
 
     it('should return correct structure with 24+ data points', () => {

@@ -97,9 +97,7 @@ export function BankAccountForm({
                 {...form.register('accountName')}
               />
               {form.formState.errors.accountName && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.accountName.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.accountName.message}</p>
               )}
             </div>
 
@@ -126,11 +124,7 @@ export function BankAccountForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="bankName">Bank Name</Label>
-              <Input
-                id="bankName"
-                placeholder="e.g., Chase Bank"
-                {...form.register('bankName')}
-              />
+              <Input id="bankName" placeholder="e.g., Chase Bank" {...form.register('bankName')} />
             </div>
 
             <div className="space-y-2">

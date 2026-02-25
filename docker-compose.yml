@@ -48,6 +48,45 @@ services:
       timeout: 5s
       retries: 5
 
+  vlm-service:
+    profiles:
+      - vlm
+    build:
+      context: services/vlm-service
+      dockerfile: Dockerfile
+      args:
+        INSTALL_VLLM: "false"
+    container_name: mizano-vlm
+    restart: unless-stopped
+    ports:
+      - '8100:8100'
+    environment:
+      - MODEL_NAME=Qwen/Qwen2.5-VL-7B-Instruct-AWQ
+      - DEVICE=cuda
+      - MAX_NEW_TOKENS=4096
+      - TEMPERATURE=0.1
+      - HOST=0.0.0.0
+      - PORT=8100
+      - LOG_LEVEL=info
+      - VLM_MOCK=false
+      - MAX_IMAGE_RESOLUTION=1280
+    volumes:
+      - vlm_models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ['CMD', 'python3', '-c', "import urllib.request; urllib.request.urlopen('http://localhost:8100/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+
 volumes:
   postgres_data:
   redis_data:
+  vlm_models:

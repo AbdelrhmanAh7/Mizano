@@ -103,14 +103,9 @@ export function containsReference(text: string, reference: string): boolean {
 /**
  * Check if text contains any of the given references
  */
-export function containsAnyReference(
-  text: string,
-  references: string[],
-): boolean {
+export function containsAnyReference(text: string, references: string[]): boolean {
   const normalizedText = normalizeText(text);
-  return references.some((ref) =>
-    normalizedText.includes(normalizeText(ref)),
-  );
+  return references.some((ref) => normalizedText.includes(normalizeText(ref)));
 }
 
 /**
@@ -118,9 +113,7 @@ export function containsAnyReference(
  */
 export function extractNumbers(text: string): number[] {
   const matches = text.match(/[\d,]+\.?\d*/g) || [];
-  return matches
-    .map((m) => parseFloat(m.replace(/,/g, '')))
-    .filter((n) => !isNaN(n));
+  return matches.map((m) => parseFloat(m.replace(/,/g, ''))).filter((n) => !isNaN(n));
 }
 
 /**
@@ -152,8 +145,7 @@ export function extractDocumentNumbers(text: string): string[] {
  */
 export function documentNumberSimilarity(num1: string, num2: string): number {
   // Normalize document numbers
-  const normalize = (n: string) =>
-    n.toUpperCase().replace(/[-\s]/g, '');
+  const normalize = (n: string) => n.toUpperCase().replace(/[-\s]/g, '');
   const n1 = normalize(num1);
   const n2 = normalize(num2);
 
@@ -180,10 +172,7 @@ export function findBestMatch(
   let bestIndex = -1;
 
   for (let i = 0; i < candidates.length; i++) {
-    const similarity = levenshteinSimilarity(
-      normalizeText(target),
-      normalizeText(candidates[i]),
-    );
+    const similarity = levenshteinSimilarity(normalizeText(target), normalizeText(candidates[i]));
     if (similarity > bestSimilarity && similarity >= threshold) {
       bestSimilarity = similarity;
       bestMatch = candidates[i];
@@ -198,11 +187,7 @@ export function findBestMatch(
  * Calculate n-gram similarity between two strings
  * @param n Size of n-grams (default: 2 for bigrams)
  */
-export function nGramSimilarity(
-  str1: string,
-  str2: string,
-  n: number = 2,
-): number {
+export function nGramSimilarity(str1: string, str2: string, n: number = 2): number {
   const getNGrams = (str: string): Set<string> => {
     const normalized = normalizeText(str);
     const ngrams = new Set<string>();
@@ -284,9 +269,6 @@ export function patternMatches(pattern: string, description: string): boolean {
   const extractedPattern = extractPattern(description);
   return (
     normalizeText(pattern) === normalizeText(extractedPattern) ||
-    levenshteinSimilarity(
-      normalizeText(pattern),
-      normalizeText(extractedPattern),
-    ) > 0.85
+    levenshteinSimilarity(normalizeText(pattern), normalizeText(extractedPattern)) > 0.85
   );
 }

@@ -11,7 +11,7 @@ const publicPaths = ['/login', '/register'];
 // Check if path is public (remove locale prefix for checking)
 function isPublicPath(pathname: string): boolean {
   const pathWithoutLocale = pathname.replace(/^\/(en|ar)/, '') || '/';
-  return publicPaths.some(path => pathWithoutLocale.startsWith(path));
+  return publicPaths.some((path) => pathWithoutLocale.startsWith(path));
 }
 
 // Extract locale from pathname
@@ -24,11 +24,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip middleware for API routes, static files, etc.
-  if (
-    pathname.startsWith('/api/') ||
-    pathname.startsWith('/_next') ||
-    pathname.includes('.')
-  ) {
+  if (pathname.startsWith('/api/') || pathname.startsWith('/_next') || pathname.includes('.')) {
     return NextResponse.next();
   }
 
@@ -39,7 +35,9 @@ export async function middleware(request: NextRequest) {
   // This avoids expensive JWT verification for unauthenticated visitors on login/register
   if (isPublicPath(pathname)) {
     // Quick check: if no session cookie exists, skip token verification entirely
-    const sessionCookie = request.cookies.get('next-auth.session-token') || request.cookies.get('__Secure-next-auth.session-token');
+    const sessionCookie =
+      request.cookies.get('next-auth.session-token') ||
+      request.cookies.get('__Secure-next-auth.session-token');
     if (!sessionCookie) {
       return intlMiddleware(request);
     }

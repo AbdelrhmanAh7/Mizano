@@ -68,7 +68,12 @@ export class AttendanceController {
     @Query('month') month: string,
     @Query('year') year: string,
   ) {
-    return this.attendanceService.getAttendanceSummary(orgId, employeeId, parseInt(month), parseInt(year));
+    return this.attendanceService.getAttendanceSummary(
+      orgId,
+      employeeId,
+      parseInt(month),
+      parseInt(year),
+    );
   }
 
   @Put(':id')

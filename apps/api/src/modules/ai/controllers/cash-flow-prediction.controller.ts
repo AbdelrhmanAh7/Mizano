@@ -1,18 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -53,10 +40,7 @@ export class CashFlowPredictionController {
     @CurrentOrg() orgId: string,
     @Query() query: ForecastQueryDto,
   ): Promise<{ data: CashFlowPredictionResponse }> {
-    const forecast = await this.cashFlowPredictionService.predict(
-      orgId,
-      query.horizon || 90,
-    );
+    const forecast = await this.cashFlowPredictionService.predict(orgId, query.horizon || 90);
     return { data: forecast };
   }
 
@@ -68,9 +52,7 @@ export class CashFlowPredictionController {
     description: 'Returns quick forecast summary',
     type: QuickForecastResponse,
   })
-  async getQuickForecast(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: QuickForecastResponse }> {
+  async getQuickForecast(@CurrentOrg() orgId: string): Promise<{ data: QuickForecastResponse }> {
     const forecast = await this.cashFlowPredictionService.getQuickForecast(orgId);
     return { data: forecast };
   }
@@ -83,9 +65,7 @@ export class CashFlowPredictionController {
     description: 'Returns three scenario forecasts',
     type: ScenariosResponse,
   })
-  async getScenarios(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: ScenariosResponse }> {
+  async getScenarios(@CurrentOrg() orgId: string): Promise<{ data: ScenariosResponse }> {
     const scenarios = await this.cashFlowPredictionService.getScenarios(orgId);
     return { data: scenarios };
   }
@@ -98,9 +78,7 @@ export class CashFlowPredictionController {
     description: 'Returns cash flow alerts',
     type: [CashFlowAlertResponse],
   })
-  async getAlerts(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: CashFlowAlertResponse[] }> {
+  async getAlerts(@CurrentOrg() orgId: string): Promise<{ data: CashFlowAlertResponse[] }> {
     const alerts = await this.cashFlowPredictionService.getAlerts(orgId);
     return { data: alerts };
   }
@@ -139,9 +117,7 @@ export class CashFlowPredictionController {
     description: 'Returns recalculation result',
     type: RecalculateResultResponse,
   })
-  async recalculate(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: RecalculateResultResponse }> {
+  async recalculate(@CurrentOrg() orgId: string): Promise<{ data: RecalculateResultResponse }> {
     const result = await this.cashFlowPredictionService.dailyRecalculate(orgId);
     return { data: result };
   }

@@ -9,13 +9,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -66,9 +60,7 @@ export class AiAlertsController {
   @Permissions('ai.view')
   @ApiOperation({ summary: 'Get alert summary for dashboard' })
   @ApiResponse({ status: 200, type: AlertSummaryResponse })
-  async getSummary(
-    @CurrentOrg() organizationId: string,
-  ): Promise<AlertSummaryResponse> {
+  async getSummary(@CurrentOrg() organizationId: string): Promise<AlertSummaryResponse> {
     return this.alertsService.getAlertSummary(organizationId);
   }
 
@@ -93,11 +85,7 @@ export class AiAlertsController {
     @Param('category') category: AlertCategory,
     @Query() query: AlertLimitDto,
   ): Promise<UnifiedAlertResponse[]> {
-    return this.alertsService.getAlertsByCategory(
-      organizationId,
-      category,
-      query.limit,
-    );
+    return this.alertsService.getAlertsByCategory(organizationId, category, query.limit);
   }
 
   @Post('aggregate')
@@ -105,9 +93,7 @@ export class AiAlertsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Aggregate alerts from all AI sources' })
   @ApiResponse({ status: 200, type: AggregateResultResponse })
-  async aggregateAlerts(
-    @CurrentOrg() organizationId: string,
-  ): Promise<AggregateResultResponse> {
+  async aggregateAlerts(@CurrentOrg() organizationId: string): Promise<AggregateResultResponse> {
     return this.alertsService.aggregateAlerts(organizationId);
   }
 
@@ -133,10 +119,7 @@ export class AiAlertsController {
     @CurrentOrg() organizationId: string,
     @Body() dto: MarkAllReadDto,
   ): Promise<MarkReadResultResponse> {
-    const count = await this.alertsService.markAllAsRead(
-      organizationId,
-      dto.category,
-    );
+    const count = await this.alertsService.markAllAsRead(organizationId, dto.category);
     return { count };
   }
 
@@ -152,12 +135,7 @@ export class AiAlertsController {
     @Param('id') alertId: string,
     @Body() dto: DismissAlertDto,
   ): Promise<void> {
-    await this.alertsService.dismissAlert(
-      organizationId,
-      alertId,
-      user.id,
-      dto.reason,
-    );
+    await this.alertsService.dismissAlert(organizationId, alertId, user.id, dto.reason);
   }
 
   @Post(':id/action')
@@ -179,9 +157,7 @@ export class AiAlertsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Clean up expired alerts' })
   @ApiResponse({ status: 200, description: 'Number of alerts expired' })
-  async cleanupExpired(
-    @CurrentOrg() organizationId: string,
-  ): Promise<{ expired: number }> {
+  async cleanupExpired(@CurrentOrg() organizationId: string): Promise<{ expired: number }> {
     const expired = await this.alertsService.cleanupExpiredAlerts(organizationId);
     return { expired };
   }

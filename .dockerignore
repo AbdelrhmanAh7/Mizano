@@ -1,6 +1,7 @@
 # Dependencies
 node_modules
 **/node_modules
+.pnpm-store
 
 # Build outputs
 dist
@@ -13,12 +14,17 @@ apps/web/.next/trace
 # Git
 .git
 .gitignore
+.gitattributes
 
 # IDE
 .vscode
 .idea
 *.swp
 *.swo
+
+# AI coding assistants
+.claude/
+.clinerules
 
 # Environment
 .env
@@ -39,13 +45,53 @@ apps/api/src/test/
 
 # Documentation
 docs/
+prompts/
 *.md
 !README.md
 
-# CI/Misc
+# CI/CD
+.github/
 .husky
 .turbo
 **/.turbo
+
+# Config files not needed in image
 .prettierrc
 .prettierignore
+.eslintcache
 commitlint.config.js
+docker-compose*.yml
+
+# ML Models (download at runtime)
+apps/api/ml-models/
+*.onnx
+*.tar
+
+# Generated reports & test data
+kpi-reports/
+test-data/
+tmp/
+temp/
+
+# Database dumps
+*.dump
+*.sql.gz
+
+# Uploads & storage
+uploads/
+storage/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Python / VLM service (excluded from the Node.js root Docker build context)
+services/
+**/__pycache__/
+**/*.py[cod]
+**/*.pyc
+**/*.egg-info/
+**/*.safetensors
+**/*.bin
+**/*.pt
+**/*.pth

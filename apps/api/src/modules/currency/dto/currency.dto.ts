@@ -1,12 +1,4 @@
-import {
-  IsString,
-  IsNumber,
-  IsOptional,
-  IsDateString,
-  IsEnum,
-  Min,
-  Length,
-} from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsDateString, IsEnum, Min, Length } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -19,9 +11,31 @@ export enum CurrencySource {
 
 // Common currency codes
 export const SUPPORTED_CURRENCIES = [
-  'SAR', 'USD', 'EUR', 'GBP', 'AED', 'KWD', 'BHD', 'OMR', 'QAR',
-  'EGP', 'JOD', 'LBP', 'MAD', 'TND', 'IQD', 'SYP', 'YER',
-  'INR', 'PKR', 'CNY', 'JPY', 'TRY', 'CHF', 'AUD', 'CAD',
+  'SAR',
+  'USD',
+  'EUR',
+  'GBP',
+  'AED',
+  'KWD',
+  'BHD',
+  'OMR',
+  'QAR',
+  'EGP',
+  'JOD',
+  'LBP',
+  'MAD',
+  'TND',
+  'IQD',
+  'SYP',
+  'YER',
+  'INR',
+  'PKR',
+  'CNY',
+  'JPY',
+  'TRY',
+  'CHF',
+  'AUD',
+  'CAD',
 ];
 
 // ============ Exchange Rate DTOs ============

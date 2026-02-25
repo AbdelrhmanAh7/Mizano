@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { io, Socket } from 'socket.io-client';
 import { useSession } from 'next-auth/react';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6001/api';
 // Strip the /api path to get the base WS URL
 const WS_URL = API_BASE.replace(/\/api$/, '');
 

@@ -1,12 +1,4 @@
-import {
-  IsString,
-  IsOptional,
-  IsBoolean,
-  IsEnum,
-  Min,
-  Max,
-  IsNumber,
-} from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsEnum, Min, Max, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AlertCategory, AlertPriority, AlertSource } from '@prisma/client';

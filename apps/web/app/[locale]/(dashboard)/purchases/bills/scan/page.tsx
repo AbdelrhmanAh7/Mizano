@@ -41,6 +41,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ConfidenceBadge } from '@/components/ai/confidence-badge';
+import { AccountingEntryPreview } from '@/components/ai/accounting-entry-preview';
 import { useToast } from '@/components/ui/use-toast';
 import {
   useDocumentIntakeProcess,
@@ -173,7 +174,7 @@ export default function ScanBillPage() {
         setStep('review');
         toast({
           title: 'Document processed',
-          description: `Classified as ${result.documentType} with ${Math.round(result.ocrConfidence * 100)}% OCR confidence`,
+          description: `Classified as ${result.documentType} with ${Math.round(result.ocrConfidence * 100)}% confidence (${result.extractionMethod === 'vlm' ? 'VLM' : 'OCR'})`,
         });
       },
       onError: (error: any) => {
@@ -224,7 +225,23 @@ export default function ScanBillPage() {
         taxRate: parseFloat(item.taxRate) || 0,
       })),
       notes: notes || undefined,
-      corrections: Object.keys(corrections).length > 0 ? corrections : undefined,
+      corrections: {
+        ...(Object.keys(corrections).length > 0 ? corrections : {}),
+        // VLM feedback metadata
+        _extractionMethod: intakeResult?.extractionMethod,
+        _originalExtraction: {
+          vendorName: intakeResult?.extractedFields.vendorName ?? null,
+          invoiceNumber: intakeResult?.extractedFields.documentNumber ?? null,
+          date: intakeResult?.extractedFields.date ?? null,
+          dueDate: intakeResult?.extractedFields.dueDate ?? null,
+          total: intakeResult?.extractedFields.total ?? null,
+          subtotal: intakeResult?.extractedFields.subtotal ?? null,
+          tax: intakeResult?.extractedFields.tax ?? null,
+          lineItemCount: intakeResult?.extractedFields.lineItems?.length || 0,
+        },
+        _fieldConfidence: intakeResult?.fieldConfidence,
+        _accountingEntryAccepted: intakeResult?.accountingEntry != null,
+      },
     };
 
     confirmIntake.mutate(data, {
@@ -423,7 +440,7 @@ export default function ScanBillPage() {
                     {processDocument.isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Processing... (this may take a few seconds)
+                        AI is analyzing your invoice...
                       </>
                     ) : (
                       <>
@@ -499,7 +516,15 @@ export default function ScanBillPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
                 Document
-                <ConfidenceBadge confidence={intakeResult.ocrConfidence} size="sm" />
+                <div className="flex items-center gap-2">
+                  <ConfidenceBadge confidence={intakeResult.ocrConfidence} size="sm" />
+                  <Badge
+                    variant={intakeResult.extractionMethod === 'vlm' ? 'default' : 'secondary'}
+                    className="text-xs"
+                  >
+                    {intakeResult.extractionMethod === 'vlm' ? '🧠 VLM' : '📝 OCR'}
+                  </Badge>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -787,6 +812,20 @@ export default function ScanBillPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Accounting Entry Suggestion (from VLM) */}
+            {intakeResult?.accountingEntry && (
+              <AccountingEntryPreview
+                entry={intakeResult.accountingEntry}
+                subtotal={lineItems.reduce(
+                  (sum, item) =>
+                    sum + (parseFloat(item.rate) || 0) * (parseFloat(item.quantity) || 0),
+                  0,
+                )}
+                taxAmount={intakeResult.extractedFields.tax || 0}
+                totalAmount={intakeResult.extractedFields.total || 0}
+              />
+            )}
 
             {/* Actions */}
             <div className="flex items-center justify-between">

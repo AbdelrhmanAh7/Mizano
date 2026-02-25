@@ -62,9 +62,7 @@ export function FlightRiskCard() {
                   <span>Tenure: {formatTenure(employee.tenure || 0)}</span>
                 </div>
                 {employee.recommendations && employee.recommendations.length > 0 && (
-                  <div className="text-xs text-blue-600 mt-1">
-                    💡 {employee.recommendations[0]}
-                  </div>
+                  <div className="text-xs text-blue-600 mt-1">💡 {employee.recommendations[0]}</div>
                 )}
               </div>
               <Button variant="outline" size="sm" asChild>

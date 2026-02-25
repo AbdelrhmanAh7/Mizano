@@ -32,23 +32,48 @@ import { AI_MODELS } from './all-models-config';
 
 // Retraining thresholds (matching backend)
 const RETRAINING_THRESHOLDS: Partial<Record<AiFeature, number>> = {
-  CATEGORIZATION: 50, RECONCILIATION: 30, OCR_LAYOUT: 20, DEMAND_FORECAST: 100,
-  LEAD_SCORING: 20, ANOMALY: 50, REORDER: 50, PAYMENT_PREDICTION: 30,
-  CASH_FLOW: 50, PATTERN_DETECTION: 30, CHURN_PREDICTION: 30, CLV_ANALYSIS: 50,
-  CROSS_SELL: 40, DYNAMIC_PRICING: 50, PIPELINE_FORECAST: 30,
-  FRAUD_DETECTION: 20, COMPLIANCE_MONITORING: 30, AUDIT_RISK: 30,
-  DOCUMENT_CLASSIFICATION: 30, SENTIMENT_ANALYSIS: 50, ENTITY_EXTRACTION: 30,
-  CONTRACT_ANALYSIS: 50, EMPLOYEE_ATTRITION: 30, COMPENSATION_BENCHMARK: 50,
-  SKILLS_GAP: 50, QUALITY_PREDICTION: 40, PREDICTIVE_MAINTENANCE: 40,
-  WORKFORCE_SCHEDULING: 50, ROUTE_OPTIMIZATION: 100, RESOURCE_OPTIMIZATION: 100,
-  CHATBOT: 50, KNOWLEDGE_ASSISTANT: 50,
+  CATEGORIZATION: 50,
+  RECONCILIATION: 30,
+  OCR_LAYOUT: 20,
+  DEMAND_FORECAST: 100,
+  LEAD_SCORING: 20,
+  ANOMALY: 50,
+  REORDER: 50,
+  PAYMENT_PREDICTION: 30,
+  CASH_FLOW: 50,
+  PATTERN_DETECTION: 30,
+  CHURN_PREDICTION: 30,
+  CLV_ANALYSIS: 50,
+  CROSS_SELL: 40,
+  DYNAMIC_PRICING: 50,
+  PIPELINE_FORECAST: 30,
+  FRAUD_DETECTION: 20,
+  COMPLIANCE_MONITORING: 30,
+  AUDIT_RISK: 30,
+  DOCUMENT_CLASSIFICATION: 30,
+  SENTIMENT_ANALYSIS: 50,
+  ENTITY_EXTRACTION: 30,
+  CONTRACT_ANALYSIS: 50,
+  EMPLOYEE_ATTRITION: 30,
+  COMPENSATION_BENCHMARK: 50,
+  SKILLS_GAP: 50,
+  QUALITY_PREDICTION: 40,
+  PREDICTIVE_MAINTENANCE: 40,
+  WORKFORCE_SCHEDULING: 50,
+  ROUTE_OPTIMIZATION: 100,
+  RESOURCE_OPTIMIZATION: 100,
+  CHATBOT: 50,
+  KNOWLEDGE_ASSISTANT: 50,
 };
 
 export function FeedbackCorrectionPanel() {
   const [selectedFeature, setSelectedFeature] = useState<AiFeature>('CATEGORIZATION');
 
   const { data: feedbackStats, isLoading: loadingStats } = useAiFeedbackStats(selectedFeature);
-  const { data: recentFeedback, isLoading: loadingFeedback } = useRecentFeedback(selectedFeature, 30);
+  const { data: recentFeedback, isLoading: loadingFeedback } = useRecentFeedback(
+    selectedFeature,
+    30,
+  );
   const { data: trends } = useFeedbackTrends(selectedFeature, 30);
   const retrain = useTriggerRetraining();
 
@@ -161,17 +186,16 @@ export function FeedbackCorrectionPanel() {
         </CardHeader>
         <CardContent className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              Corrections since last training
+            <span className="text-muted-foreground">Corrections since last training</span>
+            <span className="font-medium">
+              {correctionCount} / {threshold}
             </span>
-            <span className="font-medium">{correctionCount} / {threshold}</span>
           </div>
           <Progress value={thresholdProgress} />
           <p className="text-xs text-muted-foreground">
             {thresholdProgress >= 100
               ? 'Threshold reached! Retraining is recommended.'
-              : `${threshold - correctionCount} more corrections needed before automatic retraining.`
-            }
+              : `${threshold - correctionCount} more corrections needed before automatic retraining.`}
           </p>
         </CardContent>
       </Card>
@@ -185,8 +209,14 @@ export function FeedbackCorrectionPanel() {
           <CardContent>
             <div className="flex items-end gap-0.5 h-24">
               {trendEntries.map((entry: any, idx: number) => {
-                const total = (entry.accepted || 0) + (entry.rejected || 0) + (entry.corrected || 0);
-                const maxVal = Math.max(...trendEntries.map((e: any) => (e.accepted || 0) + (e.rejected || 0) + (e.corrected || 0)), 1);
+                const total =
+                  (entry.accepted || 0) + (entry.rejected || 0) + (entry.corrected || 0);
+                const maxVal = Math.max(
+                  ...trendEntries.map(
+                    (e: any) => (e.accepted || 0) + (e.rejected || 0) + (e.corrected || 0),
+                  ),
+                  1,
+                );
                 const height = total > 0 ? (total / maxVal) * 100 : 0;
                 return (
                   <div
@@ -221,9 +251,11 @@ export function FeedbackCorrectionPanel() {
                 >
                   <Badge
                     variant={
-                      entry.userAction === 'ACCEPTED' ? 'default' :
-                      entry.userAction === 'REJECTED' ? 'destructive' :
-                      'outline'
+                      entry.userAction === 'ACCEPTED'
+                        ? 'default'
+                        : entry.userAction === 'REJECTED'
+                          ? 'destructive'
+                          : 'outline'
                     }
                     className="text-[10px] mt-0.5 shrink-0"
                   >
@@ -235,8 +267,7 @@ export function FeedbackCorrectionPanel() {
                       <code className="text-[10px] bg-muted px-1 rounded truncate max-w-[200px] inline-block">
                         {typeof entry.aiSuggestion === 'object'
                           ? JSON.stringify(entry.aiSuggestion).slice(0, 60)
-                          : String(entry.aiSuggestion).slice(0, 60)
-                        }
+                          : String(entry.aiSuggestion).slice(0, 60)}
                       </code>
                     </div>
                     {entry.userAction === 'CORRECTED' && entry.userAnswer && (
@@ -254,7 +285,8 @@ export function FeedbackCorrectionPanel() {
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground text-sm">
-              No feedback submitted yet for {AI_MODELS.find(m => m.feature === selectedFeature)?.name || selectedFeature}.
+              No feedback submitted yet for{' '}
+              {AI_MODELS.find((m) => m.feature === selectedFeature)?.name || selectedFeature}.
             </div>
           )}
         </CardContent>
@@ -263,7 +295,8 @@ export function FeedbackCorrectionPanel() {
       {/* Retrain result */}
       {retrain.isSuccess && (
         <div className="rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 p-3 text-sm text-green-700 dark:text-green-300">
-          Retraining check complete. {retrain.data?.data?.message || retrain.data?.message || 'Done.'}
+          Retraining check complete.{' '}
+          {retrain.data?.data?.message || retrain.data?.message || 'Done.'}
         </div>
       )}
     </div>

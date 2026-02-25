@@ -3,15 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  ArrowLeft,
-  Edit,
-  Trash2,
-  Package,
-  Layers,
-  DollarSign,
-  Wrench,
-} from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Package, Layers, DollarSign, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -177,10 +169,7 @@ export default function BOMDetailPage() {
             </Link>
           </Button>
           {canDelete && (
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
+            <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </Button>
@@ -196,12 +185,8 @@ export default function BOMDetailPage() {
               <Package className="h-4 w-4" />
               Output Item
             </div>
-            <div className="text-lg font-bold">
-              {bom.outputItem?.name || '-'}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {bom.outputItem?.code}
-            </div>
+            <div className="text-lg font-bold">{bom.outputItem?.name || '-'}</div>
+            <div className="text-xs text-muted-foreground">{bom.outputItem?.code}</div>
           </CardContent>
         </Card>
 
@@ -211,9 +196,7 @@ export default function BOMDetailPage() {
               <Package className="h-4 w-4" />
               Output Quantity
             </div>
-            <div className="text-2xl font-bold">
-              {bom.outputQuantity}
-            </div>
+            <div className="text-2xl font-bold">{bom.outputQuantity}</div>
             <div className="text-xs text-muted-foreground">per production run</div>
           </CardContent>
         </Card>
@@ -224,9 +207,7 @@ export default function BOMDetailPage() {
               <Layers className="h-4 w-4" />
               Components
             </div>
-            <div className="text-2xl font-bold">
-              {bom.components?.length || 0}
-            </div>
+            <div className="text-2xl font-bold">{bom.components?.length || 0}</div>
             <div className="text-xs text-muted-foreground">raw materials</div>
           </CardContent>
         </Card>
@@ -237,9 +218,7 @@ export default function BOMDetailPage() {
               <DollarSign className="h-4 w-4" />
               Operations Cost
             </div>
-            <div className="text-2xl font-bold font-mono">
-              {formatCurrency(bom.operationsCost)}
-            </div>
+            <div className="text-2xl font-bold font-mono">{formatCurrency(bom.operationsCost)}</div>
           </CardContent>
         </Card>
       </div>
@@ -266,26 +245,16 @@ export default function BOMDetailPage() {
               <TableBody>
                 {bom.components.map((component: BOMComponent) => (
                   <TableRow key={component.id}>
-                    <TableCell className="font-mono text-sm">
-                      {component.itemCode || '-'}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {component.itemName || '-'}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {component.quantity}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {component.unit || '-'}
-                    </TableCell>
+                    <TableCell className="font-mono text-sm">{component.itemCode || '-'}</TableCell>
+                    <TableCell className="font-medium">{component.itemName || '-'}</TableCell>
+                    <TableCell className="text-right font-mono">{component.quantity}</TableCell>
+                    <TableCell className="text-muted-foreground">{component.unit || '-'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              No components defined
-            </div>
+            <div className="text-center py-8 text-muted-foreground">No components defined</div>
           )}
         </CardContent>
       </Card>
@@ -296,16 +265,13 @@ export default function BOMDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete BOM</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete BOM &quot;{bom.name}&quot;?
-              This action cannot be undone.
+              Are you sure you want to delete BOM &quot;{bom.name}&quot;? This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

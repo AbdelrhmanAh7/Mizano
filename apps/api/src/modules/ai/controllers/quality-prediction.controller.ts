@@ -1,17 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -43,10 +31,7 @@ export class QualityPredictionController {
     @CurrentOrg() orgId: string,
     @Param('workOrderId') workOrderId: string,
   ) {
-    const result = await this.qualityPredictionService.predictWorkOrderQuality(
-      orgId,
-      workOrderId,
-    );
+    const result = await this.qualityPredictionService.predictWorkOrderQuality(orgId, workOrderId);
     return { data: result };
   }
 
@@ -63,10 +48,7 @@ export class QualityPredictionController {
     @CurrentOrg() orgId: string,
     @Param('bomId') bomId: string,
   ): Promise<{ data: BomQualityMetricsDto }> {
-    const result = await this.qualityPredictionService.getBomQualityMetrics(
-      orgId,
-      bomId,
-    );
+    const result = await this.qualityPredictionService.getBomQualityMetrics(orgId, bomId);
     return { data: result };
   }
 
@@ -78,9 +60,7 @@ export class QualityPredictionController {
     description: 'Returns monthly quality trend data',
     type: [QualityTrendDto],
   })
-  async getQualityTrends(
-    @CurrentOrg() orgId: string,
-  ) {
+  async getQualityTrends(@CurrentOrg() orgId: string) {
     const result = await this.qualityPredictionService.getQualityTrends(orgId);
     return { data: result };
   }
@@ -92,9 +72,7 @@ export class QualityPredictionController {
     status: 200,
     description: 'Returns training results',
   })
-  async trainModel(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: any }> {
+  async trainModel(@CurrentOrg() orgId: string): Promise<{ data: any }> {
     const result = await this.qualityPredictionService.trainModel(orgId);
     return { data: result };
   }

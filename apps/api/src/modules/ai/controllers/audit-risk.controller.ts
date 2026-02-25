@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -46,10 +39,7 @@ export class AuditRiskController {
   @ApiOperation({ summary: 'Get high-risk entities across all types' })
   @ApiQuery({ name: 'limit', required: false })
   @ApiResponse({ status: 200, description: 'Returns list of high-risk entities' })
-  getHighRisk(
-    @CurrentOrg() orgId: string,
-    @Query('limit') limit?: number,
-  ) {
+  getHighRisk(@CurrentOrg() orgId: string, @Query('limit') limit?: number) {
     return this.auditRiskService.getHighRiskEntities(orgId, limit || 20);
   }
 
@@ -58,10 +48,7 @@ export class AuditRiskController {
   @ApiOperation({ summary: 'Batch score all entities of a type' })
   @ApiParam({ name: 'entityType', enum: ['journal', 'invoice', 'bill', 'expense'] })
   @ApiResponse({ status: 200, description: 'Batch scoring completed' })
-  batchScore(
-    @CurrentOrg() orgId: string,
-    @Param('entityType') entityType: string,
-  ) {
+  batchScore(@CurrentOrg() orgId: string, @Param('entityType') entityType: string) {
     return this.auditRiskService.batchScore(orgId, entityType);
   }
 

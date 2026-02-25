@@ -28,22 +28,22 @@ This guide covers the full deployment lifecycle for Mizano ERP, from prerequisit
 
 ### Server Specifications (Minimum)
 
-| Resource | Minimum | Recommended |
-|----------|---------|-------------|
-| CPU | 2 vCPUs | 4 vCPUs |
-| RAM | 4 GB | 8 GB |
-| Storage | 40 GB SSD | 100 GB SSD |
-| OS | Ubuntu 22.04 LTS | Ubuntu 22.04 LTS |
+| Resource | Minimum          | Recommended      |
+| -------- | ---------------- | ---------------- |
+| CPU      | 2 vCPUs          | 4 vCPUs          |
+| RAM      | 4 GB             | 8 GB             |
+| Storage  | 40 GB SSD        | 100 GB SSD       |
+| OS       | Ubuntu 22.04 LTS | Ubuntu 22.04 LTS |
 
 ### Required Software
 
-| Software | Version | Purpose |
-|----------|---------|---------|
-| Docker | 24+ | Container runtime |
-| Docker Compose | 2.20+ | Multi-container orchestration |
-| Node.js | 20 LTS | Build toolchain (if building outside Docker) |
-| pnpm | 8+ | Package manager (if building outside Docker) |
-| Nginx | 1.24+ | Reverse proxy and SSL termination (optional if using cloud LB) |
+| Software       | Version | Purpose                                                        |
+| -------------- | ------- | -------------------------------------------------------------- |
+| Docker         | 24+     | Container runtime                                              |
+| Docker Compose | 2.20+   | Multi-container orchestration                                  |
+| Node.js        | 20 LTS  | Build toolchain (if building outside Docker)                   |
+| pnpm           | 8+      | Package manager (if building outside Docker)                   |
+| Nginx          | 1.24+   | Reverse proxy and SSL termination (optional if using cloud LB) |
 
 ### Domain and SSL
 
@@ -181,6 +181,7 @@ pnpm db:seed
 ```
 
 The seed script creates:
+
 - A default Organization
 - An admin User with a temporary password (must be changed on first login)
 - A standard chart of accounts
@@ -259,9 +260,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "127.0.0.1:5432:5432"  # Only accessible from localhost
+      - '127.0.0.1:5432:5432' # Only accessible from localhost
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mizano -d mizano_db"]
+      test: ['CMD-SHELL', 'pg_isready -U mizano -d mizano_db']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -273,9 +274,9 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "127.0.0.1:6379:6379"  # Only accessible from localhost
+      - '127.0.0.1:6379:6379' # Only accessible from localhost
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -288,14 +289,14 @@ services:
     restart: always
     env_file: .env.production
     ports:
-      - "127.0.0.1:3000:3000"
+      - '127.0.0.1:6001:6001'
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:6001/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -309,11 +310,11 @@ services:
     restart: always
     env_file: .env.production
     ports:
-      - "127.0.0.1:3001:3001"
+      - '127.0.0.1:5001:5001'
     depends_on:
       - api
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:5001']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -370,7 +371,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/mizano.io/privkey.pem;
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:6001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -386,7 +387,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/mizano.io/privkey.pem;
 
     location / {
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:5001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -401,11 +402,11 @@ server {
 
 The API exposes three health check endpoints that should be monitored continuously.
 
-| Endpoint | What it Checks | Expected Response |
-|----------|---------------|-------------------|
-| `GET /health` | API process is running | `{ "status": "ok" }` |
-| `GET /health/db` | PostgreSQL connection is alive | `{ "status": "ok", "database": "connected" }` |
-| `GET /health/redis` | Redis connection is alive | `{ "status": "ok", "redis": "connected" }` |
+| Endpoint            | What it Checks                 | Expected Response                             |
+| ------------------- | ------------------------------ | --------------------------------------------- |
+| `GET /health`       | API process is running         | `{ "status": "ok" }`                          |
+| `GET /health/db`    | PostgreSQL connection is alive | `{ "status": "ok", "database": "connected" }` |
+| `GET /health/redis` | Redis connection is alive      | `{ "status": "ok", "redis": "connected" }`    |
 
 ### Verification
 
@@ -464,15 +465,15 @@ After deployment, verify all critical paths manually or with automated smoke tes
 
 ## Performance Targets
 
-| Metric | Target | How to Measure |
-|--------|--------|----------------|
-| Dashboard load | < 3 seconds | Browser DevTools Network tab (DOMContentLoaded) |
-| API response (list endpoints) | < 500ms | Response time header or logging middleware |
-| API response (single resource) | < 200ms | Response time header or logging middleware |
-| Report generation (1 year data) | < 5 seconds | Measure from request to response complete |
-| Document OCR processing | < 30 seconds | Queue job completion time |
-| Database query (with indexes) | < 100ms | Prisma query logging |
-| Time to First Byte (TTFB) | < 800ms | Lighthouse or WebPageTest |
+| Metric                          | Target       | How to Measure                                  |
+| ------------------------------- | ------------ | ----------------------------------------------- |
+| Dashboard load                  | < 3 seconds  | Browser DevTools Network tab (DOMContentLoaded) |
+| API response (list endpoints)   | < 500ms      | Response time header or logging middleware      |
+| API response (single resource)  | < 200ms      | Response time header or logging middleware      |
+| Report generation (1 year data) | < 5 seconds  | Measure from request to response complete       |
+| Document OCR processing         | < 30 seconds | Queue job completion time                       |
+| Database query (with indexes)   | < 100ms      | Prisma query logging                            |
+| Time to First Byte (TTFB)       | < 800ms      | Lighthouse or WebPageTest                       |
 
 ### Performance Tuning
 
@@ -504,6 +505,7 @@ Configure structured JSON logging for production:
 ```
 
 Log aggregation options:
+
 - **Self-hosted**: ELK Stack (Elasticsearch + Logstash + Kibana) or Loki + Grafana
 - **Managed**: Datadog, AWS CloudWatch, Google Cloud Logging
 
@@ -528,6 +530,7 @@ SENTRY_DSN="https://examplePublicKey@o0.ingest.sentry.io/0"
 ```
 
 Configure in both the NestJS API and Next.js frontend:
+
 - Capture unhandled exceptions automatically
 - Add breadcrumbs for key operations (login, payment processing, journal posting)
 - Set up alerts for new error types and error rate spikes
@@ -536,14 +539,14 @@ Configure in both the NestJS API and Next.js frontend:
 
 Set up alerts for server resource usage:
 
-| Metric | Warning | Critical | Action |
-|--------|---------|----------|--------|
-| CPU usage | > 70% for 5 min | > 90% for 2 min | Scale up or investigate runaway process |
-| Memory usage | > 75% | > 90% | Check for memory leaks, increase RAM |
-| Disk usage | > 75% | > 90% | Clean old backups/logs, expand volume |
-| PostgreSQL connections | > 80% of max | > 95% of max | Increase pool size or add PgBouncer |
-| Redis memory | > 200MB | > 250MB | Review cache TTLs, increase maxmemory |
-| API response time (p95) | > 1 second | > 3 seconds | Profile slow endpoints, check DB indexes |
+| Metric                  | Warning         | Critical        | Action                                   |
+| ----------------------- | --------------- | --------------- | ---------------------------------------- |
+| CPU usage               | > 70% for 5 min | > 90% for 2 min | Scale up or investigate runaway process  |
+| Memory usage            | > 75%           | > 90%           | Check for memory leaks, increase RAM     |
+| Disk usage              | > 75%           | > 90%           | Clean old backups/logs, expand volume    |
+| PostgreSQL connections  | > 80% of max    | > 95% of max    | Increase pool size or add PgBouncer      |
+| Redis memory            | > 200MB         | > 250MB         | Review cache TTLs, increase maxmemory    |
+| API response time (p95) | > 1 second      | > 3 seconds     | Profile slow endpoints, check DB indexes |
 
 ---
 
@@ -606,11 +609,11 @@ echo "Cleaned backups older than $RETENTION_DAYS days"
 
 ### Retention Policy
 
-| Backup Type | Frequency | Retention |
-|-------------|-----------|-----------|
-| Daily full backup | Every day at 2:00 AM | 30 days |
-| Weekly backup (Sunday) | Weekly | 90 days |
-| Monthly backup (1st) | Monthly | 1 year |
+| Backup Type            | Frequency            | Retention |
+| ---------------------- | -------------------- | --------- |
+| Daily full backup      | Every day at 2:00 AM | 30 days   |
+| Weekly backup (Sunday) | Weekly               | 90 days   |
+| Monthly backup (1st)   | Monthly              | 1 year    |
 
 ### Restore Testing
 
@@ -663,18 +666,18 @@ During the first 24 hours after launch, actively monitor:
 
 ### Ongoing Maintenance
 
-| Task | Frequency |
-|------|-----------|
-| Review error tracking / logs | Daily |
-| Verify backup completion | Daily (automated alert) |
-| Update dependencies (security patches) | Weekly |
-| Database vacuum and analyze | Weekly (auto-vacuum should handle this, but verify) |
-| Review and rotate API keys/secrets | Quarterly |
-| Test backup restore procedure | Monthly |
-| Review and update firewall rules | Quarterly |
-| Upgrade PostgreSQL minor versions | As released |
-| Load testing | Before major releases |
-| Security audit | Annually |
+| Task                                   | Frequency                                           |
+| -------------------------------------- | --------------------------------------------------- |
+| Review error tracking / logs           | Daily                                               |
+| Verify backup completion               | Daily (automated alert)                             |
+| Update dependencies (security patches) | Weekly                                              |
+| Database vacuum and analyze            | Weekly (auto-vacuum should handle this, but verify) |
+| Review and rotate API keys/secrets     | Quarterly                                           |
+| Test backup restore procedure          | Monthly                                             |
+| Review and update firewall rules       | Quarterly                                           |
+| Upgrade PostgreSQL minor versions      | As released                                         |
+| Load testing                           | Before major releases                               |
+| Security audit                         | Annually                                            |
 
 ---
 
@@ -749,6 +752,7 @@ curl -s https://api.mizano.io/health/redis | jq .
 ### Step 5: Post-Mortem
 
 After stabilizing:
+
 1. Document what went wrong and why
 2. Identify the root cause of the failure
 3. Fix the issue on a development branch

@@ -58,9 +58,7 @@ describe('Multi-Tenancy (e2e)', () => {
 
   describe('Cross-Org Access Prevention', () => {
     it('should return 403 or 404 when accessing other org resources with orgId param', async () => {
-      const res = await apiOrg1
-        .get('/invoices')
-        .query({ organizationId: 'other-org-002' });
+      const res = await apiOrg1.get('/invoices').query({ organizationId: 'other-org-002' });
 
       // OrganizationGuard should block this (403) or endpoint ignores param (200 with own data)
       expect([200, 403, 404]).toContain(res.status);

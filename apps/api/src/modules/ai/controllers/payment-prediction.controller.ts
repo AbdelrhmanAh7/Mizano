@@ -1,17 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -44,10 +32,7 @@ export class PaymentPredictionController {
     @CurrentOrg() orgId: string,
     @Param('id') invoiceId: string,
   ): Promise<{ data: PaymentPredictionResponse | null }> {
-    const prediction = await this.predictionService.predictPaymentDate(
-      orgId,
-      invoiceId,
-    );
+    const prediction = await this.predictionService.predictPaymentDate(orgId, invoiceId);
     return { data: prediction };
   }
 
@@ -79,10 +64,7 @@ export class PaymentPredictionController {
     @CurrentOrg() orgId: string,
     @Param('id') customerId: string,
   ): Promise<{ data: CustomerPaymentProfileResponse | null }> {
-    const profile = await this.predictionService.getCustomerPaymentProfile(
-      orgId,
-      customerId,
-    );
+    const profile = await this.predictionService.getCustomerPaymentProfile(orgId, customerId);
     return { data: profile };
   }
 
@@ -99,10 +81,7 @@ export class PaymentPredictionController {
     @CurrentOrg() orgId: string,
     @Param('id') customerId: string,
   ): Promise<{ data: PaymentHistoryDetailResponse }> {
-    const details = await this.predictionService.getPaymentHistoryDetails(
-      orgId,
-      customerId,
-    );
+    const details = await this.predictionService.getPaymentHistoryDetails(orgId, customerId);
     return { data: details };
   }
 
@@ -128,9 +107,7 @@ export class PaymentPredictionController {
     status: 200,
     description: 'Profiles rebuilt successfully',
   })
-  async rebuildProfiles(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: { updated: number } }> {
+  async rebuildProfiles(@CurrentOrg() orgId: string): Promise<{ data: { updated: number } }> {
     const result = await this.predictionService.updatePredictions(orgId);
     return { data: result };
   }

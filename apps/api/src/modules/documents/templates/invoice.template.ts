@@ -35,10 +35,7 @@ export interface InvoiceData {
   terms?: string;
 }
 
-export function generateInvoiceHtml(
-  org: OrganizationInfo,
-  invoice: InvoiceData,
-): string {
+export function generateInvoiceHtml(org: OrganizationInfo, invoice: InvoiceData): string {
   const primaryColor = org.primaryColor || defaultTemplateConfig.colors.primary;
 
   const statusColors: Record<string, string> = {
@@ -126,19 +123,27 @@ export function generateInvoiceHtml(
         )}
 
         <!-- Notes and Terms -->
-        ${invoice.notes ? `
+        ${
+          invoice.notes
+            ? `
           <div style="margin-top: 30px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">Notes</h4>
             <p style="color: #6B7280; font-size: 12px; white-space: pre-line;">${invoice.notes}</p>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
 
-        ${invoice.terms ? `
+        ${
+          invoice.terms
+            ? `
           <div style="margin-top: 20px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">Terms & Conditions</h4>
             <p style="color: #6B7280; font-size: 12px; white-space: pre-line;">${invoice.terms}</p>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
 
         ${generateFooterHtml(org, primaryColor)}
       </div>

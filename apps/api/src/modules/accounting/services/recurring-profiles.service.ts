@@ -11,8 +11,17 @@ export class RecurringProfilesService {
   constructor(private prisma: PrismaService) {}
 
   async create(organizationId: string, createRecurringProfileDto: CreateRecurringProfileDto) {
-    const { name, frequency, startDate, endDate, autoPost, autoSend, templateData, entityType, type } =
-      createRecurringProfileDto;
+    const {
+      name,
+      frequency,
+      startDate,
+      endDate,
+      autoPost,
+      autoSend,
+      templateData,
+      entityType,
+      type,
+    } = createRecurringProfileDto;
 
     const nextRunDate = this.calculateNextRunDate(new Date(startDate), frequency);
 
@@ -124,11 +133,11 @@ export class RecurringProfilesService {
 
     // Recalculate next run date if frequency changes
     let nextRunDate = profile.nextRunDate;
-    if (updateRecurringProfileDto.frequency && updateRecurringProfileDto.frequency !== profile.frequency) {
-      nextRunDate = this.calculateNextRunDate(
-        new Date(),
-        updateRecurringProfileDto.frequency,
-      );
+    if (
+      updateRecurringProfileDto.frequency &&
+      updateRecurringProfileDto.frequency !== profile.frequency
+    ) {
+      nextRunDate = this.calculateNextRunDate(new Date(), updateRecurringProfileDto.frequency);
     }
 
     // Build update data, excluding type and entityType which need special handling
@@ -201,10 +210,7 @@ export class RecurringProfilesService {
       where: {
         isActive: true,
         nextRunDate: { lte: today },
-        OR: [
-          { endDate: null },
-          { endDate: { gte: today } },
-        ],
+        OR: [{ endDate: null }, { endDate: { gte: today } }],
       },
     });
 
@@ -239,7 +245,7 @@ export class RecurringProfilesService {
     const templateData = profile.templateData as any;
     const entityType = profile.type || profile.entityType;
     let createdEntityId: string = '';
-    let createdEntityType: string = entityType;
+    const createdEntityType: string = entityType;
 
     try {
       switch (entityType?.toLowerCase()) {
@@ -358,7 +364,9 @@ export class RecurringProfilesService {
       where: { id: templateData.customerId, organizationId: profile.organizationId },
     });
     if (!customer) {
-      throw new NotFoundException(`Customer ${templateData.customerId} not found for this organization`);
+      throw new NotFoundException(
+        `Customer ${templateData.customerId} not found for this organization`,
+      );
     }
     const paymentTerms = customer.paymentTerms || 30;
     const dueDate = new Date();
@@ -416,7 +424,9 @@ export class RecurringProfilesService {
       where: { id: templateData.vendorId, organizationId: profile.organizationId },
     });
     if (!vendor) {
-      throw new NotFoundException(`Vendor ${templateData.vendorId} not found for this organization`);
+      throw new NotFoundException(
+        `Vendor ${templateData.vendorId} not found for this organization`,
+      );
     }
     const paymentTerms = vendor.paymentTerms || 30;
     const dueDate = new Date();

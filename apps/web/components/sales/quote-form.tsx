@@ -178,9 +178,7 @@ export function QuoteForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.customerId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
               )}
             </div>
 
@@ -197,29 +195,17 @@ export function QuoteForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="quoteDate">Quote Date *</Label>
-              <Input
-                id="quoteDate"
-                type="date"
-                {...form.register('quoteDate')}
-              />
+              <Input id="quoteDate" type="date" {...form.register('quoteDate')} />
               {form.formState.errors.quoteDate && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.quoteDate.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.quoteDate.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="expiryDate">Expiry Date *</Label>
-              <Input
-                id="expiryDate"
-                type="date"
-                {...form.register('expiryDate')}
-              />
+              <Input id="expiryDate" type="date" {...form.register('expiryDate')} />
               {form.formState.errors.expiryDate && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.expiryDate.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.expiryDate.message}</p>
               )}
             </div>
           </div>
@@ -281,11 +267,7 @@ export function QuoteForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? 'Saving...'
-            : isEditing
-            ? 'Update Quote'
-            : 'Create Quote'}
+          {isSubmitting ? 'Saving...' : isEditing ? 'Update Quote' : 'Create Quote'}
         </Button>
       </div>
     </form>

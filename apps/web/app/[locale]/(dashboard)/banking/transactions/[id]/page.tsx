@@ -84,8 +84,17 @@ export default function BankTransactionDetailPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Amount</span>
-              <span className={cn('font-mono font-bold text-lg flex items-center gap-1', isDeposit ? 'text-green-600' : 'text-red-600')}>
-                {isDeposit ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+              <span
+                className={cn(
+                  'font-mono font-bold text-lg flex items-center gap-1',
+                  isDeposit ? 'text-green-600' : 'text-red-600',
+                )}
+              >
+                {isDeposit ? (
+                  <ArrowDownLeft className="h-4 w-4" />
+                ) : (
+                  <ArrowUpRight className="h-4 w-4" />
+                )}
                 ${Math.abs(amount).toFixed(2)}
               </span>
             </div>

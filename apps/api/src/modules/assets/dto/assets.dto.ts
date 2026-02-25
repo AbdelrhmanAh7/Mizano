@@ -1,12 +1,4 @@
-import {
-  IsString,
-  IsNumber,
-  IsOptional,
-  IsEnum,
-  IsDateString,
-  Min,
-  Max,
-} from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsEnum, IsDateString, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AssetType, DepreciationMethod, AssetStatus } from '@prisma/client';

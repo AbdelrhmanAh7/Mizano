@@ -4,7 +4,7 @@ import { QueryClient, dehydrate, HydrationBoundary } from '@tanstack/react-query
 import { DashboardClient } from '@/components/dashboard/dashboard-client';
 import { transformDashboardOverview } from '@/lib/hooks/use-dashboard';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6001/api';
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);

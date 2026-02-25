@@ -17,11 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -115,15 +111,9 @@ export function ProjectForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Project Name *</Label>
-              <Input
-                id="name"
-                placeholder="Enter project name"
-                {...form.register('name')}
-              />
+              <Input id="name" placeholder="Enter project name" {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.name.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
 
@@ -145,9 +135,7 @@ export function ProjectForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.customerId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
               )}
             </div>
           </div>
@@ -190,7 +178,7 @@ export function ProjectForm({
                     variant="outline"
                     className={cn(
                       'w-full justify-start text-left font-normal',
-                      !form.watch('startDate') && 'text-muted-foreground'
+                      !form.watch('startDate') && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -218,7 +206,7 @@ export function ProjectForm({
                     variant="outline"
                     className={cn(
                       'w-full justify-start text-left font-normal',
-                      !form.watch('endDate') && 'text-muted-foreground'
+                      !form.watch('endDate') && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -262,9 +250,7 @@ export function ProjectForm({
                   <SelectItem key={option.value} value={option.value}>
                     <div>
                       <div className="font-medium">{option.label}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {option.description}
-                      </div>
+                      <div className="text-xs text-muted-foreground">{option.description}</div>
                     </div>
                   </SelectItem>
                 ))}

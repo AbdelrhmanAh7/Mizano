@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+neverBuiltDependencies:
+  - gl
+
 importers:
 
   .:
@@ -41,6 +44,9 @@ importers:
       '@mizano/validators':
         specifier: workspace:*
         version: link:../../packages/validators
+      '@nestjs/axios':
+        specifier: ^3.1.3
+        version: 3.1.3(@nestjs/common@10.4.22)(axios@1.13.4)(rxjs@7.8.2)
       '@nestjs/cache-manager':
         specifier: ^3.1.0
         version: 3.1.0(@nestjs/common@10.4.22)(@nestjs/core@10.4.22)(cache-manager@7.2.8)(keyv@5.6.0)(rxjs@7.8.2)
@@ -83,6 +89,9 @@ importers:
       '@prisma/client':
         specifier: ^5.8.1
         version: 5.22.0(prisma@5.22.0)
+      axios:
+        specifier: ^1.7.9
+        version: 1.13.4
       bcrypt:
         specifier: ^5.1.1
         version: 5.1.1
@@ -119,6 +128,9 @@ importers:
       decimal.js:
         specifier: ^10.4.3
         version: 10.6.0
+      form-data:
+        specifier: ^4.0.1
+        version: 4.0.5
       helmet:
         specifier: ^7.1.0
         version: 7.2.0
@@ -2074,6 +2086,18 @@ packages:
       '@tybys/wasm-util': 0.10.1
     dev: true
     optional: true
+
+  /@nestjs/axios@3.1.3(@nestjs/common@10.4.22)(axios@1.13.4)(rxjs@7.8.2):
+    resolution: {integrity: sha512-RZ/63c1tMxGLqyG3iOCVt7A72oy4x1eM6QEhd4KzCYpaVWW0igq0WSREeRoEZhIxRcZfDfIIkvsOMiM7yfVGZQ==}
+    peerDependencies:
+      '@nestjs/common': ^7.0.0 || ^8.0.0 || ^9.0.0 || ^10.0.0
+      axios: ^1.3.1
+      rxjs: ^6.0.0 || ^7.0.0
+    dependencies:
+      '@nestjs/common': 10.4.22(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      axios: 1.13.4
+      rxjs: 7.8.2
+    dev: false
 
   /@nestjs/cache-manager@3.1.0(@nestjs/common@10.4.22)(@nestjs/core@10.4.22)(cache-manager@7.2.8)(keyv@5.6.0)(rxjs@7.8.2):
     resolution: {integrity: sha512-pEIqYZrBcE8UdkJmZRduurvoUfdU+3kRPeO1R2muiMbZnRuqlki5klFFNllO9LyYWzrx98bd1j0PSPKSJk1Wbw==}
@@ -8022,7 +8046,6 @@ packages:
   /gl@5.0.3:
     resolution: {integrity: sha512-toWmb3Rgli5Wl9ygjZeglFBVLDYMOomy+rXlVZVDCoIRV+6mQE5nY4NgQgokYIc5oQzc1pvWY9lQJ0hGn61ZUg==}
     engines: {node: '>=12.0.0'}
-    requiresBuild: true
     dependencies:
       bindings: 1.5.0
       bit-twiddle: 1.0.2
@@ -11328,6 +11351,7 @@ packages:
   /prebuild-install@7.1.3:
     resolution: {integrity: sha512-8Mf2cbV7x1cXPUILADGI3wuhfqWvtiLA1iclTDbFRZkgRQS0NqsPZphna9V+HyTEadheuPmjaJMsbzKQFOzLug==}
     engines: {node: '>=10'}
+    deprecated: No longer maintained. Please contact the author of the relevant native addon; alternatives are available.
     hasBin: true
     dependencies:
       detect-libc: 2.1.2

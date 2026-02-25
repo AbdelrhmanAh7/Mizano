@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -47,10 +39,7 @@ export class FraudDetectionController {
   @ApiOperation({ summary: 'Get unresolved fraud alerts' })
   @ApiQuery({ name: 'limit', required: false })
   @ApiResponse({ status: 200, description: 'Returns list of fraud alerts' })
-  getAlerts(
-    @CurrentOrg() orgId: string,
-    @Query('limit') limit?: number,
-  ) {
+  getAlerts(@CurrentOrg() orgId: string, @Query('limit') limit?: number) {
     return this.fraudService.getFraudAlerts(orgId, undefined, limit);
   }
 
@@ -67,10 +56,7 @@ export class FraudDetectionController {
   @ApiOperation({ summary: 'Mark a fraud alert as resolved' })
   @ApiParam({ name: 'alertId' })
   @ApiResponse({ status: 200, description: 'Alert resolved' })
-  resolveAlert(
-    @CurrentOrg() orgId: string,
-    @Param('alertId') alertId: string,
-  ) {
+  resolveAlert(@CurrentOrg() orgId: string, @Param('alertId') alertId: string) {
     return this.fraudService.resolveAlert(orgId, alertId, false, 'system');
   }
 }

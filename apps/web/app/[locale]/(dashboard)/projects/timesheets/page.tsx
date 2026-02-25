@@ -92,9 +92,7 @@ function TimesheetsPageContent() {
     {
       accessorKey: 'task.name',
       header: 'Task',
-      cell: ({ row }) => (
-        <span className="font-medium">{row.original.task?.name || '-'}</span>
-      ),
+      cell: ({ row }) => <span className="font-medium">{row.original.task?.name || '-'}</span>,
     },
     {
       accessorKey: 'description',
@@ -158,9 +156,7 @@ function TimesheetsPageContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Timesheets</h1>
-          <p className="text-muted-foreground">
-            Track time spent on projects and tasks
-          </p>
+          <p className="text-muted-foreground">Track time spent on projects and tasks</p>
         </div>
         <Button asChild>
           <Link href="/projects/timesheets/new">
@@ -255,16 +251,12 @@ function TimesheetsPageContent() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Time Entry</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this time entry? This action cannot
-              be undone.
+              Are you sure you want to delete this time entry? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

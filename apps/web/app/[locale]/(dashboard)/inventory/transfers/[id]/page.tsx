@@ -81,10 +81,8 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
     );
   }
 
-  const totalQty = transfer.lines?.reduce(
-    (sum: number, line: any) => sum + (line.quantity || 0),
-    0
-  ) || 0;
+  const totalQty =
+    transfer.lines?.reduce((sum: number, line: any) => sum + (line.quantity || 0), 0) || 0;
 
   const canComplete = transfer.status === 'PENDING' || transfer.status === 'IN_TRANSIT';
   const canCancel = transfer.status === 'PENDING' || transfer.status === 'IN_TRANSIT';
@@ -101,13 +99,8 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
-                {transfer.transferNumber}
-              </h1>
-              <Badge
-                variant="outline"
-                className={getTransferStatusColor(transfer.status)}
-              >
+              <h1 className="text-3xl font-bold tracking-tight">{transfer.transferNumber}</h1>
+              <Badge variant="outline" className={getTransferStatusColor(transfer.status)}>
                 {getTransferStatusLabel(transfer.status)}
               </Badge>
             </div>
@@ -130,15 +123,13 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
                 <AlertDialogHeader>
                   <AlertDialogTitle>Complete Transfer</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will finalize the transfer and update inventory levels in both
-                    warehouses. This action cannot be undone.
+                    This will finalize the transfer and update inventory levels in both warehouses.
+                    This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleComplete}>
-                    Complete Transfer
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={handleComplete}>Complete Transfer</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -155,16 +146,13 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
                 <AlertDialogHeader>
                   <AlertDialogTitle>Cancel Transfer</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to cancel this transfer? If items were
-                    already in transit, no stock changes will be made.
+                    Are you sure you want to cancel this transfer? If items were already in transit,
+                    no stock changes will be made.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Keep Transfer</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleCancel}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
+                  <AlertDialogAction onClick={handleCancel} className="bg-red-600 hover:bg-red-700">
                     Cancel Transfer
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -182,9 +170,7 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
               <div className="p-4 bg-blue-100 rounded-lg inline-block">
                 <Truck className="h-8 w-8 text-blue-600" />
               </div>
-              <p className="mt-2 font-semibold">
-                {transfer.fromWarehouse?.name}
-              </p>
+              <p className="mt-2 font-semibold">{transfer.fromWarehouse?.name}</p>
               <p className="text-sm text-muted-foreground">Source</p>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -196,9 +182,7 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
               <div className="p-4 bg-green-100 rounded-lg inline-block">
                 <Truck className="h-8 w-8 text-green-600" />
               </div>
-              <p className="mt-2 font-semibold">
-                {transfer.toWarehouse?.name}
-              </p>
+              <p className="mt-2 font-semibold">{transfer.toWarehouse?.name}</p>
               <p className="text-sm text-muted-foreground">Destination</p>
             </div>
           </div>
@@ -210,9 +194,7 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Transfer Number</p>
-            <p className="text-xl font-semibold font-mono">
-              {transfer.transferNumber}
-            </p>
+            <p className="text-xl font-semibold font-mono">{transfer.transferNumber}</p>
           </CardContent>
         </Card>
 
@@ -260,12 +242,8 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
             <TableBody>
               {transfer.lines?.map((line: any) => (
                 <TableRow key={line.id}>
-                  <TableCell className="font-medium">
-                    {line.item?.name || '-'}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {line.item?.sku || '-'}
-                  </TableCell>
+                  <TableCell className="font-medium">{line.item?.name || '-'}</TableCell>
+                  <TableCell className="font-mono text-sm">{line.item?.sku || '-'}</TableCell>
                   <TableCell className="text-right font-mono font-medium">
                     {line.quantity}
                   </TableCell>

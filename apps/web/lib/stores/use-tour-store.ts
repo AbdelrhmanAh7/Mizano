@@ -27,10 +27,7 @@ export const useTourStore = create<TourState>()(
       startTour: (tourId: string) => {
         const state = get();
         // Don't start if already completed or dismissed
-        if (
-          state.completedTours.includes(tourId) ||
-          state.dismissedTours.includes(tourId)
-        ) {
+        if (state.completedTours.includes(tourId) || state.dismissedTours.includes(tourId)) {
           return;
         }
         set({ currentTour: tourId, isActive: true });
@@ -52,10 +49,8 @@ export const useTourStore = create<TourState>()(
             ? state.dismissedTours
             : [...state.dismissedTours, tourId],
         })),
-      isTourCompleted: (tourId: string) =>
-        get().completedTours.includes(tourId),
-      isTourDismissed: (tourId: string) =>
-        get().dismissedTours.includes(tourId),
+      isTourCompleted: (tourId: string) => get().completedTours.includes(tourId),
+      isTourDismissed: (tourId: string) => get().dismissedTours.includes(tourId),
       resetTours: () => set({ completedTours: [], dismissedTours: [] }),
     }),
     {
@@ -64,6 +59,6 @@ export const useTourStore = create<TourState>()(
         completedTours: state.completedTours,
         dismissedTours: state.dismissedTours,
       }),
-    }
-  )
+    },
+  ),
 );

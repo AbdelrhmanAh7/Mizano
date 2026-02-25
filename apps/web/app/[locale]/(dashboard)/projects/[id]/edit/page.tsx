@@ -70,9 +70,7 @@ export default function EditProjectPage({ params }: EditProjectPageProps) {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Edit Project</h1>
-          <p className="text-muted-foreground">
-            Update project details for {project.name}
-          </p>
+          <p className="text-muted-foreground">Update project details for {project.name}</p>
         </div>
       </div>
 

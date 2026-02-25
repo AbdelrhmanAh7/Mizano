@@ -62,7 +62,12 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 const STAGE_ORDER: DealStage[] = [
-  'NEW', 'MEETING_SCHEDULED', 'PROPOSAL_SENT', 'NEGOTIATION', 'WON', 'LOST',
+  'NEW',
+  'MEETING_SCHEDULED',
+  'PROPOSAL_SENT',
+  'NEGOTIATION',
+  'WON',
+  'LOST',
 ];
 
 const LOST_REASONS = [
@@ -178,7 +183,9 @@ export default function DealDetailPage() {
       <div className="space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
-            <Link href="/crm/deals"><ArrowLeft className="h-4 w-4" /></Link>
+            <Link href="/crm/deals">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
           </Button>
           <h1 className="text-3xl font-bold tracking-tight">Deal Not Found</h1>
         </div>
@@ -205,7 +212,9 @@ export default function DealDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
-            <Link href="/crm/deals"><ArrowLeft className="h-4 w-4" /></Link>
+            <Link href="/crm/deals">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
           </Button>
           <div>
             <div className="flex items-center gap-3">
@@ -215,7 +224,10 @@ export default function DealDetailPage() {
               </Badge>
             </div>
             {deal.lead && (
-              <Link href={`/crm/leads/${deal.lead.id}`} className="text-muted-foreground hover:underline text-sm">
+              <Link
+                href={`/crm/leads/${deal.lead.id}`}
+                className="text-muted-foreground hover:underline text-sm"
+              >
                 Lead: {deal.lead.leadName}
               </Link>
             )}
@@ -263,7 +275,7 @@ export default function DealDetailPage() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center gap-1">
-            {STAGE_ORDER.filter(s => s !== 'LOST').map((stage, i) => {
+            {STAGE_ORDER.filter((s) => s !== 'LOST').map((stage, i) => {
               const isCurrentOrPast = currentStageIndex >= i;
               const isCurrent = deal.stage === stage;
               return (
@@ -271,7 +283,7 @@ export default function DealDetailPage() {
                   key={stage}
                   className={cn(
                     'flex-1 h-2 rounded-full',
-                    isCurrent ? 'bg-blue-500' : isCurrentOrPast ? 'bg-green-500' : 'bg-gray-200'
+                    isCurrent ? 'bg-blue-500' : isCurrentOrPast ? 'bg-green-500' : 'bg-gray-200',
                   )}
                   title={getDealStageLabel(stage)}
                 />
@@ -279,7 +291,7 @@ export default function DealDetailPage() {
             })}
           </div>
           <div className="flex justify-between mt-1">
-            {STAGE_ORDER.filter(s => s !== 'LOST').map((stage) => (
+            {STAGE_ORDER.filter((s) => s !== 'LOST').map((stage) => (
               <span key={stage} className="text-[10px] text-muted-foreground">
                 {getDealStageLabel(stage)}
               </span>
@@ -329,9 +341,7 @@ export default function DealDetailPage() {
               <User className="h-4 w-4" />
               Assigned To
             </div>
-            <div className="text-lg font-bold">
-              {deal.assignedTo?.name || 'Unassigned'}
-            </div>
+            <div className="text-lg font-bold">{deal.assignedTo?.name || 'Unassigned'}</div>
           </CardContent>
         </Card>
       </div>
@@ -340,9 +350,7 @@ export default function DealDetailPage() {
       {isLost && deal.lostReason && (
         <Card className="border-red-200 bg-red-50">
           <CardContent className="pt-6">
-            <span className="text-sm font-medium text-red-700">
-              Lost reason: {deal.lostReason}
-            </span>
+            <span className="text-sm font-medium text-red-700">Lost reason: {deal.lostReason}</span>
           </CardContent>
         </Card>
       )}
@@ -363,7 +371,7 @@ export default function DealDetailPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {STAGE_ORDER.filter(s => s !== 'WON' && s !== 'LOST').map((stage) => (
+                {STAGE_ORDER.filter((s) => s !== 'WON' && s !== 'LOST').map((stage) => (
                   <SelectItem key={stage} value={stage}>
                     {getDealStageLabel(stage)}
                   </SelectItem>
@@ -372,7 +380,9 @@ export default function DealDetailPage() {
             </Select>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setStageDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setStageDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button onClick={handleStageChange} disabled={updateStage.isPending}>
               {updateStage.isPending ? 'Moving...' : 'Move'}
             </Button>
@@ -386,7 +396,8 @@ export default function DealDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Mark Deal as Won</AlertDialogTitle>
             <AlertDialogDescription>
-              Congratulations! This will mark the deal as won. A customer record will be created if one doesn&apos;t exist.
+              Congratulations! This will mark the deal as won. A customer record will be created if
+              one doesn&apos;t exist.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -413,13 +424,17 @@ export default function DealDetailPage() {
               </SelectTrigger>
               <SelectContent>
                 {LOST_REASONS.map((reason) => (
-                  <SelectItem key={reason} value={reason}>{reason}</SelectItem>
+                  <SelectItem key={reason} value={reason}>
+                    {reason}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setLostDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setLostDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={handleMarkLost}
               disabled={markLost.isPending || !lostReason}

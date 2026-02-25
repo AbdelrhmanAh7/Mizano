@@ -23,19 +23,19 @@ export default function SalesPage() {
   // Calculate metrics
   const totalOutstanding = customers.reduce(
     (sum: number, c: any) => sum + parseFloat(c.outstandingBalance || '0'),
-    0
+    0,
   );
 
   const overdueInvoices = invoices.filter((i: any) => i.status === 'OVERDUE');
   const overdueAmount = overdueInvoices.reduce(
     (sum: number, i: any) => sum + parseFloat(i.balanceDue || '0'),
-    0
+    0,
   );
 
   const pendingQuotes = quotes.filter((q: any) => q.status === 'SENT');
   const pendingQuotesTotal = pendingQuotes.reduce(
     (sum: number, q: any) => sum + parseFloat(q.grandTotal || '0'),
-    0
+    0,
   );
 
   const paidThisMonth = invoices
@@ -90,9 +90,7 @@ export default function SalesPage() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Sales</h1>
-        <p className="text-muted-foreground">
-          Manage customers, quotes, invoices, and payments
-        </p>
+        <p className="text-muted-foreground">Manage customers, quotes, invoices, and payments</p>
       </div>
 
       {/* Summary Cards */}
@@ -106,13 +104,9 @@ export default function SalesPage() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">
-                {formatCurrency(totalOutstanding, 'USD')}
-              </div>
+              <div className="text-2xl font-bold">{formatCurrency(totalOutstanding, 'USD')}</div>
             )}
-            <p className="text-xs text-muted-foreground">
-              Across {customers.length} customers
-            </p>
+            <p className="text-xs text-muted-foreground">Across {customers.length} customers</p>
           </CardContent>
         </Card>
 
@@ -144,9 +138,7 @@ export default function SalesPage() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">
-                {formatCurrency(pendingQuotesTotal, 'USD')}
-              </div>
+              <div className="text-2xl font-bold">{formatCurrency(pendingQuotesTotal, 'USD')}</div>
             )}
             <p className="text-xs text-muted-foreground">
               {pendingQuotes.length} quotes awaiting response
@@ -167,9 +159,7 @@ export default function SalesPage() {
                 {formatCurrency(paidThisMonth, 'USD')}
               </div>
             )}
-            <p className="text-xs text-muted-foreground">
-              From paid invoices
-            </p>
+            <p className="text-xs text-muted-foreground">From paid invoices</p>
           </CardContent>
         </Card>
       </div>
@@ -190,9 +180,7 @@ export default function SalesPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                {module.description}
-              </p>
+              <p className="text-sm text-muted-foreground mb-4">{module.description}</p>
               <Button asChild variant="outline" className="w-full">
                 <Link href={module.href}>Open {module.title}</Link>
               </Button>

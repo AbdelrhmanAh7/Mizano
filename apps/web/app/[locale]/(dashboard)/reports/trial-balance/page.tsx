@@ -19,14 +19,16 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
-import { useTrialBalanceReport, formatCurrency, TrialBalanceAccount } from '@/lib/hooks/use-reports';
+import {
+  useTrialBalanceReport,
+  formatCurrency,
+  TrialBalanceAccount,
+} from '@/lib/hooks/use-reports';
 
 export default function TrialBalanceReportPage() {
   const [asOfDate, setAsOfDate] = useState(new Date());
 
-  const { data: report, isLoading } = useTrialBalanceReport(
-    format(asOfDate, 'yyyy-MM-dd')
-  );
+  const { data: report, isLoading } = useTrialBalanceReport(format(asOfDate, 'yyyy-MM-dd'));
 
   if (isLoading) {
     return (
@@ -42,16 +44,44 @@ export default function TrialBalanceReportPage() {
   const mockReport = report || {
     accounts: [
       { id: '1', code: '1000', name: 'Cash', type: 'ASSET', debit: 50000, credit: 0 },
-      { id: '2', code: '1100', name: 'Accounts Receivable', type: 'ASSET', debit: 35000, credit: 0 },
+      {
+        id: '2',
+        code: '1100',
+        name: 'Accounts Receivable',
+        type: 'ASSET',
+        debit: 35000,
+        credit: 0,
+      },
       { id: '3', code: '1200', name: 'Inventory', type: 'ASSET', debit: 25000, credit: 0 },
       { id: '4', code: '1500', name: 'Fixed Assets', type: 'ASSET', debit: 100000, credit: 0 },
-      { id: '5', code: '2000', name: 'Accounts Payable', type: 'LIABILITY', debit: 0, credit: 20000 },
+      {
+        id: '5',
+        code: '2000',
+        name: 'Accounts Payable',
+        type: 'LIABILITY',
+        debit: 0,
+        credit: 20000,
+      },
       { id: '6', code: '2100', name: 'Loans Payable', type: 'LIABILITY', debit: 0, credit: 50000 },
-      { id: '7', code: '3000', name: 'Owner\'s Capital', type: 'EQUITY', debit: 0, credit: 100000 },
+      { id: '7', code: '3000', name: "Owner's Capital", type: 'EQUITY', debit: 0, credit: 100000 },
       { id: '8', code: '3100', name: 'Retained Earnings', type: 'EQUITY', debit: 0, credit: 15000 },
       { id: '9', code: '4000', name: 'Revenue', type: 'INCOME', debit: 0, credit: 125000 },
-      { id: '10', code: '5000', name: 'Cost of Goods Sold', type: 'EXPENSE', debit: 45000, credit: 0 },
-      { id: '11', code: '6000', name: 'Operating Expenses', type: 'EXPENSE', debit: 35000, credit: 0 },
+      {
+        id: '10',
+        code: '5000',
+        name: 'Cost of Goods Sold',
+        type: 'EXPENSE',
+        debit: 45000,
+        credit: 0,
+      },
+      {
+        id: '11',
+        code: '6000',
+        name: 'Operating Expenses',
+        type: 'EXPENSE',
+        debit: 35000,
+        credit: 0,
+      },
       { id: '12', code: '6100', name: 'Salaries', type: 'EXPENSE', debit: 20000, credit: 0 },
     ],
     totalDebits: 310000,
@@ -81,9 +111,7 @@ export default function TrialBalanceReportPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Trial Balance</h1>
-          <p className="text-muted-foreground">
-            As of {format(asOfDate, 'MMMM d, yyyy')}
-          </p>
+          <p className="text-muted-foreground">As of {format(asOfDate, 'MMMM d, yyyy')}</p>
         </div>
       </div>
 
@@ -96,10 +124,9 @@ export default function TrialBalanceReportPage() {
       />
 
       {/* Balance Status */}
-      <Card className={cn(
-        'border-2',
-        mockReport.isBalanced ? 'border-green-500' : 'border-red-500'
-      )}>
+      <Card
+        className={cn('border-2', mockReport.isBalanced ? 'border-green-500' : 'border-red-500')}
+      >
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

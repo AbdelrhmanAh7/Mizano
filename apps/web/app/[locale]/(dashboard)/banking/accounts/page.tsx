@@ -2,7 +2,17 @@
 
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { Plus, MoreHorizontal, Eye, Pencil, Trash2, Landmark, CreditCard, Wallet, PiggyBank } from 'lucide-react';
+import {
+  Plus,
+  MoreHorizontal,
+  Eye,
+  Pencil,
+  Trash2,
+  Landmark,
+  CreditCard,
+  Wallet,
+  PiggyBank,
+} from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import {
@@ -67,9 +77,8 @@ function BankAccountsPageContent() {
 
   // Calculate totals
   const totalBalance = accounts.reduce((sum, acc) => {
-    const balance = typeof acc.currentBalance === 'string'
-      ? parseFloat(acc.currentBalance)
-      : acc.currentBalance;
+    const balance =
+      typeof acc.currentBalance === 'string' ? parseFloat(acc.currentBalance) : acc.currentBalance;
     return sum + (balance || 0);
   }, 0);
 
@@ -94,9 +103,7 @@ function BankAccountsPageContent() {
             {row.original.accountName}
           </Link>
           {row.original.bankName && (
-            <p className="text-sm text-muted-foreground">
-              {row.original.bankName}
-            </p>
+            <p className="text-sm text-muted-foreground">{row.original.bankName}</p>
           )}
         </div>
       ),
@@ -115,9 +122,7 @@ function BankAccountsPageContent() {
       header: 'Account #',
       meta: { cellClassName: 'font-mono text-sm text-muted-foreground' },
       cell: ({ row }) =>
-        row.original.accountNumber
-          ? `.... ${row.original.accountNumber.slice(-4)}`
-          : '-',
+        row.original.accountNumber ? `.... ${row.original.accountNumber.slice(-4)}` : '-',
     },
     {
       accessorKey: 'currentBalance',
@@ -132,14 +137,14 @@ function BankAccountsPageContent() {
       ),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => {
-        const balance = typeof row.original.currentBalance === 'string'
-          ? parseFloat(row.original.currentBalance)
-          : row.original.currentBalance;
+        const balance =
+          typeof row.original.currentBalance === 'string'
+            ? parseFloat(row.original.currentBalance)
+            : row.original.currentBalance;
         return (
-          <span className={cn(
-            'font-bold font-mono',
-            balance < 0 ? 'text-red-600' : 'text-green-600'
-          )}>
+          <span
+            className={cn('font-bold font-mono', balance < 0 ? 'text-red-600' : 'text-green-600')}
+          >
             {formatCurrency(balance)}
           </span>
         );
@@ -180,10 +185,7 @@ function BankAccountsPageContent() {
                   Edit
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-red-600"
-                onClick={() => setDeleteId(account.id)}
-              >
+              <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(account.id)}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </DropdownMenuItem>
@@ -200,9 +202,7 @@ function BankAccountsPageContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Bank Accounts</h1>
-          <p className="text-muted-foreground">
-            Manage your bank accounts and track balances
-          </p>
+          <p className="text-muted-foreground">Manage your bank accounts and track balances</p>
         </div>
         <Button asChild>
           <Link href="/banking/accounts/new">
@@ -222,7 +222,7 @@ function BankAccountsPageContent() {
             </div>
             <div className="text-right">
               <p className="text-sm text-muted-foreground">Active Accounts</p>
-              <p className="text-2xl font-bold">{accounts.filter(a => a.isActive).length}</p>
+              <p className="text-2xl font-bold">{accounts.filter((a) => a.isActive).length}</p>
             </div>
           </div>
         </CardContent>
@@ -275,16 +275,13 @@ function BankAccountsPageContent() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Bank Account</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this bank account? This action cannot be
-              undone. All associated transactions will also be deleted.
+              Are you sure you want to delete this bank account? This action cannot be undone. All
+              associated transactions will also be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

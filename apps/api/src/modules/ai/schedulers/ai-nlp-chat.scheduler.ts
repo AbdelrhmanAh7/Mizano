@@ -33,19 +33,14 @@ export class AiNlpChatScheduler {
 
       for (const org of organizations) {
         try {
-          const needsRetraining =
-            await this.feedbackService.checkRetrainingThreshold(
-              org.id,
-              'DOCUMENT_CLASSIFICATION',
-            );
+          const needsRetraining = await this.feedbackService.checkRetrainingThreshold(
+            org.id,
+            'DOCUMENT_CLASSIFICATION',
+          );
 
           if (needsRetraining) {
-            this.logger.log(
-              `Org ${org.name}: Retraining document classifier...`,
-            );
-            const result = await this.docClassificationService.trainModel(
-              org.id,
-            );
+            this.logger.log(`Org ${org.name}: Retraining document classifier...`);
+            const result = await this.docClassificationService.trainModel(org.id);
             this.logger.log(
               `Org ${org.name}: Document classification model trained: v${result.version}, accuracy: ${(result.accuracy * 100).toFixed(1)}%, samples: ${result.sampleCount}`,
             );
@@ -59,9 +54,7 @@ export class AiNlpChatScheduler {
 
       this.logger.log('Document classification retraining check completed');
     } catch (error) {
-      this.logger.error(
-        `Document classification retraining check failed: ${error.message}`,
-      );
+      this.logger.error(`Document classification retraining check failed: ${error.message}`);
     }
   }
 
@@ -80,11 +73,10 @@ export class AiNlpChatScheduler {
 
       for (const org of organizations) {
         try {
-          const needsRetraining =
-            await this.feedbackService.checkRetrainingThreshold(
-              org.id,
-              'CHATBOT',
-            );
+          const needsRetraining = await this.feedbackService.checkRetrainingThreshold(
+            org.id,
+            'CHATBOT',
+          );
 
           if (needsRetraining) {
             this.logger.log(`Org ${org.name}: Retraining chatbot...`);
@@ -126,17 +118,13 @@ export class AiNlpChatScheduler {
             `Org ${org.name}: Knowledge index rebuilt - ${result.indexed} documents indexed`,
           );
         } catch (error) {
-          this.logger.error(
-            `Error rebuilding knowledge index for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error rebuilding knowledge index for org ${org.id}: ${error.message}`);
         }
       }
 
       this.logger.log('Weekly knowledge index rebuild completed');
     } catch (error) {
-      this.logger.error(
-        `Weekly knowledge index rebuild failed: ${error.message}`,
-      );
+      this.logger.error(`Weekly knowledge index rebuild failed: ${error.message}`);
     }
   }
 }

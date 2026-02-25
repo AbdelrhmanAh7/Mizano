@@ -17,11 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -48,12 +44,7 @@ interface TaskFormProps {
   isSubmitting?: boolean;
 }
 
-export function TaskForm({
-  task,
-  onSubmit,
-  onCancel,
-  isSubmitting,
-}: TaskFormProps) {
+export function TaskForm({ task, onSubmit, onCancel, isSubmitting }: TaskFormProps) {
   const isEditing = !!task;
 
   const form = useForm<TaskFormData>({
@@ -102,15 +93,9 @@ export function TaskForm({
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Task Name *</Label>
-            <Input
-              id="name"
-              placeholder="Enter task name"
-              {...form.register('name')}
-            />
+            <Input id="name" placeholder="Enter task name" {...form.register('name')} />
             {form.formState.errors.name && (
-              <p className="text-sm text-red-500">
-                {form.formState.errors.name.message}
-              </p>
+              <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
             )}
           </div>
 
@@ -169,7 +154,7 @@ export function TaskForm({
                     variant="outline"
                     className={cn(
                       'w-full justify-start text-left font-normal',
-                      !form.watch('dueDate') && 'text-muted-foreground'
+                      !form.watch('dueDate') && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />

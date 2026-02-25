@@ -259,9 +259,15 @@ export function useDashboardExpenses() {
     queryKey: ['dashboard', 'expenses'],
     queryFn: async (): Promise<ExpenseCategory[]> => {
       const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-      const res = await api.get(`/reports/dashboard/expenses-by-category?startDate=${startOfMonth}&endDate=${endOfMonth}`);
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString()
+        .split('T')[0];
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        .toISOString()
+        .split('T')[0];
+      const res = await api.get(
+        `/reports/dashboard/expenses-by-category?startDate=${startOfMonth}&endDate=${endOfMonth}`,
+      );
       const data = res.data?.data ?? res.data;
       const expenseArray = Array.isArray(data) ? data : [];
       const total = expenseArray.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
@@ -327,7 +333,11 @@ export function useDashboardInventory() {
       const res = await api.get('/reports/dashboard/inventory-value-trend?months=6');
       const data = res.data?.data ?? res.data;
       return Array.isArray(data)
-        ? data.map((i: any) => ({ month: i.month, value: i.value || 0, itemCount: i.itemCount || 0 }))
+        ? data.map((i: any) => ({
+            month: i.month,
+            value: i.value || 0,
+            itemCount: i.itemCount || 0,
+          }))
         : [];
     },
     refetchInterval: REFETCH_INTERVAL,
@@ -349,7 +359,8 @@ export function useDashboard() {
   const inventoryQuery = useDashboardInventory();
 
   const isLoading = statsQuery.isLoading;
-  const isRefetching = statsQuery.isRefetching || revenueQuery.isRefetching || cashFlowQuery.isRefetching;
+  const isRefetching =
+    statsQuery.isRefetching || revenueQuery.isRefetching || cashFlowQuery.isRefetching;
 
   const data = statsQuery.data
     ? {

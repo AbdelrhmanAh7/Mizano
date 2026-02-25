@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Query, UseGuards, DefaultValuePipe, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  UseGuards,
+  DefaultValuePipe,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -17,7 +25,10 @@ export class PipelineForecastController {
   @Permissions('crm.view')
   @ApiOperation({ summary: 'Forecast pipeline revenue' })
   @ApiQuery({ name: 'months', required: false })
-  async getForecast(@CurrentOrg() orgId: string, @Query('months', new DefaultValuePipe(6), ParseIntPipe) months: number) {
+  async getForecast(
+    @CurrentOrg() orgId: string,
+    @Query('months', new DefaultValuePipe(6), ParseIntPipe) months: number,
+  ) {
     const result = await this.pipelineService.forecastPipeline(orgId, months);
     return { data: result };
   }

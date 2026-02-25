@@ -17,7 +17,7 @@ export class PredictCategorizationDto {
   @IsOptional()
   vendorName?: string;
 
-  @ApiProperty({ description: 'Transaction amount', example: 150.00 })
+  @ApiProperty({ description: 'Transaction amount', example: 150.0 })
   @IsNumber()
   amount: number;
 

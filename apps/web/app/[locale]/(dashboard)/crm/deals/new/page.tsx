@@ -16,9 +16,7 @@ export default function NewDealPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">New Deal</h1>
-          <p className="text-muted-foreground">
-            Create a new deal in your pipeline
-          </p>
+          <p className="text-muted-foreground">Create a new deal in your pipeline</p>
         </div>
       </div>
       <DealForm />

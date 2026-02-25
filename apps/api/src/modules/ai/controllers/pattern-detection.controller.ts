@@ -9,13 +9,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -48,10 +42,7 @@ export class PatternDetectionController {
   @Permissions('ai.view')
   @ApiOperation({ summary: 'Get detected transaction patterns' })
   @ApiResponse({ status: 200, type: PatternListResponse })
-  async getPatterns(
-    @CurrentOrg() organizationId: string,
-    @Query() query: PatternQueryDto,
-  ) {
+  async getPatterns(@CurrentOrg() organizationId: string, @Query() query: PatternQueryDto) {
     return this.patternService.getPatterns(organizationId, {
       status: query.status,
       entityType: query.entityType,
@@ -76,10 +67,7 @@ export class PatternDetectionController {
   @ApiOperation({ summary: 'Get pattern details with occurrences' })
   @ApiParam({ name: 'id', description: 'Pattern ID' })
   @ApiResponse({ status: 200, type: PatternDetailsResponse })
-  async getPatternDetails(
-    @CurrentOrg() organizationId: string,
-    @Param('id') patternId: string,
-  ) {
+  async getPatternDetails(@CurrentOrg() organizationId: string, @Param('id') patternId: string) {
     return this.patternService.getPatternDetails(organizationId, patternId);
   }
 
@@ -88,9 +76,7 @@ export class PatternDetectionController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Run pattern analysis manually' })
   @ApiResponse({ status: 200, type: AnalysisResultResponse })
-  async runAnalysis(
-    @CurrentOrg() organizationId: string,
-  ): Promise<AnalysisResultResponse> {
+  async runAnalysis(@CurrentOrg() organizationId: string): Promise<AnalysisResultResponse> {
     return this.patternService.analyzePatterns(organizationId);
   }
 
@@ -162,10 +148,6 @@ export class PatternDetectionController {
     @Param('id') suggestionId: string,
     @Body() dto: DismissSuggestionDto,
   ): Promise<void> {
-    await this.patternService.dismissSuggestion(
-      organizationId,
-      suggestionId,
-      dto.reason,
-    );
+    await this.patternService.dismissSuggestion(organizationId, suggestionId, dto.reason);
   }
 }

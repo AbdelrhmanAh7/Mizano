@@ -53,7 +53,14 @@ interface FileCorrections {
   [filename: string]: Record<string, any>;
 }
 
-const EDITABLE_FIELDS = ['date', 'total', 'subtotal', 'tax', 'invoiceNumber', 'vendorName'] as const;
+const EDITABLE_FIELDS = [
+  'date',
+  'total',
+  'subtotal',
+  'tax',
+  'invoiceNumber',
+  'vendorName',
+] as const;
 const FIELD_LABELS: Record<string, string> = {
   date: 'Date',
   total: 'Total',
@@ -154,12 +161,7 @@ export function OcrBatchTrainer({
   };
 
   // Update correction for a specific file and field
-  const updateCorrection = (
-    filename: string,
-    field: string,
-    value: any,
-    originalValue: any,
-  ) => {
+  const updateCorrection = (filename: string, field: string, value: any, originalValue: any) => {
     setCorrections((prev) => {
       const fileCorrections = { ...(prev[filename] || {}) };
       const normalizedOriginal = originalValue === null ? '' : String(originalValue);
@@ -179,8 +181,7 @@ export function OcrBatchTrainer({
     for (const result of results) {
       if (!result.extraction || result.error) continue;
       const fileCorrections = corrections[result.filename];
-      if (!fileCorrections || Object.keys(fileCorrections).length === 0)
-        continue;
+      if (!fileCorrections || Object.keys(fileCorrections).length === 0) continue;
 
       try {
         await submitMutation.mutateAsync({
@@ -226,9 +227,7 @@ export function OcrBatchTrainer({
       <CardHeader>
         <CardTitle className="text-base flex items-center justify-between">
           Batch Training
-          {files.length > 0 && (
-            <Badge variant="secondary">{files.length} file(s)</Badge>
-          )}
+          {files.length > 0 && <Badge variant="secondary">{files.length} file(s)</Badge>}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -264,13 +263,9 @@ export function OcrBatchTrainer({
               <input {...getInputProps()} />
               <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
               <p className="text-sm font-medium">
-                {isDragActive
-                  ? 'Drop files here...'
-                  : 'Upload multiple bill images (up to 10)'}
+                {isDragActive ? 'Drop files here...' : 'Upload multiple bill images (up to 10)'}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                JPEG, PNG, PDF up to 15MB each
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, PDF up to 15MB each</p>
             </div>
 
             {/* File list */}
@@ -283,18 +278,12 @@ export function OcrBatchTrainer({
                   >
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-muted-foreground" />
-                      <span className="truncate max-w-[200px]">
-                        {file.name}
-                      </span>
+                      <span className="truncate max-w-[200px]">{file.name}</span>
                       <span className="text-xs text-muted-foreground">
                         ({(file.size / 1024).toFixed(0)} KB)
                       </span>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeFile(i)}
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => removeFile(i)}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
@@ -303,9 +292,7 @@ export function OcrBatchTrainer({
                 <div className="flex items-center gap-2">
                   <Button
                     onClick={handleProcess}
-                    disabled={
-                      batchExtractMutation.isPending || !vendorId
-                    }
+                    disabled={batchExtractMutation.isPending || !vendorId}
                     size="sm"
                   >
                     {batchExtractMutation.isPending ? (
@@ -352,10 +339,7 @@ export function OcrBatchTrainer({
                   return (
                     <React.Fragment key={index}>
                       <TableRow
-                        className={cn(
-                          'cursor-pointer',
-                          result.error && 'bg-red-50/50',
-                        )}
+                        className={cn('cursor-pointer', result.error && 'bg-red-50/50')}
                         onClick={() => toggleRow(index)}
                       >
                         <TableCell>
@@ -381,19 +365,13 @@ export function OcrBatchTrainer({
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell>
-                          {result.extraction?.total?.toFixed(2) || '-'}
-                        </TableCell>
-                        <TableCell>
-                          {result.extraction?.date || '-'}
-                        </TableCell>
+                        <TableCell>{result.extraction?.total?.toFixed(2) || '-'}</TableCell>
+                        <TableCell>{result.extraction?.date || '-'}</TableCell>
                         <TableCell>
                           {corrCount > 0 ? (
                             <Badge className="text-xs">{corrCount}</Badge>
                           ) : (
-                            <span className="text-xs text-muted-foreground">
-                              None
-                            </span>
+                            <span className="text-xs text-muted-foreground">None</span>
                           )}
                         </TableCell>
                       </TableRow>
@@ -401,25 +379,18 @@ export function OcrBatchTrainer({
                         <TableRow>
                           <TableCell colSpan={6} className="bg-muted/30 p-4">
                             {result.error ? (
-                              <p className="text-sm text-destructive">
-                                {result.error}
-                              </p>
+                              <p className="text-sm text-destructive">{result.error}</p>
                             ) : result.extraction ? (
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                 {EDITABLE_FIELDS.map((field) => {
                                   const original =
-                                    result.extraction![
-                                      field as keyof OcrTrainingExtractResult
-                                    ];
+                                    result.extraction![field as keyof OcrTrainingExtractResult];
                                   const corrected = fileCorr[field];
-                                  const isCorrected =
-                                    corrected !== undefined;
+                                  const isCorrected = corrected !== undefined;
 
                                   return (
                                     <div key={field} className="space-y-1">
-                                      <Label className="text-xs">
-                                        {FIELD_LABELS[field]}
-                                      </Label>
+                                      <Label className="text-xs">{FIELD_LABELS[field]}</Label>
                                       <Input
                                         value={
                                           isCorrected
@@ -438,13 +409,10 @@ export function OcrBatchTrainer({
                                         }
                                         className={cn(
                                           'h-7 text-xs',
-                                          isCorrected &&
-                                            'border-blue-400 bg-blue-50/50',
+                                          isCorrected && 'border-blue-400 bg-blue-50/50',
                                         )}
                                         placeholder={
-                                          original !== null
-                                            ? String(original)
-                                            : 'Not detected'
+                                          original !== null ? String(original) : 'Not detected'
                                         }
                                       />
                                     </div>
@@ -466,15 +434,11 @@ export function OcrBatchTrainer({
               <div className="flex items-center gap-2 text-sm">
                 {totalCorrections > 0 && (
                   <Badge variant="secondary">
-                    {totalCorrections} correction(s) across{' '}
-                    {filesWithCorrections} file(s)
+                    {totalCorrections} correction(s) across {filesWithCorrections} file(s)
                   </Badge>
                 )}
                 {submittedCount > 0 && (
-                  <Badge
-                    variant="outline"
-                    className="bg-green-50 text-green-700 border-green-200"
-                  >
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                     <Check className="h-3 w-3 mr-1" />
                     {submittedCount} submitted
                   </Badge>
@@ -487,9 +451,7 @@ export function OcrBatchTrainer({
                 <Button
                   size="sm"
                   onClick={handleSubmitAll}
-                  disabled={
-                    totalCorrections === 0 || submitMutation.isPending
-                  }
+                  disabled={totalCorrections === 0 || submitMutation.isPending}
                 >
                   {submitMutation.isPending ? (
                     <>

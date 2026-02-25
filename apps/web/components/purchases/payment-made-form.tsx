@@ -17,11 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -98,7 +94,7 @@ export function PaymentMadeForm({
 
   // Fetch unpaid bills for selected vendor
   const { data: billsData, isLoading: billsLoading } = useUnpaidBills(
-    selectedVendorId || undefined
+    selectedVendorId || undefined,
   );
 
   // Get selected vendor's currency
@@ -129,8 +125,8 @@ export function PaymentMadeForm({
             prev.map((a) =>
               a.billId === preselectedBillId
                 ? { ...a, allocated: preselectedBill.balanceDue, selected: true }
-                : a
-            )
+                : a,
+            ),
           );
         }
       }
@@ -158,7 +154,7 @@ export function PaymentMadeForm({
           };
         }
         return a;
-      })
+      }),
     );
   };
 
@@ -175,7 +171,7 @@ export function PaymentMadeForm({
           };
         }
         return a;
-      })
+      }),
     );
   };
 
@@ -192,15 +188,13 @@ export function PaymentMadeForm({
           allocated: toAllocate,
           selected: toAllocate > 0,
         };
-      })
+      }),
     );
   };
 
   // Clear all allocations
   const clearAllocations = () => {
-    setAllocations((prev) =>
-      prev.map((a) => ({ ...a, allocated: 0, selected: false }))
-    );
+    setAllocations((prev) => prev.map((a) => ({ ...a, allocated: 0, selected: false })));
   };
 
   const handleSubmit = (data: PaymentMadeFormData) => {
@@ -220,7 +214,7 @@ export function PaymentMadeForm({
 
   // Filter accounts to show only bank/cash accounts
   const bankAccounts = accounts.filter(
-    (a) => a.code.startsWith('1') // Typically asset accounts
+    (a) => a.code.startsWith('1'), // Typically asset accounts
   );
 
   return (
@@ -254,9 +248,7 @@ export function PaymentMadeForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.vendorId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.vendorId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.vendorId.message}</p>
               )}
             </div>
 
@@ -268,13 +260,11 @@ export function PaymentMadeForm({
                     variant="outline"
                     className={cn(
                       'w-full justify-start text-left font-normal',
-                      !form.watch('date') && 'text-muted-foreground'
+                      !form.watch('date') && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {form.watch('date')
-                      ? format(form.watch('date'), 'PPP')
-                      : 'Pick a date'}
+                    {form.watch('date') ? format(form.watch('date'), 'PPP') : 'Pick a date'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -287,9 +277,7 @@ export function PaymentMadeForm({
                 </PopoverContent>
               </Popover>
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.date.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
               )}
             </div>
           </div>
@@ -306,9 +294,7 @@ export function PaymentMadeForm({
                 {...form.register('amount', { valueAsNumber: true })}
               />
               {form.formState.errors.amount && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.amount.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.amount.message}</p>
               )}
             </div>
 
@@ -330,9 +316,7 @@ export function PaymentMadeForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.paymentMode && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.paymentMode.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.paymentMode.message}</p>
               )}
             </div>
 
@@ -400,12 +384,7 @@ export function PaymentMadeForm({
                 >
                   Auto-Allocate
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={clearAllocations}
-                >
+                <Button type="button" variant="outline" size="sm" onClick={clearAllocations}>
                   Clear
                 </Button>
               </div>
@@ -413,9 +392,7 @@ export function PaymentMadeForm({
           </CardHeader>
           <CardContent>
             {billsLoading ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Loading bills...
-              </div>
+              <div className="text-center py-8 text-muted-foreground">Loading bills...</div>
             ) : allocations.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No unpaid bills found for this vendor
@@ -440,20 +417,12 @@ export function PaymentMadeForm({
                         <TableCell>
                           <Checkbox
                             checked={allocation.selected}
-                            onCheckedChange={() =>
-                              toggleBillSelection(allocation.billId)
-                            }
+                            onCheckedChange={() => toggleBillSelection(allocation.billId)}
                           />
                         </TableCell>
-                        <TableCell className="font-mono">
-                          {allocation.billNumber}
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(allocation.date), 'MMM d, yyyy')}
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(allocation.dueDate), 'MMM d, yyyy')}
-                        </TableCell>
+                        <TableCell className="font-mono">{allocation.billNumber}</TableCell>
+                        <TableCell>{format(new Date(allocation.date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>{format(new Date(allocation.dueDate), 'MMM d, yyyy')}</TableCell>
                         <TableCell className="text-right font-mono">
                           {formatCurrency(allocation.grandTotal, currency)}
                         </TableCell>
@@ -468,10 +437,7 @@ export function PaymentMadeForm({
                             max={allocation.balanceDue}
                             value={allocation.allocated || ''}
                             onChange={(e) =>
-                              updateAllocation(
-                                allocation.billId,
-                                parseFloat(e.target.value) || 0
-                              )
+                              updateAllocation(allocation.billId, parseFloat(e.target.value) || 0)
                             }
                             className="w-32 text-right ml-auto"
                           />
@@ -501,7 +467,7 @@ export function PaymentMadeForm({
                       <span
                         className={cn(
                           'font-mono font-medium',
-                          totals.unallocated !== 0 && 'text-yellow-600'
+                          totals.unallocated !== 0 && 'text-yellow-600',
                         )}
                       >
                         {formatCurrency(totals.unallocated, currency)}

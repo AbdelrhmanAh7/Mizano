@@ -70,8 +70,18 @@ export interface OvertimeAnalysis {
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 const STANDARD_WORK_HOURS = 9;
 
@@ -172,9 +182,7 @@ export class WorkforceSchedulingService {
         historicalAvgPresent + historicalAvgAbsent > 0
           ? historicalAvgAbsent / (historicalAvgPresent + historicalAvgAbsent)
           : 0.1;
-      const suggestedStaff = Math.ceil(
-        historicalAvgPresent * (1 + absentRate * 0.5),
-      );
+      const suggestedStaff = Math.ceil(historicalAvgPresent * (1 + absentRate * 0.5));
 
       dailySuggestions.push({
         dayOfWeek: d,
@@ -305,9 +313,7 @@ export class WorkforceSchedulingService {
   /**
    * Analyze attendance patterns by day of week and month
    */
-  async getAttendancePatterns(
-    organizationId: string,
-  ): Promise<AttendancePatterns> {
+  async getAttendancePatterns(organizationId: string): Promise<AttendancePatterns> {
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
@@ -413,18 +419,14 @@ export class WorkforceSchedulingService {
     });
 
     // Build employee overtime map
-    const employeeOvertime = new Map<
-      string,
-      { totalHours: number; days: number }
-    >();
+    const employeeOvertime = new Map<string, { totalHours: number; days: number }>();
 
     let totalOvertimeHours = 0;
 
     for (const record of attendance) {
       if (!record.checkIn || !record.checkOut) continue;
 
-      const hoursWorked =
-        (record.checkOut.getTime() - record.checkIn.getTime()) / (1000 * 60 * 60);
+      const hoursWorked = (record.checkOut.getTime() - record.checkIn.getTime()) / (1000 * 60 * 60);
 
       if (hoursWorked > STANDARD_WORK_HOURS) {
         const overtimeHours = hoursWorked - STANDARD_WORK_HOURS;
@@ -452,18 +454,16 @@ export class WorkforceSchedulingService {
 
     const employeeMap = new Map(employees.map((e) => [e.id, e]));
 
-    const topOvertimeEmployees: OvertimeEmployee[] = sortedEmployees.map(
-      ([empId, data]) => {
-        const emp = employeeMap.get(empId);
-        return {
-          employeeId: empId,
-          employeeName: emp?.name || 'Unknown',
-          department: emp?.department || null,
-          totalOvertimeHours: Math.round(data.totalHours * 10) / 10,
-          overtimeDays: data.days,
-        };
-      },
-    );
+    const topOvertimeEmployees: OvertimeEmployee[] = sortedEmployees.map(([empId, data]) => {
+      const emp = employeeMap.get(empId);
+      return {
+        employeeId: empId,
+        employeeName: emp?.name || 'Unknown',
+        department: emp?.department || null,
+        totalOvertimeHours: Math.round(data.totalHours * 10) / 10,
+        overtimeDays: data.days,
+      };
+    });
 
     // Generate recommendations
     const recommendations: string[] = [];
@@ -474,9 +474,7 @@ export class WorkforceSchedulingService {
       );
     }
 
-    const heavyOvertimeEmployees = sortedEmployees.filter(
-      ([, data]) => data.days > 20,
-    );
+    const heavyOvertimeEmployees = sortedEmployees.filter(([, data]) => data.days > 20);
     if (heavyOvertimeEmployees.length > 0) {
       recommendations.push(
         `${heavyOvertimeEmployees.length} employee(s) worked overtime more than 20 days in the last 3 months - risk of burnout`,

@@ -214,8 +214,7 @@ export function useTrainAllModels() {
 export function useTrainModel() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (trainEndpoint: string) =>
-      trainingLabApi.trainModel(trainEndpoint),
+    mutationFn: (trainEndpoint: string) => trainingLabApi.trainModel(trainEndpoint),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ai-training-lab'] });
       queryClient.invalidateQueries({ queryKey: ['ai-model-status'] });
@@ -245,8 +244,7 @@ export function useModelHistory(feature?: AiFeature, limit?: number) {
 export function useTriggerRetraining() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (feature: AiFeature) =>
-      trainingLabApi.triggerRetraining(feature),
+    mutationFn: (feature: AiFeature) => trainingLabApi.triggerRetraining(feature),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ai-model-status'] });
       queryClient.invalidateQueries({ queryKey: ['ai-model-history'] });

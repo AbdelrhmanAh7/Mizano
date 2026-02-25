@@ -13,12 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   useModelHistory,
   useTrainingStats,
@@ -67,10 +62,15 @@ export function ModelDetailDialog({ model, open, onOpenChange }: ModelDetailDial
                 <h4 className="text-sm font-medium">Training Readiness</h4>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Samples</span>
-                  <span>{readiness.currentSamples} / {readiness.minimumRequired} min</span>
+                  <span>
+                    {readiness.currentSamples} / {readiness.minimumRequired} min
+                  </span>
                 </div>
                 <Progress
-                  value={Math.min(100, (readiness.currentSamples / readiness.minimumRequired) * 100)}
+                  value={Math.min(
+                    100,
+                    (readiness.currentSamples / readiness.minimumRequired) * 100,
+                  )}
                 />
                 <Badge variant={readiness.isReady ? 'default' : 'secondary'}>
                   {readiness.isReady ? 'Ready to train' : 'Needs more data'}
@@ -98,7 +98,11 @@ export function ModelDetailDialog({ model, open, onOpenChange }: ModelDetailDial
                   </div>
                   <div className="p-3 rounded-lg bg-muted">
                     <p className="text-muted-foreground text-xs">Accuracy</p>
-                    <p className="font-medium">{historyEntries[0]?.accuracy ? `${(Number(historyEntries[0].accuracy) * 100).toFixed(1)}%` : 'N/A'}</p>
+                    <p className="font-medium">
+                      {historyEntries[0]?.accuracy
+                        ? `${(Number(historyEntries[0].accuracy) * 100).toFixed(1)}%`
+                        : 'N/A'}
+                    </p>
                   </div>
                   <div className="p-3 rounded-lg bg-muted">
                     <p className="text-muted-foreground text-xs">Samples</p>
@@ -106,7 +110,11 @@ export function ModelDetailDialog({ model, open, onOpenChange }: ModelDetailDial
                   </div>
                   <div className="p-3 rounded-lg bg-muted">
                     <p className="text-muted-foreground text-xs">Trained</p>
-                    <p className="font-medium">{historyEntries[0]?.trainedAt ? new Date(historyEntries[0].trainedAt).toLocaleDateString() : 'Never'}</p>
+                    <p className="font-medium">
+                      {historyEntries[0]?.trainedAt
+                        ? new Date(historyEntries[0].trainedAt).toLocaleDateString()
+                        : 'Never'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -152,8 +160,12 @@ export function ModelDetailDialog({ model, open, onOpenChange }: ModelDetailDial
                           return (
                             <div key={label} className="space-y-1">
                               <div className="flex items-center justify-between text-xs">
-                                <span className="truncate max-w-[200px]" title={label}>{label}</span>
-                                <span className="text-muted-foreground">{count} ({pct.toFixed(0)}%)</span>
+                                <span className="truncate max-w-[200px]" title={label}>
+                                  {label}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  {count} ({pct.toFixed(0)}%)
+                                </span>
                               </div>
                               <div className="h-2 bg-muted rounded-full overflow-hidden">
                                 <div
@@ -181,18 +193,16 @@ export function ModelDetailDialog({ model, open, onOpenChange }: ModelDetailDial
                     className="flex items-center justify-between p-3 rounded-lg border"
                   >
                     <div className="flex items-center gap-3">
-                      <Badge
-                        variant={entry.status === 'ACTIVE' ? 'default' : 'secondary'}
-                      >
+                      <Badge variant={entry.status === 'ACTIVE' ? 'default' : 'secondary'}>
                         v{entry.version}
                       </Badge>
                       <div>
                         <p className="text-sm font-medium">
-                          {entry.accuracy ? `${(Number(entry.accuracy) * 100).toFixed(1)}% accuracy` : 'No accuracy data'}
+                          {entry.accuracy
+                            ? `${(Number(entry.accuracy) * 100).toFixed(1)}% accuracy`
+                            : 'No accuracy data'}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          {entry.sampleCount} samples
-                        </p>
+                        <p className="text-xs text-muted-foreground">{entry.sampleCount} samples</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -220,17 +230,23 @@ export function ModelDetailDialog({ model, open, onOpenChange }: ModelDetailDial
                 <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950 text-center">
                   <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto mb-1" />
                   <p className="text-xs text-muted-foreground">Accepted</p>
-                  <p className="text-lg font-bold text-green-600">{feedbackStats.data.accepted || 0}</p>
+                  <p className="text-lg font-bold text-green-600">
+                    {feedbackStats.data.accepted || 0}
+                  </p>
                 </div>
                 <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 text-center">
                   <XCircle className="h-4 w-4 text-red-600 mx-auto mb-1" />
                   <p className="text-xs text-muted-foreground">Rejected</p>
-                  <p className="text-lg font-bold text-red-600">{feedbackStats.data.rejected || 0}</p>
+                  <p className="text-lg font-bold text-red-600">
+                    {feedbackStats.data.rejected || 0}
+                  </p>
                 </div>
                 <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950 text-center">
                   <MessageSquare className="h-4 w-4 text-amber-600 mx-auto mb-1" />
                   <p className="text-xs text-muted-foreground">Corrected</p>
-                  <p className="text-lg font-bold text-amber-600">{feedbackStats.data.corrected || 0}</p>
+                  <p className="text-lg font-bold text-amber-600">
+                    {feedbackStats.data.corrected || 0}
+                  </p>
                 </div>
               </div>
             )}
@@ -243,9 +259,11 @@ export function ModelDetailDialog({ model, open, onOpenChange }: ModelDetailDial
                     <div className="flex items-center justify-between">
                       <Badge
                         variant={
-                          entry.userAction === 'ACCEPTED' ? 'default' :
-                          entry.userAction === 'REJECTED' ? 'destructive' :
-                          'outline'
+                          entry.userAction === 'ACCEPTED'
+                            ? 'default'
+                            : entry.userAction === 'REJECTED'
+                              ? 'destructive'
+                              : 'outline'
                         }
                         className="text-[10px]"
                       >

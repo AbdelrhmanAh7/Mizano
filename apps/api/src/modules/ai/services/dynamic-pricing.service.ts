@@ -45,10 +45,7 @@ export class DynamicPricingService {
 
   constructor(private prisma: PrismaService) {}
 
-  async estimateElasticity(
-    organizationId: string,
-    itemId: string,
-  ): Promise<ElasticityResult> {
+  async estimateElasticity(organizationId: string, itemId: string): Promise<ElasticityResult> {
     const item = await this.prisma.item.findFirst({
       where: { id: itemId, organizationId },
     });
@@ -161,7 +158,7 @@ export class DynamicPricingService {
       } else {
         // Inelastic: can raise price
         suggestedPrice = currentPrice * 1.05;
-        reason = 'Price-insensitive item: moderate increase won\'t reduce volume';
+        reason = "Price-insensitive item: moderate increase won't reduce volume";
       }
     }
 
@@ -169,10 +166,8 @@ export class DynamicPricingService {
     const minPrice = costPrice > 0 ? costPrice / (1 - target) : 0;
     suggestedPrice = Math.max(suggestedPrice, minPrice);
 
-    const suggestedMargin =
-      suggestedPrice > 0 ? (suggestedPrice - costPrice) / suggestedPrice : 0;
-    const expectedRevenueChange =
-      ((suggestedPrice - currentPrice) / currentPrice) * 100;
+    const suggestedMargin = suggestedPrice > 0 ? (suggestedPrice - costPrice) / suggestedPrice : 0;
+    const expectedRevenueChange = ((suggestedPrice - currentPrice) / currentPrice) * 100;
 
     return {
       itemId,
@@ -200,10 +195,7 @@ export class DynamicPricingService {
     for (const item of items) {
       try {
         const result = await this.suggestPrice(organizationId, item.id);
-        if (
-          Math.abs(result.suggestedPrice - result.currentPrice) >
-          result.currentPrice * 0.02
-        ) {
+        if (Math.abs(result.suggestedPrice - result.currentPrice) > result.currentPrice * 0.02) {
           suggestions++;
         }
       } catch {
@@ -214,9 +206,7 @@ export class DynamicPricingService {
     return { analyzed: items.length, suggestions };
   }
 
-  async getPricingInsights(
-    organizationId: string,
-  ): Promise<PricingInsight[]> {
+  async getPricingInsights(organizationId: string): Promise<PricingInsight[]> {
     const items = await this.prisma.item.findMany({
       where: { organizationId, isActive: true },
       select: { id: true, name: true, sellingPrice: true, costPrice: true },
@@ -233,10 +223,7 @@ export class DynamicPricingService {
       const margin = (currentPrice - costPrice) / currentPrice;
 
       try {
-        const elasticity = await this.estimateElasticity(
-          organizationId,
-          item.id,
-        );
+        const elasticity = await this.estimateElasticity(organizationId, item.id);
 
         if (elasticity.dataPoints < 5) {
           insights.push({

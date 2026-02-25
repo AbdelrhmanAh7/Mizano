@@ -15,10 +15,7 @@ describe('DashboardService', () => {
     prisma = createMockPrisma();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        DashboardService,
-        { provide: PrismaService, useValue: prisma },
-      ],
+      providers: [DashboardService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = module.get<DashboardService>(DashboardService);
@@ -28,20 +25,22 @@ describe('DashboardService', () => {
    * Helper to set up common mocks for getDashboardOverview.
    * All aggregate/count/findMany calls return sensible defaults.
    */
-  function setupDashboardMocks(overrides: {
-    receivables?: number;
-    payables?: number;
-    currentRevenue?: number;
-    currentExpenses?: number;
-    currentBillExpenses?: number;
-    prevRevenue?: number;
-    prevExpenses?: number;
-    prevBillExpenses?: number;
-    yearlyRevenue?: number;
-    overdueInvoices?: number;
-    overdueBills?: number;
-    activeProjects?: number;
-  } = {}) {
+  function setupDashboardMocks(
+    overrides: {
+      receivables?: number;
+      payables?: number;
+      currentRevenue?: number;
+      currentExpenses?: number;
+      currentBillExpenses?: number;
+      prevRevenue?: number;
+      prevExpenses?: number;
+      prevBillExpenses?: number;
+      yearlyRevenue?: number;
+      overdueInvoices?: number;
+      overdueBills?: number;
+      activeProjects?: number;
+    } = {},
+  ) {
     const {
       receivables = 0,
       payables = 0,
@@ -77,7 +76,13 @@ describe('DashboardService', () => {
 
     // Bank balances
     prisma.bankAccount.findMany.mockResolvedValue([
-      { id: 'bank-1', name: 'Main Account', systemBalance: dec('50000'), bankBalance: dec('50000'), currency: 'USD' },
+      {
+        id: 'bank-1',
+        name: 'Main Account',
+        systemBalance: dec('50000'),
+        bankBalance: dec('50000'),
+        currency: 'USD',
+      },
     ] as any);
 
     // Counts
@@ -193,11 +198,7 @@ describe('DashboardService', () => {
     it('should accept custom date range parameters', async () => {
       setupDashboardMocks({ currentRevenue: 25000 });
 
-      const result = await service.getDashboardOverview(
-        ORG_ID,
-        '2024-01-01',
-        '2024-03-31',
-      );
+      const result = await service.getDashboardOverview(ORG_ID, '2024-01-01', '2024-03-31');
 
       expect(result).toBeDefined();
       expect(result.overview.monthlyRevenue).toBe(25000);
@@ -242,9 +243,7 @@ describe('DashboardService', () => {
     });
 
     it('should use "Uncategorized" for expenses without account', async () => {
-      prisma.expense.findMany.mockResolvedValue([
-        { amount: dec('200'), account: null },
-      ] as any);
+      prisma.expense.findMany.mockResolvedValue([{ amount: dec('200'), account: null }] as any);
 
       const result = await service.getExpensesByCategory(ORG_ID, '2024-01-01', '2024-12-31');
 
@@ -332,9 +331,7 @@ describe('DashboardService', () => {
             { hours: dec('20'), duration: dec('20') },
             { hours: dec('15'), duration: dec('15') },
           ],
-          invoices: [
-            { total: dec('5000'), grandTotal: dec('5000') },
-          ],
+          invoices: [{ total: dec('5000'), grandTotal: dec('5000') }],
         },
       ] as any);
 
@@ -375,12 +372,8 @@ describe('DashboardService', () => {
       prisma.paymentReceived.findMany.mockResolvedValue([
         { date: today, amount: dec('5000') },
       ] as any);
-      prisma.paymentMade.findMany.mockResolvedValue([
-        { date: today, amount: dec('2000') },
-      ] as any);
-      prisma.expense.findMany.mockResolvedValue([
-        { date: today, amount: dec('1000') },
-      ] as any);
+      prisma.paymentMade.findMany.mockResolvedValue([{ date: today, amount: dec('2000') }] as any);
+      prisma.expense.findMany.mockResolvedValue([{ date: today, amount: dec('1000') }] as any);
 
       const result = await service.getCashFlowChart(ORG_ID, 30);
 

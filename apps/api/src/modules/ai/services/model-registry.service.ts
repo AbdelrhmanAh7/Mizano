@@ -111,10 +111,7 @@ export class ModelRegistryService {
   /**
    * Load the active model for a feature
    */
-  async loadActiveModel(
-    organizationId: string,
-    feature: AiFeature,
-  ): Promise<SavedModel | null> {
+  async loadActiveModel(organizationId: string, feature: AiFeature): Promise<SavedModel | null> {
     const model = await this.prisma.aiModel.findFirst({
       where: {
         organizationId,
@@ -246,9 +243,7 @@ export class ModelRegistryService {
     });
 
     if (result.count > 0) {
-      this.logger.log(
-        `Retired ${result.count} old models for ${feature} in org ${organizationId}`,
-      );
+      this.logger.log(`Retired ${result.count} old models for ${feature} in org ${organizationId}`);
     }
 
     return { retired: result.count };
@@ -257,11 +252,7 @@ export class ModelRegistryService {
   /**
    * Activate a specific model version
    */
-  async activateModel(
-    organizationId: string,
-    feature: AiFeature,
-    version: number,
-  ): Promise<void> {
+  async activateModel(organizationId: string, feature: AiFeature, version: number): Promise<void> {
     // Check if model exists
     const model = await this.prisma.aiModel.findUnique({
       where: {
@@ -274,9 +265,7 @@ export class ModelRegistryService {
     });
 
     if (!model) {
-      throw new NotFoundException(
-        `Model version ${version} not found for ${feature}`,
-      );
+      throw new NotFoundException(`Model version ${version} not found for ${feature}`);
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -307,9 +296,7 @@ export class ModelRegistryService {
       });
     });
 
-    this.logger.log(
-      `Activated model v${version} for ${feature} in org ${organizationId}`,
-    );
+    this.logger.log(`Activated model v${version} for ${feature} in org ${organizationId}`);
 
     this.eventEmitter.emit('ai.model.activated', {
       organizationId,
@@ -493,13 +480,7 @@ export class ModelRegistryService {
     }
 
     // Normal flow: promote to ACTIVE
-    const result = await this.saveModel(
-      organizationId,
-      feature,
-      modelData,
-      accuracy,
-      sampleCount,
-    );
+    const result = await this.saveModel(organizationId, feature, modelData, accuracy, sampleCount);
 
     return { ...result, promoted: true };
   }
@@ -530,9 +511,7 @@ export class ModelRegistryService {
     });
 
     if (!bestRetired) {
-      throw new NotFoundException(
-        `No retired model found to rollback to for ${feature}`,
-      );
+      throw new NotFoundException(`No retired model found to rollback to for ${feature}`);
     }
 
     await this.activateModel(organizationId, feature, bestRetired.version);
@@ -579,8 +558,7 @@ export class ModelRegistryService {
     }
 
     const currentAccuracy = history[0].accuracy;
-    const avgAccuracy =
-      history.reduce((sum, h) => sum + h.accuracy, 0) / history.length;
+    const avgAccuracy = history.reduce((sum, h) => sum + h.accuracy, 0) / history.length;
 
     // Compare recent 3 vs older 3
     let trend: 'improving' | 'stable' | 'degrading' = 'stable';
@@ -591,10 +569,8 @@ export class ModelRegistryService {
       const recent = history.slice(0, recentCount);
       const older = history.slice(recentCount, recentCount * 2);
 
-      const recentAvg =
-        recent.reduce((s, h) => s + h.accuracy, 0) / recent.length;
-      const olderAvg =
-        older.reduce((s, h) => s + h.accuracy, 0) / older.length;
+      const recentAvg = recent.reduce((s, h) => s + h.accuracy, 0) / recent.length;
+      const olderAvg = older.reduce((s, h) => s + h.accuracy, 0) / older.length;
 
       const diff = recentAvg - olderAvg;
       if (diff > 0.02) {
@@ -622,10 +598,7 @@ export class ModelRegistryService {
   /**
    * Delete all models for a feature (for testing/reset)
    */
-  async deleteAllModels(
-    organizationId: string,
-    feature: AiFeature,
-  ): Promise<{ deleted: number }> {
+  async deleteAllModels(organizationId: string, feature: AiFeature): Promise<{ deleted: number }> {
     const result = await this.prisma.aiModel.deleteMany({
       where: {
         organizationId,
@@ -633,9 +606,7 @@ export class ModelRegistryService {
       },
     });
 
-    this.logger.log(
-      `Deleted ${result.count} models for ${feature} in org ${organizationId}`,
-    );
+    this.logger.log(`Deleted ${result.count} models for ${feature} in org ${organizationId}`);
 
     return { deleted: result.count };
   }
@@ -643,10 +614,7 @@ export class ModelRegistryService {
   /**
    * Get the next version number for a feature
    */
-  private async getNextVersion(
-    organizationId: string,
-    feature: AiFeature,
-  ): Promise<number> {
+  private async getNextVersion(organizationId: string, feature: AiFeature): Promise<number> {
     const lastModel = await this.prisma.aiModel.findFirst({
       where: {
         organizationId,

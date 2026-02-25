@@ -209,18 +209,11 @@ export function generateTimeSeries(
     noise?: number;
   } = {},
 ): number[] {
-  const {
-    base = 100,
-    trend = 0,
-    seasonalAmplitude = 0,
-    seasonLength = 12,
-    noise = 0,
-  } = options;
+  const { base = 100, trend = 0, seasonalAmplitude = 0, seasonLength = 12, noise = 0 } = options;
 
   return Array.from({ length }, (_, i) => {
     const trendComponent = trend * i;
-    const seasonalComponent =
-      seasonalAmplitude * Math.sin((2 * Math.PI * i) / seasonLength);
+    const seasonalComponent = seasonalAmplitude * Math.sin((2 * Math.PI * i) / seasonLength);
     const noiseComponent = noise * (Math.random() - 0.5) * 2;
     return base + trendComponent + seasonalComponent + noiseComponent;
   });

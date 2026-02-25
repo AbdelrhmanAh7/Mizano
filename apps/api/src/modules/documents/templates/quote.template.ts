@@ -34,10 +34,7 @@ export interface QuoteData {
   terms?: string;
 }
 
-export function generateQuoteHtml(
-  org: OrganizationInfo,
-  quote: QuoteData,
-): string {
+export function generateQuoteHtml(org: OrganizationInfo, quote: QuoteData): string {
   const primaryColor = org.primaryColor || defaultTemplateConfig.colors.primary;
 
   const statusColors: Record<string, string> = {
@@ -124,19 +121,27 @@ export function generateQuoteHtml(
         )}
 
         <!-- Notes and Terms -->
-        ${quote.notes ? `
+        ${
+          quote.notes
+            ? `
           <div style="margin-top: 30px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">Notes</h4>
             <p style="color: #6B7280; font-size: 12px; white-space: pre-line;">${quote.notes}</p>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
 
-        ${quote.terms ? `
+        ${
+          quote.terms
+            ? `
           <div style="margin-top: 20px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">Terms & Conditions</h4>
             <p style="color: #6B7280; font-size: 12px; white-space: pre-line;">${quote.terms}</p>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
 
         <!-- Acceptance Section -->
         <div style="margin-top: 40px; padding: 20px; background: ${defaultTemplateConfig.colors.lightGray}; border-radius: 8px;">

@@ -37,10 +37,7 @@ export interface PayslipData {
   ytdNet?: number;
 }
 
-export function generatePayslipHtml(
-  org: OrganizationInfo,
-  payslip: PayslipData,
-): string {
+export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData): string {
   const primaryColor = org.primaryColor || defaultTemplateConfig.colors.primary;
 
   const payPeriod = `${formatDate(payslip.payPeriodStart)} - ${formatDate(payslip.payPeriodEnd)}`;
@@ -83,18 +80,26 @@ export function generatePayslipHtml(
                 <td style="padding: 3px 15px 3px 0; color: #6B7280;">Employee ID:</td>
                 <td>${payslip.employee.employeeId}</td>
               </tr>
-              ${payslip.employee.department ? `
+              ${
+                payslip.employee.department
+                  ? `
                 <tr>
                   <td style="padding: 3px 15px 3px 0; color: #6B7280;">Department:</td>
                   <td>${payslip.employee.department}</td>
                 </tr>
-              ` : ''}
-              ${payslip.employee.position ? `
+              `
+                  : ''
+              }
+              ${
+                payslip.employee.position
+                  ? `
                 <tr>
                   <td style="padding: 3px 15px 3px 0; color: #6B7280;">Position:</td>
                   <td>${payslip.employee.position}</td>
                 </tr>
-              ` : ''}
+              `
+                  : ''
+              }
             </table>
           </div>
           <div style="text-align: right;">
@@ -107,12 +112,16 @@ export function generatePayslipHtml(
                 <td style="padding: 3px 15px 3px 0; color: #6B7280;">Pay Date:</td>
                 <td style="font-weight: bold;">${formatDate(payslip.payDate)}</td>
               </tr>
-              ${payslip.employee.bankAccount ? `
+              ${
+                payslip.employee.bankAccount
+                  ? `
                 <tr>
                   <td style="padding: 3px 15px 3px 0; color: #6B7280;">Bank Account:</td>
                   <td>${payslip.employee.bankAccount}</td>
                 </tr>
-              ` : ''}
+              `
+                  : ''
+              }
             </table>
           </div>
         </div>
@@ -125,14 +134,18 @@ export function generatePayslipHtml(
               Earnings
             </h4>
             <table style="width: 100%; font-size: 12px;">
-              ${payslip.earnings.map(e => `
+              ${payslip.earnings
+                .map(
+                  (e) => `
                 <tr style="border-bottom: 1px solid ${defaultTemplateConfig.colors.border};">
                   <td style="padding: 8px 0;">${e.description}</td>
                   <td style="padding: 8px 0; text-align: right; font-weight: ${e.isGross ? 'bold' : 'normal'};">
                     ${formatCurrency(e.amount, payslip.currency)}
                   </td>
                 </tr>
-              `).join('')}
+              `,
+                )
+                .join('')}
               <tr style="background: ${defaultTemplateConfig.colors.lightGray};">
                 <td style="padding: 10px 0; font-weight: bold;">Gross Pay</td>
                 <td style="padding: 10px 0; text-align: right; font-weight: bold; font-size: 14px;">
@@ -148,19 +161,27 @@ export function generatePayslipHtml(
               Deductions
             </h4>
             <table style="width: 100%; font-size: 12px;">
-              ${payslip.deductions.length > 0 ? payslip.deductions.map(d => `
+              ${
+                payslip.deductions.length > 0
+                  ? payslip.deductions
+                      .map(
+                        (d) => `
                 <tr style="border-bottom: 1px solid ${defaultTemplateConfig.colors.border};">
                   <td style="padding: 8px 0;">${d.description}</td>
                   <td style="padding: 8px 0; text-align: right; color: #EF4444;">
                     -${formatCurrency(d.amount, payslip.currency)}
                   </td>
                 </tr>
-              `).join('') : `
+              `,
+                      )
+                      .join('')
+                  : `
                 <tr style="border-bottom: 1px solid ${defaultTemplateConfig.colors.border};">
                   <td style="padding: 8px 0; color: #9CA3AF;">No deductions</td>
                   <td style="padding: 8px 0; text-align: right;">-</td>
                 </tr>
-              `}
+              `
+              }
               <tr style="background: ${defaultTemplateConfig.colors.lightGray};">
                 <td style="padding: 10px 0; font-weight: bold;">Total Deductions</td>
                 <td style="padding: 10px 0; text-align: right; font-weight: bold; font-size: 14px; color: #EF4444;">
@@ -178,7 +199,9 @@ export function generatePayslipHtml(
         </div>
 
         <!-- YTD Totals -->
-        ${payslip.ytdGross ? `
+        ${
+          payslip.ytdGross
+            ? `
           <div style="margin-bottom: 30px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 15px; font-size: 12px; text-transform: uppercase;">Year To Date</h4>
             <div style="display: flex; gap: 20px;">
@@ -196,7 +219,9 @@ export function generatePayslipHtml(
               </div>
             </div>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
 
         <!-- Footer -->
         <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid ${defaultTemplateConfig.colors.border}; text-align: center;">

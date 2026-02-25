@@ -96,7 +96,8 @@ export class AttendanceService {
   }
 
   async bulkRecordAttendance(organizationId: string, records: any[]) {
-    const results: Array<{ success: boolean; record?: any; employeeId?: string; error?: string }> = [];
+    const results: Array<{ success: boolean; record?: any; employeeId?: string; error?: string }> =
+      [];
     for (const record of records) {
       try {
         const result = await this.recordAttendance(organizationId, record);
@@ -108,7 +109,12 @@ export class AttendanceService {
     return results;
   }
 
-  async getAttendanceByEmployee(organizationId: string, employeeId: string, startDate: string, endDate: string) {
+  async getAttendanceByEmployee(
+    organizationId: string,
+    employeeId: string,
+    startDate: string,
+    endDate: string,
+  ) {
     return this.prisma.attendance.findMany({
       where: {
         employeeId,
@@ -136,7 +142,12 @@ export class AttendanceService {
     });
   }
 
-  async getAttendanceSummary(organizationId: string, employeeId: string, month: number, year: number) {
+  async getAttendanceSummary(
+    organizationId: string,
+    employeeId: string,
+    month: number,
+    year: number,
+  ) {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
 

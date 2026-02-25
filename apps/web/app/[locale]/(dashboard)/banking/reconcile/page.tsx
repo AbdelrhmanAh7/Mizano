@@ -37,9 +37,7 @@ export default function ReconcilePage() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Bank Reconciliation</h1>
-        <p className="text-muted-foreground">
-          Select a bank account to reconcile transactions
-        </p>
+        <p className="text-muted-foreground">Select a bank account to reconcile transactions</p>
       </div>
 
       {/* Account Selection */}
@@ -47,9 +45,7 @@ export default function ReconcilePage() {
         <div className="text-center py-12">
           <Landmark className="mx-auto h-12 w-12 text-muted-foreground" />
           <h3 className="mt-4 text-lg font-semibold">No bank accounts</h3>
-          <p className="text-muted-foreground">
-            Add a bank account first to start reconciliation.
-          </p>
+          <p className="text-muted-foreground">Add a bank account first to start reconciliation.</p>
           <Button asChild className="mt-4">
             <Link href="/banking/accounts/new">Add Bank Account</Link>
           </Button>
@@ -57,13 +53,15 @@ export default function ReconcilePage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {accounts.map((account) => {
-            const currentBalance = typeof account.currentBalance === 'string'
-              ? parseFloat(account.currentBalance)
-              : account.currentBalance;
+            const currentBalance =
+              typeof account.currentBalance === 'string'
+                ? parseFloat(account.currentBalance)
+                : account.currentBalance;
 
-            const bankBalance = typeof account.bankBalance === 'string'
-              ? parseFloat(account.bankBalance)
-              : account.bankBalance;
+            const bankBalance =
+              typeof account.bankBalance === 'string'
+                ? parseFloat(account.bankBalance)
+                : account.bankBalance;
 
             const difference = Math.abs((bankBalance || 0) - (currentBalance || 0));
             const needsReconciliation = difference > 0.01;
@@ -73,7 +71,9 @@ export default function ReconcilePage() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className={cn('p-2 rounded-lg', getAccountTypeColor(account.accountType))}>
+                      <div
+                        className={cn('p-2 rounded-lg', getAccountTypeColor(account.accountType))}
+                      >
                         <Landmark className="h-4 w-4" />
                       </div>
                       <CardTitle className="text-base">{account.accountName}</CardTitle>
@@ -96,16 +96,20 @@ export default function ReconcilePage() {
                       <span className="font-mono">{formatCurrency(bankBalance || 0)}</span>
                     </div>
                     <div className="border-t pt-2 flex justify-between">
-                      <span className={cn(
-                        'text-sm font-medium',
-                        needsReconciliation ? 'text-yellow-600' : 'text-green-600'
-                      )}>
+                      <span
+                        className={cn(
+                          'text-sm font-medium',
+                          needsReconciliation ? 'text-yellow-600' : 'text-green-600',
+                        )}
+                      >
                         Difference
                       </span>
-                      <span className={cn(
-                        'font-mono font-medium',
-                        needsReconciliation ? 'text-yellow-600' : 'text-green-600'
-                      )}>
+                      <span
+                        className={cn(
+                          'font-mono font-medium',
+                          needsReconciliation ? 'text-yellow-600' : 'text-green-600',
+                        )}
+                      >
                         {formatCurrency(difference)}
                       </span>
                     </div>

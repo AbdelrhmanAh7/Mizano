@@ -120,7 +120,9 @@ export default function LeadDetailPage() {
       <div className="space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
-            <Link href="/crm/leads"><ArrowLeft className="h-4 w-4" /></Link>
+            <Link href="/crm/leads">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
           </Button>
           <h1 className="text-3xl font-bold tracking-tight">Lead Not Found</h1>
         </div>
@@ -166,7 +168,9 @@ export default function LeadDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
-            <Link href="/crm/leads"><ArrowLeft className="h-4 w-4" /></Link>
+            <Link href="/crm/leads">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
           </Button>
           <div>
             <div className="flex items-center gap-3">
@@ -180,9 +184,7 @@ export default function LeadDetailPage() {
                 </Badge>
               )}
             </div>
-            {lead.companyName && (
-              <p className="text-muted-foreground">{lead.companyName}</p>
-            )}
+            {lead.companyName && <p className="text-muted-foreground">{lead.companyName}</p>}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -221,7 +223,10 @@ export default function LeadDetailPage() {
               {lead.email && (
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-muted-foreground" />
-                  <a href={`mailto:${lead.email}`} className="text-blue-600 hover:underline text-sm">
+                  <a
+                    href={`mailto:${lead.email}`}
+                    className="text-blue-600 hover:underline text-sm"
+                  >
                     {lead.email}
                   </a>
                 </div>
@@ -274,8 +279,8 @@ export default function LeadDetailPage() {
           <DialogHeader>
             <DialogTitle>Convert Lead to Customer</DialogTitle>
             <DialogDescription>
-              This will create a new customer record from this lead&apos;s information
-              and optionally create a deal.
+              This will create a new customer record from this lead&apos;s information and
+              optionally create a deal.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

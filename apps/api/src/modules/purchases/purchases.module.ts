@@ -13,8 +13,20 @@ import { AccountingModule } from '../accounting/accounting.module';
 
 @Module({
   imports: [AccountingModule],
-  controllers: [VendorsController, ExpensesController, BillsController, PaymentsMadeController, VendorCreditsController],
-  providers: [VendorsService, ExpensesService, BillsService, PaymentsMadeService, VendorCreditsService],
+  controllers: [
+    VendorsController,
+    ExpensesController,
+    BillsController,
+    PaymentsMadeController,
+    VendorCreditsController,
+  ],
+  providers: [
+    VendorsService,
+    ExpensesService,
+    BillsService,
+    PaymentsMadeService,
+    VendorCreditsService,
+  ],
   exports: [VendorsService, BillsService],
 })
 export class PurchasesModule {}

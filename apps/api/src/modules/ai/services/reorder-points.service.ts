@@ -2,11 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ReorderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import {
-  mean,
-  standardDeviation,
-  getZValueForServiceLevel,
-} from '../utils/statistics.util';
+import { mean, standardDeviation, getZValueForServiceLevel } from '../utils/statistics.util';
 
 export interface ReorderCalculation {
   avgDailyDemand: number;
@@ -71,7 +67,7 @@ export class ReorderPointsService {
   private readonly HOLDING_COST_RATE = 0.25; // 25% of item cost
   private readonly DEFAULT_ORDERING_COST = 50; // Default ordering cost
   private readonly DEAD_STOCK_DAYS = 90;
-  private readonly ABC_SERVICE_LEVELS = { A: 0.98, B: 0.95, C: 0.90 };
+  private readonly ABC_SERVICE_LEVELS = { A: 0.98, B: 0.95, C: 0.9 };
 
   constructor(private prisma: PrismaService) {}
 
@@ -103,9 +99,7 @@ export class ReorderPointsService {
     // Safety Stock = Z × σ × √L
     // Where Z is the z-value for service level, σ is demand std dev, L is lead time
     const zScore = getZValueForServiceLevel(serviceLevel);
-    const safetyStock = Math.ceil(
-      zScore * demandStdDev * Math.sqrt(leadTimeDays),
-    );
+    const safetyStock = Math.ceil(zScore * demandStdDev * Math.sqrt(leadTimeDays));
 
     // Reorder Point = (Average Daily Demand × Lead Time) + Safety Stock
     const reorderPoint = Math.ceil(avgDailyDemand * leadTimeDays + safetyStock);
@@ -121,19 +115,13 @@ export class ReorderPointsService {
   /**
    * Calculate Economic Order Quantity (EOQ)
    */
-  calculateEOQ(
-    annualDemand: number,
-    orderingCost: number,
-    holdingCostPerUnit: number,
-  ): number {
+  calculateEOQ(annualDemand: number, orderingCost: number, holdingCostPerUnit: number): number {
     if (annualDemand <= 0 || holdingCostPerUnit <= 0) {
       return 0;
     }
     // EOQ = √((2 × D × S) / H)
     // D = annual demand, S = ordering cost, H = holding cost per unit
-    return Math.ceil(
-      Math.sqrt((2 * annualDemand * orderingCost) / holdingCostPerUnit),
-    );
+    return Math.ceil(Math.sqrt((2 * annualDemand * orderingCost) / holdingCostPerUnit));
   }
 
   /**
@@ -172,8 +160,11 @@ export class ReorderPointsService {
     const dailySales = await this.getDemandHistory(organizationId, itemId, 90);
 
     // Calculate reorder point
-    const { avgDailyDemand, demandStdDev, safetyStock, reorderPoint } =
-      this.calculateReorderPoint(dailySales, leadTimeDays, serviceLevel);
+    const { avgDailyDemand, demandStdDev, safetyStock, reorderPoint } = this.calculateReorderPoint(
+      dailySales,
+      leadTimeDays,
+      serviceLevel,
+    );
 
     // Calculate EOQ
     const annualDemand = avgDailyDemand * 365;
@@ -186,9 +177,7 @@ export class ReorderPointsService {
 
     // Calculate days of stock remaining
     const daysOfStockRemaining =
-      avgDailyDemand > 0
-        ? Math.floor(item.currentStock / avgDailyDemand)
-        : null;
+      avgDailyDemand > 0 ? Math.floor(item.currentStock / avgDailyDemand) : null;
 
     // Determine status
     const status = this.determineStatus(
@@ -257,9 +246,7 @@ export class ReorderPointsService {
         });
         calculated++;
       } catch (error) {
-        this.logger.error(
-          `Failed to calculate reorder for item ${item.id}: ${error}`,
-        );
+        this.logger.error(`Failed to calculate reorder for item ${item.id}: ${error}`);
         failed++;
       }
     }
@@ -382,15 +369,11 @@ export class ReorderPointsService {
 
       // Check if dead stock (no sales or last sale > threshold)
       const isDeadStock =
-        !lastSaleDate ||
-        (daysSinceLastSale !== null && daysSinceLastSale >= thresholdDays);
+        !lastSaleDate || (daysSinceLastSale !== null && daysSinceLastSale >= thresholdDays);
 
       if (isDeadStock) {
         const stockValue = item.currentStock * Number(item.costPrice);
-        const suggestedDiscount = this.calculateSuggestedDiscount(
-          daysSinceLastSale,
-          thresholdDays,
-        );
+        const suggestedDiscount = this.calculateSuggestedDiscount(daysSinceLastSale, thresholdDays);
 
         deadStock.push({
           itemId: item.id,
@@ -406,9 +389,7 @@ export class ReorderPointsService {
     }
 
     // Sort by days since last sale (longest first)
-    deadStock.sort(
-      (a, b) => (b.daysSinceLastSale || 999) - (a.daysSinceLastSale || 999),
-    );
+    deadStock.sort((a, b) => (b.daysSinceLastSale || 999) - (a.daysSinceLastSale || 999));
 
     return deadStock;
   }
@@ -491,15 +472,11 @@ export class ReorderPointsService {
 
         updated++;
       } catch (error) {
-        this.logger.error(
-          `Failed to update reorder for item ${item.id}: ${error}`,
-        );
+        this.logger.error(`Failed to update reorder for item ${item.id}: ${error}`);
       }
     }
 
-    this.logger.log(
-      `Updated reorder points for ${updated} items in org ${organizationId}`,
-    );
+    this.logger.log(`Updated reorder points for ${updated} items in org ${organizationId}`);
 
     return { updated };
   }
@@ -562,30 +539,49 @@ export class ReorderPointsService {
   ): ReorderCalculation {
     if (item.type !== 'GOODS') {
       return {
-        avgDailyDemand: 0, demandStdDev: 0, safetyStock: 0, reorderPoint: 0,
-        economicOrderQty: 0, daysOfStockRemaining: null, status: 'OK', needsReorder: false,
+        avgDailyDemand: 0,
+        demandStdDev: 0,
+        safetyStock: 0,
+        reorderPoint: 0,
+        economicOrderQty: 0,
+        daysOfStockRemaining: null,
+        status: 'OK',
+        needsReorder: false,
       };
     }
 
-    const { avgDailyDemand, demandStdDev, safetyStock, reorderPoint } =
-      this.calculateReorderPoint(dailySales, leadTimeDays, serviceLevel);
+    const { avgDailyDemand, demandStdDev, safetyStock, reorderPoint } = this.calculateReorderPoint(
+      dailySales,
+      leadTimeDays,
+      serviceLevel,
+    );
 
     const annualDemand = avgDailyDemand * 365;
     const holdingCostPerUnit = Number(item.costPrice) * this.HOLDING_COST_RATE;
     const economicOrderQty = this.calculateEOQ(
-      annualDemand, this.DEFAULT_ORDERING_COST, holdingCostPerUnit,
+      annualDemand,
+      this.DEFAULT_ORDERING_COST,
+      holdingCostPerUnit,
     );
 
     const daysOfStockRemaining =
       avgDailyDemand > 0 ? Math.floor(item.currentStock / avgDailyDemand) : null;
 
     const status = this.determineStatus(
-      item.currentStock, reorderPoint, safetyStock, avgDailyDemand,
+      item.currentStock,
+      reorderPoint,
+      safetyStock,
+      avgDailyDemand,
     );
 
     return {
-      avgDailyDemand, demandStdDev, safetyStock, reorderPoint,
-      economicOrderQty, daysOfStockRemaining, status,
+      avgDailyDemand,
+      demandStdDev,
+      safetyStock,
+      reorderPoint,
+      economicOrderQty,
+      daysOfStockRemaining,
+      status,
       needsReorder: item.currentStock <= reorderPoint,
     };
   }
@@ -625,7 +621,10 @@ export class ReorderPointsService {
       }
       const dateKey = mov.createdAt.toISOString().split('T')[0];
       const dayMap = itemMovements.get(mov.itemId)!;
-      dayMap.set(dateKey, (dayMap.get(dateKey) || 0) + Math.abs(parseFloat(mov.quantity.toString())));
+      dayMap.set(
+        dateKey,
+        (dayMap.get(dateKey) || 0) + Math.abs(parseFloat(mov.quantity.toString())),
+      );
     }
 
     // Build daily arrays for each item
@@ -715,9 +714,7 @@ export class ReorderPointsService {
 
     // Base discount: 10% for items just past threshold
     // Increase by 5% for each additional 30 days
-    const additionalPeriods = Math.floor(
-      (daysSinceLastSale - thresholdDays) / 30,
-    );
+    const additionalPeriods = Math.floor((daysSinceLastSale - thresholdDays) / 30);
     const discount = Math.min(10 + additionalPeriods * 5, 50); // Max 50%
 
     return discount;
@@ -806,9 +803,7 @@ export class ReorderPointsService {
 
     // Calculate annual value for each item
     const itemValues = items.map((item) => {
-      const avgDailyDemand = item.reorderAnalysis
-        ? Number(item.reorderAnalysis.avgDailyDemand)
-        : 0;
+      const avgDailyDemand = item.reorderAnalysis ? Number(item.reorderAnalysis.avgDailyDemand) : 0;
       const annualValue = avgDailyDemand * 365 * Number(item.costPrice);
 
       return {
@@ -853,7 +848,11 @@ export class ReorderPointsService {
     });
 
     // Build summary
-    const summary = { A: { count: 0, value: 0 }, B: { count: 0, value: 0 }, C: { count: 0, value: 0 } };
+    const summary = {
+      A: { count: 0, value: 0 },
+      B: { count: 0, value: 0 },
+      C: { count: 0, value: 0 },
+    };
     for (const item of classifications) {
       summary[item.category].count++;
       summary[item.category].value += item.annualValue;

@@ -22,8 +22,19 @@ import { ImportExportModule } from '../import-export/import-export.module';
       limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
     }),
   ],
-  controllers: [BankAccountsController, BankTransactionsController, BankRulesController, ReconciliationController],
-  providers: [BankAccountsService, BankTransactionsService, BankStatementImportService, BankRulesService, ReconciliationService],
+  controllers: [
+    BankAccountsController,
+    BankTransactionsController,
+    BankRulesController,
+    ReconciliationController,
+  ],
+  providers: [
+    BankAccountsService,
+    BankTransactionsService,
+    BankStatementImportService,
+    BankRulesService,
+    ReconciliationService,
+  ],
   exports: [BankAccountsService],
 })
 export class BankingModule {}

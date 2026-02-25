@@ -155,60 +155,100 @@ export class ActivitiesService {
     };
   }
 
-  async logCall(organizationId: string, userId: string, params: {
-    leadId?: string;
-    dealId?: string;
-    description: string;
-  }) {
-    return this.create(organizationId, {
-      type: 'CALL',
-      ...params,
-    }, userId);
+  async logCall(
+    organizationId: string,
+    userId: string,
+    params: {
+      leadId?: string;
+      dealId?: string;
+      description: string;
+    },
+  ) {
+    return this.create(
+      organizationId,
+      {
+        type: 'CALL',
+        ...params,
+      },
+      userId,
+    );
   }
 
-  async logEmail(organizationId: string, userId: string, params: {
-    leadId?: string;
-    dealId?: string;
-    description: string;
-  }) {
-    return this.create(organizationId, {
-      type: 'EMAIL',
-      ...params,
-    }, userId);
+  async logEmail(
+    organizationId: string,
+    userId: string,
+    params: {
+      leadId?: string;
+      dealId?: string;
+      description: string;
+    },
+  ) {
+    return this.create(
+      organizationId,
+      {
+        type: 'EMAIL',
+        ...params,
+      },
+      userId,
+    );
   }
 
-  async logMeeting(organizationId: string, userId: string, params: {
-    leadId?: string;
-    dealId?: string;
-    description: string;
-    date?: string;
-  }) {
-    return this.create(organizationId, {
-      type: 'MEETING',
-      ...params,
-    }, userId);
+  async logMeeting(
+    organizationId: string,
+    userId: string,
+    params: {
+      leadId?: string;
+      dealId?: string;
+      description: string;
+      date?: string;
+    },
+  ) {
+    return this.create(
+      organizationId,
+      {
+        type: 'MEETING',
+        ...params,
+      },
+      userId,
+    );
   }
 
-  async logNote(organizationId: string, userId: string, params: {
-    leadId?: string;
-    dealId?: string;
-    description: string;
-  }) {
-    return this.create(organizationId, {
-      type: 'NOTE',
-      ...params,
-    }, userId);
+  async logNote(
+    organizationId: string,
+    userId: string,
+    params: {
+      leadId?: string;
+      dealId?: string;
+      description: string;
+    },
+  ) {
+    return this.create(
+      organizationId,
+      {
+        type: 'NOTE',
+        ...params,
+      },
+      userId,
+    );
   }
 
-  async logTask(organizationId: string, userId: string, params: {
-    leadId?: string;
-    dealId?: string;
-    description: string;
-    date?: string;
-  }) {
-    return this.create(organizationId, {
-      type: 'TASK',
-      ...params,
-    }, userId);
+  async logTask(
+    organizationId: string,
+    userId: string,
+    params: {
+      leadId?: string;
+      dealId?: string;
+      description: string;
+      date?: string;
+    },
+  ) {
+    return this.create(
+      organizationId,
+      {
+        type: 'TASK',
+        ...params,
+      },
+      userId,
+    );
   }
 }

@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -89,10 +82,7 @@ export class LeadScoringController {
     @CurrentOrg() orgId: string,
     @Query() query: LeadLimitDto,
   ): Promise<{ data: HotLeadResponse[] }> {
-    const leads = await this.leadScoringService.getHotLeads(
-      orgId,
-      query.limit || 10,
-    );
+    const leads = await this.leadScoringService.getHotLeads(orgId, query.limit || 10);
     return { data: leads };
   }
 
@@ -113,10 +103,7 @@ export class LeadScoringController {
     @CurrentOrg() orgId: string,
     @Query() query: LeadLimitDto,
   ): Promise<{ data: ColdLeadResponse[] }> {
-    const leads = await this.leadScoringService.getColdLeads(
-      orgId,
-      query.limit || 20,
-    );
+    const leads = await this.leadScoringService.getColdLeads(orgId, query.limit || 20);
     return { data: leads };
   }
 
@@ -133,10 +120,7 @@ export class LeadScoringController {
     @CurrentOrg() orgId: string,
     @Param('id') leadId: string,
   ): Promise<{ data: ConversionPredictionResponse }> {
-    const prediction = await this.leadScoringService.getConversionPrediction(
-      orgId,
-      leadId,
-    );
+    const prediction = await this.leadScoringService.getConversionPrediction(orgId, leadId);
     return { data: prediction };
   }
 
@@ -153,10 +137,7 @@ export class LeadScoringController {
     @CurrentOrg() orgId: string,
     @Param('id') leadId: string,
   ): Promise<{ data: ScoreHistoryEntryResponse[] }> {
-    const history = await this.leadScoringService.getLeadScoreHistory(
-      orgId,
-      leadId,
-    );
+    const history = await this.leadScoringService.getLeadScoreHistory(orgId, leadId);
     return { data: history };
   }
 
@@ -168,9 +149,7 @@ export class LeadScoringController {
     description: 'Returns scoring results',
     type: ScoreAllResultResponse,
   })
-  async scoreAllLeads(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: ScoreAllResultResponse }> {
+  async scoreAllLeads(@CurrentOrg() orgId: string): Promise<{ data: ScoreAllResultResponse }> {
     const result = await this.leadScoringService.scoreAllLeads(orgId);
     return { data: result };
   }
@@ -186,9 +165,7 @@ export class LeadScoringController {
   async getScoreDistribution(
     @CurrentOrg() orgId: string,
   ): Promise<{ data: ScoreDistributionResponse }> {
-    const distribution = await this.leadScoringService.getScoreDistribution(
-      orgId,
-    );
+    const distribution = await this.leadScoringService.getScoreDistribution(orgId);
     return { data: distribution };
   }
 

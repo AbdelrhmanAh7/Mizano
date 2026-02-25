@@ -77,9 +77,7 @@ export function PhoneInput({
     <div className="flex gap-2">
       <Select value={selectedCountry} onValueChange={handleCountryChange} disabled={disabled}>
         <SelectTrigger className="w-[130px] shrink-0">
-          <SelectValue>
-            {country ? `${country.flag} ${country.dialCode}` : 'Select'}
-          </SelectValue>
+          <SelectValue>{country ? `${country.flag} ${country.dialCode}` : 'Select'}</SelectValue>
         </SelectTrigger>
         <SelectContent className="max-h-[300px]">
           {countries.map((c) => (

@@ -51,9 +51,7 @@ export default function AccountingPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <CardDescription className="text-sm">
-                {module.description}
-              </CardDescription>
+              <CardDescription className="text-sm">{module.description}</CardDescription>
               <Link href={module.href}>
                 <Button variant="outline" className="w-full group">
                   Open

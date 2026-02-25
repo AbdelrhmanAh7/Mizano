@@ -89,10 +89,7 @@ export class CashFlowPredictionService {
   /**
    * Generate cash flow prediction with Monte Carlo simulation
    */
-  async predict(
-    organizationId: string,
-    horizonDays: number = 90,
-  ): Promise<CashFlowPrediction> {
+  async predict(organizationId: string, horizonDays: number = 90): Promise<CashFlowPrediction> {
     // 1. Get current cash balance
     const currentCash = await this.getCurrentCashBalance(organizationId);
 
@@ -191,11 +188,7 @@ export class CashFlowPredictionService {
       p50: f.closingBalance.p50,
     }));
     const threshold = prediction.summary.currentCash * 0.1;
-    const criticalDates = identifyCriticalDates(
-      simplifiedForecasts,
-      events,
-      threshold,
-    );
+    const criticalDates = identifyCriticalDates(simplifiedForecasts, events, threshold);
 
     return {
       next7Days: {
@@ -231,10 +224,7 @@ export class CashFlowPredictionService {
   }> {
     const prediction = await this.predict(organizationId, 90);
 
-    const buildScenario = (
-      name: string,
-      percentile: 'p10' | 'p50' | 'p90',
-    ): CashFlowScenario => {
+    const buildScenario = (name: string, percentile: 'p10' | 'p50' | 'p90'): CashFlowScenario => {
       const forecasts = prediction.forecasts.map((f) => ({
         date: f.date,
         balance: f.closingBalance[percentile],
@@ -273,8 +263,7 @@ export class CashFlowPredictionService {
   async getAlerts(organizationId: string): Promise<CashFlowAlert[]> {
     const prediction = await this.predict(organizationId, 90);
     const alerts: CashFlowAlert[] = [];
-    const avgDailyExpense =
-      prediction.summary.totalExpectedOutflows / 90 || 1000;
+    const avgDailyExpense = prediction.summary.totalExpectedOutflows / 90 || 1000;
 
     for (const forecast of prediction.forecasts) {
       // Critical: Negative cash
@@ -304,9 +293,7 @@ export class CashFlowPredictionService {
     const largeOutflowThreshold = prediction.summary.currentCash * 0.2;
     for (const forecast of prediction.forecasts) {
       const totalOutflow =
-        forecast.outflows.ap +
-        forecast.outflows.payroll +
-        forecast.outflows.recurring;
+        forecast.outflows.ap + forecast.outflows.payroll + forecast.outflows.recurring;
       if (totalOutflow > largeOutflowThreshold) {
         alerts.push({
           type: 'warning',
@@ -323,10 +310,7 @@ export class CashFlowPredictionService {
   /**
    * Run what-if analysis
    */
-  async whatIf(
-    organizationId: string,
-    scenario: WhatIfScenario,
-  ): Promise<WhatIfResult> {
+  async whatIf(organizationId: string, scenario: WhatIfScenario): Promise<WhatIfResult> {
     // Get baseline prediction
     const baselinePrediction = await this.predict(organizationId, 90);
 
@@ -352,30 +336,23 @@ export class CashFlowPredictionService {
     });
 
     const startDate = new Date();
-    const adjustedDailyForecasts = generateDailyForecasts(
-      adjustedSimulation,
-      startDate,
-    );
+    const adjustedDailyForecasts = generateDailyForecasts(adjustedSimulation, startDate);
 
-    const adjustedForecasts: CashFlowForecast[] = adjustedDailyForecasts.map(
-      (day, index) => ({
-        date: day.date,
-        openingBalance:
-          index === 0 ? currentCash : adjustedDailyForecasts[index - 1].p50,
-        inflows: { ar: 0, other: 0 },
-        outflows: { ap: 0, payroll: 0, recurring: 0 },
-        closingBalance: { p10: day.p10, p50: day.p50, p90: day.p90 },
-        alerts: [],
-      }),
-    );
+    const adjustedForecasts: CashFlowForecast[] = adjustedDailyForecasts.map((day, index) => ({
+      date: day.date,
+      openingBalance: index === 0 ? currentCash : adjustedDailyForecasts[index - 1].p50,
+      inflows: { ar: 0, other: 0 },
+      outflows: { ap: 0, payroll: 0, recurring: 0 },
+      closingBalance: { p10: day.p10, p50: day.p50, p90: day.p90 },
+      alerts: [],
+    }));
 
     // Calculate impact
     const baselineEndBalance =
-      baselinePrediction.forecasts[baselinePrediction.forecasts.length - 1]
-        ?.closingBalance.p50 || currentCash;
-    const adjustedEndBalance =
-      adjustedForecasts[adjustedForecasts.length - 1]?.closingBalance.p50 ||
+      baselinePrediction.forecasts[baselinePrediction.forecasts.length - 1]?.closingBalance.p50 ||
       currentCash;
+    const adjustedEndBalance =
+      adjustedForecasts[adjustedForecasts.length - 1]?.closingBalance.p50 || currentCash;
 
     return {
       baseline: baselinePrediction.forecasts,
@@ -385,8 +362,7 @@ export class CashFlowPredictionService {
         daysUntilNegativeChange:
           adjustedSimulation.daysUntilNegative !== null &&
           baselinePrediction.summary.daysUntilNegative !== null
-            ? adjustedSimulation.daysUntilNegative -
-              baselinePrediction.summary.daysUntilNegative
+            ? adjustedSimulation.daysUntilNegative - baselinePrediction.summary.daysUntilNegative
             : null,
       },
     };
@@ -400,9 +376,7 @@ export class CashFlowPredictionService {
       const prediction = await this.predict(organizationId, 90);
       return { updated: prediction.forecasts.length };
     } catch (error) {
-      this.logger.error(
-        `Failed to recalculate cash flow for org ${organizationId}: ${error}`,
-      );
+      this.logger.error(`Failed to recalculate cash flow for org ${organizationId}: ${error}`);
       return { updated: 0 };
     }
   }
@@ -423,10 +397,7 @@ export class CashFlowPredictionService {
       },
     });
 
-    return bankAccounts.reduce(
-      (sum, acc) => sum + Number(acc.systemBalance),
-      0,
-    );
+    return bankAccounts.reduce((sum, acc) => sum + Number(acc.systemBalance), 0);
   }
 
   /**
@@ -474,7 +445,8 @@ export class CashFlowPredictionService {
         );
         if (prediction) {
           predictedDate = prediction.predictedDate;
-          confidence = prediction.confidence === 'high' ? 0.8 : prediction.confidence === 'medium' ? 0.6 : 0.4;
+          confidence =
+            prediction.confidence === 'high' ? 0.8 : prediction.confidence === 'medium' ? 0.6 : 0.4;
         }
       } catch {
         // Use due date if prediction fails
@@ -577,16 +549,15 @@ export class CashFlowPredictionService {
     });
 
     for (const profile of recurringProfiles) {
-      let runDate = profile.nextRunDate
-        ? new Date(profile.nextRunDate)
-        : new Date();
+      const runDate = profile.nextRunDate ? new Date(profile.nextRunDate) : new Date();
       const intervalDays = this.getIntervalDays(profile.frequency);
 
       // Extract amount from templateData JSON
       const templateData = profile.templateData as Record<string, unknown> | null;
-      const profileAmount = templateData && typeof templateData === 'object'
-        ? Number((templateData as any).grandTotal || (templateData as any).amount || 0)
-        : 0;
+      const profileAmount =
+        templateData && typeof templateData === 'object'
+          ? Number((templateData as any).grandTotal || (templateData as any).amount || 0)
+          : 0;
 
       while (runDate <= endDate) {
         if (runDate >= startDate) {
@@ -628,10 +599,7 @@ export class CashFlowPredictionService {
   /**
    * Calculate confidence level
    */
-  private calculateConfidence(
-    eventCount: number,
-    currentCash: number,
-  ): 'high' | 'medium' | 'low' {
+  private calculateConfidence(eventCount: number, currentCash: number): 'high' | 'medium' | 'low' {
     if (eventCount > 20 && currentCash > 0) return 'high';
     if (eventCount > 10) return 'medium';
     return 'low';
@@ -656,9 +624,7 @@ export class CashFlowPredictionService {
         forecastDate: f.date,
         openingBalance: new Decimal(f.openingBalance),
         expectedInflows: new Decimal(f.inflows.ar + f.inflows.other),
-        expectedOutflows: new Decimal(
-          f.outflows.ap + f.outflows.payroll + f.outflows.recurring,
-        ),
+        expectedOutflows: new Decimal(f.outflows.ap + f.outflows.payroll + f.outflows.recurring),
         closingBalanceP10: new Decimal(f.closingBalance.p10),
         closingBalanceP50: new Decimal(f.closingBalance.p50),
         closingBalanceP90: new Decimal(f.closingBalance.p90),

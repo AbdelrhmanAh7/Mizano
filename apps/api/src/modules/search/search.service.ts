@@ -128,7 +128,7 @@ export class SearchService {
 
       // If pg_trgm queries failed, fall back to ILIKE + app-level scoring
       if (!hasTrgm) {
-        return this.fallbackSearch(organizationId, query, limit, configs);
+        return await this.fallbackSearch(organizationId, query, limit, configs);
       }
 
       // Re-rank with JaroWinkler and build response

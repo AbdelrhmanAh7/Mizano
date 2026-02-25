@@ -17,9 +17,7 @@ export default function NewWorkOrderPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">New Work Order</h1>
-          <p className="text-muted-foreground">
-            Create a production work order from a BOM
-          </p>
+          <p className="text-muted-foreground">Create a production work order from a BOM</p>
         </div>
       </div>
 

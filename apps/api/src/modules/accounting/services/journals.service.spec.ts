@@ -5,10 +5,7 @@ import { JournalsService } from './journals.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { OrganizationsService } from '../../organizations/organizations.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
-import {
-  createMockJournalEntry,
-  createMockJournalLine,
-} from '../../../test/helpers/test-utils';
+import { createMockJournalEntry, createMockJournalLine } from '../../../test/helpers/test-utils';
 import { dec, expectDecimalEqual } from '../../../test/helpers/decimal.helpers';
 
 describe('JournalsService', () => {
@@ -78,9 +75,7 @@ describe('JournalsService', () => {
         ],
       };
 
-      await expect(service.create(ORG_ID, unbalancedDto)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.create(ORG_ID, unbalancedDto)).rejects.toThrow(BadRequestException);
       await expect(service.create(ORG_ID, unbalancedDto)).rejects.toThrow(
         'Total debits must equal total credits',
       );
@@ -193,12 +188,8 @@ describe('JournalsService', () => {
         ],
       };
 
-      await expect(service.create(ORG_ID, lockedDto)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.create(ORG_ID, lockedDto)).rejects.toThrow(
-        /period is locked/,
-      );
+      await expect(service.create(ORG_ID, lockedDto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(ORG_ID, lockedDto)).rejects.toThrow(/period is locked/);
     });
 
     it('should include organizationId in the created journal data', async () => {
@@ -275,9 +266,7 @@ describe('JournalsService', () => {
     it('should throw NotFoundException when journal does not exist', async () => {
       prisma.journal.findFirst.mockResolvedValue(null);
 
-      await expect(service.findOne(ORG_ID, 'nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.findOne(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
 
     it('should query with organizationId and deletedAt: null', async () => {
@@ -328,9 +317,7 @@ describe('JournalsService', () => {
     it('should throw NotFoundException for non-existent journal on remove', async () => {
       prisma.journal.findFirst.mockResolvedValue(null);
 
-      await expect(service.remove(ORG_ID, 'nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.remove(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
 
     it('should reject remove for journals before lock date', async () => {
@@ -338,9 +325,7 @@ describe('JournalsService', () => {
       prisma.journal.findFirst.mockResolvedValue(journal as any);
       organizationsService.getLockDate.mockResolvedValue(new Date('2024-12-31'));
 
-      await expect(service.remove(ORG_ID, 'j1')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.remove(ORG_ID, 'j1')).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -431,9 +416,9 @@ describe('JournalsService', () => {
     it('should throw NotFoundException when updating non-existent journal', async () => {
       prisma.journal.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.update(ORG_ID, 'nonexistent', { notes: 'updated' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.update(ORG_ID, 'nonexistent', { notes: 'updated' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

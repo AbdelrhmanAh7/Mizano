@@ -11,24 +11,29 @@ services:
     container_name: mizano-api
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "6001:6001"
     environment:
       - NODE_ENV=production
-      - PORT=3001
+      - API_PORT=6001
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=${JWT_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5001}
+      - VLM_SERVICE_URL=http://vlm-service:8100
+      - VLM_TIMEOUT_MS=120000
+      - VLM_ENABLED=true
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      vlm-service:
+        condition: service_started
     networks:
       - mizano-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -44,23 +49,62 @@ services:
     container_name: mizano-web
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "5001:5001"
     environment:
       - NODE_ENV=production
-      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:5001}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://api:3001}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://api:6001}
     depends_on:
       api:
         condition: service_healthy
     networks:
       - mizano-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5001/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  # ============================================
+  # VLM Service (Vision-Language Model)
+  # ============================================
+  vlm-service:
+    build:
+      context: services/vlm-service
+      dockerfile: Dockerfile
+      args:
+        INSTALL_VLLM: "${INSTALL_VLLM:-false}"
+    container_name: mizano-vlm
+    restart: unless-stopped
+    environment:
+      - MODEL_NAME=${VLM_MODEL_NAME:-Qwen/Qwen2.5-VL-7B-Instruct-AWQ}
+      - DEVICE=cuda
+      - MAX_NEW_TOKENS=4096
+      - TEMPERATURE=0.1
+      - HOST=0.0.0.0
+      - PORT=8100
+      - LOG_LEVEL=warning
+      - VLM_MOCK=false
+      - MAX_IMAGE_RESOLUTION=1280
+    volumes:
+      - vlm_models:/models
+    networks:
+      - mizano-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ['CMD', 'python3', '-c', "import urllib.request; urllib.request.urlopen('http://localhost:8100/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
 
   # ============================================
   # PostgreSQL Database
@@ -136,6 +180,8 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  vlm_models:
     driver: local
 
 # ============================================

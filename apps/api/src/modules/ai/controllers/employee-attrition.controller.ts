@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -47,10 +40,7 @@ export class EmployeeAttritionController {
     @CurrentOrg() orgId: string,
     @Param('employeeId') employeeId: string,
   ): Promise<{ data: AttritionPredictionDto }> {
-    const result = await this.attritionService.predictAttrition(
-      orgId,
-      employeeId,
-    );
+    const result = await this.attritionService.predictAttrition(orgId, employeeId);
     return { data: result };
   }
 
@@ -67,14 +57,8 @@ export class EmployeeAttritionController {
     description: 'Returns list of employees with highest attrition risk',
     type: [FlightRiskDto],
   })
-  async getFlightRisk(
-    @CurrentOrg() orgId: string,
-    @Query() query: AttritionLimitDto,
-  ) {
-    const result = await this.attritionService.getFlightRisk(
-      orgId,
-      query.limit || 20,
-    );
+  async getFlightRisk(@CurrentOrg() orgId: string, @Query() query: AttritionLimitDto) {
+    const result = await this.attritionService.getFlightRisk(orgId, query.limit || 20);
     return { data: result };
   }
 
@@ -86,9 +70,7 @@ export class EmployeeAttritionController {
     description: 'Returns batch prediction summary',
     type: AttritionBatchDto,
   })
-  async predictAll(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: AttritionBatchDto }> {
+  async predictAll(@CurrentOrg() orgId: string): Promise<{ data: AttritionBatchDto }> {
     const result = await this.attritionService.predictAll(orgId);
     return { data: result };
   }
@@ -101,9 +83,7 @@ export class EmployeeAttritionController {
     description: 'Returns training results including accuracy metrics',
     type: AttritionTrainingDto,
   })
-  async trainModel(
-    @CurrentOrg() orgId: string,
-  ) {
+  async trainModel(@CurrentOrg() orgId: string) {
     const result = await this.attritionService.trainModel(orgId);
     return { data: result };
   }

@@ -45,12 +45,7 @@ export interface OcrScannerProps {
   className?: string;
 }
 
-export function OcrScanner({
-  vendorId,
-  onExtract,
-  onApply,
-  className,
-}: OcrScannerProps) {
+export function OcrScanner({ vendorId, onExtract, onApply, className }: OcrScannerProps) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<OcrExtractedData | null>(null);
@@ -137,7 +132,7 @@ export function OcrScanner({
         onSuccess: () => {
           // Show success feedback
         },
-      }
+      },
     );
   };
 
@@ -178,15 +173,13 @@ export function OcrScanner({
                 'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
                 isDragActive
                   ? 'border-primary bg-primary/5'
-                  : 'border-muted-foreground/25 hover:border-primary/50'
+                  : 'border-muted-foreground/25 hover:border-primary/50',
               )}
             >
               <input {...getInputProps()} />
               <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
               <p className="text-sm font-medium">
-                {isDragActive
-                  ? 'Drop the file here...'
-                  : 'Drag & drop an invoice image'}
+                {isDragActive ? 'Drop the file here...' : 'Drag & drop an invoice image'}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 or click to browse (JPEG, PNG, PDF up to 10MB)
@@ -213,14 +206,8 @@ export function OcrScanner({
               </div>
 
               <div className="flex items-center justify-between">
-                <div className="text-sm text-muted-foreground truncate">
-                  {file.name}
-                </div>
-                <Button
-                  onClick={handleExtract}
-                  disabled={isExtracting}
-                  size="sm"
-                >
+                <div className="text-sm text-muted-foreground truncate">{file.name}</div>
+                <Button onClick={handleExtract} disabled={isExtracting} size="sm">
                   {isExtracting ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -248,10 +235,7 @@ export function OcrScanner({
               Extracted Fields
             </span>
             {extractedData && (
-              <ConfidenceBadge
-                confidence={extractedData.ocrConfidence}
-                size="sm"
-              />
+              <ConfidenceBadge confidence={extractedData.ocrConfidence} size="sm" />
             )}
           </CardTitle>
         </CardHeader>
@@ -259,9 +243,7 @@ export function OcrScanner({
           {!extractedData ? (
             <div className="text-center py-12 text-muted-foreground">
               <FileText className="h-10 w-10 mx-auto mb-4 opacity-50" />
-              <p className="text-sm">
-                Upload and extract an invoice to see the results
-              </p>
+              <p className="text-sm">Upload and extract an invoice to see the results</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -270,8 +252,7 @@ export function OcrScanner({
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>Possible Duplicate</AlertTitle>
                   <AlertDescription>
-                    This invoice may already exist in the system. Please verify before
-                    proceeding.
+                    This invoice may already exist in the system. Please verify before proceeding.
                   </AlertDescription>
                 </Alert>
               )}
@@ -310,9 +291,7 @@ export function OcrScanner({
                   value={getFieldValue('subtotal')}
                   originalValue={extractedData.subtotal}
                   isCorrected={isFieldCorrected('subtotal')}
-                  onChange={(value) =>
-                    handleFieldChange('subtotal', parseFloat(value) || null)
-                  }
+                  onChange={(value) => handleFieldChange('subtotal', parseFloat(value) || null)}
                   type="number"
                   confidence={extractedData.ocrConfidence}
                 />
@@ -322,9 +301,7 @@ export function OcrScanner({
                   value={getFieldValue('tax')}
                   originalValue={extractedData.tax}
                   isCorrected={isFieldCorrected('tax')}
-                  onChange={(value) =>
-                    handleFieldChange('tax', parseFloat(value) || null)
-                  }
+                  onChange={(value) => handleFieldChange('tax', parseFloat(value) || null)}
                   type="number"
                   confidence={extractedData.ocrConfidence}
                 />
@@ -334,9 +311,7 @@ export function OcrScanner({
                   value={getFieldValue('total')}
                   originalValue={extractedData.total}
                   isCorrected={isFieldCorrected('total')}
-                  onChange={(value) =>
-                    handleFieldChange('total', parseFloat(value) || null)
-                  }
+                  onChange={(value) => handleFieldChange('total', parseFloat(value) || null)}
                   type="number"
                   confidence={extractedData.ocrConfidence}
                 />
@@ -375,17 +350,8 @@ export function OcrScanner({
                 </div>
                 <div className="flex items-center gap-2">
                   {vendorId && hasCorrections && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleLearn}
-                      disabled={isLearning}
-                    >
-                      {isLearning ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        'Save Layout'
-                      )}
+                    <Button variant="outline" size="sm" onClick={handleLearn} disabled={isLearning}>
+                      {isLearning ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Layout'}
                     </Button>
                   )}
                   <Button size="sm" onClick={handleApply}>
@@ -440,13 +406,11 @@ function ExtractedField({
         onChange={(e) => onChange(e.target.value)}
         className={cn(
           isLowConfidence && !isCorrected && 'border-yellow-300 bg-yellow-50',
-          isCorrected && 'border-blue-300 bg-blue-50'
+          isCorrected && 'border-blue-300 bg-blue-50',
         )}
       />
       {isLowConfidence && !isCorrected && originalValue && (
-        <p className="text-xs text-yellow-600">
-          Low confidence - please verify this value
-        </p>
+        <p className="text-xs text-yellow-600">Low confidence - please verify this value</p>
       )}
     </div>
   );

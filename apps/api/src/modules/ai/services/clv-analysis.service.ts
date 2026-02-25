@@ -45,10 +45,7 @@ export class ClvAnalysisService {
 
   constructor(private prisma: PrismaService) {}
 
-  async calculateCLV(
-    organizationId: string,
-    customerId: string,
-  ): Promise<CLVResult> {
+  async calculateCLV(organizationId: string, customerId: string): Promise<CLVResult> {
     const customer = await this.prisma.customer.findFirst({
       where: { id: customerId, organizationId, deletedAt: null },
     });
@@ -70,9 +67,7 @@ export class ClvAnalysisService {
 
     const customerAge = Math.max(
       1,
-      Math.floor(
-        (Date.now() - customer.createdAt.getTime()) / (30 * 86400000),
-      ),
+      Math.floor((Date.now() - customer.createdAt.getTime()) / (30 * 86400000)),
     );
 
     if (invoices.length === 0) {
@@ -97,25 +92,20 @@ export class ClvAnalysisService {
     // Calculate inter-purchase intervals
     const intervals: number[] = [];
     for (let i = 1; i < invoices.length; i++) {
-      const days =
-        (invoices[i].date.getTime() - invoices[i - 1].date.getTime()) /
-        86400000;
+      const days = (invoices[i].date.getTime() - invoices[i - 1].date.getTime()) / 86400000;
       intervals.push(days);
     }
-    const avgInterval =
-      intervals.length > 0 ? ss.mean(intervals) : customerAge * 30;
+    const avgInterval = intervals.length > 0 ? ss.mean(intervals) : customerAge * 30;
 
     // Simplified BG/NBD: expected transactions in next 12 months
     const T = customerAge;
     const recency = Math.floor(
-      (Date.now() - invoices[invoices.length - 1].date.getTime()) /
-        (30 * 86400000),
+      (Date.now() - invoices[invoices.length - 1].date.getTime()) / (30 * 86400000),
     );
     const frequency = invoices.length;
 
     // Retention probability based on recency vs average interval
-    const recencyDays =
-      (Date.now() - invoices[invoices.length - 1].date.getTime()) / 86400000;
+    const recencyDays = (Date.now() - invoices[invoices.length - 1].date.getTime()) / 86400000;
     const retentionProbability = Math.max(
       0.05,
       Math.min(0.99, 1 - recencyDays / (avgInterval * 3)),
@@ -123,9 +113,7 @@ export class ClvAnalysisService {
 
     // Expected future purchases in next 12 months
     const expectedPurchases12m =
-      frequency > 1
-        ? (frequency / T) * 12 * retentionProbability
-        : retentionProbability * 2;
+      frequency > 1 ? (frequency / T) * 12 * retentionProbability : retentionProbability * 2;
 
     // CLV = historical value + predicted future value (12 month horizon)
     const historicalValue = amounts.reduce((a, b) => a + b, 0);
@@ -134,15 +122,10 @@ export class ClvAnalysisService {
 
     // Predicted next purchase
     const predictedNextPurchase =
-      intervals.length > 0
-        ? Math.max(0, avgInterval - recencyDays)
-        : avgInterval;
+      intervals.length > 0 ? Math.max(0, avgInterval - recencyDays) : avgInterval;
 
     // Confidence based on data points
-    const confidence = Math.min(
-      0.95,
-      0.3 + invoices.length * 0.05 + (T > 6 ? 0.2 : 0),
-    );
+    const confidence = Math.min(0.95, 0.3 + invoices.length * 0.05 + (T > 6 ? 0.2 : 0));
 
     // Store in profile
     await this.prisma.customerAiProfile.upsert({
@@ -190,9 +173,7 @@ export class ClvAnalysisService {
         const result = await this.calculateCLV(organizationId, customer.id);
         clvValues.push({ customerId: customer.id, clv: result.lifetimeValue });
       } catch (error) {
-        this.logger.warn(
-          `Failed to calculate CLV for ${customer.id}: ${error.message}`,
-        );
+        this.logger.warn(`Failed to calculate CLV for ${customer.id}: ${error.message}`);
       }
     }
 
@@ -228,10 +209,7 @@ export class ClvAnalysisService {
       select: { lifetimeValue: true, clvSegment: true },
     });
 
-    const segmentMap = new Map<
-      string,
-      { count: number; totalCLV: number }
-    >();
+    const segmentMap = new Map<string, { count: number; totalCLV: number }>();
     let totalCLV = 0;
 
     for (const p of profiles) {
@@ -270,9 +248,15 @@ export class ClvAnalysisService {
 
     if (values.length === 0) {
       return {
-        mean: 0, median: 0, stdDev: 0, min: 0, max: 0,
-        percentile25: 0, percentile75: 0,
-        totalCustomers: 0, totalCLV: 0,
+        mean: 0,
+        median: 0,
+        stdDev: 0,
+        min: 0,
+        max: 0,
+        percentile25: 0,
+        percentile75: 0,
+        totalCustomers: 0,
+        totalCLV: 0,
       };
     }
 

@@ -2,7 +2,14 @@
 
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isWeekend } from 'date-fns';
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameDay,
+  isWeekend,
+} from 'date-fns';
 import { ChevronLeft, ChevronRight, UserCheck, Clock, CalendarOff } from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
@@ -44,7 +51,7 @@ function AttendancePageContent() {
   const { data: employeesData, isLoading: employeesLoading } = useEmployees({ status: 'ACTIVE' });
   const { data: attendanceData, isLoading: attendanceLoading } = useAttendance(
     format(startOfMonth(currentMonth), 'yyyy-MM-dd'),
-    format(endOfMonth(currentMonth), 'yyyy-MM-dd')
+    format(endOfMonth(currentMonth), 'yyyy-MM-dd'),
   );
   const bulkMark = useBulkMarkAttendance();
 
@@ -58,7 +65,7 @@ function AttendancePageContent() {
 
   const getAttendanceForDay = (employeeId: string, date: Date) => {
     return attendance.find(
-      (a: any) => a.employeeId === employeeId && isSameDay(new Date(a.date), date)
+      (a: any) => a.employeeId === employeeId && isSameDay(new Date(a.date), date),
     );
   };
 
@@ -79,7 +86,7 @@ function AttendancePageContent() {
 
   // Calculate summary for selected date
   const selectedDateAttendance = attendance.filter((a: any) =>
-    isSameDay(new Date(a.date), selectedDate)
+    isSameDay(new Date(a.date), selectedDate),
   );
   const presentCount = selectedDateAttendance.filter((a: any) => a.status === 'PRESENT').length;
   const absentCount = selectedDateAttendance.filter((a: any) => a.status === 'ABSENT').length;
@@ -106,9 +113,7 @@ function AttendancePageContent() {
               <p className="font-medium">
                 {employee.firstName} {employee.lastName}
               </p>
-              <p className="text-xs text-muted-foreground">
-                {employee.jobTitle}
-              </p>
+              <p className="text-xs text-muted-foreground">{employee.jobTitle}</p>
             </div>
           </div>
         );
@@ -120,10 +125,7 @@ function AttendancePageContent() {
       cell: ({ row }) => {
         const att = getAttendanceForDay(row.original.id, selectedDate);
         return att ? (
-          <Badge
-            variant="outline"
-            className={getAttendanceStatusColor(att.status)}
-          >
+          <Badge variant="outline" className={getAttendanceStatusColor(att.status)}>
             {getAttendanceStatusLabel(att.status)}
           </Badge>
         ) : (
@@ -189,9 +191,7 @@ function AttendancePageContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Attendance</h1>
-          <p className="text-muted-foreground">
-            Track employee attendance and working hours
-          </p>
+          <p className="text-muted-foreground">Track employee attendance and working hours</p>
         </div>
         <Button asChild>
           <Link href="/hr/attendance/mark">
@@ -306,18 +306,19 @@ function AttendancePageContent() {
                       className={cn(
                         'text-center min-w-[40px] cursor-pointer hover:bg-muted',
                         isWeekend(day) && 'bg-muted/50',
-                        isSameDay(day, selectedDate) && 'bg-primary/10'
+                        isSameDay(day, selectedDate) && 'bg-primary/10',
                       )}
                       onClick={() => setSelectedDate(day)}
                     >
                       <div className="flex flex-col items-center">
-                        <span className="text-xs text-muted-foreground">
-                          {format(day, 'EEE')}
-                        </span>
-                        <span className={cn(
-                          'text-sm',
-                          isSameDay(day, new Date()) && 'bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center'
-                        )}>
+                        <span className="text-xs text-muted-foreground">{format(day, 'EEE')}</span>
+                        <span
+                          className={cn(
+                            'text-sm',
+                            isSameDay(day, new Date()) &&
+                              'bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center',
+                          )}
+                        >
                           {format(day, 'd')}
                         </span>
                       </div>
@@ -350,16 +351,13 @@ function AttendancePageContent() {
                           className={cn(
                             'text-center p-1',
                             isWeekend(day) && 'bg-muted/50',
-                            isSelected && 'bg-primary/10'
+                            isSelected && 'bg-primary/10',
                           )}
                         >
                           {att ? (
                             <Badge
                               variant="outline"
-                              className={cn(
-                                'text-xs px-1',
-                                getAttendanceStatusColor(att.status)
-                              )}
+                              className={cn('text-xs px-1', getAttendanceStatusColor(att.status))}
                             >
                               {att.status === 'PRESENT' && 'P'}
                               {att.status === 'ABSENT' && 'A'}
@@ -385,9 +383,7 @@ function AttendancePageContent() {
       {/* Selected Date Details */}
       <Card>
         <CardHeader>
-          <CardTitle>
-            {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-          </CardTitle>
+          <CardTitle>{format(selectedDate, 'EEEE, MMMM d, yyyy')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -402,19 +398,27 @@ function AttendancePageContent() {
       {/* Legend */}
       <div className="flex items-center gap-6 text-sm">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-green-100 text-green-800">P</Badge>
+          <Badge variant="outline" className="bg-green-100 text-green-800">
+            P
+          </Badge>
           <span>Present</span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-red-100 text-red-800">A</Badge>
+          <Badge variant="outline" className="bg-red-100 text-red-800">
+            A
+          </Badge>
           <span>Absent</span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-yellow-100 text-yellow-800">L</Badge>
+          <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+            L
+          </Badge>
           <span>Leave</span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-orange-100 text-orange-800">H</Badge>
+          <Badge variant="outline" className="bg-orange-100 text-orange-800">
+            H
+          </Badge>
           <span>Half Day</span>
         </div>
       </div>

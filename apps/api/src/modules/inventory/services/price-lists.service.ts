@@ -14,16 +14,24 @@ export class PriceListsService {
         type: dto.type,
         adjustment: new Decimal(dto.adjustment),
         organizationId,
-        items: dto.items ? {
-          create: dto.items.map((item: any) => ({ itemId: item.itemId, customPrice: new Decimal(item.customPrice) })),
-        } : undefined,
+        items: dto.items
+          ? {
+              create: dto.items.map((item: any) => ({
+                itemId: item.itemId,
+                customPrice: new Decimal(item.customPrice),
+              })),
+            }
+          : undefined,
       },
       include: { items: { include: { item: { select: { id: true, name: true } } } } },
     });
   }
 
   async findAll(organizationId: string) {
-    return this.prisma.priceList.findMany({ where: { organizationId, isActive: true }, orderBy: { name: 'asc' } });
+    return this.prisma.priceList.findMany({
+      where: { organizationId, isActive: true },
+      orderBy: { name: 'asc' },
+    });
   }
 
   async findOne(organizationId: string, id: string) {

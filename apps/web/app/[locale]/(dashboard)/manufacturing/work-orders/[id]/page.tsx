@@ -202,9 +202,7 @@ export default function WorkOrderDetailPage() {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
-                {workOrder.workOrderNumber}
-              </h1>
+              <h1 className="text-3xl font-bold tracking-tight">{workOrder.workOrderNumber}</h1>
               <Badge className={getWorkOrderStatusColor(workOrder.status)}>
                 {getWorkOrderStatusLabel(workOrder.status)}
               </Badge>
@@ -248,10 +246,7 @@ export default function WorkOrderDetailPage() {
             </Button>
           )}
           {canDelete && isDraft && (
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
+            <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </Button>
@@ -281,12 +276,8 @@ export default function WorkOrderDetailPage() {
               <Package className="h-4 w-4" />
               Output Item
             </div>
-            <div className="text-lg font-bold">
-              {workOrder.outputItem?.name || '-'}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {workOrder.outputItem?.code}
-            </div>
+            <div className="text-lg font-bold">{workOrder.outputItem?.name || '-'}</div>
+            <div className="text-xs text-muted-foreground">{workOrder.outputItem?.code}</div>
           </CardContent>
         </Card>
 
@@ -298,9 +289,7 @@ export default function WorkOrderDetailPage() {
             </div>
             <div className="text-2xl font-bold">{workOrder.quantity}</div>
             {workOrder.completedQuantity !== undefined && workOrder.completedQuantity > 0 && (
-              <div className="text-xs text-green-600">
-                {workOrder.completedQuantity} completed
-              </div>
+              <div className="text-xs text-green-600">{workOrder.completedQuantity} completed</div>
             )}
           </CardContent>
         </Card>
@@ -324,9 +313,7 @@ export default function WorkOrderDetailPage() {
               Due Date
             </div>
             <div className="text-lg font-bold">
-              {workOrder.dueDate
-                ? format(new Date(workOrder.dueDate), 'MMM d, yyyy')
-                : 'Not set'}
+              {workOrder.dueDate ? format(new Date(workOrder.dueDate), 'MMM d, yyyy') : 'Not set'}
             </div>
           </CardContent>
         </Card>
@@ -396,8 +383,8 @@ export default function WorkOrderDetailPage() {
           <DialogHeader>
             <DialogTitle>Complete Work Order</DialogTitle>
             <DialogDescription>
-              Enter the quantity produced to complete this work order.
-              Raw materials will be consumed and finished goods will be added to inventory.
+              Enter the quantity produced to complete this work order. Raw materials will be
+              consumed and finished goods will be added to inventory.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -442,10 +429,7 @@ export default function WorkOrderDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleCancel}
-              className="bg-orange-600 hover:bg-orange-700"
-            >
+            <AlertDialogAction onClick={handleCancel} className="bg-orange-600 hover:bg-orange-700">
               Cancel Work Order
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -464,10 +448,7 @@ export default function WorkOrderDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

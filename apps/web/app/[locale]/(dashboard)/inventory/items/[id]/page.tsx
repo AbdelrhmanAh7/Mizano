@@ -3,7 +3,15 @@
 import { use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Pencil, Trash2, Package, DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
+import {
+  ArrowLeft,
+  Pencil,
+  Trash2,
+  Package,
+  DollarSign,
+  TrendingUp,
+  AlertTriangle,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -87,15 +95,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               <span
                 className={cn(
                   'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-                  getItemTypeColor(item.type)
+                  getItemTypeColor(item.type),
                 )}
               >
                 {getItemTypeLabel(item.type)}
               </span>
             </div>
-            {item.sku && (
-              <p className="text-muted-foreground font-mono">SKU: {item.sku}</p>
-            )}
+            {item.sku && <p className="text-muted-foreground font-mono">SKU: {item.sku}</p>}
           </div>
         </div>
 
@@ -117,16 +123,12 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete Item</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to delete this item? This action cannot
-                  be undone.
+                  Are you sure you want to delete this item? This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  className="bg-red-600 hover:bg-red-700"
-                >
+                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
                   Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -161,9 +163,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Purchase Price</p>
-                <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(item.purchasePrice)}
-                </p>
+                <p className="text-2xl font-bold font-mono">{formatCurrency(item.purchasePrice)}</p>
               </div>
             </div>
           </CardContent>
@@ -198,15 +198,15 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                   stockStatus.status === 'ok'
                     ? 'bg-green-100'
                     : stockStatus.status === 'low'
-                    ? 'bg-yellow-100'
-                    : 'bg-red-100'
+                      ? 'bg-yellow-100'
+                      : 'bg-red-100',
                 )}
               >
                 {stockStatus.status !== 'ok' ? (
                   <AlertTriangle
                     className={cn(
                       'h-5 w-5',
-                      stockStatus.status === 'low' ? 'text-yellow-600' : 'text-red-600'
+                      stockStatus.status === 'low' ? 'text-yellow-600' : 'text-red-600',
                     )}
                   />
                 ) : (
@@ -236,7 +236,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               <span
                 className={cn(
                   'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-                  getItemTypeColor(item.type)
+                  getItemTypeColor(item.type),
                 )}
               >
                 {getItemTypeLabel(item.type)}
@@ -278,13 +278,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Reorder Point</span>
                 <span className="font-mono">
-                  {item.reorderPoint ?? '-'} {item.reorderPoint ? (item.unit || 'units') : ''}
+                  {item.reorderPoint ?? '-'} {item.reorderPoint ? item.unit || 'units' : ''}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Reorder Quantity</span>
                 <span className="font-mono">
-                  {item.reorderQuantity ?? '-'} {item.reorderQuantity ? (item.unit || 'units') : ''}
+                  {item.reorderQuantity ?? '-'} {item.reorderQuantity ? item.unit || 'units' : ''}
                 </span>
               </div>
             </CardContent>

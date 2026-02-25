@@ -4,7 +4,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 // Request DTOs
 
 export class AnalyzeTextDto {
-  @ApiProperty({ description: 'Text to analyze for sentiment', example: 'The product quality was excellent and delivery was fast' })
+  @ApiProperty({
+    description: 'Text to analyze for sentiment',
+    example: 'The product quality was excellent and delivery was fast',
+  })
   @IsString()
   @MinLength(1)
   text: string;
@@ -19,7 +22,11 @@ export class SentimentResultDto {
   @ApiProperty({ description: 'Comparative score (normalized per word)', example: 0.46 })
   comparative: number;
 
-  @ApiProperty({ description: 'Positive words found', type: [String], example: ['excellent', 'fast'] })
+  @ApiProperty({
+    description: 'Positive words found',
+    type: [String],
+    example: ['excellent', 'fast'],
+  })
   positive: string[];
 
   @ApiProperty({ description: 'Negative words found', type: [String], example: [] })

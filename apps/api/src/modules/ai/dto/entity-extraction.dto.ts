@@ -4,7 +4,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 // Request DTOs
 
 export class ExtractEntitiesDto {
-  @ApiProperty({ description: 'Text to extract entities from', example: 'Send payment of $5,000 to John Smith at Acme Corp by March 15, 2024' })
+  @ApiProperty({
+    description: 'Text to extract entities from',
+    example: 'Send payment of $5,000 to John Smith at Acme Corp by March 15, 2024',
+  })
   @IsString()
   @MinLength(1)
   text: string;

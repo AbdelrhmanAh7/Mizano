@@ -19,5 +19,13 @@
     ],
     "react/no-unescaped-entities": "off",
     "react-hooks/exhaustive-deps": "warn"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["**/*.spec.tsx", "**/*.spec.ts", "**/*.test.tsx", "**/*.test.ts"],
+      "rules": {
+        "react/display-name": "off"
+      }
+    }
+  ]
 }

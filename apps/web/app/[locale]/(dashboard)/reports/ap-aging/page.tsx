@@ -54,9 +54,7 @@ export default function APAgingReportPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Accounts Payable Aging</h1>
-          <p className="text-muted-foreground">
-            As of {format(asOfDate, 'MMMM d, yyyy')}
-          </p>
+          <p className="text-muted-foreground">As of {format(asOfDate, 'MMMM d, yyyy')}</p>
         </div>
       </div>
 
@@ -76,9 +74,7 @@ export default function APAgingReportPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Payable</p>
-                <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(reportData.total)}
-                </p>
+                <p className="text-2xl font-bold font-mono">{formatCurrency(reportData.total)}</p>
               </div>
             </div>
           </CardContent>
@@ -97,25 +93,21 @@ export default function APAgingReportPage() {
         </CardHeader>
         <CardContent>
           {reportData.buckets.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground">
-              No outstanding payables found.
-            </p>
+            <p className="text-center py-8 text-muted-foreground">No outstanding payables found.</p>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {reportData.buckets.map((bucket: AgingBucket) => (
                 <button
                   key={bucket.range}
                   onClick={() =>
-                    setExpandedBucket(
-                      expandedBucket === bucket.range ? null : bucket.range
-                    )
+                    setExpandedBucket(expandedBucket === bucket.range ? null : bucket.range)
                   }
                   className={cn(
                     'p-4 rounded-lg border-2 text-left transition-colors',
                     expandedBucket === bucket.range
                       ? 'border-primary'
                       : 'border-transparent hover:border-primary/50',
-                    getAgingBucketColor(bucket.range)
+                    getAgingBucketColor(bucket.range),
                   )}
                 >
                   <p className="text-sm font-medium">{getAgingBucketLabel(bucket.range)}</p>
@@ -136,7 +128,8 @@ export default function APAgingReportPage() {
             <CardTitle>{getAgingBucketLabel(expandedBucket)} Bills</CardTitle>
           </CardHeader>
           <CardContent>
-            {reportData.buckets.find((b: AgingBucket) => b.range === expandedBucket)?.items?.length ? (
+            {reportData.buckets.find((b: AgingBucket) => b.range === expandedBucket)?.items
+              ?.length ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -178,8 +171,8 @@ export default function APAgingReportPage() {
                               item.daysOverdue > 30
                                 ? 'bg-red-100 text-red-800'
                                 : item.daysOverdue > 0
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-green-100 text-green-800'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-green-100 text-green-800',
                             )}
                           >
                             {item.daysOverdue}

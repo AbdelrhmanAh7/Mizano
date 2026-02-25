@@ -8,10 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { payrollApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import {
-    formatCurrency,
-    getPayrollStatusColor,
-    getPayrollStatusLabel,
-    usePayrollRuns,
+  formatCurrency,
+  getPayrollStatusColor,
+  getPayrollStatusLabel,
+  usePayrollRuns,
 } from '@/lib/hooks/use-hr';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';

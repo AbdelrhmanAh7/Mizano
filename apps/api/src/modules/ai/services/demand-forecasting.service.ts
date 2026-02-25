@@ -275,11 +275,7 @@ export class DemandForecastingService {
 
     for (const item of items) {
       try {
-        const historicalData = await this.getMonthlyDemandHistory(
-          organizationId,
-          item.id,
-          36,
-        );
+        const historicalData = await this.getMonthlyDemandHistory(organizationId, item.id, 36);
 
         if (historicalData.length < this.MIN_DATA_POINTS) {
           skipped++;
@@ -289,16 +285,13 @@ export class DemandForecastingService {
         await this.forecastItem(organizationId, item.id);
         processed++;
       } catch (error) {
-        const errorMsg =
-          error instanceof Error ? error.message : 'Unknown error';
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         errors.push(`${item.name}: ${errorMsg}`);
         this.logger.error(`Failed to forecast item ${item.id}: ${error}`);
       }
     }
 
-    this.logger.log(
-      `Forecasted ${processed} items, skipped ${skipped}, errors: ${errors.length}`,
-    );
+    this.logger.log(`Forecasted ${processed} items, skipped ${skipped}, errors: ${errors.length}`);
 
     return { processed, skipped, errors };
   }
@@ -310,11 +303,7 @@ export class DemandForecastingService {
     organizationId: string,
     itemId: string,
   ): Promise<SeasonalityAnalysis> {
-    const historicalData = await this.getMonthlyDemandHistory(
-      organizationId,
-      itemId,
-      36,
-    );
+    const historicalData = await this.getMonthlyDemandHistory(organizationId, itemId, 36);
 
     if (historicalData.length < 12) {
       return {
@@ -377,15 +366,8 @@ export class DemandForecastingService {
   /**
    * Detect trend for an item
    */
-  async detectItemTrend(
-    organizationId: string,
-    itemId: string,
-  ): Promise<TrendAnalysis> {
-    const historicalData = await this.getMonthlyDemandHistory(
-      organizationId,
-      itemId,
-      24,
-    );
+  async detectItemTrend(organizationId: string, itemId: string): Promise<TrendAnalysis> {
+    const historicalData = await this.getMonthlyDemandHistory(organizationId, itemId, 24);
 
     if (historicalData.length < 3) {
       return {
@@ -444,11 +426,7 @@ export class DemandForecastingService {
       seasonalIndex: f.seasonalIndex,
     }));
 
-    const adjustedPoints = applyHolidayMultipliers(
-      forecastPoints,
-      startDate,
-      holidays,
-    );
+    const adjustedPoints = applyHolidayMultipliers(forecastPoints, startDate, holidays);
 
     return {
       ...forecasts,
@@ -498,9 +476,7 @@ export class DemandForecastingService {
 
     // Calculate metrics
     const itemsWithForecasts = new Set(forecasts.map((f) => f.itemId)).size;
-    const highConfidenceCount = forecasts.filter(
-      (f) => Number(f.confidence) > 0.7,
-    ).length;
+    const highConfidenceCount = forecasts.filter((f) => Number(f.confidence) > 0.7).length;
 
     // Get item trends
     const itemTrends: Array<{
@@ -593,9 +569,7 @@ export class DemandForecastingService {
   /**
    * Calculate monthly indices from historical data
    */
-  private calculateMonthlyIndices(
-    data: { month: Date; value: number }[],
-  ): number[] {
+  private calculateMonthlyIndices(data: { month: Date; value: number }[]): number[] {
     const monthlyTotals: number[] = Array(12).fill(0);
     const monthlyCounts: number[] = Array(12).fill(0);
 
@@ -620,10 +594,7 @@ export class DemandForecastingService {
   /**
    * Calculate confidence level based on data points and MAPE
    */
-  private calculateConfidence(
-    dataPoints: number,
-    mape: number,
-  ): 'high' | 'medium' | 'low' {
+  private calculateConfidence(dataPoints: number, mape: number): 'high' | 'medium' | 'low' {
     if (dataPoints >= 24 && mape < 15) return 'high';
     if (dataPoints >= 12 && mape < 25) return 'medium';
     return 'low';
@@ -654,9 +625,7 @@ export class DemandForecastingService {
         upperBound: new Decimal(f.upperBound),
         seasonalIndex: new Decimal(f.seasonalIndex),
         trendComponent: new Decimal(model.trend),
-        confidence: new Decimal(
-          model.mape < 15 ? 0.9 : model.mape < 25 ? 0.7 : 0.5,
-        ),
+        confidence: new Decimal(model.mape < 15 ? 0.9 : model.mape < 25 ? 0.7 : 0.5),
       })),
     });
   }

@@ -40,9 +40,7 @@ export class AiSalesCrmScheduler {
             `Org ${org.name}: Churn prediction - ${result.processed} customers (high: ${result.highRisk}, medium: ${result.mediumRisk}, low: ${result.lowRisk})`,
           );
         } catch (error) {
-          this.logger.error(
-            `Error predicting churn for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error predicting churn for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -68,13 +66,9 @@ export class AiSalesCrmScheduler {
       for (const org of organizations) {
         try {
           const result = await this.clvService.calculateAllCLV(org.id);
-          this.logger.log(
-            `Org ${org.name}: CLV calculated for ${result.processed} customers`,
-          );
+          this.logger.log(`Org ${org.name}: CLV calculated for ${result.processed} customers`);
         } catch (error) {
-          this.logger.error(
-            `Error calculating CLV for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error calculating CLV for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -99,9 +93,7 @@ export class AiSalesCrmScheduler {
 
       for (const org of organizations) {
         try {
-          const result = await this.crossSellService.buildCoOccurrenceMatrix(
-            org.id,
-          );
+          const result = await this.crossSellService.buildCoOccurrenceMatrix(org.id);
           this.logger.log(
             `Org ${org.name}: Cross-sell matrix rebuilt - ${result.itemPairs} item pairs from ${result.totalTransactions} transactions`,
           );
@@ -114,9 +106,7 @@ export class AiSalesCrmScheduler {
 
       this.logger.log('Weekly cross-sell matrix rebuild completed');
     } catch (error) {
-      this.logger.error(
-        `Weekly cross-sell matrix rebuild failed: ${error.message}`,
-      );
+      this.logger.error(`Weekly cross-sell matrix rebuild failed: ${error.message}`);
     }
   }
 
@@ -136,13 +126,9 @@ export class AiSalesCrmScheduler {
       for (const org of organizations) {
         try {
           const result = await this.pricingService.analyzeAllPricing(org.id);
-          this.logger.log(
-            `Org ${org.name}: Pricing analysis - ${result.analyzed} items analyzed`,
-          );
+          this.logger.log(`Org ${org.name}: Pricing analysis - ${result.analyzed} items analyzed`);
         } catch (error) {
-          this.logger.error(
-            `Error analyzing pricing for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error analyzing pricing for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -172,9 +158,7 @@ export class AiSalesCrmScheduler {
             `Org ${org.name}: Pipeline forecast - weighted value: ${result.totalWeighted.toFixed(2)}, active deals: ${result.activeDeals}`,
           );
         } catch (error) {
-          this.logger.error(
-            `Error forecasting pipeline for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error forecasting pipeline for org ${org.id}: ${error.message}`);
         }
       }
 

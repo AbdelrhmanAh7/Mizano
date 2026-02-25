@@ -78,27 +78,36 @@ jest.mock('@/i18n/config', () => ({
 
 // Mock UI components
 jest.mock('@/components/ui/button', () => ({
-  Button: React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string }>(
-    ({ children, className, onClick, ...props }, ref) => (
-      <button ref={ref} className={className} onClick={onClick} {...props}>
-        {children}
-      </button>
-    ),
-  ),
+  Button: React.forwardRef<
+    HTMLButtonElement,
+    React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string }
+  >(({ children, className, onClick, ...props }, ref) => (
+    <button ref={ref} className={className} onClick={onClick} {...props}>
+      {children}
+    </button>
+  )),
 }));
 
 jest.mock('@/components/ui/sheet', () => ({
   Sheet: ({ children, open }: { children: React.ReactNode; open?: boolean }) => (
-    <div data-testid="sheet" data-open={open}>{children}</div>
+    <div data-testid="sheet" data-open={open}>
+      {children}
+    </div>
   ),
   SheetContent: ({ children, side }: { children: React.ReactNode; side?: string }) => (
-    <div data-testid="sheet-content" data-side={side}>{children}</div>
+    <div data-testid="sheet-content" data-side={side}>
+      {children}
+    </div>
   ),
   SheetHeader: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div data-testid="sheet-header" className={className}>{children}</div>
+    <div data-testid="sheet-header" className={className}>
+      {children}
+    </div>
   ),
   SheetTitle: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div data-testid="sheet-title" className={className}>{children}</div>
+    <div data-testid="sheet-title" className={className}>
+      {children}
+    </div>
   ),
   SheetTrigger: React.forwardRef<HTMLElement, { children: React.ReactNode; asChild?: boolean }>(
     ({ children }, ref) => <div ref={ref as React.Ref<HTMLDivElement>}>{children}</div>,
@@ -180,8 +189,7 @@ describe('Sidebar', () => {
     const dashboardLinks = screen.getAllByText('dashboard');
     // At least one of them should have the active class
     const hasActiveLink = dashboardLinks.some(
-      (link) =>
-        link.closest('a')?.className.includes('bg-primary') ?? false,
+      (link) => link.closest('a')?.className.includes('bg-primary') ?? false,
     );
     expect(hasActiveLink).toBe(true);
   });

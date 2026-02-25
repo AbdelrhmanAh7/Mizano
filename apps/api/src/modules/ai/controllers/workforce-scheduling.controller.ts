@@ -1,16 +1,5 @@
-import {
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -43,14 +32,8 @@ export class WorkforceSchedulingController {
     description: 'Returns suggested schedule for the week',
     type: ScheduleSuggestionDto,
   })
-  async suggestSchedule(
-    @CurrentOrg() orgId: string,
-    @Query('weekStart') weekStart: string,
-  ) {
-    const result = await this.workforceSchedulingService.suggestSchedule(
-      orgId,
-      weekStart,
-    );
+  async suggestSchedule(@CurrentOrg() orgId: string, @Query('weekStart') weekStart: string) {
+    const result = await this.workforceSchedulingService.suggestSchedule(orgId, weekStart);
     return { data: result };
   }
 
@@ -62,9 +45,7 @@ export class WorkforceSchedulingController {
     description: 'Returns staffing gap analysis by department',
     type: [StaffingNeedDto],
   })
-  async getStaffingNeeds(
-    @CurrentOrg() orgId: string,
-  ) {
+  async getStaffingNeeds(@CurrentOrg() orgId: string) {
     const result = await this.workforceSchedulingService.getStaffingNeeds(orgId);
     return { data: result };
   }
@@ -77,9 +58,7 @@ export class WorkforceSchedulingController {
     description: 'Returns attendance pattern data',
     type: [AttendancePatternDto],
   })
-  async getAttendancePatterns(
-    @CurrentOrg() orgId: string,
-  ) {
+  async getAttendancePatterns(@CurrentOrg() orgId: string) {
     const result = await this.workforceSchedulingService.getAttendancePatterns(orgId);
     return { data: result };
   }
@@ -92,9 +71,7 @@ export class WorkforceSchedulingController {
     description: 'Returns overtime analysis with recommendations',
     type: OvertimeAnalysisDto,
   })
-  async getOvertimeAnalysis(
-    @CurrentOrg() orgId: string,
-  ) {
+  async getOvertimeAnalysis(@CurrentOrg() orgId: string) {
     const result = await this.workforceSchedulingService.getOvertimeAnalysis(orgId);
     return { data: result };
   }

@@ -91,7 +91,12 @@ export class BomService {
     // If setting as active, deactivate other BOMs for same item
     if (dto.isActive) {
       await this.prisma.bOM.updateMany({
-        where: { outputItemId: existing.outputItemId, organizationId, isActive: true, id: { not: id } },
+        where: {
+          outputItemId: existing.outputItemId,
+          organizationId,
+          isActive: true,
+          id: { not: id },
+        },
         data: { isActive: false },
       });
     }
@@ -157,7 +162,10 @@ export class BomService {
       const stockMovements = await this.prisma.inventoryMovement.findMany({
         where: { itemId: bomItem.itemId, organizationId },
       });
-      const currentStock = stockMovements.reduce((sum: number, m) => sum + parseFloat(m.quantity.toString()), 0);
+      const currentStock = stockMovements.reduce(
+        (sum: number, m) => sum + parseFloat(m.quantity.toString()),
+        0,
+      );
 
       requirements.push({
         item: bomItem.item,

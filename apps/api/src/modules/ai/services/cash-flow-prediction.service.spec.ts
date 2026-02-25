@@ -66,9 +66,7 @@ describe('CashFlowPredictionService', () => {
         expect(typeof forecast.closingBalance.p50).toBe('number');
         expect(typeof forecast.closingBalance.p90).toBe('number');
         // p10 should be <= p50 <= p90 (pessimistic to optimistic)
-        expect(forecast.closingBalance.p10).toBeLessThanOrEqual(
-          forecast.closingBalance.p90,
-        );
+        expect(forecast.closingBalance.p10).toBeLessThanOrEqual(forecast.closingBalance.p90);
       }
     });
 
@@ -254,15 +252,17 @@ describe('CashFlowPredictionService', () => {
 
       const futureBill = new Date();
       futureBill.setDate(futureBill.getDate() + 5);
-      prisma.bill.findMany.mockResolvedValue([{
-        id: 'bill-001',
-        billNumber: 'BILL-001',
-        vendorId: 'vendor-001',
-        grandTotal: new Decimal('10000.0000'),
-        balanceDue: new Decimal('10000.0000'),
-        dueDate: futureBill,
-        vendor: { name: 'Big Vendor' },
-      }] as any);
+      prisma.bill.findMany.mockResolvedValue([
+        {
+          id: 'bill-001',
+          billNumber: 'BILL-001',
+          vendorId: 'vendor-001',
+          grandTotal: new Decimal('10000.0000'),
+          balanceDue: new Decimal('10000.0000'),
+          dueDate: futureBill,
+          vendor: { name: 'Big Vendor' },
+        },
+      ] as any);
 
       const alerts = await service.getAlerts(orgId);
 
@@ -315,9 +315,7 @@ describe('CashFlowPredictionService', () => {
     });
 
     it('should return 0 when prediction fails', async () => {
-      prisma.bankAccount.findMany.mockRejectedValue(
-        new Error('DB connection error'),
-      );
+      prisma.bankAccount.findMany.mockRejectedValue(new Error('DB connection error'));
 
       const result = await service.dailyRecalculate(orgId);
 

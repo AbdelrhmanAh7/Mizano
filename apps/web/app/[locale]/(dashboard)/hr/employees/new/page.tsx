@@ -17,9 +17,7 @@ export default function NewEmployeePage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Add Employee</h1>
-          <p className="text-muted-foreground">
-            Create a new employee profile
-          </p>
+          <p className="text-muted-foreground">Create a new employee profile</p>
         </div>
       </div>
 

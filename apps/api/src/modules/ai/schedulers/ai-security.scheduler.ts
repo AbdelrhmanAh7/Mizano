@@ -38,9 +38,7 @@ export class AiSecurityScheduler {
             );
           }
         } catch (error) {
-          this.logger.error(
-            `Error running fraud scan for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error running fraud scan for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -65,16 +63,12 @@ export class AiSecurityScheduler {
 
       for (const org of organizations) {
         try {
-          const report = await this.complianceService.runComplianceCheck(
-            org.id,
-          );
+          const report = await this.complianceService.runComplianceCheck(org.id);
           this.logger.log(
             `Org ${org.name}: Compliance score ${report.score.toFixed(0)}% - ${report.violations.length} violations found`,
           );
         } catch (error) {
-          this.logger.error(
-            `Error checking compliance for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error checking compliance for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -100,10 +94,7 @@ export class AiSecurityScheduler {
       for (const org of organizations) {
         for (const entityType of ['journal', 'invoice', 'bill', 'expense']) {
           try {
-            const result = await this.auditRiskService.batchScore(
-              org.id,
-              entityType,
-            );
+            const result = await this.auditRiskService.batchScore(org.id, entityType);
             if (result.highRisk > 0) {
               this.logger.log(
                 `Org ${org.name}: Audit risk ${entityType} - ${result.processed} scored (high: ${result.highRisk}, medium: ${result.mediumRisk})`,
@@ -119,9 +110,7 @@ export class AiSecurityScheduler {
 
       this.logger.log('Weekly audit risk scoring completed');
     } catch (error) {
-      this.logger.error(
-        `Weekly audit risk scoring failed: ${error.message}`,
-      );
+      this.logger.error(`Weekly audit risk scoring failed: ${error.message}`);
     }
   }
 
@@ -142,13 +131,9 @@ export class AiSecurityScheduler {
         },
       });
 
-      this.logger.log(
-        `Cleaned up ${deleted.count} old resolved fraud alerts`,
-      );
+      this.logger.log(`Cleaned up ${deleted.count} old resolved fraud alerts`);
     } catch (error) {
-      this.logger.error(
-        `Weekly fraud alert cleanup failed: ${error.message}`,
-      );
+      this.logger.error(`Weekly fraud alert cleanup failed: ${error.message}`);
     }
   }
 }

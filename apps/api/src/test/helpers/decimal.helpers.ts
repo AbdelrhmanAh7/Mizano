@@ -17,7 +17,10 @@ export function expectDecimalEqual(actual: Decimal, expected: Decimal | string |
 /**
  * Assert a Decimal is greater than another
  */
-export function expectDecimalGreaterThan(actual: Decimal, expected: Decimal | string | number): void {
+export function expectDecimalGreaterThan(
+  actual: Decimal,
+  expected: Decimal | string | number,
+): void {
   const actualDec = actual instanceof Decimal ? actual : new Decimal(actual);
   const expectedDec = expected instanceof Decimal ? expected : new Decimal(expected);
   expect(actualDec.greaterThan(expectedDec)).toBe(true);

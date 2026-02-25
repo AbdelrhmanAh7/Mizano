@@ -62,9 +62,7 @@ describe('LeadScoringService', () => {
     it('should throw NotFoundException when lead does not exist', async () => {
       prisma.lead.findFirst.mockResolvedValue(null as any);
 
-      await expect(service.scoreLead(orgId, 'non-existent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.scoreLead(orgId, 'non-existent')).rejects.toThrow(NotFoundException);
     });
 
     it('should return a score between 0-100 for a valid lead', async () => {
@@ -175,9 +173,7 @@ describe('LeadScoringService', () => {
         createMockLead({ id: 'lead-002' }),
         createMockLead({ id: 'lead-003' }),
       ];
-      prisma.lead.findMany.mockResolvedValue(
-        leads.map((l) => ({ id: l.id })) as any,
-      );
+      prisma.lead.findMany.mockResolvedValue(leads.map((l) => ({ id: l.id })) as any);
       // Each scoreLead call needs findFirst for the lead
       (prisma.lead.findFirst as jest.Mock).mockImplementation(async (args: any) => {
         const found = leads.find((l) => l.id === args?.where?.id);
@@ -189,7 +185,9 @@ describe('LeadScoringService', () => {
       const result = await service.scoreAllLeads(orgId);
 
       expect(result.processed).toBe(3);
-      expect(result.byTier.hot + result.byTier.warm + result.byTier.cool + result.byTier.cold).toBe(3);
+      expect(result.byTier.hot + result.byTier.warm + result.byTier.cool + result.byTier.cold).toBe(
+        3,
+      );
     });
 
     it('should return zero counts for empty organization', async () => {

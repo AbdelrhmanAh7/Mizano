@@ -62,7 +62,15 @@ export class GeneralSettingsDto {
   @ApiPropertyOptional({ description: 'Industry type' })
   @IsOptional()
   @IsString()
-  @IsIn(['retail', 'services', 'construction', 'manufacturing', 'healthcare', 'technology', 'other'])
+  @IsIn([
+    'retail',
+    'services',
+    'construction',
+    'manufacturing',
+    'healthcare',
+    'technology',
+    'other',
+  ])
   industry?: string;
 
   @ApiPropertyOptional({ description: 'Base currency code' })

@@ -37,7 +37,18 @@ export class CompositeItemsService {
       },
       include: {
         components: {
-          include: { item: { select: { id: true, name: true, sku: true, unit: true, costPrice: true, currentStock: true } } },
+          include: {
+            item: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                unit: true,
+                costPrice: true,
+                currentStock: true,
+              },
+            },
+          },
         },
       },
     });
@@ -76,7 +87,18 @@ export class CompositeItemsService {
       where: { id, organizationId },
       include: {
         components: {
-          include: { item: { select: { id: true, name: true, sku: true, unit: true, costPrice: true, currentStock: true } } },
+          include: {
+            item: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                unit: true,
+                costPrice: true,
+                currentStock: true,
+              },
+            },
+          },
         },
       },
     });
@@ -124,7 +146,18 @@ export class CompositeItemsService {
       },
       include: {
         components: {
-          include: { item: { select: { id: true, name: true, sku: true, unit: true, costPrice: true, currentStock: true } } },
+          include: {
+            item: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                unit: true,
+                costPrice: true,
+                currentStock: true,
+              },
+            },
+          },
         },
       },
     });
@@ -175,7 +208,13 @@ export class CompositeItemsService {
     const composite = await this.findOne(organizationId, id);
 
     let totalCost = new Decimal(0);
-    const breakdown: Array<{ itemId: string; itemName: string; quantity: number; costPerUnit: number; lineCost: number }> = [];
+    const breakdown: Array<{
+      itemId: string;
+      itemName: string;
+      quantity: number;
+      costPerUnit: number;
+      lineCost: number;
+    }> = [];
 
     for (const comp of composite.components) {
       const costPerUnit = parseFloat(comp.item.costPrice.toString());
@@ -203,7 +242,11 @@ export class CompositeItemsService {
    * Assemble a composite item by consuming component stock.
    * Creates OUT inventory movements for each component.
    */
-  async assemble(organizationId: string, id: string, dto: { quantity: number; warehouseId: string }) {
+  async assemble(
+    organizationId: string,
+    id: string,
+    dto: { quantity: number; warehouseId: string },
+  ) {
     const composite = await this.findOne(organizationId, id);
     const { quantity, warehouseId } = dto;
 
@@ -248,7 +291,12 @@ export class CompositeItemsService {
         await tx.inventoryLevel.upsert({
           where: { itemId_warehouseId: { itemId: comp.itemId, warehouseId } },
           update: { quantity: { decrement: consumeQty } },
-          create: { itemId: comp.itemId, warehouseId, quantity: new Decimal(-consumeQty), organizationId },
+          create: {
+            itemId: comp.itemId,
+            warehouseId,
+            quantity: new Decimal(-consumeQty),
+            organizationId,
+          },
         });
       }
 

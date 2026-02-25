@@ -7,11 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { Bell, Check, CheckCheck, AlertTriangle, Info, TrendingUp, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -98,7 +94,8 @@ export function NotificationPanel() {
   });
 
   const unreadCount = countData?.data?.count ?? 0;
-  const notifications: Notification[] = notificationsData?.data?.data ?? notificationsData?.data ?? [];
+  const notifications: Notification[] =
+    notificationsData?.data?.data ?? notificationsData?.data ?? [];
 
   const handleNotificationClick = useCallback(
     (notification: Notification) => {
@@ -200,7 +197,9 @@ export function NotificationPanel() {
                         <div
                           className={cn(
                             'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center',
-                            !notification.isRead ? 'bg-blue-100 text-blue-600' : 'bg-muted text-muted-foreground',
+                            !notification.isRead
+                              ? 'bg-blue-100 text-blue-600'
+                              : 'bg-muted text-muted-foreground',
                           )}
                         >
                           <Icon className="h-4 w-4" />
@@ -218,7 +217,9 @@ export function NotificationPanel() {
                             {notification.message}
                           </p>
                           <p className="text-[10px] text-muted-foreground mt-1">
-                            {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                            {formatDistanceToNow(new Date(notification.createdAt), {
+                              addSuffix: true,
+                            })}
                           </p>
                         </div>
                         {!notification.isRead && (

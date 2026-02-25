@@ -1,18 +1,5 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Query,
-  UseGuards,
-  Param,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { Controller, Post, Get, Body, Query, UseGuards, Param } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -36,10 +23,7 @@ export class AiFeedbackController {
   @Permissions('ai.feedback')
   @ApiOperation({ summary: 'Submit feedback for an AI prediction' })
   @ApiResponse({ status: 201, description: 'Feedback submitted successfully' })
-  submitFeedback(
-    @CurrentOrg() orgId: string,
-    @Body() dto: SubmitFeedbackDto,
-  ) {
+  submitFeedback(@CurrentOrg() orgId: string, @Body() dto: SubmitFeedbackDto) {
     return this.feedbackService.processFeedback(orgId, dto);
   }
 
@@ -83,10 +67,7 @@ export class AiFeedbackController {
   @Get('models/:feature/status')
   @Permissions('ai.view')
   @ApiOperation({ summary: 'Get model status for a feature' })
-  getModelStatus(
-    @CurrentOrg() orgId: string,
-    @Param('feature') feature: AiFeature,
-  ) {
+  getModelStatus(@CurrentOrg() orgId: string, @Param('feature') feature: AiFeature) {
     return this.modelRegistry.getModelStatus(orgId, feature);
   }
 
@@ -104,10 +85,7 @@ export class AiFeedbackController {
   @Post('models/:feature/retrain')
   @Permissions('ai.manage')
   @ApiOperation({ summary: 'Trigger retraining for a feature' })
-  async triggerRetraining(
-    @CurrentOrg() orgId: string,
-    @Param('feature') feature: AiFeature,
-  ) {
+  async triggerRetraining(@CurrentOrg() orgId: string, @Param('feature') feature: AiFeature) {
     const { shouldRetrain, correctionCount, threshold } =
       await this.feedbackService.checkRetrainingThreshold(orgId, feature);
 
@@ -116,9 +94,7 @@ export class AiFeedbackController {
       correctionCount,
       threshold,
       shouldRetrain,
-      message: shouldRetrain
-        ? 'Retraining queued'
-        : 'Retraining not needed yet',
+      message: shouldRetrain ? 'Retraining queued' : 'Retraining not needed yet',
     };
   }
 }

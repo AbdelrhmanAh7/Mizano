@@ -105,7 +105,7 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
                     <div
                       className={cn(
                         'flex items-center gap-1 font-mono font-medium',
-                        isPositive ? 'text-green-600' : 'text-red-600'
+                        isPositive ? 'text-green-600' : 'text-red-600',
                       )}
                     >
                       {isPositive ? (

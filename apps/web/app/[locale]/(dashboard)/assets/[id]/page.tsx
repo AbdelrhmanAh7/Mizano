@@ -107,9 +107,8 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
     setDisposeOpen(false);
   };
 
-  const depreciationProgress = asset.purchasePrice > 0
-    ? ((asset.accumulatedDepreciation / asset.purchasePrice) * 100)
-    : 0;
+  const depreciationProgress =
+    asset.purchasePrice > 0 ? (asset.accumulatedDepreciation / asset.purchasePrice) * 100 : 0;
 
   const remainingMonths = calculateRemainingLife(asset);
 
@@ -144,7 +143,8 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
                 <DialogHeader>
                   <DialogTitle>Dispose Asset</DialogTitle>
                   <DialogDescription>
-                    Record the disposal of this asset. This will create a journal entry for any gain or loss.
+                    Record the disposal of this asset. This will create a journal entry for any gain
+                    or loss.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -305,7 +305,9 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Gain/Loss</span>
-                  <span className={`font-mono ${(asset.disposalGainLoss || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <span
+                    className={`font-mono ${(asset.disposalGainLoss || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                  >
                     {formatCurrency(asset.disposalGainLoss)}
                   </span>
                 </div>
@@ -334,9 +336,7 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
               <TableBody>
                 {schedule.map((item: any) => (
                   <TableRow key={item.id}>
-                    <TableCell>
-                      {format(new Date(item.year, item.month - 1), 'MMM yyyy')}
-                    </TableCell>
+                    <TableCell>{format(new Date(item.year, item.month - 1), 'MMM yyyy')}</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatCurrency(item.amount)}
                     </TableCell>
@@ -347,7 +347,14 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
                       {formatCurrency(item.bookValue)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={item.executedAt ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                      <Badge
+                        variant="outline"
+                        className={
+                          item.executedAt
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }
+                      >
                         {item.executedAt ? 'Posted' : 'Pending'}
                       </Badge>
                     </TableCell>

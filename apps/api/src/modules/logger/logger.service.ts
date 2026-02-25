@@ -41,15 +41,31 @@ export class LoggerService {
   private categorize(message: string, context?: Record<string, any>): LogCategory {
     const msg = message.toLowerCase();
     if (context?.category) return context.category as LogCategory;
-    if (msg.includes('prisma') || msg.includes('database') || msg.includes('sql')) return LogCategory.DATABASE_ERROR;
-    if (msg.includes('unauthorized') || msg.includes('forbidden') || msg.includes('auth') || msg.includes('token')) return LogCategory.AUTH_ERROR;
-    if (msg.includes('validation') || msg.includes('invalid') || msg.includes('required')) return LogCategory.VALIDATION_ERROR;
-    if (msg.includes('ai') || msg.includes('model') || msg.includes('inference') || msg.includes('prediction')) return LogCategory.AI_INFERENCE_ERROR;
+    if (msg.includes('prisma') || msg.includes('database') || msg.includes('sql'))
+      return LogCategory.DATABASE_ERROR;
+    if (
+      msg.includes('unauthorized') ||
+      msg.includes('forbidden') ||
+      msg.includes('auth') ||
+      msg.includes('token')
+    )
+      return LogCategory.AUTH_ERROR;
+    if (msg.includes('validation') || msg.includes('invalid') || msg.includes('required'))
+      return LogCategory.VALIDATION_ERROR;
+    if (
+      msg.includes('ai') ||
+      msg.includes('model') ||
+      msg.includes('inference') ||
+      msg.includes('prediction')
+    )
+      return LogCategory.AI_INFERENCE_ERROR;
     if (msg.includes('training') || msg.includes('train')) return LogCategory.AI_TRAINING_ERROR;
-    if (msg.includes('network') || msg.includes('timeout') || msg.includes('econnrefused')) return LogCategory.NETWORK_ERROR;
+    if (msg.includes('network') || msg.includes('timeout') || msg.includes('econnrefused'))
+      return LogCategory.NETWORK_ERROR;
     if (msg.includes('business') || msg.includes('rule')) return LogCategory.BUSINESS_LOGIC;
     if (msg.includes('deprecated')) return LogCategory.DEPRECATION;
-    if (msg.includes('slow') || msg.includes('performance') || msg.includes('memory')) return LogCategory.PERFORMANCE;
+    if (msg.includes('slow') || msg.includes('performance') || msg.includes('memory'))
+      return LogCategory.PERFORMANCE;
     return LogCategory.UNKNOWN;
   }
 
@@ -134,11 +150,7 @@ export class LoggerService {
   /**
    * Capture error from exception filter
    */
-  captureException(
-    error: Error,
-    source: LogSource,
-    context?: Record<string, any>,
-  ): LogEntry {
+  captureException(error: Error, source: LogSource, context?: Record<string, any>): LogEntry {
     return this.capture({
       level: LogLevel.ERROR,
       source,
@@ -151,11 +163,7 @@ export class LoggerService {
   /**
    * Capture warning
    */
-  captureWarning(
-    message: string,
-    source: LogSource,
-    context?: Record<string, any>,
-  ): LogEntry {
+  captureWarning(message: string, source: LogSource, context?: Record<string, any>): LogEntry {
     return this.capture({
       level: LogLevel.WARN,
       source,
@@ -202,9 +210,7 @@ export class LoggerService {
       }
     }
 
-    return logs.sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-    );
+    return logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }
 
   /**
@@ -301,9 +307,7 @@ export class LoggerService {
    * Generate a Claude prompt for fixing selected errors
    */
   generatePrompt(ids: string[]): GeneratePromptResponse {
-    const selectedLogs = ids
-      .map((id) => this.logs.get(id))
-      .filter((l): l is LogEntry => !!l);
+    const selectedLogs = ids.map((id) => this.logs.get(id)).filter((l): l is LogEntry => !!l);
 
     if (selectedLogs.length === 0) {
       return { prompt: 'No errors selected.', logCount: 0 };

@@ -3,10 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import type { Prisma } from '@prisma/client';
 import { getRiskLevel } from '../utils/risk-level.util';
-import {
-  buildIsolationForest1D,
-  isolationForestScore1D,
-} from '../utils/isolation-forest.util';
+import { buildIsolationForest1D, isolationForestScore1D } from '../utils/isolation-forest.util';
 import { zScore, mean, standardDeviation } from '../utils/statistics.util';
 
 export interface FraudScoreResult {
@@ -41,51 +38,31 @@ export class FraudDetectionService {
     let weightSum = 0;
 
     // 1. Amount anomaly check (weight: 0.3)
-    const amountResult = await this.amountAnomalyCheck(
-      organizationId,
-      entityType,
-      entityId,
-    );
+    const amountResult = await this.amountAnomalyCheck(organizationId, entityType, entityId);
     signals.push(amountResult.signal);
     totalScore += amountResult.signal.score * 0.3;
     weightSum += 0.3;
 
     // 2. Time-of-day check (weight: 0.15)
-    const timeResult = await this.timeOfDayCheck(
-      organizationId,
-      entityType,
-      entityId,
-    );
+    const timeResult = await this.timeOfDayCheck(organizationId, entityType, entityId);
     signals.push(timeResult);
     totalScore += timeResult.score * 0.15;
     weightSum += 0.15;
 
     // 3. Velocity check (weight: 0.25)
-    const velocityResult = await this.velocityCheck(
-      organizationId,
-      entityType,
-      entityId,
-    );
+    const velocityResult = await this.velocityCheck(organizationId, entityType, entityId);
     signals.push(velocityResult);
     totalScore += velocityResult.score * 0.25;
     weightSum += 0.25;
 
     // 4. Duplicate check (weight: 0.2)
-    const dupResult = await this.duplicateCheck(
-      organizationId,
-      entityType,
-      entityId,
-    );
+    const dupResult = await this.duplicateCheck(organizationId, entityType, entityId);
     signals.push(dupResult);
     totalScore += dupResult.score * 0.2;
     weightSum += 0.2;
 
     // 5. Benford's law check (weight: 0.1)
-    const benfordResult = await this.benfordCheck(
-      organizationId,
-      entityType,
-      entityId,
-    );
+    const benfordResult = await this.benfordCheck(organizationId, entityType, entityId);
     signals.push(benfordResult);
     totalScore += benfordResult.score * 0.1;
     weightSum += 0.1;
@@ -123,11 +100,7 @@ export class FraudDetectionService {
     for (const journal of journals) {
       scanned++;
       try {
-        const result = await this.scoreTransaction(
-          organizationId,
-          'journal',
-          journal.id,
-        );
+        const result = await this.scoreTransaction(organizationId, 'journal', journal.id);
         if (result.fraudScore > 0.5) {
           await this.createFraudAlert(organizationId, result);
           alertsCreated++;
@@ -149,11 +122,7 @@ export class FraudDetectionService {
     for (const txn of bankTxns) {
       scanned++;
       try {
-        const result = await this.scoreTransaction(
-          organizationId,
-          'bank_transaction',
-          txn.id,
-        );
+        const result = await this.scoreTransaction(organizationId, 'bank_transaction', txn.id);
         if (result.fraudScore > 0.5) {
           await this.createFraudAlert(organizationId, result);
           alertsCreated++;
@@ -176,11 +145,7 @@ export class FraudDetectionService {
     for (const expense of expenses) {
       scanned++;
       try {
-        const result = await this.scoreTransaction(
-          organizationId,
-          'expense',
-          expense.id,
-        );
+        const result = await this.scoreTransaction(organizationId, 'expense', expense.id);
         if (result.fraudScore > 0.5) {
           await this.createFraudAlert(organizationId, result);
           alertsCreated++;
@@ -190,17 +155,11 @@ export class FraudDetectionService {
       }
     }
 
-    this.logger.log(
-      `Fraud scan: ${scanned} scanned, ${alertsCreated} alerts created`,
-    );
+    this.logger.log(`Fraud scan: ${scanned} scanned, ${alertsCreated} alerts created`);
     return { scanned, alertsCreated };
   }
 
-  async getFraudAlerts(
-    organizationId: string,
-    resolved?: boolean,
-    limit?: number,
-  ) {
+  async getFraudAlerts(organizationId: string, resolved?: boolean, limit?: number) {
     const where: Prisma.FraudAlertWhereInput = { organizationId };
     if (resolved !== undefined) where.isResolved = resolved;
 
@@ -235,15 +194,8 @@ export class FraudDetectionService {
     entityType: string,
     entityId: string,
   ): Promise<{ signal: FraudSignal; amount: number }> {
-    const amount = await this.getEntityAmount(
-      organizationId,
-      entityType,
-      entityId,
-    );
-    const historicalAmounts = await this.getHistoricalAmounts(
-      organizationId,
-      entityType,
-    );
+    const amount = await this.getEntityAmount(organizationId, entityType, entityId);
+    const historicalAmounts = await this.getHistoricalAmounts(organizationId, entityType);
 
     let score = 0;
     let description = 'Amount within normal range';
@@ -286,11 +238,7 @@ export class FraudDetectionService {
     entityType: string,
     entityId: string,
   ): Promise<FraudSignal> {
-    const createdAt = await this.getEntityCreatedAt(
-      organizationId,
-      entityType,
-      entityId,
-    );
+    const createdAt = await this.getEntityCreatedAt(organizationId, entityType, entityId);
     if (!createdAt) {
       return {
         signal: 'time_anomaly',
@@ -332,11 +280,7 @@ export class FraudDetectionService {
     entityType: string,
     entityId: string,
   ): Promise<FraudSignal> {
-    const createdAt = await this.getEntityCreatedAt(
-      organizationId,
-      entityType,
-      entityId,
-    );
+    const createdAt = await this.getEntityCreatedAt(organizationId, entityType, entityId);
     if (!createdAt) {
       return {
         signal: 'velocity',
@@ -400,16 +344,8 @@ export class FraudDetectionService {
     entityType: string,
     entityId: string,
   ): Promise<FraudSignal> {
-    const amount = await this.getEntityAmount(
-      organizationId,
-      entityType,
-      entityId,
-    );
-    const createdAt = await this.getEntityCreatedAt(
-      organizationId,
-      entityType,
-      entityId,
-    );
+    const amount = await this.getEntityAmount(organizationId, entityType, entityId);
+    const createdAt = await this.getEntityCreatedAt(organizationId, entityType, entityId);
     if (!createdAt) {
       return {
         signal: 'duplicate',
@@ -479,24 +415,24 @@ export class FraudDetectionService {
     entityType: string,
     entityId: string,
   ): Promise<FraudSignal> {
-    const amount = await this.getEntityAmount(
-      organizationId,
-      entityType,
-      entityId,
-    );
+    const amount = await this.getEntityAmount(organizationId, entityType, entityId);
     const leadingDigit = parseInt(Math.abs(amount).toString()[0]);
 
     // Benford's expected distribution
     const expected: Record<number, number> = {
-      1: 0.301, 2: 0.176, 3: 0.125, 4: 0.097, 5: 0.079,
-      6: 0.067, 7: 0.058, 8: 0.051, 9: 0.046,
+      1: 0.301,
+      2: 0.176,
+      3: 0.125,
+      4: 0.097,
+      5: 0.079,
+      6: 0.067,
+      7: 0.058,
+      8: 0.051,
+      9: 0.046,
     };
 
     // Get actual distribution from recent transactions
-    const historicalAmounts = await this.getHistoricalAmounts(
-      organizationId,
-      entityType,
-    );
+    const historicalAmounts = await this.getHistoricalAmounts(organizationId, entityType);
 
     if (historicalAmounts.length < 50) {
       return {
@@ -618,9 +554,7 @@ export class FraudDetectionService {
         select: { lines: { select: { debit: true } } },
         take: 500,
       });
-      return journals.map((j) =>
-        j.lines.reduce((sum, l) => sum + Number(l.debit), 0),
-      );
+      return journals.map((j) => j.lines.reduce((sum, l) => sum + Number(l.debit), 0));
     }
     if (entityType === 'bank_transaction') {
       const txns = await this.prisma.bankTransaction.findMany({
@@ -633,10 +567,7 @@ export class FraudDetectionService {
     return [];
   }
 
-  private async createFraudAlert(
-    organizationId: string,
-    result: FraudScoreResult,
-  ): Promise<void> {
+  private async createFraudAlert(organizationId: string, result: FraudScoreResult): Promise<void> {
     // Check if alert already exists for this entity
     const existing = await this.prisma.fraudAlert.findFirst({
       where: {
@@ -656,20 +587,11 @@ export class FraudDetectionService {
         entityId: result.entityId,
         fraudScore: new Decimal(result.fraudScore),
         signals: result.signals as unknown as Prisma.InputJsonValue,
-        velocityCheck: result.signals.some(
-          (s) => s.signal === 'velocity' && s.triggered,
-        ),
-        amountAnomaly: result.signals.some(
-          (s) => s.signal === 'amount_anomaly' && s.triggered,
-        ),
-        timeAnomaly: result.signals.some(
-          (s) => s.signal === 'time_anomaly' && s.triggered,
-        ),
-        duplicateCheck: result.signals.some(
-          (s) => s.signal === 'duplicate' && s.triggered,
-        ),
+        velocityCheck: result.signals.some((s) => s.signal === 'velocity' && s.triggered),
+        amountAnomaly: result.signals.some((s) => s.signal === 'amount_anomaly' && s.triggered),
+        timeAnomaly: result.signals.some((s) => s.signal === 'time_anomaly' && s.triggered),
+        duplicateCheck: result.signals.some((s) => s.signal === 'duplicate' && s.triggered),
       },
     });
   }
-
 }

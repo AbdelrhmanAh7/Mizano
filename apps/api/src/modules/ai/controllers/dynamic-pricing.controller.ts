@@ -27,7 +27,11 @@ export class DynamicPricingController {
   @ApiOperation({ summary: 'Get price suggestion for an item' })
   @ApiParam({ name: 'id', description: 'Item ID' })
   @ApiQuery({ name: 'targetMargin', required: false })
-  async getSuggestion(@CurrentOrg() orgId: string, @Param('id') itemId: string, @Query('targetMargin', new ParseFloatPipe({ optional: true })) targetMargin?: number) {
+  async getSuggestion(
+    @CurrentOrg() orgId: string,
+    @Param('id') itemId: string,
+    @Query('targetMargin', new ParseFloatPipe({ optional: true })) targetMargin?: number,
+  ) {
     const result = await this.pricingService.suggestPrice(orgId, itemId, targetMargin);
     return { data: result };
   }

@@ -11,13 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { DeliveryChallansService } from '../services/delivery-challans.service';
 import {
   CreateDeliveryChallanDto,
@@ -36,18 +30,13 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 @Controller('delivery-challans')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class DeliveryChallansController {
-  constructor(
-    private readonly deliveryChallansService: DeliveryChallansService,
-  ) {}
+  constructor(private readonly deliveryChallansService: DeliveryChallansService) {}
 
   @Post()
   @Permissions('sales.create')
   @ApiOperation({ summary: 'Create a new delivery challan' })
   @ApiResponse({ status: 201, type: DeliveryChallanResponse })
-  create(
-    @CurrentOrg() orgId: string,
-    @Body() dto: CreateDeliveryChallanDto,
-  ) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateDeliveryChallanDto) {
     return this.deliveryChallansService.create(orgId, dto);
   }
 
@@ -55,10 +44,7 @@ export class DeliveryChallansController {
   @Permissions('sales.view')
   @ApiOperation({ summary: 'Get all delivery challans' })
   @ApiResponse({ status: 200, type: ChallanListResponse })
-  findAll(
-    @CurrentOrg() orgId: string,
-    @Query() query: ChallanQueryDto,
-  ) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: ChallanQueryDto) {
     return this.deliveryChallansService.findAll(orgId, query);
   }
 
@@ -67,10 +53,7 @@ export class DeliveryChallansController {
   @ApiOperation({ summary: 'Get delivery challan by ID' })
   @ApiParam({ name: 'id', description: 'Delivery challan ID' })
   @ApiResponse({ status: 200, type: DeliveryChallanResponse })
-  findOne(
-    @CurrentOrg() orgId: string,
-    @Param('id') id: string,
-  ) {
+  findOne(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.deliveryChallansService.findOne(orgId, id);
   }
 
@@ -92,10 +75,7 @@ export class DeliveryChallansController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete delivery challan' })
   @ApiParam({ name: 'id', description: 'Delivery challan ID' })
-  remove(
-    @CurrentOrg() orgId: string,
-    @Param('id') id: string,
-  ) {
+  remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.deliveryChallansService.remove(orgId, id);
   }
 
@@ -105,10 +85,7 @@ export class DeliveryChallansController {
   @ApiOperation({ summary: 'Issue delivery challan (decreases inventory)' })
   @ApiParam({ name: 'id', description: 'Delivery challan ID' })
   @ApiResponse({ status: 200, type: DeliveryChallanResponse })
-  issue(
-    @CurrentOrg() orgId: string,
-    @Param('id') id: string,
-  ) {
+  issue(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.deliveryChallansService.issue(orgId, id);
   }
 
@@ -118,10 +95,7 @@ export class DeliveryChallansController {
   @ApiOperation({ summary: 'Mark delivery challan as returned (reverses inventory)' })
   @ApiParam({ name: 'id', description: 'Delivery challan ID' })
   @ApiResponse({ status: 200, type: DeliveryChallanResponse })
-  markReturned(
-    @CurrentOrg() orgId: string,
-    @Param('id') id: string,
-  ) {
+  markReturned(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.deliveryChallansService.markReturned(orgId, id);
   }
 
@@ -130,10 +104,7 @@ export class DeliveryChallansController {
   @ApiOperation({ summary: 'Create delivery challan from invoice' })
   @ApiParam({ name: 'invoiceId', description: 'Invoice ID' })
   @ApiResponse({ status: 201, type: DeliveryChallanResponse })
-  createFromInvoice(
-    @CurrentOrg() orgId: string,
-    @Param('invoiceId') invoiceId: string,
-  ) {
+  createFromInvoice(@CurrentOrg() orgId: string, @Param('invoiceId') invoiceId: string) {
     return this.deliveryChallansService.createFromInvoice(orgId, invoiceId);
   }
 }

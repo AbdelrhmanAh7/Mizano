@@ -112,9 +112,7 @@ function TimelineItem({ entry, isLast }: { entry: AuditLogEntry; isLast: boolean
   return (
     <div className="flex gap-3 relative">
       {/* Vertical line */}
-      {!isLast && (
-        <div className="absolute left-[15px] top-[32px] bottom-0 w-px bg-border" />
-      )}
+      {!isLast && <div className="absolute left-[15px] top-[32px] bottom-0 w-px bg-border" />}
 
       {/* Icon circle */}
       <div
@@ -212,11 +210,7 @@ export function ActivityTimeline({
           <ScrollArea style={{ maxHeight }} className="pr-2">
             <div className="space-y-0">
               {entries.map((entry, idx) => (
-                <TimelineItem
-                  key={entry.id}
-                  entry={entry}
-                  isLast={idx === entries.length - 1}
-                />
+                <TimelineItem key={entry.id} entry={entry} isLast={idx === entries.length - 1} />
               ))}
             </div>
           </ScrollArea>

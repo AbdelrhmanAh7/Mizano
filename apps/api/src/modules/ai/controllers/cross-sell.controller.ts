@@ -18,7 +18,11 @@ export class CrossSellController {
   @ApiOperation({ summary: 'Get cross-sell recommendations for a customer' })
   @ApiParam({ name: 'id', description: 'Customer ID' })
   @ApiQuery({ name: 'limit', required: false })
-  async getRecommendations(@CurrentOrg() orgId: string, @Param('id') customerId: string, @Query('limit') limit?: number) {
+  async getRecommendations(
+    @CurrentOrg() orgId: string,
+    @Param('id') customerId: string,
+    @Query('limit') limit?: number,
+  ) {
     const result = await this.crossSellService.getRecommendations(orgId, customerId, limit || 5);
     return { data: result };
   }
@@ -28,8 +32,16 @@ export class CrossSellController {
   @ApiOperation({ summary: 'Get upsell recommendations for a customer' })
   @ApiParam({ name: 'id', description: 'Customer ID' })
   @ApiQuery({ name: 'limit', required: false })
-  async getUpsellRecommendations(@CurrentOrg() orgId: string, @Param('id') customerId: string, @Query('limit') limit?: number) {
-    const result = await this.crossSellService.getUpsellRecommendations(orgId, customerId, limit || 5);
+  async getUpsellRecommendations(
+    @CurrentOrg() orgId: string,
+    @Param('id') customerId: string,
+    @Query('limit') limit?: number,
+  ) {
+    const result = await this.crossSellService.getUpsellRecommendations(
+      orgId,
+      customerId,
+      limit || 5,
+    );
     return { data: result };
   }
 

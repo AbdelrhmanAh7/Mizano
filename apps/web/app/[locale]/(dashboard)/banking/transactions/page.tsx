@@ -60,7 +60,10 @@ export default function BankTransactionsPage() {
       </div>
 
       <div className="flex gap-4">
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as TransactionStatus | '')}>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as TransactionStatus | '')}
+        >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
@@ -106,8 +109,17 @@ export default function BankTransactionsPage() {
                       </TableCell>
                       <TableCell>{txn.payee || '-'}</TableCell>
                       <TableCell className="text-right">
-                        <span className={cn('font-mono font-medium flex items-center justify-end gap-1', isDeposit ? 'text-green-600' : 'text-red-600')}>
-                          {isDeposit ? <ArrowDownLeft className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
+                        <span
+                          className={cn(
+                            'font-mono font-medium flex items-center justify-end gap-1',
+                            isDeposit ? 'text-green-600' : 'text-red-600',
+                          )}
+                        >
+                          {isDeposit ? (
+                            <ArrowDownLeft className="h-3 w-3" />
+                          ) : (
+                            <ArrowUpRight className="h-3 w-3" />
+                          )}
                           ${Math.abs(amount).toFixed(2)}
                         </span>
                       </TableCell>

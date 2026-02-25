@@ -4,7 +4,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import axios from 'axios';
 import { authApi } from './api';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6001/api';
 
 // Access token refresh buffer: refresh 1 minute before expiry
 const REFRESH_BUFFER_MS = 60_000;

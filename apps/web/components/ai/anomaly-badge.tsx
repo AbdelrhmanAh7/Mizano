@@ -2,12 +2,7 @@
 
 import { AlertTriangle, AlertCircle, Info, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 export type AnomalySeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -110,7 +105,7 @@ export function AnomalyBadge({
         'inline-flex items-center gap-1 font-medium',
         config.color,
         sizeStyles.badge,
-        className
+        className,
       )}
     >
       <Icon className={cn(sizeStyles.icon, config.iconColor)} />
@@ -138,8 +133,8 @@ export function AnomalyBadge({
                 {Math.abs(zScore) > 3
                   ? 'Highly unusual'
                   : Math.abs(zScore) > 2
-                  ? 'Unusual'
-                  : 'Slightly unusual'}
+                    ? 'Unusual'
+                    : 'Slightly unusual'}
                 )
               </div>
             )}
@@ -180,16 +175,14 @@ export function AnomalyIndicator({
             className={cn(
               'inline-flex items-center justify-center rounded-full p-1',
               severity === 'CRITICAL' && 'animate-pulse',
-              className
+              className,
             )}
           >
             <Icon className={cn('h-4 w-4', config.iconColor)} />
           </div>
         </TooltipTrigger>
         <TooltipContent>
-          <p>
-            {config.label} severity anomaly detected. Click for details.
-          </p>
+          <p>{config.label} severity anomaly detected. Click for details.</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

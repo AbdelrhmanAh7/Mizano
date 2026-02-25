@@ -1,18 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -42,14 +29,8 @@ export class SkillsGapController {
     description: 'Returns skill gap analysis for the employee',
     type: EmployeeSkillGapDto,
   })
-  async analyzeEmployeeGap(
-    @CurrentOrg() orgId: string,
-    @Param('employeeId') employeeId: string,
-  ) {
-    const result = await this.skillsGapService.analyzeEmployeeGap(
-      orgId,
-      employeeId,
-    );
+  async analyzeEmployeeGap(@CurrentOrg() orgId: string, @Param('employeeId') employeeId: string) {
+    const result = await this.skillsGapService.analyzeEmployeeGap(orgId, employeeId);
     return { data: result };
   }
 
@@ -62,14 +43,8 @@ export class SkillsGapController {
     description: 'Returns department-level skill gap analysis',
     type: DepartmentGapDto,
   })
-  async analyzeDepartmentGap(
-    @CurrentOrg() orgId: string,
-    @Param('department') department: string,
-  ) {
-    const result = await this.skillsGapService.analyzeDepartmentGap(
-      orgId,
-      department,
-    );
+  async analyzeDepartmentGap(@CurrentOrg() orgId: string, @Param('department') department: string) {
+    const result = await this.skillsGapService.analyzeDepartmentGap(orgId, department);
     return { data: result };
   }
 
@@ -81,9 +56,7 @@ export class SkillsGapController {
     description: 'Returns aggregated skills inventory across all employees',
     type: [SkillInventoryDto],
   })
-  async getSkillsInventory(
-    @CurrentOrg() orgId: string,
-  ) {
+  async getSkillsInventory(@CurrentOrg() orgId: string) {
     const result = await this.skillsGapService.getSkillsInventory(orgId);
     return { data: result };
   }
@@ -96,14 +69,8 @@ export class SkillsGapController {
     description: 'Returns employees ranked by match score for the required skills',
     type: [EmployeeMatchDto],
   })
-  async matchEmployeesToRole(
-    @CurrentOrg() orgId: string,
-    @Body() body: MatchRequiredSkillsDto,
-  ) {
-    const result = await this.skillsGapService.matchEmployeesToRole(
-      orgId,
-      body.requiredSkills,
-    );
+  async matchEmployeesToRole(@CurrentOrg() orgId: string, @Body() body: MatchRequiredSkillsDto) {
+    const result = await this.skillsGapService.matchEmployeesToRole(orgId, body.requiredSkills);
     return { data: result };
   }
 }

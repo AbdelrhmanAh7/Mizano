@@ -92,12 +92,8 @@ describe('monte-carlo.util', () => {
     it('should have P10 <= P50 <= P90', () => {
       const result = runCashFlowMonteCarlo(params);
       for (let day = 0; day < result.percentiles.p50.length; day++) {
-        expect(result.percentiles.p10[day]).toBeLessThanOrEqual(
-          result.percentiles.p50[day],
-        );
-        expect(result.percentiles.p50[day]).toBeLessThanOrEqual(
-          result.percentiles.p90[day],
-        );
+        expect(result.percentiles.p10[day]).toBeLessThanOrEqual(result.percentiles.p50[day]);
+        expect(result.percentiles.p50[day]).toBeLessThanOrEqual(result.percentiles.p90[day]);
       }
     });
 
@@ -220,9 +216,7 @@ describe('monte-carlo.util', () => {
         delayDays: 10,
       });
 
-      expect(modified[0].date.getTime()).toBeGreaterThan(
-        events[0].date.getTime(),
-      );
+      expect(modified[0].date.getTime()).toBeGreaterThan(events[0].date.getTime());
     });
 
     it('should add new expense', () => {

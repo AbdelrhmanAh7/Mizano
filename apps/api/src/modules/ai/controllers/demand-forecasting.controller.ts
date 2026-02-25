@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Query,
-  Body,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Body, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -98,10 +90,7 @@ export class DemandForecastingController {
     @CurrentOrg() orgId: string,
     @Param('id') itemId: string,
   ): Promise<{ data: SeasonalityResponse }> {
-    const seasonality = await this.demandForecastingService.getSeasonalityPattern(
-      orgId,
-      itemId,
-    );
+    const seasonality = await this.demandForecastingService.getSeasonalityPattern(orgId, itemId);
     return { data: seasonality };
   }
 
@@ -118,10 +107,7 @@ export class DemandForecastingController {
     @CurrentOrg() orgId: string,
     @Param('id') itemId: string,
   ): Promise<{ data: TrendResponse }> {
-    const trend = await this.demandForecastingService.detectItemTrend(
-      orgId,
-      itemId,
-    );
+    const trend = await this.demandForecastingService.detectItemTrend(orgId, itemId);
     return { data: trend };
   }
 
@@ -133,12 +119,8 @@ export class DemandForecastingController {
     description: 'Returns forecast dashboard data',
     type: ForecastDashboardResponse,
   })
-  async getDashboard(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: ForecastDashboardResponse }> {
-    const dashboard = await this.demandForecastingService.getForecastDashboard(
-      orgId,
-    );
+  async getDashboard(@CurrentOrg() orgId: string): Promise<{ data: ForecastDashboardResponse }> {
+    const dashboard = await this.demandForecastingService.getForecastDashboard(orgId);
     return { data: dashboard };
   }
 
@@ -150,9 +132,7 @@ export class DemandForecastingController {
     description: 'Returns recalculation results',
     type: RecalculateResponse,
   })
-  async recalculate(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: RecalculateResponse }> {
+  async recalculate(@CurrentOrg() orgId: string): Promise<{ data: RecalculateResponse }> {
     const result = await this.demandForecastingService.forecastAllItems(orgId);
     return { data: result };
   }
@@ -172,20 +152,17 @@ export class DemandForecastingController {
     @Body() config: HolidayConfigDto,
   ): Promise<{ data: DemandForecastResponse }> {
     // First get the base forecast
-    const forecast = await this.demandForecastingService.forecastItem(
-      orgId,
-      itemId,
-    );
+    const forecast = await this.demandForecastingService.forecastItem(orgId, itemId);
 
     // Apply holiday config
-    const adjustedForecast = await this.demandForecastingService.applyHolidayConfig(
-      forecast,
-      {
-        ramadan: { enabled: false, multiplier: 1, categories: [], ...config.ramadan },
-        eid: { enabled: false, multiplier: 1, ...config.eid },
-        customHolidays: (config.customHolidays || []).map(h => ({ ...h, categories: h.categories || [] })),
-      },
-    );
+    const adjustedForecast = await this.demandForecastingService.applyHolidayConfig(forecast, {
+      ramadan: { enabled: false, multiplier: 1, categories: [], ...config.ramadan },
+      eid: { enabled: false, multiplier: 1, ...config.eid },
+      customHolidays: (config.customHolidays || []).map((h) => ({
+        ...h,
+        categories: h.categories || [],
+      })),
+    });
 
     return { data: adjustedForecast };
   }

@@ -57,9 +57,13 @@ export class BankAccountsService {
   async updateBalance(id: string, amount: number, type: 'add' | 'subtract') {
     const account = await this.prisma.bankAccount.findUnique({ where: { id } });
     if (!account) return;
-    const newBalance = type === 'add'
-      ? parseFloat(account.systemBalance.toString()) + amount
-      : parseFloat(account.systemBalance.toString()) - amount;
-    await this.prisma.bankAccount.update({ where: { id }, data: { systemBalance: new Decimal(newBalance) } });
+    const newBalance =
+      type === 'add'
+        ? parseFloat(account.systemBalance.toString()) + amount
+        : parseFloat(account.systemBalance.toString()) - amount;
+    await this.prisma.bankAccount.update({
+      where: { id },
+      data: { systemBalance: new Decimal(newBalance) },
+    });
   }
 }

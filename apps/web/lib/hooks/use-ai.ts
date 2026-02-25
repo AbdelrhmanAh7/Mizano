@@ -87,10 +87,7 @@ export type {
 } from './use-ai-categorization';
 
 // Document Intake (use-ai-document-intake)
-export {
-  useDocumentIntakeProcess,
-  useDocumentIntakeConfirm,
-} from './use-ai-document-intake';
+export { useDocumentIntakeProcess, useDocumentIntakeConfirm } from './use-ai-document-intake';
 export type {
   DocumentIntakeResult,
   VendorCandidate,
@@ -195,12 +192,7 @@ export {
   useCLVDistribution,
   useCalculateAllCLV,
 } from './use-ai-clv';
-export type {
-  CustomerCLV,
-  CLVSegment,
-  CLVDistribution,
-  CLVCalculationResult,
-} from './use-ai-clv';
+export type { CustomerCLV, CLVSegment, CLVDistribution, CLVCalculationResult } from './use-ai-clv';
 
 // Pipeline Forecast (use-ai-pipeline-forecast)
 export {
@@ -299,11 +291,7 @@ export {
   useMarkAllAlertsAsRead,
   useDismissAlert,
 } from './use-ai-alerts';
-export type {
-  UnifiedAlert,
-  AlertSummary,
-  AlertAggregationResult,
-} from './use-ai-alerts';
+export type { UnifiedAlert, AlertSummary, AlertAggregationResult } from './use-ai-alerts';
 
 // Training Lab (use-ai-training-lab)
 export {

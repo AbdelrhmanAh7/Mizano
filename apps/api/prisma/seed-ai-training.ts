@@ -54,14 +54,54 @@ export async function seedAiTrainingData(
   // ──────────────────────────────────────────────────────────────────
   console.log('  → Creating additional vendors...');
   const extraVendors = [
-    { id: 'vend-003', name: 'Staples Office Supply', email: 'orders@staples.com', phone: '+201001112233' },
-    { id: 'vend-004', name: 'Egypt Telecom', email: 'billing@egypttelecom.com', phone: '+201001113344' },
-    { id: 'vend-005', name: 'Cairo Catering Co', email: 'events@cairocatering.com', phone: '+201001114455' },
-    { id: 'vend-006', name: 'EgyptAir Corporate', email: 'corporate@egyptair.com', phone: '+201001115566' },
-    { id: 'vend-007', name: 'Digital Marketing Pro', email: 'ads@dmpro.com', phone: '+201001116677' },
-    { id: 'vend-008', name: 'Nile Insurance Group', email: 'claims@nileinsurance.com', phone: '+201001117788' },
-    { id: 'vend-009', name: 'Cairo Properties LLC', email: 'leasing@cairoprop.com', phone: '+201001118899' },
-    { id: 'vend-010', name: 'Baker McKenzie Egypt', email: 'billing@bakermckenzie.eg', phone: '+201001119900' },
+    {
+      id: 'vend-003',
+      name: 'Staples Office Supply',
+      email: 'orders@staples.com',
+      phone: '+201001112233',
+    },
+    {
+      id: 'vend-004',
+      name: 'Egypt Telecom',
+      email: 'billing@egypttelecom.com',
+      phone: '+201001113344',
+    },
+    {
+      id: 'vend-005',
+      name: 'Cairo Catering Co',
+      email: 'events@cairocatering.com',
+      phone: '+201001114455',
+    },
+    {
+      id: 'vend-006',
+      name: 'EgyptAir Corporate',
+      email: 'corporate@egyptair.com',
+      phone: '+201001115566',
+    },
+    {
+      id: 'vend-007',
+      name: 'Digital Marketing Pro',
+      email: 'ads@dmpro.com',
+      phone: '+201001116677',
+    },
+    {
+      id: 'vend-008',
+      name: 'Nile Insurance Group',
+      email: 'claims@nileinsurance.com',
+      phone: '+201001117788',
+    },
+    {
+      id: 'vend-009',
+      name: 'Cairo Properties LLC',
+      email: 'leasing@cairoprop.com',
+      phone: '+201001118899',
+    },
+    {
+      id: 'vend-010',
+      name: 'Baker McKenzie Egypt',
+      email: 'billing@bakermckenzie.eg',
+      phone: '+201001119900',
+    },
   ];
 
   for (const vd of extraVendors) {
@@ -81,7 +121,13 @@ export async function seedAiTrainingData(
   console.log('  → Seeding categorization training data...');
   const categorizationRecords: Array<{ inputData: Record<string, any>; label: string }> = [];
 
-  const categorizationSamples: Array<{ descriptions: string[]; vendorName?: string; accountCode: string; direction: string; amountRange: [number, number] }> = [
+  const categorizationSamples: Array<{
+    descriptions: string[];
+    vendorName?: string;
+    accountCode: string;
+    direction: string;
+    amountRange: [number, number];
+  }> = [
     // Office Supplies → 6000
     {
       descriptions: [
@@ -315,9 +361,12 @@ export async function seedAiTrainingData(
 
   for (const sample of categorizationSamples) {
     for (const desc of sample.descriptions) {
-      const amount = Math.round(
-        (sample.amountRange[0] + Math.random() * (sample.amountRange[1] - sample.amountRange[0])) * 100,
-      ) / 100;
+      const amount =
+        Math.round(
+          (sample.amountRange[0] +
+            Math.random() * (sample.amountRange[1] - sample.amountRange[0])) *
+            100,
+        ) / 100;
 
       categorizationRecords.push({
         inputData: {
@@ -350,60 +399,203 @@ export async function seedAiTrainingData(
   console.log('  → Seeding reconciliation training data...');
   const reconciliationRecords = [
     // Invoice matches
-    { inputData: { description: 'TRF FROM TECHCORP EGYPT REF INV-001', amount: 1299.99, date: '2025-12-15' }, label: 'invoice:INV-001' },
-    { inputData: { description: 'DEPOSIT TECHCORP PAYMENT INV001', amount: 1299.99, date: '2025-12-16' }, label: 'invoice:INV-001' },
-    { inputData: { description: 'GLOBAL SOLUTIONS WIRE TRANSFER', amount: 699.98, date: '2025-12-20' }, label: 'invoice:INV-002' },
-    { inputData: { description: 'CHQ DEP - GLOBAL SOLUTIONS INV-002', amount: 699.98, date: '2025-12-22' }, label: 'invoice:INV-002' },
-    { inputData: { description: 'ACH RECEIPT RETAIL PLUS', amount: 500.00, date: '2025-11-15' }, label: 'invoice:INV-003' },
-    { inputData: { description: 'WIRE IN FROM RETAIL PLUS CO', amount: 500.00, date: '2025-11-16' }, label: 'invoice:INV-003' },
+    {
+      inputData: {
+        description: 'TRF FROM TECHCORP EGYPT REF INV-001',
+        amount: 1299.99,
+        date: '2025-12-15',
+      },
+      label: 'invoice:INV-001',
+    },
+    {
+      inputData: {
+        description: 'DEPOSIT TECHCORP PAYMENT INV001',
+        amount: 1299.99,
+        date: '2025-12-16',
+      },
+      label: 'invoice:INV-001',
+    },
+    {
+      inputData: {
+        description: 'GLOBAL SOLUTIONS WIRE TRANSFER',
+        amount: 699.98,
+        date: '2025-12-20',
+      },
+      label: 'invoice:INV-002',
+    },
+    {
+      inputData: {
+        description: 'CHQ DEP - GLOBAL SOLUTIONS INV-002',
+        amount: 699.98,
+        date: '2025-12-22',
+      },
+      label: 'invoice:INV-002',
+    },
+    {
+      inputData: { description: 'ACH RECEIPT RETAIL PLUS', amount: 500.0, date: '2025-11-15' },
+      label: 'invoice:INV-003',
+    },
+    {
+      inputData: { description: 'WIRE IN FROM RETAIL PLUS CO', amount: 500.0, date: '2025-11-16' },
+      label: 'invoice:INV-003',
+    },
     // Bill matches
-    { inputData: { description: 'PAYMENT TO SUPPLIER ALPHA', amount: -5000.00, date: '2025-12-01' }, label: 'bill:BILL-001' },
-    { inputData: { description: 'CHQ 1234 SUPPLIER ALPHA', amount: -5000.00, date: '2025-12-02' }, label: 'bill:BILL-001' },
-    { inputData: { description: 'SUPPLIER BETA WIRE OUT', amount: -3500.00, date: '2025-12-05' }, label: 'bill:BILL-002' },
-    { inputData: { description: 'TRF TO SUPPLIER BETA ACCT', amount: -3500.00, date: '2025-12-06' }, label: 'bill:BILL-002' },
+    {
+      inputData: { description: 'PAYMENT TO SUPPLIER ALPHA', amount: -5000.0, date: '2025-12-01' },
+      label: 'bill:BILL-001',
+    },
+    {
+      inputData: { description: 'CHQ 1234 SUPPLIER ALPHA', amount: -5000.0, date: '2025-12-02' },
+      label: 'bill:BILL-001',
+    },
+    {
+      inputData: { description: 'SUPPLIER BETA WIRE OUT', amount: -3500.0, date: '2025-12-05' },
+      label: 'bill:BILL-002',
+    },
+    {
+      inputData: { description: 'TRF TO SUPPLIER BETA ACCT', amount: -3500.0, date: '2025-12-06' },
+      label: 'bill:BILL-002',
+    },
     // Expense matches - rent
-    { inputData: { description: 'CAIRO PROPERTIES MONTHLY RENT', amount: -8000.00, date: '2025-12-01' }, label: 'expense:rent' },
-    { inputData: { description: 'RENT PAYMENT DEC 2025', amount: -8000.00, date: '2025-12-01' }, label: 'expense:rent' },
-    { inputData: { description: 'STANDING ORDER CAIRO PROP', amount: -8000.00, date: '2025-11-01' }, label: 'expense:rent' },
+    {
+      inputData: {
+        description: 'CAIRO PROPERTIES MONTHLY RENT',
+        amount: -8000.0,
+        date: '2025-12-01',
+      },
+      label: 'expense:rent',
+    },
+    {
+      inputData: { description: 'RENT PAYMENT DEC 2025', amount: -8000.0, date: '2025-12-01' },
+      label: 'expense:rent',
+    },
+    {
+      inputData: { description: 'STANDING ORDER CAIRO PROP', amount: -8000.0, date: '2025-11-01' },
+      label: 'expense:rent',
+    },
     // Expense matches - utilities
-    { inputData: { description: 'EGYPT TELECOM DD', amount: -350.00, date: '2025-12-15' }, label: 'expense:utilities' },
-    { inputData: { description: 'ELECTRICITY BILL AUTO PAY', amount: -450.00, date: '2025-12-10' }, label: 'expense:utilities' },
-    { inputData: { description: 'INTERNET SERVICE PROVIDER', amount: -199.99, date: '2025-12-14' }, label: 'expense:utilities' },
+    {
+      inputData: { description: 'EGYPT TELECOM DD', amount: -350.0, date: '2025-12-15' },
+      label: 'expense:utilities',
+    },
+    {
+      inputData: { description: 'ELECTRICITY BILL AUTO PAY', amount: -450.0, date: '2025-12-10' },
+      label: 'expense:utilities',
+    },
+    {
+      inputData: { description: 'INTERNET SERVICE PROVIDER', amount: -199.99, date: '2025-12-14' },
+      label: 'expense:utilities',
+    },
     // Expense matches - insurance
-    { inputData: { description: 'NILE INSURANCE PREMIUM', amount: -2500.00, date: '2025-12-01' }, label: 'expense:insurance' },
-    { inputData: { description: 'INS PREMIUM Q4 NILE GROUP', amount: -2500.00, date: '2025-09-01' }, label: 'expense:insurance' },
+    {
+      inputData: { description: 'NILE INSURANCE PREMIUM', amount: -2500.0, date: '2025-12-01' },
+      label: 'expense:insurance',
+    },
+    {
+      inputData: { description: 'INS PREMIUM Q4 NILE GROUP', amount: -2500.0, date: '2025-09-01' },
+      label: 'expense:insurance',
+    },
     // Payroll
-    { inputData: { description: 'PAYROLL JAN 2026', amount: -45000.00, date: '2026-01-28' }, label: 'expense:payroll' },
-    { inputData: { description: 'SALARY TRANSFER BATCH JAN', amount: -45000.00, date: '2026-01-28' }, label: 'expense:payroll' },
-    { inputData: { description: 'MONTHLY WAGES DEC 2025', amount: -42000.00, date: '2025-12-28' }, label: 'expense:payroll' },
+    {
+      inputData: { description: 'PAYROLL JAN 2026', amount: -45000.0, date: '2026-01-28' },
+      label: 'expense:payroll',
+    },
+    {
+      inputData: { description: 'SALARY TRANSFER BATCH JAN', amount: -45000.0, date: '2026-01-28' },
+      label: 'expense:payroll',
+    },
+    {
+      inputData: { description: 'MONTHLY WAGES DEC 2025', amount: -42000.0, date: '2025-12-28' },
+      label: 'expense:payroll',
+    },
     // Bank charges
-    { inputData: { description: 'BANK FEE - MONTHLY SERVICE', amount: -25.00, date: '2025-12-31' }, label: 'expense:bank_charges' },
-    { inputData: { description: 'WIRE TRANSFER FEE', amount: -15.00, date: '2025-12-05' }, label: 'expense:bank_charges' },
-    { inputData: { description: 'ATM WITHDRAWAL FEE', amount: -5.00, date: '2025-12-15' }, label: 'expense:bank_charges' },
+    {
+      inputData: { description: 'BANK FEE - MONTHLY SERVICE', amount: -25.0, date: '2025-12-31' },
+      label: 'expense:bank_charges',
+    },
+    {
+      inputData: { description: 'WIRE TRANSFER FEE', amount: -15.0, date: '2025-12-05' },
+      label: 'expense:bank_charges',
+    },
+    {
+      inputData: { description: 'ATM WITHDRAWAL FEE', amount: -5.0, date: '2025-12-15' },
+      label: 'expense:bank_charges',
+    },
     // Card payments
-    { inputData: { description: 'POS TXN STAPLES CAIRO', amount: -89.50, date: '2025-12-08' }, label: 'expense:office_supplies' },
-    { inputData: { description: 'AMAZON BUSINESS PURCHASE', amount: -245.00, date: '2025-12-10' }, label: 'expense:office_supplies' },
-    { inputData: { description: 'POS CAIRO CATERING', amount: -320.00, date: '2025-12-12' }, label: 'expense:meals' },
+    {
+      inputData: { description: 'POS TXN STAPLES CAIRO', amount: -89.5, date: '2025-12-08' },
+      label: 'expense:office_supplies',
+    },
+    {
+      inputData: { description: 'AMAZON BUSINESS PURCHASE', amount: -245.0, date: '2025-12-10' },
+      label: 'expense:office_supplies',
+    },
+    {
+      inputData: { description: 'POS CAIRO CATERING', amount: -320.0, date: '2025-12-12' },
+      label: 'expense:meals',
+    },
     // Unknown / uncategorized
-    { inputData: { description: 'MISC DEBIT REF 99881', amount: -150.00, date: '2025-12-20' }, label: 'unknown' },
-    { inputData: { description: 'REVERSAL ADJUSTMENT', amount: 75.00, date: '2025-12-21' }, label: 'unknown' },
-    { inputData: { description: 'CASH DEPOSIT', amount: 1000.00, date: '2025-12-22' }, label: 'unknown' },
+    {
+      inputData: { description: 'MISC DEBIT REF 99881', amount: -150.0, date: '2025-12-20' },
+      label: 'unknown',
+    },
+    {
+      inputData: { description: 'REVERSAL ADJUSTMENT', amount: 75.0, date: '2025-12-21' },
+      label: 'unknown',
+    },
+    {
+      inputData: { description: 'CASH DEPOSIT', amount: 1000.0, date: '2025-12-22' },
+      label: 'unknown',
+    },
     // Transfers between accounts
-    { inputData: { description: 'TRF TO SAVINGS ACCT', amount: -10000.00, date: '2025-12-15' }, label: 'transfer:internal' },
-    { inputData: { description: 'INTERNAL TRANSFER', amount: -5000.00, date: '2025-12-20' }, label: 'transfer:internal' },
-    { inputData: { description: 'TRF FROM SAVINGS', amount: 5000.00, date: '2025-12-25' }, label: 'transfer:internal' },
+    {
+      inputData: { description: 'TRF TO SAVINGS ACCT', amount: -10000.0, date: '2025-12-15' },
+      label: 'transfer:internal',
+    },
+    {
+      inputData: { description: 'INTERNAL TRANSFER', amount: -5000.0, date: '2025-12-20' },
+      label: 'transfer:internal',
+    },
+    {
+      inputData: { description: 'TRF FROM SAVINGS', amount: 5000.0, date: '2025-12-25' },
+      label: 'transfer:internal',
+    },
     // Tax payments
-    { inputData: { description: 'VAT PAYMENT Q4 2025', amount: -8500.00, date: '2025-12-31' }, label: 'expense:tax' },
-    { inputData: { description: 'TAX AUTHORITY PAYMENT', amount: -3200.00, date: '2025-12-31' }, label: 'expense:tax' },
+    {
+      inputData: { description: 'VAT PAYMENT Q4 2025', amount: -8500.0, date: '2025-12-31' },
+      label: 'expense:tax',
+    },
+    {
+      inputData: { description: 'TAX AUTHORITY PAYMENT', amount: -3200.0, date: '2025-12-31' },
+      label: 'expense:tax',
+    },
     // Refunds
-    { inputData: { description: 'REFUND FROM SUPPLIER ALPHA', amount: 250.00, date: '2025-12-18' }, label: 'refund:vendor' },
-    { inputData: { description: 'CREDIT NOTE - STAPLES', amount: 45.00, date: '2025-12-19' }, label: 'refund:vendor' },
+    {
+      inputData: { description: 'REFUND FROM SUPPLIER ALPHA', amount: 250.0, date: '2025-12-18' },
+      label: 'refund:vendor',
+    },
+    {
+      inputData: { description: 'CREDIT NOTE - STAPLES', amount: 45.0, date: '2025-12-19' },
+      label: 'refund:vendor',
+    },
     // Loan
-    { inputData: { description: 'LOAN REPAYMENT - BANK', amount: -5000.00, date: '2025-12-15' }, label: 'expense:loan_repayment' },
-    { inputData: { description: 'MORTGAGE INSTALLMENT', amount: -12000.00, date: '2025-12-01' }, label: 'expense:loan_repayment' },
+    {
+      inputData: { description: 'LOAN REPAYMENT - BANK', amount: -5000.0, date: '2025-12-15' },
+      label: 'expense:loan_repayment',
+    },
+    {
+      inputData: { description: 'MORTGAGE INSTALLMENT', amount: -12000.0, date: '2025-12-01' },
+      label: 'expense:loan_repayment',
+    },
     // Subscriptions
-    { inputData: { description: 'GOOGLE WORKSPACE MONTHLY', amount: -72.00, date: '2025-12-01' }, label: 'expense:subscriptions' },
-    { inputData: { description: 'SLACK BUSINESS PLAN', amount: -125.00, date: '2025-12-01' }, label: 'expense:subscriptions' },
+    {
+      inputData: { description: 'GOOGLE WORKSPACE MONTHLY', amount: -72.0, date: '2025-12-01' },
+      label: 'expense:subscriptions',
+    },
+    {
+      inputData: { description: 'SLACK BUSINESS PLAN', amount: -125.0, date: '2025-12-01' },
+      label: 'expense:subscriptions',
+    },
   ];
 
   await prisma.aiTrainingData.createMany({
@@ -422,7 +614,14 @@ export async function seedAiTrainingData(
   // 12e. LEADS for Lead Scoring (~60 records, WON + LOST)
   // ──────────────────────────────────────────────────────────────────
   console.log('  → Seeding leads for lead scoring...');
-  const sources: LeadSource[] = ['WEBSITE', 'FACEBOOK_ADS', 'GOOGLE_ADS', 'REFERRAL', 'COLD_CALL', 'OTHER'];
+  const sources: LeadSource[] = [
+    'WEBSITE',
+    'FACEBOOK_ADS',
+    'GOOGLE_ADS',
+    'REFERRAL',
+    'COLD_CALL',
+    'OTHER',
+  ];
   const leadData: Array<{
     leadName: string;
     companyName: string;
@@ -435,12 +634,36 @@ export async function seedAiTrainingData(
 
   // 30 WON leads
   const wonCompanies = [
-    'Alpha Industries', 'Beta Corp', 'Gamma Solutions', 'Delta Technologies', 'Epsilon Group',
-    'Zeta Innovations', 'Eta Partners', 'Theta Systems', 'Iota Digital', 'Kappa Ventures',
-    'Lambda Networks', 'Mu Analytics', 'Nu Consulting', 'Xi Enterprises', 'Omicron Labs',
-    'Pi Software', 'Rho Dynamics', 'Sigma Holdings', 'Tau Resources', 'Upsilon Tech',
-    'Phi Electronics', 'Chi Manufacturing', 'Psi Global', 'Omega Services', 'Atlas Corp',
-    'Nexus Systems', 'Prime Logic', 'Vertex AI', 'Quantum Labs', 'Stellar Solutions',
+    'Alpha Industries',
+    'Beta Corp',
+    'Gamma Solutions',
+    'Delta Technologies',
+    'Epsilon Group',
+    'Zeta Innovations',
+    'Eta Partners',
+    'Theta Systems',
+    'Iota Digital',
+    'Kappa Ventures',
+    'Lambda Networks',
+    'Mu Analytics',
+    'Nu Consulting',
+    'Xi Enterprises',
+    'Omicron Labs',
+    'Pi Software',
+    'Rho Dynamics',
+    'Sigma Holdings',
+    'Tau Resources',
+    'Upsilon Tech',
+    'Phi Electronics',
+    'Chi Manufacturing',
+    'Psi Global',
+    'Omega Services',
+    'Atlas Corp',
+    'Nexus Systems',
+    'Prime Logic',
+    'Vertex AI',
+    'Quantum Labs',
+    'Stellar Solutions',
   ];
 
   for (let i = 0; i < 30; i++) {
@@ -450,19 +673,48 @@ export async function seedAiTrainingData(
       email: `contact@${wonCompanies[i].toLowerCase().replace(/\s/g, '')}.com`,
       source: sources[i % sources.length],
       status: 'WON',
-      notes: i % 3 === 0 ? 'Scheduled demo, converted after follow-up' : i % 3 === 1 ? 'Referral lead, quick close' : 'Inbound from website, good fit',
+      notes:
+        i % 3 === 0
+          ? 'Scheduled demo, converted after follow-up'
+          : i % 3 === 1
+            ? 'Referral lead, quick close'
+            : 'Inbound from website, good fit',
       daysAgo: 30 + Math.floor(Math.random() * 330),
     });
   }
 
   // 30 LOST leads
   const lostCompanies = [
-    'Acme Industries', 'Budget Corp', 'Cheap Solutions', 'Discount Tech', 'Economy Group',
-    'Frugal Inc', 'Ghost Partners', 'Half Systems', 'Idle Digital', 'Jolt Ventures',
-    'Keen Networks', 'Lost Analytics', 'Mute Consulting', 'Nope Enterprises', 'Off Labs',
-    'Pass Software', 'Quiet Dynamics', 'Reject Holdings', 'Skip Resources', 'Try Tech',
-    'Undo Electronics', 'Void Manufacturing', 'Wait Global', 'Xero Services', 'Yield Corp',
-    'Zero Systems', 'Archive Logic', 'Backup AI', 'Cache Labs', 'Debug Solutions',
+    'Acme Industries',
+    'Budget Corp',
+    'Cheap Solutions',
+    'Discount Tech',
+    'Economy Group',
+    'Frugal Inc',
+    'Ghost Partners',
+    'Half Systems',
+    'Idle Digital',
+    'Jolt Ventures',
+    'Keen Networks',
+    'Lost Analytics',
+    'Mute Consulting',
+    'Nope Enterprises',
+    'Off Labs',
+    'Pass Software',
+    'Quiet Dynamics',
+    'Reject Holdings',
+    'Skip Resources',
+    'Try Tech',
+    'Undo Electronics',
+    'Void Manufacturing',
+    'Wait Global',
+    'Xero Services',
+    'Yield Corp',
+    'Zero Systems',
+    'Archive Logic',
+    'Backup AI',
+    'Cache Labs',
+    'Debug Solutions',
   ];
 
   for (let i = 0; i < 30; i++) {
@@ -472,7 +724,12 @@ export async function seedAiTrainingData(
       email: `info@${lostCompanies[i].toLowerCase().replace(/\s/g, '')}.com`,
       source: sources[i % sources.length],
       status: 'LOST',
-      notes: i % 3 === 0 ? 'Budget constraints, went with competitor' : i % 3 === 1 ? 'No response after initial contact' : 'Not a good fit, too small',
+      notes:
+        i % 3 === 0
+          ? 'Budget constraints, went with competitor'
+          : i % 3 === 1
+            ? 'No response after initial contact'
+            : 'Not a good fit, too small',
       daysAgo: 30 + Math.floor(Math.random() * 330),
     });
   }
@@ -504,11 +761,35 @@ export async function seedAiTrainingData(
   // ──────────────────────────────────────────────────────────────────
   console.log('  → Seeding expenses for anomaly detection...');
   const expenseTemplates = [
-    { accountCode: '6000', vendorId: 'vend-003', desc: 'Office supplies', baseAmount: 150, stdDev: 30 },
-    { accountCode: '6100', vendorId: 'vend-004', desc: 'Utility bill', baseAmount: 400, stdDev: 50 },
+    {
+      accountCode: '6000',
+      vendorId: 'vend-003',
+      desc: 'Office supplies',
+      baseAmount: 150,
+      stdDev: 30,
+    },
+    {
+      accountCode: '6100',
+      vendorId: 'vend-004',
+      desc: 'Utility bill',
+      baseAmount: 400,
+      stdDev: 50,
+    },
     { accountCode: '6200', vendorId: 'vend-005', desc: 'Team meals', baseAmount: 250, stdDev: 80 },
-    { accountCode: '6300', vendorId: 'vend-006', desc: 'Travel expense', baseAmount: 1500, stdDev: 500 },
-    { accountCode: '6400', vendorId: 'vend-007', desc: 'Marketing spend', baseAmount: 3000, stdDev: 800 },
+    {
+      accountCode: '6300',
+      vendorId: 'vend-006',
+      desc: 'Travel expense',
+      baseAmount: 1500,
+      stdDev: 500,
+    },
+    {
+      accountCode: '6400',
+      vendorId: 'vend-007',
+      desc: 'Marketing spend',
+      baseAmount: 3000,
+      stdDev: 800,
+    },
     { accountCode: '6600', vendorId: 'vend-009', desc: 'Office rent', baseAmount: 8000, stdDev: 0 },
   ];
 
@@ -583,7 +864,7 @@ export async function seedAiTrainingData(
   // Base monthly demand per item + seasonal multipliers
   const itemDemandProfiles = [
     { itemId: itemIds[0], baseDemand: 20, seasonalPeak: 11 }, // item-001: peaks in December (month 11)
-    { itemId: itemIds[1], baseDemand: 35, seasonalPeak: 8 },  // item-002: peaks in September (back-to-school)
+    { itemId: itemIds[1], baseDemand: 35, seasonalPeak: 8 }, // item-002: peaks in September (back-to-school)
     { itemId: itemIds[2], baseDemand: 100, seasonalPeak: 11 }, // item-003: peaks in December
   ];
 
@@ -617,9 +898,10 @@ export async function seedAiTrainingData(
         const saleDate = new Date(date);
         saleDate.setDate(1 + Math.floor(Math.random() * 28));
 
-        const saleQty = s === salesPerMonth - 1
-          ? remaining
-          : Math.max(1, Math.floor(remaining / (salesPerMonth - s) * (0.5 + Math.random())));
+        const saleQty =
+          s === salesPerMonth - 1
+            ? remaining
+            : Math.max(1, Math.floor((remaining / (salesPerMonth - s)) * (0.5 + Math.random())));
 
         remaining -= saleQty;
 
@@ -673,9 +955,9 @@ export async function seedAiTrainingData(
 
   // Payment behavior profiles per customer
   const paymentProfiles = [
-    { avgDaysToPayment: 25, stdDev: 3 },  // TechCorp: reliable, pays ~25 days
-    { avgDaysToPayment: 35, stdDev: 10 },  // Global: somewhat late, variable
-    { avgDaysToPayment: 45, stdDev: 15 },  // Retail: often late, very variable
+    { avgDaysToPayment: 25, stdDev: 3 }, // TechCorp: reliable, pays ~25 days
+    { avgDaysToPayment: 35, stdDev: 10 }, // Global: somewhat late, variable
+    { avgDaysToPayment: 45, stdDev: 15 }, // Retail: often late, very variable
   ];
 
   let invoiceIdx = 100;
@@ -830,7 +1112,12 @@ export async function seedAiTrainingData(
     { vendorId: 'vend-009', accountCode: '6600', desc: 'Monthly office rent', amount: 8000 },
     { vendorId: 'vend-004', accountCode: '6100', desc: 'Monthly internet service', amount: 350 },
     { vendorId: 'vend-008', accountCode: '6500', desc: 'Monthly insurance premium', amount: 2500 },
-    { vendorId: 'vend-003', accountCode: '6000', desc: 'Monthly office supplies subscription', amount: 120 },
+    {
+      vendorId: 'vend-003',
+      accountCode: '6000',
+      desc: 'Monthly office supplies subscription',
+      amount: 120,
+    },
   ];
 
   let recurringCount = 0;

@@ -44,12 +44,10 @@ export const StatCard = memo(function StatCard({
             </p>
             {trend && (
               <p
-                className={cn(
-                  'text-xs mt-1',
-                  trend.isPositive ? 'text-green-600' : 'text-red-600'
-                )}
+                className={cn('text-xs mt-1', trend.isPositive ? 'text-green-600' : 'text-red-600')}
               >
-                {trend.isPositive ? '↑' : '↓'} {t('fromLastMonth', { value: Math.abs(trend.value) })}
+                {trend.isPositive ? '↑' : '↓'}{' '}
+                {t('fromLastMonth', { value: Math.abs(trend.value) })}
               </p>
             )}
           </div>

@@ -27,7 +27,13 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 
 const LEAD_SOURCES: LeadSource[] = [
-  'FACEBOOK_ADS', 'GOOGLE_ADS', 'WEBSITE', 'REFERRAL', 'COLD_CALL', 'TRADE_SHOW', 'OTHER',
+  'FACEBOOK_ADS',
+  'GOOGLE_ADS',
+  'WEBSITE',
+  'REFERRAL',
+  'COLD_CALL',
+  'TRADE_SHOW',
+  'OTHER',
 ];
 
 const leadSchema = z.object({
@@ -35,7 +41,15 @@ const leadSchema = z.object({
   companyName: z.string().optional(),
   email: z.string().email('Invalid email').optional().or(z.literal('')),
   phone: z.string().optional(),
-  source: z.enum(['FACEBOOK_ADS', 'GOOGLE_ADS', 'WEBSITE', 'REFERRAL', 'COLD_CALL', 'TRADE_SHOW', 'OTHER']),
+  source: z.enum([
+    'FACEBOOK_ADS',
+    'GOOGLE_ADS',
+    'WEBSITE',
+    'REFERRAL',
+    'COLD_CALL',
+    'TRADE_SHOW',
+    'OTHER',
+  ]),
   notes: z.string().optional(),
 });
 
@@ -105,11 +119,7 @@ export function LeadForm({ lead }: LeadFormProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="leadName">Lead Name *</Label>
-              <Input
-                id="leadName"
-                placeholder="John Doe"
-                {...form.register('leadName')}
-              />
+              <Input id="leadName" placeholder="John Doe" {...form.register('leadName')} />
               {form.formState.errors.leadName && (
                 <p className="text-sm text-red-500">{form.formState.errors.leadName.message}</p>
               )}
@@ -117,11 +127,7 @@ export function LeadForm({ lead }: LeadFormProps) {
 
             <div className="space-y-2">
               <Label htmlFor="companyName">Company</Label>
-              <Input
-                id="companyName"
-                placeholder="Acme Corp"
-                {...form.register('companyName')}
-              />
+              <Input id="companyName" placeholder="Acme Corp" {...form.register('companyName')} />
             </div>
           </div>
 

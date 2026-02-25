@@ -88,12 +88,8 @@ function BankRulesPageContent() {
               <span className="text-muted-foreground">
                 {getConditionFieldLabel(condition.field)}
               </span>{' '}
-              <span className="font-medium">
-                {getConditionOperatorLabel(condition.operator)}
-              </span>{' '}
-              <span className="font-mono bg-muted px-1 rounded">
-                {condition.value}
-              </span>
+              <span className="font-medium">{getConditionOperatorLabel(condition.operator)}</span>{' '}
+              <span className="font-mono bg-muted px-1 rounded">{condition.value}</span>
             </p>
           ))}
         </div>
@@ -103,9 +99,7 @@ function BankRulesPageContent() {
       id: 'action',
       header: 'Action',
       cell: ({ row }) => (
-        <Badge variant="outline">
-          {getActionTypeLabel(row.original.action.type)}
-        </Badge>
+        <Badge variant="outline">{getActionTypeLabel(row.original.action.type)}</Badge>
       ),
     },
     {
@@ -121,10 +115,7 @@ function BankRulesPageContent() {
       cell: ({ row }) => {
         const rule = row.original;
         return (
-          <button
-            onClick={() => handleToggleActive(rule)}
-            className="inline-flex items-center"
-          >
+          <button onClick={() => handleToggleActive(rule)} className="inline-flex items-center">
             {rule.isActive ? (
               <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
                 <ToggleRight className="mr-1 h-3 w-3" />
@@ -160,10 +151,7 @@ function BankRulesPageContent() {
                   Edit
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-red-600"
-                onClick={() => setDeleteId(rule.id)}
-              >
+              <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(rule.id)}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete
               </DropdownMenuItem>
@@ -231,10 +219,7 @@ function BankRulesPageContent() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

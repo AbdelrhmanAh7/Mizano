@@ -22,7 +22,15 @@ export class CompanyInfoStepDto {
   @ApiPropertyOptional({ description: 'Industry type' })
   @IsOptional()
   @IsString()
-  @IsIn(['retail', 'services', 'construction', 'manufacturing', 'healthcare', 'technology', 'other'])
+  @IsIn([
+    'retail',
+    'services',
+    'construction',
+    'manufacturing',
+    'healthcare',
+    'technology',
+    'other',
+  ])
   industry?: string;
 
   @ApiPropertyOptional({ description: 'Logo URL (after upload)' })
@@ -50,7 +58,10 @@ export class CompanyInfoStepDto {
 // ============================================
 
 export class ChartOfAccountsStepDto {
-  @ApiProperty({ description: 'Selected COA template', enum: ['standard', 'retail', 'services', 'manufacturing', 'construction'] })
+  @ApiProperty({
+    description: 'Selected COA template',
+    enum: ['standard', 'retail', 'services', 'manufacturing', 'construction'],
+  })
   @IsString()
   @IsIn(['standard', 'retail', 'services', 'manufacturing', 'construction'])
   template: string;
@@ -207,9 +218,28 @@ export class TourCompletedStepDto {
 // ============================================
 
 export class SkipStepDto {
-  @ApiProperty({ description: 'Step to skip', enum: ['company_info', 'chart_of_accounts', 'tax_config', 'opening_balances', 'import_data', 'ai_features', 'tour'] })
+  @ApiProperty({
+    description: 'Step to skip',
+    enum: [
+      'company_info',
+      'chart_of_accounts',
+      'tax_config',
+      'opening_balances',
+      'import_data',
+      'ai_features',
+      'tour',
+    ],
+  })
   @IsString()
-  @IsIn(['company_info', 'chart_of_accounts', 'tax_config', 'opening_balances', 'import_data', 'ai_features', 'tour'])
+  @IsIn([
+    'company_info',
+    'chart_of_accounts',
+    'tax_config',
+    'opening_balances',
+    'import_data',
+    'ai_features',
+    'tour',
+  ])
   step: string;
 }
 

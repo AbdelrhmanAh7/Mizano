@@ -51,7 +51,7 @@ export function useAuditLog(id: string | undefined) {
 export function useEntityAuditLogs(
   entityType: string | undefined,
   entityId: string | undefined,
-  params?: Pick<AuditLogParams, 'page' | 'limit' | 'sortOrder'>
+  params?: Pick<AuditLogParams, 'page' | 'limit' | 'sortOrder'>,
 ) {
   return useQuery({
     queryKey: ['audit-logs', 'entity', entityType, entityId, params],

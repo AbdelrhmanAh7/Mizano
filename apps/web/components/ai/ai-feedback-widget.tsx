@@ -88,7 +88,7 @@ export function AiFeedbackWidget({
         onSuccess: () => {
           onAccept?.(suggestion);
         },
-      }
+      },
     );
   };
 
@@ -105,7 +105,7 @@ export function AiFeedbackWidget({
         onSuccess: () => {
           onReject?.();
         },
-      }
+      },
     );
   };
 
@@ -127,17 +127,12 @@ export function AiFeedbackWidget({
           setCorrectedValue('');
           onCorrect?.(correctedValue);
         },
-      }
+      },
     );
   };
 
   return (
-    <div
-      className={cn(
-        'flex items-center gap-2 rounded-lg border bg-muted/50 p-2',
-        className
-      )}
-    >
+    <div className={cn('flex items-center gap-2 rounded-lg border bg-muted/50 p-2', className)}>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium truncate">{displaySuggestion}</span>
@@ -158,11 +153,7 @@ export function AiFeedbackWidget({
           className="h-8 w-8 p-0 hover:bg-green-100 hover:text-green-700"
           title="Accept suggestion"
         >
-          {isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Check className="h-4 w-4" />
-          )}
+          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
         </Button>
 
         <Button

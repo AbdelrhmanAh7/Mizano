@@ -4,7 +4,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 // Request DTOs
 
 export class AnalyzeContractDto {
-  @ApiProperty({ description: 'Contract text to analyze', example: 'This agreement is entered into between Party A and Party B...' })
+  @ApiProperty({
+    description: 'Contract text to analyze',
+    example: 'This agreement is entered into between Party A and Party B...',
+  })
   @IsString()
   @MinLength(1)
   text: string;
@@ -53,13 +56,21 @@ export class ContractDatesDto {
 }
 
 export class ContractAnalysisResultDto {
-  @ApiProperty({ description: 'Parties involved in the contract', type: [String], example: ['Party A', 'Party B'] })
+  @ApiProperty({
+    description: 'Parties involved in the contract',
+    type: [String],
+    example: ['Party A', 'Party B'],
+  })
   parties: string[];
 
   @ApiProperty({ description: 'Contract dates information', type: ContractDatesDto })
   dates: ContractDatesDto;
 
-  @ApiProperty({ description: 'Key terms identified', type: [String], example: ['net-30 payment', 'auto-renewal'] })
+  @ApiProperty({
+    description: 'Key terms identified',
+    type: [String],
+    example: ['net-30 payment', 'auto-renewal'],
+  })
   keyTerms: string[];
 
   @ApiProperty({ description: 'Contract clauses analyzed', type: [ContractClauseDto] })
@@ -68,7 +79,11 @@ export class ContractAnalysisResultDto {
   @ApiProperty({ description: 'Overall risk score (0-100)', example: 45 })
   riskScore: number;
 
-  @ApiProperty({ description: 'Risk factors identified', type: [String], example: ['Auto-renewal clause', 'No liability cap'] })
+  @ApiProperty({
+    description: 'Risk factors identified',
+    type: [String],
+    example: ['Auto-renewal clause', 'No liability cap'],
+  })
   riskFactors: string[];
 }
 

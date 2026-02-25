@@ -3,61 +3,61 @@
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { projectsApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import {
-    formatCurrency,
-    formatHours,
-    getBillingMethodLabel,
-    getProjectStatusColor,
-    getProjectStatusLabel,
-    Project,
-    ProjectStatus,
-    useDeleteProject,
-    useProjects,
+  formatCurrency,
+  formatHours,
+  getBillingMethodLabel,
+  getProjectStatusColor,
+  getProjectStatusLabel,
+  Project,
+  ProjectStatus,
+  useDeleteProject,
+  useProjects,
 } from '@/lib/hooks/use-projects';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import {
-    Briefcase,
-    CheckCircle,
-    Clock,
-    DollarSign,
-    Eye,
-    PauseCircle,
-    Pencil,
-    Play,
-    Plus,
-    Trash2,
-    XCircle,
+  Briefcase,
+  CheckCircle,
+  Clock,
+  DollarSign,
+  Eye,
+  PauseCircle,
+  Pencil,
+  Play,
+  Plus,
+  Trash2,
+  XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';

@@ -4,14 +4,7 @@ import { use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Download,
-  FileText,
-  Printer,
-  Mail,
-} from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Download, FileText, Printer, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -50,15 +43,21 @@ import {
 } from '@/lib/hooks/use-hr';
 
 const months = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
-export default function PayrollDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function PayrollDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const { data: payrollRun, isLoading } = usePayrollRun(id);
@@ -96,7 +95,10 @@ export default function PayrollDetailPage({
 
   const payslips = payrollRun.payslips || [];
   const totalGross = payslips.reduce((sum: number, p: any) => sum + (p.gross || 0), 0);
-  const totalDeductions = payslips.reduce((sum: number, p: any) => sum + (p.totalDeductions || 0) + (p.taxAmount || 0), 0);
+  const totalDeductions = payslips.reduce(
+    (sum: number, p: any) => sum + (p.totalDeductions || 0) + (p.taxAmount || 0),
+    0,
+  );
   const totalNetPay = payslips.reduce((sum: number, p: any) => sum + (p.netPay || 0), 0);
 
   return (
@@ -114,10 +116,7 @@ export default function PayrollDetailPage({
               <h1 className="text-3xl font-bold tracking-tight">
                 Payroll - {months[payrollRun.month - 1]} {payrollRun.year}
               </h1>
-              <Badge
-                variant="outline"
-                className={getPayrollStatusColor(payrollRun.status)}
-              >
+              <Badge variant="outline" className={getPayrollStatusColor(payrollRun.status)}>
                 {getPayrollStatusLabel(payrollRun.status)}
               </Badge>
             </div>
@@ -139,15 +138,13 @@ export default function PayrollDetailPage({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Confirm Payroll</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will finalize the payroll and create accounting entries.
-                    This action cannot be undone.
+                    This will finalize the payroll and create accounting entries. This action cannot
+                    be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleConfirm}>
-                    Confirm
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={handleConfirm}>Confirm</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -192,9 +189,7 @@ export default function PayrollDetailPage({
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Gross</p>
-            <p className="text-2xl font-bold font-mono">
-              {formatCurrency(totalGross)}
-            </p>
+            <p className="text-2xl font-bold font-mono">{formatCurrency(totalGross)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -208,9 +203,7 @@ export default function PayrollDetailPage({
         <Card className="bg-primary/5">
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Net Pay</p>
-            <p className="text-2xl font-bold font-mono">
-              {formatCurrency(totalNetPay)}
-            </p>
+            <p className="text-2xl font-bold font-mono">{formatCurrency(totalNetPay)}</p>
           </CardContent>
         </Card>
       </div>
@@ -252,11 +245,12 @@ export default function PayrollDetailPage({
                     {formatCurrency(slip.basicSalary || 0)}
                   </TableCell>
                   <TableCell className="text-right font-mono text-green-600">
-                    +{formatCurrency(
+                    +
+                    {formatCurrency(
                       Object.values(slip.allowances || {}).reduce(
                         (sum: number, a: any) => sum + (a || 0),
-                        0
-                      )
+                        0,
+                      ),
                     )}
                   </TableCell>
                   <TableCell className="text-right font-mono">
@@ -280,9 +274,7 @@ export default function PayrollDetailPage({
                   </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/hr/payslips/${slip.id}`}>
-                        View
-                      </Link>
+                      <Link href={`/hr/payslips/${slip.id}`}>View</Link>
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -310,9 +302,7 @@ export default function PayrollDetailPage({
                 </div>
               </div>
               <Button variant="outline" size="sm" asChild>
-                <Link href={`/accounting/journals/${payrollRun.journalId}`}>
-                  View Journal
-                </Link>
+                <Link href={`/accounting/journals/${payrollRun.journalId}`}>View Journal</Link>
               </Button>
             </div>
           </CardContent>

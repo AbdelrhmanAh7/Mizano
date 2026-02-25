@@ -34,13 +34,10 @@ export default function GeneralLedgerPage() {
   const [accountId, setAccountId] = useState('');
 
   const { data: accounts } = useAccounts();
-  const { data: ledger, isLoading } = useGeneralLedgerReport(
-    accountId,
-    {
-      startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
-      endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
-    },
-  );
+  const { data: ledger, isLoading } = useGeneralLedgerReport(accountId, {
+    startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
+    endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
+  });
 
   const accountList = accounts?.data || accounts || [];
 
@@ -82,19 +79,16 @@ export default function GeneralLedgerPage() {
               <SelectValue placeholder="Select an account" />
             </SelectTrigger>
             <SelectContent>
-              {Array.isArray(accountList) && accountList.map((account: any) => (
-                <SelectItem key={account.id} value={account.id}>
-                  {account.code} - {account.name}
-                </SelectItem>
-              ))}
+              {Array.isArray(accountList) &&
+                accountList.map((account: any) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.code} - {account.name}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
         </div>
-        <ReportFilters
-          dateRange={dateRange}
-          onDateRangeChange={setDateRange}
-          showDateRange
-        />
+        <ReportFilters dateRange={dateRange} onDateRangeChange={setDateRange} showDateRange />
       </div>
 
       {!accountId ? (
@@ -157,7 +151,9 @@ export default function GeneralLedgerPage() {
                             >
                               {entry.journalNumber}
                             </Link>
-                          ) : '-'}
+                          ) : (
+                            '-'
+                          )}
                         </TableCell>
                         <TableCell>{entry.description || entry.reference || '-'}</TableCell>
                         <TableCell className="text-right font-mono">

@@ -78,7 +78,9 @@ export default function AIInsightsPage() {
   const anomalyCount = insights.filter((i) => i.type === 'ANOMALY').length;
   const recommendationCount = insights.filter((i) => i.type === 'RECOMMENDATION').length;
   const alertCount = insights.filter((i) => i.type === 'ALERT').length;
-  const highPriorityCount = insights.filter((i) => i.priority === 'HIGH' || i.priority === 'CRITICAL').length;
+  const highPriorityCount = insights.filter(
+    (i) => i.priority === 'HIGH' || i.priority === 'CRITICAL',
+  ).length;
 
   if (isLoading) {
     return (
@@ -112,7 +114,9 @@ export default function AIInsightsPage() {
           </p>
         </div>
         <Button onClick={handleRunAnalysis} disabled={runAnomalyDetection.isPending}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${runAnomalyDetection.isPending ? 'animate-spin' : ''}`} />
+          <RefreshCw
+            className={`mr-2 h-4 w-4 ${runAnomalyDetection.isPending ? 'animate-spin' : ''}`}
+          />
           {runAnomalyDetection.isPending ? 'Analyzing...' : 'Run Analysis'}
         </Button>
       </div>
@@ -225,15 +229,23 @@ export default function AIInsightsPage() {
           {insights.map((insight) => (
             <Card key={insight.id} className="overflow-hidden">
               <div className="flex">
-                <div className={`w-1 ${
-                  insight.priority === 'CRITICAL' ? 'bg-red-500' :
-                  insight.priority === 'HIGH' ? 'bg-orange-500' :
-                  insight.priority === 'MEDIUM' ? 'bg-blue-500' : 'bg-gray-300'
-                }`} />
+                <div
+                  className={`w-1 ${
+                    insight.priority === 'CRITICAL'
+                      ? 'bg-red-500'
+                      : insight.priority === 'HIGH'
+                        ? 'bg-orange-500'
+                        : insight.priority === 'MEDIUM'
+                          ? 'bg-blue-500'
+                          : 'bg-gray-300'
+                  }`}
+                />
                 <div className="flex-1 p-6">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-4">
-                      <div className={`p-2 rounded-lg ${getInsightTypeColor(insight.type).split(' ')[0]}`}>
+                      <div
+                        className={`p-2 rounded-lg ${getInsightTypeColor(insight.type).split(' ')[0]}`}
+                      >
                         {insightIcons[insight.type]}
                       </div>
                       <div className="space-y-1">
@@ -242,7 +254,10 @@ export default function AIInsightsPage() {
                           <Badge variant="outline" className={getInsightTypeColor(insight.type)}>
                             {getInsightTypeLabel(insight.type)}
                           </Badge>
-                          <Badge variant="outline" className={getInsightPriorityColor(insight.priority)}>
+                          <Badge
+                            variant="outline"
+                            className={getInsightPriorityColor(insight.priority)}
+                          >
                             {getInsightPriorityLabel(insight.priority)}
                           </Badge>
                         </div>
@@ -254,7 +269,8 @@ export default function AIInsightsPage() {
                         )}
                         {insight.recommendation && (
                           <p className="text-sm text-blue-600">
-                            <span className="font-medium">Recommendation:</span> {insight.recommendation}
+                            <span className="font-medium">Recommendation:</span>{' '}
+                            {insight.recommendation}
                           </p>
                         )}
                         <div className="flex items-center gap-4 pt-2 text-sm text-muted-foreground">
@@ -297,9 +313,7 @@ export default function AIInsightsPage() {
               <BarChart3 className="h-4 w-4" />
               Cash Flow Forecast
             </CardTitle>
-            <CardDescription>
-              View AI-powered cash flow predictions
-            </CardDescription>
+            <CardDescription>View AI-powered cash flow predictions</CardDescription>
           </CardHeader>
           <CardContent>
             <Button variant="outline" className="w-full" asChild>
@@ -313,9 +327,7 @@ export default function AIInsightsPage() {
               <TrendingUp className="h-4 w-4" />
               Revenue Predictions
             </CardTitle>
-            <CardDescription>
-              Revenue forecast based on historical data
-            </CardDescription>
+            <CardDescription>Revenue forecast based on historical data</CardDescription>
           </CardHeader>
           <CardContent>
             <Button variant="outline" className="w-full" asChild>
@@ -329,9 +341,7 @@ export default function AIInsightsPage() {
               <Target className="h-4 w-4" />
               Customer Analysis
             </CardTitle>
-            <CardDescription>
-              Customer segmentation and insights
-            </CardDescription>
+            <CardDescription>Customer segmentation and insights</CardDescription>
           </CardHeader>
           <CardContent>
             <Button variant="outline" className="w-full" asChild>

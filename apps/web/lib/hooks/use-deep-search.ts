@@ -73,7 +73,10 @@ export function useDeepSearchJobs(page = 1, limit = 10) {
     queryKey: ['deep-search-jobs', page, limit],
     queryFn: async () => {
       const res = await deepSearchApi.getJobs(page, limit);
-      return res as { data: DeepSearchJob[]; meta: { page: number; limit: number; total: number; totalPages: number } };
+      return res as {
+        data: DeepSearchJob[];
+        meta: { page: number; limit: number; total: number; totalPages: number };
+      };
     },
     staleTime: 10000,
   });

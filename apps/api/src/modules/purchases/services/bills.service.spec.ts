@@ -17,10 +17,7 @@ describe('BillsService', () => {
     prisma = createMockPrisma();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        BillsService,
-        { provide: PrismaService, useValue: prisma },
-      ],
+      providers: [BillsService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = module.get<BillsService>(BillsService);
@@ -32,9 +29,7 @@ describe('BillsService', () => {
       billNumber: 'BILL-001',
       date: '2024-06-15',
       dueDate: '2024-07-15',
-      lines: [
-        { description: 'Office supplies', quantity: '10', rate: '50', taxRate: '15' },
-      ],
+      lines: [{ description: 'Office supplies', quantity: '10', rate: '50', taxRate: '15' }],
     };
 
     it('should create a bill with correct total calculation', async () => {
@@ -98,9 +93,7 @@ describe('BillsService', () => {
 
       const noTaxDto = {
         ...validDto,
-        lines: [
-          { description: 'Item', quantity: '4', rate: '250' },
-        ],
+        lines: [{ description: 'Item', quantity: '4', rate: '250' }],
       };
 
       await service.create(ORG_ID, noTaxDto);
@@ -117,12 +110,8 @@ describe('BillsService', () => {
     it('should throw BadRequestException when vendor not found', async () => {
       prisma.vendor.findFirst.mockResolvedValue(null);
 
-      await expect(service.create(ORG_ID, validDto)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.create(ORG_ID, validDto)).rejects.toThrow(
-        'Vendor not found',
-      );
+      await expect(service.create(ORG_ID, validDto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(ORG_ID, validDto)).rejects.toThrow('Vendor not found');
     });
 
     it('should include organizationId in created bill', async () => {
@@ -167,9 +156,7 @@ describe('BillsService', () => {
     it('should throw NotFoundException for non-existent bill', async () => {
       prisma.bill.findFirst.mockResolvedValue(null);
 
-      await expect(service.findOne(ORG_ID, 'nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.findOne(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
 
     it('should filter by organizationId and exclude soft-deleted', async () => {
@@ -192,17 +179,15 @@ describe('BillsService', () => {
       const openBill = createMockBill({ status: 'OPEN' });
       prisma.bill.findFirst.mockResolvedValue(openBill as any);
 
-      await expect(
-        service.update(ORG_ID, 'bill-1', { notes: 'updated' }),
-      ).rejects.toThrow('Only draft bills can be updated');
+      await expect(service.update(ORG_ID, 'bill-1', { notes: 'updated' })).rejects.toThrow(
+        'Only draft bills can be updated',
+      );
     });
 
     it('should throw NotFoundException for non-existent bill', async () => {
       prisma.bill.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.update(ORG_ID, 'nonexistent', {}),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.update(ORG_ID, 'nonexistent', {})).rejects.toThrow(NotFoundException);
     });
 
     it('should allow updating DRAFT bills', async () => {
@@ -237,9 +222,7 @@ describe('BillsService', () => {
     it('should throw NotFoundException for non-existent bill', async () => {
       prisma.bill.findFirst.mockResolvedValue(null);
 
-      await expect(service.approve(ORG_ID, 'nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.approve(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -291,10 +274,7 @@ describe('BillsService', () => {
         id: 'bill-1',
         grandTotal: dec('500'),
         status: 'OPEN',
-        billAllocations: [
-          { amount: dec('300') },
-          { amount: dec('300') },
-        ],
+        billAllocations: [{ amount: dec('300') }, { amount: dec('300') }],
       });
       prisma.bill.findUnique.mockResolvedValue(bill as any);
       prisma.bill.update.mockResolvedValue({} as any);
@@ -347,9 +327,7 @@ describe('BillsService', () => {
     it('should throw NotFoundException for non-existent bill', async () => {
       prisma.bill.findFirst.mockResolvedValue(null);
 
-      await expect(service.remove(ORG_ID, 'nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.remove(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
 

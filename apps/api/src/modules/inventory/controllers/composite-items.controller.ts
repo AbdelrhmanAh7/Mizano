@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CompositeItemsService } from '../services/composite-items.service';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
@@ -56,13 +66,21 @@ export class CompositeItemsController {
     @Param('id') id: string,
     @Query('quantity') quantity?: string,
   ) {
-    return this.compositeItemsService.checkAvailability(orgId, id, quantity ? parseInt(quantity, 10) : 1);
+    return this.compositeItemsService.checkAvailability(
+      orgId,
+      id,
+      quantity ? parseInt(quantity, 10) : 1,
+    );
   }
 
   @Post(':id/assemble')
   @Permissions('inventory.create')
   @ApiOperation({ summary: 'Assemble a composite item (consume component stock)' })
-  assemble(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: { quantity: number; warehouseId: string }) {
+  assemble(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: { quantity: number; warehouseId: string },
+  ) {
     return this.compositeItemsService.assemble(orgId, id, dto);
   }
 }

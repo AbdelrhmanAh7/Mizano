@@ -76,10 +76,9 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
     );
   }
 
-  const totalQty = adjustment.lines?.reduce(
-    (sum: number, line: any) => sum + (line.quantityAdjusted || 0),
-    0
-  ) || 0;
+  const totalQty =
+    adjustment.lines?.reduce((sum: number, line: any) => sum + (line.quantityAdjusted || 0), 0) ||
+    0;
 
   return (
     <div className="space-y-6">
@@ -93,13 +92,8 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
-                {adjustment.adjustmentNumber}
-              </h1>
-              <Badge
-                variant="outline"
-                className={getAdjustmentStatusColor(adjustment.status)}
-              >
+              <h1 className="text-3xl font-bold tracking-tight">{adjustment.adjustmentNumber}</h1>
+              <Badge variant="outline" className={getAdjustmentStatusColor(adjustment.status)}>
                 {getAdjustmentStatusLabel(adjustment.status)}
               </Badge>
             </div>
@@ -122,15 +116,13 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
                 <AlertDialogHeader>
                   <AlertDialogTitle>Post Adjustment</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will update the stock levels for all items in this adjustment.
-                    This action cannot be undone.
+                    This will update the stock levels for all items in this adjustment. This action
+                    cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handlePost}>
-                    Post Adjustment
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={handlePost}>Post Adjustment</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -146,7 +138,7 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
               <div
                 className={cn(
                   'p-2 rounded-lg',
-                  adjustment.type === 'INCREASE' ? 'bg-green-100' : 'bg-red-100'
+                  adjustment.type === 'INCREASE' ? 'bg-green-100' : 'bg-red-100',
                 )}
               >
                 {adjustment.type === 'INCREASE' ? (
@@ -160,7 +152,7 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
                 <p
                   className={cn(
                     'text-lg font-semibold',
-                    adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600'
+                    adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
                   )}
                 >
                   {adjustment.type === 'INCREASE' ? 'Increase Stock' : 'Decrease Stock'}
@@ -190,7 +182,7 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
             <p
               className={cn(
                 'text-2xl font-bold font-mono',
-                adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600'
+                adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
               )}
             >
               {adjustment.type === 'INCREASE' ? '+' : '-'}
@@ -223,10 +215,7 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
             )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Status</span>
-              <Badge
-                variant="outline"
-                className={getAdjustmentStatusColor(adjustment.status)}
-              >
+              <Badge variant="outline" className={getAdjustmentStatusColor(adjustment.status)}>
                 {getAdjustmentStatusLabel(adjustment.status)}
               </Badge>
             </div>
@@ -263,20 +252,14 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
             <TableBody>
               {adjustment.lines?.map((line: any) => (
                 <TableRow key={line.id}>
-                  <TableCell className="font-medium">
-                    {line.item?.name || '-'}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {line.item?.sku || '-'}
-                  </TableCell>
+                  <TableCell className="font-medium">{line.item?.name || '-'}</TableCell>
+                  <TableCell className="font-mono text-sm">{line.item?.sku || '-'}</TableCell>
                   <TableCell>{line.warehouse?.name || '-'}</TableCell>
                   <TableCell className="text-right">
                     <span
                       className={cn(
                         'font-mono font-medium',
-                        adjustment.type === 'INCREASE'
-                          ? 'text-green-600'
-                          : 'text-red-600'
+                        adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
                       )}
                     >
                       {adjustment.type === 'INCREASE' ? '+' : '-'}

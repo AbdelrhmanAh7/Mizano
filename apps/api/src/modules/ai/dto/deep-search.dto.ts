@@ -16,7 +16,12 @@ export class RunDeepSearchDto {
   @IsArray()
   categories?: string[];
 
-  @ApiPropertyOptional({ description: 'Maximum number of suggestions to generate', minimum: 1, maximum: 30, default: 15 })
+  @ApiPropertyOptional({
+    description: 'Maximum number of suggestions to generate',
+    minimum: 1,
+    maximum: 30,
+    default: 15,
+  })
   @IsOptional()
   @IsInt()
   @Min(1)

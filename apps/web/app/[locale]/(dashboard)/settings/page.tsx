@@ -2,16 +2,16 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    Activity,
-    Bell,
-    Brain,
-    Building2,
-    CreditCard,
-    Database,
-    Globe,
-    Palette,
-    Receipt,
-    Users,
+  Activity,
+  Bell,
+  Brain,
+  Building2,
+  CreditCard,
+  Database,
+  Globe,
+  Palette,
+  Receipt,
+  Users,
 } from 'lucide-react';
 import Link from 'next/link';
 

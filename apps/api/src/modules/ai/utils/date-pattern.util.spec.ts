@@ -193,7 +193,7 @@ describe('date-pattern.util', () => {
 
   describe('getAmountCluster', () => {
     it('should return exact value for small amounts', () => {
-      expect(getAmountCluster(5.50)).toBe(5.50);
+      expect(getAmountCluster(5.5)).toBe(5.5);
     });
 
     it('should cluster larger amounts to round values', () => {

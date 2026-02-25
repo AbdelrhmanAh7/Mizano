@@ -1,16 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -55,10 +44,7 @@ export class VoiceCommandController {
     description: 'Command execution result',
     type: CommandExecutionDto,
   })
-  async executeCommand(
-    @CurrentOrg() orgId: string,
-    @Body() body: VoiceInputDto,
-  ) {
+  async executeCommand(@CurrentOrg() orgId: string, @Body() body: VoiceInputDto) {
     const parsed = await this.voiceCommandService.parseCommand(body.text);
     return this.voiceCommandService.executeCommand(orgId, parsed);
   }

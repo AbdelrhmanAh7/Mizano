@@ -37,9 +37,7 @@ describe('InvoicesService', () => {
       customerId: 'cust-test-001',
       date: '2024-06-15',
       dueDate: '2024-07-15',
-      lines: [
-        { description: 'Consulting services', quantity: '10', rate: '100', taxRate: '15' },
-      ],
+      lines: [{ description: 'Consulting services', quantity: '10', rate: '100', taxRate: '15' }],
     };
 
     it('should create an invoice with correct total calculation', async () => {
@@ -79,9 +77,7 @@ describe('InvoicesService', () => {
         customerId: 'cust-test-001',
         date: '2024-06-15',
         dueDate: '2024-07-15',
-        lines: [
-          { description: 'Item', quantity: '5', rate: '200', discount: '10', taxRate: '20' },
-        ],
+        lines: [{ description: 'Item', quantity: '5', rate: '200', discount: '10', taxRate: '20' }],
       };
 
       prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
@@ -152,12 +148,8 @@ describe('InvoicesService', () => {
     it('should throw BadRequestException when customer not found', async () => {
       prisma.customer.findFirst.mockResolvedValue(null);
 
-      await expect(service.create(ORG_ID, validDto)).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.create(ORG_ID, validDto)).rejects.toThrow(
-        'Customer not found',
-      );
+      await expect(service.create(ORG_ID, validDto)).rejects.toThrow(BadRequestException);
+      await expect(service.create(ORG_ID, validDto)).rejects.toThrow('Customer not found');
     });
 
     it('should generate INV-001 for first invoice', async () => {
@@ -229,9 +221,7 @@ describe('InvoicesService', () => {
     it('should throw NotFoundException for non-existent invoice', async () => {
       prisma.invoice.findFirst.mockResolvedValue(null);
 
-      await expect(service.findOne(ORG_ID, 'nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.findOne(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
 
     it('should filter by organizationId and exclude soft-deleted', async () => {
@@ -254,35 +244,35 @@ describe('InvoicesService', () => {
       const sentInvoice = createMockInvoice({ status: 'SENT' });
       prisma.invoice.findFirst.mockResolvedValue(sentInvoice as any);
 
-      await expect(
-        service.update(ORG_ID, 'inv-1', { notes: 'updated' } as any),
-      ).rejects.toThrow('Only draft invoices can be updated');
+      await expect(service.update(ORG_ID, 'inv-1', { notes: 'updated' } as any)).rejects.toThrow(
+        'Only draft invoices can be updated',
+      );
     });
 
     it('should reject updating PAID invoices', async () => {
       const paidInvoice = createMockInvoice({ status: 'PAID' });
       prisma.invoice.findFirst.mockResolvedValue(paidInvoice as any);
 
-      await expect(
-        service.update(ORG_ID, 'inv-1', { notes: 'updated' } as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.update(ORG_ID, 'inv-1', { notes: 'updated' } as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should reject updating VOID invoices', async () => {
       const voidInvoice = createMockInvoice({ status: 'VOID' });
       prisma.invoice.findFirst.mockResolvedValue(voidInvoice as any);
 
-      await expect(
-        service.update(ORG_ID, 'inv-1', { notes: 'updated' } as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.update(ORG_ID, 'inv-1', { notes: 'updated' } as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw NotFoundException for non-existent invoice', async () => {
       prisma.invoice.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.update(ORG_ID, 'nonexistent', {} as any),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.update(ORG_ID, 'nonexistent', {} as any)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -360,9 +350,7 @@ describe('InvoicesService', () => {
         defaultRevenueAccountId: null,
       } as any);
 
-      await expect(service.send(ORG_ID, 'inv-1')).rejects.toThrow(
-        /configure default accounts/,
-      );
+      await expect(service.send(ORG_ID, 'inv-1')).rejects.toThrow(/configure default accounts/);
     });
   });
 

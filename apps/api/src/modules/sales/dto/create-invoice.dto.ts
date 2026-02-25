@@ -1,4 +1,12 @@
-import { IsString, IsDateString, IsArray, ValidateNested, ArrayMinSize, IsOptional, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsDateString,
+  IsArray,
+  ValidateNested,
+  ArrayMinSize,
+  IsOptional,
+  MaxLength,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -17,7 +25,12 @@ export class CreateInvoiceDto {
   @ApiProperty({ required: false }) @IsString() @IsOptional() projectId?: string;
   @ApiProperty() @IsDateString() date: string;
   @ApiProperty() @IsDateString() dueDate: string;
-  @ApiProperty({ type: [InvoiceLineDto] }) @IsArray() @ValidateNested({ each: true }) @ArrayMinSize(1) @Type(() => InvoiceLineDto) lines: InvoiceLineDto[];
+  @ApiProperty({ type: [InvoiceLineDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @ArrayMinSize(1)
+  @Type(() => InvoiceLineDto)
+  lines: InvoiceLineDto[];
   @ApiProperty({ required: false }) @IsString() @IsOptional() shippingAmount?: string;
   @ApiProperty({ required: false }) @IsString() @IsOptional() @MaxLength(2000) notes?: string;
   @ApiProperty({ required: false }) @IsString() @IsOptional() @MaxLength(2000) terms?: string;

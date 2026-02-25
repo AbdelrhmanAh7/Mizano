@@ -1,8 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import {
-  holtWinters,
-} from '../utils/holt-winters.util';
+import { holtWinters } from '../utils/holt-winters.util';
 
 export interface PipelineForecast {
   totalWeighted: number;
@@ -57,10 +55,7 @@ export class PipelineForecastService {
 
   constructor(private prisma: PrismaService) {}
 
-  async forecastPipeline(
-    organizationId: string,
-    months: number = 6,
-  ): Promise<PipelineForecast> {
+  async forecastPipeline(organizationId: string, months: number = 6): Promise<PipelineForecast> {
     const activeDeals = await this.prisma.deal.findMany({
       where: {
         organizationId,
@@ -84,8 +79,7 @@ export class PipelineForecastService {
       totalWeighted += amount * (this.STAGE_WEIGHTS[deal.stage] || 0);
     }
 
-    const avgDealSize =
-      activeDeals.length > 0 ? totalUnweighted / activeDeals.length : 0;
+    const avgDealSize = activeDeals.length > 0 ? totalUnweighted / activeDeals.length : 0;
 
     // Calculate avg days to close from historical data
     const closedDeals = await this.prisma.deal.findMany({
@@ -101,10 +95,7 @@ export class PipelineForecastService {
     const avgDaysToClose =
       closedDeals.length > 0
         ? closedDeals.reduce(
-            (sum, d) =>
-              sum +
-              (d.actualCloseDate!.getTime() - d.createdAt.getTime()) /
-                86400000,
+            (sum, d) => sum + (d.actualCloseDate!.getTime() - d.createdAt.getTime()) / 86400000,
             0,
           ) / closedDeals.length
         : 30;
@@ -129,9 +120,7 @@ export class PipelineForecastService {
       } catch {
         // Fallback: use average
         const avg =
-          monthlyWon.length > 0
-            ? monthlyWon.reduce((a, b) => a + b, 0) / monthlyWon.length
-            : 0;
+          monthlyWon.length > 0 ? monthlyWon.reduce((a, b) => a + b, 0) / monthlyWon.length : 0;
         const now = new Date();
         forecastByMonth = Array.from({ length: months }, (_, i) => {
           const date = new Date(now);
@@ -155,9 +144,7 @@ export class PipelineForecastService {
     };
   }
 
-  async getWeightedPipeline(
-    organizationId: string,
-  ): Promise<WeightedPipelineStage[]> {
+  async getWeightedPipeline(organizationId: string): Promise<WeightedPipelineStage[]> {
     const deals = await this.prisma.deal.findMany({
       where: {
         organizationId,
@@ -171,10 +158,7 @@ export class PipelineForecastService {
     const historicalRates = await this.getStageConversionRates(organizationId);
     const rateMap = new Map(historicalRates.map((r) => [r.stage, r.winRate]));
 
-    const stageMap = new Map<
-      string,
-      { count: number; total: number; daysSum: number }
-    >();
+    const stageMap = new Map<string, { count: number; total: number; daysSum: number }>();
 
     for (const deal of deals) {
       const existing = stageMap.get(deal.stage) || {
@@ -184,8 +168,7 @@ export class PipelineForecastService {
       };
       existing.count++;
       existing.total += Number(deal.expectedAmount);
-      existing.daysSum +=
-        (Date.now() - deal.updatedAt.getTime()) / 86400000;
+      existing.daysSum += (Date.now() - deal.updatedAt.getTime()) / 86400000;
       stageMap.set(deal.stage, existing);
     }
 
@@ -193,16 +176,13 @@ export class PipelineForecastService {
       stage,
       dealCount: data.count,
       totalValue: data.total,
-      weightedValue:
-        data.total * (rateMap.get(stage) ?? this.STAGE_WEIGHTS[stage] ?? 0),
+      weightedValue: data.total * (rateMap.get(stage) ?? this.STAGE_WEIGHTS[stage] ?? 0),
       historicalWinRate: rateMap.get(stage) ?? this.STAGE_WEIGHTS[stage] ?? 0,
       avgDaysInStage: data.count > 0 ? data.daysSum / data.count : 0,
     }));
   }
 
-  async getStageConversionRates(
-    organizationId: string,
-  ): Promise<StageConversionRate[]> {
+  async getStageConversionRates(organizationId: string): Promise<StageConversionRate[]> {
     const deals = await this.prisma.deal.findMany({
       where: {
         organizationId,
@@ -215,16 +195,12 @@ export class PipelineForecastService {
     // For now, calculate overall win rate and apply stage weights
     const won = deals.filter((d) => d.stage === 'WON');
     const lost = deals.filter((d) => d.stage === 'LOST');
-    const overallWinRate =
-      deals.length > 0 ? won.length / deals.length : 0.3;
+    const overallWinRate = deals.length > 0 ? won.length / deals.length : 0.3;
 
     const stages = ['NEW', 'QUALIFIED', 'PROPOSAL', 'NEGOTIATION'];
     return stages.map((stage) => {
       const baseRate = this.STAGE_WEIGHTS[stage] || 0;
-      const adjustedRate =
-        deals.length > 10
-          ? baseRate * (overallWinRate / 0.3)
-          : baseRate;
+      const adjustedRate = deals.length > 10 ? baseRate * (overallWinRate / 0.3) : baseRate;
 
       return {
         stage,
@@ -233,10 +209,7 @@ export class PipelineForecastService {
         lostDeals: lost.length,
         winRate: Math.min(1, adjustedRate),
         avgAmount:
-          won.length > 0
-            ? won.reduce((s, d) => s + Number(d.expectedAmount), 0) /
-              won.length
-            : 0,
+          won.length > 0 ? won.reduce((s, d) => s + Number(d.expectedAmount), 0) / won.length : 0,
       };
     });
   }
@@ -251,15 +224,10 @@ export class PipelineForecastService {
     if (!deal) throw new Error(`Deal ${dealId} not found`);
 
     const winRate = this.STAGE_WEIGHTS[deal.stage] || 0;
-    const daysInStage = Math.floor(
-      (Date.now() - deal.updatedAt.getTime()) / 86400000,
-    );
+    const daysInStage = Math.floor((Date.now() - deal.updatedAt.getTime()) / 86400000);
 
     // Predict close date based on historical avg
-    const avgDays = await this.getAvgDaysToCloseFromStage(
-      organizationId,
-      deal.stage,
-    );
+    const avgDays = await this.getAvgDaysToCloseFromStage(organizationId, deal.stage);
     const predictedClose = new Date();
     predictedClose.setDate(predictedClose.getDate() + Math.max(1, avgDays - daysInStage));
 
@@ -275,9 +243,7 @@ export class PipelineForecastService {
     };
   }
 
-  private async getMonthlyWonAmounts(
-    organizationId: string,
-  ): Promise<number[]> {
+  private async getMonthlyWonAmounts(organizationId: string): Promise<number[]> {
     const deals = await this.prisma.deal.findMany({
       where: {
         organizationId,
@@ -295,19 +261,13 @@ export class PipelineForecastService {
     for (const deal of deals) {
       const d = deal.actualCloseDate!;
       const key = `${d.getFullYear()}-${d.getMonth()}`;
-      monthlyMap.set(
-        key,
-        (monthlyMap.get(key) || 0) + Number(deal.expectedAmount),
-      );
+      monthlyMap.set(key, (monthlyMap.get(key) || 0) + Number(deal.expectedAmount));
     }
 
     return Array.from(monthlyMap.values());
   }
 
-  private async getAvgDaysToCloseFromStage(
-    organizationId: string,
-    stage: string,
-  ): Promise<number> {
+  private async getAvgDaysToCloseFromStage(organizationId: string, stage: string): Promise<number> {
     // Default estimates per stage
     const defaults: Record<string, number> = {
       NEW: 60,

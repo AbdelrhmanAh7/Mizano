@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { AuditService } from './audit.service';
 import { AuditQueryDto } from './dto/audit-query.dto';
@@ -21,20 +15,14 @@ export class AuditController {
   @Get()
   @ApiOperation({ summary: 'Get all audit logs with filtering and pagination' })
   @Permissions('settings.view')
-  findAll(
-    @CurrentOrg() organizationId: string,
-    @Query() query: AuditQueryDto,
-  ) {
+  findAll(@CurrentOrg() organizationId: string, @Query() query: AuditQueryDto) {
     return this.auditService.findAll(organizationId, query);
   }
 
   @Get('stats')
   @ApiOperation({ summary: 'Get audit log statistics' })
   @Permissions('settings.view')
-  getStats(
-    @CurrentOrg() organizationId: string,
-    @Query('days') days?: number,
-  ) {
+  getStats(@CurrentOrg() organizationId: string, @Query('days') days?: number) {
     return this.auditService.getStats(organizationId, days ? Number(days) : 30);
   }
 
@@ -61,10 +49,7 @@ export class AuditController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a single audit log by ID' })
   @Permissions('settings.view')
-  findOne(
-    @CurrentOrg() organizationId: string,
-    @Param('id') id: string,
-  ) {
+  findOne(@CurrentOrg() organizationId: string, @Param('id') id: string) {
     return this.auditService.findOne(organizationId, id);
   }
 }

@@ -35,10 +35,7 @@ export class DeepSearchController {
   @Permissions('ai.manage')
   @ApiOperation({ summary: 'Start a new DeepSearch job' })
   @ApiResponse({ status: 201, description: 'Job created and pipeline started' })
-  async run(
-    @CurrentOrg() organizationId: string,
-    @Body() dto: RunDeepSearchDto,
-  ) {
+  async run(@CurrentOrg() organizationId: string, @Body() dto: RunDeepSearchDto) {
     const job = await this.deepSearchService.runSearch(organizationId, dto);
     return { data: job };
   }
@@ -64,10 +61,7 @@ export class DeepSearchController {
   @Permissions('ai.view')
   @ApiOperation({ summary: 'Get a specific DeepSearch job with its suggestions' })
   @ApiParam({ name: 'id', description: 'Job ID' })
-  async getJob(
-    @CurrentOrg() organizationId: string,
-    @Param('id') id: string,
-  ) {
+  async getJob(@CurrentOrg() organizationId: string, @Param('id') id: string) {
     const job = await this.deepSearchService.getJob(organizationId, id);
     if (!job) throw new NotFoundException('Job not found');
     return { data: job };
@@ -90,10 +84,7 @@ export class DeepSearchController {
   @Permissions('ai.view')
   @ApiOperation({ summary: 'Get the Claude Code prompt for a suggestion' })
   @ApiParam({ name: 'id', description: 'Suggestion ID' })
-  async getSuggestionPrompt(
-    @CurrentOrg() organizationId: string,
-    @Param('id') id: string,
-  ) {
+  async getSuggestionPrompt(@CurrentOrg() organizationId: string, @Param('id') id: string) {
     const result = await this.deepSearchService.getSuggestionPrompt(organizationId, id);
     if (!result) throw new NotFoundException('Suggestion not found');
     return { data: result };

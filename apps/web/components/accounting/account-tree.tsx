@@ -11,7 +11,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { Account, AccountType, getAccountTypeColor, getAccountTypeLabel } from '@/lib/hooks/use-accounts';
+import {
+  Account,
+  AccountType,
+  getAccountTypeColor,
+  getAccountTypeLabel,
+} from '@/lib/hooks/use-accounts';
 
 interface AccountTreeNodeProps {
   account: Account;
@@ -30,17 +35,14 @@ function AccountTreeNode({ account, level, onEdit, onDelete, onAddChild }: Accou
       <div
         className={cn(
           'flex items-center justify-between py-2 px-3 hover:bg-muted/50 rounded-md group',
-          level > 0 && 'ml-6'
+          level > 0 && 'ml-6',
         )}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {/* Expand/Collapse button */}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className={cn(
-              'p-0.5 hover:bg-muted rounded',
-              !hasChildren && 'invisible'
-            )}
+            className={cn('p-0.5 hover:bg-muted rounded', !hasChildren && 'invisible')}
           >
             {isExpanded ? (
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -50,9 +52,7 @@ function AccountTreeNode({ account, level, onEdit, onDelete, onAddChild }: Accou
           </button>
 
           {/* Account code */}
-          <span className="font-mono text-sm text-muted-foreground w-16">
-            {account.code}
-          </span>
+          <span className="font-mono text-sm text-muted-foreground w-16">{account.code}</span>
 
           {/* Account name */}
           <span className="font-medium truncate">{account.name}</span>
@@ -147,14 +147,17 @@ export function AccountTree({
   isLoading,
 }: AccountTreeProps) {
   // Group accounts by type
-  const groupedAccounts = accounts.reduce((acc, account) => {
-    const type = account.type;
-    if (!acc[type]) {
-      acc[type] = [];
-    }
-    acc[type].push(account);
-    return acc;
-  }, {} as Record<AccountType, Account[]>);
+  const groupedAccounts = accounts.reduce(
+    (acc, account) => {
+      const type = account.type;
+      if (!acc[type]) {
+        acc[type] = [];
+      }
+      acc[type].push(account);
+      return acc;
+    },
+    {} as Record<AccountType, Account[]>,
+  );
 
   const typeOrder: AccountType[] = ['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'REVENUE', 'EXPENSE'];
 
@@ -172,7 +175,9 @@ export function AccountTree({
     return (
       <div className="text-center py-12 text-muted-foreground">
         <p>No accounts found.</p>
-        <p className="text-sm mt-1">Create your first account or seed default accounts to get started.</p>
+        <p className="text-sm mt-1">
+          Create your first account or seed default accounts to get started.
+        </p>
       </div>
     );
   }
@@ -185,10 +190,12 @@ export function AccountTree({
 
         return (
           <div key={type}>
-            <h3 className={cn(
-              'text-sm font-semibold mb-2 px-3 py-1 rounded-md',
-              getAccountTypeColor(type)
-            )}>
+            <h3
+              className={cn(
+                'text-sm font-semibold mb-2 px-3 py-1 rounded-md',
+                getAccountTypeColor(type),
+              )}
+            >
               {getAccountTypeLabel(type)} Accounts
             </h3>
             <div className="space-y-0.5">

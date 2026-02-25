@@ -1,15 +1,5 @@
-import {
-  Controller,
-  Post,
-  Body,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -38,14 +28,8 @@ export class ContractAnalysisController {
     description: 'Returns full contract analysis',
     type: ContractAnalysisResultDto,
   })
-  async analyzeContract(
-    @CurrentOrg() orgId: string,
-    @Body() body: AnalyzeContractDto,
-  ) {
-    const result = await this.contractAnalysisService.analyzeContract(
-      orgId,
-      body.text,
-    );
+  async analyzeContract(@CurrentOrg() orgId: string, @Body() body: AnalyzeContractDto) {
+    const result = await this.contractAnalysisService.analyzeContract(orgId, body.text);
     return { data: result };
   }
 
@@ -57,9 +41,7 @@ export class ContractAnalysisController {
     description: 'Returns contract dates and deadlines',
     type: ContractDatesDto,
   })
-  async extractDates(
-    @Body() body: AnalyzeContractDto,
-  ) {
+  async extractDates(@Body() body: AnalyzeContractDto) {
     const result = await this.contractAnalysisService.extractDates(body.text);
     return { data: result };
   }
@@ -72,9 +54,7 @@ export class ContractAnalysisController {
     description: 'Returns contract obligations by party',
     type: [ContractObligationsDto],
   })
-  async extractObligations(
-    @Body() body: AnalyzeContractDto,
-  ) {
+  async extractObligations(@Body() body: AnalyzeContractDto) {
     const result = await this.contractAnalysisService.extractObligations(body.text);
     return { data: result };
   }
@@ -87,9 +67,7 @@ export class ContractAnalysisController {
     description: 'Returns contract risk assessment',
     type: ContractRiskAnalysisDto,
   })
-  async riskAnalysis(
-    @Body() body: AnalyzeContractDto,
-  ) {
+  async riskAnalysis(@Body() body: AnalyzeContractDto) {
     const result = await this.contractAnalysisService.riskAnalysis(body.text);
     return { data: result };
   }

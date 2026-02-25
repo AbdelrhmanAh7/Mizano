@@ -31,10 +31,7 @@ function formatRelativeTime(dateStr: string): string {
   return date.toLocaleDateString();
 }
 
-export function VendorTrainingHistory({
-  vendorId,
-  className,
-}: VendorTrainingHistoryProps) {
+export function VendorTrainingHistory({ vendorId, className }: VendorTrainingHistoryProps) {
   const { data, isLoading } = useVendorOcrHistory(vendorId);
   const history = data?.data;
 
@@ -42,9 +39,7 @@ export function VendorTrainingHistory({
     return (
       <Card className={className}>
         <CardContent className="flex items-center justify-center py-12">
-          <p className="text-sm text-muted-foreground">
-            Select a vendor to view training history
-          </p>
+          <p className="text-sm text-muted-foreground">Select a vendor to view training history</p>
         </CardContent>
       </Card>
     );
@@ -54,9 +49,7 @@ export function VendorTrainingHistory({
     return (
       <Card className={className}>
         <CardContent className="flex items-center justify-center py-12">
-          <p className="text-sm text-muted-foreground animate-pulse">
-            Loading history...
-          </p>
+          <p className="text-sm text-muted-foreground animate-pulse">Loading history...</p>
         </CardContent>
       </Card>
     );
@@ -66,9 +59,7 @@ export function VendorTrainingHistory({
     return (
       <Card className={className}>
         <CardContent className="flex items-center justify-center py-12">
-          <p className="text-sm text-muted-foreground">
-            No training history found
-          </p>
+          <p className="text-sm text-muted-foreground">No training history found</p>
         </CardContent>
       </Card>
     );
@@ -76,10 +67,7 @@ export function VendorTrainingHistory({
 
   const sampleCount = history.layout?.sampleCount || 0;
   const isActive = sampleCount >= ACTIVATION_THRESHOLD;
-  const progressPercent = Math.min(
-    100,
-    (sampleCount / ACTIVATION_THRESHOLD) * 100,
-  );
+  const progressPercent = Math.min(100, (sampleCount / ACTIVATION_THRESHOLD) * 100);
 
   // Extract learned field names from layout
   const learnedFields = history.layout?.fieldPositions
@@ -94,10 +82,7 @@ export function VendorTrainingHistory({
         <CardTitle className="text-sm font-medium flex items-center justify-between">
           <span className="truncate">{history.vendorName}</span>
           {isActive ? (
-            <Badge
-              variant="outline"
-              className="bg-green-50 text-green-700 border-green-200"
-            >
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Active
             </Badge>
@@ -120,8 +105,8 @@ export function VendorTrainingHistory({
           <Progress value={progressPercent} className="h-2" />
           {!isActive && (
             <p className="text-xs text-muted-foreground">
-              {ACTIVATION_THRESHOLD - sampleCount} more correction(s) needed to
-              activate layout learning
+              {ACTIVATION_THRESHOLD - sampleCount} more correction(s) needed to activate layout
+              learning
             </p>
           )}
         </div>
@@ -147,16 +132,10 @@ export function VendorTrainingHistory({
         {/* Learned fields */}
         {learnedFields.length > 0 && (
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">
-              Learned Fields
-            </p>
+            <p className="text-xs font-medium text-muted-foreground">Learned Fields</p>
             <div className="flex flex-wrap gap-1.5">
               {learnedFields.map((field) => (
-                <Badge
-                  key={field}
-                  variant="outline"
-                  className="text-xs capitalize"
-                >
+                <Badge key={field} variant="outline" className="text-xs capitalize">
                   {field.replace(/([A-Z])/g, ' $1').trim()}
                 </Badge>
               ))}
@@ -176,13 +155,9 @@ export function VendorTrainingHistory({
 
         {/* Recent corrections */}
         <div className="space-y-1.5">
-          <p className="text-xs font-medium text-muted-foreground">
-            Recent Corrections
-          </p>
+          <p className="text-xs font-medium text-muted-foreground">Recent Corrections</p>
           {history.corrections.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-2">
-              No corrections yet
-            </p>
+            <p className="text-xs text-muted-foreground py-2">No corrections yet</p>
           ) : (
             <ScrollArea className="h-[200px]">
               <div className="space-y-2">
@@ -198,10 +173,7 @@ export function VendorTrainingHistory({
                   }
 
                   return (
-                    <div
-                      key={correction.id}
-                      className="border rounded-md p-2 text-xs space-y-1"
-                    >
+                    <div key={correction.id} className="border rounded-md p-2 text-xs space-y-1">
                       <div className="flex items-center justify-between">
                         <Badge
                           variant="outline"
@@ -221,10 +193,7 @@ export function VendorTrainingHistory({
                       {Object.keys(correctedFields).length > 0 && (
                         <div className="flex flex-wrap gap-1">
                           {Object.entries(correctedFields).map(([key, val]) => (
-                            <span
-                              key={key}
-                              className="text-muted-foreground bg-muted px-1 rounded"
-                            >
+                            <span key={key} className="text-muted-foreground bg-muted px-1 rounded">
                               {key}: {String(val).slice(0, 20)}
                             </span>
                           ))}

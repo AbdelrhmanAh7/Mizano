@@ -1,13 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import {
-  Brain,
-  TrendingUp,
-  AlertTriangle,
-  Sparkles,
-  ArrowRight,
-} from 'lucide-react';
+import { Brain, TrendingUp, AlertTriangle, Sparkles, ArrowRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,9 +26,7 @@ function PulseSection({
     <div className={cn('flex-1 min-w-0', className)}>
       <div className="flex items-center gap-1.5 mb-1">
         <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-xs font-medium text-muted-foreground truncate">
-          {label}
-        </span>
+        <span className="text-xs font-medium text-muted-foreground truncate">{label}</span>
       </div>
       {children}
     </div>
@@ -74,9 +66,7 @@ export const AIBusinessPulse = memo(function AIBusinessPulse() {
   const criticalCount = alertSummary?.criticalCount ?? 0;
   const unreadCount = alertSummary?.unread ?? 0;
   const topRecommendation =
-    weeklySnapshot?.recommendations?.[0] ||
-    weeklySnapshot?.summary ||
-    'All systems operational';
+    weeklySnapshot?.recommendations?.[0] || weeklySnapshot?.summary || 'All systems operational';
 
   return (
     <Card className="bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-900 dark:to-blue-950 border-blue-100 dark:border-blue-900">
@@ -106,12 +96,8 @@ export const AIBusinessPulse = memo(function AIBusinessPulse() {
               </>
             ) : (
               <>
-                <p className="text-lg font-bold font-mono text-muted-foreground">
-                  —
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Not enough data yet
-                </p>
+                <p className="text-lg font-bold font-mono text-muted-foreground">—</p>
+                <p className="text-xs text-muted-foreground">Not enough data yet</p>
               </>
             )}
           </PulseSection>
@@ -134,14 +120,8 @@ export const AIBusinessPulse = memo(function AIBusinessPulse() {
           </PulseSection>
 
           {/* AI Recommendation */}
-          <PulseSection
-            icon={Sparkles}
-            label="Top AI Recommendation"
-            className="md:col-span-2"
-          >
-            <p className="text-sm leading-snug line-clamp-2">
-              {topRecommendation}
-            </p>
+          <PulseSection icon={Sparkles} label="Top AI Recommendation" className="md:col-span-2">
+            <p className="text-sm leading-snug line-clamp-2">{topRecommendation}</p>
           </PulseSection>
         </div>
       </CardContent>

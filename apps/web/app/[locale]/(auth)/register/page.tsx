@@ -15,16 +15,18 @@ import { useToast } from '@/components/ui/use-toast';
 import { authApi } from '@/lib/api';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
 
-const registerSchema = z.object({
-  firstName: z.string().min(2),
-  lastName: z.string().min(2),
-  email: z.string().email(),
-  password: z.string().min(8),
-  confirmPassword: z.string(),
-  organizationName: z.string().min(2),
-}).refine((data) => data.password === data.confirmPassword, {
-  path: ['confirmPassword'],
-});
+const registerSchema = z
+  .object({
+    firstName: z.string().min(2),
+    lastName: z.string().min(2),
+    email: z.string().email(),
+    password: z.string().min(8),
+    confirmPassword: z.string(),
+    organizationName: z.string().min(2),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    path: ['confirmPassword'],
+  });
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
@@ -38,7 +40,11 @@ export default function RegisterPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<RegisterForm>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
   });
 
@@ -85,14 +91,22 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">{t('firstName')}</Label>
-                <Input id="firstName" placeholder={t('firstNamePlaceholder')} {...register('firstName')} />
+                <Input
+                  id="firstName"
+                  placeholder={t('firstNamePlaceholder')}
+                  {...register('firstName')}
+                />
                 {errors.firstName && (
                   <p className="text-sm text-red-500">{tValidation('nameMin')}</p>
                 )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastName">{t('lastName')}</Label>
-                <Input id="lastName" placeholder={t('lastNamePlaceholder')} {...register('lastName')} />
+                <Input
+                  id="lastName"
+                  placeholder={t('lastNamePlaceholder')}
+                  {...register('lastName')}
+                />
                 {errors.lastName && (
                   <p className="text-sm text-red-500">{tValidation('nameMin')}</p>
                 )}
@@ -117,9 +131,7 @@ export default function RegisterPage() {
                 placeholder={t('emailPlaceholder')}
                 {...register('email')}
               />
-              {errors.email && (
-                <p className="text-sm text-red-500">{tValidation('email')}</p>
-              )}
+              {errors.email && <p className="text-sm text-red-500">{tValidation('email')}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">{t('password')}</Label>

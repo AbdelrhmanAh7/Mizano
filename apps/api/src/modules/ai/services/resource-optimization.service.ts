@@ -1,9 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import {
-  holtWinters,
-  simpleExponentialSmoothing,
-} from '../utils/holt-winters.util';
+import { holtWinters, simpleExponentialSmoothing } from '../utils/holt-winters.util';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ss = require('simple-statistics');
@@ -64,10 +61,7 @@ export class ResourceOptimizationService {
   /**
    * Analyze expense trends by category over time
    */
-  async getResourceTrends(
-    organizationId: string,
-    months: number = 12,
-  ): Promise<ResourceTrends> {
+  async getResourceTrends(organizationId: string, months: number = 12): Promise<ResourceTrends> {
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - months);
     startDate.setDate(1);
@@ -87,10 +81,7 @@ export class ResourceOptimizationService {
     });
 
     // Group by account (category) and month
-    const categoryMonthly = new Map<
-      string,
-      Map<string, number>
-    >();
+    const categoryMonthly = new Map<string, Map<string, number>>();
 
     for (const exp of expenses) {
       const category = exp.account.name;
@@ -106,8 +97,7 @@ export class ResourceOptimizationService {
     const categories: CategoryTrend[] = [];
 
     for (const [category, monthMap] of categoryMonthly) {
-      const sortedMonths = Array.from(monthMap.entries())
-        .sort(([a], [b]) => a.localeCompare(b));
+      const sortedMonths = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b));
 
       if (sortedMonths.length < 2) continue;
 
@@ -120,9 +110,7 @@ export class ResourceOptimizationService {
       const xValues = sortedMonths.map((_, i) => i);
       const yValues = sortedMonths.map(([, amount]) => amount);
 
-      const trend = ss.linearRegression(
-        xValues.map((x, i) => [x, yValues[i]]),
-      );
+      const trend = ss.linearRegression(xValues.map((x, i) => [x, yValues[i]]));
       const regressionLine = ss.linearRegressionLine(trend);
 
       // Calculate R-squared
@@ -196,14 +184,10 @@ export class ResourceOptimizationService {
     const monthlyTotals = new Map<string, number>();
     for (const exp of expenses) {
       const monthKey = `${exp.date.getFullYear()}-${String(exp.date.getMonth() + 1).padStart(2, '0')}`;
-      monthlyTotals.set(
-        monthKey,
-        (monthlyTotals.get(monthKey) || 0) + Number(exp.amount),
-      );
+      monthlyTotals.set(monthKey, (monthlyTotals.get(monthKey) || 0) + Number(exp.amount));
     }
 
-    const sortedMonths = Array.from(monthlyTotals.entries())
-      .sort(([a], [b]) => a.localeCompare(b));
+    const sortedMonths = Array.from(monthlyTotals.entries()).sort(([a], [b]) => a.localeCompare(b));
 
     const historical = sortedMonths.map(([month, amount]) => ({
       month,
@@ -272,9 +256,7 @@ export class ResourceOptimizationService {
   /**
    * Find cost-saving optimization opportunities
    */
-  async getOptimizationOpportunities(
-    organizationId: string,
-  ): Promise<OptimizationOpportunities> {
+  async getOptimizationOpportunities(organizationId: string): Promise<OptimizationOpportunities> {
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
@@ -300,10 +282,7 @@ export class ResourceOptimizationService {
       select: { grandTotal: true },
     });
 
-    const totalRevenue = revenue.reduce(
-      (sum, inv) => sum + Number(inv.grandTotal),
-      0,
-    );
+    const totalRevenue = revenue.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
 
     const opportunities: OptimizationOpportunity[] = [];
 
@@ -321,16 +300,10 @@ export class ResourceOptimizationService {
       const monthMap = categoryMonthly.get(category)!;
       monthMap.set(monthKey, (monthMap.get(monthKey) || 0) + Number(exp.amount));
 
-      categoryTotals.set(
-        category,
-        (categoryTotals.get(category) || 0) + Number(exp.amount),
-      );
+      categoryTotals.set(category, (categoryTotals.get(category) || 0) + Number(exp.amount));
     }
 
-    const totalExpenses = Array.from(categoryTotals.values()).reduce(
-      (sum, v) => sum + v,
-      0,
-    );
+    const totalExpenses = Array.from(categoryTotals.values()).reduce((sum, v) => sum + v, 0);
 
     // Detect spikes using z-score
     for (const [category, monthMap] of categoryMonthly) {
@@ -343,9 +316,7 @@ export class ResourceOptimizationService {
       if (stdDev === 0) continue;
 
       // Check the most recent month for spikes
-      const sortedEntries = Array.from(monthMap.entries()).sort(
-        ([a], [b]) => a.localeCompare(b),
-      );
+      const sortedEntries = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b));
       const latestValue = sortedEntries[sortedEntries.length - 1][1];
       const latestMonth = sortedEntries[sortedEntries.length - 1][0];
       const z = (latestValue - meanVal) / stdDev;
@@ -364,16 +335,13 @@ export class ResourceOptimizationService {
 
     // Detect growing cost categories
     for (const [category, monthMap] of categoryMonthly) {
-      const sortedEntries = Array.from(monthMap.entries())
-        .sort(([a], [b]) => a.localeCompare(b));
+      const sortedEntries = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b));
       if (sortedEntries.length < 3) continue;
 
       const values = sortedEntries.map(([, v]) => v);
       const xValues = values.map((_, i) => i);
 
-      const regression = ss.linearRegression(
-        xValues.map((x, i) => [x, values[i]]),
-      );
+      const regression = ss.linearRegression(xValues.map((x, i) => [x, values[i]]));
 
       const meanVal = ss.mean(values);
       const slopePercent = meanVal > 0 ? (regression.m / meanVal) * 100 : 0;
@@ -415,9 +383,7 @@ export class ResourceOptimizationService {
   /**
    * Calculate revenue-per-expense efficiency metrics
    */
-  async getEfficiencyMetrics(
-    organizationId: string,
-  ): Promise<EfficiencyMetrics> {
+  async getEfficiencyMetrics(organizationId: string): Promise<EfficiencyMetrics> {
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
@@ -432,10 +398,7 @@ export class ResourceOptimizationService {
       select: { grandTotal: true, date: true },
     });
 
-    const totalRevenue = invoices.reduce(
-      (sum, inv) => sum + Number(inv.grandTotal),
-      0,
-    );
+    const totalRevenue = invoices.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
 
     // Get expenses
     const expenses = await this.prisma.expense.findMany({
@@ -449,10 +412,7 @@ export class ResourceOptimizationService {
       },
     });
 
-    const totalExpenses = expenses.reduce(
-      (sum, exp) => sum + Number(exp.amount),
-      0,
-    );
+    const totalExpenses = expenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
 
     // Get employee count
     const employeeCount = await this.prisma.employee.count({
@@ -471,22 +431,14 @@ export class ResourceOptimizationService {
     const categoryTotals = new Map<string, number>();
     for (const exp of expenses) {
       const category = exp.account.name;
-      categoryTotals.set(
-        category,
-        (categoryTotals.get(category) || 0) + Number(exp.amount),
-      );
+      categoryTotals.set(category, (categoryTotals.get(category) || 0) + Number(exp.amount));
     }
 
-    const categoryEfficiency: CategoryEfficiency[] = Array.from(
-      categoryTotals.entries(),
-    )
+    const categoryEfficiency: CategoryEfficiency[] = Array.from(categoryTotals.entries())
       .map(([category, total]) => ({
         category,
         totalExpenses: Math.round(total * 100) / 100,
-        percentOfTotal:
-          totalExpenses > 0
-            ? Math.round((total / totalExpenses) * 10000) / 10000
-            : 0,
+        percentOfTotal: totalExpenses > 0 ? Math.round((total / totalExpenses) * 10000) / 10000 : 0,
       }))
       .sort((a, b) => b.totalExpenses - a.totalExpenses);
 
@@ -508,15 +460,12 @@ export class ResourceOptimizationService {
       .filter((exp) => exp.date >= sixMonthsAgo)
       .reduce((sum, exp) => sum + Number(exp.amount), 0);
 
-    const firstHalfRatio =
-      firstHalfExpenses > 0 ? firstHalfRevenue / firstHalfExpenses : 0;
-    const secondHalfRatio =
-      secondHalfExpenses > 0 ? secondHalfRevenue / secondHalfExpenses : 0;
+    const firstHalfRatio = firstHalfExpenses > 0 ? firstHalfRevenue / firstHalfExpenses : 0;
+    const secondHalfRatio = secondHalfExpenses > 0 ? secondHalfRevenue / secondHalfExpenses : 0;
 
     let trend: EfficiencyMetrics['trend'];
-    const ratioChange = firstHalfRatio > 0
-      ? ((secondHalfRatio - firstHalfRatio) / firstHalfRatio) * 100
-      : 0;
+    const ratioChange =
+      firstHalfRatio > 0 ? ((secondHalfRatio - firstHalfRatio) / firstHalfRatio) * 100 : 0;
 
     if (ratioChange > 5) {
       trend = 'improving';

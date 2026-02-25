@@ -1,24 +1,16 @@
-import {
-  Injectable,
-  Logger,
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiFeature, AiFeedbackAction } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { OcrService, ExtractedInvoiceData } from './ocr.service';
-import {
-  DocumentClassificationService,
-  DocumentCategory,
-} from './document-classification.service';
+import { DocumentClassificationService, DocumentCategory } from './document-classification.service';
 import { EntityExtractionService } from './entity-extraction.service';
 import { AiFeedbackService } from './ai-feedback.service';
+import { VlmService } from './vlm.service';
+import { VlmFeedbackService } from './vlm-feedback.service';
 import { extractTextFromPdf } from '../utils/pdf-extractor.util';
-import {
-  levenshteinSimilarity,
-  normalizeText,
-} from '../utils/text-similarity.util';
+import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.util';
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -85,6 +77,16 @@ export interface DocumentIntakeResult {
 
   /** Raw OCR text */
   rawText: string;
+
+  /** Accounting entry suggestion (from VLM) */
+  accountingEntry?: {
+    debitAccount: string | null;
+    creditAccount: string | null;
+    taxAccount: string | null;
+  } | null;
+
+  /** Which AI engine extracted the data */
+  extractionMethod: 'vlm' | 'ocr';
 }
 
 export interface ConfirmIntakeLineDto {
@@ -124,6 +126,9 @@ export class DocumentIntakeService {
     private classificationService: DocumentClassificationService,
     private entityExtractionService: EntityExtractionService,
     private feedbackService: AiFeedbackService,
+    private vlmService: VlmService,
+    private vlmFeedbackService: VlmFeedbackService,
+    private configService: ConfigService,
   ) {}
 
   /**
@@ -147,43 +152,57 @@ export class DocumentIntakeService {
       `Processing document intake: mime=${mimeType}, size=${fileBuffer.length}, file=${filename || 'unknown'}`,
     );
 
-    // Step 1: Extract text based on file type
+    // Step 1: Extract text/fields from the document
     let rawText = '';
     let ocrResult: ExtractedInvoiceData | null = null;
-    const isPdf = mimeType === 'application/pdf';
+    let accountingEntry: DocumentIntakeResult['accountingEntry'] = null;
+    let extractionMethod: 'vlm' | 'ocr' = 'ocr';
 
-    if (isPdf) {
-      // Try native PDF text extraction first
-      try {
-        const pdfResult = await extractTextFromPdf(fileBuffer);
-        this.logger.log(
-          `PDF extraction: pages=${pdfResult.pageCount}, native=${pdfResult.isNativeText}, textLen=${pdfResult.text.length}`,
-        );
+    // ── Step 1a: Try VLM extraction first (primary) ──
+    const vlmResult = await this.vlmService.extractFromImage(fileBuffer, mimeType, filename);
+    if (vlmResult) {
+      ocrResult = this.vlmService.toExtractedInvoiceData(vlmResult);
+      rawText = ocrResult.rawText;
+      accountingEntry = vlmResult.accountingEntry;
+      extractionMethod = 'vlm';
+      this.logger.log(
+        `VLM extraction succeeded: confidence=${vlmResult.confidence.overall}, time=${vlmResult.processingTimeMs}ms`,
+      );
+    }
 
-        if (pdfResult.isNativeText) {
-          rawText = pdfResult.text;
-          // Reuse OcrService extraction logic (native PDF text = 85% confidence)
-          ocrResult = this.ocrService.buildExtractionResult(rawText, 85);
-        } else {
-          // Scanned PDF — fall through to OCR
-          ocrResult = await this.ocrService.extractFromImage(
-            fileBuffer,
-            language,
+    // ── Step 1b: Fall back to existing OCR if VLM failed ──
+    if (!ocrResult) {
+      this.logger.log('VLM unavailable or failed, falling back to OCR');
+      const isPdf = mimeType === 'application/pdf';
+
+      if (isPdf) {
+        // Try native PDF text extraction first
+        try {
+          const pdfResult = await extractTextFromPdf(fileBuffer);
+          this.logger.log(
+            `PDF extraction: pages=${pdfResult.pageCount}, native=${pdfResult.isNativeText}, textLen=${pdfResult.text.length}`,
           );
+
+          if (pdfResult.isNativeText) {
+            rawText = pdfResult.text;
+            // Reuse OcrService extraction logic (native PDF text = 85% confidence)
+            ocrResult = this.ocrService.buildExtractionResult(rawText, 85);
+          } else {
+            // Scanned PDF — fall through to OCR
+            ocrResult = await this.ocrService.extractFromImage(fileBuffer, language);
+            rawText = ocrResult.rawText;
+          }
+        } catch (error) {
+          this.logger.warn(`PDF parsing failed, falling back to OCR: ${error}`);
+          ocrResult = await this.ocrService.extractFromImage(fileBuffer, language);
           rawText = ocrResult.rawText;
         }
-      } catch (error) {
-        this.logger.warn(`PDF parsing failed, falling back to OCR: ${error}`);
-        ocrResult = await this.ocrService.extractFromImage(
-          fileBuffer,
-          language,
-        );
+      } else {
+        // Image file — use tesseract.js OCR
+        ocrResult = await this.ocrService.extractFromImage(fileBuffer, language);
         rawText = ocrResult.rawText;
       }
-    } else {
-      // Image file — use tesseract.js OCR
-      ocrResult = await this.ocrService.extractFromImage(fileBuffer, language);
-      rawText = ocrResult.rawText;
+      extractionMethod = 'ocr';
     }
 
     // Step 2: Classify document
@@ -205,18 +224,16 @@ export class DocumentIntakeService {
     );
 
     // Step 4: Build vendor/customer candidate lists
-    const { vendorCandidates, matchedVendor } =
-      await this.matchVendors(
-        organizationId,
-        ocrResult?.vendorName || null,
-        entityResult.matches,
-      );
+    const { vendorCandidates, matchedVendor } = await this.matchVendors(
+      organizationId,
+      ocrResult?.vendorName || null,
+      entityResult.matches,
+    );
 
-    const { customerCandidates, matchedCustomer } =
-      await this.matchCustomers(
-        organizationId,
-        entityResult.matches,
-      );
+    const { customerCandidates, matchedCustomer } = await this.matchCustomers(
+      organizationId,
+      entityResult.matches,
+    );
 
     // Step 4b: Apply vendor-specific learned hints to improve extraction
     if (matchedVendor && ocrResult) {
@@ -289,6 +306,8 @@ export class DocumentIntakeService {
       customerCandidates,
       duplicateWarning,
       rawText,
+      accountingEntry,
+      extractionMethod,
     };
   }
 
@@ -379,11 +398,7 @@ export class DocumentIntakeService {
     // Learn vendor layout if corrections were provided
     if (dto.corrections && dto.vendorId && Object.keys(dto.corrections).length > 0) {
       try {
-        await this.ocrService.learnLayout(
-          organizationId,
-          dto.vendorId,
-          dto.corrections,
-        );
+        await this.ocrService.learnLayout(organizationId, dto.vendorId, dto.corrections);
       } catch (error) {
         this.logger.warn(`Failed to learn vendor layout: ${error}`);
       }
@@ -394,16 +409,36 @@ export class DocumentIntakeService {
       await this.feedbackService.processFeedback(organizationId, {
         feature: AiFeature.OCR_LAYOUT,
         aiSuggestion: { type: 'document_intake', documentType: 'BILL' },
-        userAction: dto.corrections
-          ? AiFeedbackAction.CORRECTED
-          : AiFeedbackAction.ACCEPTED,
-        userAnswer: dto.corrections
-          ? JSON.stringify(dto.corrections)
-          : undefined,
+        userAction: dto.corrections ? AiFeedbackAction.CORRECTED : AiFeedbackAction.ACCEPTED,
+        userAnswer: dto.corrections ? JSON.stringify(dto.corrections) : undefined,
         inputData: { billNumber, vendorId: dto.vendorId },
       });
     } catch (error) {
       this.logger.warn(`Failed to log feedback: ${error}`);
+    }
+
+    // Log VLM-specific feedback for accuracy tracking
+    if (dto.corrections?._extractionMethod) {
+      try {
+        const correctedFields = this.detectCorrectedFields(dto);
+        await this.vlmFeedbackService.logVlmFeedback(organizationId, bill.id, {
+          extractionMethod: dto.corrections._extractionMethod as 'vlm' | 'ocr',
+          originalExtraction: dto.corrections._originalExtraction || {},
+          confirmedValues: {
+            vendorId: dto.vendorId!,
+            documentNumber: dto.documentNumber || null,
+            date: dto.date,
+            dueDate: dto.dueDate,
+            lineCount: dto.lines.length,
+            totalAmount: grandTotal,
+          },
+          correctedFields,
+          fieldConfidence: dto.corrections._fieldConfidence || {},
+          accountingEntryAccepted: dto.corrections._accountingEntryAccepted ?? false,
+        });
+      } catch (error) {
+        this.logger.warn(`Failed to log VLM feedback: ${error}`);
+      }
     }
 
     this.logger.log(
@@ -421,9 +456,7 @@ export class DocumentIntakeService {
     dto: ConfirmIntakeDto,
   ): Promise<{ type: 'invoice'; id: string; number: string }> {
     if (!dto.customerId) {
-      throw new BadRequestException(
-        'Customer is required to create an invoice',
-      );
+      throw new BadRequestException('Customer is required to create an invoice');
     }
 
     // Verify customer
@@ -493,11 +526,29 @@ export class DocumentIntakeService {
   }
 
   /**
+   * Detect which fields were corrected by comparing the corrections object.
+   * Fields prefixed with `_` are system metadata and are excluded.
+   */
+  private detectCorrectedFields(dto: ConfirmIntakeDto): string[] {
+    const corrections = dto.corrections || {};
+    const correctedFields: string[] = [];
+
+    if (corrections.vendorName !== undefined) correctedFields.push('vendorName');
+    if (corrections.documentNumber !== undefined) correctedFields.push('documentNumber');
+    if (corrections.date !== undefined) correctedFields.push('date');
+    if (corrections.dueDate !== undefined) correctedFields.push('dueDate');
+    if (corrections.total !== undefined) correctedFields.push('total');
+    if (corrections.subtotal !== undefined) correctedFields.push('subtotal');
+    if (corrections.tax !== undefined) correctedFields.push('tax');
+    if (corrections.lineItems !== undefined) correctedFields.push('lineItems');
+
+    return correctedFields;
+  }
+
+  /**
    * Map document classification category to intake document type.
    */
-  private mapClassificationToType(
-    category: DocumentCategory,
-  ): IntakeDocumentType {
+  private mapClassificationToType(category: DocumentCategory): IntakeDocumentType {
     switch (category) {
       case DocumentCategory.INVOICE:
         // Default to BILL since most uploaded invoices are vendor invoices
@@ -554,13 +605,7 @@ export class DocumentIntakeService {
     // Try direct fuzzy matching of OCR vendor name against vendor list
     if (ocrVendorName) {
       const vendorNames = vendors.map((v) => v.displayName || v.name);
-      const topMatches = this.findTopMatches(
-        ocrVendorName,
-        vendorNames,
-        vendors,
-        5,
-        0.4,
-      );
+      const topMatches = this.findTopMatches(ocrVendorName, vendorNames, vendors, 5, 0.4);
 
       for (const match of topMatches) {
         const existing = candidateMap.get(match.id);
@@ -571,9 +616,7 @@ export class DocumentIntakeService {
     }
 
     // Sort by similarity descending
-    const vendorCandidates = [...candidateMap.values()].sort(
-      (a, b) => b.similarity - a.similarity,
-    );
+    const vendorCandidates = [...candidateMap.values()].sort((a, b) => b.similarity - a.similarity);
 
     // Top candidate with > 0.6 similarity is the match
     const matchedVendor =
@@ -633,10 +676,7 @@ export class DocumentIntakeService {
     const results: VendorCandidate[] = [];
 
     for (let i = 0; i < names.length; i++) {
-      const similarity = levenshteinSimilarity(
-        normalizedTarget,
-        normalizeText(names[i]),
-      );
+      const similarity = levenshteinSimilarity(normalizedTarget, normalizeText(names[i]));
       if (similarity >= threshold) {
         results.push({
           id: records[i].id,
@@ -646,9 +686,7 @@ export class DocumentIntakeService {
       }
     }
 
-    return results
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, topN);
+    return results.sort((a, b) => b.similarity - a.similarity).slice(0, topN);
   }
 
   /**
@@ -677,9 +715,7 @@ export class DocumentIntakeService {
   /**
    * Generate a sequential invoice number.
    */
-  private async generateInvoiceNumber(
-    organizationId: string,
-  ): Promise<string> {
+  private async generateInvoiceNumber(organizationId: string): Promise<string> {
     const lastInvoice = await this.prisma.invoice.findFirst({
       where: { organizationId },
       orderBy: { createdAt: 'desc' },

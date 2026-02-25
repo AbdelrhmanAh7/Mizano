@@ -84,6 +84,7 @@ apps/web/app/
 ```
 
 Each domain resource follows a consistent URL pattern:
+
 - `/{module}/{resource}` -- list page
 - `/{module}/{resource}/new` -- create page
 - `/{module}/{resource}/[id]` -- detail page
@@ -240,6 +241,7 @@ messages/
 ```
 
 Structure example:
+
 ```json
 {
   "common": {
@@ -291,6 +293,7 @@ const localizedHref = `/${locale}${item.href}`;  // e.g., "/en/sales/invoices"
 ### Server Components (default)
 
 Pages and layouts are Server Components by default. Use them for:
+
 - Data fetching on the server
 - Layout wrappers
 - Static content
@@ -300,6 +303,7 @@ The `[locale]/layout.tsx` is a Server Component that loads translations server-s
 ### Client Components
 
 Add `'use client'` directive when the component needs:
+
 - React hooks (`useState`, `useEffect`, `useSession`, etc.)
 - Event handlers (`onClick`, `onChange`, etc.)
 - TanStack Query hooks
@@ -480,12 +484,9 @@ export function useDeleteInvoice() {
 Query keys follow a hierarchical pattern:
 
 ```typescript
-['invoices']              // All invoices (list invalidation)
-['invoices', params]      // Filtered invoices (specific query)
-['invoices', id]          // Single invoice
-['customers']             // All customers
-['dashboard']             // Dashboard data
-['reports', 'profit-loss', { startDate, endDate }]  // Report with params
+['invoices'][('invoices', params)][('invoices', id)]['customers']['dashboard'][ // All invoices (list invalidation) // Filtered invoices (specific query) // Single invoice // All customers // Dashboard data
+  ('reports', 'profit-loss', { startDate, endDate })
+]; // Report with params
 ```
 
 ### Using hooks in pages
@@ -497,7 +498,11 @@ export default function InvoicesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
 
-  const { data: invoicesData, isLoading, refetch } = useInvoices({
+  const {
+    data: invoicesData,
+    isLoading,
+    refetch,
+  } = useInvoices({
     search: searchQuery || undefined,
     status: selectedStatus !== 'all' ? (selectedStatus as InvoiceStatus) : undefined,
   });
@@ -532,7 +537,7 @@ The API client is built with Axios and lives in `apps/web/lib/api.ts`. There are
 import axios from 'axios';
 import { getSession } from 'next-auth/react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6001/api';
 
 // Public client (no auth) - used for login/register
 const publicApi = axios.create({
@@ -565,7 +570,7 @@ api.interceptors.response.use(
       window.location.href = '/login';
     }
     return Promise.reject(error);
-  }
+  },
 );
 ```
 
@@ -576,12 +581,9 @@ Each domain has a typed API object that groups related endpoints:
 ```typescript
 // Auth (uses publicApi)
 export const authApi = {
-  login: (email: string, password: string) =>
-    publicApi.post('/auth/login', { email, password }),
-  register: (data: RegisterData) =>
-    publicApi.post('/auth/register', data),
-  refreshToken: (refreshToken: string) =>
-    publicApi.post('/auth/refresh', { refreshToken }),
+  login: (email: string, password: string) => publicApi.post('/auth/login', { email, password }),
+  register: (data: RegisterData) => publicApi.post('/auth/register', data),
+  refreshToken: (refreshToken: string) => publicApi.post('/auth/refresh', { refreshToken }),
 };
 
 // Invoices (uses authenticated api)
@@ -610,10 +612,8 @@ export const customersApi = {
 export const reportsApi = {
   getProfitAndLoss: (startDate: string, endDate: string) =>
     api.get(`/reports/profit-and-loss?startDate=${startDate}&endDate=${endDate}`),
-  getBalanceSheet: (asOfDate: string) =>
-    api.get(`/reports/balance-sheet?asOfDate=${asOfDate}`),
-  getTrialBalance: (asOfDate: string) =>
-    api.get(`/reports/trial-balance?asOfDate=${asOfDate}`),
+  getBalanceSheet: (asOfDate: string) => api.get(`/reports/balance-sheet?asOfDate=${asOfDate}`),
+  getTrialBalance: (asOfDate: string) => api.get(`/reports/trial-balance?asOfDate=${asOfDate}`),
   getReceivablesAging: (asOfDate?: string) =>
     api.get(`/reports/receivables-aging${asOfDate ? `?asOfDate=${asOfDate}` : ''}`),
   getPayablesAging: (asOfDate?: string) =>
@@ -634,14 +634,14 @@ export const aiApi = {
 
 ### CRUD method conventions
 
-| Operation | HTTP Method | API Method |
-|-----------|-------------|------------|
-| List | `GET /resource` | `getAll(params?)` |
-| Detail | `GET /resource/:id` | `getOne(id)` |
-| Create | `POST /resource` | `create(data)` |
-| Update | `PATCH /resource/:id` | `update(id, data)` |
-| Delete | `DELETE /resource/:id` | `delete(id)` |
-| Action | `PATCH /resource/:id/action` | `send(id)`, `void(id)`, etc. |
+| Operation | HTTP Method                  | API Method                   |
+| --------- | ---------------------------- | ---------------------------- |
+| List      | `GET /resource`              | `getAll(params?)`            |
+| Detail    | `GET /resource/:id`          | `getOne(id)`                 |
+| Create    | `POST /resource`             | `create(data)`               |
+| Update    | `PATCH /resource/:id`        | `update(id, data)`           |
+| Delete    | `DELETE /resource/:id`       | `delete(id)`                 |
+| Action    | `PATCH /resource/:id/action` | `send(id)`, `void(id)`, etc. |
 
 ---
 
@@ -877,6 +877,7 @@ export function InvoiceForm({
 ```
 
 Key patterns:
+
 - `zodResolver(schema)` connects Zod validation to React Hook Form.
 - `useFieldArray` manages dynamic line items (invoice lines, journal lines, etc.).
 - `isSubmitting` is passed from the parent page (from `mutation.isPending`).
@@ -927,6 +928,7 @@ Never modify `ui/` components directly unless customizing a design system token.
 ### Domain components
 
 Extracted when a piece of UI is:
+
 - Used in multiple pages (e.g., `InvoiceForm` in both `/new` and `/[id]/edit`)
 - Complex enough to warrant its own file (100+ lines)
 
@@ -995,19 +997,19 @@ export const useTourStore = create<TourState>()(
     (set) => ({
       currentTour: null,
       isActive: false,
-      startTour: (tourId: string) =>
-        set({ currentTour: tourId, isActive: true }),
+      startTour: (tourId: string) => set({ currentTour: tourId, isActive: true }),
       endTour: () => set({ currentTour: null, isActive: false }),
       skipTour: () => set({ currentTour: null, isActive: false }),
     }),
     {
       name: 'tour-storage', // persists to localStorage
-    }
-  )
+    },
+  ),
 );
 ```
 
 When to use which:
+
 - **TanStack Query** -- any data that comes from or goes to the API
 - **Zustand** -- UI preferences, sidebar collapsed state, onboarding tour progress, theme settings
 - **React `useState`** -- ephemeral component state (search input, dialog open/closed, selected item)
@@ -1255,11 +1257,11 @@ const { toast } = useToast();
 
 All pages must be tested at three breakpoints:
 
-| Breakpoint | Width | Target |
-|------------|-------|--------|
-| Desktop | 1920px | Full layout with sidebar |
-| Tablet | 768px | Collapsed sidebar or overlay |
-| Mobile | 375px | Sheet sidebar, stacked layouts |
+| Breakpoint | Width  | Target                         |
+| ---------- | ------ | ------------------------------ |
+| Desktop    | 1920px | Full layout with sidebar       |
+| Tablet     | 768px  | Collapsed sidebar or overlay   |
+| Mobile     | 375px  | Sheet sidebar, stacked layouts |
 
 ### Responsive patterns used
 

@@ -106,11 +106,7 @@ function buildIsolationTree(
 /**
  * Calculate the path length to isolate a point in a single tree.
  */
-function pathLength(
-  point: number[],
-  node: IsolationTreeNode,
-  currentDepth: number,
-): number {
+function pathLength(point: number[], node: IsolationTreeNode, currentDepth: number): number {
   // External node — estimate remaining path using c(n)
   if (node.left === null || node.right === null) {
     return currentDepth + averagePathLength(node.size);
@@ -165,10 +161,7 @@ export function buildIsolationForest(
  * @param forest Trained Isolation Forest
  * @returns Anomaly score between 0 and 1
  */
-export function isolationForestScore(
-  point: number[],
-  forest: IsolationForest,
-): number {
+export function isolationForestScore(point: number[], forest: IsolationForest): number {
   if (forest.trees.length === 0) return 0.5;
 
   // Calculate average path length across all trees
@@ -210,10 +203,7 @@ export function isolationForestDetect(
  * @param numTrees Number of trees (default 100)
  * @returns IsolationForest model
  */
-export function buildIsolationForest1D(
-  values: number[],
-  numTrees: number = 100,
-): IsolationForest {
+export function buildIsolationForest1D(values: number[], numTrees: number = 100): IsolationForest {
   const data = values.map((v) => [v]);
   return buildIsolationForest(data, numTrees);
 }
@@ -221,10 +211,7 @@ export function buildIsolationForest1D(
 /**
  * Calculate anomaly score for a single value using a 1D forest.
  */
-export function isolationForestScore1D(
-  value: number,
-  forest: IsolationForest,
-): number {
+export function isolationForestScore1D(value: number, forest: IsolationForest): number {
   return isolationForestScore([value], forest);
 }
 

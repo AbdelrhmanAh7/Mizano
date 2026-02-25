@@ -27,18 +27,8 @@ export class PaddleOcrService implements OnModuleInit {
   private isAvailable = false;
 
   private readonly modelPaths = {
-    detection: join(
-      process.cwd(),
-      'ml-models',
-      'paddle-ocr',
-      'en_det_infer.onnx',
-    ),
-    recognition: join(
-      process.cwd(),
-      'ml-models',
-      'paddle-ocr',
-      'en_rec_infer.onnx',
-    ),
+    detection: join(process.cwd(), 'ml-models', 'paddle-ocr', 'en_det_infer.onnx'),
+    recognition: join(process.cwd(), 'ml-models', 'paddle-ocr', 'en_rec_infer.onnx'),
   };
 
   async onModuleInit() {
@@ -57,38 +47,27 @@ export class PaddleOcrService implements OnModuleInit {
    */
   private async loadModels(): Promise<void> {
     // Check if model files exist
-    if (
-      !existsSync(this.modelPaths.detection) ||
-      !existsSync(this.modelPaths.recognition)
-    ) {
-      throw new Error(
-        `PaddleOCR ONNX models not found. Please run: pnpm download-ocr-models`,
-      );
+    if (!existsSync(this.modelPaths.detection) || !existsSync(this.modelPaths.recognition)) {
+      throw new Error(`PaddleOCR ONNX models not found. Please run: pnpm download-ocr-models`);
     }
 
     this.logger.log('Loading PaddleOCR ONNX models...');
 
     // Load detection model (DBNet)
-    this.detectionSession = await ort.InferenceSession.create(
-      this.modelPaths.detection,
-      {
-        executionProviders: ['cpu'], // CPU-only for cost efficiency
-        graphOptimizationLevel: 'all',
-        enableCpuMemArena: true,
-        enableMemPattern: true,
-      },
-    );
+    this.detectionSession = await ort.InferenceSession.create(this.modelPaths.detection, {
+      executionProviders: ['cpu'], // CPU-only for cost efficiency
+      graphOptimizationLevel: 'all',
+      enableCpuMemArena: true,
+      enableMemPattern: true,
+    });
 
     // Load recognition model (CRNN)
-    this.recognitionSession = await ort.InferenceSession.create(
-      this.modelPaths.recognition,
-      {
-        executionProviders: ['cpu'],
-        graphOptimizationLevel: 'all',
-        enableCpuMemArena: true,
-        enableMemPattern: true,
-      },
-    );
+    this.recognitionSession = await ort.InferenceSession.create(this.modelPaths.recognition, {
+      executionProviders: ['cpu'],
+      graphOptimizationLevel: 'all',
+      enableCpuMemArena: true,
+      enableMemPattern: true,
+    });
 
     this.isAvailable = true;
     this.logger.log('PaddleOCR models loaded successfully');
@@ -104,19 +83,14 @@ export class PaddleOcrService implements OnModuleInit {
   /**
    * Extract text from image using PaddleOCR ONNX models.
    */
-  async extractText(
-    imageBuffer: Buffer,
-    language: string = 'en',
-  ): Promise<PaddleOcrResult> {
+  async extractText(imageBuffer: Buffer, language: string = 'en'): Promise<PaddleOcrResult> {
     if (!this.isAvailable) {
       throw new Error('PaddleOCR models not loaded');
     }
 
     try {
       // 1. Preprocess image for detection
-      const { imageData, width, height } = await this.preprocessForDetection(
-        imageBuffer,
-      );
+      const { imageData, width, height } = await this.preprocessForDetection(imageBuffer);
 
       // 2. Run text detection to find bounding boxes
       const boxes = await this.detectText(imageData, width, height);
@@ -130,17 +104,12 @@ export class PaddleOcrService implements OnModuleInit {
       }
 
       // 3. Extract and recognize text from each box
-      const recognizedBoxes = await this.recognizeTextBoxes(
-        imageBuffer,
-        boxes,
-        language,
-      );
+      const recognizedBoxes = await this.recognizeTextBoxes(imageBuffer, boxes, language);
 
       // 4. Combine results
       const text = recognizedBoxes.map((box) => box.text).join('\n');
       const avgConfidence =
-        recognizedBoxes.reduce((sum, box) => sum + box.confidence, 0) /
-        recognizedBoxes.length;
+        recognizedBoxes.reduce((sum, box) => sum + box.confidence, 0) / recognizedBoxes.length;
 
       return {
         text,
@@ -226,12 +195,7 @@ export class PaddleOcrService implements OnModuleInit {
     }
 
     // Create input tensor [1, 3, H, W]
-    const inputTensor = new ort.Tensor('float32', imageData, [
-      1,
-      3,
-      height,
-      width,
-    ]);
+    const inputTensor = new ort.Tensor('float32', imageData, [1, 3, height, width]);
 
     // Run inference
     const feeds = { x: inputTensor };
@@ -393,17 +357,10 @@ export class PaddleOcrService implements OnModuleInit {
       try {
         // Extract and preprocess region
         const regionBuffer = await this.extractRegion(originalImage, box.bbox);
-        const { imageData, width } = await this.preprocessForRecognition(
-          regionBuffer,
-        );
+        const { imageData, width } = await this.preprocessForRecognition(regionBuffer);
 
         // Run recognition
-        const inputTensor = new ort.Tensor('float32', imageData, [
-          1,
-          3,
-          48,
-          width,
-        ]);
+        const inputTensor = new ort.Tensor('float32', imageData, [1, 3, 48, width]);
         const feeds = { x: inputTensor };
         const recResults = await this.recognitionSession.run(feeds);
 
@@ -432,10 +389,7 @@ export class PaddleOcrService implements OnModuleInit {
   /**
    * Extract image region defined by bounding box.
    */
-  private async extractRegion(
-    imageBuffer: Buffer,
-    bbox: number[][],
-  ): Promise<Buffer> {
+  private async extractRegion(imageBuffer: Buffer, bbox: number[][]): Promise<Buffer> {
     // Find bounding rectangle
     const minX = Math.min(...bbox.map((p) => p[0]));
     const minY = Math.min(...bbox.map((p) => p[1]));
@@ -534,9 +488,7 @@ export class PaddleOcrService implements OnModuleInit {
 
     const text = chars.join('');
     const avgConfidence =
-      confidences.length > 0
-        ? confidences.reduce((a, b) => a + b, 0) / confidences.length
-        : 0;
+      confidences.length > 0 ? confidences.reduce((a, b) => a + b, 0) / confidences.length : 0;
 
     return { text, confidence: avgConfidence };
   }

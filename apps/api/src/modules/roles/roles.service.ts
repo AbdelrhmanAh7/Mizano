@@ -61,13 +61,7 @@ export class RolesService {
    * Find all roles in an organization with pagination
    */
   async findAll(organizationId: string, params: PaginationParams = {}) {
-    const {
-      page = 1,
-      limit = 20,
-      search,
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
-    } = params;
+    const { page = 1, limit = 20, search, sortBy = 'createdAt', sortOrder = 'desc' } = params;
 
     const skip = (page - 1) * limit;
 
@@ -127,11 +121,7 @@ export class RolesService {
   /**
    * Update a role
    */
-  async update(
-    organizationId: string,
-    id: string,
-    updateRoleDto: UpdateRoleDto,
-  ) {
+  async update(organizationId: string, id: string, updateRoleDto: UpdateRoleDto) {
     // Verify role exists and belongs to organization
     const existingRole = await this.prisma.role.findFirst({
       where: { id, organizationId },

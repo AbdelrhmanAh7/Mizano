@@ -1,16 +1,5 @@
-import {
-  Controller,
-  Get,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -39,14 +28,8 @@ export class CompensationBenchmarkController {
     description: 'Returns compensation benchmark for the employee',
     type: EmployeeBenchmarkDto,
   })
-  async benchmarkEmployee(
-    @CurrentOrg() orgId: string,
-    @Param('employeeId') employeeId: string,
-  ) {
-    const result = await this.compensationService.benchmarkEmployee(
-      orgId,
-      employeeId,
-    );
+  async benchmarkEmployee(@CurrentOrg() orgId: string, @Param('employeeId') employeeId: string) {
+    const result = await this.compensationService.benchmarkEmployee(orgId, employeeId);
     return { data: result };
   }
 
@@ -58,9 +41,7 @@ export class CompensationBenchmarkController {
     description: 'Returns department-level compensation benchmarks',
     type: [DepartmentBenchmarkDto],
   })
-  async getDepartmentBenchmarks(
-    @CurrentOrg() orgId: string,
-  ) {
+  async getDepartmentBenchmarks(@CurrentOrg() orgId: string) {
     const result = await this.compensationService.getDepartmentBenchmarks(orgId);
     return { data: result };
   }
@@ -73,9 +54,7 @@ export class CompensationBenchmarkController {
     description: 'Returns employees with salaries significantly above or below benchmarks',
     type: [SalaryOutlierDto],
   })
-  async getOutliers(
-    @CurrentOrg() orgId: string,
-  ) {
+  async getOutliers(@CurrentOrg() orgId: string) {
     const result = await this.compensationService.getOutliers(orgId);
     return { data: result };
   }
@@ -88,9 +67,7 @@ export class CompensationBenchmarkController {
     description: 'Returns salary distribution with ranges and counts',
     type: SalaryDistributionDto,
   })
-  async getSalaryDistribution(
-    @CurrentOrg() orgId: string,
-  ) {
+  async getSalaryDistribution(@CurrentOrg() orgId: string) {
     const result = await this.compensationService.getSalaryDistribution(orgId);
     return { data: result };
   }

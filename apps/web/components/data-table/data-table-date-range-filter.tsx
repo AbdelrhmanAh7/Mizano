@@ -5,14 +5,14 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import {
-    endOfMonth,
-    format,
-    startOfMonth,
-    startOfQuarter,
-    startOfYear,
-    subDays,
-    subMonths,
-    subQuarters,
+  endOfMonth,
+  format,
+  startOfMonth,
+  startOfQuarter,
+  startOfYear,
+  subDays,
+  subMonths,
+  subQuarters,
 } from 'date-fns';
 import { CalendarIcon, X } from 'lucide-react';
 import { useState } from 'react';

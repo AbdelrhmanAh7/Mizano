@@ -39,12 +39,14 @@ This document describes all 23 backend modules in the Mizano ERP system, located
 **Purpose:** Core financial backbone of the ERP. Manages the General Ledger, Chart of Accounts, Journal Entries, and Recurring Profiles. All other financial modules ultimately post journal entries through this module.
 
 **Key Entities:**
+
 - **Account** -- Chart of Accounts with tree hierarchy (parent/child). Types: Asset, Liability, Equity, Revenue, Expense.
 - **Journal** -- Double-entry journal entries with line items. Each line has a debit or credit amount.
 - **JournalLine** -- Individual debit/credit line within a journal entry, linked to an Account.
 - **RecurringProfile** -- Templates for auto-generating journal entries on a schedule (monthly, quarterly, etc.).
 
 **Business Rules:**
+
 - Total debits MUST equal total credits on every journal entry. Save is blocked if unbalanced.
 - Lock date enforcement: transactions cannot be created or edited before the organization's lock date.
 - Auto-numbering format: `JRN-YYYY-XXXXX` (e.g., JRN-2026-00042).
@@ -53,6 +55,7 @@ This document describes all 23 backend modules in the Mizano ERP system, located
 - Recurring profiles auto-generate journals on their schedule via cron.
 
 **Key Endpoints:**
+
 - `GET /accounts` -- List chart of accounts (tree structure)
 - `POST /accounts` -- Create account
 - `GET /accounts/:id` -- Get account details with balance
@@ -76,6 +79,7 @@ This document describes all 23 backend modules in the Mizano ERP system, located
 **Purpose:** Comprehensive AI and machine learning module providing 33 AI features across financial, CRM, security, NLP, HR, and operations domains. All ML models run locally with zero external API dependencies. Uses `natural`, `brain.js`, `ml-*`, `simple-statistics`, `compromise`, `sentiment`, and `tesseract.js`.
 
 **Key Entities:**
+
 - **AiModel** -- Trained model metadata and serialized weights
 - **AiTrainingData** -- Training datasets per feature per organization
 - **AiFeedback** -- User feedback on AI predictions (feature + userAction enum)
@@ -94,6 +98,7 @@ This document describes all 23 backend modules in the Mizano ERP system, located
 All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insights`, `ai-training`, `model-registry`, `document-intake`, `entity-extraction`, `ocr`
 
 **Schedulers (5):**
+
 - `ai-retraining` -- Periodic model retraining based on feedback thresholds
 - `ai-sales-crm` -- Lead scoring, churn prediction, CLV updates
 - `ai-security` -- Fraud detection, compliance monitoring, audit risk scans
@@ -104,6 +109,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 `holt-winters`, `monte-carlo`, `statistics`, `text-similarity`, `date-pattern`, `isolation-forest`, `logistic-regression`, `pdf-extractor`
 
 **Business Rules:**
+
 - All AI suggestions MUST be dismissible (Human-in-the-Loop).
 - Confidence scores are displayed on all AI-generated data.
 - AI learns from user corrections via the feedback loop.
@@ -113,6 +119,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - Document intake pipeline: OCR -> Classification -> Entity Extraction -> Vendor Matching -> Duplicate Check.
 
 **Key Endpoints:**
+
 - `POST /ai/categorize` -- Categorize a transaction
 - `POST /ai/ocr/extract` -- Extract text from document image
 - `POST /ai/document-intake/process` -- Full document intake pipeline
@@ -137,9 +144,11 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Fixed asset lifecycle management including acquisition, depreciation calculation, and disposal with automatic journal entry generation.
 
 **Key Entities:**
+
 - **Asset** -- Fixed asset register entry (name, acquisition date, cost, useful life, salvage value, accumulated depreciation, status)
 
 **Business Rules:**
+
 - Depreciation method: straight-line (Cost - Salvage Value) / Useful Life per year.
 - Monthly depreciation cron job runs automatically.
 - Asset status lifecycle: `Active` -> `Fully Depreciated` -> `Disposed`.
@@ -148,6 +157,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - Monthly depreciation creates journal: Dr Depreciation Expense / Cr Accumulated Depreciation.
 
 **Key Endpoints:**
+
 - `GET /assets` -- List all assets (filterable by status)
 - `POST /assets` -- Register new asset
 - `GET /assets/:id` -- Get asset details with depreciation schedule
@@ -165,15 +175,18 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Immutable audit trail for all write operations across the system. Every CREATE, UPDATE, and DELETE action is logged with full before/after snapshots.
 
 **Key Entities:**
+
 - **AuditLog** -- Immutable log entry with fields: `userId`, `timestamp`, `action` (CREATE/UPDATE/DELETE), `entityType`, `entityId`, `oldValues` (JSON), `newValues` (JSON), `organizationId`
 
 **Business Rules:**
+
 - Audit logs are append-only and immutable -- they cannot be updated or deleted.
 - Every write operation across all modules creates an audit log entry automatically.
 - `entityType` and `entityId` are separate fields (not a single combined field).
 - Searchable by user, date range, entity type, entity ID, and action type.
 
 **Key Endpoints:**
+
 - `GET /audit-logs` -- List audit logs (paginated, filterable by user, date, entity type, action)
 - `GET /audit-logs/:id` -- Get specific audit log entry with full diff
 
@@ -188,10 +201,12 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Authentication and session management using JWT with Passport. Handles user registration, login, token refresh, and logout with secure token rotation.
 
 **Key Entities:**
+
 - **User** (via Users module) -- Authentication credentials
 - **RefreshToken** -- Stored refresh tokens for rotation
 
 **Business Rules:**
+
 - Password hashing with bcrypt (cost factor 12+).
 - Token pair: access token (15-minute TTL) + refresh token (7-day TTL).
 - Refresh token rotation: each refresh invalidates the old token and issues a new pair.
@@ -199,6 +214,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - Failed login attempts should be rate-limited.
 
 **Key Endpoints:**
+
 - `POST /auth/register` -- Register new user and organization
 - `POST /auth/login` -- Login (returns access + refresh token pair)
 - `POST /auth/refresh` -- Refresh token pair (rotation)
@@ -215,11 +231,13 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Bank account management, transaction tracking, statement import, reconciliation, and automatic categorization rules. Serves as the bridge between external banking data and the internal ledger.
 
 **Key Entities:**
+
 - **BankAccount** -- Bank account details with system balance and bank statement balance tracking
 - **BankTransaction** -- Individual bank transactions (imported or manual)
 - **BankRule** -- Auto-categorization rules applied during import
 
 **Business Rules:**
+
 - Statement import supports CSV, XLSX, and OFX formats.
 - Bank rules auto-categorize transactions on import based on pattern matching (description, amount range, etc.).
 - System balance vs. bank statement balance tracking for reconciliation.
@@ -227,6 +245,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - Reconciliation marks transactions as matched and creates corresponding journal entries.
 
 **Key Endpoints:**
+
 - `GET /bank-accounts` -- List bank accounts
 - `POST /bank-accounts` -- Create bank account
 - `GET /bank-accounts/:id` -- Get bank account with balance summary
@@ -250,11 +269,13 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Customer Relationship Management with lead tracking, deal pipeline management, and activity logging. Supports the full sales funnel from lead capture to customer conversion.
 
 **Key Entities:**
+
 - **Lead** -- Potential customers with source tracking (web, referral, campaign, etc.), status, and contact info
 - **Deal** -- Sales opportunities with Kanban pipeline stages, value, probability, and expected close date
 - **Activity** -- Interaction logs: calls, emails, meetings, notes linked to leads or deals
 
 **Business Rules:**
+
 - Lead -> Deal conversion: creates a Deal linked to the Lead with inherited contact data.
 - Deal -> Customer conversion on win: creates a Customer record in the Sales module.
 - Deal pipeline stages are customizable per organization (Kanban board).
@@ -262,6 +283,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - Activities are timestamped and linked to the responsible user.
 
 **Key Endpoints:**
+
 - `GET /crm/leads` -- List leads (filterable by status, source)
 - `POST /crm/leads` -- Create lead
 - `POST /crm/leads/:id/convert` -- Convert lead to deal
@@ -284,16 +306,19 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Multi-currency support with exchange rate management and currency conversion for international transactions.
 
 **Key Entities:**
+
 - **Currency** -- Currency definitions (code, name, symbol, decimal places)
 - **ExchangeRate** -- Exchange rates between currency pairs with effective dates
 
 **Business Rules:**
+
 - Organization has a base currency; all reporting converts to base currency.
 - Exchange rates can be manually entered or fetched.
 - Transactions in foreign currencies store both the original amount and the base currency equivalent.
 - Realized and unrealized gain/loss tracking for currency fluctuations.
 
 **Key Endpoints:**
+
 - `GET /currencies` -- List available currencies
 - `POST /currencies` -- Add currency
 - `GET /currencies/exchange-rates` -- Get exchange rates
@@ -311,18 +336,22 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Document template management and PDF generation for invoices, quotes, payslips, and other business documents. Also handles email delivery of documents.
 
 **Key Entities:**
+
 - **DocumentTemplate** -- HTML/Handlebars templates for PDF rendering with organization branding
 
 **Services:**
+
 - **PdfService** -- PDF generation using Puppeteer (headless Chrome)
 - **EmailService** -- Email delivery via nodemailer
 
 **Business Rules:**
+
 - PDFs render with organization branding (logo, colors, address, tax ID).
 - Templates are customizable per document type (invoice, quote, credit note, payslip, delivery challan).
 - Generated PDFs are stored or streamed directly to the client.
 
 **Key Endpoints:**
+
 - `GET /documents/templates` -- List document templates
 - `POST /documents/templates` -- Create/update template
 - `POST /documents/generate-pdf` -- Generate PDF for a given entity
@@ -339,12 +368,14 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Human Resources management covering employee records, attendance tracking, payroll processing, and payslip generation with automatic journal entry creation.
 
 **Key Entities:**
+
 - **Employee** -- Employee records (no `deletedAt` field -- use `isActive: true` or `status: 'ACTIVE'` instead)
 - **Attendance** -- Daily attendance records: present, absent, leave, half-day
 - **PayrollRun** -- Monthly payroll batch processing
 - **Payslip** -- Individual payslip per employee per payroll run
 
 **Business Rules:**
+
 - Payroll calculation: `Gross = Basic + Allowances`, `LOP = (Gross / 30) * absent days`, `Net = Gross - LOP - Tax - Deductions`.
 - Cannot run payroll twice for the same month/period -- system enforces uniqueness.
 - Payroll journal entry: Dr Salaries Expense / Cr Payroll Payable + Cr Tax Payable.
@@ -352,6 +383,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - Attendance is tracked daily with support for present, absent, leave, and half-day statuses.
 
 **Key Endpoints:**
+
 - `GET /employees` -- List employees (filterable by department, status)
 - `POST /employees` -- Create employee
 - `GET /employees/:id` -- Get employee details
@@ -374,15 +406,18 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Bulk data import and export in CSV and XLSX formats. Supports column mapping for flexible imports and formatted exports for all major entities.
 
 **Key Entities:**
+
 - No dedicated database entities -- operates on entities from other modules.
 
 **Business Rules:**
+
 - Import supports column mapping UI -- users map CSV/XLSX columns to system fields.
 - Validation runs on each row during import; invalid rows are reported with error details.
 - Export supports CSV and Excel formats with formatted headers.
 - Bulk operations run asynchronously for large datasets.
 
 **Key Endpoints:**
+
 - `POST /import/:entityType` -- Import data (CSV/XLSX upload with column mapping)
 - `GET /import/:entityType/template` -- Download import template
 - `GET /export/:entityType` -- Export data (CSV/XLSX download with filters)
@@ -398,6 +433,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Complete inventory management with item tracking, warehouse management, stock movements, adjustments, composite items, transfers, price lists, and FIFO costing.
 
 **Key Entities:**
+
 - **Item** -- Products and services. Goods track stock; services do not. SKU is unique per organization.
 - **Warehouse** -- Physical storage locations with per-item stock levels.
 - **StockMovement** -- Every stock change is logged (purchase, sale, adjustment, transfer, manufacturing).
@@ -407,6 +443,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - **PriceList** -- Custom pricing (%, fixed amount adjustments) linkable to specific customers.
 
 **Business Rules:**
+
 - Goods-type items track stock; service-type items do not.
 - SKU must be unique within the organization.
 - Stock per item per warehouse is maintained.
@@ -417,6 +454,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - Composite items have a BOM-like structure listing component items and quantities.
 
 **Key Endpoints:**
+
 - `GET /items` -- List items (filterable by type, category, warehouse)
 - `POST /items` -- Create item
 - `GET /items/:id` -- Get item details with stock levels
@@ -444,10 +482,12 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Manufacturing operations management with Bill of Materials (BOM) definitions and Work Order processing. Handles material requirements planning and COGM (Cost of Goods Manufactured) accounting.
 
 **Key Entities:**
+
 - **BOM (Bill of Materials)** -- Defines finished goods with their raw material components and quantities. Supports nested BOMs (sub-assemblies).
 - **WorkOrder** -- Production orders with material requirements calculated from BOM x quantity.
 
 **Business Rules:**
+
 - BOM defines finished good + raw materials with quantities.
 - Nested BOM support: a BOM component can itself reference another BOM (sub-assemblies).
 - Work order material requirements = BOM quantities x work order quantity.
@@ -457,6 +497,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - COGM journal entry on completion: Dr Finished Goods Inventory / Cr Raw Materials Inventory + Cr Manufacturing Overhead.
 
 **Key Endpoints:**
+
 - `GET /boms` -- List BOMs
 - `POST /boms` -- Create BOM
 - `GET /boms/:id` -- Get BOM details with components (resolves nested BOMs)
@@ -478,15 +519,18 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Notification delivery system supporting both email notifications (via nodemailer) and in-app notifications. Used by other modules to alert users about events, deadlines, and AI insights.
 
 **Key Entities:**
+
 - **Notification** -- In-app notification record with type, message, read/unread status, and target user.
 
 **Business Rules:**
+
 - Email notifications sent via nodemailer with configurable SMTP settings.
 - In-app notifications support read/unread status and bulk mark-as-read.
 - AI alert delivery routes through this module.
 - Notification preferences can be configured per user.
 
 **Key Endpoints:**
+
 - `GET /notifications` -- List notifications for current user
 - `PUT /notifications/:id/read` -- Mark notification as read
 - `PUT /notifications/read-all` -- Mark all as read
@@ -503,14 +547,17 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Multi-tenant organization management. Handles organization creation, settings, and the onboarding wizard. Every entity in the system is scoped to an organization via `organizationId`.
 
 **Key Entities:**
+
 - **Organization** -- Tenant entity with name, settings, base currency, fiscal year, lock date, branding, and address details.
 
 **Business Rules:**
+
 - All database queries across all modules MUST include `organizationId` -- data never leaks across tenants.
 - Organization settings include: base currency, fiscal year start, lock date, tax configuration, branding (logo, colors).
 - Onboarding wizard guides new organizations through initial setup (chart of accounts, bank accounts, opening balances).
 
 **Key Endpoints:**
+
 - `GET /organizations/current` -- Get current organization details
 - `PUT /organizations/current` -- Update organization settings
 - `POST /organizations` -- Create new organization
@@ -528,11 +575,13 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Project management with task tracking, timesheet logging, and project-based invoicing. Supports both billable and non-billable time tracking with budget monitoring.
 
 **Key Entities:**
+
 - **Project** -- Project record with name, linked customer, billing method (fixed/hourly), budget, and status.
 - **Task** -- Individual tasks within a project with hourly rate and billable flag.
 - **TimesheetEntry** -- Time logged against tasks via timer or manual entry. Status: `Unbilled` -> `Invoiced`.
 
 **Business Rules:**
+
 - Time can be logged via running timer or manual entry.
 - Tasks have an hourly rate and a billable flag (non-billable hours are tracked but not invoiced).
 - Timesheet entry status lifecycle: `Unbilled` -> `Invoiced`.
@@ -541,6 +590,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - Projects link to Customers in the Sales module for invoicing.
 
 **Key Endpoints:**
+
 - `GET /projects` -- List projects (filterable by status, customer)
 - `POST /projects` -- Create project
 - `GET /projects/:id` -- Get project details with budget usage
@@ -564,6 +614,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Full purchase cycle management covering vendor records, bills, expenses, vendor credits, and payment processing. Handles accounts payable and purchase-related journal entries.
 
 **Key Entities:**
+
 - **Vendor** -- Supplier records with contact info, payment terms, tax ID, and currency.
 - **Bill** -- Purchase invoices from vendors with vendor reference number.
 - **Expense** -- Immediate cash outflow (no accounts payable -- expensed directly).
@@ -571,6 +622,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - **PaymentMade** -- Payment records with allocation across multiple bills.
 
 **Business Rules:**
+
 - Bill journal entry: Dr Inventory/Expense + Dr VAT Receivable / Cr Accounts Payable.
 - Expenses are immediate cash outflow -- no AP involved (Dr Expense / Cr Cash/Bank).
 - AI categorization suggests expense categories based on description and vendor history.
@@ -580,6 +632,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - Bill status lifecycle: `Draft` -> `Open` -> `Partially Paid` -> `Paid` -> `Overdue`.
 
 **Key Endpoints:**
+
 - `GET /vendors` -- List vendors
 - `POST /vendors` -- Create vendor
 - `GET /vendors/:id` -- Get vendor with outstanding balance
@@ -606,14 +659,17 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Financial and management reporting covering all standard accounting reports. All reports support date range filtering, period comparison, and CSV/Excel export.
 
 **Key Entities:**
+
 - No dedicated database entities -- reports aggregate data from Accounting, Sales, Purchases, and Banking modules.
 
 **Services:**
+
 - **FinancialReportsService** -- P&L, Balance Sheet, Cash Flow, Trial Balance, General Ledger
 - **AgingReportsService** -- AR and AP aging analysis
 - **DashboardService** -- Dashboard KPIs and summary widgets
 
 **Report Types:**
+
 - **Profit & Loss (P&L)** -- Revenue - Expenses = Net Income. Supports period-over-period comparison.
 - **Balance Sheet** -- Assets = Liabilities + Equity. MUST balance.
 - **Cash Flow Statement** -- Operating + Investing + Financing activities.
@@ -623,6 +679,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - **AP Aging** -- Accounts Payable aged by: 1-15, 16-30, 31-60, 61-90, 90+ day buckets.
 
 **Business Rules:**
+
 - All reports filter by `organizationId` and support date range parameters.
 - Balance Sheet must always balance (Assets = Liabilities + Equity).
 - Trial Balance must always balance (total Debits = total Credits).
@@ -630,6 +687,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - Dashboard provides real-time KPIs: revenue, expenses, profit, cash position, AR/AP totals.
 
 **Key Endpoints:**
+
 - `GET /reports/profit-and-loss` -- P&L report
 - `GET /reports/balance-sheet` -- Balance Sheet report
 - `GET /reports/cash-flow` -- Cash Flow Statement
@@ -651,10 +709,12 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Role-Based Access Control (RBAC) system managing roles, permissions, and authorization across all modules.
 
 **Key Entities:**
+
 - **Role** -- Named role with a set of permissions (e.g., Admin, Accountant, Sales Rep)
 - **Permission** -- Granular permission entries: View, Create, Edit, Delete, Export per module
 
 **Business Rules:**
+
 - Default roles: Admin, Accountant, Sales Rep, Store Keeper, Manager.
 - Permissions are granular: View, Create, Edit, Delete, Export per module.
 - Admin role bypasses all permission checks.
@@ -662,6 +722,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - Roles are enforced via `@Permissions('module.action')` decorator on controller endpoints.
 
 **Key Endpoints:**
+
 - `GET /roles` -- List roles
 - `POST /roles` -- Create custom role
 - `GET /roles/:id` -- Get role with permissions
@@ -679,6 +740,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Complete sales cycle management from customer records through quoting, invoicing, credit notes, payment collection, delivery challans, and recurring invoices. Handles accounts receivable and revenue recognition.
 
 **Key Entities:**
+
 - **Customer** -- Customer records with name, email, phone, addresses, tax ID, payment terms, and currency.
 - **Quote** -- Sales estimates/proposals. Auto-numbered: `EST-YYYY-XXXXX`.
 - **Invoice** -- Sales invoices. Auto-numbered: `INV-YYYY-XXXXX`.
@@ -687,6 +749,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - **DeliveryChallan** -- Delivery/shipping documents for dispatched goods.
 
 **Business Rules:**
+
 - Quote -> Invoice conversion: creates invoice from quote data.
 - Invoice journal entry: Dr Accounts Receivable / Cr Revenue / Cr VAT Payable.
 - Invoice status lifecycle: `Draft` -> `Sent` -> `Partially Paid` -> `Paid` -> `Overdue`.
@@ -697,6 +760,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - Recurring invoices generate automatically on schedule.
 
 **Key Endpoints:**
+
 - `GET /customers` -- List customers
 - `POST /customers` -- Create customer
 - `GET /customers/:id` -- Get customer with outstanding balance
@@ -727,11 +791,13 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Tax rate management, VAT return preparation, and VAT payment tracking. Handles the full tax compliance cycle from rate definition through filing and payment.
 
 **Key Entities:**
+
 - **TaxRate** -- Tax rate definition with name, percentage, type (inclusive/exclusive), and linked ledger account.
 - **VATReturn** -- VAT filing record: Output VAT - Input VAT = Net VAT.
 - **VATPayment** -- Payment of VAT liability to tax authority.
 
 **Business Rules:**
+
 - Tax rates link to a specific ledger account for automatic journal posting.
 - VAT Return calculation: Output VAT (from sales) - Input VAT (from purchases) = Net VAT payable/receivable.
 - Filing a VAT return locks the period -- transactions within the period cannot be modified.
@@ -739,6 +805,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - Deadline alerts fire at 7, 3, and 1 days before filing due dates via notifications.
 
 **Key Endpoints:**
+
 - `GET /tax-rates` -- List tax rates
 - `POST /tax-rates` -- Create tax rate
 - `PUT /tax-rates/:id` -- Update tax rate
@@ -758,9 +825,11 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** Per-user configuration for UI and localization settings. Stores preferences that affect how data is displayed to individual users without changing organizational data.
 
 **Key Entities:**
+
 - **UserPreference** -- User-specific settings record.
 
 **Configurable Settings:**
+
 - Language / locale
 - Timezone
 - Date format (DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD)
@@ -768,6 +837,7 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 - Number format (decimal/thousands separators)
 
 **Key Endpoints:**
+
 - `GET /user-preferences` -- Get current user's preferences
 - `PUT /user-preferences` -- Update preferences
 
@@ -782,14 +852,17 @@ All controller services plus: `ai-categorization`, `ai-forecasting`, `ai-insight
 **Purpose:** User account management including profile updates, password changes, and user listing for the organization.
 
 **Key Entities:**
+
 - **User** -- User account with name, email, password hash, role, organization membership, and active status.
 
 **Business Rules:**
+
 - Users belong to an organization (multi-tenant scoping).
 - Password changes require current password verification.
 - User listing is scoped to the current organization.
 
 **Key Endpoints:**
+
 - `GET /users` -- List users in organization
 - `GET /users/:id` -- Get user profile
 - `PUT /users/:id` -- Update user profile

@@ -83,7 +83,9 @@ export function InventoryAIPanel() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Avg Accuracy</span>
                 <Badge variant="outline" className="bg-green-50 text-green-700">
-                  {forecast.averageAccuracy ? `${(forecast.averageAccuracy * 100).toFixed(1)}%` : 'N/A'}
+                  {forecast.averageAccuracy
+                    ? `${(forecast.averageAccuracy * 100).toFixed(1)}%`
+                    : 'N/A'}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">

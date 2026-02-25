@@ -268,20 +268,13 @@ export function forecastWithConfidenceIntervals(
     seasonal = result.seasonal;
   } else if (data.length >= 6) {
     // Use double exponential smoothing
-    forecasts = doubleExponentialSmoothing(
-      data,
-      params.alpha,
-      params.beta,
-      horizonPeriods,
-    );
+    forecasts = doubleExponentialSmoothing(data, params.alpha, params.beta, horizonPeriods);
     const fittedSES = applyDoubleExponentialSmoothingFit(
       data,
       params.alpha || 0.3,
       params.beta || 0.1,
     );
-    residualStdDev = calculateStdDev(
-      data.slice(1).map((v, i) => v - fittedSES[i]),
-    );
+    residualStdDev = calculateStdDev(data.slice(1).map((v, i) => v - fittedSES[i]));
     seasonal = Array(seasonLength).fill(1);
   } else {
     // Use simple exponential smoothing
@@ -291,7 +284,7 @@ export function forecastWithConfidenceIntervals(
   }
 
   // Z-value for confidence level (approx)
-  const zValue = confidenceLevel === 0.95 ? 1.96 : confidenceLevel === 0.90 ? 1.645 : 1.96;
+  const zValue = confidenceLevel === 0.95 ? 1.96 : confidenceLevel === 0.9 ? 1.645 : 1.96;
 
   // Generate forecast points with expanding confidence intervals
   const forecastPoints: ForecastPoint[] = [];
@@ -326,11 +319,7 @@ function calculateStdDev(values: number[]): number {
 /**
  * Helper: Apply double exponential smoothing to get fitted values
  */
-function applyDoubleExponentialSmoothingFit(
-  data: number[],
-  alpha: number,
-  beta: number,
-): number[] {
+function applyDoubleExponentialSmoothingFit(data: number[], alpha: number, beta: number): number[] {
   if (data.length < 2) return [];
 
   let level = data[0];
@@ -351,10 +340,7 @@ function applyDoubleExponentialSmoothingFit(
  * Detect seasonality strength in time series
  * Returns a value between 0 (no seasonality) and 1 (strong seasonality)
  */
-export function detectSeasonalityStrength(
-  data: number[],
-  seasonLength: number,
-): number {
+export function detectSeasonalityStrength(data: number[], seasonLength: number): number {
   if (data.length < 2 * seasonLength) return 0;
 
   // Calculate seasonal averages
@@ -364,17 +350,14 @@ export function detectSeasonalityStrength(
     for (let i = s; i < data.length; i += seasonLength) {
       seasonalValues.push(data[i]);
     }
-    seasonalMeans.push(
-      seasonalValues.reduce((a, b) => a + b, 0) / seasonalValues.length,
-    );
+    seasonalMeans.push(seasonalValues.reduce((a, b) => a + b, 0) / seasonalValues.length);
   }
 
   const overallMean = data.reduce((a, b) => a + b, 0) / data.length;
 
   // Variance of seasonal means
   const seasonalVariance =
-    seasonalMeans.reduce((sum, m) => sum + Math.pow(m - overallMean, 2), 0) /
-    seasonLength;
+    seasonalMeans.reduce((sum, m) => sum + Math.pow(m - overallMean, 2), 0) / seasonLength;
 
   // Total variance
   const totalVariance =

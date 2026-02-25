@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ChallanStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -165,11 +161,7 @@ export class DeliveryChallansService {
     return challan;
   }
 
-  async update(
-    organizationId: string,
-    id: string,
-    dto: UpdateDeliveryChallanDto,
-  ) {
+  async update(organizationId: string, id: string, dto: UpdateDeliveryChallanDto) {
     const challan = await this.findOne(organizationId, id);
 
     if (challan.status !== ChallanStatus.DRAFT) {
@@ -353,9 +345,7 @@ export class DeliveryChallansService {
     }
 
     // Filter only goods items (not services)
-    const goodsLines = invoice.lines.filter(
-      (line) => line.item?.type === 'GOODS',
-    );
+    const goodsLines = invoice.lines.filter((line) => line.item?.type === 'GOODS');
 
     if (goodsLines.length === 0) {
       throw new BadRequestException('Invoice has no deliverable goods items');
@@ -408,10 +398,7 @@ export class DeliveryChallansService {
     return `DC-${String(lastNumber + 1).padStart(3, '0')}`;
   }
 
-  private async getItemStock(
-    itemId: string,
-    warehouseId?: string | null,
-  ): Promise<number> {
+  private async getItemStock(itemId: string, warehouseId?: string | null): Promise<number> {
     const where: any = { itemId };
     if (warehouseId) {
       where.warehouseId = warehouseId;

@@ -9,23 +9,10 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  IsString,
-  IsOptional,
-  IsArray,
-  IsEnum,
-  IsNumber,
-  IsObject,
-} from 'class-validator';
+import { IsString, IsOptional, IsArray, IsEnum, IsNumber, IsObject } from 'class-validator';
 import { Type } from 'class-transformer';
 import { LoggerService } from './logger.service';
-import {
-  LogLevel,
-  LogSource,
-  LogCategory,
-  LogStatus,
-  LogFilter,
-} from '@mizano/shared-types';
+import { LogLevel, LogSource, LogCategory, LogStatus, LogFilter } from '@mizano/shared-types';
 
 class CaptureLogDto {
   @IsEnum(LogLevel)

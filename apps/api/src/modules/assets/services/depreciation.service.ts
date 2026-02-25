@@ -37,9 +37,7 @@ export class DepreciationService {
           `Org ${org.id}: ${result.processed} assets, ${result.journalsCreated} journals created`,
         );
       } catch (error) {
-        this.logger.error(
-          `Failed to run depreciation for org ${org.id}: ${error.message}`,
-        );
+        this.logger.error(`Failed to run depreciation for org ${org.id}: ${error.message}`);
       }
     }
   }
@@ -160,9 +158,7 @@ export class DepreciationService {
         processed++;
         totalDepreciation += depreciationAmount.toNumber();
       } catch (error) {
-        this.logger.error(
-          `Failed to process depreciation for asset ${asset.id}: ${error.message}`,
-        );
+        this.logger.error(`Failed to process depreciation for asset ${asset.id}: ${error.message}`);
       }
     }
 
@@ -285,12 +281,14 @@ export class DepreciationService {
   async getDepreciationForecast(
     organizationId: string,
     months: number = 12,
-  ): Promise<{
-    month: number;
-    year: number;
-    totalDepreciation: number;
-    assetCount: number;
-  }[]> {
+  ): Promise<
+    {
+      month: number;
+      year: number;
+      totalDepreciation: number;
+      assetCount: number;
+    }[]
+  > {
     const today = new Date();
     const results: {
       month: number;
@@ -317,14 +315,9 @@ export class DepreciationService {
         },
       });
 
-      const activeSchedules = schedules.filter(
-        (s) => s.asset.status === AssetStatus.ACTIVE,
-      );
+      const activeSchedules = schedules.filter((s) => s.asset.status === AssetStatus.ACTIVE);
 
-      const totalDepreciation = activeSchedules.reduce(
-        (sum, s) => sum + s.amount.toNumber(),
-        0,
-      );
+      const totalDepreciation = activeSchedules.reduce((sum, s) => sum + s.amount.toNumber(), 0);
 
       results.push({
         month: currentMonth,
@@ -346,10 +339,7 @@ export class DepreciationService {
   /**
    * Reverse a depreciation entry
    */
-  async reverseDepreciation(
-    organizationId: string,
-    scheduleId: string,
-  ): Promise<void> {
+  async reverseDepreciation(organizationId: string, scheduleId: string): Promise<void> {
     const schedule = await this.prisma.depreciationSchedule.findFirst({
       where: { id: scheduleId, organizationId },
       include: {
@@ -407,10 +397,7 @@ export class DepreciationService {
     });
   }
 
-  private async generateJournalNumber(
-    tx: any,
-    organizationId: string,
-  ): Promise<string> {
+  private async generateJournalNumber(tx: any, organizationId: string): Promise<string> {
     const lastJournal = await tx.journal.findFirst({
       where: { organizationId },
       orderBy: { createdAt: 'desc' },

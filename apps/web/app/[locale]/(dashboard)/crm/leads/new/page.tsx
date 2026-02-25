@@ -16,9 +16,7 @@ export default function NewLeadPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">New Lead</h1>
-          <p className="text-muted-foreground">
-            Capture a new sales lead
-          </p>
+          <p className="text-muted-foreground">Capture a new sales lead</p>
         </div>
       </div>
       <LeadForm />

@@ -68,9 +68,7 @@ export function PromptModal({ suggestion, open, onOpenChange }: PromptModalProps
         </ScrollArea>
 
         <div className="flex items-center justify-between pt-2">
-          <p className="text-xs text-muted-foreground">
-            {suggestion.prompt.length} characters
-          </p>
+          <p className="text-xs text-muted-foreground">{suggestion.prompt.length} characters</p>
           <Button onClick={handleCopy} className="min-w-[140px]">
             {copied ? (
               <>

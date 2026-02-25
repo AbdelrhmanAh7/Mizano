@@ -88,7 +88,10 @@ const patternApi = {
     const response = await api.post('/ai/patterns/analyze');
     return response.data;
   },
-  acceptSuggestion: async (suggestionId: string, options?: { autoPost?: boolean; name?: string }) => {
+  acceptSuggestion: async (
+    suggestionId: string,
+    options?: { autoPost?: boolean; name?: string },
+  ) => {
     const response = await api.post(`/ai/patterns/suggestions/${suggestionId}/accept`, options);
     return response.data;
   },
@@ -145,8 +148,13 @@ export function useRunPatternAnalysis() {
 export function useAcceptSuggestion() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ suggestionId, options }: { suggestionId: string; options?: { autoPost?: boolean; name?: string } }) =>
-      patternApi.acceptSuggestion(suggestionId, options),
+    mutationFn: ({
+      suggestionId,
+      options,
+    }: {
+      suggestionId: string;
+      options?: { autoPost?: boolean; name?: string };
+    }) => patternApi.acceptSuggestion(suggestionId, options),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ai-patterns'] });
       queryClient.invalidateQueries({ queryKey: ['ai-pattern-suggestions'] });

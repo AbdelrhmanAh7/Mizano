@@ -4,47 +4,47 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table';
 import type {
-    IndexRecommendation,
-    QueryDistributionItem,
-    QueryMetricEntry,
-    TimeTrendItem,
+  IndexRecommendation,
+  QueryDistributionItem,
+  QueryMetricEntry,
+  TimeTrendItem,
 } from '@/lib/hooks/use-performance';
 import {
-    useDatabaseHealth,
-    useIndexRecommendations,
-    useQueryDistribution,
-    useQueryStats,
-    useResetMetrics,
-    useResponseTimeTrend,
-    useSlowQueries,
+  useDatabaseHealth,
+  useIndexRecommendations,
+  useQueryDistribution,
+  useQueryStats,
+  useResetMetrics,
+  useResponseTimeTrend,
+  useSlowQueries,
 } from '@/lib/hooks/use-performance';
 import {
-    Activity,
-    AlertTriangle,
-    ChevronLeft,
-    ChevronRight,
-    Clock,
-    Database,
-    Lightbulb,
-    RefreshCw,
-    Server,
-    Zap,
+  Activity,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Database,
+  Lightbulb,
+  RefreshCw,
+  Server,
+  Zap,
 } from 'lucide-react';
 import { useState } from 'react';
 

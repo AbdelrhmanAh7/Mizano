@@ -1,13 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Database,
-  CheckCircle2,
-  FileStack,
-  TrendingUp,
-  ChevronDown,
-} from 'lucide-react';
+import { Database, CheckCircle2, FileStack, TrendingUp, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { OcrTrainingViewer } from './ocr-training-viewer';
@@ -32,9 +26,7 @@ export function OcrTrainingLabPanel() {
                 <Database className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
-                  {stats?.totalVendorLayouts ?? '-'}
-                </p>
+                <p className="text-2xl font-bold">{stats?.totalVendorLayouts ?? '-'}</p>
                 <p className="text-xs text-muted-foreground">Vendor Layouts</p>
               </div>
             </div>
@@ -48,12 +40,8 @@ export function OcrTrainingLabPanel() {
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
-                  {stats?.activeLayouts ?? '-'}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Active (3+ samples)
-                </p>
+                <p className="text-2xl font-bold">{stats?.activeLayouts ?? '-'}</p>
+                <p className="text-xs text-muted-foreground">Active (3+ samples)</p>
               </div>
             </div>
           </CardContent>
@@ -66,9 +54,7 @@ export function OcrTrainingLabPanel() {
                 <FileStack className="h-4 w-4 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
-                  {stats?.totalSamples ?? '-'}
-                </p>
+                <p className="text-2xl font-bold">{stats?.totalSamples ?? '-'}</p>
                 <p className="text-xs text-muted-foreground">Total Samples</p>
               </div>
             </div>
@@ -82,12 +68,8 @@ export function OcrTrainingLabPanel() {
                 <TrendingUp className="h-4 w-4 text-amber-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
-                  {stats?.recentCorrections ?? '-'}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Corrections (7d)
-                </p>
+                <p className="text-2xl font-bold">{stats?.recentCorrections ?? '-'}</p>
+                <p className="text-xs text-muted-foreground">Corrections (7d)</p>
               </div>
             </div>
           </CardContent>

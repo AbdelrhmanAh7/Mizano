@@ -49,28 +49,20 @@ describe('JwtAuthGuard', () => {
     });
 
     it('should throw UnauthorizedException when error occurs', () => {
-      expect(() =>
-        guard.handleRequest(new Error('Token expired'), null, null),
-      ).toThrow(Error);
+      expect(() => guard.handleRequest(new Error('Token expired'), null, null)).toThrow(Error);
     });
 
     it('should throw UnauthorizedException when no user', () => {
-      expect(() => guard.handleRequest(null, null, null)).toThrow(
-        UnauthorizedException,
-      );
+      expect(() => guard.handleRequest(null, null, null)).toThrow(UnauthorizedException);
     });
 
     it('should throw UnauthorizedException with message when no user', () => {
-      expect(() => guard.handleRequest(null, null, null)).toThrow(
-        'Invalid or expired token',
-      );
+      expect(() => guard.handleRequest(null, null, null)).toThrow('Invalid or expired token');
     });
 
     it('should propagate original error if present', () => {
       const originalError = new Error('Custom error');
-      expect(() => guard.handleRequest(originalError, null, null)).toThrow(
-        originalError,
-      );
+      expect(() => guard.handleRequest(originalError, null, null)).toThrow(originalError);
     });
   });
 });

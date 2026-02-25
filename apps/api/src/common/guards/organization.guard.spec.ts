@@ -72,9 +72,7 @@ describe('OrganizationGuard', () => {
       { organizationId: 'org-2' },
     );
     expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
-    expect(() => guard.canActivate(context)).toThrow(
-      'You do not have access to this organization',
-    );
+    expect(() => guard.canActivate(context)).toThrow('You do not have access to this organization');
   });
 
   it('should throw ForbiddenException when orgId does not match (query)', () => {

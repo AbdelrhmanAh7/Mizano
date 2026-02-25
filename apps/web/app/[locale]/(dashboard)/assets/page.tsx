@@ -80,9 +80,7 @@ export default function AssetsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Fixed Assets</h1>
-          <p className="text-muted-foreground">
-            Manage fixed assets and depreciation
-          </p>
+          <p className="text-muted-foreground">Manage fixed assets and depreciation</p>
         </div>
         <Button asChild>
           <Link href="/assets/new">
@@ -126,10 +124,7 @@ export default function AssetsPage() {
       )}
 
       <div className="flex gap-4">
-        <Select
-          value={statusFilter}
-          onValueChange={(v) => setStatusFilter(v as AssetStatus | '')}
-        >
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as AssetStatus | '')}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
@@ -140,10 +135,7 @@ export default function AssetsPage() {
             <SelectItem value="FULLY_DEPRECIATED">Fully Depreciated</SelectItem>
           </SelectContent>
         </Select>
-        <Select
-          value={typeFilter}
-          onValueChange={(v) => setTypeFilter(v as AssetType | '')}
-        >
+        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as AssetType | '')}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="All Types" />
           </SelectTrigger>
@@ -222,7 +214,8 @@ export default function AssetsPage() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete Asset</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure? This can only be done if no depreciation has been posted.
+                                  Are you sure? This can only be done if no depreciation has been
+                                  posted.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>

@@ -239,9 +239,7 @@ export function InvoiceForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.customerId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
               )}
             </div>
 
@@ -258,15 +256,9 @@ export function InvoiceForm({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="invoiceDate">Invoice Date *</Label>
-              <Input
-                id="invoiceDate"
-                type="date"
-                {...form.register('invoiceDate')}
-              />
+              <Input id="invoiceDate" type="date" {...form.register('invoiceDate')} />
               {form.formState.errors.invoiceDate && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.invoiceDate.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.invoiceDate.message}</p>
               )}
             </div>
 
@@ -291,15 +283,9 @@ export function InvoiceForm({
 
             <div className="space-y-2">
               <Label htmlFor="dueDate">Due Date *</Label>
-              <Input
-                id="dueDate"
-                type="date"
-                {...form.register('dueDate')}
-              />
+              <Input id="dueDate" type="date" {...form.register('dueDate')} />
               {form.formState.errors.dueDate && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.dueDate.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.dueDate.message}</p>
               )}
             </div>
           </div>
@@ -388,11 +374,7 @@ export function InvoiceForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? 'Saving...'
-            : isEditing
-            ? 'Update Invoice'
-            : 'Create Invoice'}
+          {isSubmitting ? 'Saving...' : isEditing ? 'Update Invoice' : 'Create Invoice'}
         </Button>
       </div>
     </form>

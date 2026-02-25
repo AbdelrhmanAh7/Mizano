@@ -73,14 +73,14 @@ export default function AccountSettingsPage() {
   const assetAccounts = flattenedAccounts.filter((a) => a.type === 'ASSET' && a.isActive);
   const liabilityAccounts = flattenedAccounts.filter((a) => a.type === 'LIABILITY' && a.isActive);
   const revenueAccounts = flattenedAccounts.filter(
-    (a) => (a.type === 'REVENUE' || a.type === 'INCOME') && a.isActive
+    (a) => (a.type === 'REVENUE' || a.type === 'INCOME') && a.isActive,
   );
   const expenseAccounts = flattenedAccounts.filter((a) => a.type === 'EXPENSE' && a.isActive);
 
   const handleSubmit = async (data: AccountSettingsFormData) => {
     // Convert empty strings to null
     const cleanedData = Object.fromEntries(
-      Object.entries(data).map(([key, value]) => [key, value || null])
+      Object.entries(data).map(([key, value]) => [key, value || null]),
     );
     await updateSettings.mutateAsync(cleanedData);
   };
@@ -164,9 +164,7 @@ export default function AccountSettingsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Credit when invoices are sent
-                </p>
+                <p className="text-xs text-muted-foreground">Credit when invoices are sent</p>
               </div>
 
               <div className="space-y-2">
@@ -210,9 +208,7 @@ export default function AccountSettingsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Debit when credit notes are issued
-                </p>
+                <p className="text-xs text-muted-foreground">Debit when credit notes are issued</p>
               </div>
             </div>
           </CardContent>
@@ -287,9 +283,7 @@ export default function AccountSettingsPage() {
               <Landmark className="h-5 w-5" />
               Bank & Cash Accounts
             </CardTitle>
-            <CardDescription>
-              Default accounts for deposits and withdrawals
-            </CardDescription>
+            <CardDescription>Default accounts for deposits and withdrawals</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -306,9 +300,7 @@ export default function AccountSettingsPage() {
                     <SelectItem value="">-- Not Set --</SelectItem>
                     {assetAccounts
                       .filter(
-                        (a) =>
-                          a.name.toLowerCase().includes('bank') ||
-                          a.code.startsWith('1001')
+                        (a) => a.name.toLowerCase().includes('bank') || a.code.startsWith('1001'),
                       )
                       .map((account) => (
                         <SelectItem key={account.id} value={account.id}>
@@ -317,9 +309,7 @@ export default function AccountSettingsPage() {
                       ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Used for bank transfer payments
-                </p>
+                <p className="text-xs text-muted-foreground">Used for bank transfer payments</p>
               </div>
 
               <div className="space-y-2">
@@ -335,9 +325,7 @@ export default function AccountSettingsPage() {
                     <SelectItem value="">-- Not Set --</SelectItem>
                     {assetAccounts
                       .filter(
-                        (a) =>
-                          a.name.toLowerCase().includes('cash') ||
-                          a.code.startsWith('1000')
+                        (a) => a.name.toLowerCase().includes('cash') || a.code.startsWith('1000'),
                       )
                       .map((account) => (
                         <SelectItem key={account.id} value={account.id}>
@@ -346,9 +334,7 @@ export default function AccountSettingsPage() {
                       ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Used for cash payments
-                </p>
+                <p className="text-xs text-muted-foreground">Used for cash payments</p>
               </div>
             </div>
           </CardContent>

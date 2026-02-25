@@ -15,13 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import {
-  useCreateDeal,
-  useLeads,
-  Deal,
-  DealStage,
-  getDealStageLabel,
-} from '@/lib/hooks/use-crm';
+import { useCreateDeal, useLeads, Deal, DealStage, getDealStageLabel } from '@/lib/hooks/use-crm';
 import { useToast } from '@/components/ui/use-toast';
 
 const STAGES: DealStage[] = ['NEW', 'MEETING_SCHEDULED', 'PROPOSAL_SENT', 'NEGOTIATION'];
@@ -142,7 +136,9 @@ export function DealForm({ deal }: DealFormProps) {
                 {...form.register('expectedAmount', { valueAsNumber: true })}
               />
               {form.formState.errors.expectedAmount && (
-                <p className="text-sm text-red-500">{form.formState.errors.expectedAmount.message}</p>
+                <p className="text-sm text-red-500">
+                  {form.formState.errors.expectedAmount.message}
+                </p>
               )}
             </div>
 
@@ -159,11 +155,7 @@ export function DealForm({ deal }: DealFormProps) {
 
             <div className="space-y-2">
               <Label htmlFor="expectedCloseDate">Expected Close Date</Label>
-              <Input
-                id="expectedCloseDate"
-                type="date"
-                {...form.register('expectedCloseDate')}
-              />
+              <Input id="expectedCloseDate" type="date" {...form.register('expectedCloseDate')} />
             </div>
           </div>
         </CardContent>

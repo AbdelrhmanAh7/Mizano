@@ -11,7 +11,7 @@ import { LogEntry } from '@mizano/shared-types';
 @WebSocketGateway({
   namespace: '/logger',
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+    origin: process.env.FRONTEND_URL || 'http://localhost:5001',
     credentials: true,
   },
 })

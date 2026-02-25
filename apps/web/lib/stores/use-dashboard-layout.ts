@@ -13,14 +13,29 @@ export interface DashboardWidget {
 
 const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: 'ai-pulse', label: 'AI Business Pulse', visible: true, order: 0 },
-  { id: 'kpi-row-1', label: 'KPI Row 1 (Revenue, Expenses, Profit, Balance)', visible: true, order: 1 },
-  { id: 'kpi-row-2', label: 'KPI Row 2 (Receivables, Payables, Overdue, Projects)', visible: true, order: 2 },
+  {
+    id: 'kpi-row-1',
+    label: 'KPI Row 1 (Revenue, Expenses, Profit, Balance)',
+    visible: true,
+    order: 1,
+  },
+  {
+    id: 'kpi-row-2',
+    label: 'KPI Row 2 (Receivables, Payables, Overdue, Projects)',
+    visible: true,
+    order: 2,
+  },
   { id: 'ai-forecast', label: 'AI Forecast Charts', visible: true, order: 3 },
   { id: 'cash-flow-revenue', label: 'Cash Flow & Revenue', visible: true, order: 4 },
   { id: 'ar-ap-expenses', label: 'AR/AP & Expenses', visible: true, order: 5 },
   { id: 'profit-customers', label: 'Profit Margin & Top Customers', visible: true, order: 6 },
   { id: 'bank-inventory', label: 'Bank Balance & Inventory Value', visible: true, order: 7 },
-  { id: 'insights-transactions', label: 'AI Insights & Recent Transactions', visible: true, order: 8 },
+  {
+    id: 'insights-transactions',
+    label: 'AI Insights & Recent Transactions',
+    visible: true,
+    order: 8,
+  },
 ];
 
 interface DashboardLayoutState {
@@ -43,9 +58,7 @@ export const useDashboardLayout = create<DashboardLayoutState>()(
       setWidgets: (widgets) => set({ widgets }),
       toggleWidget: (id) =>
         set((state) => ({
-          widgets: state.widgets.map((w) =>
-            w.id === id ? { ...w, visible: !w.visible } : w,
-          ),
+          widgets: state.widgets.map((w) => (w.id === id ? { ...w, visible: !w.visible } : w)),
         })),
       moveWidget: (id, direction) =>
         set((state) => {

@@ -21,13 +21,11 @@ export interface EntityEvent {
 @WebSocketGateway({
   namespace: '/events',
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+    origin: process.env.FRONTEND_URL || 'http://localhost:5001',
     credentials: true,
   },
 })
-export class NotificationsGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
-{
+export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
@@ -91,9 +89,7 @@ export class NotificationsGateway
       ...notification,
       timestamp: new Date().toISOString(),
     });
-    this.logger.debug(
-      `Broadcast notification: "${notification.title}" to org:${orgId}`,
-    );
+    this.logger.debug(`Broadcast notification: "${notification.title}" to org:${orgId}`);
   }
 
   /**

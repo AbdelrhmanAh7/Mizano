@@ -122,9 +122,7 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
                 {warehouse.isActive ? 'Active' : 'Inactive'}
               </Badge>
             </div>
-            {warehouse.code && (
-              <p className="text-muted-foreground font-mono">{warehouse.code}</p>
-            )}
+            {warehouse.code && <p className="text-muted-foreground font-mono">{warehouse.code}</p>}
           </div>
         </div>
 
@@ -150,16 +148,13 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete Warehouse</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to delete this warehouse? Warehouses
-                  with stock cannot be deleted.
+                  Are you sure you want to delete this warehouse? Warehouses with stock cannot be
+                  deleted.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  className="bg-red-600 hover:bg-red-700"
-                >
+                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
                   Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -252,12 +247,8 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
                         {s.item.name}
                       </Link>
                     </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {s.item.sku || '-'}
-                    </TableCell>
-                    <TableCell className="text-right font-mono font-medium">
-                      {s.quantity}
-                    </TableCell>
+                    <TableCell className="font-mono text-sm">{s.item.sku || '-'}</TableCell>
+                    <TableCell className="text-right font-mono font-medium">{s.quantity}</TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       {s.item.unit || 'units'}
                     </TableCell>

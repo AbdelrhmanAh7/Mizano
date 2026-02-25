@@ -86,7 +86,7 @@ export class TransactionCategorizerService {
     if (trainingData.length < this.MIN_SAMPLES_FOR_PREDICTION) {
       throw new BadRequestException(
         `Insufficient training data: ${trainingData.length} samples found, minimum ${this.MIN_SAMPLES_FOR_PREDICTION} required. ` +
-        `Use the "Seed from History" button or categorize more transactions first.`,
+          `Use the "Seed from History" button or categorize more transactions first.`,
       );
     }
 
@@ -178,9 +178,7 @@ export class TransactionCategorizerService {
         `Categorization training failed for org ${organizationId}: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Training failed: ${error.message}`,
-      );
+      throw new BadRequestException(`Training failed: ${error.message}`);
     }
   }
 
@@ -344,9 +342,7 @@ export class TransactionCategorizerService {
       );
 
       if (shouldRetrain) {
-        this.logger.log(
-          `Categorization retraining threshold reached for org ${organizationId}`,
-        );
+        this.logger.log(`Categorization retraining threshold reached for org ${organizationId}`);
         this.eventEmitter.emit('ai.retraining.needed', {
           organizationId,
           feature: 'CATEGORIZATION',
@@ -380,17 +376,13 @@ export class TransactionCategorizerService {
     const modelData = model.modelData as unknown as CategorizationModelData;
 
     if (!modelData.classifierJson || modelData.sampleCount < this.MIN_SAMPLES_FOR_PREDICTION) {
-      this.logger.debug(
-        `Categorization model for org ${organizationId} has insufficient samples`,
-      );
+      this.logger.debug(`Categorization model for org ${organizationId} has insufficient samples`);
       return false;
     }
 
     try {
       // Deserialize classifier
-      const classifier = natural.BayesClassifier.restore(
-        JSON.parse(modelData.classifierJson),
-      );
+      const classifier = natural.BayesClassifier.restore(JSON.parse(modelData.classifierJson));
 
       // Cache the classifier
       this.classifierCache.set(organizationId, {
@@ -400,9 +392,7 @@ export class TransactionCategorizerService {
         loadedAt: new Date(),
       });
 
-      this.logger.debug(
-        `Loaded categorization model v${model.version} for org ${organizationId}`,
-      );
+      this.logger.debug(`Loaded categorization model v${model.version} for org ${organizationId}`);
       return true;
     } catch (error) {
       this.logger.error(
@@ -645,9 +635,7 @@ export class TransactionCategorizerService {
     }
 
     const avgAccuracy =
-      foldResults.length > 0
-        ? foldResults.reduce((a, b) => a + b, 0) / foldResults.length
-        : 0;
+      foldResults.length > 0 ? foldResults.reduce((a, b) => a + b, 0) / foldResults.length : 0;
 
     return { avgAccuracy, foldResults };
   }

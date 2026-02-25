@@ -51,7 +51,10 @@ export class AiForecastingService {
           dueDate: { gte: weekStart, lt: weekEnd },
         },
       });
-      const inflowAmount = expectedInflows.reduce((sum, inv) => sum + parseFloat(inv.balanceDue.toString()), 0);
+      const inflowAmount = expectedInflows.reduce(
+        (sum, inv) => sum + parseFloat(inv.balanceDue.toString()),
+        0,
+      );
 
       // Expected outflows - bills due this week
       const expectedOutflows = await this.prisma.bill.findMany({
@@ -62,7 +65,10 @@ export class AiForecastingService {
           dueDate: { gte: weekStart, lt: weekEnd },
         },
       });
-      const outflowAmount = expectedOutflows.reduce((sum, bill) => sum + parseFloat(bill.balanceDue.toString()), 0);
+      const outflowAmount = expectedOutflows.reduce(
+        (sum, bill) => sum + parseFloat(bill.balanceDue.toString()),
+        0,
+      );
 
       // Estimated recurring expenses (payroll, rent, etc.) - simplified
       const weeklyRecurring = await this.estimateWeeklyRecurring(organizationId);
@@ -114,7 +120,8 @@ export class AiForecastingService {
         data.historical.map((amount: number, i: number) => ({ month: i, value: amount })),
         months,
       );
-      data.averageMonthly = data.historical.reduce((sum: number, v: number) => sum + v, 0) / data.historical.length;
+      data.averageMonthly =
+        data.historical.reduce((sum: number, v: number) => sum + v, 0) / data.historical.length;
     }
 
     // Calculate total forecast
@@ -171,11 +178,13 @@ export class AiForecastingService {
     for (const customer of customers) {
       const lastInvoiceDate = customer.invoices[0]?.date;
       const invoiceCount = customer.invoices.length;
-      const recentInvoices = customer.invoices.filter((inv: { date: Date }) => inv.date >= threeMonthsAgo).length;
+      const recentInvoices = customer.invoices.filter(
+        (inv: { date: Date }) => inv.date >= threeMonthsAgo,
+      ).length;
 
       // Calculate churn risk score
       let riskScore = 0;
-      let riskFactors: string[] = [];
+      const riskFactors: string[] = [];
 
       // No invoices in 3 months
       if (lastInvoiceDate && lastInvoiceDate < threeMonthsAgo) {
@@ -193,7 +202,11 @@ export class AiForecastingService {
       }
 
       // Low lifetime value
-      const totalRevenue = customer.invoices.reduce((sum: number, inv: { grandTotal: { toString: () => string } }) => sum + parseFloat(inv.grandTotal.toString()), 0);
+      const totalRevenue = customer.invoices.reduce(
+        (sum: number, inv: { grandTotal: { toString: () => string } }) =>
+          sum + parseFloat(inv.grandTotal.toString()),
+        0,
+      );
       if (invoiceCount > 0 && totalRevenue / invoiceCount < 100) {
         riskScore += 20;
         riskFactors.push('Low average order value');

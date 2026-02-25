@@ -331,7 +331,7 @@ export function getCurrencyName(code: string): string {
 export function formatCurrencyAmount(
   amount: number | string | undefined,
   currencyCode: string = 'SAR',
-  showSymbol: boolean = true
+  showSymbol: boolean = true,
 ): string {
   if (amount === undefined || amount === null) {
     return showSymbol ? `${getCurrencySymbol(currencyCode)}0.00` : '0.00';

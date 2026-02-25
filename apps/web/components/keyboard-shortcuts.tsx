@@ -1,11 +1,11 @@
 'use client';
 
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog';
 import { useGlobalShortcutListener, useKeyboardShortcut } from '@/lib/hooks/use-keyboard-shortcut';
 import { modifierSymbol, useShortcutRegistry } from '@/lib/stores/use-shortcut-registry';

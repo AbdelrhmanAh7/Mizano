@@ -63,7 +63,11 @@ describe('LoggerController', () => {
     });
 
     it('should search logs', () => {
-      service.capture({ level: LogLevel.ERROR, source: LogSource.BACKEND, message: 'Database crash' });
+      service.capture({
+        level: LogLevel.ERROR,
+        source: LogSource.BACKEND,
+        message: 'Database crash',
+      });
       service.capture({ level: LogLevel.ERROR, source: LogSource.BACKEND, message: 'Auth failed' });
 
       const logs = controller.getLogs(undefined, undefined, undefined, undefined, 'database');

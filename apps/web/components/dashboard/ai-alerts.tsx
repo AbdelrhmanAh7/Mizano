@@ -74,7 +74,7 @@ export function AIAlerts({ alerts }: AIAlertsProps) {
                 className={cn(
                   'flex items-start gap-3 p-3 rounded-lg border',
                   styles.bg,
-                  styles.border
+                  styles.border,
                 )}
               >
                 <div className={styles.color}>

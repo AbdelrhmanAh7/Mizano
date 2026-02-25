@@ -43,11 +43,7 @@ const insightIcons: Record<InsightType, React.ReactNode> = {
   OPPORTUNITY: <Target className="h-6 w-6" />,
 };
 
-export default function InsightDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function InsightDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const { data: insight, isLoading } = useAIInsight(id);
@@ -215,10 +211,10 @@ export default function InsightDetailPage({
                   {confidencePercent >= 90
                     ? 'Very high confidence in this analysis'
                     : confidencePercent >= 70
-                    ? 'Good confidence in this analysis'
-                    : confidencePercent >= 50
-                    ? 'Moderate confidence - review recommended'
-                    : 'Low confidence - manual verification needed'}
+                      ? 'Good confidence in this analysis'
+                      : confidencePercent >= 50
+                        ? 'Moderate confidence - review recommended'
+                        : 'Low confidence - manual verification needed'}
                 </p>
               </div>
             </CardContent>

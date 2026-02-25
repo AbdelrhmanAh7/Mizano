@@ -138,18 +138,13 @@ export function ReconciliationMatchCard({
       className={cn(
         'transition-all hover:shadow-md',
         confidenceColors[match.confidence],
-        className
+        className,
       )}
     >
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           {/* Entity Type Icon */}
-          <div
-            className={cn(
-              'flex items-center justify-center rounded-lg p-2',
-              config.bgColor
-            )}
-          >
+          <div className={cn('flex items-center justify-center rounded-lg p-2', config.bgColor)}>
             <Icon className={cn('h-5 w-5', config.color)} />
           </div>
 
@@ -163,15 +158,9 @@ export function ReconciliationMatchCard({
                     {config.label}
                   </Badge>
                 </div>
-                <div className="text-sm text-muted-foreground mt-0.5">
-                  {getEntityName()}
-                </div>
+                <div className="text-sm text-muted-foreground mt-0.5">{getEntityName()}</div>
               </div>
-              <ConfidenceBadge
-                confidence={match.totalScore}
-                size="sm"
-                showPercentage={true}
-              />
+              <ConfidenceBadge confidence={match.totalScore} size="sm" showPercentage={true} />
             </div>
 
             {/* Amount and Date */}
@@ -224,11 +213,7 @@ export function ReconciliationMatchCard({
             size="sm"
             onClick={() => onConfirm?.(match.entityType, match.entityId)}
             disabled={isLoading}
-            className={
-              match.confidence === 'high'
-                ? 'bg-green-600 hover:bg-green-700'
-                : undefined
-            }
+            className={match.confidence === 'high' ? 'bg-green-600 hover:bg-green-700' : undefined}
           >
             <Check className="h-4 w-4 mr-1" />
             {match.confidence === 'high' ? 'Quick Match' : 'Confirm Match'}
@@ -257,11 +242,7 @@ function ScoreBreakdown({ breakdown }: { breakdown: MatchScoreBreakdown }) {
               <div
                 className={cn(
                   'h-full rounded-full',
-                  score >= 0.7
-                    ? 'bg-green-500'
-                    : score >= 0.3
-                    ? 'bg-yellow-500'
-                    : 'bg-gray-300'
+                  score >= 0.7 ? 'bg-green-500' : score >= 0.3 ? 'bg-yellow-500' : 'bg-gray-300',
                 )}
                 style={{ width: `${score * 100}%` }}
               />
@@ -292,11 +273,7 @@ export function ReconciliationMatchList({
   emptyMessage?: string;
 }) {
   if (matches.length === 0) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        {emptyMessage}
-      </div>
-    );
+    return <div className="text-center py-8 text-muted-foreground">{emptyMessage}</div>;
   }
 
   return (

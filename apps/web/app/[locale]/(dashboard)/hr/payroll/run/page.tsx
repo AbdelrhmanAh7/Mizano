@@ -36,16 +36,21 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Progress } from '@/components/ui/progress';
-import {
-  useEmployees,
-  useRunPayroll,
-  useConfirmPayroll,
-  formatCurrency,
-} from '@/lib/hooks/use-hr';
+import { useEmployees, useRunPayroll, useConfirmPayroll, formatCurrency } from '@/lib/hooks/use-hr';
 
 const months = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 interface PayslipPreview {
@@ -81,9 +86,8 @@ export default function RunPayrollPage() {
     // In real implementation, this would call an API to generate preview
     // For now, simulate with local calculation
     const previewData: PayslipPreview[] = employees.map((emp: any) => {
-      const basicSalary = typeof emp.basicSalary === 'string'
-        ? parseFloat(emp.basicSalary)
-        : emp.basicSalary;
+      const basicSalary =
+        typeof emp.basicSalary === 'string' ? parseFloat(emp.basicSalary) : emp.basicSalary;
       const allowances = emp.allowances || [];
       const deductions = emp.deductions || [];
       const totalAllowances = allowances.reduce((sum: number, a: any) => sum + (a.amount || 0), 0);
@@ -159,45 +163,56 @@ export default function RunPayrollPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Run Payroll</h1>
-          <p className="text-muted-foreground">
-            Process employee salaries for a pay period
-          </p>
+          <p className="text-muted-foreground">Process employee salaries for a pay period</p>
         </div>
       </div>
 
       {/* Progress Steps */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            step === 'select' ? 'bg-primary text-primary-foreground' : 'bg-green-500 text-white'
-          }`}>
+          <div
+            className={`w-8 h-8 rounded-full flex items-center justify-center ${
+              step === 'select' ? 'bg-primary text-primary-foreground' : 'bg-green-500 text-white'
+            }`}
+          >
             {step === 'select' ? '1' : <CheckCircle2 className="h-5 w-5" />}
           </div>
           <span className="font-medium">Select Period</span>
         </div>
         <div className="flex-1 h-1 bg-muted">
-          <div className={`h-full bg-primary transition-all ${
-            step === 'select' ? 'w-0' : step === 'preview' ? 'w-1/2' : 'w-full'
-          }`} />
+          <div
+            className={`h-full bg-primary transition-all ${
+              step === 'select' ? 'w-0' : step === 'preview' ? 'w-1/2' : 'w-full'
+            }`}
+          />
         </div>
         <div className="flex items-center gap-2">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            step === 'select' ? 'bg-muted text-muted-foreground' :
-            step === 'preview' ? 'bg-primary text-primary-foreground' : 'bg-green-500 text-white'
-          }`}>
+          <div
+            className={`w-8 h-8 rounded-full flex items-center justify-center ${
+              step === 'select'
+                ? 'bg-muted text-muted-foreground'
+                : step === 'preview'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-green-500 text-white'
+            }`}
+          >
             {step === 'confirm' ? <CheckCircle2 className="h-5 w-5" /> : '2'}
           </div>
           <span className="font-medium">Preview</span>
         </div>
         <div className="flex-1 h-1 bg-muted">
-          <div className={`h-full bg-primary transition-all ${
-            step === 'confirm' ? 'w-full' : 'w-0'
-          }`} />
+          <div
+            className={`h-full bg-primary transition-all ${step === 'confirm' ? 'w-full' : 'w-0'}`}
+          />
         </div>
         <div className="flex items-center gap-2">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            step === 'confirm' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-          }`}>
+          <div
+            className={`w-8 h-8 rounded-full flex items-center justify-center ${
+              step === 'confirm'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground'
+            }`}
+          >
             3
           </div>
           <span className="font-medium">Confirm</span>
@@ -209,18 +224,13 @@ export default function RunPayrollPage() {
         <Card>
           <CardHeader>
             <CardTitle>Select Pay Period</CardTitle>
-            <CardDescription>
-              Choose the month and year for this payroll run
-            </CardDescription>
+            <CardDescription>Choose the month and year for this payroll run</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-2 gap-4 max-w-md">
               <div className="space-y-2">
                 <Label>Month</Label>
-                <Select
-                  value={month.toString()}
-                  onValueChange={(v) => setMonth(parseInt(v))}
-                >
+                <Select value={month.toString()} onValueChange={(v) => setMonth(parseInt(v))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -235,10 +245,7 @@ export default function RunPayrollPage() {
               </div>
               <div className="space-y-2">
                 <Label>Year</Label>
-                <Select
-                  value={year.toString()}
-                  onValueChange={(v) => setYear(parseInt(v))}
-                >
+                <Select value={year.toString()} onValueChange={(v) => setYear(parseInt(v))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -287,9 +294,7 @@ export default function RunPayrollPage() {
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">Total Gross</p>
-                <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(totalGross)}
-                </p>
+                <p className="text-2xl font-bold font-mono">{formatCurrency(totalGross)}</p>
               </CardContent>
             </Card>
             <Card>
@@ -303,9 +308,7 @@ export default function RunPayrollPage() {
             <Card className="bg-primary/5">
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">Total Net Pay</p>
-                <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(totalNetPay)}
-                </p>
+                <p className="text-2xl font-bold font-mono">{formatCurrency(totalNetPay)}</p>
               </CardContent>
             </Card>
           </div>
@@ -315,9 +318,7 @@ export default function RunPayrollPage() {
               <CardTitle>
                 Payroll Preview - {months[month - 1]} {year}
               </CardTitle>
-              <CardDescription>
-                Review the calculated salaries before processing
-              </CardDescription>
+              <CardDescription>Review the calculated salaries before processing</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -336,9 +337,7 @@ export default function RunPayrollPage() {
                 <TableBody>
                   {preview.map((slip) => (
                     <TableRow key={slip.employeeId}>
-                      <TableCell className="font-medium">
-                        {slip.employeeName}
-                      </TableCell>
+                      <TableCell className="font-medium">{slip.employeeName}</TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(slip.basicSalary)}
                       </TableCell>
@@ -350,9 +349,7 @@ export default function RunPayrollPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         {slip.lopDays > 0 ? (
-                          <span className="text-red-600">
-                            {slip.lopDays} days
-                          </span>
+                          <span className="text-red-600">{slip.lopDays} days</span>
                         ) : (
                           '-'
                         )}
@@ -393,7 +390,8 @@ export default function RunPayrollPage() {
               <CheckCircle2 className="mx-auto h-16 w-16 text-green-500" />
               <h2 className="text-2xl font-bold">Payroll Generated Successfully</h2>
               <p className="text-muted-foreground">
-                Payslips for {months[month - 1]} {year} have been created for {preview.length} employees.
+                Payslips for {months[month - 1]} {year} have been created for {preview.length}{' '}
+                employees.
               </p>
               <div className="py-4">
                 <Badge variant="outline" className="text-lg px-4 py-2">
@@ -402,9 +400,7 @@ export default function RunPayrollPage() {
               </div>
               <div className="flex justify-center gap-4">
                 <Button variant="outline" asChild>
-                  <Link href={`/hr/payroll/${payrollRunId}`}>
-                    View Details
-                  </Link>
+                  <Link href={`/hr/payroll/${payrollRunId}`}>View Details</Link>
                 </Button>
                 <Button onClick={() => setShowConfirmDialog(true)}>
                   <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -422,16 +418,13 @@ export default function RunPayrollPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Payroll</AlertDialogTitle>
             <AlertDialogDescription>
-              This will finalize the payroll and create accounting entries.
-              This action cannot be undone. Make sure all details are correct.
+              This will finalize the payroll and create accounting entries. This action cannot be
+              undone. Make sure all details are correct.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmPayroll}
-              disabled={confirmPayroll.isPending}
-            >
+            <AlertDialogAction onClick={handleConfirmPayroll} disabled={confirmPayroll.isPending}>
               {confirmPayroll.isPending ? 'Confirming...' : 'Confirm Payroll'}
             </AlertDialogAction>
           </AlertDialogFooter>

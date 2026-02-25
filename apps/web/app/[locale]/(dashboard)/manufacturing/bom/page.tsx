@@ -59,7 +59,11 @@ function BOMListPageContent() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedBOM, setSelectedBOM] = useState<BOM | null>(null);
 
-  const { data: bomsData, isLoading, refetch } = useBOMs({
+  const {
+    data: bomsData,
+    isLoading,
+    refetch,
+  } = useBOMs({
     search: tableParams.search || undefined,
     status: selectedStatus !== 'all' ? selectedStatus : undefined,
   });
@@ -122,10 +126,12 @@ function BOMListPageContent() {
         const bom = row.original;
         return bom.outputItem ? (
           <span>
-            <span className="text-xs text-muted-foreground">{bom.outputItem.code}</span>
-            {' '}{bom.outputItem.name}
+            <span className="text-xs text-muted-foreground">{bom.outputItem.code}</span>{' '}
+            {bom.outputItem.name}
           </span>
-        ) : '-';
+        ) : (
+          '-'
+        );
       },
     },
     {
@@ -139,9 +145,7 @@ function BOMListPageContent() {
       header: 'Operations Cost',
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => (
-        <span className="font-mono">
-          {formatCurrency(row.original.operationsCost)}
-        </span>
+        <span className="font-mono">{formatCurrency(row.original.operationsCost)}</span>
       ),
     },
     {
@@ -184,10 +188,7 @@ function BOMListPageContent() {
               {canDelete && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => handleDelete(bom)}
-                    className="text-red-600"
-                  >
+                  <DropdownMenuItem onClick={() => handleDelete(bom)} className="text-red-600">
                     <Trash2 className="mr-2 h-4 w-4" />
                     Delete
                   </DropdownMenuItem>
@@ -206,9 +207,7 @@ function BOMListPageContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Bills of Materials</h1>
-          <p className="text-muted-foreground">
-            Define product recipes and component requirements
-          </p>
+          <p className="text-muted-foreground">Define product recipes and component requirements</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
@@ -288,16 +287,13 @@ function BOMListPageContent() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete BOM</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete BOM &quot;{selectedBOM?.name}&quot;?
-              This action cannot be undone.
+              Are you sure you want to delete BOM &quot;{selectedBOM?.name}&quot;? This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

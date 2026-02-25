@@ -98,7 +98,7 @@ export function Cannot({ permission, children }: CannotProps) {
 export function withPermission<P extends object>(
   WrappedComponent: React.ComponentType<P>,
   permission: string,
-  FallbackComponent?: React.ComponentType
+  FallbackComponent?: React.ComponentType,
 ) {
   return function PermissionGate(props: P) {
     const { hasPermission, isLoading } = usePermissions();

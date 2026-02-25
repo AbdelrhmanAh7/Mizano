@@ -51,7 +51,10 @@ export class EmailService {
         invoiceNumber: invoice.invoiceNumber,
         invoiceDate: formatDate(invoice.date),
         dueDate: formatDate(invoice.dueDate),
-        grandTotal: formatCurrency(parseFloat(invoice.grandTotal.toString()), invoice.currencyCode || 'SAR'),
+        grandTotal: formatCurrency(
+          parseFloat(invoice.grandTotal.toString()),
+          invoice.currencyCode || 'SAR',
+        ),
         currency: invoice.currencyCode || 'SAR',
       };
 
@@ -143,7 +146,10 @@ export class EmailService {
         quoteNumber: quote.quoteNumber,
         quoteDate: formatDate(quote.date),
         expiryDate: formatDate(quote.expiryDate),
-        grandTotal: formatCurrency(parseFloat(quote.grandTotal.toString()), quote.currencyCode || 'SAR'),
+        grandTotal: formatCurrency(
+          parseFloat(quote.grandTotal.toString()),
+          quote.currencyCode || 'SAR',
+        ),
         currency: quote.currencyCode || 'SAR',
       };
 
@@ -313,7 +319,12 @@ export class EmailService {
     organizationId: string,
     payrollRunId: string,
     options?: { subjectTemplate?: string; messageTemplate?: string },
-  ): Promise<{ total: number; sent: number; failed: number; errors: Array<{ employeeId: string; error: string }> }> {
+  ): Promise<{
+    total: number;
+    sent: number;
+    failed: number;
+    errors: Array<{ employeeId: string; error: string }>;
+  }> {
     const payrollRun = await this.prisma.payrollRun.findFirst({
       where: { id: payrollRunId, organizationId },
       include: {

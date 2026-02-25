@@ -101,11 +101,26 @@ export class BankStatementImportService {
     const lower = headers.map((h) => h.toLowerCase().trim());
 
     // Date column
-    const datePatterns = ['date', 'transaction date', 'post date', 'value date', 'booking date', 'trans date'];
+    const datePatterns = [
+      'date',
+      'transaction date',
+      'post date',
+      'value date',
+      'booking date',
+      'trans date',
+    ];
     mapping.dateCol = this.findMatchingHeader(headers, lower, datePatterns);
 
     // Description column
-    const descPatterns = ['description', 'memo', 'narration', 'details', 'particulars', 'narrative', 'transaction description'];
+    const descPatterns = [
+      'description',
+      'memo',
+      'narration',
+      'details',
+      'particulars',
+      'narrative',
+      'transaction description',
+    ];
     mapping.descriptionCol = this.findMatchingHeader(headers, lower, descPatterns);
 
     // Amount column (single combined column)
@@ -121,7 +136,16 @@ export class BankStatementImportService {
     mapping.creditCol = this.findMatchingHeader(headers, lower, creditPatterns);
 
     // Reference column
-    const refPatterns = ['reference', 'check no', 'ref no', 'cheque', 'fitid', 'transaction id', 'ref', 'check number'];
+    const refPatterns = [
+      'reference',
+      'check no',
+      'ref no',
+      'cheque',
+      'fitid',
+      'transaction id',
+      'ref',
+      'check number',
+    ];
     mapping.referenceCol = this.findMatchingHeader(headers, lower, refPatterns);
 
     // If no amount column but have debit/credit, that's fine
@@ -168,7 +192,11 @@ export class BankStatementImportService {
     for (const row of rows) {
       let amount = 0;
 
-      if (mapping.amountCol && row[mapping.amountCol] !== undefined && row[mapping.amountCol] !== '') {
+      if (
+        mapping.amountCol &&
+        row[mapping.amountCol] !== undefined &&
+        row[mapping.amountCol] !== ''
+      ) {
         // Single amount column
         amount = this.parseAmount(row[mapping.amountCol]);
       } else if (mapping.debitCol || mapping.creditCol) {
@@ -184,8 +212,12 @@ export class BankStatementImportService {
       const dateStr = mapping.dateCol ? this.parseDate(row[mapping.dateCol]) : null;
       if (!dateStr) continue; // Skip rows without valid date
 
-      const description = mapping.descriptionCol ? String(row[mapping.descriptionCol] || '').trim() : '';
-      const reference = mapping.referenceCol ? String(row[mapping.referenceCol] || '').trim() || null : null;
+      const description = mapping.descriptionCol
+        ? String(row[mapping.descriptionCol] || '').trim()
+        : '';
+      const reference = mapping.referenceCol
+        ? String(row[mapping.referenceCol] || '').trim() || null
+        : null;
 
       transactions.push({
         date: dateStr,
@@ -209,9 +241,7 @@ export class BankStatementImportService {
 
     // Handle parentheses for negative: (1234.56) → -1234.56
     const isNegative = str.startsWith('(') && str.endsWith(')');
-    const cleaned = str
-      .replace(/[()]/g, '')
-      .replace(/[^0-9.\-,]/g, ''); // Keep digits, dots, minus, commas
+    const cleaned = str.replace(/[()]/g, '').replace(/[^0-9.\-,]/g, ''); // Keep digits, dots, minus, commas
 
     // Detect format: if last separator is comma and has 2 digits after → European format
     const lastComma = cleaned.lastIndexOf(',');
@@ -336,8 +366,10 @@ export class BankStatementImportService {
 
       // Check by reference
       if (tx.reference) {
-        if (existingSignatures.has(`${dateStr}|${signedAmount}|ref:${tx.reference}`) ||
-            existingSignatures.has(`${dateStr}|${amount}|ref:${tx.reference}`)) {
+        if (
+          existingSignatures.has(`${dateStr}|${signedAmount}|ref:${tx.reference}`) ||
+          existingSignatures.has(`${dateStr}|${amount}|ref:${tx.reference}`)
+        ) {
           isDuplicate = true;
         }
       }
@@ -345,8 +377,10 @@ export class BankStatementImportService {
       // Check by description
       if (!isDuplicate && tx.description) {
         const descKey = tx.description.substring(0, 50).toLowerCase();
-        if (existingSignatures.has(`${dateStr}|${signedAmount}|desc:${descKey}`) ||
-            existingSignatures.has(`${dateStr}|${amount}|desc:${descKey}`)) {
+        if (
+          existingSignatures.has(`${dateStr}|${signedAmount}|desc:${descKey}`) ||
+          existingSignatures.has(`${dateStr}|${amount}|desc:${descKey}`)
+        ) {
           isDuplicate = true;
         }
       }

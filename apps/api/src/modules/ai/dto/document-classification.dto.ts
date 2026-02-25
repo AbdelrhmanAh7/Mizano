@@ -4,12 +4,18 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 // Request DTOs
 
 export class ClassifyDocumentDto {
-  @ApiProperty({ description: 'Document text content to classify', example: 'Invoice #1234 from Acme Corp for office supplies' })
+  @ApiProperty({
+    description: 'Document text content to classify',
+    example: 'Invoice #1234 from Acme Corp for office supplies',
+  })
   @IsString()
   @MinLength(1)
   text: string;
 
-  @ApiPropertyOptional({ description: 'Original filename for context', example: 'invoice_acme_2024.pdf' })
+  @ApiPropertyOptional({
+    description: 'Original filename for context',
+    example: 'invoice_acme_2024.pdf',
+  })
   @IsString()
   @IsOptional()
   filename?: string;

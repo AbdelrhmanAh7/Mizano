@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
+import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../../../prisma/prisma.module';
 import { AiCoreModule } from '../core/ai-core.module';
 import { AiNlpModule } from '../nlp/ai-nlp.module';
 
 // Operations Services
+import { VlmService } from '../services/vlm.service';
+import { VlmFeedbackService } from '../services/vlm-feedback.service';
 import { OcrService } from '../services/ocr.service';
 import { PaddleOcrService } from '../services/paddle-ocr.service';
 import { DocumentIntakeService } from '../services/document-intake.service';
@@ -20,9 +24,10 @@ import { ReorderPointsController } from '../controllers/reorder-points.controlle
 import { PatternDetectionController } from '../controllers/pattern-detection.controller';
 import { AnomalyDetectionController } from '../controllers/anomaly-detection.controller';
 import { ReconciliationAiController } from '../controllers/reconciliation-ai.controller';
+import { VlmStatsController } from '../controllers/vlm-stats.controller';
 
 @Module({
-  imports: [PrismaModule, AiCoreModule, AiNlpModule],
+  imports: [PrismaModule, AiCoreModule, AiNlpModule, HttpModule, ConfigModule],
   controllers: [
     OcrController,
     OcrTrainingController,
@@ -31,8 +36,11 @@ import { ReconciliationAiController } from '../controllers/reconciliation-ai.con
     PatternDetectionController,
     AnomalyDetectionController,
     ReconciliationAiController,
+    VlmStatsController,
   ],
   providers: [
+    VlmService,
+    VlmFeedbackService,
     OcrService,
     PaddleOcrService,
     DocumentIntakeService,
@@ -42,6 +50,8 @@ import { ReconciliationAiController } from '../controllers/reconciliation-ai.con
     ReconciliationMatcherService,
   ],
   exports: [
+    VlmService,
+    VlmFeedbackService,
     OcrService,
     PaddleOcrService,
     DocumentIntakeService,

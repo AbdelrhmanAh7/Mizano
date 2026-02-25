@@ -33,19 +33,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
             retry: 1,
           },
         },
-      })
+      }),
   );
 
   return (
-    <SessionProvider
-      refetchInterval={0}
-      refetchOnWindowFocus={false}
-      refetchWhenOffline={false}
-    >
+    <SessionProvider refetchInterval={0} refetchOnWindowFocus={false} refetchWhenOffline={false}>
       <QueryClientProvider client={queryClient}>
-        <SessionGuard>
-          {children}
-        </SessionGuard>
+        <SessionGuard>{children}</SessionGuard>
         <Toaster />
       </QueryClientProvider>
     </SessionProvider>

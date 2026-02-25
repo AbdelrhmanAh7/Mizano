@@ -117,15 +117,8 @@ export function runCashFlowMonteCarlo(params: MonteCarloParams): MonteCarloResul
       const eventCopy = { ...e, date: new Date(e.date) };
 
       // Randomize AR timing
-      if (
-        eventCopy.type === 'inflow' &&
-        eventCopy.source === 'ar' &&
-        eventCopy.predictedDate
-      ) {
-        eventCopy.date = randomizeARDate(
-          eventCopy.predictedDate,
-          eventCopy.confidence || 0.7,
-        );
+      if (eventCopy.type === 'inflow' && eventCopy.source === 'ar' && eventCopy.predictedDate) {
+        eventCopy.date = randomizeARDate(eventCopy.predictedDate, eventCopy.confidence || 0.7);
       }
 
       return eventCopy;
@@ -269,23 +262,15 @@ export function calculatePeriodTotals(
   for (const event of events) {
     if (event.date >= startDate && event.date <= endDate) {
       if (event.type === 'inflow') {
-        inflowsBySource[event.source] =
-          (inflowsBySource[event.source] || 0) + event.amount;
+        inflowsBySource[event.source] = (inflowsBySource[event.source] || 0) + event.amount;
       } else {
-        outflowsBySource[event.source] =
-          (outflowsBySource[event.source] || 0) + event.amount;
+        outflowsBySource[event.source] = (outflowsBySource[event.source] || 0) + event.amount;
       }
     }
   }
 
-  const expectedInflows = Object.values(inflowsBySource).reduce(
-    (sum, v) => sum + v,
-    0,
-  );
-  const expectedOutflows = Object.values(outflowsBySource).reduce(
-    (sum, v) => sum + v,
-    0,
-  );
+  const expectedInflows = Object.values(inflowsBySource).reduce((sum, v) => sum + v, 0);
+  const expectedOutflows = Object.values(outflowsBySource).reduce((sum, v) => sum + v, 0);
 
   return {
     expectedInflows,
@@ -404,9 +389,7 @@ export function identifyCriticalDates(
       // 20% of threshold
       // Find what caused the drop
       const dayEvents = events.filter(
-        (e) =>
-          e.type === 'outflow' &&
-          e.date.toDateString() === curr.date.toDateString(),
+        (e) => e.type === 'outflow' && e.date.toDateString() === curr.date.toDateString(),
       );
 
       const largestEvent = dayEvents.sort((a, b) => b.amount - a.amount)[0];

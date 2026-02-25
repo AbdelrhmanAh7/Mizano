@@ -8,10 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import {
-  useDashboardFilters,
-  type DatePreset,
-} from '@/lib/stores/use-dashboard-filters';
+import { useDashboardFilters, type DatePreset } from '@/lib/stores/use-dashboard-filters';
 
 const presets: { label: string; value: DatePreset }[] = [
   { label: 'This Month', value: 'thisMonth' },
@@ -39,8 +36,7 @@ export function DateRangePicker() {
           {dateRange?.from ? (
             dateRange.to ? (
               <>
-                {format(dateRange.from, 'MMM d, yyyy')} -{' '}
-                {format(dateRange.to, 'MMM d, yyyy')}
+                {format(dateRange.from, 'MMM d, yyyy')} - {format(dateRange.to, 'MMM d, yyyy')}
               </>
             ) : (
               format(dateRange.from, 'MMM d, yyyy')
@@ -53,9 +49,7 @@ export function DateRangePicker() {
       <PopoverContent className="w-auto p-0" align="end">
         <div className="flex">
           <div className="border-e p-3 space-y-1 min-w-[150px]">
-            <p className="text-xs font-medium text-muted-foreground mb-2 px-2">
-              Quick Select
-            </p>
+            <p className="text-xs font-medium text-muted-foreground mb-2 px-2">Quick Select</p>
             {presets.map((p) => (
               <Button
                 key={p.value}

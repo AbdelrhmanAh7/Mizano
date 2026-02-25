@@ -31,9 +31,7 @@ export function CitySelect({
   const cities = useMemo(() => {
     if (!country) return [];
     // Find country code from name
-    const countryObj = countries.find(
-      (c) => c.name === country || c.code === country
-    );
+    const countryObj = countries.find((c) => c.name === country || c.code === country);
     if (!countryObj) return [];
     return citiesByCountry[countryObj.code] || [];
   }, [country]);

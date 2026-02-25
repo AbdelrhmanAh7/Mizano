@@ -31,10 +31,14 @@ jest.mock('lucide-react', () => {
 // Mock UI components
 jest.mock('@/components/ui/card', () => ({
   Card: ({ children, ...props }: { children: React.ReactNode }) => (
-    <div data-testid="card" {...props}>{children}</div>
+    <div data-testid="card" {...props}>
+      {children}
+    </div>
   ),
   CardContent: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div data-testid="card-content" className={className}>{children}</div>
+    <div data-testid="card-content" className={className}>
+      {children}
+    </div>
   ),
 }));
 
@@ -60,31 +64,23 @@ const { DollarSign, Users } = jest.requireMock('lucide-react');
 
 describe('StatCard', () => {
   it('renders the title text', () => {
-    render(
-      <StatCard title="Total Revenue" value={50000} icon={DollarSign} />,
-    );
+    render(<StatCard title="Total Revenue" value={50000} icon={DollarSign} />);
     expect(screen.getByText('Total Revenue')).toBeInTheDocument();
   });
 
   it('renders a formatted currency value by default', () => {
-    render(
-      <StatCard title="Revenue" value={1500000} icon={DollarSign} currency="USD" />,
-    );
+    render(<StatCard title="Revenue" value={1500000} icon={DollarSign} currency="USD" />);
     // Compact notation: $1.5M
     expect(screen.getByText('$1.5M')).toBeInTheDocument();
   });
 
   it('renders a plain number when currency is "count"', () => {
-    render(
-      <StatCard title="Active Users" value={1234} icon={Users} currency="count" />,
-    );
+    render(<StatCard title="Active Users" value={1234} icon={Users} currency="count" />);
     expect(screen.getByText('1,234')).toBeInTheDocument();
   });
 
   it('renders the icon', () => {
-    render(
-      <StatCard title="Revenue" value={50000} icon={DollarSign} />,
-    );
+    render(<StatCard title="Revenue" value={50000} icon={DollarSign} />);
     expect(screen.getByTestId('stat-icon')).toBeInTheDocument();
   });
 
@@ -97,9 +93,7 @@ describe('StatCard', () => {
         trend={{ value: 12.5, isPositive: true }}
       />,
     );
-    const trendElement = screen.getByText((content) =>
-      content.includes('12.5% from last month'),
-    );
+    const trendElement = screen.getByText((content) => content.includes('12.5% from last month'));
     expect(trendElement).toBeInTheDocument();
     expect(trendElement.className).toContain('text-green-600');
     expect(trendElement.textContent).toContain('\u2191'); // up arrow
@@ -114,18 +108,14 @@ describe('StatCard', () => {
         trend={{ value: -8.3, isPositive: false }}
       />,
     );
-    const trendElement = screen.getByText((content) =>
-      content.includes('8.3% from last month'),
-    );
+    const trendElement = screen.getByText((content) => content.includes('8.3% from last month'));
     expect(trendElement).toBeInTheDocument();
     expect(trendElement.className).toContain('text-red-600');
     expect(trendElement.textContent).toContain('\u2193'); // down arrow
   });
 
   it('does not render trend section when trend prop is not provided', () => {
-    render(
-      <StatCard title="Revenue" value={50000} icon={DollarSign} />,
-    );
+    render(<StatCard title="Revenue" value={50000} icon={DollarSign} />);
     expect(screen.queryByText(/from last month/)).not.toBeInTheDocument();
   });
 
@@ -145,9 +135,7 @@ describe('StatCard', () => {
   });
 
   it('defaults to blue icon color and background when not specified', () => {
-    const { container } = render(
-      <StatCard title="Revenue" value={50000} icon={DollarSign} />,
-    );
+    const { container } = render(<StatCard title="Revenue" value={50000} icon={DollarSign} />);
     // Default blue colors should be in the rendered HTML
     expect(container.innerHTML).toContain('blue');
   });

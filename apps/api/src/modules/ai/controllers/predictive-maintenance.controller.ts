@@ -1,17 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -39,14 +27,8 @@ export class PredictiveMaintenanceController {
     description: 'Returns health prediction for the asset',
     type: AssetHealthDto,
   })
-  async predictAssetHealth(
-    @CurrentOrg() orgId: string,
-    @Param('assetId') assetId: string,
-  ) {
-    const result = await this.predictiveMaintenanceService.predictAssetHealth(
-      orgId,
-      assetId,
-    );
+  async predictAssetHealth(@CurrentOrg() orgId: string, @Param('assetId') assetId: string) {
+    const result = await this.predictiveMaintenanceService.predictAssetHealth(orgId, assetId);
     return { data: result };
   }
 
@@ -58,9 +40,7 @@ export class PredictiveMaintenanceController {
     description: 'Returns prioritized maintenance schedule',
     type: [MaintenanceScheduleItemDto],
   })
-  async getMaintenanceSchedule(
-    @CurrentOrg() orgId: string,
-  ) {
+  async getMaintenanceSchedule(@CurrentOrg() orgId: string) {
     const result = await this.predictiveMaintenanceService.getMaintenanceSchedule(orgId);
     return { data: result };
   }
@@ -73,9 +53,7 @@ export class PredictiveMaintenanceController {
     description: 'Returns health scores for all tracked assets',
     type: [AssetHealthDto],
   })
-  async getHealthScores(
-    @CurrentOrg() orgId: string,
-  ) {
+  async getHealthScores(@CurrentOrg() orgId: string) {
     const result = await this.predictiveMaintenanceService.getHealthScores(orgId);
     return { data: result };
   }
@@ -88,9 +66,7 @@ export class PredictiveMaintenanceController {
     description: 'Returns batch prediction summary',
     type: MaintenanceBatchDto,
   })
-  async predictAll(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: MaintenanceBatchDto }> {
+  async predictAll(@CurrentOrg() orgId: string): Promise<{ data: MaintenanceBatchDto }> {
     const result = await this.predictiveMaintenanceService.predictAll(orgId);
     return { data: result };
   }

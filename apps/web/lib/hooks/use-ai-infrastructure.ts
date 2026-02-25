@@ -203,7 +203,7 @@ const newAiApi = {
   confirmReconciliationMatch: async (
     transactionId: string,
     entityType: string,
-    entityId: string
+    entityId: string,
   ) => {
     const response = await api.post(`/ai/reconciliation/confirm/${transactionId}`, {
       entityType,
@@ -231,9 +231,13 @@ const newAiApi = {
     return response.data;
   },
   bulkAutoMatch: async (transactionIds: string[], minConfidence?: number) => {
-    const response = await api.post('/ai/reconciliation/bulk-match', {
-      transactionIds,
-    }, { params: { minConfidence } });
+    const response = await api.post(
+      '/ai/reconciliation/bulk-match',
+      {
+        transactionIds,
+      },
+      { params: { minConfidence } },
+    );
     return response.data;
   },
 
@@ -264,11 +268,7 @@ const newAiApi = {
     const response = await api.post('/ai/ocr/learn', data);
     return response.data;
   },
-  checkDuplicate: async (data: {
-    vendorId?: string;
-    invoiceNumber?: string;
-    amount?: number;
-  }) => {
+  checkDuplicate: async (data: { vendorId?: string; invoiceNumber?: string; amount?: number }) => {
     const response = await api.post('/ai/ocr/check-duplicate', data);
     return response.data;
   },
@@ -363,7 +363,7 @@ export function useDeadStock(thresholdDays?: number) {
 export function useItemReorderAnalysis(
   itemId: string,
   leadTimeDays?: number,
-  serviceLevel?: number
+  serviceLevel?: number,
 ) {
   return useQuery({
     queryKey: ['ai-reorder', 'item', itemId, leadTimeDays, serviceLevel],

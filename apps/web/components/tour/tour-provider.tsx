@@ -4,21 +4,12 @@ import { useEffect, useRef, useCallback } from 'react';
 import type { Driver } from 'driver.js';
 import { useLocale } from 'next-intl';
 import { useTourStore } from '@/lib/stores/use-tour-store';
-import {
-  useUpdateTourProgress,
-  useDismissTour,
-} from '@/lib/hooks/use-user-preferences';
+import { useUpdateTourProgress, useDismissTour } from '@/lib/hooks/use-user-preferences';
 import { tourDefinitions } from './tour-definitions';
 
 export function TourProvider({ children }: { children: React.ReactNode }) {
   const locale = useLocale();
-  const {
-    currentTour,
-    isActive,
-    endTour,
-    completeTour,
-    dismissTour,
-  } = useTourStore();
+  const { currentTour, isActive, endTour, completeTour, dismissTour } = useTourStore();
   const updateTourMutation = useUpdateTourProgress();
   const dismissTourMutation = useDismissTour();
   const driverRef = useRef<Driver | null>(null);
@@ -39,7 +30,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [completeTour, dismissTour]
+    [completeTour, dismissTour],
   );
 
   useEffect(() => {
@@ -86,16 +77,11 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
         disableActiveInteraction: true,
         stagePadding: 10,
         stageRadius: 8,
-        progressText:
-          locale === 'ar'
-            ? '{{current}} من {{total}}'
-            : '{{current}} of {{total}}',
+        progressText: locale === 'ar' ? '{{current}} من {{total}}' : '{{current}} of {{total}}',
         nextBtnText: locale === 'ar' ? 'التالي' : 'Next',
         prevBtnText: locale === 'ar' ? 'السابق' : 'Previous',
         doneBtnText: locale === 'ar' ? 'إنهاء' : 'Done',
-        popoverClass: isDirRtl
-          ? 'driver-popover-rtl'
-          : 'driver-popover-ltr',
+        popoverClass: isDirRtl ? 'driver-popover-rtl' : 'driver-popover-ltr',
         onCloseClick: () => {
           // User clicked X — treat as dismiss (not complete)
           if (isDestroyingRef.current) return;

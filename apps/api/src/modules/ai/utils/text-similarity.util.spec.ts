@@ -123,23 +123,17 @@ describe('text-similarity.util', () => {
 
   describe('containsAnyReference', () => {
     it('should find any matching reference', () => {
-      expect(
-        containsAnyReference('Payment for INV-001', ['inv-001', 'inv-002']),
-      ).toBe(true);
+      expect(containsAnyReference('Payment for INV-001', ['inv-001', 'inv-002'])).toBe(true);
     });
 
     it('should return false when none match', () => {
-      expect(
-        containsAnyReference('Random text', ['inv-001', 'inv-002']),
-      ).toBe(false);
+      expect(containsAnyReference('Random text', ['inv-001', 'inv-002'])).toBe(false);
     });
   });
 
   describe('extractNumbers', () => {
     it('should extract numbers from text', () => {
-      expect(extractNumbers('Total: $1,234.56 and tax 100.00')).toEqual([
-        1234.56, 100.0,
-      ]);
+      expect(extractNumbers('Total: $1,234.56 and tax 100.00')).toEqual([1234.56, 100.0]);
     });
 
     it('should handle text with no numbers', () => {

@@ -34,9 +34,7 @@ export class ComplianceMonitoringService {
 
   constructor(private prisma: PrismaService) {}
 
-  async runComplianceCheck(
-    organizationId: string,
-  ): Promise<ComplianceReport> {
+  async runComplianceCheck(organizationId: string): Promise<ComplianceReport> {
     const violations: ComplianceViolation[] = [];
 
     const [
@@ -81,9 +79,7 @@ export class ComplianceMonitoringService {
     };
   }
 
-  async checkJournalBalance(
-    organizationId: string,
-  ): Promise<ComplianceViolation[]> {
+  async checkJournalBalance(organizationId: string): Promise<ComplianceViolation[]> {
     const violations: ComplianceViolation[] = [];
 
     // Find journals where debits != credits
@@ -99,14 +95,8 @@ export class ComplianceMonitoringService {
     });
 
     for (const journal of journals) {
-      const totalDebits = journal.lines.reduce(
-        (sum, l) => sum + Number(l.debit),
-        0,
-      );
-      const totalCredits = journal.lines.reduce(
-        (sum, l) => sum + Number(l.credit),
-        0,
-      );
+      const totalDebits = journal.lines.reduce((sum, l) => sum + Number(l.debit), 0);
+      const totalCredits = journal.lines.reduce((sum, l) => sum + Number(l.credit), 0);
       const diff = Math.abs(totalDebits - totalCredits);
 
       if (diff > 0.01) {
@@ -124,9 +114,7 @@ export class ComplianceMonitoringService {
     return violations;
   }
 
-  async checkMissingReferences(
-    organizationId: string,
-  ): Promise<ComplianceViolation[]> {
+  async checkMissingReferences(organizationId: string): Promise<ComplianceViolation[]> {
     const violations: ComplianceViolation[] = [];
 
     // Paid invoices without payment records
@@ -160,9 +148,7 @@ export class ComplianceMonitoringService {
     return violations;
   }
 
-  async checkSegregationOfDuties(
-    organizationId: string,
-  ): Promise<ComplianceViolation[]> {
+  async checkSegregationOfDuties(organizationId: string): Promise<ComplianceViolation[]> {
     const violations: ComplianceViolation[] = [];
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
 
@@ -184,10 +170,7 @@ export class ComplianceMonitoringService {
     });
 
     // Group by entity
-    const entityActions = new Map<
-      string,
-      Map<string, Set<string>>
-    >();
+    const entityActions = new Map<string, Map<string, Set<string>>>();
     for (const log of auditLogs) {
       const key = `${log.entityType}:${log.entityId}`;
       if (!entityActions.has(key)) entityActions.set(key, new Map());
@@ -207,7 +190,8 @@ export class ComplianceMonitoringService {
             entityType,
             entityId,
             description: `Same user created and modified/approved ${entityType} ${entityId}`,
-            recommendation: 'Ensure different users handle creation and approval of financial records',
+            recommendation:
+              'Ensure different users handle creation and approval of financial records',
           });
         }
       }
@@ -216,9 +200,7 @@ export class ComplianceMonitoringService {
     return violations.slice(0, 20); // Limit results
   }
 
-  async checkRegulatoryFilings(
-    organizationId: string,
-  ): Promise<ComplianceViolation[]> {
+  async checkRegulatoryFilings(organizationId: string): Promise<ComplianceViolation[]> {
     const violations: ComplianceViolation[] = [];
     const now = new Date();
 
@@ -233,9 +215,7 @@ export class ComplianceMonitoringService {
 
     for (const ret of overdueReturns) {
       if (!ret.periodEnd) continue;
-      const daysPast = Math.floor(
-        (now.getTime() - ret.periodEnd.getTime()) / 86400000,
-      );
+      const daysPast = Math.floor((now.getTime() - ret.periodEnd.getTime()) / 86400000);
       violations.push({
         type: 'overdue_filing',
         severity: daysPast > 30 ? 'CRITICAL' : 'HIGH',
@@ -249,9 +229,7 @@ export class ComplianceMonitoringService {
     return violations;
   }
 
-  async checkBackdatedTransactions(
-    organizationId: string,
-  ): Promise<ComplianceViolation[]> {
+  async checkBackdatedTransactions(organizationId: string): Promise<ComplianceViolation[]> {
     const violations: ComplianceViolation[] = [];
 
     // Find journals where date is significantly before createdAt
@@ -284,41 +262,29 @@ export class ComplianceMonitoringService {
     return violations;
   }
 
-  async getComplianceScore(
-    organizationId: string,
-  ): Promise<ComplianceScoreResult> {
+  async getComplianceScore(organizationId: string): Promise<ComplianceScoreResult> {
     const report = await this.runComplianceCheck(organizationId);
 
     const categories = [
       {
         category: 'Journal Integrity',
-        violations: report.violations.filter(
-          (v) => v.type === 'unbalanced_journal',
-        ),
+        violations: report.violations.filter((v) => v.type === 'unbalanced_journal'),
       },
       {
         category: 'Reference Completeness',
-        violations: report.violations.filter((v) =>
-          v.type.includes('missing_'),
-        ),
+        violations: report.violations.filter((v) => v.type.includes('missing_')),
       },
       {
         category: 'Segregation of Duties',
-        violations: report.violations.filter(
-          (v) => v.type === 'segregation_of_duties',
-        ),
+        violations: report.violations.filter((v) => v.type === 'segregation_of_duties'),
       },
       {
         category: 'Regulatory Filings',
-        violations: report.violations.filter(
-          (v) => v.type === 'overdue_filing',
-        ),
+        violations: report.violations.filter((v) => v.type === 'overdue_filing'),
       },
       {
         category: 'Transaction Dating',
-        violations: report.violations.filter(
-          (v) => v.type === 'backdated_transaction',
-        ),
+        violations: report.violations.filter((v) => v.type === 'backdated_transaction'),
       },
     ];
 

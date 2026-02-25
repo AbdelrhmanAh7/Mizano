@@ -1,16 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -37,10 +26,7 @@ export class DocumentClassificationController {
     description: 'Returns document classification with confidence scores',
     type: ClassificationResultDto,
   })
-  async classifyDocument(
-    @CurrentOrg() orgId: string,
-    @Body() body: ClassifyDocumentDto,
-  ) {
+  async classifyDocument(@CurrentOrg() orgId: string, @Body() body: ClassifyDocumentDto) {
     const result = await this.documentClassificationService.classifyDocument(
       orgId,
       body.text,
@@ -56,9 +42,7 @@ export class DocumentClassificationController {
     status: 200,
     description: 'Model trained successfully',
   })
-  async trainModel(
-    @CurrentOrg() orgId: string,
-  ) {
+  async trainModel(@CurrentOrg() orgId: string) {
     const result = await this.documentClassificationService.trainModel(orgId);
     return { data: result };
   }
@@ -71,9 +55,7 @@ export class DocumentClassificationController {
     description: 'Returns ML model status and metadata',
     type: ModelStatusDto,
   })
-  async getModelStatus(
-    @CurrentOrg() orgId: string,
-  ) {
+  async getModelStatus(@CurrentOrg() orgId: string) {
     const status = await this.documentClassificationService.getModelStatus(orgId);
     return { data: status };
   }

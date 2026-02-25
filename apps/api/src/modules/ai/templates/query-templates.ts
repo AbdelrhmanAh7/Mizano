@@ -59,14 +59,17 @@ export interface QueryTemplate {
   id: string;
   question: string;
   description: string;
-  category: 'sales' | 'accounts-receivable' | 'accounts-payable' | 'expenses' | 'inventory' | 'profitability' | 'cash-flow';
+  category:
+    | 'sales'
+    | 'accounts-receivable'
+    | 'accounts-payable'
+    | 'expenses'
+    | 'inventory'
+    | 'profitability'
+    | 'cash-flow';
   parameters?: QueryParameter[];
   chartType?: 'bar' | 'line' | 'pie' | 'table' | 'metric';
-  execute: (
-    prisma: PrismaService,
-    orgId: string,
-    params?: Record<string, any>,
-  ) => Promise<any>;
+  execute: (prisma: PrismaService, orgId: string, params?: Record<string, any>) => Promise<any>;
   render: (data: any, params?: Record<string, any>) => string;
 }
 
@@ -244,7 +247,10 @@ export const queryTemplates: QueryTemplate[] = [
       });
       const accountMap = new Map(accounts.map((a: AccountRecord) => [a.id, a]));
 
-      const total = expenses.reduce((sum: number, e: { _sum: { amount?: Decimal | null } }) => sum + Number(e._sum.amount || 0), 0);
+      const total = expenses.reduce(
+        (sum: number, e: { _sum: { amount?: Decimal | null } }) => sum + Number(e._sum.amount || 0),
+        0,
+      );
 
       return expenses.map((e: { accountId: string; _sum: { amount?: Decimal | null } }) => {
         const account = accountMap.get(e.accountId) as AccountRecord | undefined;
@@ -365,7 +371,12 @@ export const queryTemplates: QueryTemplate[] = [
           reorderPoint: item.reorderAnalysis?.reorderPoint || item.reorderPoint || 0,
           status: item.reorderAnalysis?.status || 'LOW_STOCK',
         }))
-        .sort((a: { currentStock: number; reorderPoint: number }, b: { currentStock: number; reorderPoint: number }) => a.currentStock - a.reorderPoint - (b.currentStock - b.reorderPoint));
+        .sort(
+          (
+            a: { currentStock: number; reorderPoint: number },
+            b: { currentStock: number; reorderPoint: number },
+          ) => a.currentStock - a.reorderPoint - (b.currentStock - b.reorderPoint),
+        );
     },
     render: (data) => {
       if (data.length === 0) {
@@ -523,8 +534,7 @@ export const queryTemplates: QueryTemplate[] = [
 
       const currentSales = Number(thisMonth._sum.grandTotal) || 0;
       const previousSales = Number(lastMonth._sum.grandTotal) || 0;
-      const change =
-        previousSales > 0 ? ((currentSales - previousSales) / previousSales) * 100 : 0;
+      const change = previousSales > 0 ? ((currentSales - previousSales) / previousSales) * 100 : 0;
 
       return {
         currentPeriod: currentSales,

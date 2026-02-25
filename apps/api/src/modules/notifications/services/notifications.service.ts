@@ -21,7 +21,14 @@ export class NotificationsService {
     });
   }
 
-  async createForUser(userId: string, organizationId: string, type: string, title: string, message: string, entityInfo?: { entityType?: string; entityId?: string }) {
+  async createForUser(
+    userId: string,
+    organizationId: string,
+    type: string,
+    title: string,
+    message: string,
+    entityInfo?: { entityType?: string; entityId?: string },
+  ) {
     return this.prisma.notification.create({
       data: {
         type,
@@ -35,7 +42,13 @@ export class NotificationsService {
     });
   }
 
-  async createForAllUsers(organizationId: string, type: string, title: string, message: string, entityInfo?: { entityType?: string; entityId?: string }) {
+  async createForAllUsers(
+    organizationId: string,
+    type: string,
+    title: string,
+    message: string,
+    entityInfo?: { entityType?: string; entityId?: string },
+  ) {
     const users = await this.prisma.user.findMany({
       where: { organizationId, status: UserStatus.ACTIVE },
       select: { id: true },
@@ -56,7 +69,11 @@ export class NotificationsService {
     return { created: notifications.count };
   }
 
-  async findAllForUser(organizationId: string, userId: string, query: { isRead?: boolean; type?: string }) {
+  async findAllForUser(
+    organizationId: string,
+    userId: string,
+    query: { isRead?: boolean; type?: string },
+  ) {
     const where: any = { organizationId, userId };
     if (query.isRead !== undefined) where.isRead = query.isRead;
     if (query.type) where.type = query.type;
@@ -122,7 +139,9 @@ export class NotificationsService {
         balanceDue: { gt: 0 },
         status: { not: 'OVERDUE' },
       },
-      include: { organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } } },
+      include: {
+        organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
+      },
     });
 
     for (const invoice of overdueInvoices) {
@@ -151,7 +170,9 @@ export class NotificationsService {
         dueDate: { gte: new Date(), lte: threeDaysFromNow },
         balanceDue: { gt: 0 },
       },
-      include: { organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } } },
+      include: {
+        organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
+      },
     });
 
     for (const bill of upcomingBills) {
@@ -173,7 +194,9 @@ export class NotificationsService {
   async checkLowInventory() {
     const items = await this.prisma.item.findMany({
       where: { type: 'GOODS' },
-      include: { organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } } },
+      include: {
+        organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
+      },
     });
 
     for (const item of items) {

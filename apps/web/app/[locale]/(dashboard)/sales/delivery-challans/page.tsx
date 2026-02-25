@@ -78,9 +78,7 @@ export default function DeliveryChallansPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Delivery Challans</h1>
-          <p className="text-muted-foreground">
-            Manage delivery challans for goods dispatch
-          </p>
+          <p className="text-muted-foreground">Manage delivery challans for goods dispatch</p>
         </div>
         <Button asChild>
           <Link href="/sales/delivery-challans/new">
@@ -111,10 +109,7 @@ export default function DeliveryChallansPage() {
             <SelectItem value="RETURNED">Returned</SelectItem>
           </SelectContent>
         </Select>
-        <Select
-          value={typeFilter}
-          onValueChange={(v) => setTypeFilter(v as ChallanType | '')}
-        >
+        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as ChallanType | '')}>
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="All Types" />
           </SelectTrigger>

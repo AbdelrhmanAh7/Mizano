@@ -168,10 +168,7 @@ export class ReconciliationMatcherService {
     if (nameScore >= 0.7) matchReasons.push('Name/payee match');
 
     // 4. Date proximity (10% weight)
-    const dateScore = this.calculateDateScore(
-      transaction.date,
-      this.getCandidateDate(candidate),
-    );
+    const dateScore = this.calculateDateScore(transaction.date, this.getCandidateDate(candidate));
     if (dateScore >= 0.1) matchReasons.push('Date proximity');
 
     // Calculate total weighted score
@@ -248,9 +245,7 @@ export class ReconciliationMatcherService {
     const extractedNumbers = extractDocumentNumbers(combinedText);
     for (const num of extractedNumbers) {
       if (num.toUpperCase() === normalizedRef) return 1.0;
-      if (
-        levenshteinSimilarity(num.toUpperCase(), normalizedRef) > 0.8
-      ) {
+      if (levenshteinSimilarity(num.toUpperCase(), normalizedRef) > 0.8) {
         return 0.5;
       }
     }
@@ -267,20 +262,14 @@ export class ReconciliationMatcherService {
   /**
    * Calculate name matching score using Levenshtein distance
    */
-  private calculateNameScore(
-    transactionPayee: string,
-    candidateName: string,
-  ): number {
+  private calculateNameScore(transactionPayee: string, candidateName: string): number {
     if (!transactionPayee || !candidateName) return 0;
 
     const normalizedPayee = normalizeText(transactionPayee);
     const normalizedName = normalizeText(candidateName);
 
     // Exact substring match
-    if (
-      normalizedPayee.includes(normalizedName) ||
-      normalizedName.includes(normalizedPayee)
-    ) {
+    if (normalizedPayee.includes(normalizedName) || normalizedName.includes(normalizedPayee)) {
       return 1.0;
     }
 
@@ -298,10 +287,7 @@ export class ReconciliationMatcherService {
     maxDaysDiff: number = 30,
   ): number {
     const daysDiff = Math.abs(
-      Math.floor(
-        (transactionDate.getTime() - candidateDate.getTime()) /
-          (1000 * 60 * 60 * 24),
-      ),
+      Math.floor((transactionDate.getTime() - candidateDate.getTime()) / (1000 * 60 * 60 * 24)),
     );
 
     if (daysDiff <= 3) return 1.0;
@@ -398,10 +384,7 @@ export class ReconciliationMatcherService {
   }
 
   // Helper methods to extract data from different entity types
-  private getCandidateAmount(candidate: {
-    entityType: string;
-    entity: any;
-  }): number {
+  private getCandidateAmount(candidate: { entityType: string; entity: any }): number {
     switch (candidate.entityType) {
       case 'invoice':
         return Number(candidate.entity.grandTotal);
@@ -416,10 +399,7 @@ export class ReconciliationMatcherService {
     }
   }
 
-  private getCandidateReference(candidate: {
-    entityType: string;
-    entity: any;
-  }): string {
+  private getCandidateReference(candidate: { entityType: string; entity: any }): string {
     switch (candidate.entityType) {
       case 'invoice':
         return candidate.entity.invoiceNumber;
@@ -434,10 +414,7 @@ export class ReconciliationMatcherService {
     }
   }
 
-  private getCandidateName(candidate: {
-    entityType: string;
-    entity: any;
-  }): string {
+  private getCandidateName(candidate: { entityType: string; entity: any }): string {
     switch (candidate.entityType) {
       case 'invoice':
       case 'payment':
@@ -450,10 +427,7 @@ export class ReconciliationMatcherService {
     }
   }
 
-  private getCandidateDate(candidate: {
-    entityType: string;
-    entity: any;
-  }): Date {
+  private getCandidateDate(candidate: { entityType: string; entity: any }): Date {
     return candidate.entity.date || candidate.entity.createdAt;
   }
 
@@ -517,9 +491,7 @@ export class ReconciliationMatcherService {
       },
     });
 
-    this.logger.debug(
-      `Learned pattern for transaction ${transactionId}: ${pattern}`,
-    );
+    this.logger.debug(`Learned pattern for transaction ${transactionId}: ${pattern}`);
   }
 
   private async getPatternMatchCount(
@@ -627,10 +599,7 @@ export class ReconciliationMatcherService {
   /**
    * Apply rules to a transaction
    */
-  async applyRules(
-    organizationId: string,
-    transactionId: string,
-  ) {
+  async applyRules(organizationId: string, transactionId: string) {
     const transaction = await this.prisma.bankTransaction.findFirst({
       where: { id: transactionId, organizationId },
     });
@@ -644,10 +613,7 @@ export class ReconciliationMatcherService {
       where: {
         organizationId,
         isActive: true,
-        OR: [
-          { bankAccountId: transaction.bankAccountId },
-          { bankAccountId: null },
-        ],
+        OR: [{ bankAccountId: transaction.bankAccountId }, { bankAccountId: null }],
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -673,28 +639,19 @@ export class ReconciliationMatcherService {
   /**
    * Evaluate a rule condition against a transaction
    */
-  private evaluateCondition(
-    transaction: TransactionRecord,
-    condition: BankRuleCondition,
-  ): boolean {
+  private evaluateCondition(transaction: TransactionRecord, condition: BankRuleCondition): boolean {
     const fieldValue = this.getFieldValue(transaction, condition.field);
     const conditionValue = condition.value;
 
     switch (condition.operator) {
       case 'contains':
-        return String(fieldValue)
-          .toLowerCase()
-          .includes(conditionValue.toLowerCase());
+        return String(fieldValue).toLowerCase().includes(conditionValue.toLowerCase());
       case 'equals':
         return String(fieldValue).toLowerCase() === conditionValue.toLowerCase();
       case 'startsWith':
-        return String(fieldValue)
-          .toLowerCase()
-          .startsWith(conditionValue.toLowerCase());
+        return String(fieldValue).toLowerCase().startsWith(conditionValue.toLowerCase());
       case 'endsWith':
-        return String(fieldValue)
-          .toLowerCase()
-          .endsWith(conditionValue.toLowerCase());
+        return String(fieldValue).toLowerCase().endsWith(conditionValue.toLowerCase());
       case 'greaterThan':
         return Number(fieldValue) > Number(conditionValue);
       case 'lessThan':
@@ -727,10 +684,7 @@ export class ReconciliationMatcherService {
   /**
    * Get all rules for an organization
    */
-  async getRules(
-    organizationId: string,
-    bankAccountId?: string,
-  ) {
+  async getRules(organizationId: string, bankAccountId?: string) {
     return this.prisma.bankRule.findMany({
       where: {
         organizationId,
@@ -783,10 +737,7 @@ export class ReconciliationMatcherService {
   /**
    * Get learned reconciliation patterns
    */
-  async getLearnedPatterns(
-    organizationId: string,
-    minMatchCount: number = 1,
-  ) {
+  async getLearnedPatterns(organizationId: string, minMatchCount: number = 1) {
     return this.prisma.reconciliationPattern.findMany({
       where: {
         organizationId,
@@ -856,9 +807,7 @@ export class ReconciliationMatcherService {
       }
     }
 
-    this.logger.log(
-      `Bulk match completed: ${matched} matched, ${unmatched} unmatched`,
-    );
+    this.logger.log(`Bulk match completed: ${matched} matched, ${unmatched} unmatched`);
 
     return { matched, unmatched, results };
   }

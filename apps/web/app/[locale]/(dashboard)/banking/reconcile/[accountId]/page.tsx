@@ -41,7 +41,8 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
   const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
 
   const { data: account, isLoading: accountLoading } = useBankAccount(accountId);
-  const { data: transactionsData, isLoading: transactionsLoading } = useUnmatchedTransactions(accountId);
+  const { data: transactionsData, isLoading: transactionsLoading } =
+    useUnmatchedTransactions(accountId);
   const { data: suggestedData } = useSuggestedMatches(selectedTransaction || '');
 
   const matchTransaction = useMatchTransaction();
@@ -102,12 +103,8 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Reconcile {account.accountName}
-            </h1>
-            <p className="text-muted-foreground">
-              Match bank transactions with your records
-            </p>
+            <h1 className="text-3xl font-bold tracking-tight">Reconcile {account.accountName}</h1>
+            <p className="text-muted-foreground">Match bank transactions with your records</p>
           </div>
         </div>
         <Badge variant="outline" className="text-lg px-4 py-2">
@@ -120,9 +117,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Book Balance</p>
-            <p className="text-2xl font-bold font-mono">
-              {formatCurrency(account.currentBalance)}
-            </p>
+            <p className="text-2xl font-bold font-mono">{formatCurrency(account.currentBalance)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -147,13 +142,9 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
           <CardContent className="py-12 text-center">
             <Check className="mx-auto h-12 w-12 text-green-600" />
             <h3 className="mt-4 text-lg font-semibold text-green-600">All Caught Up!</h3>
-            <p className="text-muted-foreground">
-              All bank transactions have been matched.
-            </p>
+            <p className="text-muted-foreground">All bank transactions have been matched.</p>
             <Button asChild className="mt-4">
-              <Link href={`/banking/accounts/${accountId}`}>
-                View Account Details
-              </Link>
+              <Link href={`/banking/accounts/${accountId}`}>View Account Details</Link>
             </Button>
           </CardContent>
         </Card>
@@ -175,7 +166,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                         'p-4 border rounded-lg cursor-pointer transition-colors',
                         selectedTransaction === tx.id
                           ? 'border-primary bg-primary/5'
-                          : 'hover:border-primary/50'
+                          : 'hover:border-primary/50',
                       )}
                     >
                       <div className="flex items-start justify-between">
@@ -197,7 +188,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                           <p
                             className={cn(
                               'font-mono font-medium',
-                              tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600'
+                              tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600',
                             )}
                           >
                             {tx.type === 'DEPOSIT' ? '+' : '-'}
@@ -244,9 +235,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                           <span
                             className={cn(
                               'font-mono',
-                              selectedTx.type === 'DEPOSIT'
-                                ? 'text-green-600'
-                                : 'text-red-600'
+                              selectedTx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600',
                             )}
                           >
                             {selectedTx.type === 'DEPOSIT' ? '+' : '-'}
@@ -308,7 +297,9 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                     {/* Actions */}
                     <div className="border-t pt-4 space-y-2">
                       <Button variant="outline" className="w-full" asChild>
-                        <Link href={`/purchases/expenses/new?bankTransactionId=${selectedTransaction}`}>
+                        <Link
+                          href={`/purchases/expenses/new?bankTransactionId=${selectedTransaction}`}
+                        >
                           <Plus className="mr-2 h-4 w-4" />
                           Create Expense
                         </Link>

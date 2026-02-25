@@ -1,16 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -89,9 +78,7 @@ export class CategorizationController {
     description: 'Model trained successfully',
     type: TrainCategorizationResponse,
   })
-  async train(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: TrainCategorizationResponse }> {
+  async train(@CurrentOrg() orgId: string): Promise<{ data: TrainCategorizationResponse }> {
     const result = await this.categorizerService.train(orgId);
     return { data: result };
   }
@@ -104,9 +91,7 @@ export class CategorizationController {
     description: 'Returns model statistics',
     type: CategorizationStatsResponse,
   })
-  async getStats(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: CategorizationStatsResponse }> {
+  async getStats(@CurrentOrg() orgId: string): Promise<{ data: CategorizationStatsResponse }> {
     const stats = await this.categorizerService.getStats(orgId);
     return { data: stats };
   }
@@ -119,9 +104,7 @@ export class CategorizationController {
     description: 'Training data seeded from history',
     type: SeedCategorizationResponse,
   })
-  async seed(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: SeedCategorizationResponse }> {
+  async seed(@CurrentOrg() orgId: string): Promise<{ data: SeedCategorizationResponse }> {
     const result = await this.categorizerService.seedFromHistory(orgId);
     return { data: result };
   }

@@ -122,15 +122,23 @@ export function generateFooterHtml(org: OrganizationInfo, primaryColor?: string)
 
   return `
     <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid ${defaultTemplateConfig.colors.border};">
-      ${org.bankDetails ? `
+      ${
+        org.bankDetails
+          ? `
         <div style="margin-bottom: 15px;">
           <h4 style="color: ${color}; margin-bottom: 5px; font-size: 12px;">Bank Details</h4>
           <p style="white-space: pre-line; color: #6B7280; font-size: 11px;">${org.bankDetails}</p>
         </div>
-      ` : ''}
-      ${org.footerText ? `
+      `
+          : ''
+      }
+      ${
+        org.footerText
+          ? `
         <p style="text-align: center; color: #9CA3AF; font-size: 10px;">${org.footerText}</p>
-      ` : ''}
+      `
+          : ''
+      }
     </div>
   `;
 }
@@ -144,13 +152,7 @@ export function generateItemsTableHtml(
 ): string {
   const color = primaryColor || defaultTemplateConfig.colors.primary;
 
-  const headers = [
-    'Description',
-    'Qty',
-    'Rate',
-    ...(showTax ? ['Tax %'] : []),
-    'Amount',
-  ];
+  const headers = ['Description', 'Qty', 'Rate', ...(showTax ? ['Tax %'] : []), 'Amount'];
 
   const headerCells = headers
     .map(

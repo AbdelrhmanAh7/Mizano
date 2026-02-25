@@ -68,7 +68,10 @@ export function Breadcrumbs() {
     const crumbs = segments.map((segment, index) => {
       const href = '/' + segments.slice(0, index + 1).join('/');
       const isId = /^[a-z0-9]{20,}$/i.test(segment) || /^[0-9a-f-]{36}$/i.test(segment);
-      const label = isId ? 'Details' : segmentLabels[segment] || segment.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const label = isId
+        ? 'Details'
+        : segmentLabels[segment] ||
+          segment.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
       return { label, href, isLast: index === segments.length - 1 };
     });
 
@@ -78,11 +81,11 @@ export function Breadcrumbs() {
   if (breadcrumbs.length === 0) return null;
 
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm text-muted-foreground mb-4">
-      <Link
-        href="/dashboard"
-        className="flex items-center hover:text-foreground transition-colors"
-      >
+    <nav
+      aria-label="Breadcrumb"
+      className="flex items-center gap-1 text-sm text-muted-foreground mb-4"
+    >
+      <Link href="/dashboard" className="flex items-center hover:text-foreground transition-colors">
         <Home className="h-3.5 w-3.5" />
       </Link>
       {breadcrumbs.map((crumb) => (

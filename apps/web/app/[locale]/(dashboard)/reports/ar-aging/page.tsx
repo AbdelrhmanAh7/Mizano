@@ -50,8 +50,26 @@ export default function ARAgingReportPage() {
         amount: 15000,
         count: 5,
         items: [
-          { id: '1', number: 'INV-001', date: '2024-01-15', dueDate: '2024-02-15', counterpartyName: 'Acme Corp', amount: 5000, balanceDue: 5000, daysOverdue: 0 },
-          { id: '2', number: 'INV-002', date: '2024-01-20', dueDate: '2024-02-20', counterpartyName: 'Tech Solutions', amount: 3000, balanceDue: 3000, daysOverdue: 0 },
+          {
+            id: '1',
+            number: 'INV-001',
+            date: '2024-01-15',
+            dueDate: '2024-02-15',
+            counterpartyName: 'Acme Corp',
+            amount: 5000,
+            balanceDue: 5000,
+            daysOverdue: 0,
+          },
+          {
+            id: '2',
+            number: 'INV-002',
+            date: '2024-01-20',
+            dueDate: '2024-02-20',
+            counterpartyName: 'Tech Solutions',
+            amount: 3000,
+            balanceDue: 3000,
+            daysOverdue: 0,
+          },
         ],
       },
       {
@@ -59,7 +77,16 @@ export default function ARAgingReportPage() {
         amount: 8000,
         count: 3,
         items: [
-          { id: '3', number: 'INV-003', date: '2024-01-01', dueDate: '2024-01-31', counterpartyName: 'Global Inc', amount: 8000, balanceDue: 8000, daysOverdue: 10 },
+          {
+            id: '3',
+            number: 'INV-003',
+            date: '2024-01-01',
+            dueDate: '2024-01-31',
+            counterpartyName: 'Global Inc',
+            amount: 8000,
+            balanceDue: 8000,
+            daysOverdue: 10,
+          },
         ],
       },
       {
@@ -102,9 +129,7 @@ export default function ARAgingReportPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Accounts Receivable Aging</h1>
-          <p className="text-muted-foreground">
-            As of {format(asOfDate, 'MMMM d, yyyy')}
-          </p>
+          <p className="text-muted-foreground">As of {format(asOfDate, 'MMMM d, yyyy')}</p>
         </div>
       </div>
 
@@ -126,9 +151,7 @@ export default function ARAgingReportPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Outstanding</p>
-                <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(mockReport.total)}
-                </p>
+                <p className="text-2xl font-bold font-mono">{formatCurrency(mockReport.total)}</p>
               </div>
             </div>
           </CardContent>
@@ -152,22 +175,18 @@ export default function ARAgingReportPage() {
               <button
                 key={bucket.range}
                 onClick={() =>
-                  setExpandedBucket(
-                    expandedBucket === bucket.range ? null : bucket.range
-                  )
+                  setExpandedBucket(expandedBucket === bucket.range ? null : bucket.range)
                 }
                 className={cn(
                   'p-4 rounded-lg border-2 text-left transition-colors',
                   expandedBucket === bucket.range
                     ? 'border-primary'
                     : 'border-transparent hover:border-primary/50',
-                  getAgingBucketColor(bucket.range)
+                  getAgingBucketColor(bucket.range),
                 )}
               >
                 <p className="text-sm font-medium">{getAgingBucketLabel(bucket.range)}</p>
-                <p className="text-xl font-bold font-mono mt-1">
-                  {formatCurrency(bucket.amount)}
-                </p>
+                <p className="text-xl font-bold font-mono mt-1">{formatCurrency(bucket.amount)}</p>
                 <p className="text-xs mt-1">{bucket.count} invoices</p>
               </button>
             ))}
@@ -182,7 +201,8 @@ export default function ARAgingReportPage() {
             <CardTitle>{getAgingBucketLabel(expandedBucket)} Invoices</CardTitle>
           </CardHeader>
           <CardContent>
-            {mockReport.buckets.find((b: AgingBucket) => b.range === expandedBucket)?.items?.length ? (
+            {mockReport.buckets.find((b: AgingBucket) => b.range === expandedBucket)?.items
+              ?.length ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -209,12 +229,8 @@ export default function ARAgingReportPage() {
                           </Link>
                         </TableCell>
                         <TableCell>{item.counterpartyName}</TableCell>
-                        <TableCell>
-                          {format(new Date(item.date), 'MMM d, yyyy')}
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(item.dueDate), 'MMM d, yyyy')}
-                        </TableCell>
+                        <TableCell>{format(new Date(item.date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>{format(new Date(item.dueDate), 'MMM d, yyyy')}</TableCell>
                         <TableCell className="text-right font-mono">
                           {formatCurrency(item.amount)}
                         </TableCell>
@@ -228,8 +244,8 @@ export default function ARAgingReportPage() {
                               item.daysOverdue > 30
                                 ? 'bg-red-100 text-red-800'
                                 : item.daysOverdue > 0
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-green-100 text-green-800'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-green-100 text-green-800',
                             )}
                           >
                             {item.daysOverdue}

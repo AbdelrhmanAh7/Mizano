@@ -25,9 +25,13 @@ Mizano is an AI-powered ERP system (Autonomous Accounting Platform) designed for
 
 ```bash
 # Development
-pnpm dev              # Start all apps (web: 5001, api: 6000)
+pnpm dev              # Start infra (postgres+redis) + all apps (web: 5001, api: 6001)
+pnpm dev:api          # API only
+pnpm dev:web          # Web only
+pnpm dev:vlm          # Start VLM service (requires GPU)
 pnpm build            # Build all packages
 pnpm lint             # Lint all packages
+pnpm type-check       # TypeScript type checking
 
 # Database
 pnpm db:generate      # Generate Prisma client
@@ -36,8 +40,17 @@ pnpm db:migrate       # Run migrations
 pnpm db:seed          # Seed database
 pnpm db:studio        # Open Prisma Studio
 
+# Testing
+pnpm test             # Run all tests
+pnpm test:api         # API unit tests
+pnpm test:cov         # API coverage report
+pnpm test:e2e         # API end-to-end tests
+
 # Infrastructure
-docker-compose up -d  # Start PostgreSQL + Redis
+pnpm docker:up        # Start PostgreSQL + Redis
+pnpm docker:up:vlm    # Start PostgreSQL + Redis + VLM
+pnpm docker:down      # Stop infrastructure
+pnpm docker:prod      # Build & start production stack
 ```
 
 ## Project Structure
@@ -56,7 +69,7 @@ mizano/
 │   │   └── lib/
 │   │       ├── api/            # API client functions
 │   │       └── hooks/          # React Query hooks
-│   └── api/                    # NestJS backend (port 6000)
+│   └── api/                    # NestJS backend (port 6001)
 │       ├── src/
 │       │   ├── modules/        # Business domain modules
 │       │   ├── common/         # Shared utilities
@@ -66,7 +79,10 @@ mizano/
 ├── packages/
 │   ├── shared-types/           # Shared TypeScript types
 │   └── validators/             # Shared Zod schemas
-├── docker-compose.yml          # PostgreSQL + Redis
+├── services/
+│   └── vlm-service/            # Python FastAPI VLM microservice (port 8100)
+├── prompts/                    # AI feature design specifications
+├── docker-compose.yml          # PostgreSQL + Redis + VLM
 └── turbo.json                  # Turborepo config
 ```
 
@@ -205,7 +221,9 @@ JWT_SECRET="your-secret"
 JWT_REFRESH_SECRET="your-refresh-secret"
 NEXTAUTH_SECRET="your-nextauth-secret"
 NEXTAUTH_URL="http://localhost:5001"
-API_URL="http://localhost:6000"
+API_URL="http://localhost:6001"
+NEXT_PUBLIC_API_URL="http://localhost:6001"
+VLM_SERVICE_URL=http://localhost:8100
 ```
 
 ## Code Quality Checklist

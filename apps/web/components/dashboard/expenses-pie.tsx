@@ -3,14 +3,7 @@
 import { memo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Legend,
-  Tooltip,
-} from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { ExpenseCategory, formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 
 interface ExpensesPieProps {
@@ -43,10 +36,7 @@ export const ExpensesPie = memo(function ExpensesPie({ data, currency = 'USD' }:
                 nameKey="name"
               >
                 {data.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
-                  />
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip

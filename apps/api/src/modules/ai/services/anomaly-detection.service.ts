@@ -8,10 +8,7 @@ import {
   zScoreWithStats,
   interquartileRange,
 } from '../utils/statistics.util';
-import {
-  buildIsolationForest1D,
-  isolationForestScore1D,
-} from '../utils/isolation-forest.util';
+import { buildIsolationForest1D, isolationForestScore1D } from '../utils/isolation-forest.util';
 
 export interface AnomalyResult {
   isAnomaly: boolean;
@@ -95,14 +92,17 @@ export class AnomalyDetectionService {
     const isAnomaly = isZScoreOutlier || isIqrOutlier || isIsolationOutlier;
 
     // Count how many methods agree for severity boosting
-    const methodsAgreed = [isZScoreOutlier, isIqrOutlier, isIsolationOutlier].filter(Boolean).length;
+    const methodsAgreed = [isZScoreOutlier, isIqrOutlier, isIsolationOutlier].filter(
+      Boolean,
+    ).length;
     const severity = this.determineSeverity(absZScore, isolationScore, methodsAgreed);
 
     let reason = 'normal';
     if (isAnomaly) {
       const methods: string[] = [];
       if (isZScoreOutlier) methods.push(`z-score ${absZScore.toFixed(1)}σ`);
-      if (isIqrOutlier) methods.push(`outside IQR [${iqrLower.toFixed(2)}, ${iqrUpper.toFixed(2)}]`);
+      if (isIqrOutlier)
+        methods.push(`outside IQR [${iqrLower.toFixed(2)}, ${iqrUpper.toFixed(2)}]`);
       if (isIsolationOutlier) methods.push(`isolation score ${isolationScore.toFixed(2)}`);
       reason = `Value ${value.toFixed(2)} flagged by ${methods.join(', ')} (mean: ${avg.toFixed(2)})`;
     }
@@ -214,8 +214,7 @@ export class AnomalyDetectionService {
       .map((a) => {
         const checkIn = new Date(a.checkIn!);
         const checkOut = new Date(a.checkOut!);
-        const workedHours =
-          (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
+        const workedHours = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
         return Math.max(0, workedHours - 8);
       });
 
@@ -276,10 +275,7 @@ export class AnomalyDetectionService {
   /**
    * Check for payroll anomaly
    */
-  async checkPayrollAnomaly(
-    organizationId: string,
-    payrollRunId: string,
-  ): Promise<AnomalyResult> {
+  async checkPayrollAnomaly(organizationId: string, payrollRunId: string): Promise<AnomalyResult> {
     // Get current payroll run total
     const currentRun = await this.prisma.payrollRun.findUnique({
       where: { id: payrollRunId },
@@ -564,11 +560,7 @@ export class AnomalyDetectionService {
   /**
    * Resolve an anomaly
    */
-  async resolveAnomaly(
-    organizationId: string,
-    anomalyId: string,
-    userId: string,
-  ): Promise<void> {
+  async resolveAnomaly(organizationId: string, anomalyId: string, userId: string): Promise<void> {
     await this.prisma.aiAnomaly.update({
       where: {
         id: anomalyId,

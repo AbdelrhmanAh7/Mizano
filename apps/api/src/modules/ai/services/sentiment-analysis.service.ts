@@ -138,17 +138,18 @@ export class SentimentAnalysisService {
 
     const dealIds = deals.map((d) => d.id);
 
-    const activities = dealIds.length > 0
-      ? await this.prisma.activityLog.findMany({
-          where: {
-            organizationId,
-            dealId: { in: dealIds },
-          },
-          select: { description: true, date: true },
-          orderBy: { date: 'desc' },
-          take: MAX_DETAILS,
-        })
-      : [];
+    const activities =
+      dealIds.length > 0
+        ? await this.prisma.activityLog.findMany({
+            where: {
+              organizationId,
+              dealId: { in: dealIds },
+            },
+            select: { description: true, date: true },
+            orderBy: { date: 'desc' },
+            take: MAX_DETAILS,
+          })
+        : [];
 
     // Build text entries
     const entries: Array<{ source: string; text: string; date: Date }> = [];
@@ -224,20 +225,14 @@ export class SentimentAnalysisService {
     entityType: EntityType,
     period: TrendPeriod = 'monthly',
   ): Promise<SentimentTrendPoint[]> {
-    const entries = await this.fetchEntriesByEntityType(
-      organizationId,
-      entityType,
-    );
+    const entries = await this.fetchEntriesByEntityType(organizationId, entityType);
 
     if (entries.length === 0) {
       return [];
     }
 
     // Group by period
-    const buckets = new Map<
-      string,
-      { totalComparative: number; count: number }
-    >();
+    const buckets = new Map<string, { totalComparative: number; count: number }>();
 
     for (const entry of entries) {
       const key = this.periodKey(entry.date, period);
@@ -293,10 +288,7 @@ export class SentimentAnalysisService {
 
       details.push({
         source: entry.source,
-        text:
-          entry.text.length > 200
-            ? entry.text.substring(0, 200) + '...'
-            : entry.text,
+        text: entry.text.length > 200 ? entry.text.substring(0, 200) + '...' : entry.text,
         sentiment: result.sentiment,
         comparative: result.comparative,
         date: entry.date,
@@ -367,8 +359,7 @@ export class SentimentAnalysisService {
           orderBy: { createdAt: 'desc' },
         });
         for (const lead of leads) {
-          if (lead.notes)
-            entries.push({ text: lead.notes, date: lead.createdAt });
+          if (lead.notes) entries.push({ text: lead.notes, date: lead.createdAt });
         }
         break;
       }
@@ -383,8 +374,7 @@ export class SentimentAnalysisService {
           orderBy: { createdAt: 'desc' },
         });
         for (const deal of deals) {
-          if (deal.lostReason)
-            entries.push({ text: deal.lostReason, date: deal.createdAt });
+          if (deal.lostReason) entries.push({ text: deal.lostReason, date: deal.createdAt });
         }
         break;
       }

@@ -76,9 +76,7 @@ describe('PermissionsGuard', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['sales.view']);
     mockPrisma.role.findUnique.mockResolvedValue({
       name: 'Sales Rep',
-      permissions: [
-        { module: 'sales', actions: ['view', 'create'] },
-      ],
+      permissions: [{ module: 'sales', actions: ['view', 'create'] }],
     });
     const context = createMockContext({ roleId: 'sales-role' });
     expect(await guard.canActivate(context)).toBe(true);
@@ -88,21 +86,14 @@ describe('PermissionsGuard', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['sales.delete']);
     mockPrisma.role.findUnique.mockResolvedValue({
       name: 'Sales Rep',
-      permissions: [
-        { module: 'sales', actions: ['view', 'create'] },
-      ],
+      permissions: [{ module: 'sales', actions: ['view', 'create'] }],
     });
     const context = createMockContext({ roleId: 'sales-role' });
-    await expect(guard.canActivate(context)).rejects.toThrow(
-      'Missing permission: sales.delete',
-    );
+    await expect(guard.canActivate(context)).rejects.toThrow('Missing permission: sales.delete');
   });
 
   it('should check all required permissions', async () => {
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([
-      'sales.view',
-      'inventory.view',
-    ]);
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['sales.view', 'inventory.view']);
     mockPrisma.role.findUnique.mockResolvedValue({
       name: 'Sales Rep',
       permissions: [
@@ -111,16 +102,11 @@ describe('PermissionsGuard', () => {
       ],
     });
     const context = createMockContext({ roleId: 'sales-role' });
-    await expect(guard.canActivate(context)).rejects.toThrow(
-      'Missing permission: inventory.view',
-    );
+    await expect(guard.canActivate(context)).rejects.toThrow('Missing permission: inventory.view');
   });
 
   it('should handle multiple module permissions correctly', async () => {
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([
-      'sales.view',
-      'inventory.view',
-    ]);
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['sales.view', 'inventory.view']);
     mockPrisma.role.findUnique.mockResolvedValue({
       name: 'Manager',
       permissions: [

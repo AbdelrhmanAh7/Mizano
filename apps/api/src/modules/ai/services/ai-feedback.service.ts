@@ -115,10 +115,7 @@ export class AiFeedbackService {
     }
 
     // Check if retraining is needed
-    const { shouldRetrain } = await this.checkRetrainingThreshold(
-      organizationId,
-      dto.feature,
-    );
+    const { shouldRetrain } = await this.checkRetrainingThreshold(organizationId, dto.feature);
 
     if (shouldRetrain) {
       this.triggerRetraining(organizationId, dto.feature);
@@ -141,11 +138,10 @@ export class AiFeedbackService {
       return { shouldRetrain: false, correctionCount: 0, threshold: 0 };
     }
 
-    const correctionCount =
-      await this.trainingService.countCorrectionsSinceLastTraining(
-        organizationId,
-        feature,
-      );
+    const correctionCount = await this.trainingService.countCorrectionsSinceLastTraining(
+      organizationId,
+      feature,
+    );
 
     const shouldRetrain = correctionCount >= threshold;
 
@@ -296,10 +292,7 @@ export class AiFeedbackService {
     });
 
     // Aggregate by date
-    const trends: Record<
-      string,
-      { accepted: number; rejected: number; corrected: number }
-    > = {};
+    const trends: Record<string, { accepted: number; rejected: number; corrected: number }> = {};
 
     for (const item of feedback) {
       const date = item.createdAt.toISOString().split('T')[0];
@@ -320,9 +313,7 @@ export class AiFeedbackService {
    * Trigger retraining event
    */
   private triggerRetraining(organizationId: string, feature: AiFeature): void {
-    this.logger.log(
-      `Triggering retraining for ${feature} in org ${organizationId}`,
-    );
+    this.logger.log(`Triggering retraining for ${feature} in org ${organizationId}`);
 
     this.eventEmitter.emit('ai.retraining.needed', {
       organizationId,
@@ -420,18 +411,11 @@ export class AiFeedbackService {
    * Invalidate cached predictions when a new model is activated
    */
   @OnEvent('ai.model.activated')
-  async onModelActivated(payload: {
-    organizationId: string;
-    feature: AiFeature;
-    version: number;
-  }) {
+  async onModelActivated(payload: { organizationId: string; feature: AiFeature; version: number }) {
     this.logger.log(
       `Model v${payload.version} activated for ${payload.feature} — invalidating prediction cache`,
     );
-    await this.invalidatePredictionCache(
-      payload.organizationId,
-      payload.feature,
-    );
+    await this.invalidatePredictionCache(payload.organizationId, payload.feature);
   }
 
   /**

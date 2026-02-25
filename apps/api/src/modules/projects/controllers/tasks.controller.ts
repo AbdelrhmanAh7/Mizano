@@ -22,7 +22,10 @@ export class TasksController {
   @Get()
   @Permissions('projects.view')
   @ApiOperation({ summary: 'Get all tasks' })
-  findAll(@CurrentOrg() orgId: string, @Query() query: { projectId?: string; status?: string; assigneeId?: string }) {
+  findAll(
+    @CurrentOrg() orgId: string,
+    @Query() query: { projectId?: string; status?: string; assigneeId?: string },
+  ) {
     return this.tasksService.findAll(orgId, query);
   }
 
@@ -71,7 +74,10 @@ export class TasksController {
   @Put('sort-order/update')
   @Permissions('projects.edit')
   @ApiOperation({ summary: 'Update task sort order' })
-  updateSortOrder(@CurrentOrg() orgId: string, @Body() dto: { taskOrders: { id: string; sortOrder: number }[] }) {
+  updateSortOrder(
+    @CurrentOrg() orgId: string,
+    @Body() dto: { taskOrders: { id: string; sortOrder: number }[] },
+  ) {
     return this.tasksService.updateSortOrder(orgId, dto.taskOrders);
   }
 }

@@ -5,9 +5,9 @@ import { ReportFilters } from '@/components/reports/report-filters';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-    formatCurrency,
-    usePurchasesByVendorReport,
-    type PurchasesByVendorEntry,
+  formatCurrency,
+  usePurchasesByVendorReport,
+  type PurchasesByVendorEntry,
 } from '@/lib/hooks/use-reports';
 import type { ColumnDef } from '@tanstack/react-table';
 import { endOfMonth, format, startOfMonth } from 'date-fns';

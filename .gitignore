@@ -11,8 +11,10 @@ build
 # Environment files
 .env
 .env.local
+.env.production
 .env.*.local
 !.env.example
+!.env.production.example
 
 # IDE
 .idea
@@ -36,6 +38,9 @@ coverage
 # Turbo
 .turbo
 
+# Lint caches
+.eslintcache
+
 # Prisma
 prisma/*.db
 prisma/*.db-journal
@@ -46,6 +51,10 @@ prisma/*.db-journal
 tmp
 temp
 
+# Uploads & storage
+uploads/
+storage/
+
 # ML Models (large files, download separately)
 apps/api/ml-models/
 *.onnx
@@ -54,8 +63,46 @@ apps/api/ml-models/
 # Generated reports
 kpi-reports/
 
+# Database dumps
+*.dump
+*.sql.gz
+
 # OS
 Thumbs.db
 
 # Test-data
 test-data/
+
+# ─── Python / VLM Service ────────────────────────────────────────────────────
+# Virtual environments
+venv/
+.venv/
+**/__pycache__/
+**/*.py[cod]
+**/*.pyo
+**/*.pyd
+**/.Python
+
+# Distribution / packaging
+services/vlm-service/*.egg-info/
+services/vlm-service/dist/
+services/vlm-service/build/
+services/vlm-service/.eggs/
+
+# Testing & coverage
+services/vlm-service/.pytest_cache/
+services/vlm-service/.coverage
+services/vlm-service/htmlcov/
+services/vlm-service/coverage.xml
+
+# Type checking
+services/vlm-service/.mypy_cache/
+services/vlm-service/.ruff_cache/
+.pyright/
+
+# HuggingFace model weights (multi-GB, download separately)
+services/vlm-service/models/
+**/*.safetensors
+**/*.bin
+**/*.pt
+**/*.pth

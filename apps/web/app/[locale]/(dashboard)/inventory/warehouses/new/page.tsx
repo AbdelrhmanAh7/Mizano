@@ -31,9 +31,7 @@ export default function NewWarehousePage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">New Warehouse</h1>
-          <p className="text-muted-foreground">
-            Add a new storage location
-          </p>
+          <p className="text-muted-foreground">Add a new storage location</p>
         </div>
       </div>
 

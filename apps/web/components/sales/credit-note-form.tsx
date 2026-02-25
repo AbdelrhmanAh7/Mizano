@@ -81,7 +81,7 @@ export function CreditNoteForm({
       inv.id !== selectedInvoiceId &&
       inv.status !== 'VOID' &&
       inv.status !== 'DRAFT' &&
-      parseFloat(inv.balanceDue || '0') > 0
+      parseFloat(inv.balanceDue || '0') > 0,
   );
 
   // Get selected invoice details
@@ -137,9 +137,7 @@ export function CreditNoteForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.customerId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
               )}
             </div>
 
@@ -160,7 +158,9 @@ export function CreditNoteForm({
               disabled={!selectedCustomerId}
             >
               <SelectTrigger>
-                <SelectValue placeholder={selectedCustomerId ? 'Select an invoice' : 'Select a customer first'} />
+                <SelectValue
+                  placeholder={selectedCustomerId ? 'Select an invoice' : 'Select a customer first'}
+                />
               </SelectTrigger>
               <SelectContent>
                 {invoices
@@ -173,9 +173,7 @@ export function CreditNoteForm({
               </SelectContent>
             </Select>
             {form.formState.errors.invoiceId && (
-              <p className="text-sm text-red-500">
-                {form.formState.errors.invoiceId.message}
-              </p>
+              <p className="text-sm text-red-500">{form.formState.errors.invoiceId.message}</p>
             )}
           </div>
 

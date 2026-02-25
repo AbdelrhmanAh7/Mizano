@@ -48,7 +48,7 @@ export function usePermissions() {
       const permission = permissions.find((p) => p.module === module);
       return permission?.actions?.includes(action) ?? false;
     },
-    [permissions, isAuthenticated]
+    [permissions, isAuthenticated],
   );
 
   /**
@@ -59,7 +59,7 @@ export function usePermissions() {
     (requiredPermissions: string[]): boolean => {
       return requiredPermissions.some((p) => hasPermission(p));
     },
-    [hasPermission]
+    [hasPermission],
   );
 
   /**
@@ -70,7 +70,7 @@ export function usePermissions() {
     (requiredPermissions: string[]): boolean => {
       return requiredPermissions.every((p) => hasPermission(p));
     },
-    [hasPermission]
+    [hasPermission],
   );
 
   /**
@@ -81,7 +81,7 @@ export function usePermissions() {
     (moduleName: string): boolean => {
       return permissions.some((p) => p.module === moduleName && p.actions.length > 0);
     },
-    [permissions]
+    [permissions],
   );
 
   /**
@@ -93,7 +93,7 @@ export function usePermissions() {
       const permission = permissions.find((p) => p.module === moduleName);
       return permission?.actions || [];
     },
-    [permissions]
+    [permissions],
   );
 
   return {

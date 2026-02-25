@@ -86,9 +86,7 @@ describe('Auth (e2e)', () => {
 
   describe('Protected endpoints', () => {
     it('should reject requests without token', () => {
-      return request(app.getHttpServer())
-        .get('/users/me')
-        .expect(401);
+      return request(app.getHttpServer()).get('/users/me').expect(401);
     });
 
     it('should reject requests with invalid token', () => {

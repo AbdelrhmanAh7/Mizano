@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -19,7 +11,11 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
-import { SentimentAnalysisService, EntityType, TrendPeriod } from '../services/sentiment-analysis.service';
+import {
+  SentimentAnalysisService,
+  EntityType,
+  TrendPeriod,
+} from '../services/sentiment-analysis.service';
 import {
   AnalyzeTextDto,
   SentimentResultDto,
@@ -42,9 +38,7 @@ export class SentimentAnalysisController {
     description: 'Returns sentiment analysis result',
     type: SentimentResultDto,
   })
-  async analyzeText(
-    @Body() body: AnalyzeTextDto,
-  ) {
+  async analyzeText(@Body() body: AnalyzeTextDto) {
     const result = await this.sentimentAnalysisService.analyzeText(body.text);
     return { data: result };
   }
@@ -62,10 +56,7 @@ export class SentimentAnalysisController {
     @CurrentOrg() orgId: string,
     @Param('customerId') customerId: string,
   ) {
-    const result = await this.sentimentAnalysisService.analyzeCustomerSentiment(
-      orgId,
-      customerId,
-    );
+    const result = await this.sentimentAnalysisService.analyzeCustomerSentiment(orgId, customerId);
     return { data: result };
   }
 
@@ -78,14 +69,8 @@ export class SentimentAnalysisController {
     description: 'Returns vendor sentiment overview',
     type: CustomerSentimentDto,
   })
-  async analyzeVendorSentiment(
-    @CurrentOrg() orgId: string,
-    @Param('vendorId') vendorId: string,
-  ) {
-    const result = await this.sentimentAnalysisService.analyzeVendorSentiment(
-      orgId,
-      vendorId,
-    );
+  async analyzeVendorSentiment(@CurrentOrg() orgId: string, @Param('vendorId') vendorId: string) {
+    const result = await this.sentimentAnalysisService.analyzeVendorSentiment(orgId, vendorId);
     return { data: result };
   }
 

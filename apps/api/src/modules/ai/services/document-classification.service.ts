@@ -486,11 +486,69 @@ export class DocumentClassificationService {
 
     const topScore = scores.find((s) => s.category === topCategory);
 
-    return {
+    const result: ClassificationResult = {
       category: topCategory,
       confidence: topScore?.score || 0,
       scores,
     };
+
+    return this.applyKeywordBoost(result, text);
+  }
+
+  /**
+   * Apply keyword-based confidence boosting for documents with strong
+   * category-specific keywords that the Bayes classifier may underweight
+   * (e.g., bank statements that contain embedded tax invoices).
+   */
+  private applyKeywordBoost(result: ClassificationResult, text: string): ClassificationResult {
+    const lowerText = text.toLowerCase();
+
+    // Strong INVOICE keywords (bilingual)
+    const invoiceKeywords = [
+      'tax invoice',
+      'فاتورة ضريبية',
+      'invoice no',
+      'invoice number',
+      'رقم الفاتورة',
+      'فاتورة رقم',
+      'bill to',
+      'total amount due',
+      'invoice date',
+      'تاريخ الفاتورة',
+    ];
+
+    const invoiceKeywordCount = invoiceKeywords.filter((kw) => lowerText.includes(kw)).length;
+
+    // If 2+ strong invoice keywords found but classification is not INVOICE, override
+    if (invoiceKeywordCount >= 2 && result.category !== DocumentCategory.INVOICE) {
+      const boostedScore = Math.min(0.5 + invoiceKeywordCount * 0.1, 0.95);
+      return {
+        category: DocumentCategory.INVOICE,
+        confidence: boostedScore,
+        scores: result.scores.map((s) => ({
+          ...s,
+          score: s.category === DocumentCategory.INVOICE ? boostedScore : s.score * 0.8,
+        })),
+      };
+    }
+
+    // If already INVOICE but low confidence, boost based on keyword count
+    if (
+      result.category === DocumentCategory.INVOICE &&
+      result.confidence < 0.5 &&
+      invoiceKeywordCount >= 1
+    ) {
+      const boostedConfidence = Math.min(
+        Math.max(result.confidence, 0.4 + invoiceKeywordCount * 0.1),
+        0.9,
+      );
+      return {
+        ...result,
+        confidence: boostedConfidence,
+      };
+    }
+
+    return result;
   }
 
   /**

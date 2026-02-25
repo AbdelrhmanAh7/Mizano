@@ -14,11 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -139,9 +135,7 @@ export default function MarkAttendancePage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Mark Attendance</h1>
-          <p className="text-muted-foreground">
-            Record attendance for multiple employees
-          </p>
+          <p className="text-muted-foreground">Record attendance for multiple employees</p>
         </div>
       </div>
 
@@ -149,9 +143,7 @@ export default function MarkAttendancePage() {
       <Card>
         <CardHeader>
           <CardTitle>Select Date</CardTitle>
-          <CardDescription>
-            Choose the date for which you want to mark attendance
-          </CardDescription>
+          <CardDescription>Choose the date for which you want to mark attendance</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center gap-4">
           <Popover>
@@ -160,7 +152,7 @@ export default function MarkAttendancePage() {
                 variant="outline"
                 className={cn(
                   'w-64 justify-start text-left font-normal',
-                  !selectedDate && 'text-muted-foreground'
+                  !selectedDate && 'text-muted-foreground',
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -186,21 +178,14 @@ export default function MarkAttendancePage() {
         </CardHeader>
         <CardContent className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <Checkbox
-              id="selectAll"
-              checked={selectAll}
-              onCheckedChange={handleSelectAll}
-            />
+            <Checkbox id="selectAll" checked={selectAll} onCheckedChange={handleSelectAll} />
             <label htmlFor="selectAll" className="text-sm">
               Select all employees
             </label>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Default status:</span>
-            <Select
-              value={defaultStatus}
-              onValueChange={handleDefaultStatusChange}
-            >
+            <Select value={defaultStatus} onValueChange={handleDefaultStatusChange}>
               <SelectTrigger className="w-32">
                 <SelectValue />
               </SelectTrigger>
@@ -301,9 +286,7 @@ export default function MarkAttendancePage() {
                       <Input
                         type="time"
                         value={entry?.checkIn || ''}
-                        onChange={(e) =>
-                          updateEntry(employee.id, { checkIn: e.target.value })
-                        }
+                        onChange={(e) => updateEntry(employee.id, { checkIn: e.target.value })}
                         disabled={!isSelected}
                         className="w-28"
                       />
@@ -312,9 +295,7 @@ export default function MarkAttendancePage() {
                       <Input
                         type="time"
                         value={entry?.checkOut || ''}
-                        onChange={(e) =>
-                          updateEntry(employee.id, { checkOut: e.target.value })
-                        }
+                        onChange={(e) => updateEntry(employee.id, { checkOut: e.target.value })}
                         disabled={!isSelected}
                         className="w-28"
                       />
@@ -323,9 +304,7 @@ export default function MarkAttendancePage() {
                       <Input
                         placeholder="Notes"
                         value={entry?.notes || ''}
-                        onChange={(e) =>
-                          updateEntry(employee.id, { notes: e.target.value })
-                        }
+                        onChange={(e) => updateEntry(employee.id, { notes: e.target.value })}
                         disabled={!isSelected}
                         className="w-40"
                       />
@@ -343,14 +322,9 @@ export default function MarkAttendancePage() {
         <Button variant="outline" onClick={() => router.back()}>
           Cancel
         </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={entries.size === 0 || bulkMark.isPending}
-        >
+        <Button onClick={handleSubmit} disabled={entries.size === 0 || bulkMark.isPending}>
           <UserCheck className="mr-2 h-4 w-4" />
-          {bulkMark.isPending
-            ? 'Saving...'
-            : `Mark Attendance (${entries.size})`}
+          {bulkMark.isPending ? 'Saving...' : `Mark Attendance (${entries.size})`}
         </Button>
       </div>
     </div>

@@ -74,7 +74,7 @@ const categorizationApi = {
 
 export function useCategorySuggestion(
   input: CategorizationInput | null,
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean },
 ) {
   return useQuery({
     queryKey: ['ai-categorization-predict', input],

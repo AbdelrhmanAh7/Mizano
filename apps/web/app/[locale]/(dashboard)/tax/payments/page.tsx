@@ -11,9 +11,7 @@ export default function VATPaymentsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">VAT Payments</h1>
-          <p className="text-muted-foreground">
-            View payments made for VAT returns
-          </p>
+          <p className="text-muted-foreground">View payments made for VAT returns</p>
         </div>
       </div>
 
@@ -22,8 +20,8 @@ export default function VATPaymentsPage() {
           <CreditCard className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">VAT Payments</h3>
           <p className="text-muted-foreground mb-4">
-            Payments are recorded directly from filed VAT returns.
-            Navigate to a filed VAT return to record a payment.
+            Payments are recorded directly from filed VAT returns. Navigate to a filed VAT return to
+            record a payment.
           </p>
           <Button asChild>
             <Link href="/tax/returns">View VAT Returns</Link>

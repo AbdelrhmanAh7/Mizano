@@ -2,12 +2,7 @@
 
 import { Package, AlertTriangle, XCircle, Archive } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 export type ReorderStatus = 'OK' | 'LOW_STOCK' | 'CRITICAL' | 'DEAD_STOCK';
@@ -90,7 +85,7 @@ export function ReorderStatusBadge({
         'inline-flex items-center gap-1 font-medium',
         config.color,
         sizeStyles.badge,
-        className
+        className,
       )}
     >
       <Icon className={cn(sizeStyles.icon, config.iconColor)} />
@@ -226,17 +221,15 @@ export function ReorderAlert({
         status === 'CRITICAL'
           ? 'border-red-200 bg-red-50'
           : status === 'LOW_STOCK'
-          ? 'border-yellow-200 bg-yellow-50'
-          : 'border-gray-200 bg-gray-50',
-        className
+            ? 'border-yellow-200 bg-yellow-50'
+            : 'border-gray-200 bg-gray-50',
+        className,
       )}
     >
       <Icon className={cn('h-5 w-5 mt-0.5', config.iconColor)} />
       <div className="flex-1 min-w-0">
         <div className="font-medium text-sm">{itemName}</div>
-        <div className="text-xs text-muted-foreground mt-0.5">
-          {config.description}
-        </div>
+        <div className="text-xs text-muted-foreground mt-0.5">{config.description}</div>
         <div className="flex items-center gap-4 mt-2 text-xs">
           <span>
             Current: <strong>{currentStock}</strong>

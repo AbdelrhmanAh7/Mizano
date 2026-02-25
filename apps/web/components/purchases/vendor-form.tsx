@@ -66,12 +66,7 @@ const paymentTermsOptions = [
   { value: 60, label: 'Net 60' },
 ];
 
-export function VendorForm({
-  vendor,
-  onSubmit,
-  onCancel,
-  isSubmitting,
-}: VendorFormProps) {
+export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorFormProps) {
   const isEditing = !!vendor;
 
   const form = useForm<VendorFormData>({
@@ -145,15 +140,9 @@ export function VendorForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Vendor Name *</Label>
-              <Input
-                id="name"
-                placeholder="Enter vendor name"
-                {...form.register('name')}
-              />
+              <Input id="name" placeholder="Enter vendor name" {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.name.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
 
@@ -177,9 +166,7 @@ export function VendorForm({
                 {...form.register('email')}
               />
               {form.formState.errors.email && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.email.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.email.message}</p>
               )}
             </div>
 
@@ -234,11 +221,7 @@ export function VendorForm({
 
             <div className="space-y-2">
               <Label htmlFor="taxId">Tax ID</Label>
-              <Input
-                id="taxId"
-                placeholder="Tax ID / VAT Number"
-                {...form.register('taxId')}
-              />
+              <Input id="taxId" placeholder="Tax ID / VAT Number" {...form.register('taxId')} />
             </div>
           </div>
         </CardContent>
@@ -312,11 +295,7 @@ export function VendorForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? 'Saving...'
-            : isEditing
-            ? 'Update Vendor'
-            : 'Create Vendor'}
+          {isSubmitting ? 'Saving...' : isEditing ? 'Update Vendor' : 'Create Vendor'}
         </Button>
       </div>
     </form>

@@ -68,9 +68,16 @@ export default function RevenueForecastPage() {
   const historicalData = forecastData.filter((d: any) => d.isHistorical);
   const predictedData = forecastData.filter((d: any) => !d.isHistorical);
 
-  const avgHistorical = historicalData.reduce((sum: number, d: any) => sum + (d.actualRevenue || 0), 0) / historicalData.length;
-  const avgPredicted = predictedData.reduce((sum: number, d: any) => sum + (d.predictedRevenue || 0), 0) / predictedData.length;
-  const totalPredicted = predictedData.reduce((sum: number, d: any) => sum + (d.predictedRevenue || 0), 0);
+  const avgHistorical =
+    historicalData.reduce((sum: number, d: any) => sum + (d.actualRevenue || 0), 0) /
+    historicalData.length;
+  const avgPredicted =
+    predictedData.reduce((sum: number, d: any) => sum + (d.predictedRevenue || 0), 0) /
+    predictedData.length;
+  const totalPredicted = predictedData.reduce(
+    (sum: number, d: any) => sum + (d.predictedRevenue || 0),
+    0,
+  );
   const growthRate = ((avgPredicted - avgHistorical) / avgHistorical) * 100;
 
   if (isLoading) {
@@ -127,9 +134,7 @@ export default function RevenueForecastPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Avg Historical</p>
-                <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(avgHistorical)}
-                </p>
+                <p className="text-2xl font-bold font-mono">{formatCurrency(avgHistorical)}</p>
               </div>
             </div>
           </CardContent>
@@ -142,9 +147,7 @@ export default function RevenueForecastPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Avg Predicted</p>
-                <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(avgPredicted)}
-                </p>
+                <p className="text-2xl font-bold font-mono">{formatCurrency(avgPredicted)}</p>
               </div>
             </div>
           </CardContent>
@@ -153,12 +156,17 @@ export default function RevenueForecastPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-lg ${growthRate >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
-                <TrendingUp className={`h-5 w-5 ${growthRate >= 0 ? 'text-green-600' : 'text-red-600'}`} />
+                <TrendingUp
+                  className={`h-5 w-5 ${growthRate >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Growth Rate</p>
-                <p className={`text-2xl font-bold ${growthRate >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {growthRate >= 0 ? '+' : ''}{growthRate.toFixed(1)}%
+                <p
+                  className={`text-2xl font-bold ${growthRate >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                >
+                  {growthRate >= 0 ? '+' : ''}
+                  {growthRate.toFixed(1)}%
                 </p>
               </div>
             </div>
@@ -167,12 +175,8 @@ export default function RevenueForecastPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Predicted</p>
-            <p className="text-2xl font-bold font-mono">
-              {formatCurrency(totalPredicted)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Next {months} months
-            </p>
+            <p className="text-2xl font-bold font-mono">{formatCurrency(totalPredicted)}</p>
+            <p className="text-xs text-muted-foreground">Next {months} months</p>
           </CardContent>
         </Card>
       </div>
@@ -181,9 +185,7 @@ export default function RevenueForecastPage() {
       <Card>
         <CardHeader>
           <CardTitle>Revenue Trend</CardTitle>
-          <CardDescription>
-            Historical revenue vs AI predictions
-          </CardDescription>
+          <CardDescription>Historical revenue vs AI predictions</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[400px]">
@@ -219,18 +221,23 @@ export default function RevenueForecastPage() {
       <Card>
         <CardHeader>
           <CardTitle>Predicted Monthly Revenue</CardTitle>
-          <CardDescription>
-            Detailed breakdown of revenue predictions
-          </CardDescription>
+          <CardDescription>Detailed breakdown of revenue predictions</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {predictedData.map((month: any, index: number) => (
-              <div key={month.date} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+              <div
+                key={month.date}
+                className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+              >
                 <div className="flex items-center gap-4">
                   <div className="text-center min-w-[60px]">
-                    <p className="text-lg font-bold">{format(new Date(month.date + '-01'), 'MMM')}</p>
-                    <p className="text-xs text-muted-foreground">{format(new Date(month.date + '-01'), 'yyyy')}</p>
+                    <p className="text-lg font-bold">
+                      {format(new Date(month.date + '-01'), 'MMM')}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(month.date + '-01'), 'yyyy')}
+                    </p>
                   </div>
                   <div>
                     <p className="text-2xl font-bold font-mono">
@@ -247,15 +254,15 @@ export default function RevenueForecastPage() {
                     month.predictedRevenue > avgHistorical * 1.1
                       ? 'bg-green-100 text-green-800'
                       : month.predictedRevenue < avgHistorical * 0.9
-                      ? 'bg-red-100 text-red-800'
-                      : 'bg-gray-100 text-gray-800'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-gray-100 text-gray-800'
                   }
                 >
                   {month.predictedRevenue > avgHistorical * 1.1
                     ? 'Above Average'
                     : month.predictedRevenue < avgHistorical * 0.9
-                    ? 'Below Average'
-                    : 'On Track'}
+                      ? 'Below Average'
+                      : 'On Track'}
                 </Badge>
               </div>
             ))}

@@ -50,20 +50,12 @@ export function SearchProgress({ job }: SearchProgressProps) {
             <p className="text-sm text-muted-foreground">{job.progressMessage}</p>
           )}
 
-          {job.error && (
-            <p className="text-sm text-red-500">{job.error}</p>
-          )}
+          {job.error && <p className="text-sm text-red-500">{job.error}</p>}
 
           <div className="flex gap-4 text-xs text-muted-foreground">
-            {job.webSourcesScraped > 0 && (
-              <span>Web sources: {job.webSourcesScraped}</span>
-            )}
-            {job.codeFilesAnalyzed > 0 && (
-              <span>Code files: {job.codeFilesAnalyzed}</span>
-            )}
-            {job.suggestionsCount > 0 && (
-              <span>Suggestions: {job.suggestionsCount}</span>
-            )}
+            {job.webSourcesScraped > 0 && <span>Web sources: {job.webSourcesScraped}</span>}
+            {job.codeFilesAnalyzed > 0 && <span>Code files: {job.codeFilesAnalyzed}</span>}
+            {job.suggestionsCount > 0 && <span>Suggestions: {job.suggestionsCount}</span>}
           </div>
         </div>
       </CardContent>

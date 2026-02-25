@@ -85,8 +85,7 @@ export function useUpdateBankAccount() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
-      bankAccountsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: any }) => bankAccountsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       toast.success('Bank account updated successfully');

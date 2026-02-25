@@ -47,8 +47,8 @@ export function GenerateDataDialog({ model, open, onOpenChange }: GenerateDataDi
             Generate Training Data
           </DialogTitle>
           <DialogDescription>
-            Generate synthetic training samples for <strong>{model?.name}</strong>.
-            This creates realistic random data to help the model learn.
+            Generate synthetic training samples for <strong>{model?.name}</strong>. This creates
+            realistic random data to help the model learn.
           </DialogDescription>
         </DialogHeader>
 
@@ -61,7 +61,9 @@ export function GenerateDataDialog({ model, open, onOpenChange }: GenerateDataDi
               min={10}
               max={500}
               value={count}
-              onChange={(e) => setCount(Math.max(10, Math.min(500, parseInt(e.target.value) || 100)))}
+              onChange={(e) =>
+                setCount(Math.max(10, Math.min(500, parseInt(e.target.value) || 100)))
+              }
             />
             <p className="text-xs text-muted-foreground">
               Between 10 and 500 samples. More data generally improves accuracy.

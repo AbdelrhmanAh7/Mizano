@@ -170,8 +170,7 @@ export function useDismissInsight() {
 export function useActionInsight() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, action }: { id: string; action: string }) =>
-      aiApi.actionInsight(id, action),
+    mutationFn: ({ id, action }: { id: string; action: string }) => aiApi.actionInsight(id, action),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ai-insights'] });
     },

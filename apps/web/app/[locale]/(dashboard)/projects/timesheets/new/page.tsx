@@ -18,11 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -96,9 +92,7 @@ export default function NewTimesheetPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Log Time</h1>
-          <p className="text-muted-foreground">
-            Record time spent on a project task
-          </p>
+          <p className="text-muted-foreground">Record time spent on a project task</p>
         </div>
       </div>
 
@@ -131,9 +125,7 @@ export default function NewTimesheetPage() {
                   </SelectContent>
                 </Select>
                 {form.formState.errors.projectId && (
-                  <p className="text-sm text-red-500">
-                    {form.formState.errors.projectId.message}
-                  </p>
+                  <p className="text-sm text-red-500">{form.formState.errors.projectId.message}</p>
                 )}
               </div>
 
@@ -156,9 +148,7 @@ export default function NewTimesheetPage() {
                   </SelectContent>
                 </Select>
                 {form.formState.errors.taskId && (
-                  <p className="text-sm text-red-500">
-                    {form.formState.errors.taskId.message}
-                  </p>
+                  <p className="text-sm text-red-500">{form.formState.errors.taskId.message}</p>
                 )}
               </div>
             </div>
@@ -172,13 +162,11 @@ export default function NewTimesheetPage() {
                       variant="outline"
                       className={cn(
                         'w-full justify-start text-left font-normal',
-                        !form.watch('date') && 'text-muted-foreground'
+                        !form.watch('date') && 'text-muted-foreground',
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {form.watch('date')
-                        ? format(form.watch('date'), 'PPP')
-                        : 'Pick a date'}
+                      {form.watch('date') ? format(form.watch('date'), 'PPP') : 'Pick a date'}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -203,9 +191,7 @@ export default function NewTimesheetPage() {
                   {...form.register('hours', { valueAsNumber: true })}
                 />
                 {form.formState.errors.hours && (
-                  <p className="text-sm text-red-500">
-                    {form.formState.errors.hours.message}
-                  </p>
+                  <p className="text-sm text-red-500">{form.formState.errors.hours.message}</p>
                 )}
               </div>
             </div>

@@ -8,11 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmployeeForm } from '@/components/hr/employee-form';
 import { useEmployee } from '@/lib/hooks/use-hr';
 
-export default function EditEmployeePage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function EditEmployeePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: employee, isLoading } = useEmployee(id);
 

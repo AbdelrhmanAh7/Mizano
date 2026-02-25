@@ -6,7 +6,12 @@ export class AiCategorizationService {
   private readonly logger = new Logger(AiCategorizationService.name);
   constructor(private prisma: PrismaService) {}
 
-  async categorizeTransaction(organizationId: string, description: string, amount: number, type: 'expense' | 'income') {
+  async categorizeTransaction(
+    organizationId: string,
+    description: string,
+    amount: number,
+    type: 'expense' | 'income',
+  ) {
     // Get historical categorizations for learning
     const historicalData = await this.getHistoricalCategorizations(organizationId, type);
 
@@ -92,7 +97,12 @@ export class AiCategorizationService {
       const type = transaction.type === 'DEPOSIT' ? 'income' : 'expense';
       const description = transaction.description || transaction.payee || '';
 
-      const categorization = await this.categorizeTransaction(organizationId, description, parseFloat(transaction.amount.toString()), type);
+      const categorization = await this.categorizeTransaction(
+        organizationId,
+        description,
+        parseFloat(transaction.amount.toString()),
+        type,
+      );
 
       results.push({
         transactionId: transaction.id,
@@ -156,7 +166,10 @@ export class AiCategorizationService {
       });
 
       // Build pattern map to count occurrences
-      const patternMap = new Map<string, { accountId: string; accountName: string; matchCount: number }>();
+      const patternMap = new Map<
+        string,
+        { accountId: string; accountName: string; matchCount: number }
+      >();
 
       for (const expense of expenses) {
         const pattern = this.normalizeDescription(expense.description || '');
@@ -187,7 +200,12 @@ export class AiCategorizationService {
 
   private findBestMatch(
     description: string,
-    historicalData: { pattern: string; accountId: string; accountName: string; matchCount: number }[],
+    historicalData: {
+      pattern: string;
+      accountId: string;
+      accountName: string;
+      matchCount: number;
+    }[],
   ) {
     const normalizedDesc = this.normalizeDescription(description);
     const descWords = normalizedDesc.split(/\s+/);
@@ -251,7 +269,10 @@ export class AiCategorizationService {
       'meal|food|restaurant|lunch|dinner|coffee': { name: 'Meals & Entertainment', code: '6300' },
       'rent|lease|office space': { name: 'Rent Expense', code: '6100' },
       'utility|electric|water|gas|internet': { name: 'Utilities', code: '6110' },
-      'marketing|advertising|ads|google|facebook': { name: 'Marketing & Advertising', code: '6500' },
+      'marketing|advertising|ads|google|facebook': {
+        name: 'Marketing & Advertising',
+        code: '6500',
+      },
       'insurance|coverage|premium': { name: 'Insurance', code: '6800' },
       'legal|attorney|lawyer': { name: 'Professional Services', code: '6400' },
       'accounting|bookkeeping|tax prep': { name: 'Professional Services', code: '6400' },

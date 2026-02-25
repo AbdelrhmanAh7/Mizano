@@ -91,7 +91,8 @@ export class RouteOptimizationService {
       customerName: d.customer.name,
       city: d.customer.shippingCity || d.customer.billingCity || d.customer.city || null,
       state: d.customer.shippingState || d.customer.billingState || null,
-      country: d.customer.shippingCountry || d.customer.billingCountry || d.customer.country || null,
+      country:
+        d.customer.shippingCountry || d.customer.billingCountry || d.customer.country || null,
     }));
 
     // Build distance matrix (using location grouping as proxy)
@@ -110,9 +111,7 @@ export class RouteOptimizationService {
     );
     const optimizedDistance = this.calculateRouteDistance(route, distanceMatrix);
     const savings =
-      originalDistance > 0
-        ? ((originalDistance - optimizedDistance) / originalDistance) * 100
-        : 0;
+      originalDistance > 0 ? ((originalDistance - optimizedDistance) / originalDistance) * 100 : 0;
 
     // Count unique regions
     const regions = new Set(stops.map((s) => s.city || s.state || s.country || 'Unknown'));
@@ -139,10 +138,7 @@ export class RouteOptimizationService {
   /**
    * Estimate delivery time based on historical data
    */
-  async estimateDelivery(
-    organizationId: string,
-    deliveryId: string,
-  ): Promise<DeliveryEstimate> {
+  async estimateDelivery(organizationId: string, deliveryId: string): Promise<DeliveryEstimate> {
     const delivery = await this.prisma.deliveryChallan.findFirst({
       where: { id: deliveryId, organizationId, deletedAt: null },
       include: {
@@ -166,11 +162,8 @@ export class RouteOptimizationService {
     }
 
     const targetCity =
-      delivery.customer.shippingCity ||
-      delivery.customer.billingCity ||
-      delivery.customer.city;
-    const targetState =
-      delivery.customer.shippingState || delivery.customer.billingState;
+      delivery.customer.shippingCity || delivery.customer.billingCity || delivery.customer.city;
+    const targetState = delivery.customer.shippingState || delivery.customer.billingState;
     const targetCountry =
       delivery.customer.shippingCountry ||
       delivery.customer.billingCountry ||
@@ -203,14 +196,10 @@ export class RouteOptimizationService {
     const matchingDeliveries: { days: number; matchLevel: number }[] = [];
 
     for (const hd of historicalDeliveries) {
-      const hdCity =
-        hd.customer.shippingCity || hd.customer.billingCity || hd.customer.city;
-      const hdState =
-        hd.customer.shippingState || hd.customer.billingState;
+      const hdCity = hd.customer.shippingCity || hd.customer.billingCity || hd.customer.city;
+      const hdState = hd.customer.shippingState || hd.customer.billingState;
       const hdCountry =
-        hd.customer.shippingCountry ||
-        hd.customer.billingCountry ||
-        hd.customer.country;
+        hd.customer.shippingCountry || hd.customer.billingCountry || hd.customer.country;
 
       let matchLevel = 0;
       if (targetCity && hdCity && targetCity === hdCity) {
@@ -245,12 +234,9 @@ export class RouteOptimizationService {
 
     // Weight by match level
     const bestMatchLevel = Math.max(...matchingDeliveries.map((d) => d.matchLevel));
-    const bestMatches = matchingDeliveries.filter(
-      (d) => d.matchLevel === bestMatchLevel,
-    );
+    const bestMatches = matchingDeliveries.filter((d) => d.matchLevel === bestMatchLevel);
 
-    const avgDays =
-      bestMatches.reduce((sum, d) => sum + d.days, 0) / bestMatches.length;
+    const avgDays = bestMatches.reduce((sum, d) => sum + d.days, 0) / bestMatches.length;
 
     // Confidence based on match level and sample size
     const baseConfidence = bestMatchLevel === 3 ? 0.8 : bestMatchLevel === 2 ? 0.6 : 0.4;
@@ -306,10 +292,7 @@ export class RouteOptimizationService {
 
     for (const d of deliveries) {
       const region =
-        d.customer.shippingCity ||
-        d.customer.billingCity ||
-        d.customer.city ||
-        'Unknown';
+        d.customer.shippingCity || d.customer.billingCity || d.customer.city || 'Unknown';
 
       if (!regionData.has(region)) {
         regionData.set(region, { count: 0, totalDays: 0 });
@@ -347,8 +330,7 @@ export class RouteOptimizationService {
     ).length;
     const onTimeRate = nonDraftCount > 0 ? completedStatusCount / nonDraftCount : 0;
 
-    const avgDeliveryDays =
-      completedCount > 0 ? totalDeliveryDays / completedCount : 0;
+    const avgDeliveryDays = completedCount > 0 ? totalDeliveryDays / completedCount : 0;
 
     return {
       totalDeliveries: deliveries.length,
@@ -372,31 +354,17 @@ export class RouteOptimizationService {
     }>,
   ): number[][] {
     const n = stops.length;
-    const matrix: number[][] = Array.from({ length: n }, () =>
-      Array(n).fill(0),
-    );
+    const matrix: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
 
     for (let i = 0; i < n; i++) {
       for (let j = i + 1; j < n; j++) {
         let distance: number;
 
-        if (
-          stops[i].city &&
-          stops[j].city &&
-          stops[i].city === stops[j].city
-        ) {
+        if (stops[i].city && stops[j].city && stops[i].city === stops[j].city) {
           distance = 1; // Same city
-        } else if (
-          stops[i].state &&
-          stops[j].state &&
-          stops[i].state === stops[j].state
-        ) {
+        } else if (stops[i].state && stops[j].state && stops[i].state === stops[j].state) {
           distance = 5; // Same state, different city
-        } else if (
-          stops[i].country &&
-          stops[j].country &&
-          stops[i].country === stops[j].country
-        ) {
+        } else if (stops[i].country && stops[j].country && stops[i].country === stops[j].country) {
           distance = 10; // Same country, different state
         } else {
           distance = 20; // Different country or unknown
@@ -414,10 +382,7 @@ export class RouteOptimizationService {
    * Nearest-neighbor heuristic for initial route construction
    * Start from first stop, always go to nearest unvisited
    */
-  private nearestNeighbor(
-    distanceMatrix: number[][],
-    n: number,
-  ): number[] {
+  private nearestNeighbor(distanceMatrix: number[][], n: number): number[] {
     if (n <= 1) return Array.from({ length: n }, (_, i) => i);
 
     const visited = new Set<number>();
@@ -473,10 +438,7 @@ export class RouteOptimizationService {
             right--;
           }
 
-          const newDistance = this.calculateRouteDistance(
-            newRoute,
-            distanceMatrix,
-          );
+          const newDistance = this.calculateRouteDistance(newRoute, distanceMatrix);
           if (newDistance < bestDistance) {
             bestRoute = newRoute;
             bestDistance = newDistance;
@@ -492,10 +454,7 @@ export class RouteOptimizationService {
   /**
    * Calculate total distance of a route
    */
-  private calculateRouteDistance(
-    route: number[],
-    distanceMatrix: number[][],
-  ): number {
+  private calculateRouteDistance(route: number[], distanceMatrix: number[][]): number {
     let distance = 0;
     for (let i = 0; i < route.length - 1; i++) {
       distance += distanceMatrix[route[i]][route[i + 1]];

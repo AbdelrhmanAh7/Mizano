@@ -9,5 +9,6 @@ export * from './collection-priority-card';
 export * from './customer-ai-insights';
 export * from './pipeline-forecast-card';
 export * from './flight-risk-card';
+export * from './accounting-entry-preview';
 export * from './chatbot/chat-widget';
 export * from './chatbot/chat-message';

@@ -100,7 +100,15 @@ Controllers use decorators to handle routing, authentication, authorization, and
 
 ```typescript
 import {
-  Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards,
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { InvoicesService } from '../services/invoices.service';
@@ -160,6 +168,7 @@ export class InvoicesController {
 ```
 
 Key conventions:
+
 - `@UseGuards(JwtAuthGuard, PermissionsGuard)` applied at the class level protects all routes.
 - `@Permissions('module.action')` on each method specifies required RBAC permissions.
 - `@CurrentOrg()` extracts the authenticated user's `organizationId` from the JWT.
@@ -224,6 +233,7 @@ export class InvoicesService {
 ```
 
 Key conventions:
+
 - **Every query includes `organizationId`** to enforce multi-tenancy isolation.
 - **Monetary values use `Decimal`** from `@prisma/client/runtime/library` -- never JavaScript `number` or `float`.
 - Services throw NestJS exceptions (`NotFoundException`, `BadRequestException`, etc.) for error cases.
@@ -238,7 +248,15 @@ DTOs use `class-validator` decorators for runtime validation and `@nestjs/swagge
 ### Create DTO
 
 ```typescript
-import { IsString, IsDateString, IsArray, ValidateNested, ArrayMinSize, IsOptional, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsDateString,
+  IsArray,
+  ValidateNested,
+  ArrayMinSize,
+  IsOptional,
+  MaxLength,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -257,7 +275,8 @@ export class CreateInvoiceDto {
   customerId: string;
 
   @ApiProperty({ required: false })
-  @IsString() @IsOptional()
+  @IsString()
+  @IsOptional()
   quoteId?: string;
 
   @ApiProperty()
@@ -276,11 +295,15 @@ export class CreateInvoiceDto {
   lines: InvoiceLineDto[];
 
   @ApiProperty({ required: false })
-  @IsString() @IsOptional() @MaxLength(2000)
+  @IsString()
+  @IsOptional()
+  @MaxLength(2000)
   notes?: string;
 
   @ApiProperty({ required: false })
-  @IsString() @IsOptional() @MaxLength(2000)
+  @IsString()
+  @IsOptional()
+  @MaxLength(2000)
   terms?: string;
 }
 ```
@@ -295,19 +318,23 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 export class InvoiceQueryDto extends PaginationDto {
   @ApiProperty({ required: false, enum: InvoiceStatus })
-  @IsEnum(InvoiceStatus) @IsOptional()
+  @IsEnum(InvoiceStatus)
+  @IsOptional()
   status?: InvoiceStatus;
 
   @ApiProperty({ required: false })
-  @IsString() @IsOptional()
+  @IsString()
+  @IsOptional()
   customerId?: string;
 
   @ApiProperty({ required: false })
-  @IsDateString() @IsOptional()
+  @IsDateString()
+  @IsOptional()
   dateFrom?: string;
 
   @ApiProperty({ required: false })
-  @IsDateString() @IsOptional()
+  @IsDateString()
+  @IsOptional()
   dateTo?: string;
 }
 ```
@@ -486,12 +513,13 @@ Registration creates the organization, default Admin role with full permissions,
 
 ### Token Details
 
-| Token | Secret | Default Expiry |
-|-------|--------|----------------|
-| Access Token | `JWT_SECRET` | 15 minutes |
-| Refresh Token | `JWT_REFRESH_SECRET` | 7 days |
+| Token         | Secret               | Default Expiry |
+| ------------- | -------------------- | -------------- |
+| Access Token  | `JWT_SECRET`         | 15 minutes     |
+| Refresh Token | `JWT_REFRESH_SECRET` | 7 days         |
 
 JWT payload:
+
 ```typescript
 {
   sub: userId,
@@ -586,13 +614,16 @@ Loads the user's role and checks that all required permissions (set via `@Permis
 ```typescript
 @Injectable()
 export class PermissionsGuard implements CanActivate {
-  constructor(private reflector: Reflector, private prisma: PrismaService) {}
+  constructor(
+    private reflector: Reflector,
+    private prisma: PrismaService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(
-      PERMISSIONS_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
     if (!requiredPermissions || requiredPermissions.length === 0) return true;
 
@@ -620,6 +651,7 @@ export class PermissionsGuard implements CanActivate {
 ```
 
 Permission strings follow the `module.action` format:
+
 - `sales.view`, `sales.create`, `sales.edit`, `sales.delete`, `sales.export`
 - `accounting.view`, `accounting.create`, `accounting.edit`, `accounting.delete`
 - `settings.view`, `settings.edit`
@@ -717,15 +749,15 @@ approve(@CurrentOrg() orgId: string, @Param('id') id: string) { ... }
 
 Each document type has an auto-incrementing number prefixed by a document type code:
 
-| Document | Format | Example |
-|----------|--------|---------|
-| Invoice | `INV-XXX` | `INV-001`, `INV-042` |
-| Quote/Estimate | `EST-XXX` | `EST-001` |
-| Credit Note | `CN-XXX` | `CN-001` |
-| Journal | `JRN-XXX` | `JRN-001` |
-| Bill | `BILL-XXX` | `BILL-001` |
-| Payment Received | `PMT-XXX` | `PMT-001` |
-| Payment Made | `PAY-XXX` | `PAY-001` |
+| Document         | Format     | Example              |
+| ---------------- | ---------- | -------------------- |
+| Invoice          | `INV-XXX`  | `INV-001`, `INV-042` |
+| Quote/Estimate   | `EST-XXX`  | `EST-001`            |
+| Credit Note      | `CN-XXX`   | `CN-001`             |
+| Journal          | `JRN-XXX`  | `JRN-001`            |
+| Bill             | `BILL-XXX` | `BILL-001`           |
+| Payment Received | `PMT-XXX`  | `PMT-001`            |
+| Payment Made     | `PAY-XXX`  | `PAY-001`            |
 
 Implementation pattern:
 
@@ -817,6 +849,7 @@ async findAll(organizationId: string, query: InvoiceQueryDto) {
 ```
 
 Query parameters:
+
 - `page` (default: 1) -- the page number, 1-indexed
 - `limit` (default: 20, max: 100) -- items per page
 - `search` -- full-text search across relevant fields (case-insensitive)
@@ -905,6 +938,7 @@ await this.updateBalanceDue(id);
 ```
 
 When to use transactions:
+
 - Creating an entity with related child records (if they must all succeed)
 - Recording payments (create payment + update invoice balance)
 - Sending invoices (update status + create journal entries)
@@ -981,6 +1015,7 @@ throw new BusinessRuleException(
 ```
 
 Available static factory methods:
+
 - `journalNotBalanced(debits, credits)`
 - `insufficientInventory(itemId, required, available)`
 - `periodLocked(date, lockDate)`
@@ -1004,12 +1039,12 @@ Available static factory methods:
 
 The `AllExceptionsFilter` automatically translates Prisma errors:
 
-| Prisma Code | HTTP Status | Error Code |
-|-------------|-------------|------------|
-| P2002 | 409 Conflict | `UNIQUE_CONSTRAINT_VIOLATION` |
-| P2003 | 400 Bad Request | `FOREIGN_KEY_VIOLATION` |
-| P2025 | 404 Not Found | `RECORD_NOT_FOUND` |
-| P2014 | 400 Bad Request | `REQUIRED_RELATION_VIOLATION` |
+| Prisma Code | HTTP Status     | Error Code                    |
+| ----------- | --------------- | ----------------------------- |
+| P2002       | 409 Conflict    | `UNIQUE_CONSTRAINT_VIOLATION` |
+| P2003       | 400 Bad Request | `FOREIGN_KEY_VIOLATION`       |
+| P2025       | 404 Not Found   | `RECORD_NOT_FOUND`            |
+| P2014       | 400 Bad Request | `REQUIRED_RELATION_VIOLATION` |
 
 ---
 
@@ -1053,7 +1088,7 @@ const invoice = await this.prisma.invoice.findFirst({
 // In list queries
 const where = {
   organizationId,
-  deletedAt: null,  // Required!
+  deletedAt: null, // Required!
 };
 ```
 
@@ -1093,7 +1128,7 @@ export class AuditInterceptor implements NestInterceptor {
               action,
               entityType,
               entityId,
-              oldValues: null,     // Can be set by service before update
+              oldValues: null, // Can be set by service before update
               newValues: method !== 'DELETE' ? response : null,
               ipAddress: request.ip,
               userAgent: request.headers['user-agent'],
@@ -1111,6 +1146,7 @@ export class AuditInterceptor implements NestInterceptor {
 ```
 
 Audit log schema:
+
 - `userId` -- who performed the action
 - `action` -- `CREATE`, `UPDATE`, or `DELETE`
 - `entityType` -- derived from the URL path (e.g., `invoices`, `customers`)
@@ -1122,6 +1158,7 @@ Audit log schema:
 - `organizationId` -- for multi-tenant scoping
 
 Audit logs are queryable via the Audit Logs API:
+
 - `GET /audit-logs` -- list with pagination
 - `GET /audit-logs/:id` -- single entry
 - `GET /audit-logs/entity/:entityType/:entityId` -- history for a specific entity

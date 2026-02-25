@@ -12,18 +12,33 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 export class PriceListsController {
   constructor(private readonly priceListsService: PriceListsService) {}
 
-  @Post() @Permissions('inventory.create')
-  create(@CurrentOrg() orgId: string, @Body() dto: any) { return this.priceListsService.create(orgId, dto); }
+  @Post()
+  @Permissions('inventory.create')
+  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+    return this.priceListsService.create(orgId, dto);
+  }
 
-  @Get() @Permissions('inventory.view')
-  findAll(@CurrentOrg() orgId: string) { return this.priceListsService.findAll(orgId); }
+  @Get()
+  @Permissions('inventory.view')
+  findAll(@CurrentOrg() orgId: string) {
+    return this.priceListsService.findAll(orgId);
+  }
 
-  @Get(':id') @Permissions('inventory.view')
-  findOne(@CurrentOrg() orgId: string, @Param('id') id: string) { return this.priceListsService.findOne(orgId, id); }
+  @Get(':id')
+  @Permissions('inventory.view')
+  findOne(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.priceListsService.findOne(orgId, id);
+  }
 
-  @Patch(':id') @Permissions('inventory.edit')
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) { return this.priceListsService.update(orgId, id, dto); }
+  @Patch(':id')
+  @Permissions('inventory.edit')
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+    return this.priceListsService.update(orgId, id, dto);
+  }
 
-  @Delete(':id') @Permissions('inventory.delete')
-  remove(@CurrentOrg() orgId: string, @Param('id') id: string) { return this.priceListsService.remove(orgId, id); }
+  @Delete(':id')
+  @Permissions('inventory.delete')
+  remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.priceListsService.remove(orgId, id);
+  }
 }

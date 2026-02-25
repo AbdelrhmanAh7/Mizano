@@ -2,12 +2,12 @@
 
 import { Button } from '@/components/ui/button';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { AlertCircle, CheckCircle2, Loader2, XCircle } from 'lucide-react';
@@ -48,7 +48,7 @@ export function BulkProgressDialog({
 }: BulkProgressDialogProps) {
   const [progress, setProgress] = useState<BulkJobProgress | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
-  const baseUrl = apiBaseUrl || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+  const baseUrl = apiBaseUrl || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6001/api';
 
   useEffect(() => {
     if (!open || !jobId) return;

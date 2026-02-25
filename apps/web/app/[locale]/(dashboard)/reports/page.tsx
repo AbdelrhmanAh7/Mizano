@@ -2,16 +2,16 @@
 
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    ArrowRight,
-    BarChart3,
-    Building2,
-    Calculator,
-    FileText,
-    Package,
-    PieChart,
-    ShoppingCart,
-    TrendingUp,
-    Users,
+  ArrowRight,
+  BarChart3,
+  Building2,
+  Calculator,
+  FileText,
+  Package,
+  PieChart,
+  ShoppingCart,
+  TrendingUp,
+  Users,
 } from 'lucide-react';
 import Link from 'next/link';
 

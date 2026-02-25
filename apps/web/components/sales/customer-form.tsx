@@ -68,12 +68,7 @@ const paymentTermsOptions = [
   { value: 60, label: 'Net 60' },
 ];
 
-export function CustomerForm({
-  customer,
-  onSubmit,
-  onCancel,
-  isSubmitting,
-}: CustomerFormProps) {
+export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: CustomerFormProps) {
   const isEditing = !!customer;
 
   const form = useForm<CustomerFormData>({
@@ -174,15 +169,9 @@ export function CustomerForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Customer Name *</Label>
-              <Input
-                id="name"
-                placeholder="Enter customer name"
-                {...form.register('name')}
-              />
+              <Input id="name" placeholder="Enter customer name" {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.name.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
 
@@ -206,9 +195,7 @@ export function CustomerForm({
                 {...form.register('email')}
               />
               {form.formState.errors.email && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.email.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.email.message}</p>
               )}
             </div>
 
@@ -263,11 +250,7 @@ export function CustomerForm({
 
             <div className="space-y-2">
               <Label htmlFor="taxId">Tax ID</Label>
-              <Input
-                id="taxId"
-                placeholder="Tax ID / VAT Number"
-                {...form.register('taxId')}
-              />
+              <Input id="taxId" placeholder="Tax ID / VAT Number" {...form.register('taxId')} />
             </div>
           </div>
 
@@ -350,12 +333,7 @@ export function CustomerForm({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Shipping Address</CardTitle>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={copyBillingToShipping}
-            >
+            <Button type="button" variant="outline" size="sm" onClick={copyBillingToShipping}>
               Copy from Billing
             </Button>
           </div>
@@ -423,11 +401,7 @@ export function CustomerForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? 'Saving...'
-            : isEditing
-            ? 'Update Customer'
-            : 'Create Customer'}
+          {isSubmitting ? 'Saving...' : isEditing ? 'Update Customer' : 'Create Customer'}
         </Button>
       </div>
     </form>

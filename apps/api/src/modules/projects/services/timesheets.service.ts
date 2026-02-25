@@ -42,7 +42,11 @@ export class TimesheetsService {
     });
   }
 
-  async startTimer(organizationId: string, userId: string, dto: { projectId: string; taskId?: string; description?: string }) {
+  async startTimer(
+    organizationId: string,
+    userId: string,
+    dto: { projectId: string; taskId?: string; description?: string },
+  ) {
     // Check for existing running timer
     const existing = await this.prisma.timesheetEntry.findFirst({
       where: { userId, organizationId, timerStartedAt: { not: null }, timerEndedAt: null },
@@ -74,7 +78,13 @@ export class TimesheetsService {
 
   async stopTimer(organizationId: string, userId: string, entryId: string) {
     const entry = await this.prisma.timesheetEntry.findFirst({
-      where: { id: entryId, userId, organizationId, timerStartedAt: { not: null }, timerEndedAt: null },
+      where: {
+        id: entryId,
+        userId,
+        organizationId,
+        timerStartedAt: { not: null },
+        timerEndedAt: null,
+      },
     });
     if (!entry) throw new NotFoundException('Running timer not found');
 
@@ -104,7 +114,16 @@ export class TimesheetsService {
     });
   }
 
-  async findAll(organizationId: string, query: { userId?: string; projectId?: string; startDate?: string; endDate?: string; isBilled?: boolean }) {
+  async findAll(
+    organizationId: string,
+    query: {
+      userId?: string;
+      projectId?: string;
+      startDate?: string;
+      endDate?: string;
+      isBilled?: boolean;
+    },
+  ) {
     const where: any = { organizationId };
     if (query.userId) where.userId = query.userId;
     if (query.projectId) where.projectId = query.projectId;
@@ -200,14 +219,20 @@ export class TimesheetsService {
     }
 
     // Calculate totals
-    const totalHours = entries.reduce((sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()), 0);
-    const billableHours = entries.filter((e) => e.isBillable).reduce((sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()), 0);
+    const totalHours = entries.reduce(
+      (sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()),
+      0,
+    );
+    const billableHours = entries
+      .filter((e) => e.isBillable)
+      .reduce((sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()), 0);
 
     // Group by project
     const byProject: Record<string, number> = {};
     for (const entry of entries) {
       const key = entry.project.name;
-      byProject[key] = (byProject[key] || 0) + parseFloat((entry.hours ?? entry.duration).toString());
+      byProject[key] =
+        (byProject[key] || 0) + parseFloat((entry.hours ?? entry.duration).toString());
     }
 
     return {
@@ -221,7 +246,12 @@ export class TimesheetsService {
     };
   }
 
-  async getTimesheetReport(organizationId: string, startDate: string, endDate: string, groupBy: 'user' | 'project') {
+  async getTimesheetReport(
+    organizationId: string,
+    startDate: string,
+    endDate: string,
+    groupBy: 'user' | 'project',
+  ) {
     const entries = await this.prisma.timesheetEntry.findMany({
       where: {
         organizationId,
@@ -233,13 +263,19 @@ export class TimesheetsService {
       },
     });
 
-    const grouped: Record<string, { name: string; totalHours: number; billableHours: number; billableAmount: number }> = {};
+    const grouped: Record<
+      string,
+      { name: string; totalHours: number; billableHours: number; billableAmount: number }
+    > = {};
 
     for (const entry of entries) {
       const key = groupBy === 'user' ? entry.userId : entry.projectId;
-      const name = groupBy === 'user' ? `${entry.user.firstName} ${entry.user.lastName}` : entry.project.name;
+      const name =
+        groupBy === 'user' ? `${entry.user.firstName} ${entry.user.lastName}` : entry.project.name;
       const hours = parseFloat((entry.hours ?? entry.duration).toString());
-      const hourlyRate = entry.project.hourlyRate ? parseFloat(entry.project.hourlyRate.toString()) : 0;
+      const hourlyRate = entry.project.hourlyRate
+        ? parseFloat(entry.project.hourlyRate.toString())
+        : 0;
 
       if (!grouped[key]) {
         grouped[key] = { name, totalHours: 0, billableHours: 0, billableAmount: 0 };

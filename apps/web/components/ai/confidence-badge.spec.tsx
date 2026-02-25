@@ -142,9 +142,7 @@ describe('ConfidenceBadge', () => {
   it('renders tooltip content when showTooltip is true', () => {
     render(<ConfidenceBadge confidence={0.9} showTooltip={true} />);
     expect(screen.getByText('High Confidence')).toBeInTheDocument();
-    expect(
-      screen.getByText('AI is highly confident in this suggestion'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('AI is highly confident in this suggestion')).toBeInTheDocument();
   });
 
   it('does not render tooltip content when showTooltip is false', () => {

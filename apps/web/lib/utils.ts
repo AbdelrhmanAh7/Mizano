@@ -12,7 +12,11 @@ export function formatCurrency(amount: number, currency: string = 'USD', locale:
   }).format(amount);
 }
 
-export function formatDate(date: Date | string, locale: string = 'en', options?: Intl.DateTimeFormatOptions) {
+export function formatDate(
+  date: Date | string,
+  locale: string = 'en',
+  options?: Intl.DateTimeFormatOptions,
+) {
   return new Date(date).toLocaleDateString(locale, {
     year: 'numeric',
     month: 'short',

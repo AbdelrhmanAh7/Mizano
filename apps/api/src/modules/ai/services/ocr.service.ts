@@ -318,6 +318,30 @@ export class OcrService {
     // Fix OCR garbling of / as | or \ in dates
     normalized = normalized.replace(/(\d{1,2})[|\\](\d{1,2})[|\\](\d{2,4})/g, '$1/$2/$3');
 
+    // Fix run-together dates: DDMMYYYY (8 consecutive digits) → DD/MM/YYYY
+    // e.g., "31122025" → "31/12/2025", "01012024" → "01/01/2024"
+    normalized = normalized.replace(/\b(\d{2})(\d{2})(\d{4})\b/g, (match, dd, mm, yyyy) => {
+      const day = parseInt(dd, 10);
+      const month = parseInt(mm, 10);
+      const year = parseInt(yyyy, 10);
+      if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2099) {
+        return `${dd}/${mm}/${yyyy}`;
+      }
+      return match;
+    });
+
+    // Fix DDMM/YYYY format: 4-digit/4-digit where first 4 digits encode DD+MM
+    // e.g., "0112/2025" → "01/12/2025", "3112/2025" → "31/12/2025"
+    normalized = normalized.replace(/\b(\d{2})(\d{2})\/(\d{4})\b/g, (match, dd, mm, yyyy) => {
+      const day = parseInt(dd, 10);
+      const month = parseInt(mm, 10);
+      const year = parseInt(yyyy, 10);
+      if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2099) {
+        return `${dd}/${mm}/${yyyy}`;
+      }
+      return match;
+    });
+
     // Fix split words (common in OCR): rejoin words broken by single space in middle
     // e.g., "Consult ing" → "Consulting", "Desc ription" → "Description"
     normalized = normalized.replace(/\b([A-Z][a-z]{2,})\s([a-z]{2,})\b/g, (match, p1, p2) => {
@@ -353,18 +377,79 @@ export class OcrService {
     normalized = normalized.replace(/(\d)\u060C(\d{2})\b/g, '$1.$2');
 
     // Fix space-as-decimal in amount contexts (e.g., "24 95" → "24.95")
-    // Only apply on lines that contain total/tax/vat/amount/subtotal keywords
-    normalized = normalized
-      .split('\n')
-      .map((line) => {
-        if (/total|tax|vat|amount|subtotal|aed|sar|usd|eur/i.test(line)) {
-          // Replace space-as-decimal but NOT when preceded by a decimal point
-          // e.g., "24 95" → "24.95" but "499.00 24" should NOT become "499.00.24"
-          return line.replace(/(?<!\.\d*)(?<=\s|^)(\d{1,6}) (\d{2})(?=\s|$)/g, '$1.$2');
+    // Apply on (1) lines with keywords AND (2) data rows within table sections
+    {
+      const normLines = normalized.split('\n');
+      const AMOUNT_LINE_KW = /total|tax|vat|amount|subtotal|aed|sar|usd|eur/i;
+
+      // Detect table header rows: lines with 2+ financial column keywords
+      const tableHeaderKw = [
+        'total',
+        'amount',
+        'vat',
+        'tax',
+        'price',
+        'rate',
+        'qty',
+        'quantity',
+        'subtotal',
+      ];
+      const headerRowIndices = new Set<number>();
+      for (let i = 0; i < normLines.length; i++) {
+        const kwCount = tableHeaderKw.filter((kw) =>
+          new RegExp(`\\b${kw}\\b`, 'i').test(normLines[i]),
+        ).length;
+        if (kwCount >= 2) {
+          headerRowIndices.add(i);
+          continue;
         }
-        return line;
-      })
-      .join('\n');
+
+        // Multi-line header: merge 2 consecutive lines
+        if (i + 1 < normLines.length) {
+          const merged2 = normLines[i] + ' ' + normLines[i + 1];
+          const kwCount2 = tableHeaderKw.filter((kw) =>
+            new RegExp(`\\b${kw}\\b`, 'i').test(merged2),
+          ).length;
+          if (kwCount2 >= 2) {
+            headerRowIndices.add(i + 1);
+            continue;
+          }
+
+          // Three-line header merge
+          if (i + 2 < normLines.length) {
+            const merged3 = merged2 + ' ' + normLines[i + 2];
+            const kwCount3 = tableHeaderKw.filter((kw) =>
+              new RegExp(`\\b${kw}\\b`, 'i').test(merged3),
+            ).length;
+            if (kwCount3 >= 2) {
+              headerRowIndices.add(i + 2);
+              continue;
+            }
+          }
+        }
+      }
+
+      // A line is in a "table section" if within 15 lines after a header row
+      // (bilingual invoices can have 5-8 lines of Arabic translations between header and data)
+      const isInTableSection = (lineIdx: number): boolean => {
+        for (const hIdx of headerRowIndices) {
+          if (lineIdx > hIdx && lineIdx <= hIdx + 15) return true;
+        }
+        return false;
+      };
+
+      const spaceDecimalFix = (line: string) =>
+        line.replace(/(?<!\.\d*)(?<=\s|^)(\d{1,6}) (\d{2})(?=\s|$)/g, '$1.$2');
+
+      normalized = normLines
+        .map((line, idx) => {
+          if (AMOUNT_LINE_KW.test(line) || isInTableSection(idx)) {
+            return spaceDecimalFix(line);
+          }
+          return line;
+        })
+        .join('\n');
+    }
 
     // Collapse multiple spaces
     normalized = normalized.replace(/ {2,}/g, ' ');
@@ -1001,6 +1086,18 @@ export class OcrService {
       return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     }
 
+    // Try DDMMYYYY (8 digits, no separators — already normalized but handle raw form as fallback)
+    match = dateStr.match(/^(\d{2})(\d{2})(\d{4})$/);
+    if (match) {
+      const [, dd, mm, yyyy] = match;
+      const d = parseInt(dd, 10);
+      const m = parseInt(mm, 10);
+      const y = parseInt(yyyy, 10);
+      if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900 && y <= 2099) {
+        return `${yyyy}-${mm}-${dd}`;
+      }
+    }
+
     throw new Error('Could not parse date');
   }
 
@@ -1093,6 +1190,51 @@ export class OcrService {
       return lastTotalAmount;
     }
 
+    // Strategy 2b: Table-aware extraction.
+    // When "Total" appears as a column header (multi-keyword header row),
+    // find the last data row with amounts and take the largest.
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const tableKw = ['total', 'amount', 'vat', 'tax', 'price', 'rate', 'qty', 'description'];
+      const kwCount = tableKw.filter((kw) => new RegExp(`\\b${kw}\\b`, 'i').test(line)).length;
+
+      if (kwCount >= 3) {
+        // Found a table header row. Find data rows below it.
+        let lastDataRow: string | null = null;
+        for (let j = i + 1; j < Math.min(i + 12, lines.length); j++) {
+          const dataLine = lines[j].trim();
+          if (!dataLine) continue;
+          // A "data row" has at least 2 numbers
+          const nums = dataLine.match(/\d[\d,]*(?:\.\d+)?/g);
+          if (nums && nums.length >= 2) {
+            lastDataRow = dataLine;
+          }
+        }
+
+        if (lastDataRow) {
+          const amounts: number[] = [];
+          const decimalAmts = lastDataRow.match(/(\d[\d,]*\.\d{2})/g);
+          if (decimalAmts) {
+            for (const a of decimalAmts) {
+              const val = this.parseAmount(a);
+              if (val > 0 && val < 100_000_000) amounts.push(val);
+            }
+          }
+          const rawNums = lastDataRow.match(/\b(\d{4,})\b/g);
+          if (rawNums) {
+            for (const raw of rawNums) {
+              if (decimalAmts?.some((d) => d.replace(/[.,]/g, '').includes(raw))) continue;
+              const inferred = this.inferDecimalFromContext(raw, lastDataRow);
+              if (inferred > 0 && inferred < 100_000_000) amounts.push(inferred);
+            }
+          }
+          if (amounts.length > 0) {
+            return Math.max(...amounts);
+          }
+        }
+      }
+    }
+
     // Strategy 3: If we have subtotal and tax, compute total
     const subtotal = this.extractSubtotal(text);
     const tax = this.extractTax(text);
@@ -1153,6 +1295,35 @@ export class OcrService {
           // and first + second makes a reasonable total
           if (first > 0 && first > second && first + second > 0) {
             return first;
+          }
+        }
+      }
+    }
+
+    // Strategy 2b: Table-aware extraction.
+    // When amounts are in a tabular grid, find the last data row and take the first amount
+    // (columns are typically: Transaction Amount | VAT | Total)
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const tableKw = ['total', 'amount', 'vat', 'tax', 'price', 'rate', 'qty', 'description'];
+      const kwCount = tableKw.filter((kw) => new RegExp(`\\b${kw}\\b`, 'i').test(line)).length;
+
+      if (kwCount >= 3) {
+        let lastDataRow: string | null = null;
+        for (let j = i + 1; j < Math.min(i + 12, lines.length); j++) {
+          const dataLine = lines[j].trim();
+          if (!dataLine) continue;
+          const nums = dataLine.match(/\d[\d,]*(?:\.\d+)?/g);
+          if (nums && nums.length >= 3) {
+            lastDataRow = dataLine;
+          }
+        }
+
+        if (lastDataRow) {
+          const amounts = lastDataRow.match(/(\d[\d,]*\.\d{2})/g);
+          if (amounts && amounts.length >= 3) {
+            const first = this.parseAmount(amounts[0]);
+            if (first > 0) return first;
           }
         }
       }
@@ -1228,6 +1399,39 @@ export class OcrService {
       }
     }
 
+    // Strategy 2b: Table-aware extraction.
+    // When amounts are in a tabular grid, find the last data row and take the second amount
+    // (columns are typically: Transaction Amount | VAT | Total)
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const tableKw = ['total', 'amount', 'vat', 'tax', 'price', 'rate', 'qty', 'description'];
+      const kwCount = tableKw.filter((kw) => new RegExp(`\\b${kw}\\b`, 'i').test(line)).length;
+
+      if (kwCount >= 3) {
+        let lastDataRow: string | null = null;
+        for (let j = i + 1; j < Math.min(i + 12, lines.length); j++) {
+          const dataLine = lines[j].trim();
+          if (!dataLine) continue;
+          const nums = dataLine.match(/\d[\d,]*(?:\.\d+)?/g);
+          if (nums && nums.length >= 3) {
+            lastDataRow = dataLine;
+          }
+        }
+
+        if (lastDataRow) {
+          const amounts = lastDataRow.match(/(\d[\d,]*\.\d{2})/g);
+          if (amounts && amounts.length >= 3) {
+            const first = this.parseAmount(amounts[0]);
+            const second = this.parseAmount(amounts[1]);
+            // Second amount is typically the VAT/tax column
+            if (second > 0 && second < first) {
+              return second;
+            }
+          }
+        }
+      }
+    }
+
     // Fallback: triplet detection for minimal invoices
     const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
     if (nonEmptyLines.length < 10) {
@@ -1244,14 +1448,14 @@ export class OcrService {
   private extractInvoiceNumber(text: string): string | null {
     // Strategy 1: Keyword-labeled patterns (highest priority)
     const labeledPatterns = [
-      /invoice\s*(?:no|number|#|num|id)\.?\s*[:;]?\s*([A-Z0-9][\w\-\/]{2,30})/i,
-      /\binv\.?\s*(?:no|#)\.?\s*[:;]?\s*([A-Z0-9][\w\-\/]{2,30})/i,
-      /bill\s*(?:no|number|#)\.?\s*[:;]?\s*([A-Z0-9][\w\-\/]{2,30})/i,
-      /document\s*(?:no|number|#)\.?\s*[:;]?\s*([A-Z0-9][\w\-\/]{2,30})/i,
-      /reference\s*(?:no|number|#)?\.?\s*[:;]?\s*([A-Z0-9][\w\-\/]{2,30})/i,
-      /ref\.?\s*[:;#]\s*([A-Z0-9][\w\-\/]{2,30})/i,
-      /فاتورة\s*(?:رقم|#)\s*[:;]?\s*([A-Z0-9][\w\-\/]{2,30})/i,
-      /رقم\s*(?:الفاتورة|المرجع)\s*[:;]?\s*([A-Z0-9][\w\-\/]{2,30})/i,
+      /invoice[^\S\n]*(?:no|number|#|num|id)\.?[^\S\n]*[:;]?[^\S\n]*([A-Z0-9][\w\-\/]{2,30})/i,
+      /\binv\.?[^\S\n]*(?:no|#)\.?[^\S\n]*[:;]?[^\S\n]*([A-Z0-9][\w\-\/]{2,30})/i,
+      /bill[^\S\n]*(?:no|number|#)\.?[^\S\n]*[:;]?[^\S\n]*([A-Z0-9][\w\-\/]{2,30})/i,
+      /document[^\S\n]*(?:no|number|#)\.?[^\S\n]*[:;]?[^\S\n]*([A-Z0-9][\w\-\/]{2,30})/i,
+      /reference[^\S\n]*(?:no|number|#)?\.?[^\S\n]*[:;]?[^\S\n]*([A-Z0-9][\w\-\/]{2,30})/i,
+      /ref\.?[^\S\n]*[:;#][^\S\n]*([A-Z0-9][\w\-\/]{2,30})/i,
+      /فاتورة[^\S\n]*(?:رقم|#)[^\S\n]*[:;]?[^\S\n]*([A-Z0-9][\w\-\/]{2,30})/i,
+      /رقم[^\S\n]*(?:الفاتورة|المرجع)[^\S\n]*[:;]?[^\S\n]*([A-Z0-9][\w\-\/]{2,30})/i,
     ];
 
     for (const pattern of labeledPatterns) {
@@ -1295,6 +1499,12 @@ export class OcrService {
     const standaloneMatch = text.match(/\b([A-Z]{2,5}[-\/]\d{3,10})\b/i);
     if (standaloneMatch) {
       return standaloneMatch[1];
+    }
+
+    // Strategy 3b: PREFIX+DIGITS without separator (e.g., INV20251200095426, BILL20240001)
+    const prefixDigitsMatch = text.match(/\b((?:INV|BILL|REC|ORD)\d{8,20})\b/i);
+    if (prefixDigitsMatch) {
+      return prefixDigitsMatch[1];
     }
 
     // Strategy 4: Single-letter prefix with digits-dash-digits (e.g., S20251018-9014)
@@ -1509,6 +1719,8 @@ export class OcrService {
       /\bprice\b/i,
       /\btotal\b/i,
       /\bamount\b/i,
+      /\bvat\b/i,
+      /\btax\b/i,
     ];
 
     for (let i = 0; i < lines.length; i++) {
@@ -1526,6 +1738,16 @@ export class OcrService {
         const mergedCount = headerKeywords.filter((kw) => kw.test(merged)).length;
         if (mergedCount >= 3) {
           return i + 1; // Return the second line so extraction starts after both header lines
+        }
+
+        // Three-line header: merge with next two lines and check again
+        // (e.g., RAKBANK invoice headers that span 3 lines)
+        if (i + 2 < lines.length) {
+          const merged3 = merged + ' ' + lines[i + 2];
+          const merged3Count = headerKeywords.filter((kw) => kw.test(merged3)).length;
+          if (merged3Count >= 3) {
+            return i + 2; // Return the last header line
+          }
         }
       }
     }
@@ -1567,6 +1789,10 @@ export class OcrService {
 
       // Skip separator lines (dashes, equals, etc.)
       if (/^[\-=_]{3,}$/.test(line)) continue;
+
+      // Skip pure-number rows (likely summary/total rows without labels)
+      const nonDigitContent = line.replace(/[\d,.\s]/g, '').trim();
+      if (nonDigitContent.length === 0) continue;
 
       // Try to extract numbers from the line
       const numbers = this.extractNumbersFromLine(line);
@@ -1674,6 +1900,71 @@ export class OcrService {
       }
     }
     return parsed;
+  }
+
+  /**
+   * Find a table header line index using multi-line merge for strategy 2b.
+   * Returns the index of the last header line, or -1 if not found.
+   */
+  private findStrategy2bHeaderIndex(lines: string[]): number {
+    const tableKw = ['total', 'amount', 'vat', 'tax', 'price', 'rate', 'qty', 'description'];
+
+    for (let i = 0; i < lines.length; i++) {
+      const kwCount = tableKw.filter((kw) =>
+        new RegExp(`\\b${kw}\\b`, 'i').test(lines[i]),
+      ).length;
+
+      if (kwCount >= 3) {
+        return i;
+      }
+
+      // Multi-line header: merge 2 consecutive lines
+      if (i + 1 < lines.length) {
+        const merged2 = lines[i] + ' ' + lines[i + 1];
+        const kwCount2 = tableKw.filter((kw) =>
+          new RegExp(`\\b${kw}\\b`, 'i').test(merged2),
+        ).length;
+        if (kwCount2 >= 3) {
+          return i + 1;
+        }
+
+        // Three-line header merge
+        if (i + 2 < lines.length) {
+          const merged3 = merged2 + ' ' + lines[i + 2];
+          const kwCount3 = tableKw.filter((kw) =>
+            new RegExp(`\\b${kw}\\b`, 'i').test(merged3),
+          ).length;
+          if (kwCount3 >= 3) {
+            return i + 2;
+          }
+        }
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * Collect all amounts (decimal + inferred) from a data row.
+   * Used by strategy 2b in extractTotal, extractSubtotal, and extractTax.
+   */
+  private collectAmountsFromDataRow(dataRow: string): number[] {
+    const amounts: number[] = [];
+    const decimalAmts = dataRow.match(/(\d[\d,]*\.\d{2})/g);
+    if (decimalAmts) {
+      for (const a of decimalAmts) {
+        const val = this.parseAmount(a);
+        if (val > 0 && val < 100_000_000) amounts.push(val);
+      }
+    }
+    const rawNums = dataRow.match(/\b(\d{4,})\b/g);
+    if (rawNums) {
+      for (const raw of rawNums) {
+        if (decimalAmts?.some((d) => d.replace(/[.,]/g, '').includes(raw))) continue;
+        const inferred = this.inferDecimalFromContext(raw, dataRow);
+        if (inferred > 0 && inferred < 100_000_000) amounts.push(inferred);
+      }
+    }
+    return amounts;
   }
 
   /**

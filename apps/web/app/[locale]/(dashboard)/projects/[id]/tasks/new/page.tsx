@@ -58,9 +58,7 @@ export default function NewTaskPage({ params }: NewTaskPageProps) {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">New Task</h1>
-          <p className="text-muted-foreground">
-            Add a task to {project.name}
-          </p>
+          <p className="text-muted-foreground">Add a task to {project.name}</p>
         </div>
       </div>
 

@@ -134,10 +134,7 @@ export class LeadScoringService {
   /**
    * Score a single lead
    */
-  async scoreLead(
-    organizationId: string,
-    leadId: string,
-  ): Promise<LeadScoreResult> {
+  async scoreLead(organizationId: string, leadId: string): Promise<LeadScoreResult> {
     // Get lead with extended data
     const lead = await this.getLeadWithExtendedData(organizationId, leadId);
 
@@ -146,28 +143,16 @@ export class LeadScoringService {
     }
 
     // Calculate scores for each category
-    const demographicResult = this.calculateCategoryScore(
-      lead,
-      this.config.demographic,
-    );
-    const behavioralResult = this.calculateCategoryScore(
-      lead,
-      this.config.behavioral,
-    );
-    const engagementResult = this.calculateCategoryScore(
-      lead,
-      this.config.engagement,
-    );
+    const demographicResult = this.calculateCategoryScore(lead, this.config.demographic);
+    const behavioralResult = this.calculateCategoryScore(lead, this.config.behavioral);
+    const engagementResult = this.calculateCategoryScore(lead, this.config.engagement);
 
     // Apply decay for inactivity
     const weeksInactive = this.calculateWeeksInactive(lead.lastActivityAt);
     const decayMultiplier = getDecayMultiplier(weeksInactive, this.config);
 
     // Calculate rule-based score
-    const rawScore =
-      demographicResult.score +
-      behavioralResult.score +
-      engagementResult.score;
+    const rawScore = demographicResult.score + behavioralResult.score + engagementResult.score;
     let totalScore = Math.round(rawScore * decayMultiplier);
 
     // Blend with ML score if model available
@@ -189,16 +174,17 @@ export class LeadScoringService {
         predictionMethod = 'HYBRID';
       }
     } catch (error) {
-      this.logger.warn(`ML scoring failed for lead ${leadId}, falling back to rule-based: ${error.message}`);
+      this.logger.warn(
+        `ML scoring failed for lead ${leadId}, falling back to rule-based: ${error.message}`,
+      );
     }
 
     // Determine tier
     const tier = getTierFromScore(totalScore);
 
     // Estimate conversion probability (use ML if available, else rule-based)
-    const conversionProbability = mlProbability !== null
-      ? mlProbability
-      : estimateConversionProbability(totalScore, tier);
+    const conversionProbability =
+      mlProbability !== null ? mlProbability : estimateConversionProbability(totalScore, tier);
 
     // Combine breakdowns
     const breakdown: ScoreBreakdown[] = [
@@ -257,10 +243,18 @@ export class LeadScoringService {
         if (result.status === 'fulfilled') {
           processed++;
           switch (result.value.tier) {
-            case 'HOT': counts.hot++; break;
-            case 'WARM': counts.warm++; break;
-            case 'COOL': counts.cool++; break;
-            case 'COLD': counts.cold++; break;
+            case 'HOT':
+              counts.hot++;
+              break;
+            case 'WARM':
+              counts.warm++;
+              break;
+            case 'COOL':
+              counts.cool++;
+              break;
+            case 'COLD':
+              counts.cold++;
+              break;
           }
         }
       }
@@ -272,10 +266,7 @@ export class LeadScoringService {
   /**
    * Get hot leads
    */
-  async getHotLeads(
-    organizationId: string,
-    limit: number = 10,
-  ): Promise<HotLead[]> {
+  async getHotLeads(organizationId: string, limit: number = 10): Promise<HotLead[]> {
     const scores = await this.prisma.leadScore.findMany({
       where: {
         organizationId,
@@ -296,9 +287,7 @@ export class LeadScoringService {
 
     return scores.map((score) => {
       const daysInactive = score.lastActivityAt
-        ? Math.floor(
-            (Date.now() - score.lastActivityAt.getTime()) / (1000 * 60 * 60 * 24),
-          )
+        ? Math.floor((Date.now() - score.lastActivityAt.getTime()) / (1000 * 60 * 60 * 24))
         : 999;
 
       return {
@@ -309,11 +298,7 @@ export class LeadScoringService {
         tier: score.tier,
         conversionProbability: Number(score.conversionProbability),
         lastActivity: score.lastActivityAt,
-        recommendedAction: getRecommendedAction(
-          score.tier,
-          score.totalScore,
-          daysInactive,
-        ),
+        recommendedAction: getRecommendedAction(score.tier, score.totalScore, daysInactive),
       };
     });
   }
@@ -321,10 +306,7 @@ export class LeadScoringService {
   /**
    * Get cold leads
    */
-  async getColdLeads(
-    organizationId: string,
-    limit: number = 20,
-  ): Promise<ColdLead[]> {
+  async getColdLeads(organizationId: string, limit: number = 20): Promise<ColdLead[]> {
     const scores = await this.prisma.leadScore.findMany({
       where: {
         organizationId,
@@ -344,9 +326,7 @@ export class LeadScoringService {
 
     return scores.map((score) => {
       const daysInactive = score.lastActivityAt
-        ? Math.floor(
-            (Date.now() - score.lastActivityAt.getTime()) / (1000 * 60 * 60 * 24),
-          )
+        ? Math.floor((Date.now() - score.lastActivityAt.getTime()) / (1000 * 60 * 60 * 24))
         : 999;
 
       return {
@@ -391,10 +371,7 @@ export class LeadScoringService {
   /**
    * Get score history for a lead
    */
-  async getLeadScoreHistory(
-    organizationId: string,
-    leadId: string,
-  ): Promise<ScoreHistoryEntry[]> {
+  async getLeadScoreHistory(organizationId: string, leadId: string): Promise<ScoreHistoryEntry[]> {
     const score = await this.prisma.leadScore.findFirst({
       where: { organizationId, leadId },
       select: { scoreHistory: true },
@@ -504,9 +481,7 @@ export class LeadScoringService {
     const avgScore = allScores.reduce((a, b) => a + b, 0) / allScores.length;
     const medianScore =
       sortedScores.length % 2 === 0
-        ? (sortedScores[sortedScores.length / 2 - 1] +
-            sortedScores[sortedScores.length / 2]) /
-          2
+        ? (sortedScores[sortedScores.length / 2 - 1] + sortedScores[sortedScores.length / 2]) / 2
         : sortedScores[Math.floor(sortedScores.length / 2)];
 
     return { byTier, avgScore, medianScore };
@@ -612,9 +587,7 @@ export class LeadScoringService {
         return lead.trialStatus;
       case 'daysSinceLastActivity':
         if (!lead.lastActivityAt) return 999;
-        return Math.floor(
-          (Date.now() - lead.lastActivityAt.getTime()) / (1000 * 60 * 60 * 24),
-        );
+        return Math.floor((Date.now() - lead.lastActivityAt.getTime()) / (1000 * 60 * 60 * 24));
       default:
         return undefined;
     }
@@ -623,7 +596,10 @@ export class LeadScoringService {
   /**
    * Evaluate a scoring condition
    */
-  private evaluateCondition(value: string | number | boolean | undefined, condition: ScoringCondition): boolean {
+  private evaluateCondition(
+    value: string | number | boolean | undefined,
+    condition: ScoringCondition,
+  ): boolean {
     if (value === undefined || value === null) return false;
 
     switch (condition.operator) {
@@ -641,8 +617,7 @@ export class LeadScoringService {
         return Array.isArray(condition.value) && condition.value.includes(value);
       case 'contains':
         return (
-          typeof value === 'string' &&
-          value.toLowerCase().includes(condition.value.toLowerCase())
+          typeof value === 'string' && value.toLowerCase().includes(condition.value.toLowerCase())
         );
       default:
         return false;
@@ -705,12 +680,14 @@ export class LeadScoringService {
       reason: entry.reason,
     }));
 
-    const initialHistoryForJson = [{
-      date: historyEntry.date.toISOString(),
-      score: historyEntry.score,
-      change: historyEntry.change,
-      reason: historyEntry.reason,
-    }];
+    const initialHistoryForJson = [
+      {
+        date: historyEntry.date.toISOString(),
+        score: historyEntry.score,
+        change: historyEntry.change,
+        reason: historyEntry.reason,
+      },
+    ];
 
     await this.prisma.leadScore.upsert({
       where: { leadId },
@@ -743,9 +720,7 @@ export class LeadScoringService {
   /**
    * Build conversion prediction response
    */
-  private buildConversionPrediction(
-    result: LeadScoreResult,
-  ): ConversionPrediction {
+  private buildConversionPrediction(result: LeadScoreResult): ConversionPrediction {
     const factors: ConversionPrediction['factors'] = [];
 
     // Analyze demographic score
@@ -834,18 +809,9 @@ export class LeadScoringService {
       const leadData = this.buildLeadDataFromRecord(lead);
 
       // Get rule-based scores to use as features
-      const demographicResult = this.calculateCategoryScore(
-        leadData,
-        this.config.demographic,
-      );
-      const behavioralResult = this.calculateCategoryScore(
-        leadData,
-        this.config.behavioral,
-      );
-      const engagementResult = this.calculateCategoryScore(
-        leadData,
-        this.config.engagement,
-      );
+      const demographicResult = this.calculateCategoryScore(leadData, this.config.demographic);
+      const behavioralResult = this.calculateCategoryScore(leadData, this.config.behavioral);
+      const engagementResult = this.calculateCategoryScore(leadData, this.config.engagement);
 
       const featureVector = this.extractMLFeatures(leadData, {
         demographicScore: demographicResult.score,
@@ -886,7 +852,7 @@ export class LeadScoringService {
 
     this.logger.log(
       `Lead scoring ML model trained: v${saved.version}, accuracy=${(result.accuracy * 100).toFixed(1)}%, ` +
-      `precision=${(result.precision * 100).toFixed(1)}%, recall=${(result.recall * 100).toFixed(1)}%`,
+        `precision=${(result.precision * 100).toFixed(1)}%, recall=${(result.recall * 100).toFixed(1)}%`,
     );
 
     return {
@@ -904,19 +870,13 @@ export class LeadScoringService {
    * Get the status of the ML model for an organization.
    */
   async getMLModelStatus(organizationId: string): Promise<MLModelStatus> {
-    const status = await this.modelRegistry.getModelStatus(
-      organizationId,
-      'LEAD_SCORING',
-    );
+    const status = await this.modelRegistry.getModelStatus(organizationId, 'LEAD_SCORING');
 
     let accuracy: number | null = null;
     let sampleCount: number | null = null;
 
     if (status.hasActiveModel && status.activeVersion) {
-      const model = await this.modelRegistry.loadActiveModel(
-        organizationId,
-        'LEAD_SCORING',
-      );
+      const model = await this.modelRegistry.loadActiveModel(organizationId, 'LEAD_SCORING');
       if (model) {
         accuracy = model.accuracy;
         sampleCount = model.sampleCount;
@@ -936,9 +896,7 @@ export class LeadScoringService {
   /**
    * Load ML model from cache or database.
    */
-  private async loadMLModel(
-    organizationId: string,
-  ): Promise<LogisticRegressionModel | null> {
+  private async loadMLModel(organizationId: string): Promise<LogisticRegressionModel | null> {
     // Check cache (BoundedCache handles TTL expiry)
     const cached = this.mlModelCache.get(organizationId);
     if (cached) {
@@ -946,10 +904,7 @@ export class LeadScoringService {
     }
 
     // Load from database
-    const savedModel = await this.modelRegistry.loadActiveModel(
-      organizationId,
-      'LEAD_SCORING',
-    );
+    const savedModel = await this.modelRegistry.loadActiveModel(organizationId, 'LEAD_SCORING');
 
     if (!savedModel) return null;
 
@@ -986,18 +941,16 @@ export class LeadScoringService {
       (Date.now() - lead.createdAt.getTime()) / (1000 * 60 * 60 * 24),
     );
     const daysInactive = lead.lastActivityAt
-      ? Math.floor(
-          (Date.now() - lead.lastActivityAt.getTime()) / (1000 * 60 * 60 * 24),
-        )
+      ? Math.floor((Date.now() - lead.lastActivityAt.getTime()) / (1000 * 60 * 60 * 24))
       : 999;
 
     return [
       scores.demographicScore / maxDemographic, // Normalized 0-1
-      scores.behavioralScore / maxBehavioral,    // Normalized 0-1
-      scores.engagementScore / maxEngagement,    // Normalized 0-1
-      Math.log1p(daysSinceCreation),             // Log-normalized
-      Math.log1p(daysInactive),                  // Log-normalized
-      this.encodeSource(lead.source),            // Numeric encoding
+      scores.behavioralScore / maxBehavioral, // Normalized 0-1
+      scores.engagementScore / maxEngagement, // Normalized 0-1
+      Math.log1p(daysSinceCreation), // Log-normalized
+      Math.log1p(daysInactive), // Log-normalized
+      this.encodeSource(lead.source), // Numeric encoding
     ];
   }
 

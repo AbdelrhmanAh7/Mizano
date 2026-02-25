@@ -1,16 +1,5 @@
-import {
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -43,10 +32,7 @@ export class ResourceOptimizationController {
     description: 'Returns resource trends by category',
     type: [ResourceTrendDto],
   })
-  async getResourceTrends(
-    @CurrentOrg() orgId: string,
-    @Query('months') months?: string,
-  ) {
+  async getResourceTrends(@CurrentOrg() orgId: string, @Query('months') months?: string) {
     const result = await this.resourceOptimizationService.getResourceTrends(
       orgId,
       months ? parseInt(months, 10) : 12,
@@ -86,9 +72,7 @@ export class ResourceOptimizationController {
     description: 'Returns list of optimization opportunities with potential savings',
     type: [OptimizationOpportunityDto],
   })
-  async getOptimizationOpportunities(
-    @CurrentOrg() orgId: string,
-  ) {
+  async getOptimizationOpportunities(@CurrentOrg() orgId: string) {
     const result = await this.resourceOptimizationService.getOptimizationOpportunities(orgId);
     return { data: result };
   }
@@ -101,9 +85,7 @@ export class ResourceOptimizationController {
     description: 'Returns efficiency metrics including revenue ratios and trends',
     type: EfficiencyMetricsDto,
   })
-  async getEfficiencyMetrics(
-    @CurrentOrg() orgId: string,
-  ) {
+  async getEfficiencyMetrics(@CurrentOrg() orgId: string) {
     const result = await this.resourceOptimizationService.getEfficiencyMetrics(orgId);
     return { data: result };
   }

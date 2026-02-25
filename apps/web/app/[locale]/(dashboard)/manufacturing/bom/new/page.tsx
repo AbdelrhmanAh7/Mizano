@@ -17,9 +17,7 @@ export default function NewBOMPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">New Bill of Materials</h1>
-          <p className="text-muted-foreground">
-            Define a product recipe with raw materials
-          </p>
+          <p className="text-muted-foreground">Define a product recipe with raw materials</p>
         </div>
       </div>
 

@@ -1,17 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -28,9 +16,7 @@ import {
 @Controller('ai/knowledge')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class KnowledgeAssistantController {
-  constructor(
-    private readonly knowledgeAssistantService: KnowledgeAssistantService,
-  ) {}
+  constructor(private readonly knowledgeAssistantService: KnowledgeAssistantService) {}
 
   @Get('search')
   @Permissions('accounting.view')
@@ -54,11 +40,7 @@ export class KnowledgeAssistantController {
     description: 'Search results with relevance scores',
     type: KnowledgeSearchResponseDto,
   })
-  search(
-    @CurrentOrg() orgId: string,
-    @Query('q') query: string,
-    @Query('limit') limit?: number,
-  ) {
+  search(@CurrentOrg() orgId: string, @Query('q') query: string, @Query('limit') limit?: number) {
     return this.knowledgeAssistantService.search(orgId, query, limit || 10);
   }
 
@@ -89,10 +71,7 @@ export class KnowledgeAssistantController {
     description: 'List of contextual suggestions',
     type: [KnowledgeSuggestionDto],
   })
-  getSuggestions(
-    @CurrentOrg() orgId: string,
-    @Query('context') context: string,
-  ) {
+  getSuggestions(@CurrentOrg() orgId: string, @Query('context') context: string) {
     return this.knowledgeAssistantService.getSuggestions(orgId, context);
   }
 

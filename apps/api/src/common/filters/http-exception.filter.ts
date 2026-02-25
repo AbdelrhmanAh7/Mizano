@@ -29,9 +29,7 @@ interface ErrorResponse {
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
-  constructor(
-    @Optional() @Inject(LoggerService) private readonly loggerService?: LoggerService,
-  ) {}
+  constructor(@Optional() @Inject(LoggerService) private readonly loggerService?: LoggerService) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
@@ -96,9 +94,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return {
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
         code: 'INTERNAL_ERROR',
-        message: process.env.NODE_ENV === 'production'
-          ? 'An unexpected error occurred'
-          : exception.message,
+        message:
+          process.env.NODE_ENV === 'production'
+            ? 'An unexpected error occurred'
+            : exception.message,
         error: 'Internal Server Error',
         timestamp,
         path,
@@ -141,7 +140,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
       case 'P2003': {
         // Foreign key constraint violation
-        const field = exception.meta?.field_name as string || 'unknown';
+        const field = (exception.meta?.field_name as string) || 'unknown';
         return {
           statusCode: HttpStatus.BAD_REQUEST,
           code: 'FOREIGN_KEY_VIOLATION',
@@ -181,9 +180,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
         return {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           code: `PRISMA_${exception.code}`,
-          message: process.env.NODE_ENV === 'production'
-            ? 'A database error occurred'
-            : exception.message,
+          message:
+            process.env.NODE_ENV === 'production' ? 'A database error occurred' : exception.message,
           error: 'Database Error',
           timestamp,
           path,

@@ -75,21 +75,145 @@ interface ActionResult {
 }
 
 const testableFeatures: TestableFeature[] = [
-  { id: 'categorize', name: 'Categorize Transaction', description: 'Predict expense account for a transaction description', icon: <FileText className="h-5 w-5" />, endpoint: '/ai/categorization/predict', method: 'POST', bodyTemplate: { description: 'Office supplies from Staples', amount: 89.99 }, color: 'bg-blue-500' },
-  { id: 'anomaly-scan', name: 'Anomaly Scan', description: 'Scan all transactions for statistical anomalies', icon: <AlertTriangle className="h-5 w-5" />, endpoint: '/ai/anomalies/scan', method: 'POST', color: 'bg-red-500' },
-  { id: 'lead-score-all', name: 'Score All Leads', description: 'Batch score all leads using rule-based + ML model', icon: <Users className="h-5 w-5" />, endpoint: '/ai/lead-scoring/score-all', method: 'POST', color: 'bg-orange-500' },
-  { id: 'hot-leads', name: 'Get Hot Leads', description: 'Retrieve leads with score > 70', icon: <Zap className="h-5 w-5" />, endpoint: '/ai/lead-scoring/hot', method: 'GET', color: 'bg-yellow-500' },
-  { id: 'cash-flow', name: 'Cash Flow Forecast', description: 'Monte Carlo simulation for cash flow prediction', icon: <DollarSign className="h-5 w-5" />, endpoint: '/ai/cash-flow/forecast', method: 'GET', color: 'bg-green-500' },
-  { id: 'demand-forecast', name: 'Demand Forecast Dashboard', description: 'Holt-Winters forecasting for all inventory items', icon: <TrendingUp className="h-5 w-5" />, endpoint: '/ai/demand-forecast/dashboard', method: 'GET', color: 'bg-indigo-500' },
-  { id: 'pattern-analyze', name: 'Pattern Analysis', description: 'Detect recurring transaction patterns', icon: <Search className="h-5 w-5" />, endpoint: '/ai/patterns/analyze', method: 'POST', color: 'bg-purple-500' },
-  { id: 'reorder-recalculate', name: 'Reorder Points', description: 'Recalculate optimal reorder points for all items', icon: <Package className="h-5 w-5" />, endpoint: '/ai/reorder/recalculate', method: 'POST', color: 'bg-teal-500' },
-  { id: 'fraud-scan', name: 'Fraud Scan', description: 'Scan recent transactions for fraud indicators', icon: <ShieldCheck className="h-5 w-5" />, endpoint: '/ai/fraud/scan', method: 'POST', color: 'bg-red-600' },
-  { id: 'sentiment', name: 'Sentiment Analysis', description: 'Analyze sentiment of text input', icon: <MessageSquare className="h-5 w-5" />, endpoint: '/ai/sentiment/analyze', method: 'POST', bodyTemplate: { text: 'Great service, very happy with the delivery speed!' }, color: 'bg-pink-500' },
-  { id: 'chatbot', name: 'AI Chatbot', description: 'Ask questions about your financial data', icon: <MessageSquare className="h-5 w-5" />, endpoint: '/ai/chatbot/message', method: 'POST', bodyTemplate: { message: 'What are my top expenses this month?' }, color: 'bg-violet-500' },
-  { id: 'compliance', name: 'Compliance Report', description: 'Generate compliance monitoring report', icon: <ShieldCheck className="h-5 w-5" />, endpoint: '/ai/compliance/report', method: 'GET', color: 'bg-emerald-500' },
-  { id: 'narrative-monthly', name: 'Monthly Narrative', description: 'AI-generated financial narrative for current month', icon: <BarChart3 className="h-5 w-5" />, endpoint: '/ai/narrative/monthly', method: 'GET', color: 'bg-cyan-500' },
-  { id: 'churn-high-risk', name: 'High-Risk Churn', description: 'Get customers with highest churn risk', icon: <Users className="h-5 w-5" />, endpoint: '/ai/churn/high-risk', method: 'GET', color: 'bg-rose-500' },
-  { id: 'document-classify', name: 'Classify Document', description: 'Classify a text snippet as Bill, Invoice, etc.', icon: <FileText className="h-5 w-5" />, endpoint: '/ai/documents/classify', method: 'POST', bodyTemplate: { text: 'Invoice #1234 for consulting services. Total: $5,000.00' }, color: 'bg-amber-500' },
+  {
+    id: 'categorize',
+    name: 'Categorize Transaction',
+    description: 'Predict expense account for a transaction description',
+    icon: <FileText className="h-5 w-5" />,
+    endpoint: '/ai/categorization/predict',
+    method: 'POST',
+    bodyTemplate: { description: 'Office supplies from Staples', amount: 89.99 },
+    color: 'bg-blue-500',
+  },
+  {
+    id: 'anomaly-scan',
+    name: 'Anomaly Scan',
+    description: 'Scan all transactions for statistical anomalies',
+    icon: <AlertTriangle className="h-5 w-5" />,
+    endpoint: '/ai/anomalies/scan',
+    method: 'POST',
+    color: 'bg-red-500',
+  },
+  {
+    id: 'lead-score-all',
+    name: 'Score All Leads',
+    description: 'Batch score all leads using rule-based + ML model',
+    icon: <Users className="h-5 w-5" />,
+    endpoint: '/ai/lead-scoring/score-all',
+    method: 'POST',
+    color: 'bg-orange-500',
+  },
+  {
+    id: 'hot-leads',
+    name: 'Get Hot Leads',
+    description: 'Retrieve leads with score > 70',
+    icon: <Zap className="h-5 w-5" />,
+    endpoint: '/ai/lead-scoring/hot',
+    method: 'GET',
+    color: 'bg-yellow-500',
+  },
+  {
+    id: 'cash-flow',
+    name: 'Cash Flow Forecast',
+    description: 'Monte Carlo simulation for cash flow prediction',
+    icon: <DollarSign className="h-5 w-5" />,
+    endpoint: '/ai/cash-flow/forecast',
+    method: 'GET',
+    color: 'bg-green-500',
+  },
+  {
+    id: 'demand-forecast',
+    name: 'Demand Forecast Dashboard',
+    description: 'Holt-Winters forecasting for all inventory items',
+    icon: <TrendingUp className="h-5 w-5" />,
+    endpoint: '/ai/demand-forecast/dashboard',
+    method: 'GET',
+    color: 'bg-indigo-500',
+  },
+  {
+    id: 'pattern-analyze',
+    name: 'Pattern Analysis',
+    description: 'Detect recurring transaction patterns',
+    icon: <Search className="h-5 w-5" />,
+    endpoint: '/ai/patterns/analyze',
+    method: 'POST',
+    color: 'bg-purple-500',
+  },
+  {
+    id: 'reorder-recalculate',
+    name: 'Reorder Points',
+    description: 'Recalculate optimal reorder points for all items',
+    icon: <Package className="h-5 w-5" />,
+    endpoint: '/ai/reorder/recalculate',
+    method: 'POST',
+    color: 'bg-teal-500',
+  },
+  {
+    id: 'fraud-scan',
+    name: 'Fraud Scan',
+    description: 'Scan recent transactions for fraud indicators',
+    icon: <ShieldCheck className="h-5 w-5" />,
+    endpoint: '/ai/fraud/scan',
+    method: 'POST',
+    color: 'bg-red-600',
+  },
+  {
+    id: 'sentiment',
+    name: 'Sentiment Analysis',
+    description: 'Analyze sentiment of text input',
+    icon: <MessageSquare className="h-5 w-5" />,
+    endpoint: '/ai/sentiment/analyze',
+    method: 'POST',
+    bodyTemplate: { text: 'Great service, very happy with the delivery speed!' },
+    color: 'bg-pink-500',
+  },
+  {
+    id: 'chatbot',
+    name: 'AI Chatbot',
+    description: 'Ask questions about your financial data',
+    icon: <MessageSquare className="h-5 w-5" />,
+    endpoint: '/ai/chatbot/message',
+    method: 'POST',
+    bodyTemplate: { message: 'What are my top expenses this month?' },
+    color: 'bg-violet-500',
+  },
+  {
+    id: 'compliance',
+    name: 'Compliance Report',
+    description: 'Generate compliance monitoring report',
+    icon: <ShieldCheck className="h-5 w-5" />,
+    endpoint: '/ai/compliance/report',
+    method: 'GET',
+    color: 'bg-emerald-500',
+  },
+  {
+    id: 'narrative-monthly',
+    name: 'Monthly Narrative',
+    description: 'AI-generated financial narrative for current month',
+    icon: <BarChart3 className="h-5 w-5" />,
+    endpoint: '/ai/narrative/monthly',
+    method: 'GET',
+    color: 'bg-cyan-500',
+  },
+  {
+    id: 'churn-high-risk',
+    name: 'High-Risk Churn',
+    description: 'Get customers with highest churn risk',
+    icon: <Users className="h-5 w-5" />,
+    endpoint: '/ai/churn/high-risk',
+    method: 'GET',
+    color: 'bg-rose-500',
+  },
+  {
+    id: 'document-classify',
+    name: 'Classify Document',
+    description: 'Classify a text snippet as Bill, Invoice, etc.',
+    icon: <FileText className="h-5 w-5" />,
+    endpoint: '/ai/documents/classify',
+    method: 'POST',
+    bodyTemplate: { text: 'Invoice #1234 for consulting services. Total: $5,000.00' },
+    color: 'bg-amber-500',
+  },
 ];
 
 // ============ Category Icons ============
@@ -100,7 +224,7 @@ const categoryIcons: Record<ModelCategory, React.ReactNode> = {
   'Security & Compliance': <Shield className="h-4 w-4" />,
   'NLP & Documents': <FileText className="h-4 w-4" />,
   'HR & Workforce': <Users className="h-4 w-4" />,
-  'Operations': <Settings className="h-4 w-4" />,
+  Operations: <Settings className="h-4 w-4" />,
   'Chat & Voice': <MessageSquare className="h-4 w-4" />,
 };
 
@@ -131,9 +255,7 @@ export default function AiLabPage() {
   const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
 
   // Dashboard model lookup
-  const modelDataMap = new Map(
-    (dashboard?.models || []).map((m) => [m.feature, m]),
-  );
+  const modelDataMap = new Map((dashboard?.models || []).map((m) => [m.feature, m]));
 
   const summary = dashboard?.summary;
 
@@ -162,15 +284,29 @@ export default function AiLabPage() {
         let body = feature.bodyTemplate || {};
         const customInput = customInputs[feature.id];
         if (customInput) {
-          try { body = JSON.parse(customInput); } catch { body = feature.bodyTemplate || {}; }
+          try {
+            body = JSON.parse(customInput);
+          } catch {
+            body = feature.bodyTemplate || {};
+          }
         }
         response = await api.post(feature.endpoint, body);
       } else {
         response = await api.get(feature.endpoint);
       }
-      setTestResults((prev) => ({ ...prev, [feature.id]: { success: true, data: response.data, duration: Date.now() - start } }));
+      setTestResults((prev) => ({
+        ...prev,
+        [feature.id]: { success: true, data: response.data, duration: Date.now() - start },
+      }));
     } catch (err: any) {
-      setTestResults((prev) => ({ ...prev, [feature.id]: { success: false, error: err?.response?.data?.message || err.message || 'Request failed', duration: Date.now() - start } }));
+      setTestResults((prev) => ({
+        ...prev,
+        [feature.id]: {
+          success: false,
+          error: err?.response?.data?.message || err.message || 'Request failed',
+          duration: Date.now() - start,
+        },
+      }));
     } finally {
       setLoading((prev) => ({ ...prev, [feature.id]: false }));
     }
@@ -186,7 +322,8 @@ export default function AiLabPage() {
             AI Training Lab
           </h1>
           <p className="text-muted-foreground">
-            Train models, generate data, test predictions, and review feedback across all 33 AI features
+            Train models, generate data, test predictions, and review feedback across all 33 AI
+            features
           </p>
         </div>
       </div>
@@ -227,7 +364,9 @@ export default function AiLabPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Training Data</p>
-                <p className="text-2xl font-bold text-purple-600">{summary?.totalTrainingData?.toLocaleString() || 0}</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {summary?.totalTrainingData?.toLocaleString() || 0}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -306,7 +445,9 @@ export default function AiLabPage() {
             <div className="space-y-4">
               {MODEL_CATEGORIES.map((category) => {
                 const models = getModelsByCategory(category);
-                const activeCount = models.filter((m) => modelDataMap.get(m.feature)?.hasActiveModel).length;
+                const activeCount = models.filter(
+                  (m) => modelDataMap.get(m.feature)?.hasActiveModel,
+                ).length;
                 return (
                   <div key={category}>
                     <div className="flex items-center gap-2 mb-3">
@@ -362,11 +503,7 @@ export default function AiLabPage() {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={handleGenerateAll}
-                disabled={generatingAll}
-              >
+              <Button variant="outline" onClick={handleGenerateAll} disabled={generatingAll}>
                 {generatingAll ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -379,10 +516,7 @@ export default function AiLabPage() {
                   </>
                 )}
               </Button>
-              <Button
-                onClick={() => trainAll.mutate()}
-                disabled={trainAll.isPending}
-              >
+              <Button onClick={() => trainAll.mutate()} disabled={trainAll.isPending}>
                 {trainAll.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -407,7 +541,11 @@ export default function AiLabPage() {
                   className="flex items-center gap-2 w-full text-left py-2 hover:bg-muted/50 rounded-lg px-2 transition-colors"
                   onClick={() => setOpenCategories((prev) => ({ ...prev, [category]: !isOpen }))}
                 >
-                  {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  {isOpen ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
                   {categoryIcons[category]}
                   <span className="font-medium text-sm">{category}</span>
                   <Badge variant="outline" className="text-xs ml-auto">
@@ -447,7 +585,8 @@ export default function AiLabPage() {
           <div>
             <h2 className="text-xl font-semibold">Test AI Features</h2>
             <p className="text-sm text-muted-foreground">
-              Run AI predictions, scans, and analyses. Click any feature to execute it and see the response.
+              Run AI predictions, scans, and analyses. Click any feature to execute it and see the
+              response.
             </p>
           </div>
 

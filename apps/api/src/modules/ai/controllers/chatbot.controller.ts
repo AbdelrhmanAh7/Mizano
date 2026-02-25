@@ -1,19 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Delete,
-  Body,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Delete, Body, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -88,10 +74,7 @@ export class ChatbotController {
     status: 200,
     description: 'Chat history cleared successfully',
   })
-  clearHistory(
-    @CurrentOrg() orgId: string,
-    @CurrentUser('id') userId: string,
-  ) {
+  clearHistory(@CurrentOrg() orgId: string, @CurrentUser('id') userId: string) {
     return this.chatbotService.clearHistory(orgId, userId);
   }
 }

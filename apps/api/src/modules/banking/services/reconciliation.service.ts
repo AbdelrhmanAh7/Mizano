@@ -48,11 +48,16 @@ export class ReconciliationService {
         else if (Math.abs(balanceDue - amount) / amount < 0.05) confidence += 50;
 
         // Reference matching
-        if (transaction.reference && transaction.reference.includes(invoice.invoiceNumber)) confidence = 100;
+        if (transaction.reference && transaction.reference.includes(invoice.invoiceNumber))
+          confidence = 100;
         if (transaction.description?.includes(invoice.invoiceNumber)) confidence = 100;
 
         // Name matching
-        if (transaction.payee && invoice.customer.name.toLowerCase().includes(transaction.payee.toLowerCase())) confidence += 30;
+        if (
+          transaction.payee &&
+          invoice.customer.name.toLowerCase().includes(transaction.payee.toLowerCase())
+        )
+          confidence += 30;
 
         if (confidence > 0) {
           matches.push({ type: 'invoice', entity: invoice, confidence: Math.min(100, confidence) });
@@ -70,8 +75,13 @@ export class ReconciliationService {
         const balanceDue = parseFloat(bill.balanceDue.toString());
 
         if (Math.abs(balanceDue - amount) < 0.01) confidence += 90;
-        if (transaction.reference && transaction.reference.includes(bill.billNumber)) confidence = 100;
-        if (transaction.payee && bill.vendor.name.toLowerCase().includes(transaction.payee.toLowerCase())) confidence += 30;
+        if (transaction.reference && transaction.reference.includes(bill.billNumber))
+          confidence = 100;
+        if (
+          transaction.payee &&
+          bill.vendor.name.toLowerCase().includes(transaction.payee.toLowerCase())
+        )
+          confidence += 30;
 
         if (confidence > 0) {
           matches.push({ type: 'bill', entity: bill, confidence: Math.min(100, confidence) });
@@ -82,17 +92,27 @@ export class ReconciliationService {
     return matches.sort((a, b) => b.confidence - a.confidence).slice(0, 5);
   }
 
-  async confirmMatch(organizationId: string, transactionId: string, entityType: string, entityId: string) {
+  async confirmMatch(
+    organizationId: string,
+    transactionId: string,
+    entityType: string,
+    entityId: string,
+  ) {
     const transaction = await this.prisma.bankTransaction.findFirst({
       where: { id: transactionId, organizationId },
     });
     if (!transaction) throw new NotFoundException('Transaction not found');
-    if (transaction.status !== ReconciliationStatus.PENDING) throw new BadRequestException('Already reconciled');
+    if (transaction.status !== ReconciliationStatus.PENDING)
+      throw new BadRequestException('Already reconciled');
 
     // Update transaction
     await this.prisma.bankTransaction.update({
       where: { id: transactionId },
-      data: { status: ReconciliationStatus.MATCHED, matchedEntityType: entityType, matchedEntityId: entityId },
+      data: {
+        status: ReconciliationStatus.MATCHED,
+        matchedEntityType: entityType,
+        matchedEntityId: entityId,
+      },
     });
 
     // Create payment record
@@ -106,7 +126,12 @@ export class ReconciliationService {
     return { message: 'Reconciliation confirmed' };
   }
 
-  private async createPaymentForInvoice(organizationId: string, invoiceId: string, amount: number, transaction: any) {
+  private async createPaymentForInvoice(
+    organizationId: string,
+    invoiceId: string,
+    amount: number,
+    transaction: any,
+  ) {
     const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
     if (!invoice) return;
 
@@ -127,7 +152,12 @@ export class ReconciliationService {
     await this.invoicesService.updateBalanceDue(invoiceId);
   }
 
-  private async createPaymentForBill(organizationId: string, billId: string, amount: number, transaction: any) {
+  private async createPaymentForBill(
+    organizationId: string,
+    billId: string,
+    amount: number,
+    transaction: any,
+  ) {
     const bill = await this.prisma.bill.findUnique({ where: { id: billId } });
     if (!bill) return;
 
@@ -148,8 +178,15 @@ export class ReconciliationService {
     await this.billsService.updateBalanceDue(billId);
   }
 
-  async createExpenseFromTransaction(organizationId: string, transactionId: string, accountId: string, vendorId?: string) {
-    const transaction = await this.prisma.bankTransaction.findFirst({ where: { id: transactionId, organizationId } });
+  async createExpenseFromTransaction(
+    organizationId: string,
+    transactionId: string,
+    accountId: string,
+    vendorId?: string,
+  ) {
+    const transaction = await this.prisma.bankTransaction.findFirst({
+      where: { id: transactionId, organizationId },
+    });
     if (!transaction) throw new NotFoundException('Transaction not found');
 
     await this.prisma.expense.create({
@@ -177,7 +214,11 @@ export class ReconciliationService {
   private async generatePaymentNumber(organizationId: string, prefix: string): Promise<string> {
     const model = prefix === 'PMT' ? this.prisma.paymentReceived : this.prisma.paymentMade;
     const field = prefix === 'PMT' ? 'paymentNumber' : 'paymentNumber';
-    const last = await (model as any).findFirst({ where: { organizationId }, orderBy: { createdAt: 'desc' }, select: { [field]: true } });
+    const last = await (model as any).findFirst({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      select: { [field]: true },
+    });
     if (!last) return `${prefix}-001`;
     const num = parseInt(last[field].split('-')[1], 10);
     return `${prefix}-${String(num + 1).padStart(3, '0')}`;

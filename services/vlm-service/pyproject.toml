@@ -1,0 +1,9 @@
+[project]
+name = "mizano-vlm-service"
+version = "1.0.0"
+description = "Local VLM service for invoice data extraction"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

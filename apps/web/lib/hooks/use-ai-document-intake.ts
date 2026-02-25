@@ -51,6 +51,16 @@ export interface DocumentIntakeResult {
     similarity: number;
   } | null;
   rawText: string;
+
+  /** Accounting entry suggestion from VLM */
+  accountingEntry?: {
+    debitAccount: string | null;
+    creditAccount: string | null;
+    taxAccount: string | null;
+  } | null;
+
+  /** Which AI engine was used: 'vlm' (Vision-Language Model) or 'ocr' (Tesseract/PaddleOCR) */
+  extractionMethod?: 'vlm' | 'ocr';
 }
 
 export interface ConfirmIntakeLineData {
@@ -87,7 +97,7 @@ const documentIntakeApi = {
   processDocument: async (formData: FormData) => {
     const response = await api.post('/ai/document-intake/process', formData, {
       headers: { 'Content-Type': undefined },
-      timeout: 60000,
+      timeout: 120000,
     });
     return response.data;
   },

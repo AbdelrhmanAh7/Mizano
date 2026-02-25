@@ -236,10 +236,7 @@ export function getDecayMultiplier(
 /**
  * Estimate conversion probability from score
  */
-export function estimateConversionProbability(
-  score: number,
-  tier: LeadTier,
-): number {
+export function estimateConversionProbability(score: number, tier: LeadTier): number {
   // Base probability from tier
   let baseProbability: number;
   switch (tier) {
@@ -275,11 +272,7 @@ export function estimateConversionProbability(
 /**
  * Get recommended action based on tier and score
  */
-export function getRecommendedAction(
-  tier: LeadTier,
-  score: number,
-  daysInactive: number,
-): string {
+export function getRecommendedAction(tier: LeadTier, score: number, daysInactive: number): string {
   if (tier === 'HOT') {
     if (daysInactive > 7) {
       return 'Immediate follow-up required - hot lead going cold';

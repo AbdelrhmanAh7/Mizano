@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -80,10 +74,7 @@ export class NarrativeController {
     @Query('startDate') startDate?: string,
   ): Promise<{ data: GeneratedNarrative }> {
     const targetDate = startDate ? new Date(startDate) : undefined;
-    const narrative = await this.narrativeService.generateWeeklySnapshot(
-      orgId,
-      targetDate,
-    );
+    const narrative = await this.narrativeService.generateWeeklySnapshot(orgId, targetDate);
     return { data: narrative };
   }
 
@@ -100,10 +91,7 @@ export class NarrativeController {
     @CurrentOrg() orgId: string,
     @Param('id') customerId: string,
   ): Promise<{ data: GeneratedNarrative }> {
-    const narrative = await this.narrativeService.generateCustomerNarrative(
-      orgId,
-      customerId,
-    );
+    const narrative = await this.narrativeService.generateCustomerNarrative(orgId, customerId);
     return { data: narrative };
   }
 
@@ -120,10 +108,7 @@ export class NarrativeController {
     @CurrentOrg() orgId: string,
     @Param('id') itemId: string,
   ): Promise<{ data: GeneratedNarrative }> {
-    const narrative = await this.narrativeService.generateItemNarrative(
-      orgId,
-      itemId,
-    );
+    const narrative = await this.narrativeService.generateItemNarrative(orgId, itemId);
     return { data: narrative };
   }
 
@@ -135,9 +120,7 @@ export class NarrativeController {
     description: 'Returns cash flow narrative',
     type: GeneratedNarrativeResponse,
   })
-  async getCashFlowNarrative(
-    @CurrentOrg() orgId: string,
-  ): Promise<{ data: GeneratedNarrative }> {
+  async getCashFlowNarrative(@CurrentOrg() orgId: string): Promise<{ data: GeneratedNarrative }> {
     const narrative = await this.narrativeService.generateCashFlowNarrative(orgId);
     return { data: narrative };
   }

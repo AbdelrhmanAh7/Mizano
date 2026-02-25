@@ -58,10 +58,7 @@ export class OrganizationsController {
   @Patch()
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Update organization details' })
-  update(
-    @CurrentOrg() orgId: string,
-    @Body() updateOrganizationDto: UpdateOrganizationDto,
-  ) {
+  update(@CurrentOrg() orgId: string, @Body() updateOrganizationDto: UpdateOrganizationDto) {
     return this.organizationsService.update(orgId, updateOrganizationDto);
   }
 
@@ -90,80 +87,56 @@ export class OrganizationsController {
   @Patch('settings/general')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Update general settings' })
-  updateGeneralSettings(
-    @CurrentOrg() orgId: string,
-    @Body() dto: GeneralSettingsDto,
-  ) {
+  updateGeneralSettings(@CurrentOrg() orgId: string, @Body() dto: GeneralSettingsDto) {
     return this.organizationsService.updateGeneralSettings(orgId, dto);
   }
 
   @Patch('settings/financial')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Update financial settings' })
-  updateFinancialSettings(
-    @CurrentOrg() orgId: string,
-    @Body() dto: FinancialSettingsDto,
-  ) {
+  updateFinancialSettings(@CurrentOrg() orgId: string, @Body() dto: FinancialSettingsDto) {
     return this.organizationsService.updateFinancialSettings(orgId, dto);
   }
 
   @Patch('settings/invoice')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Update invoice settings' })
-  updateInvoiceSettings(
-    @CurrentOrg() orgId: string,
-    @Body() dto: InvoiceSettingsDto,
-  ) {
+  updateInvoiceSettings(@CurrentOrg() orgId: string, @Body() dto: InvoiceSettingsDto) {
     return this.organizationsService.updateInvoiceSettings(orgId, dto);
   }
 
   @Patch('settings/inventory')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Update inventory settings' })
-  updateInventorySettings(
-    @CurrentOrg() orgId: string,
-    @Body() dto: InventorySettingsDto,
-  ) {
+  updateInventorySettings(@CurrentOrg() orgId: string, @Body() dto: InventorySettingsDto) {
     return this.organizationsService.updateInventorySettings(orgId, dto);
   }
 
   @Patch('settings/ai')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Update AI settings' })
-  updateAiSettings(
-    @CurrentOrg() orgId: string,
-    @Body() dto: AiSettingsDto,
-  ) {
+  updateAiSettings(@CurrentOrg() orgId: string, @Body() dto: AiSettingsDto) {
     return this.organizationsService.updateAiSettings(orgId, dto);
   }
 
   @Patch('settings/email')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Update email/SMTP settings' })
-  updateEmailSettings(
-    @CurrentOrg() orgId: string,
-    @Body() dto: EmailSettingsDto,
-  ) {
+  updateEmailSettings(@CurrentOrg() orgId: string, @Body() dto: EmailSettingsDto) {
     return this.organizationsService.updateEmailSettings(orgId, dto);
   }
 
   @Patch('settings/localization')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Update localization settings' })
-  updateLocalizationSettings(
-    @CurrentOrg() orgId: string,
-    @Body() dto: LocalizationSettingsDto,
-  ) {
+  updateLocalizationSettings(@CurrentOrg() orgId: string, @Body() dto: LocalizationSettingsDto) {
     return this.organizationsService.updateLocalizationSettings(orgId, dto);
   }
 
   @Patch('settings/branding')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Update branding settings' })
-  updateBrandingSettings(
-    @CurrentOrg() orgId: string,
-    @Body() dto: BrandingSettingsDto,
-  ) {
+  updateBrandingSettings(@CurrentOrg() orgId: string, @Body() dto: BrandingSettingsDto) {
     return this.organizationsService.updateBrandingSettings(orgId, dto);
   }
 
@@ -208,10 +181,7 @@ export class OrganizationsController {
       },
     },
   })
-  async uploadLogo(
-    @CurrentOrg() orgId: string,
-    @UploadedFile() file: Express.Multer.File,
-  ) {
+  async uploadLogo(@CurrentOrg() orgId: string, @UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('Logo file is required');
     }
@@ -257,60 +227,42 @@ export class OrganizationsController {
   @Post('onboarding/company-info')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Complete company info onboarding step' })
-  completeCompanyInfoStep(
-    @CurrentOrg() orgId: string,
-    @Body() dto: CompanyInfoStepDto,
-  ) {
+  completeCompanyInfoStep(@CurrentOrg() orgId: string, @Body() dto: CompanyInfoStepDto) {
     return this.organizationsService.completeCompanyInfoStep(orgId, dto);
   }
 
   @Post('onboarding/chart-of-accounts')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Complete chart of accounts onboarding step' })
-  completeChartOfAccountsStep(
-    @CurrentOrg() orgId: string,
-    @Body() dto: ChartOfAccountsStepDto,
-  ) {
+  completeChartOfAccountsStep(@CurrentOrg() orgId: string, @Body() dto: ChartOfAccountsStepDto) {
     return this.organizationsService.completeChartOfAccountsStep(orgId, dto);
   }
 
   @Post('onboarding/tax-config')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Complete tax configuration onboarding step' })
-  completeTaxConfigStep(
-    @CurrentOrg() orgId: string,
-    @Body() dto: TaxConfigStepDto,
-  ) {
+  completeTaxConfigStep(@CurrentOrg() orgId: string, @Body() dto: TaxConfigStepDto) {
     return this.organizationsService.completeTaxConfigStep(orgId, dto);
   }
 
   @Post('onboarding/opening-balances')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Complete opening balances onboarding step' })
-  completeOpeningBalancesStep(
-    @CurrentOrg() orgId: string,
-    @Body() dto: OpeningBalancesStepDto,
-  ) {
+  completeOpeningBalancesStep(@CurrentOrg() orgId: string, @Body() dto: OpeningBalancesStepDto) {
     return this.organizationsService.completeOpeningBalancesStep(orgId, dto);
   }
 
   @Post('onboarding/import-data')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Complete import data onboarding step' })
-  completeImportDataStep(
-    @CurrentOrg() orgId: string,
-    @Body() dto: ImportDataStepDto,
-  ) {
+  completeImportDataStep(@CurrentOrg() orgId: string, @Body() dto: ImportDataStepDto) {
     return this.organizationsService.completeImportDataStep(orgId, dto);
   }
 
   @Post('onboarding/ai-features')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Complete AI features onboarding step' })
-  completeAiFeaturesStep(
-    @CurrentOrg() orgId: string,
-    @Body() dto: AiFeaturesStepDto,
-  ) {
+  completeAiFeaturesStep(@CurrentOrg() orgId: string, @Body() dto: AiFeaturesStepDto) {
     return this.organizationsService.completeAiFeaturesStep(orgId, dto);
   }
 
@@ -324,10 +276,7 @@ export class OrganizationsController {
   @Post('onboarding/skip')
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Skip an onboarding step' })
-  skipStep(
-    @CurrentOrg() orgId: string,
-    @Body() dto: SkipStepDto,
-  ) {
+  skipStep(@CurrentOrg() orgId: string, @Body() dto: SkipStepDto) {
     return this.organizationsService.skipStep(orgId, dto.step);
   }
 }

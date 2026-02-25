@@ -14,11 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  useCreateTaxRate,
-  useUpdateTaxRate,
-  TaxRate,
-} from '@/lib/hooks/use-tax';
+import { useCreateTaxRate, useUpdateTaxRate, TaxRate } from '@/lib/hooks/use-tax';
 import { useAccounts } from '@/lib/hooks/use-accounts';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -92,11 +88,7 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="name">Name *</Label>
-        <Input
-          id="name"
-          placeholder="e.g., VAT 15%"
-          {...form.register('name')}
-        />
+        <Input id="name" placeholder="e.g., VAT 15%" {...form.register('name')} />
         {form.formState.errors.name && (
           <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
         )}

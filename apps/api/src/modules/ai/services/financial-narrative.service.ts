@@ -308,9 +308,10 @@ export class FinancialNarrativeService {
       {
         id: 'receivables',
         title: 'Open Receivables',
-        content: openAR > 0
-          ? `Currently has ${this.formatCurrency(openAR)} in open receivables${overdueCount > 0 ? ` (${overdueCount} overdue)` : ''}.`
-          : 'No outstanding balance.',
+        content:
+          openAR > 0
+            ? `Currently has ${this.formatCurrency(openAR)} in open receivables${overdueCount > 0 ? ` (${overdueCount} overdue)` : ''}.`
+            : 'No outstanding balance.',
         metrics: [
           { label: 'Open AR', value: this.formatCurrency(openAR) },
           { label: 'Overdue', value: overdueCount.toString() },
@@ -341,10 +342,7 @@ export class FinancialNarrativeService {
   /**
    * Generate item/product narrative
    */
-  async generateItemNarrative(
-    organizationId: string,
-    itemId: string,
-  ): Promise<GeneratedNarrative> {
+  async generateItemNarrative(organizationId: string, itemId: string): Promise<GeneratedNarrative> {
     const item = await this.prisma.item.findFirst({
       where: { id: itemId, organizationId, deletedAt: null },
     });
@@ -420,19 +418,14 @@ export class FinancialNarrativeService {
   /**
    * Generate cash flow narrative
    */
-  async generateCashFlowNarrative(
-    organizationId: string,
-  ): Promise<GeneratedNarrative> {
+  async generateCashFlowNarrative(organizationId: string): Promise<GeneratedNarrative> {
     // Get bank balances
     const bankAccounts = await this.prisma.bankAccount.findMany({
       where: { organizationId, isActive: true },
       select: { name: true, systemBalance: true },
     });
 
-    const totalCash = bankAccounts.reduce(
-      (sum, acc) => sum + Number(acc.systemBalance || 0),
-      0,
-    );
+    const totalCash = bankAccounts.reduce((sum, acc) => sum + Number(acc.systemBalance || 0), 0);
 
     // Get AR and AP
     const [ar, ap] = await Promise.all([
@@ -525,7 +518,10 @@ export class FinancialNarrativeService {
       alerts,
       recommendations:
         daysRemaining < 60
-          ? ['Review upcoming receivables and accelerate collections', 'Consider delaying non-essential expenses']
+          ? [
+              'Review upcoming receivables and accelerate collections',
+              'Consider delaying non-essential expenses',
+            ]
           : [],
       summary: `Cash position: ${this.formatCurrency(totalCash)}. Net position (cash + AR - AP): ${this.formatCurrency(netPosition)}. Runway: ${daysRemaining} days.`,
     };
@@ -622,7 +618,8 @@ export class FinancialNarrativeService {
     });
 
     const revenue = Number(revenueResult._sum.grandTotal) || 0;
-    const expenses = (Number(expenseResult._sum.amount) || 0) + (Number(billResult._sum.grandTotal) || 0);
+    const expenses =
+      (Number(expenseResult._sum.amount) || 0) + (Number(billResult._sum.grandTotal) || 0);
     const netIncome = revenue - expenses;
 
     // Top revenue drivers (customers)
@@ -701,9 +698,8 @@ export class FinancialNarrativeService {
   }
 
   private generateRevenueSection(data: MonthlyFinancials): NarrativeSection {
-    const changePercent = data.prevRevenue > 0
-      ? ((data.revenue - data.prevRevenue) / data.prevRevenue) * 100
-      : 0;
+    const changePercent =
+      data.prevRevenue > 0 ? ((data.revenue - data.prevRevenue) / data.prevRevenue) * 100 : 0;
 
     let content: string;
     let trend: 'up' | 'down' | 'neutral' = 'neutral';
@@ -731,9 +727,8 @@ export class FinancialNarrativeService {
   }
 
   private generateExpenseSection(data: MonthlyFinancials): NarrativeSection {
-    const changePercent = data.prevExpenses > 0
-      ? ((data.expenses - data.prevExpenses) / data.prevExpenses) * 100
-      : 0;
+    const changePercent =
+      data.prevExpenses > 0 ? ((data.expenses - data.prevExpenses) / data.prevExpenses) * 100 : 0;
 
     let content: string;
     let trend: 'up' | 'down' | 'neutral' = 'neutral';
@@ -835,7 +830,9 @@ export class FinancialNarrativeService {
     }
 
     if (data.cashDaysRemaining < 60) {
-      recommendations.push('Review upcoming expenses and consider deferring non-essential spending.');
+      recommendations.push(
+        'Review upcoming expenses and consider deferring non-essential spending.',
+      );
     }
 
     const margin = data.revenue > 0 ? (data.netIncome / data.revenue) * 100 : 0;

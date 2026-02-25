@@ -8,12 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 interface DataTablePaginationProps {
   page: number;
@@ -40,18 +35,13 @@ export function DataTablePagination({
   return (
     <div className="flex items-center justify-between px-2">
       <div className="flex-1 text-sm text-muted-foreground">
-        {total > 0
-          ? `Showing ${startItem}-${endItem} of ${total} results`
-          : 'No results'}
+        {total > 0 ? `Showing ${startItem}-${endItem} of ${total} results` : 'No results'}
       </div>
       <div className="flex items-center space-x-6 lg:space-x-8">
         {onLimitChange && (
           <div className="flex items-center space-x-2">
             <p className="text-sm font-medium">Rows per page</p>
-            <Select
-              value={String(limit)}
-              onValueChange={(value) => onLimitChange(Number(value))}
-            >
+            <Select value={String(limit)} onValueChange={(value) => onLimitChange(Number(value))}>
               <SelectTrigger className="h-8 w-[70px]">
                 <SelectValue placeholder={String(limit)} />
               </SelectTrigger>

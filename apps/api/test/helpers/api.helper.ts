@@ -27,27 +27,21 @@ export class ApiHelper {
    * GET request with auth
    */
   get(url: string) {
-    return request(this.app.getHttpServer())
-      .get(url)
-      .set('Authorization', `Bearer ${this.token}`);
+    return request(this.app.getHttpServer()).get(url).set('Authorization', `Bearer ${this.token}`);
   }
 
   /**
    * POST request with auth
    */
   post(url: string) {
-    return request(this.app.getHttpServer())
-      .post(url)
-      .set('Authorization', `Bearer ${this.token}`);
+    return request(this.app.getHttpServer()).post(url).set('Authorization', `Bearer ${this.token}`);
   }
 
   /**
    * PUT request with auth
    */
   put(url: string) {
-    return request(this.app.getHttpServer())
-      .put(url)
-      .set('Authorization', `Bearer ${this.token}`);
+    return request(this.app.getHttpServer()).put(url).set('Authorization', `Bearer ${this.token}`);
   }
 
   /**

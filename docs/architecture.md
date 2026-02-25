@@ -8,12 +8,13 @@ Mizano is an AI-powered Autonomous Accounting Platform built as a monorepo using
 
 The monorepo contains the following workspaces:
 
-| Workspace | Technology | Purpose |
-|-----------|------------|---------|
-| `apps/api` | NestJS 10 (port 3000) | REST API backend with business logic, AI services, and database access |
-| `apps/web` | Next.js 14 (port 3001) | Frontend with App Router, server components, and BFF API routes |
-| `packages/shared-types` | TypeScript | Shared type definitions consumed by both apps |
-| `packages/validators` | Zod | Shared validation schemas for forms and API DTOs |
+| Workspace               | Technology                 | Purpose                                                                |
+| ----------------------- | -------------------------- | ---------------------------------------------------------------------- |
+| `apps/api`              | NestJS 10 (port 6001)      | REST API backend with business logic, AI services, and database access |
+| `apps/web`              | Next.js 14 (port 5001)     | Frontend with App Router, server components, and BFF API routes        |
+| `services/vlm-service`  | Python FastAPI (port 8100) | Vision-Language Model microservice for invoice data extraction         |
+| `packages/shared-types` | TypeScript                 | Shared type definitions consumed by both apps                          |
+| `packages/validators`   | Zod                        | Shared validation schemas for forms and API DTOs                       |
 
 The data layer consists of PostgreSQL 16 (via Prisma ORM) for persistent storage with 87+ models, and Redis 7 for caching and BullMQ job queues.
 
@@ -25,7 +26,7 @@ The data layer consists of PostgreSQL 16 (via Prisma ORM) for persistent storage
 |  +--------------------------+   +-----------------------------+   |
 |  |      apps/web            |   |       apps/api              |   |
 |  |      (Next.js 14)        |   |       (NestJS 10)           |   |
-|  |      Port 3001           |   |       Port 3000             |   |
+|  |      Port 5001           |   |       Port 6001             |   |
 |  |                          |   |                             |   |
 |  |  +--------------------+  |   |  +------ Controllers ----+  |   |
 |  |  | React Server       |  |   |  | JwtAuthGuard          |  |   |
@@ -72,14 +73,14 @@ All client requests follow a layered architecture that ensures security, multi-t
 Browser/Client
     |
     v
-Next.js App (port 3001)
+Next.js App (port 5001)
     |
     +-- React Server Components (direct data fetching)
     |
     +-- API Routes (BFF Layer)
             |
             v
-        NestJS API (port 3000)
+        NestJS API (port 6001)
             |
             +-- JwtAuthGuard (verify access token)
             +-- OrganizationGuard (enforce tenant isolation)
@@ -232,10 +233,10 @@ Mizano uses a layered security architecture combining JWT-based authentication w
 
 **Token Strategy:**
 
-| Token | Lifetime | Purpose |
-|-------|----------|---------|
-| Access Token | 15 minutes | Short-lived JWT for API authentication |
-| Refresh Token | 7 days | Long-lived token for obtaining new access tokens |
+| Token         | Lifetime   | Purpose                                          |
+| ------------- | ---------- | ------------------------------------------------ |
+| Access Token  | 15 minutes | Short-lived JWT for API authentication           |
+| Refresh Token | 7 days     | Long-lived token for obtaining new access tokens |
 
 Tokens are rotated on refresh -- each refresh token can only be used once. Used refresh tokens are invalidated to prevent replay attacks.
 
@@ -264,12 +265,12 @@ Tokens are rotated on refresh -- each refresh token can only be used once. Used 
 
 **Special Decorators:**
 
-| Decorator | Purpose |
-|-----------|---------|
-| `@Public()` | Marks endpoint as open (skips JwtAuthGuard) |
-| `@CurrentOrg()` | Extracts `organizationId` from the authenticated request |
-| `@CurrentUser()` | Extracts the full user object from the authenticated request |
-| `@Permissions('module.action')` | Declares required RBAC permission for the endpoint |
+| Decorator                       | Purpose                                                      |
+| ------------------------------- | ------------------------------------------------------------ |
+| `@Public()`                     | Marks endpoint as open (skips JwtAuthGuard)                  |
+| `@CurrentOrg()`                 | Extracts `organizationId` from the authenticated request     |
+| `@CurrentUser()`                | Extracts the full user object from the authenticated request |
+| `@Permissions('module.action')` | Declares required RBAC permission for the endpoint           |
 
 ---
 
@@ -279,16 +280,16 @@ Mizano's AI subsystem runs entirely locally with zero external API calls. All ma
 
 **Library Stack:**
 
-| Library | Purpose |
-|---------|---------|
-| `brain.js` | Neural networks (transaction categorization, pattern recognition) |
-| `natural` | NLP (tokenization, classification, stemming, TF-IDF) |
-| `tesseract.js` | OCR (scanned document text extraction) |
-| `ml-logistic-regression` | Binary/multi-class classification |
-| `ml-matrix` | Matrix operations (peer dependency for ml-*) |
-| `simple-statistics` | Statistical analysis (regression, distributions) |
-| `compromise` | NLP entity extraction and text parsing |
-| `sentiment` | Sentiment analysis for customer communications |
+| Library                  | Purpose                                                           |
+| ------------------------ | ----------------------------------------------------------------- |
+| `brain.js`               | Neural networks (transaction categorization, pattern recognition) |
+| `natural`                | NLP (tokenization, classification, stemming, TF-IDF)              |
+| `tesseract.js`           | OCR (scanned document text extraction)                            |
+| `ml-logistic-regression` | Binary/multi-class classification                                 |
+| `ml-matrix`              | Matrix operations (peer dependency for ml-\*)                     |
+| `simple-statistics`      | Statistical analysis (regression, distributions)                  |
+| `compromise`             | NLP entity extraction and text parsing                            |
+| `sentiment`              | Sentiment analysis for customer communications                    |
 
 **33 AI Features across 6 Categories:**
 
@@ -343,26 +344,26 @@ NLP & Interaction
 
 **8 Utility Modules:**
 
-| Utility | File | Purpose |
-|---------|------|---------|
-| Statistics | `statistics.util.ts` | Mean, median, std dev, regression |
-| Holt-Winters | `holt-winters.util.ts` | Triple exponential smoothing for time-series forecasting |
-| Monte Carlo | `monte-carlo.util.ts` | Probabilistic simulation for risk analysis |
-| Text Similarity | `text-similarity.util.ts` | Cosine similarity, Levenshtein distance for matching |
-| Date Pattern | `date-pattern.util.ts` | Detect recurring date patterns in transactions |
-| Isolation Forest | `isolation-forest.util.ts` | Anomaly detection algorithm (implemented from scratch) |
-| Logistic Regression | `logistic-regression.util.ts` | Binary classification wrapper |
-| PDF Extractor | `pdf-extractor.util.ts` | Native PDF text extraction with OCR fallback |
+| Utility             | File                          | Purpose                                                  |
+| ------------------- | ----------------------------- | -------------------------------------------------------- |
+| Statistics          | `statistics.util.ts`          | Mean, median, std dev, regression                        |
+| Holt-Winters        | `holt-winters.util.ts`        | Triple exponential smoothing for time-series forecasting |
+| Monte Carlo         | `monte-carlo.util.ts`         | Probabilistic simulation for risk analysis               |
+| Text Similarity     | `text-similarity.util.ts`     | Cosine similarity, Levenshtein distance for matching     |
+| Date Pattern        | `date-pattern.util.ts`        | Detect recurring date patterns in transactions           |
+| Isolation Forest    | `isolation-forest.util.ts`    | Anomaly detection algorithm (implemented from scratch)   |
+| Logistic Regression | `logistic-regression.util.ts` | Binary classification wrapper                            |
+| PDF Extractor       | `pdf-extractor.util.ts`       | Native PDF text extraction with OCR fallback             |
 
 **5 Background Schedulers:**
 
-| Scheduler | Cadence | Responsibilities |
-|-----------|---------|------------------|
-| `ai-retraining` | Periodic | Retrain models when feedback threshold reached |
-| `ai-sales-crm` | Daily | Update lead scores, churn predictions, revenue forecasts |
-| `ai-security` | Continuous | Fraud detection, anomaly scanning, compliance checks |
-| `ai-hr-ops` | Daily | Attendance analysis, payroll anomaly detection |
-| `ai-nlp-chat` | On-demand | Process NL queries, update search indexes |
+| Scheduler       | Cadence    | Responsibilities                                         |
+| --------------- | ---------- | -------------------------------------------------------- |
+| `ai-retraining` | Periodic   | Retrain models when feedback threshold reached           |
+| `ai-sales-crm`  | Daily      | Update lead scores, churn predictions, revenue forecasts |
+| `ai-security`   | Continuous | Fraud detection, anomaly scanning, compliance checks     |
+| `ai-hr-ops`     | Daily      | Attendance analysis, payroll anomaly detection           |
+| `ai-nlp-chat`   | On-demand  | Process NL queries, update search indexes                |
 
 **Model Lifecycle:**
 
@@ -420,23 +421,23 @@ src/modules/{domain}/
 
 **24 Business Domain Modules:**
 
-| Category | Module | Key Entities |
-|----------|--------|-------------|
-| Core | `accounting` | Accounts, Journals, JournalLines, RecurringProfiles |
-| Core | `organizations` | Organizations, Settings, Preferences |
-| Core | `users` | Users, Roles, Permissions |
-| Core | `auth` | Login, Register, Token refresh |
-| Sales | `sales` | Customers, Quotes, Invoices, CreditNotes, PaymentsReceived |
-| Purchases | `purchases` | Vendors, Bills, Expenses, VendorCredits, PaymentsMade |
-| Inventory | `inventory` | Items, Warehouses, Movements, Adjustments, PriceLists |
-| Banking | `banking` | BankAccounts, BankTransactions, BankRules |
-| HR | `hr` | Employees, Attendance, PayrollRuns, Payslips |
-| Manufacturing | `manufacturing` | BOMs, WorkOrders |
-| Projects | `projects` | Projects, Tasks, TimesheetEntries |
-| Tax | `tax` | TaxRates, VATReturns, VATPayments |
-| CRM | `crm` | Leads, Deals, Activities |
-| Reports | `reports` | P&L, Balance Sheet, AR/AP Aging, Cash Flow |
-| AI | `ai` | 38 controllers, 36 services, all ML features |
+| Category      | Module          | Key Entities                                               |
+| ------------- | --------------- | ---------------------------------------------------------- |
+| Core          | `accounting`    | Accounts, Journals, JournalLines, RecurringProfiles        |
+| Core          | `organizations` | Organizations, Settings, Preferences                       |
+| Core          | `users`         | Users, Roles, Permissions                                  |
+| Core          | `auth`          | Login, Register, Token refresh                             |
+| Sales         | `sales`         | Customers, Quotes, Invoices, CreditNotes, PaymentsReceived |
+| Purchases     | `purchases`     | Vendors, Bills, Expenses, VendorCredits, PaymentsMade      |
+| Inventory     | `inventory`     | Items, Warehouses, Movements, Adjustments, PriceLists      |
+| Banking       | `banking`       | BankAccounts, BankTransactions, BankRules                  |
+| HR            | `hr`            | Employees, Attendance, PayrollRuns, Payslips               |
+| Manufacturing | `manufacturing` | BOMs, WorkOrders                                           |
+| Projects      | `projects`      | Projects, Tasks, TimesheetEntries                          |
+| Tax           | `tax`           | TaxRates, VATReturns, VATPayments                          |
+| CRM           | `crm`           | Leads, Deals, Activities                                   |
+| Reports       | `reports`       | P&L, Balance Sheet, AR/AP Aging, Cash Flow                 |
+| AI            | `ai`            | 38 controllers, 36 services, all ML features               |
 
 **Dependency Rules:**
 
@@ -532,19 +533,19 @@ app/
 
 **Component Strategy:**
 
-| Type | Directive | Use Case |
-|------|-----------|----------|
-| React Server Components | (default) | Data fetching, static rendering, SEO |
-| Client Components | `'use client'` | Interactive UI, forms, charts, state |
+| Type                    | Directive      | Use Case                             |
+| ----------------------- | -------------- | ------------------------------------ |
+| React Server Components | (default)      | Data fetching, static rendering, SEO |
+| Client Components       | `'use client'` | Interactive UI, forms, charts, state |
 
 **State Management:**
 
-| Layer | Library | Purpose |
-|-------|---------|---------|
-| Server State | TanStack Query | API data fetching, caching, synchronization |
-| Client State | Zustand | UI state, sidebar toggle, theme, modals |
-| Form State | React Hook Form | Form values, validation, submission |
-| URL State | Next.js searchParams | Filters, pagination, sorting |
+| Layer        | Library              | Purpose                                     |
+| ------------ | -------------------- | ------------------------------------------- |
+| Server State | TanStack Query       | API data fetching, caching, synchronization |
+| Client State | Zustand              | UI state, sidebar toggle, theme, modals     |
+| Form State   | React Hook Form      | Form values, validation, submission         |
+| URL State    | Next.js searchParams | Filters, pagination, sorting                |
 
 **UI Component Library:**
 
@@ -706,7 +707,7 @@ Feedback Loop
 services:
   postgres:
     image: postgres:16-alpine
-    ports: ["5432:5432"]
+    ports: ['5435:5432']
     environment:
       POSTGRES_DB: mizano_db
       POSTGRES_USER: mizano
@@ -714,7 +715,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    ports: ['6380:6379']
 ```
 
 **Production (Docker Compose with Nginx):**
@@ -725,7 +726,7 @@ docker-compose.production.yml
     +-- nginx (reverse proxy)
     |   +-- SSL termination
     |   +-- Static file serving
-    |   +-- Proxy to Next.js (port 3001) and NestJS (port 3000)
+    |   +-- Proxy to Next.js (port 5001) and NestJS (port 6001)
     |
     +-- api (NestJS container)
     |   +-- Node.js runtime
@@ -747,11 +748,11 @@ docker-compose.production.yml
 
 **Health Check Endpoints:**
 
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /health` | Application health (returns 200 if API is running) |
-| `GET /health/db` | PostgreSQL connectivity check |
-| `GET /health/redis` | Redis connectivity check |
+| Endpoint            | Purpose                                            |
+| ------------------- | -------------------------------------------------- |
+| `GET /health`       | Application health (returns 200 if API is running) |
+| `GET /health/db`    | PostgreSQL connectivity check                      |
+| `GET /health/redis` | Redis connectivity check                           |
 
 **Background Job Processing (BullMQ):**
 
@@ -769,19 +770,22 @@ Jobs are processed by workers running in the same NestJS process, with configura
 
 ```bash
 # Database
-DATABASE_URL="postgresql://mizano:mizano_secret@localhost:5432/mizano_db"
+DATABASE_URL="postgresql://mizano:mizano_secret@localhost:5435/mizano_db"
 
 # Cache & Queues
-REDIS_URL="redis://localhost:6379"
+REDIS_URL="redis://localhost:6380"
 
 # Authentication
 JWT_SECRET="your-secret"
 JWT_REFRESH_SECRET="your-refresh-secret"
 NEXTAUTH_SECRET="your-nextauth-secret"
-NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_URL="http://localhost:5001"
 
 # API
-API_URL="http://localhost:3001"
+API_URL="http://localhost:6001"
+
+# VLM Service
+VLM_SERVICE_URL=http://localhost:8100
 ```
 
 ---
@@ -813,24 +817,24 @@ model Example {
 
 **AI-Specific Models:**
 
-| Model | Purpose |
-|-------|---------|
-| `AiTrainingData` | Labeled training examples per feature and organization |
-| `AiModel` | Versioned model storage (serialized weights + metadata) |
-| `AiFeedback` | User feedback on predictions (feature + userAction enum) |
-| `AiPrediction` | Stored predictions with confidence scores |
-| `AiAnomaly` | Detected anomalies with severity levels |
-| `ItemReorderAnalysis` | Inventory reorder point calculations |
-| `ReconciliationPattern` | Learned bank reconciliation patterns |
-| `VendorOcrLayout` | Learned vendor document layouts for OCR |
-| `ItemDemandForecast` | Demand forecasting results per item |
-| `CashFlowForecast` | Cash flow projection data points |
-| `LeadScore` | CRM lead scoring results |
-| `TransactionPattern` | Detected recurring transaction patterns |
-| `PatternSuggestion` | Suggested actions based on detected patterns |
-| `AIInsight` | Aggregated AI insights for dashboard display |
-| `EmployeeAiProfile` | HR-related AI analysis per employee |
-| `FraudAlert` | Security fraud detection alerts |
-| `CustomerAiProfile` | Customer behavior analysis for CRM |
+| Model                   | Purpose                                                  |
+| ----------------------- | -------------------------------------------------------- |
+| `AiTrainingData`        | Labeled training examples per feature and organization   |
+| `AiModel`               | Versioned model storage (serialized weights + metadata)  |
+| `AiFeedback`            | User feedback on predictions (feature + userAction enum) |
+| `AiPrediction`          | Stored predictions with confidence scores                |
+| `AiAnomaly`             | Detected anomalies with severity levels                  |
+| `ItemReorderAnalysis`   | Inventory reorder point calculations                     |
+| `ReconciliationPattern` | Learned bank reconciliation patterns                     |
+| `VendorOcrLayout`       | Learned vendor document layouts for OCR                  |
+| `ItemDemandForecast`    | Demand forecasting results per item                      |
+| `CashFlowForecast`      | Cash flow projection data points                         |
+| `LeadScore`             | CRM lead scoring results                                 |
+| `TransactionPattern`    | Detected recurring transaction patterns                  |
+| `PatternSuggestion`     | Suggested actions based on detected patterns             |
+| `AIInsight`             | Aggregated AI insights for dashboard display             |
+| `EmployeeAiProfile`     | HR-related AI analysis per employee                      |
+| `FraudAlert`            | Security fraud detection alerts                          |
+| `CustomerAiProfile`     | Customer behavior analysis for CRM                       |
 
 The `AiFeature` enum has 33 values (from `CATEGORIZATION` through `VOICE_COMMAND`) used to categorize all AI functionality and associate feedback with the correct model.

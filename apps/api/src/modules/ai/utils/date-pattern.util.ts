@@ -276,8 +276,7 @@ export function detectFrequency(dates: Date[]): FrequencyResult {
 
   // Calculate mean and standard deviation
   const mean = deltas.reduce((sum, d) => sum + d, 0) / deltas.length;
-  const variance =
-    deltas.reduce((sum, d) => sum + Math.pow(d - mean, 2), 0) / deltas.length;
+  const variance = deltas.reduce((sum, d) => sum + Math.pow(d - mean, 2), 0) / deltas.length;
   const stdDev = Math.sqrt(variance);
 
   // Coefficient of variation (lower = more consistent pattern)
@@ -342,11 +341,7 @@ export function detectFrequency(dates: Date[]): FrequencyResult {
 /**
  * Check if two amounts are within variance threshold
  */
-export function isAmountMatch(
-  amount1: number,
-  amount2: number,
-  variance: number = 0.01,
-): boolean {
+export function isAmountMatch(amount1: number, amount2: number, variance: number = 0.01): boolean {
   if (amount1 === 0 && amount2 === 0) return true;
   if (amount1 === 0 || amount2 === 0) return false;
 
@@ -380,10 +375,7 @@ export function getAmountCluster(amount: number, variance: number = 0.01): numbe
 /**
  * Calculate days until next occurrence based on frequency
  */
-export function calculateNextOccurrence(
-  lastDate: Date,
-  frequency: RecurringFrequency,
-): Date {
+export function calculateNextOccurrence(lastDate: Date, frequency: RecurringFrequency): Date {
   const nextDate = new Date(lastDate);
 
   switch (frequency) {
@@ -426,7 +418,9 @@ export function isPotentialDuplicate(
   amountVariance: number = 0.01,
 ): boolean {
   // Check entity name match
-  if (normalizeEntityName(transaction1.entityName) !== normalizeEntityName(transaction2.entityName)) {
+  if (
+    normalizeEntityName(transaction1.entityName) !== normalizeEntityName(transaction2.entityName)
+  ) {
     return false;
   }
 

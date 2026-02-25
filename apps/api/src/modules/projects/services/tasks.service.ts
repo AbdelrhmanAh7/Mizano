@@ -44,7 +44,10 @@ export class TasksService {
     });
   }
 
-  async findAll(organizationId: string, query: { projectId?: string; status?: string; assigneeId?: string }) {
+  async findAll(
+    organizationId: string,
+    query: { projectId?: string; status?: string; assigneeId?: string },
+  ) {
     const where: any = { organizationId };
     if (query.projectId) where.projectId = query.projectId;
     if (query.status) where.status = query.status;

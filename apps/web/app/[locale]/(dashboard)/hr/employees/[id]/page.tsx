@@ -49,11 +49,7 @@ import {
   formatCurrency,
 } from '@/lib/hooks/use-hr';
 
-export default function EmployeeDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const { data: employee, isLoading } = useEmployee(id);
@@ -90,9 +86,10 @@ export default function EmployeeDetailPage({
     );
   }
 
-  const basicSalary = typeof employee.basicSalary === 'string'
-    ? parseFloat(employee.basicSalary)
-    : employee.basicSalary;
+  const basicSalary =
+    typeof employee.basicSalary === 'string'
+      ? parseFloat(employee.basicSalary)
+      : employee.basicSalary;
   const allowances = employee.allowances || [];
   const deductions = employee.deductions || [];
   const totalAllowances = allowances.reduce((sum: number, a: any) => sum + (a.amount || 0), 0);
@@ -122,10 +119,7 @@ export default function EmployeeDetailPage({
                 <h1 className="text-3xl font-bold tracking-tight">
                   {employee.firstName} {employee.lastName}
                 </h1>
-                <Badge
-                  variant="outline"
-                  className={getEmployeeStatusColor(employee.status)}
-                >
+                <Badge variant="outline" className={getEmployeeStatusColor(employee.status)}>
                   {getEmployeeStatusLabel(employee.status)}
                 </Badge>
               </div>
@@ -153,16 +147,12 @@ export default function EmployeeDetailPage({
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete Employee</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to delete this employee? This action
-                  cannot be undone.
+                  Are you sure you want to delete this employee? This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  className="bg-red-600 hover:bg-red-700"
-                >
+                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
                   Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -231,9 +221,7 @@ export default function EmployeeDetailPage({
                     )}
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No banking details provided
-                  </p>
+                  <p className="text-sm text-muted-foreground">No banking details provided</p>
                 )}
                 {employee.taxId && (
                   <div className="flex items-center gap-3">
@@ -250,12 +238,8 @@ export default function EmployeeDetailPage({
                 <CardTitle className="text-base">Monthly Salary</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold font-mono">
-                  {formatCurrency(netSalary)}
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Net salary after deductions
-                </p>
+                <p className="text-3xl font-bold font-mono">{formatCurrency(netSalary)}</p>
+                <p className="text-sm text-muted-foreground mt-1">Net salary after deductions</p>
               </CardContent>
             </Card>
           </div>
@@ -333,9 +317,7 @@ export default function EmployeeDetailPage({
             <CardContent className="pt-6">
               <div className="flex justify-between items-center">
                 <span className="text-xl font-bold">Net Salary</span>
-                <span className="text-3xl font-bold font-mono">
-                  {formatCurrency(netSalary)}
-                </span>
+                <span className="text-3xl font-bold font-mono">{formatCurrency(netSalary)}</span>
               </div>
             </CardContent>
           </Card>
@@ -372,15 +354,11 @@ export default function EmployeeDetailPage({
                           {formatCurrency(slip.netPay)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">
-                            {slip.status}
-                          </Badge>
+                          <Badge variant="outline">{slip.status}</Badge>
                         </TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/hr/payslips/${slip.id}`}>
-                              View
-                            </Link>
+                            <Link href={`/hr/payslips/${slip.id}`}>View</Link>
                           </Button>
                         </TableCell>
                       </TableRow>

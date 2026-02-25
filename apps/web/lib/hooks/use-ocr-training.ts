@@ -94,9 +94,7 @@ const ocrTrainingApi = {
   },
 
   getVendorHistory: async (vendorId: string) => {
-    const response = await api.get(
-      `/ai/ocr-training/vendor-history/${vendorId}`,
-    );
+    const response = await api.get(`/ai/ocr-training/vendor-history/${vendorId}`);
     return response.data;
   },
 

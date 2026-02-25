@@ -16,10 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/components/ui/use-toast';
-import {
-  useOcrTrainingSubmit,
-  OcrTrainingExtractResult,
-} from '@/lib/hooks/use-ocr-training';
+import { useOcrTrainingSubmit, OcrTrainingExtractResult } from '@/lib/hooks/use-ocr-training';
 import { cn } from '@/lib/utils';
 
 interface QuickTrainDialogProps {
@@ -48,9 +45,7 @@ export function QuickTrainDialog({
 }: QuickTrainDialogProps) {
   const { toast } = useToast();
   const submitMutation = useOcrTrainingSubmit();
-  const [additionalCorrections, setAdditionalCorrections] = useState<
-    Record<string, any>
-  >({});
+  const [additionalCorrections, setAdditionalCorrections] = useState<Record<string, any>>({});
 
   // Merge external corrections with any additional ones from this dialog
   const allCorrections = useMemo(
@@ -96,9 +91,7 @@ export function QuickTrainDialog({
           toast({
             variant: 'destructive',
             title: 'Submission failed',
-            description:
-              error.response?.data?.message ||
-              'Failed to submit training data',
+            description: error.response?.data?.message || 'Failed to submit training data',
           });
         },
       },
@@ -116,8 +109,8 @@ export function QuickTrainDialog({
             Train OCR Model
           </DialogTitle>
           <DialogDescription>
-            Submit your corrections to help the AI learn this vendor&apos;s
-            invoice layout. The model improves with each correction.
+            Submit your corrections to help the AI learn this vendor&apos;s invoice layout. The
+            model improves with each correction.
           </DialogDescription>
         </DialogHeader>
 
@@ -125,28 +118,18 @@ export function QuickTrainDialog({
           <div className="space-y-3 pr-4">
             {correctionCount > 0 ? (
               <>
-                <p className="text-sm font-medium">
-                  You made {correctionCount} correction(s):
-                </p>
+                <p className="text-sm font-medium">You made {correctionCount} correction(s):</p>
                 {Object.entries(allCorrections).map(([field, correctedValue]) => {
-                  const original =
-                    originalValues[field as keyof typeof originalValues];
+                  const original = originalValues[field as keyof typeof originalValues];
                   return (
-                    <div
-                      key={field}
-                      className="border rounded-md p-3 space-y-1"
-                    >
-                      <Label className="text-xs font-medium">
-                        {FIELD_LABELS[field] || field}
-                      </Label>
+                    <div key={field} className="border rounded-md p-3 space-y-1">
+                      <Label className="text-xs font-medium">{FIELD_LABELS[field] || field}</Label>
                       <div className="flex items-center gap-2 text-sm">
                         <span className="text-muted-foreground line-through">
                           {original === null ? '(empty)' : String(original)}
                         </span>
                         <span className="text-muted-foreground">&rarr;</span>
-                        <span className="font-medium text-blue-700">
-                          {String(correctedValue)}
-                        </span>
+                        <span className="font-medium text-blue-700">{String(correctedValue)}</span>
                       </div>
                     </div>
                   );
@@ -158,8 +141,7 @@ export function QuickTrainDialog({
                   No corrections detected yet. You can add corrections below:
                 </p>
                 {Object.entries(FIELD_LABELS).map(([key, label]) => {
-                  const original =
-                    originalValues[key as keyof typeof originalValues];
+                  const original = originalValues[key as keyof typeof originalValues];
                   const corrected = additionalCorrections[key];
 
                   return (
@@ -189,13 +171,10 @@ export function QuickTrainDialog({
                             }));
                           }
                         }}
-                        placeholder={
-                          original !== null ? String(original) : 'Not detected'
-                        }
+                        placeholder={original !== null ? String(original) : 'Not detected'}
                         className={cn(
                           'h-8 text-sm',
-                          corrected !== undefined &&
-                            'border-blue-400 bg-blue-50/50',
+                          corrected !== undefined && 'border-blue-400 bg-blue-50/50',
                         )}
                       />
                     </div>
@@ -215,19 +194,13 @@ export function QuickTrainDialog({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button
               size="sm"
               onClick={handleSubmit}
-              disabled={
-                correctionCount === 0 || submitMutation.isPending || !vendorId
-              }
+              disabled={correctionCount === 0 || submitMutation.isPending || !vendorId}
             >
               {submitMutation.isPending ? (
                 <>

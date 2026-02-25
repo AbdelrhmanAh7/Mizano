@@ -41,7 +41,9 @@ export class StaffingNeedDto {
   @ApiProperty({ description: 'Recommended number of staff based on analysis' })
   recommendedStaff: number;
 
-  @ApiProperty({ description: 'Gap between current and recommended staffing (positive means understaffed)' })
+  @ApiProperty({
+    description: 'Gap between current and recommended staffing (positive means understaffed)',
+  })
   gap: number;
 }
 

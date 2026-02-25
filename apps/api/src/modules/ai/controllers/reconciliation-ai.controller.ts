@@ -1,19 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Body,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -45,11 +31,7 @@ export class ReconciliationAiController {
     @Param('transactionId') transactionId: string,
     @Query('minConfidence') minConfidence?: number,
   ) {
-    return this.matcherService.matchTransaction(
-      orgId,
-      transactionId,
-      minConfidence || 0.3,
-    );
+    return this.matcherService.matchTransaction(orgId, transactionId, minConfidence || 0.3);
   }
 
   @Post('confirm/:transactionId')
@@ -80,10 +62,7 @@ export class ReconciliationAiController {
     required: false,
     description: 'Minimum match count filter (default: 1)',
   })
-  getPatterns(
-    @CurrentOrg() orgId: string,
-    @Query('minMatchCount') minMatchCount?: number,
-  ) {
+  getPatterns(@CurrentOrg() orgId: string, @Query('minMatchCount') minMatchCount?: number) {
     return this.matcherService.getLearnedPatterns(orgId, minMatchCount || 1);
   }
 
@@ -97,9 +76,15 @@ export class ReconciliationAiController {
   createRule(@CurrentOrg() orgId: string, @Body() dto: CreateBankRuleDto) {
     return this.matcherService.createRule(orgId, {
       ...dto,
-      conditions: dto.conditions.map(c => ({
+      conditions: dto.conditions.map((c) => ({
         ...c,
-        operator: c.operator as 'contains' | 'equals' | 'startsWith' | 'endsWith' | 'greaterThan' | 'lessThan',
+        operator: c.operator as
+          | 'contains'
+          | 'equals'
+          | 'startsWith'
+          | 'endsWith'
+          | 'greaterThan'
+          | 'lessThan',
       })),
       action: {
         ...dto.action,
@@ -122,10 +107,7 @@ export class ReconciliationAiController {
     status: 200,
     description: 'Returns matching rule if found',
   })
-  applyRules(
-    @CurrentOrg() orgId: string,
-    @Param('transactionId') transactionId: string,
-  ) {
+  applyRules(@CurrentOrg() orgId: string, @Param('transactionId') transactionId: string) {
     return this.matcherService.applyRules(orgId, transactionId);
   }
 
@@ -146,10 +128,6 @@ export class ReconciliationAiController {
     @Body() body: { transactionIds: string[] },
     @Query('minConfidence') minConfidence?: number,
   ) {
-    return this.matcherService.bulkAutoMatch(
-      orgId,
-      body.transactionIds,
-      minConfidence || 0.85,
-    );
+    return this.matcherService.bulkAutoMatch(orgId, body.transactionIds, minConfidence || 0.85);
   }
 }

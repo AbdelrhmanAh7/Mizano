@@ -10,8 +10,7 @@ interface AutoTourTriggerProps {
 }
 
 export function AutoTourTrigger({ tourId, delay = 1500 }: AutoTourTriggerProps) {
-  const { startTour, isActive, isTourCompleted, isTourDismissed } =
-    useTourStore();
+  const { startTour, isActive, isTourCompleted, isTourDismissed } = useTourStore();
   const { data: preferences, isLoading } = useUserPreferences();
 
   useEffect(() => {

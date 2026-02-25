@@ -273,10 +273,7 @@ export class PatternDetectionService {
   /**
    * Get pending suggestions
    */
-  async getPendingSuggestions(
-    organizationId: string,
-    limit?: number,
-  ) {
+  async getPendingSuggestions(organizationId: string, limit?: number) {
     return this.prisma.patternSuggestion.findMany({
       where: {
         organizationId,
@@ -434,7 +431,9 @@ export class PatternDetectionService {
     }
 
     const normalizedEntity = normalizeEntityName(transaction.entityName);
-    const amountCluster = new Decimal(getAmountCluster(transaction.amount, this.AMOUNT_VARIANCE_THRESHOLD));
+    const amountCluster = new Decimal(
+      getAmountCluster(transaction.amount, this.AMOUNT_VARIANCE_THRESHOLD),
+    );
 
     // Find or create pattern
     let pattern = await this.prisma.transactionPattern.findFirst({
@@ -713,9 +712,7 @@ export class PatternDetectionService {
           amountVariance: new Decimal(this.AMOUNT_VARIANCE_THRESHOLD),
           frequency: frequencyAnalysis.frequency,
           frequencyDays: frequencyAnalysis.interval,
-          frequencyStdDev: frequencyAnalysis.stdDev
-            ? new Decimal(frequencyAnalysis.stdDev)
-            : null,
+          frequencyStdDev: frequencyAnalysis.stdDev ? new Decimal(frequencyAnalysis.stdDev) : null,
           occurrenceCount: cluster.transactions.length,
           firstOccurrence: cluster.transactions[0].date,
           lastOccurrence: cluster.transactions[cluster.transactions.length - 1].date,
@@ -746,9 +743,7 @@ export class PatternDetectionService {
         data: {
           frequency: frequencyAnalysis.frequency,
           frequencyDays: frequencyAnalysis.interval,
-          frequencyStdDev: frequencyAnalysis.stdDev
-            ? new Decimal(frequencyAnalysis.stdDev)
-            : null,
+          frequencyStdDev: frequencyAnalysis.stdDev ? new Decimal(frequencyAnalysis.stdDev) : null,
           occurrenceCount: cluster.transactions.length,
           lastOccurrence: cluster.transactions[cluster.transactions.length - 1].date,
           confidence: new Decimal(frequencyAnalysis.confidence),

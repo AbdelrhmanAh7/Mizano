@@ -2,7 +2,13 @@
 
 import { create } from 'zustand';
 
-export type DatePreset = 'thisMonth' | 'lastMonth' | 'lastQuarter' | 'thisYear' | 'last12Months' | 'custom';
+export type DatePreset =
+  | 'thisMonth'
+  | 'lastMonth'
+  | 'lastQuarter'
+  | 'thisYear'
+  | 'last12Months'
+  | 'custom';
 
 export interface DateRange {
   from: Date;
@@ -52,6 +58,5 @@ export const useDashboardFilters = create<DashboardFiltersState>((set) => ({
   dateRange: getPresetDates('last12Months'),
   preset: 'last12Months',
   setDateRange: (range: DateRange) => set({ dateRange: range, preset: 'custom' }),
-  setPreset: (preset: DatePreset) =>
-    set({ dateRange: getPresetDates(preset), preset }),
+  setPreset: (preset: DatePreset) => set({ dateRange: getPresetDates(preset), preset }),
 }));

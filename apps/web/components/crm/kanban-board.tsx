@@ -95,9 +95,7 @@ export function KanbanBoard({ deals }: KanbanBoardProps) {
           <Card className="h-full">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">
-                  {getDealStageLabel(stage)}
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">{getDealStageLabel(stage)}</CardTitle>
                 <Badge variant="secondary" className="text-xs">
                   {dealsByStage[stage]?.length || 0}
                 </Badge>
@@ -119,9 +117,7 @@ export function KanbanBoard({ deals }: KanbanBoardProps) {
                     >
                       <Card className="cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow">
                         <CardContent className="p-3 space-y-2">
-                          <div className="font-medium text-sm truncate">
-                            {deal.dealName}
-                          </div>
+                          <div className="font-medium text-sm truncate">{deal.dealName}</div>
                           <div className="flex items-center gap-1 text-sm font-mono">
                             <DollarSign className="h-3 w-3 text-muted-foreground" />
                             {formatCurrency(deal.expectedAmount)}
@@ -144,9 +140,7 @@ export function KanbanBoard({ deals }: KanbanBoardProps) {
                     </Link>
                   ))}
                   {(!dealsByStage[stage] || dealsByStage[stage].length === 0) && (
-                    <div className="text-center py-4 text-xs text-muted-foreground">
-                      No deals
-                    </div>
+                    <div className="text-center py-4 text-xs text-muted-foreground">No deals</div>
                   )}
                 </div>
               </ScrollArea>

@@ -15,9 +15,7 @@ export function useGlobalErrorCapture() {
     // Capture unhandled errors
     const handleError = (event: ErrorEvent) => {
       captureError(
-        event.error instanceof Error
-          ? event.error
-          : new Error(event.message || 'Unknown error'),
+        event.error instanceof Error ? event.error : new Error(event.message || 'Unknown error'),
         {
           category: LogCategory.UNHANDLED_EXCEPTION,
           filename: event.filename,
@@ -57,7 +55,7 @@ export function useGlobalErrorCapture() {
       }
     };
 
-    // Capture console.warn calls  
+    // Capture console.warn calls
     const originalWarn = console.warn;
     console.warn = (...args: any[]) => {
       originalWarn.apply(console, args);

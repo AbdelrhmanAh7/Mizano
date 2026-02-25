@@ -51,9 +51,7 @@ describe('TransactionCategorizerService', () => {
       ],
     }).compile();
 
-    service = module.get<TransactionCategorizerService>(
-      TransactionCategorizerService,
-    );
+    service = module.get<TransactionCategorizerService>(TransactionCategorizerService);
   });
 
   describe('predict', () => {
@@ -209,12 +207,7 @@ describe('TransactionCategorizerService', () => {
         direction: 'expense',
       };
 
-      await service.onUserCategorize(
-        orgId,
-        input,
-        'acc-rent',
-        false,
-      );
+      await service.onUserCategorize(orgId, input, 'acc-rent', false);
 
       expect(trainingService.addTrainingData).toHaveBeenCalledWith(
         orgId,
@@ -264,13 +257,7 @@ describe('TransactionCategorizerService', () => {
         direction: 'expense',
       };
 
-      await service.onUserCategorize(
-        orgId,
-        input,
-        'acc-rent',
-        true,
-        'acc-utilities',
-      );
+      await service.onUserCategorize(orgId, input, 'acc-rent', true, 'acc-utilities');
 
       expect(eventEmitter.emit).toHaveBeenCalledWith(
         'ai.retraining.needed',

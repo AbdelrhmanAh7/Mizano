@@ -9,13 +9,7 @@ import {
   ParseIntPipe,
   ParseFloatPipe,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -81,12 +75,7 @@ export class ReorderPointsController {
     @Query('leadTimeDays', new DefaultValuePipe(7), ParseIntPipe) leadTimeDays: number,
     @Query('serviceLevel', new DefaultValuePipe(0.95), ParseFloatPipe) serviceLevel: number,
   ) {
-    return this.reorderService.calculateForItem(
-      orgId,
-      itemId,
-      leadTimeDays,
-      serviceLevel,
-    );
+    return this.reorderService.calculateForItem(orgId, itemId, leadTimeDays, serviceLevel);
   }
 
   @Post('recalculate')
@@ -130,8 +119,7 @@ export class ReorderPointsController {
   @Permissions('inventory.manage')
   @ApiOperation({
     summary: 'Recalculate reorder points using ABC-based service levels',
-    description:
-      'Uses ABC classification to apply different service levels: A=98%, B=95%, C=90%',
+    description: 'Uses ABC classification to apply different service levels: A=98%, B=95%, C=90%',
   })
   @ApiResponse({
     status: 200,

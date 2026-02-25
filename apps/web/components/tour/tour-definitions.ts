@@ -34,7 +34,7 @@ export const tourDefinitions: Record<string, Record<string, TourDefinition>> = {
           popover: {
             title: 'AI-Powered Alerts',
             description:
-              'Mizano\'s AI watches your data and surfaces important insights — anomalies, suggestions, and reminders.',
+              "Mizano's AI watches your data and surfaces important insights — anomalies, suggestions, and reminders.",
             side: 'top',
             align: 'start',
           },
@@ -148,8 +148,7 @@ export const tourDefinitions: Record<string, Record<string, TourDefinition>> = {
           element: '[data-tour="invoice-filters"]',
           popover: {
             title: 'البحث والتصفية',
-            description:
-              'استخدم هذه الفلاتر للبحث عن الفواتير حسب الحالة والعميل والتاريخ.',
+            description: 'استخدم هذه الفلاتر للبحث عن الفواتير حسب الحالة والعميل والتاريخ.',
             side: 'bottom',
             align: 'start',
           },

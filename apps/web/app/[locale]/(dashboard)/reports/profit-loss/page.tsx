@@ -29,7 +29,7 @@ export default function ProfitLossReportPage() {
         className={cn(
           'flex justify-between py-2 border-b',
           level === 0 && 'font-medium',
-          level > 0 && 'text-sm'
+          level > 0 && 'text-sm',
         )}
         style={{ paddingLeft: `${level * 24}px` }}
       >
@@ -81,17 +81,14 @@ export default function ProfitLossReportPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Profit & Loss Statement</h1>
           <p className="text-muted-foreground">
-            {format(dateRange.startDate, 'MMMM d, yyyy')} - {format(dateRange.endDate, 'MMMM d, yyyy')}
+            {format(dateRange.startDate, 'MMMM d, yyyy')} -{' '}
+            {format(dateRange.endDate, 'MMMM d, yyyy')}
           </p>
         </div>
       </div>
 
       {/* Filters */}
-      <ReportFilters
-        dateRange={dateRange}
-        onDateRangeChange={setDateRange}
-        showDateRange
-      />
+      <ReportFilters dateRange={dateRange} onDateRangeChange={setDateRange} showDateRange />
 
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -114,10 +111,12 @@ export default function ProfitLossReportPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Net Profit</p>
-            <p className={cn(
-              'text-2xl font-bold font-mono',
-              mockReport.netProfit >= 0 ? 'text-green-600' : 'text-red-600'
-            )}>
+            <p
+              className={cn(
+                'text-2xl font-bold font-mono',
+                mockReport.netProfit >= 0 ? 'text-green-600' : 'text-red-600',
+              )}
+            >
               {formatCurrency(mockReport.netProfit)}
             </p>
           </CardContent>
@@ -159,10 +158,12 @@ export default function ProfitLossReportPage() {
         <CardContent className="pt-6">
           <div className="flex justify-between items-center">
             <span className="text-xl font-bold">Net Profit</span>
-            <span className={cn(
-              'text-3xl font-bold font-mono',
-              mockReport.netProfit >= 0 ? 'text-green-600' : 'text-red-600'
-            )}>
+            <span
+              className={cn(
+                'text-3xl font-bold font-mono',
+                mockReport.netProfit >= 0 ? 'text-green-600' : 'text-red-600',
+              )}
+            >
               {formatCurrency(mockReport.netProfit)}
             </span>
           </div>

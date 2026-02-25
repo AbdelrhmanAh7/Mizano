@@ -5,7 +5,12 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { DeepSearchSuggestion } from '@/lib/hooks/use-deep-search';
-import { getCategoryColor, getCategoryLabel, getImpactColor, getEffortColor } from '@/lib/hooks/use-deep-search';
+import {
+  getCategoryColor,
+  getCategoryLabel,
+  getImpactColor,
+  getEffortColor,
+} from '@/lib/hooks/use-deep-search';
 
 interface SuggestionCardProps {
   suggestion: DeepSearchSuggestion;
@@ -14,11 +19,18 @@ interface SuggestionCardProps {
   isUpdating?: boolean;
 }
 
-export function SuggestionCard({ suggestion, onGetPrompt, onDismiss, isUpdating }: SuggestionCardProps) {
+export function SuggestionCard({
+  suggestion,
+  onGetPrompt,
+  onDismiss,
+  isUpdating,
+}: SuggestionCardProps) {
   if (suggestion.status === 'dismissed') return null;
 
   return (
-    <Card className={`transition-all hover:shadow-md ${suggestion.status === 'accepted' ? 'border-green-300 bg-green-50/30' : ''}`}>
+    <Card
+      className={`transition-all hover:shadow-md ${suggestion.status === 'accepted' ? 'border-green-300 bg-green-50/30' : ''}`}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1.5 flex-1">
@@ -44,12 +56,16 @@ export function SuggestionCard({ suggestion, onGetPrompt, onDismiss, isUpdating 
           <div className="flex items-center gap-1">
             <TrendingUp className="h-3.5 w-3.5" />
             <span>Impact: </span>
-            <span className={`font-medium ${getImpactColor(suggestion.impact)}`}>{suggestion.impact}</span>
+            <span className={`font-medium ${getImpactColor(suggestion.impact)}`}>
+              {suggestion.impact}
+            </span>
           </div>
           <div className="flex items-center gap-1">
             <Gauge className="h-3.5 w-3.5" />
             <span>Effort: </span>
-            <span className={`font-medium ${getEffortColor(suggestion.effort)}`}>{suggestion.effort}</span>
+            <span className={`font-medium ${getEffortColor(suggestion.effort)}`}>
+              {suggestion.effort}
+            </span>
           </div>
         </div>
 
@@ -73,10 +89,7 @@ export function SuggestionCard({ suggestion, onGetPrompt, onDismiss, isUpdating 
             <X className="h-4 w-4 mr-1" />
             Dismiss
           </Button>
-          <Button
-            size="sm"
-            onClick={() => onGetPrompt(suggestion)}
-          >
+          <Button size="sm" onClick={() => onGetPrompt(suggestion)}>
             Get Prompt
             <ArrowRight className="h-4 w-4 ml-1" />
           </Button>

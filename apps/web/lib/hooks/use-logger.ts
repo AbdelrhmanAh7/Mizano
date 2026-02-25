@@ -23,10 +23,7 @@ import {
 function createClientFingerprint(message: string, source: string): string {
   const normalized = message
     .replace(/\d+/g, 'N')
-    .replace(
-      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
-      'UUID',
-    )
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, 'UUID')
     .trim();
   // Simple hash
   let hash = 0;
@@ -79,7 +76,8 @@ export function useLogger() {
       const params = new URLSearchParams();
       if (store.filter.levels?.length) params.set('levels', store.filter.levels.join(','));
       if (store.filter.sources?.length) params.set('sources', store.filter.sources.join(','));
-      if (store.filter.categories?.length) params.set('categories', store.filter.categories.join(','));
+      if (store.filter.categories?.length)
+        params.set('categories', store.filter.categories.join(','));
       if (store.filter.statuses?.length) params.set('statuses', store.filter.statuses.join(','));
       if (store.filter.search) params.set('search', store.filter.search);
       if (store.filter.from) params.set('from', store.filter.from);
@@ -143,77 +141,68 @@ export function useLogger() {
   });
 
   // Capture frontend error
-  const captureError = useCallback(
-    (error: Error, context?: Record<string, any>) => {
-      const fp = createClientFingerprint(error.message, LogSource.FRONTEND);
-      if (capturedErrors.current.has(fp)) return;
-      capturedErrors.current.add(fp);
+  const captureError = useCallback((error: Error, context?: Record<string, any>) => {
+    const fp = createClientFingerprint(error.message, LogSource.FRONTEND);
+    if (capturedErrors.current.has(fp)) return;
+    capturedErrors.current.add(fp);
 
-      captureToBackend({
-        level: LogLevel.ERROR,
-        source: LogSource.FRONTEND,
-        message: error.message,
-        stack: error.stack,
-        context: {
-          ...context,
-          currentUrl: typeof window !== 'undefined' ? window.location.href : undefined,
-          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
-        },
-        url: typeof window !== 'undefined' ? window.location.pathname : undefined,
-      }).then((entry) => {
-        if (entry) {
-          store.addLog(entry);
-          refetchStats();
-        }
-      });
-    },
-    [],
-  );
+    captureToBackend({
+      level: LogLevel.ERROR,
+      source: LogSource.FRONTEND,
+      message: error.message,
+      stack: error.stack,
+      context: {
+        ...context,
+        currentUrl: typeof window !== 'undefined' ? window.location.href : undefined,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+      },
+      url: typeof window !== 'undefined' ? window.location.pathname : undefined,
+    }).then((entry) => {
+      if (entry) {
+        store.addLog(entry);
+        refetchStats();
+      }
+    });
+  }, []);
 
   // Capture frontend warning
-  const captureWarning = useCallback(
-    (message: string, context?: Record<string, any>) => {
-      const fp = createClientFingerprint(message, LogSource.FRONTEND);
-      if (capturedErrors.current.has(fp)) return;
-      capturedErrors.current.add(fp);
+  const captureWarning = useCallback((message: string, context?: Record<string, any>) => {
+    const fp = createClientFingerprint(message, LogSource.FRONTEND);
+    if (capturedErrors.current.has(fp)) return;
+    capturedErrors.current.add(fp);
 
-      captureToBackend({
-        level: LogLevel.WARN,
-        source: LogSource.FRONTEND,
-        message,
-        context: {
-          ...context,
-          currentUrl: typeof window !== 'undefined' ? window.location.href : undefined,
-        },
-        url: typeof window !== 'undefined' ? window.location.pathname : undefined,
-      }).then((entry) => {
-        if (entry) {
-          store.addLog(entry);
-          refetchStats();
-        }
-      });
-    },
-    [],
-  );
+    captureToBackend({
+      level: LogLevel.WARN,
+      source: LogSource.FRONTEND,
+      message,
+      context: {
+        ...context,
+        currentUrl: typeof window !== 'undefined' ? window.location.href : undefined,
+      },
+      url: typeof window !== 'undefined' ? window.location.pathname : undefined,
+    }).then((entry) => {
+      if (entry) {
+        store.addLog(entry);
+        refetchStats();
+      }
+    });
+  }, []);
 
   // Capture AI model error
-  const captureAiError = useCallback(
-    (error: Error, modelContext?: Record<string, any>) => {
-      captureToBackend({
-        level: LogLevel.ERROR,
-        source: LogSource.AI_MODEL,
-        message: error.message,
-        stack: error.stack,
-        context: modelContext,
-      }).then((entry) => {
-        if (entry) {
-          store.addLog(entry);
-          refetchStats();
-        }
-      });
-    },
-    [],
-  );
+  const captureAiError = useCallback((error: Error, modelContext?: Record<string, any>) => {
+    captureToBackend({
+      level: LogLevel.ERROR,
+      source: LogSource.AI_MODEL,
+      message: error.message,
+      stack: error.stack,
+      context: modelContext,
+    }).then((entry) => {
+      if (entry) {
+        store.addLog(entry);
+        refetchStats();
+      }
+    });
+  }, []);
 
   // Mark as fixed and test-covered
   const markAsFixed = useCallback(
@@ -243,10 +232,7 @@ export function useLogger() {
   // Clear fixed/test-covered logs
   const clearResolved = useCallback(() => {
     const resolvedIds = store.logs
-      .filter(
-        (l) =>
-          l.status === LogStatus.FIXED || l.status === LogStatus.TEST_COVERED,
-      )
+      .filter((l) => l.status === LogStatus.FIXED || l.status === LogStatus.TEST_COVERED)
       .map((l) => l.id);
     if (resolvedIds.length > 0) {
       clearLogsMutation.mutate({ ids: resolvedIds });

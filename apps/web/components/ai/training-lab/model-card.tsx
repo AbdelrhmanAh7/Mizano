@@ -28,23 +28,57 @@ interface ModelCardProps {
 
 const COLOR_MAP: Record<string, { bar: string; bg: string }> = {
   blue: { bar: 'bg-blue-500', bg: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300' },
-  orange: { bar: 'bg-orange-500', bg: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300' },
+  orange: {
+    bar: 'bg-orange-500',
+    bg: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300',
+  },
   red: { bar: 'bg-red-500', bg: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' },
-  green: { bar: 'bg-green-500', bg: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300' },
-  yellow: { bar: 'bg-yellow-500', bg: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300' },
-  purple: { bar: 'bg-purple-500', bg: 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300' },
+  green: {
+    bar: 'bg-green-500',
+    bg: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300',
+  },
+  yellow: {
+    bar: 'bg-yellow-500',
+    bg: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300',
+  },
+  purple: {
+    bar: 'bg-purple-500',
+    bg: 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300',
+  },
   pink: { bar: 'bg-pink-500', bg: 'bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300' },
   teal: { bar: 'bg-teal-500', bg: 'bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300' },
-  amber: { bar: 'bg-amber-500', bg: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' },
-  emerald: { bar: 'bg-emerald-500', bg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' },
-  violet: { bar: 'bg-violet-500', bg: 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300' },
-  slate: { bar: 'bg-slate-500', bg: 'bg-slate-100 text-slate-700 dark:bg-slate-950 dark:text-slate-300' },
+  amber: {
+    bar: 'bg-amber-500',
+    bg: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+  },
+  emerald: {
+    bar: 'bg-emerald-500',
+    bg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
+  },
+  violet: {
+    bar: 'bg-violet-500',
+    bg: 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300',
+  },
+  slate: {
+    bar: 'bg-slate-500',
+    bg: 'bg-slate-100 text-slate-700 dark:bg-slate-950 dark:text-slate-300',
+  },
   cyan: { bar: 'bg-cyan-500', bg: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300' },
 };
 
-export function ModelCard({ config, dashboardData, onGenerateClick, onDetailClick }: ModelCardProps) {
+export function ModelCard({
+  config,
+  dashboardData,
+  onGenerateClick,
+  onDetailClick,
+}: ModelCardProps) {
   const trainModel = useTrainModel();
-  const [trainResult, setTrainResult] = useState<{ success: boolean; data?: any; error?: string; duration?: number } | null>(null);
+  const [trainResult, setTrainResult] = useState<{
+    success: boolean;
+    data?: any;
+    error?: string;
+    duration?: number;
+  } | null>(null);
 
   const colors = COLOR_MAP[config.color] || COLOR_MAP.blue;
   const hasModel = dashboardData?.hasActiveModel;
@@ -111,7 +145,10 @@ export function ModelCard({ config, dashboardData, onGenerateClick, onDetailClic
             {trainingCount} samples
           </span>
           {dashboardData?.lastTrainedAt && (
-            <span className="flex items-center gap-1" title={new Date(dashboardData.lastTrainedAt).toLocaleString()}>
+            <span
+              className="flex items-center gap-1"
+              title={new Date(dashboardData.lastTrainedAt).toLocaleString()}
+            >
               <RefreshCw className="h-3 w-3" />
               {formatTimeAgo(dashboardData.lastTrainedAt)}
             </span>
@@ -154,19 +191,16 @@ export function ModelCard({ config, dashboardData, onGenerateClick, onDetailClic
             Generate
           </Button>
 
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-xs h-8 px-2"
-            onClick={onDetailClick}
-          >
+          <Button size="sm" variant="ghost" className="text-xs h-8 px-2" onClick={onDetailClick}>
             <Info className="h-3 w-3" />
           </Button>
         </div>
 
         {/* Train result */}
         {trainResult && (
-          <div className={`p-2 rounded text-xs ${trainResult.success ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300'}`}>
+          <div
+            className={`p-2 rounded text-xs ${trainResult.success ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300'}`}
+          >
             {trainResult.success ? (
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="h-3 w-3" />

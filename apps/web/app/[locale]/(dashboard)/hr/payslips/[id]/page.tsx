@@ -25,15 +25,21 @@ import {
 } from '@/lib/hooks/use-hr';
 
 const months = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
-export default function PayslipDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function PayslipDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: payslip, isLoading } = usePayslip(id);
 
@@ -88,10 +94,7 @@ export default function PayslipDetailPage({
               <h1 className="text-3xl font-bold tracking-tight">
                 Payslip - {months[payslip.month - 1]} {payslip.year}
               </h1>
-              <Badge
-                variant="outline"
-                className={getPayrollStatusColor(payslip.status)}
-              >
+              <Badge variant="outline" className={getPayrollStatusColor(payslip.status)}>
                 {getPayrollStatusLabel(payslip.status)}
               </Badge>
             </div>
@@ -127,9 +130,7 @@ export default function PayslipDetailPage({
               </div>
               <div>
                 <h2 className="text-xl font-bold">Your Company Name</h2>
-                <p className="text-sm text-muted-foreground">
-                  123 Business Street, City, Country
-                </p>
+                <p className="text-sm text-muted-foreground">123 Business Street, City, Country</p>
               </div>
             </div>
             <div className="text-right">
@@ -145,28 +146,18 @@ export default function PayslipDetailPage({
           {/* Employee Details */}
           <div className="grid grid-cols-2 gap-8 mb-8">
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                Employee Details
-              </h4>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2">Employee Details</h4>
               <div className="space-y-1">
                 <p className="font-medium">
                   {employee.firstName} {employee.lastName}
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  ID: {employee.employeeNumber}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {employee.jobTitle}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {employee.department}
-                </p>
+                <p className="text-sm text-muted-foreground">ID: {employee.employeeNumber}</p>
+                <p className="text-sm text-muted-foreground">{employee.jobTitle}</p>
+                <p className="text-sm text-muted-foreground">{employee.department}</p>
               </div>
             </div>
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                Payment Details
-              </h4>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2">Payment Details</h4>
               <div className="space-y-1">
                 <p className="text-sm">
                   <span className="text-muted-foreground">Bank: </span>
@@ -190,9 +181,7 @@ export default function PayslipDetailPage({
           <div className="grid grid-cols-2 gap-8">
             {/* Earnings */}
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-4">
-                EARNINGS
-              </h4>
+              <h4 className="text-sm font-medium text-muted-foreground mb-4">EARNINGS</h4>
               <Table>
                 <TableBody>
                   <TableRow>
@@ -221,9 +210,7 @@ export default function PayslipDetailPage({
 
             {/* Deductions */}
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-4">
-                DEDUCTIONS
-              </h4>
+              <h4 className="text-sm font-medium text-muted-foreground mb-4">DEDUCTIONS</h4>
               <Table>
                 <TableBody>
                   {payslip.lopDays > 0 && (
@@ -251,8 +238,9 @@ export default function PayslipDetailPage({
                   <TableRow className="font-bold">
                     <TableCell>Total Deductions</TableCell>
                     <TableCell className="text-right font-mono text-red-600">
-                      -{formatCurrency(
-                        totalDeductions + (payslip.taxAmount || 0) + (payslip.lopAmount || 0)
+                      -
+                      {formatCurrency(
+                        totalDeductions + (payslip.taxAmount || 0) + (payslip.lopAmount || 0),
                       )}
                     </TableCell>
                   </TableRow>
@@ -266,24 +254,16 @@ export default function PayslipDetailPage({
           {/* Net Pay */}
           <div className="flex justify-between items-center p-6 bg-primary/5 rounded-lg">
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground">
-                NET PAY
-              </h4>
-              <p className="text-sm text-muted-foreground">
-                Amount payable after all deductions
-              </p>
+              <h4 className="text-sm font-medium text-muted-foreground">NET PAY</h4>
+              <p className="text-sm text-muted-foreground">Amount payable after all deductions</p>
             </div>
-            <p className="text-4xl font-bold font-mono">
-              {formatCurrency(payslip.netPay || 0)}
-            </p>
+            <p className="text-4xl font-bold font-mono">{formatCurrency(payslip.netPay || 0)}</p>
           </div>
 
           {/* Footer */}
           <div className="mt-8 pt-6 border-t text-center text-sm text-muted-foreground">
             <p>This is a computer-generated payslip. No signature required.</p>
-            <p className="mt-1">
-              Generated on {format(new Date(), 'MMMM d, yyyy')}
-            </p>
+            <p className="mt-1">Generated on {format(new Date(), 'MMMM d, yyyy')}</p>
           </div>
         </CardContent>
       </Card>

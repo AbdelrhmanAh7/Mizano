@@ -148,9 +148,7 @@ export class PaymentPredictionService {
     }
 
     // Sort by predicted date
-    predictions.sort(
-      (a, b) => a.predictedDate.getTime() - b.predictedDate.getTime(),
-    );
+    predictions.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
 
     return predictions;
   }
@@ -273,31 +271,23 @@ export class PaymentPredictionService {
       const profile = profileByCustomer.get(invoice.customerId) || null;
 
       const dueDate = new Date(invoice.dueDate);
-      const daysOverdue = Math.floor(
-        (today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
+      const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
 
       const history = historyByCustomer.get(invoice.customerId) || [];
       const prediction = this.calculatePrediction(invoice, history);
 
       // Calculate risk factor based on customer reliability
-      const riskFactor = profile
-        ? 1 + (1 - profile.onTimeRate / 100)
-        : 1.5;
+      const riskFactor = profile ? 1 + (1 - profile.onTimeRate / 100) : 1.5;
 
       // Priority score: higher is more urgent
       // Formula: (amount × daysOverdue × riskFactor) / confidence
       const amount = Number(invoice.grandTotal);
       const confidenceMultiplier =
-        prediction?.confidence === 'high'
-          ? 0.5
-          : prediction?.confidence === 'medium'
-          ? 0.75
-          : 1;
+        prediction?.confidence === 'high' ? 0.5 : prediction?.confidence === 'medium' ? 0.75 : 1;
 
       const priorityScore =
         daysOverdue > 0
-          ? (amount * daysOverdue * riskFactor) * confidenceMultiplier
+          ? amount * daysOverdue * riskFactor * confidenceMultiplier
           : amount * riskFactor * 0.1;
 
       // Determine risk level
@@ -357,9 +347,7 @@ export class PaymentPredictionService {
     // Recalculate predictions for outstanding invoices
     const predictions = await this.predictAllOutstanding(organizationId);
 
-    this.logger.log(
-      `Updated ${predictions.length} payment predictions for org ${organizationId}`,
-    );
+    this.logger.log(`Updated ${predictions.length} payment predictions for org ${organizationId}`);
 
     return { updated: predictions.length };
   }
@@ -456,9 +444,7 @@ export class PaymentPredictionService {
 
       if (payments.length === 0) continue;
 
-      const lastPaymentDate = new Date(
-        Math.max(...payments.map((d) => d.getTime())),
-      );
+      const lastPaymentDate = new Date(Math.max(...payments.map((d) => d.getTime())));
 
       const invoiceDate = new Date(invoice.date);
       const dueDate = new Date(invoice.dueDate);
@@ -540,11 +526,7 @@ export class PaymentPredictionService {
 
       // Month-end factor
       const dueDay = dueDate.getDate();
-      const lastDayOfMonth = new Date(
-        dueDate.getFullYear(),
-        dueDate.getMonth() + 1,
-        0,
-      ).getDate();
+      const lastDayOfMonth = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 0).getDate();
       if (dueDay > lastDayOfMonth - 5) {
         factors.monthEnd = 1.05;
         predictedDays *= factors.monthEnd;

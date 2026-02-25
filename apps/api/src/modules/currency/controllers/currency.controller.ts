@@ -67,10 +67,7 @@ export class CurrencyController {
   @Permissions('settings.manage')
   @ApiOperation({ summary: 'Create or update exchange rate' })
   @ApiResponse({ status: 201, type: ExchangeRateResponse })
-  createExchangeRate(
-    @CurrentOrg() orgId: string,
-    @Body() dto: CreateExchangeRateDto,
-  ) {
+  createExchangeRate(@CurrentOrg() orgId: string, @Body() dto: CreateExchangeRateDto) {
     return this.currencyService.createExchangeRate(orgId, dto);
   }
 
@@ -78,10 +75,7 @@ export class CurrencyController {
   @Permissions('settings.view')
   @ApiOperation({ summary: 'Get exchange rates' })
   @ApiResponse({ status: 200, type: ExchangeRateListResponse })
-  getExchangeRates(
-    @CurrentOrg() orgId: string,
-    @Query() query: ExchangeRateQueryDto,
-  ) {
+  getExchangeRates(@CurrentOrg() orgId: string, @Query() query: ExchangeRateQueryDto) {
     return this.currencyService.getExchangeRates(orgId, query);
   }
 
@@ -89,10 +83,7 @@ export class CurrencyController {
   @Permissions('settings.view')
   @ApiOperation({ summary: 'Get latest exchange rates from base currency' })
   @ApiQuery({ name: 'baseCurrency', required: false })
-  getLatestRates(
-    @CurrentOrg() orgId: string,
-    @Query('baseCurrency') baseCurrency?: string,
-  ) {
+  getLatestRates(@CurrentOrg() orgId: string, @Query('baseCurrency') baseCurrency?: string) {
     return this.currencyService.getLatestRates(orgId, baseCurrency);
   }
 
@@ -114,10 +105,7 @@ export class CurrencyController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete exchange rate' })
   @ApiParam({ name: 'id', description: 'Exchange rate ID' })
-  deleteExchangeRate(
-    @CurrentOrg() orgId: string,
-    @Param('id') id: string,
-  ) {
+  deleteExchangeRate(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.currencyService.deleteExchangeRate(orgId, id);
   }
 
@@ -135,12 +123,7 @@ export class CurrencyController {
     @Param('to') to: string,
     @Query('date') date?: string,
   ) {
-    return this.currencyService.getRate(
-      orgId,
-      from,
-      to,
-      date ? new Date(date) : undefined,
-    );
+    return this.currencyService.getRate(orgId, from, to, date ? new Date(date) : undefined);
   }
 
   // ============ Conversion ============
@@ -172,10 +155,7 @@ export class CurrencyController {
   @Permissions('accounting.view')
   @ApiOperation({ summary: 'Calculate unrealized forex gain/loss for all open positions' })
   @ApiQuery({ name: 'date', required: false, description: 'As of date (YYYY-MM-DD)' })
-  getUnrealizedGainLoss(
-    @CurrentOrg() orgId: string,
-    @Query('date') date?: string,
-  ) {
+  getUnrealizedGainLoss(@CurrentOrg() orgId: string, @Query('date') date?: string) {
     return this.currencyService.calculateUnrealizedGainLoss(
       orgId,
       date ? new Date(date) : undefined,

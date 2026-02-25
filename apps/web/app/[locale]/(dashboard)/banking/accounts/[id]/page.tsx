@@ -91,13 +91,13 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
     );
   }
 
-  const currentBalance = typeof account.currentBalance === 'string'
-    ? parseFloat(account.currentBalance)
-    : account.currentBalance;
+  const currentBalance =
+    typeof account.currentBalance === 'string'
+      ? parseFloat(account.currentBalance)
+      : account.currentBalance;
 
-  const bankBalance = typeof account.bankBalance === 'string'
-    ? parseFloat(account.bankBalance)
-    : account.bankBalance;
+  const bankBalance =
+    typeof account.bankBalance === 'string' ? parseFloat(account.bankBalance) : account.bankBalance;
 
   const difference = (bankBalance || 0) - (currentBalance || 0);
 
@@ -118,12 +118,12 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                 {getAccountTypeLabel(account.accountType)}
               </Badge>
               {!account.isActive && (
-                <Badge variant="outline" className="text-gray-500">Inactive</Badge>
+                <Badge variant="outline" className="text-gray-500">
+                  Inactive
+                </Badge>
               )}
             </div>
-            {account.bankName && (
-              <p className="text-muted-foreground">{account.bankName}</p>
-            )}
+            {account.bankName && <p className="text-muted-foreground">{account.bankName}</p>}
           </div>
         </div>
 
@@ -151,16 +151,13 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete Bank Account</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to delete this bank account? This action cannot
-                  be undone. All associated transactions will also be deleted.
+                  Are you sure you want to delete this bank account? This action cannot be undone.
+                  All associated transactions will also be deleted.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  className="bg-red-600 hover:bg-red-700"
-                >
+                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
                   Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -179,10 +176,12 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Current Balance</p>
-                <p className={cn(
-                  'text-2xl font-bold font-mono',
-                  currentBalance < 0 ? 'text-red-600' : 'text-green-600'
-                )}>
+                <p
+                  className={cn(
+                    'text-2xl font-bold font-mono',
+                    currentBalance < 0 ? 'text-red-600' : 'text-green-600',
+                  )}
+                >
                   {formatCurrency(currentBalance)}
                 </p>
               </div>
@@ -193,19 +192,19 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Bank Balance</p>
-            <p className="text-2xl font-bold font-mono">
-              {formatCurrency(bankBalance || 0)}
-            </p>
+            <p className="text-2xl font-bold font-mono">{formatCurrency(bankBalance || 0)}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Difference</p>
-            <p className={cn(
-              'text-2xl font-bold font-mono',
-              Math.abs(difference) > 0.01 ? 'text-yellow-600' : 'text-green-600'
-            )}>
+            <p
+              className={cn(
+                'text-2xl font-bold font-mono',
+                Math.abs(difference) > 0.01 ? 'text-yellow-600' : 'text-green-600',
+              )}
+            >
               {formatCurrency(difference)}
             </p>
           </CardContent>
@@ -294,15 +293,11 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
               <TableBody>
                 {transactions.slice(0, 10).map((tx: any) => (
                   <TableRow key={tx.id}>
-                    <TableCell>
-                      {format(new Date(tx.date), 'MMM d, yyyy')}
-                    </TableCell>
+                    <TableCell>{format(new Date(tx.date), 'MMM d, yyyy')}</TableCell>
                     <TableCell>
                       <div>
                         <p className="font-medium">{tx.description}</p>
-                        {tx.payee && (
-                          <p className="text-sm text-muted-foreground">{tx.payee}</p>
-                        )}
+                        {tx.payee && <p className="text-sm text-muted-foreground">{tx.payee}</p>}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -317,10 +312,12 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                         ) : (
                           <ArrowUpRight className="h-4 w-4 text-red-600" />
                         )}
-                        <span className={cn(
-                          'font-mono font-medium',
-                          tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600'
-                        )}>
+                        <span
+                          className={cn(
+                            'font-mono font-medium',
+                            tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600',
+                          )}
+                        >
                           {tx.type === 'DEPOSIT' ? '+' : '-'}
                           {formatCurrency(Math.abs(parseFloat(tx.amount)))}
                         </span>

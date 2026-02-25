@@ -51,10 +51,7 @@ export class AiRetrainingScheduler {
     this.logger.log(
       `Received retraining event for ${payload.feature} in org ${payload.organizationId}`,
     );
-    await this.triggerModelRetrainingWithRetry(
-      payload.organizationId,
-      payload.feature,
-    );
+    await this.triggerModelRetrainingWithRetry(payload.organizationId, payload.feature);
   }
 
   /**
@@ -80,20 +77,14 @@ export class AiRetrainingScheduler {
           totalAnomalies += result.newAnomaliesCreated;
 
           if (result.newAnomaliesCreated > 0) {
-            this.logger.log(
-              `Org ${org.name}: Found ${result.newAnomaliesCreated} anomalies`,
-            );
+            this.logger.log(`Org ${org.name}: Found ${result.newAnomaliesCreated} anomalies`);
           }
         } catch (error) {
-          this.logger.error(
-            `Error scanning anomalies for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error scanning anomalies for org ${org.id}: ${error.message}`);
         }
       }
 
-      this.logger.log(
-        `Daily anomaly scan completed. Total anomalies found: ${totalAnomalies}`,
-      );
+      this.logger.log(`Daily anomaly scan completed. Total anomalies found: ${totalAnomalies}`);
     } catch (error) {
       this.logger.error(`Daily anomaly scan failed: ${error.message}`);
     }
@@ -115,16 +106,10 @@ export class AiRetrainingScheduler {
 
       for (const org of organizations) {
         try {
-          const result = await this.reorderService.updateItemReorderPoints(
-            org.id,
-          );
-          this.logger.log(
-            `Org ${org.name}: Updated ${result.updated} item reorder points`,
-          );
+          const result = await this.reorderService.updateItemReorderPoints(org.id);
+          this.logger.log(`Org ${org.name}: Updated ${result.updated} item reorder points`);
         } catch (error) {
-          this.logger.error(
-            `Error updating reorder points for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error updating reorder points for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -170,11 +155,10 @@ export class AiRetrainingScheduler {
       for (const org of organizations) {
         for (const feature of features) {
           try {
-            const needsRetraining =
-              await this.feedbackService.checkRetrainingThreshold(
-                org.id,
-                feature,
-              );
+            const needsRetraining = await this.feedbackService.checkRetrainingThreshold(
+              org.id,
+              feature,
+            );
 
             if (needsRetraining.shouldRetrain) {
               this.logger.log(
@@ -238,9 +222,7 @@ export class AiRetrainingScheduler {
             await this.triggerModelRetraining(org.id, 'LEAD_SCORING');
           }
         } catch (error) {
-          this.logger.error(
-            `Error processing lead scoring for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error processing lead scoring for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -266,23 +248,17 @@ export class AiRetrainingScheduler {
 
       for (const org of organizations) {
         try {
-          const result = await this.demandForecastingService.forecastAllItems(
-            org.id,
-          );
+          const result = await this.demandForecastingService.forecastAllItems(org.id);
 
           this.logger.log(
             `Org ${org.name}: Processed ${result.processed} items, skipped ${result.skipped} (insufficient data)`,
           );
 
           if (result.errors.length > 0) {
-            this.logger.warn(
-              `Org ${org.name}: ${result.errors.length} errors during forecasting`,
-            );
+            this.logger.warn(`Org ${org.name}: ${result.errors.length} errors during forecasting`);
           }
         } catch (error) {
-          this.logger.error(
-            `Error updating demand forecasts for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error updating demand forecasts for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -308,25 +284,17 @@ export class AiRetrainingScheduler {
 
       for (const org of organizations) {
         try {
-          const result = await this.cashFlowPredictionService.dailyRecalculate(
-            org.id,
-          );
+          const result = await this.cashFlowPredictionService.dailyRecalculate(org.id);
 
-          this.logger.log(
-            `Org ${org.name}: Updated ${result.updated} days of cash flow forecasts`,
-          );
+          this.logger.log(`Org ${org.name}: Updated ${result.updated} days of cash flow forecasts`);
         } catch (error) {
-          this.logger.error(
-            `Error updating cash flow for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error updating cash flow for org ${org.id}: ${error.message}`);
         }
       }
 
       this.logger.log('Daily cash flow prediction update completed');
     } catch (error) {
-      this.logger.error(
-        `Daily cash flow prediction update failed: ${error.message}`,
-      );
+      this.logger.error(`Daily cash flow prediction update failed: ${error.message}`);
     }
   }
 
@@ -352,17 +320,13 @@ export class AiRetrainingScheduler {
             `Org ${org.name}: Updated ${result.updated} lead scores, ${result.decayed} leads had decay applied`,
           );
         } catch (error) {
-          this.logger.error(
-            `Error updating lead scores for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error updating lead scores for org ${org.id}: ${error.message}`);
         }
       }
 
       this.logger.log('Weekly lead scoring update completed');
     } catch (error) {
-      this.logger.error(
-        `Weekly lead scoring update failed: ${error.message}`,
-      );
+      this.logger.error(`Weekly lead scoring update failed: ${error.message}`);
     }
   }
 
@@ -382,12 +346,8 @@ export class AiRetrainingScheduler {
 
       for (const org of organizations) {
         try {
-          const result = await this.paymentPredictionService.updatePredictions(
-            org.id,
-          );
-          this.logger.log(
-            `Org ${org.name}: Updated ${result.updated} payment predictions`,
-          );
+          const result = await this.paymentPredictionService.updatePredictions(org.id);
+          this.logger.log(`Org ${org.name}: Updated ${result.updated} payment predictions`);
         } catch (error) {
           this.logger.error(
             `Error updating payment predictions for org ${org.id}: ${error.message}`,
@@ -397,9 +357,7 @@ export class AiRetrainingScheduler {
 
       this.logger.log('Weekly payment prediction update completed');
     } catch (error) {
-      this.logger.error(
-        `Weekly payment prediction update failed: ${error.message}`,
-      );
+      this.logger.error(`Weekly payment prediction update failed: ${error.message}`);
     }
   }
 
@@ -439,26 +397,25 @@ export class AiRetrainingScheduler {
               severity: 'info',
               priority: 'MEDIUM',
               title: `Monthly Summary - ${prevMonth.toLocaleString('default', { month: 'long' })} ${year}`,
-              description: narrative.summary || narrative.sections.map((s) => s.content).join(' ').slice(0, 500),
+              description:
+                narrative.summary ||
+                narrative.sections
+                  .map((s) => s.content)
+                  .join(' ')
+                  .slice(0, 500),
               data: narrative as any,
             },
           });
 
-          this.logger.log(
-            `Org ${org.name}: Monthly narrative generated for ${month}/${year}`,
-          );
+          this.logger.log(`Org ${org.name}: Monthly narrative generated for ${month}/${year}`);
         } catch (error) {
-          this.logger.error(
-            `Error generating narrative for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error generating narrative for org ${org.id}: ${error.message}`);
         }
       }
 
       this.logger.log('Monthly narrative generation completed');
     } catch (error) {
-      this.logger.error(
-        `Monthly narrative generation failed: ${error.message}`,
-      );
+      this.logger.error(`Monthly narrative generation failed: ${error.message}`);
     }
   }
 
@@ -484,9 +441,7 @@ export class AiRetrainingScheduler {
             `Org ${org.name}: Detected ${result.patternsDetected} patterns, created ${result.suggestionsCreated} suggestions, found ${result.duplicatesFound} potential duplicates`,
           );
         } catch (error) {
-          this.logger.error(
-            `Error analyzing patterns for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error analyzing patterns for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -520,9 +475,7 @@ export class AiRetrainingScheduler {
             );
           }
         } catch (error) {
-          this.logger.error(
-            `Error aggregating alerts for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error aggregating alerts for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -553,9 +506,7 @@ export class AiRetrainingScheduler {
           const cleaned = await this.aiAlertsService.cleanupExpiredAlerts(org.id);
           totalCleaned += cleaned;
         } catch (error) {
-          this.logger.error(
-            `Error cleaning up alerts for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error cleaning up alerts for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -613,9 +564,7 @@ export class AiRetrainingScheduler {
         },
       });
 
-      this.logger.log(
-        `Deleted ${deletedPredictions.count} old predictions`,
-      );
+      this.logger.log(`Deleted ${deletedPredictions.count} old predictions`);
 
       // Delete retired models older than 6 months (keep last 3 versions per feature)
       const retiredModels = await this.prisma.aiModel.deleteMany({
@@ -639,9 +588,7 @@ export class AiRetrainingScheduler {
         },
       });
 
-      this.logger.log(
-        `Deleted ${resolvedAnomalies.count} old resolved anomalies`,
-      );
+      this.logger.log(`Deleted ${resolvedAnomalies.count} old resolved anomalies`);
 
       this.logger.log('Weekly AI data cleanup completed');
     } catch (error) {
@@ -665,17 +612,14 @@ export class AiRetrainingScheduler {
 
       for (const org of organizations) {
         try {
-          const result =
-            await this.reorderService.recalculateWithAbcServiceLevels(org.id);
+          const result = await this.reorderService.recalculateWithAbcServiceLevels(org.id);
 
           this.logger.log(
             `Org ${org.name}: ABC analysis updated ${result.updated} items ` +
               `(A:${result.byCategory.A}, B:${result.byCategory.B}, C:${result.byCategory.C})`,
           );
         } catch (error) {
-          this.logger.error(
-            `Error running ABC analysis for org ${org.id}: ${error.message}`,
-          );
+          this.logger.error(`Error running ABC analysis for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -709,10 +653,7 @@ export class AiRetrainingScheduler {
       for (const org of organizations) {
         for (const feature of trainableFeatures) {
           try {
-            const trend = await this.modelRegistryService.getAccuracyTrend(
-              org.id,
-              feature,
-            );
+            const trend = await this.modelRegistryService.getAccuracyTrend(org.id, feature);
 
             if (trend.degradationDetected) {
               this.logger.warn(
@@ -730,9 +671,7 @@ export class AiRetrainingScheduler {
 
       this.logger.log('Weekly accuracy validation completed');
     } catch (error) {
-      this.logger.error(
-        `Weekly accuracy validation failed: ${error.message}`,
-      );
+      this.logger.error(`Weekly accuracy validation failed: ${error.message}`);
     }
   }
 
@@ -745,10 +684,7 @@ export class AiRetrainingScheduler {
     maxRetries: number = 3,
   ): Promise<void> {
     // Validate training data readiness before attempting
-    const readiness = await this.trainingService.validateTrainingReadiness(
-      organizationId,
-      feature,
-    );
+    const readiness = await this.trainingService.validateTrainingReadiness(organizationId, feature);
 
     if (!readiness.isReady) {
       this.logger.warn(
@@ -789,9 +725,7 @@ export class AiRetrainingScheduler {
               },
             });
           } catch (alertError) {
-            this.logger.error(
-              `Failed to create training failure alert: ${alertError.message}`,
-            );
+            this.logger.error(`Failed to create training failure alert: ${alertError.message}`);
           }
           return;
         }
@@ -806,13 +740,8 @@ export class AiRetrainingScheduler {
   /**
    * Trigger model retraining for a specific feature
    */
-  private async triggerModelRetraining(
-    organizationId: string,
-    feature: AiFeature,
-  ): Promise<void> {
-    this.logger.log(
-      `Model retraining triggered for org ${organizationId}, feature ${feature}`,
-    );
+  private async triggerModelRetraining(organizationId: string, feature: AiFeature): Promise<void> {
+    this.logger.log(`Model retraining triggered for org ${organizationId}, feature ${feature}`);
 
     switch (feature) {
       case 'CATEGORIZATION':
@@ -849,20 +778,14 @@ export class AiRetrainingScheduler {
 
       case 'RECONCILIATION':
         // Reconciliation learns from confirmed matches — no batch retrain
-        this.logger.log(
-          `Reconciliation patterns updated incrementally for org ${organizationId}`,
-        );
+        this.logger.log(`Reconciliation patterns updated incrementally for org ${organizationId}`);
         break;
 
       default:
-        this.logger.log(
-          `No specific retraining handler for ${feature} in org ${organizationId}`,
-        );
+        this.logger.log(`No specific retraining handler for ${feature} in org ${organizationId}`);
         break;
     }
 
-    this.logger.log(
-      `Model retraining completed for org ${organizationId}, feature ${feature}`,
-    );
+    this.logger.log(`Model retraining completed for org ${organizationId}, feature ${feature}`);
   }
 }

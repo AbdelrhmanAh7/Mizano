@@ -4,20 +4,34 @@
   "private": true,
   "description": "AI-powered ERP system - Autonomous Accounting Platform",
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "docker-compose up -d && turbo dev",
+    "dev:api": "pnpm --filter api dev",
+    "dev:web": "pnpm --filter @mizano/web dev",
+    "dev:vlm": "docker-compose --profile vlm up -d",
     "build": "turbo build",
     "lint": "turbo lint",
+    "lint:fix": "pnpm --filter api lint && pnpm --filter @mizano/web lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "type-check": "turbo type-check",
+    "test": "turbo test",
+    "test:api": "pnpm --filter api test",
+    "test:web": "pnpm --filter @mizano/web test",
+    "test:cov": "pnpm --filter api test:cov",
+    "test:e2e": "pnpm --filter api test:e2e",
     "db:generate": "pnpm --filter api exec prisma generate",
     "db:push": "pnpm --filter api exec prisma db push",
     "db:migrate": "pnpm --filter api exec prisma migrate dev",
     "db:seed": "pnpm --filter api exec prisma db seed",
     "db:studio": "pnpm --filter api exec prisma studio",
+    "docker:up": "docker-compose up -d",
+    "docker:up:vlm": "docker-compose --profile vlm up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:prod": "docker-compose -f docker-compose.production.yml up -d --build",
+    "docker:prod:down": "docker-compose -f docker-compose.production.yml down",
     "clean": "turbo clean && rm -rf node_modules",
-    "prepare": "husky",
-    "lint:fix": "turbo lint",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "type-check": "turbo type-check"
+    "prepare": "husky"
   },
   "lint-staged": {
     "apps/api/**/*.ts": [
@@ -53,5 +67,10 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "pnpm": {
+    "neverBuiltDependencies": [
+      "gl"
+    ]
+  }
 }

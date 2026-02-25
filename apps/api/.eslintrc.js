@@ -13,6 +13,19 @@ module.exports = {
     jest: true,
   },
   ignorePatterns: ['.eslintrc.js', 'dist/', 'node_modules/'],
+  overrides: [
+    {
+      files: ['test/**/*.ts'],
+      parserOptions: {
+        project: null,
+      },
+      rules: {
+        '@typescript-eslint/no-floating-promises': 'off',
+        '@typescript-eslint/no-misused-promises': 'off',
+        '@typescript-eslint/return-await': 'off',
+      },
+    },
+  ],
   rules: {
     // TypeScript strict rules
     '@typescript-eslint/no-explicit-any': 'warn',

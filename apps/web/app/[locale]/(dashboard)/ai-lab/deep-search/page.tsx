@@ -69,9 +69,10 @@ export default function DeepSearchPage() {
 
   const isRunning = activeJob && !['COMPLETED', 'FAILED'].includes(activeJob.status);
   const suggestions = activeJob?.suggestions || [];
-  const filteredSuggestions = categoryFilter === 'ALL'
-    ? suggestions
-    : suggestions.filter((s) => s.category === categoryFilter);
+  const filteredSuggestions =
+    categoryFilter === 'ALL'
+      ? suggestions
+      : suggestions.filter((s) => s.category === categoryFilter);
 
   // Stats for the current job
   const featureGapCount = suggestions.filter((s) => s.category === 'FEATURE_GAP').length;
@@ -196,7 +197,13 @@ export default function DeepSearchPage() {
                 size="sm"
                 onClick={() => setCategoryFilter(cat)}
               >
-                {cat === 'ALL' ? 'All' : cat === 'FEATURE_GAP' ? 'Feature Gaps' : cat === 'PERFORMANCE_UX' ? 'Performance & UX' : 'AI Capabilities'}
+                {cat === 'ALL'
+                  ? 'All'
+                  : cat === 'FEATURE_GAP'
+                    ? 'Feature Gaps'
+                    : cat === 'PERFORMANCE_UX'
+                      ? 'Performance & UX'
+                      : 'AI Capabilities'}
               </Button>
             ))}
           </div>
@@ -232,7 +239,9 @@ export default function DeepSearchPage() {
               <XCircle className="h-5 w-5" />
               <div>
                 <p className="font-medium">Search Failed</p>
-                <p className="text-sm text-muted-foreground">{activeJob.error || 'An unexpected error occurred.'}</p>
+                <p className="text-sm text-muted-foreground">
+                  {activeJob.error || 'An unexpected error occurred.'}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -246,8 +255,8 @@ export default function DeepSearchPage() {
             <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">No searches yet</h3>
             <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-              Click &ldquo;Run DeepSearch&rdquo; to analyze the ERP market and your codebase for enhancement opportunities.
-              Each suggestion includes a ready-to-use Claude Code prompt.
+              Click &ldquo;Run DeepSearch&rdquo; to analyze the ERP market and your codebase for
+              enhancement opportunities. Each suggestion includes a ready-to-use Claude Code prompt.
             </p>
           </CardContent>
         </Card>
@@ -291,7 +300,15 @@ export default function DeepSearchPage() {
                       </div>
                       <div className="flex items-center gap-3 text-sm text-muted-foreground">
                         <span>{job.suggestionsCount} suggestions</span>
-                        <Badge variant={job.status === 'COMPLETED' ? 'default' : job.status === 'FAILED' ? 'destructive' : 'secondary'}>
+                        <Badge
+                          variant={
+                            job.status === 'COMPLETED'
+                              ? 'default'
+                              : job.status === 'FAILED'
+                                ? 'destructive'
+                                : 'secondary'
+                          }
+                        >
                           {getStatusLabel(job.status)}
                         </Badge>
                       </div>

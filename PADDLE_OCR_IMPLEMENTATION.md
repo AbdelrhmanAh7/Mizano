@@ -18,12 +18,14 @@ pnpm add onnxruntime-node  # ✅ Installed
 **Option A: Use pre-converted ONNX models (Recommended)**
 
 Visit the models directory and follow the README:
+
 ```bash
 cd apps/api/ml-models
 cat README.md  # Detailed instructions
 ```
 
 **Option B: Quick setup with script**
+
 ```bash
 cd apps/api
 pnpm download-ocr-models
@@ -33,12 +35,14 @@ pnpm download-ocr-models
 **Option C: Manual download**
 
 You need to obtain two ONNX model files:
+
 - `en_det_infer.onnx` (detection model)
 - `en_rec_infer.onnx` (recognition model)
 
 Place them in: `apps/api/ml-models/paddle-ocr/`
 
 Sources for pre-converted ONNX models:
+
 - HuggingFace: https://huggingface.co/models?search=paddleocr+onnx
 - Convert yourself using paddle2onnx (see README)
 
@@ -47,17 +51,20 @@ Sources for pre-converted ONNX models:
 The following services have been created:
 
 **PaddleOcrService** (`apps/api/src/modules/ai/services/paddle-ocr.service.ts`)
+
 - ONNX model loading and inference
 - Text detection (find bounding boxes)
 - Text recognition (OCR regions)
 - Image preprocessing for optimal accuracy
 
 **Updated OcrService** (`apps/api/src/modules/ai/services/ocr.service.ts`)
+
 - Hybrid Tesseract → PaddleOCR pipeline
 - Automatic fallback if models unavailable
 - Confidence-based routing
 
 **Registered in AiModule** (`apps/api/src/modules/ai/ai.module.ts`)
+
 - PaddleOcrService added to providers and exports
 - Dependency injection ready
 
@@ -66,6 +73,7 @@ The following services have been created:
 ### Software Costs: $0/month ✅
 
 Everything is **free and open-source**:
+
 - PaddleOCR models: Free
 - ONNX Runtime: Free (MIT License)
 - All dependencies: Free
@@ -74,11 +82,11 @@ Everything is **free and open-source**:
 
 ### Infrastructure Costs
 
-| Deployment Type | Monthly Cost |
-|----------------|--------------|
-| **Local Development** | **$0** ✅ (your laptop/desktop) |
-| **Self-hosted VPS** | **$0** ✅ (server you already own) |
-| **New Cloud Server** | $5-40 (only if you need new cloud hosting) |
+| Deployment Type       | Monthly Cost                               |
+| --------------------- | ------------------------------------------ |
+| **Local Development** | **$0** ✅ (your laptop/desktop)            |
+| **Self-hosted VPS**   | **$0** ✅ (server you already own)         |
+| **New Cloud Server**  | $5-40 (only if you need new cloud hosting) |
 
 ### Performance (CPU-only)
 
@@ -89,6 +97,7 @@ Everything is **free and open-source**:
 ### Hardware Requirements
 
 **Minimum** (works on most laptops):
+
 ```
 CPU: 2 cores
 RAM: 4GB total

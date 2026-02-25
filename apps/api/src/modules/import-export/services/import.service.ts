@@ -1,9 +1,9 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
-import { Decimal } from "@prisma/client/runtime/library";
-import * as csv from "csv-parser";
-import { Readable } from "stream";
-import * as XLSX from "xlsx";
-import { PrismaService } from "../../../prisma/prisma.service";
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { Decimal } from '@prisma/client/runtime/library';
+import * as csv from 'csv-parser';
+import { Readable } from 'stream';
+import * as XLSX from 'xlsx';
+import { PrismaService } from '../../../prisma/prisma.service';
 import {
   ColumnMappingDto,
   ENTITY_FIELD_DEFINITIONS,
@@ -13,9 +13,9 @@ import {
   ParseFileResultDto,
   ValidationErrorDto,
   ValidationResultDto,
-} from "../dto/import-export.dto";
+} from '../dto/import-export.dto';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const ofxParser = require("ofx-js");
+const ofxParser = require('ofx-js');
 
 @Injectable()
 export class ImportService {
@@ -23,21 +23,18 @@ export class ImportService {
 
   // ============ File Parsing ============
 
-  async parseFile(
-    buffer: Buffer,
-    filename: string,
-  ): Promise<ParseFileResultDto> {
-    const extension = filename.toLowerCase().split(".").pop();
+  async parseFile(buffer: Buffer, filename: string): Promise<ParseFileResultDto> {
+    const extension = filename.toLowerCase().split('.').pop();
 
-    if (extension === "csv") {
+    if (extension === 'csv') {
       return this.parseCsv(buffer);
-    } else if (extension === "xlsx" || extension === "xls") {
+    } else if (extension === 'xlsx' || extension === 'xls') {
       return this.parseExcel(buffer);
-    } else if (extension === "ofx" || extension === "qfx") {
+    } else if (extension === 'ofx' || extension === 'qfx') {
       return this.parseOfx(buffer);
     } else {
       throw new BadRequestException(
-        "Unsupported file format. Please use CSV, Excel (.xlsx), or OFX/QFX",
+        'Unsupported file format. Please use CSV, Excel (.xlsx), or OFX/QFX',
       );
     }
   }
@@ -50,26 +47,26 @@ export class ImportService {
       const stream = Readable.from(buffer.toString());
       stream
         .pipe(csv())
-        .on("headers", (h: string[]) => {
+        .on('headers', (h: string[]) => {
           headers = h;
         })
-        .on("data", (row: Record<string, string>) => {
+        .on('data', (row: Record<string, string>) => {
           rows.push(row);
         })
-        .on("end", () => {
+        .on('end', () => {
           resolve({
             headers,
             preview: rows.slice(0, 10),
             totalRows: rows.length,
-            fileType: "csv",
+            fileType: 'csv',
           });
         })
-        .on("error", reject);
+        .on('error', reject);
     });
   }
 
   private parseExcel(buffer: Buffer): ParseFileResultDto {
-    const workbook = XLSX.read(buffer, { type: "buffer" });
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
@@ -78,10 +75,10 @@ export class ImportService {
     });
 
     if (data.length === 0) {
-      throw new BadRequestException("Excel file is empty");
+      throw new BadRequestException('Excel file is empty');
     }
 
-    const headers = (data[0] as string[]).map((h) => String(h || "").trim());
+    const headers = (data[0] as string[]).map((h) => String(h || '').trim());
     const rows = data.slice(1).map((row: any[]) => {
       const obj: Record<string, any> = {};
       headers.forEach((header, index) => {
@@ -94,24 +91,24 @@ export class ImportService {
       headers,
       preview: rows.slice(0, 10),
       totalRows: rows.length,
-      fileType: "xlsx",
+      fileType: 'xlsx',
     };
   }
 
   private async parseOfx(buffer: Buffer): Promise<ParseFileResultDto> {
     const rows = await this.getOfxRows(buffer);
-    const headers = ["date", "description", "amount", "reference", "type"];
+    const headers = ['date', 'description', 'amount', 'reference', 'type'];
 
     return {
       headers,
       preview: rows.slice(0, 10),
       totalRows: rows.length,
-      fileType: "ofx" as any,
+      fileType: 'ofx' as any,
     };
   }
 
   private async getOfxRows(buffer: Buffer): Promise<Record<string, any>[]> {
-    const content = buffer.toString("utf-8");
+    const content = buffer.toString('utf-8');
     const parsed = await ofxParser.parse(content);
 
     // Extract transactions from OFX structure
@@ -121,31 +118,28 @@ export class ImportService {
 
     const bankTranList =
       parsed?.OFX?.BANKMSGSRSV1?.STMTTRNRS?.STMTRS?.BANKTRANLIST?.STMTTRN ||
-      parsed?.OFX?.CREDITCARDMSGSRSV1?.CCSTMTTRNRS?.CCSTMTRS?.BANKTRANLIST
-        ?.STMTTRN;
+      parsed?.OFX?.CREDITCARDMSGSRSV1?.CCSTMTTRNRS?.CCSTMTRS?.BANKTRANLIST?.STMTTRN;
 
     if (bankTranList) {
-      transactions = Array.isArray(bankTranList)
-        ? bankTranList
-        : [bankTranList];
+      transactions = Array.isArray(bankTranList) ? bankTranList : [bankTranList];
     }
 
     return transactions.map((txn: any) => {
       // Parse OFX date format (YYYYMMDDHHMMSS or YYYYMMDD)
-      const rawDate = String(txn.DTPOSTED || "");
+      const rawDate = String(txn.DTPOSTED || '');
       const year = rawDate.substring(0, 4);
       const month = rawDate.substring(4, 6);
       const day = rawDate.substring(6, 8);
       const dateStr = `${year}-${month}-${day}`;
 
-      const amount = parseFloat(txn.TRNAMT || "0");
-      const type = amount >= 0 ? "DEPOSIT" : "WITHDRAWAL";
+      const amount = parseFloat(txn.TRNAMT || '0');
+      const type = amount >= 0 ? 'DEPOSIT' : 'WITHDRAWAL';
 
       return {
         date: dateStr,
-        description: txn.NAME || txn.MEMO || "",
+        description: txn.NAME || txn.MEMO || '',
         amount: String(amount),
-        reference: txn.FITID || "",
+        reference: txn.FITID || '',
         type,
       };
     });
@@ -182,10 +176,7 @@ export class ImportService {
         const value = mappedRow[fieldDef.field];
 
         // Required check
-        if (
-          fieldDef.required &&
-          (value === undefined || value === null || value === "")
-        ) {
+        if (fieldDef.required && (value === undefined || value === null || value === '')) {
           rowErrors.push({
             row: rowNum,
             field: fieldDef.field,
@@ -195,7 +186,7 @@ export class ImportService {
         }
 
         // Type validation
-        if (value !== undefined && value !== null && value !== "") {
+        if (value !== undefined && value !== null && value !== '') {
           const typeError = this.validateFieldType(fieldDef, value);
           if (typeError) {
             rowErrors.push({
@@ -217,11 +208,7 @@ export class ImportService {
     }
 
     // Check for duplicates
-    const duplicateWarnings = await this.checkDuplicates(
-      organizationId,
-      rows,
-      config,
-    );
+    const duplicateWarnings = await this.checkDuplicates(organizationId, rows, config);
     warnings.push(...duplicateWarnings);
 
     return {
@@ -239,36 +226,29 @@ export class ImportService {
     value: any,
   ): string | null {
     switch (fieldDef.type) {
-      case "number":
+      case 'number':
         if (isNaN(Number(value))) {
-          return "Must be a valid number";
+          return 'Must be a valid number';
         }
         break;
-      case "decimal":
+      case 'decimal':
         if (isNaN(parseFloat(value))) {
-          return "Must be a valid decimal number";
+          return 'Must be a valid decimal number';
         }
         break;
-      case "date":
+      case 'date':
         if (isNaN(Date.parse(String(value)))) {
-          return "Must be a valid date (YYYY-MM-DD)";
+          return 'Must be a valid date (YYYY-MM-DD)';
         }
         break;
-      case "boolean":
-        if (
-          !["true", "false", "1", "0", "yes", "no"].includes(
-            String(value).toLowerCase(),
-          )
-        ) {
-          return "Must be true, false, 1, 0, yes, or no";
+      case 'boolean':
+        if (!['true', 'false', '1', '0', 'yes', 'no'].includes(String(value).toLowerCase())) {
+          return 'Must be true, false, 1, 0, yes, or no';
         }
         break;
-      case "enum":
-        if (
-          fieldDef.enumValues &&
-          !fieldDef.enumValues.includes(String(value).toUpperCase())
-        ) {
-          return `Must be one of: ${fieldDef.enumValues.join(", ")}`;
+      case 'enum':
+        if (fieldDef.enumValues && !fieldDef.enumValues.includes(String(value).toUpperCase())) {
+          return `Must be one of: ${fieldDef.enumValues.join(', ')}`;
         }
         break;
     }
@@ -295,7 +275,7 @@ export class ImportService {
             row: index + 2,
             field: config.matchField!,
             value,
-            error: "Duplicate value found in file",
+            error: 'Duplicate value found in file',
           });
         }
         if (value) seen.add(String(value));
@@ -314,15 +294,10 @@ export class ImportService {
     config: ImportConfigDto,
   ): Promise<ImportResultDto> {
     // Validate first
-    const validation = await this.validateImport(
-      organizationId,
-      buffer,
-      filename,
-      config,
-    );
+    const validation = await this.validateImport(organizationId, buffer, filename, config);
     if (!validation.valid && config.stopOnError) {
       throw new BadRequestException({
-        message: "Validation failed",
+        message: 'Validation failed',
         errors: validation.errors,
       });
     }
@@ -352,9 +327,9 @@ export class ImportService {
         );
 
         result.totalProcessed++;
-        if (importResult === "created") result.created++;
-        else if (importResult === "updated") result.updated++;
-        else if (importResult === "skipped") result.skipped++;
+        if (importResult === 'created') result.created++;
+        else if (importResult === 'updated') result.updated++;
+        else if (importResult === 'skipped') result.skipped++;
       } catch (error) {
         result.failed++;
         result.errors.push({
@@ -378,49 +353,22 @@ export class ImportService {
     data: Record<string, any>,
     updateExisting: boolean = false,
     matchField?: string,
-  ): Promise<"created" | "updated" | "skipped"> {
+  ): Promise<'created' | 'updated' | 'skipped'> {
     switch (entityType) {
       case ImportEntityType.CUSTOMERS:
-        return this.importCustomer(
-          organizationId,
-          data,
-          updateExisting,
-          matchField,
-        );
+        return this.importCustomer(organizationId, data, updateExisting, matchField);
       case ImportEntityType.VENDORS:
-        return this.importVendor(
-          organizationId,
-          data,
-          updateExisting,
-          matchField,
-        );
+        return this.importVendor(organizationId, data, updateExisting, matchField);
       case ImportEntityType.ITEMS:
-        return this.importItem(
-          organizationId,
-          data,
-          updateExisting,
-          matchField,
-        );
+        return this.importItem(organizationId, data, updateExisting, matchField);
       case ImportEntityType.ACCOUNTS:
-        return this.importAccount(
-          organizationId,
-          data,
-          updateExisting,
-          matchField,
-        );
+        return this.importAccount(organizationId, data, updateExisting, matchField);
       case ImportEntityType.EMPLOYEES:
-        return this.importEmployee(
-          organizationId,
-          data,
-          updateExisting,
-          matchField,
-        );
+        return this.importEmployee(organizationId, data, updateExisting, matchField);
       case ImportEntityType.BANK_TRANSACTIONS:
         return this.importBankTransaction(organizationId, data);
       default:
-        throw new BadRequestException(
-          `Import for ${entityType} not yet implemented`,
-        );
+        throw new BadRequestException(`Import for ${entityType} not yet implemented`);
     }
   }
 
@@ -429,14 +377,14 @@ export class ImportService {
     data: Record<string, any>,
     updateExisting: boolean,
     matchField?: string,
-  ): Promise<"created" | "updated" | "skipped"> {
+  ): Promise<'created' | 'updated' | 'skipped'> {
     const matchValue = matchField ? data[matchField] : data.email;
 
     if (matchValue && updateExisting) {
       const existing = await this.prisma.customer.findFirst({
         where: {
           organizationId,
-          [matchField || "email"]: matchValue,
+          [matchField || 'email']: matchValue,
           deletedAt: null,
         },
       });
@@ -453,12 +401,10 @@ export class ImportService {
             country: data.country || existing.country,
             taxId: data.taxId || existing.taxId,
             paymentTerms: data.paymentTerms || existing.paymentTerms,
-            creditLimit: data.creditLimit
-              ? new Decimal(data.creditLimit)
-              : existing.creditLimit,
+            creditLimit: data.creditLimit ? new Decimal(data.creditLimit) : existing.creditLimit,
           },
         });
-        return "updated";
+        return 'updated';
       }
     }
 
@@ -472,13 +418,11 @@ export class ImportService {
         country: data.country,
         taxId: data.taxId,
         paymentTerms: data.paymentTerms,
-        creditLimit: data.creditLimit
-          ? new Decimal(data.creditLimit)
-          : undefined,
+        creditLimit: data.creditLimit ? new Decimal(data.creditLimit) : undefined,
         organizationId,
       },
     });
-    return "created";
+    return 'created';
   }
 
   private async importVendor(
@@ -486,14 +430,14 @@ export class ImportService {
     data: Record<string, any>,
     updateExisting: boolean,
     matchField?: string,
-  ): Promise<"created" | "updated" | "skipped"> {
+  ): Promise<'created' | 'updated' | 'skipped'> {
     const matchValue = matchField ? data[matchField] : data.email;
 
     if (matchValue && updateExisting) {
       const existing = await this.prisma.vendor.findFirst({
         where: {
           organizationId,
-          [matchField || "email"]: matchValue,
+          [matchField || 'email']: matchValue,
           deletedAt: null,
         },
       });
@@ -514,7 +458,7 @@ export class ImportService {
             bankAccount: data.bankAccount || existing.bankAccount,
           },
         });
-        return "updated";
+        return 'updated';
       }
     }
 
@@ -533,7 +477,7 @@ export class ImportService {
         organizationId,
       },
     });
-    return "created";
+    return 'created';
   }
 
   private async importItem(
@@ -541,14 +485,14 @@ export class ImportService {
     data: Record<string, any>,
     updateExisting: boolean,
     matchField?: string,
-  ): Promise<"created" | "updated" | "skipped"> {
+  ): Promise<'created' | 'updated' | 'skipped'> {
     const matchValue = matchField ? data[matchField] : data.sku;
 
     if (matchValue && updateExisting) {
       const existing = await this.prisma.item.findFirst({
         where: {
           organizationId,
-          [matchField || "sku"]: matchValue,
+          [matchField || 'sku']: matchValue,
           deletedAt: null,
         },
       });
@@ -559,21 +503,17 @@ export class ImportService {
           data: {
             name: data.name || existing.name,
             description: data.description || existing.description,
-            salesPrice: data.salesPrice
-              ? new Decimal(data.salesPrice)
-              : existing.salesPrice,
+            salesPrice: data.salesPrice ? new Decimal(data.salesPrice) : existing.salesPrice,
             purchasePrice: data.purchasePrice
               ? new Decimal(data.purchasePrice)
               : existing.purchasePrice,
             unit: data.unit || existing.unit,
-            taxRate: data.taxRate
-              ? new Decimal(data.taxRate)
-              : existing.taxRate,
+            taxRate: data.taxRate ? new Decimal(data.taxRate) : existing.taxRate,
             trackInventory: data.trackInventory ?? existing.trackInventory,
             reorderLevel: data.reorderLevel || existing.reorderLevel,
           },
         });
-        return "updated";
+        return 'updated';
       }
     }
 
@@ -581,12 +521,10 @@ export class ImportService {
       data: {
         name: data.name,
         sku: data.sku,
-        type: (data.type || "GOODS").toUpperCase(),
+        type: (data.type || 'GOODS').toUpperCase(),
         description: data.description,
         salesPrice: data.salesPrice ? new Decimal(data.salesPrice) : undefined,
-        purchasePrice: data.purchasePrice
-          ? new Decimal(data.purchasePrice)
-          : undefined,
+        purchasePrice: data.purchasePrice ? new Decimal(data.purchasePrice) : undefined,
         unit: data.unit,
         taxRate: data.taxRate ? new Decimal(data.taxRate) : undefined,
         trackInventory: data.trackInventory ?? true,
@@ -594,7 +532,7 @@ export class ImportService {
         organizationId,
       },
     });
-    return "created";
+    return 'created';
   }
 
   private async importAccount(
@@ -602,14 +540,14 @@ export class ImportService {
     data: Record<string, any>,
     updateExisting: boolean,
     matchField?: string,
-  ): Promise<"created" | "updated" | "skipped"> {
+  ): Promise<'created' | 'updated' | 'skipped'> {
     const matchValue = matchField ? data[matchField] : data.code;
 
     if (matchValue && updateExisting) {
       const existing = await this.prisma.account.findFirst({
         where: {
           organizationId,
-          [matchField || "code"]: matchValue,
+          [matchField || 'code']: matchValue,
         },
       });
 
@@ -622,7 +560,7 @@ export class ImportService {
             isActive: data.isActive ?? existing.isActive,
           },
         });
-        return "updated";
+        return 'updated';
       }
     }
 
@@ -643,14 +581,12 @@ export class ImportService {
         subType: data.subType,
         description: data.description,
         parentId,
-        openingBalance: data.openingBalance
-          ? new Decimal(data.openingBalance)
-          : undefined,
+        openingBalance: data.openingBalance ? new Decimal(data.openingBalance) : undefined,
         isActive: data.isActive ?? true,
         organizationId,
       },
     });
-    return "created";
+    return 'created';
   }
 
   private async importEmployee(
@@ -658,14 +594,14 @@ export class ImportService {
     data: Record<string, any>,
     updateExisting: boolean,
     matchField?: string,
-  ): Promise<"created" | "updated" | "skipped"> {
+  ): Promise<'created' | 'updated' | 'skipped'> {
     const matchValue = matchField ? data[matchField] : data.email;
 
     if (matchValue && updateExisting) {
       const existing = await this.prisma.employee.findFirst({
         where: {
           organizationId,
-          [matchField || "email"]: matchValue,
+          [matchField || 'email']: matchValue,
           isActive: true,
         },
       });
@@ -678,25 +614,20 @@ export class ImportService {
             phone: data.phone || existing.phone,
             position: data.position || existing.position,
             jobTitle: data.position || existing.jobTitle,
-            baseSalary: data.baseSalary
-              ? new Decimal(data.baseSalary)
-              : existing.baseSalary,
-            basicSalary: data.baseSalary
-              ? new Decimal(data.baseSalary)
-              : existing.basicSalary,
+            baseSalary: data.baseSalary ? new Decimal(data.baseSalary) : existing.baseSalary,
+            basicSalary: data.baseSalary ? new Decimal(data.baseSalary) : existing.basicSalary,
             bankAccount: data.bankAccount || existing.bankAccount,
             nationalId: data.nationalId || existing.nationalId,
             department: data.departmentName || existing.department,
           },
         });
-        return "updated";
+        return 'updated';
       }
     }
 
     // Generate employee number if not provided
     const employeeNumber =
-      data.employeeNumber ||
-      (await this.generateEmployeeNumber(organizationId));
+      data.employeeNumber || (await this.generateEmployeeNumber(organizationId));
 
     await this.prisma.employee.create({
       data: {
@@ -717,16 +648,16 @@ export class ImportService {
         organizationId,
       },
     });
-    return "created";
+    return 'created';
   }
 
   private async importBankTransaction(
     organizationId: string,
     data: Record<string, any>,
-  ): Promise<"created" | "updated" | "skipped"> {
+  ): Promise<'created' | 'updated' | 'skipped'> {
     // Bank transactions are always created, not updated
     const amount = parseFloat(data.amount);
-    const type = amount >= 0 ? "DEPOSIT" : "WITHDRAWAL";
+    const type = amount >= 0 ? 'DEPOSIT' : 'WITHDRAWAL';
 
     // Get or require bankAccountId
     let bankAccountId = data.bankAccountId;
@@ -739,7 +670,7 @@ export class ImportService {
 
     if (!bankAccountId) {
       throw new BadRequestException(
-        "Bank account ID or name is required for bank transaction import",
+        'Bank account ID or name is required for bank transaction import',
       );
     }
 
@@ -754,25 +685,19 @@ export class ImportService {
         organizationId,
       },
     });
-    return "created";
+    return 'created';
   }
 
   // ============ Helper Methods ============
 
-  private mapRow(
-    row: Record<string, any>,
-    mappings: ColumnMappingDto[],
-  ): Record<string, any> {
+  private mapRow(row: Record<string, any>, mappings: ColumnMappingDto[]): Record<string, any> {
     const result: Record<string, any> = {};
 
     for (const mapping of mappings) {
       let value = row[mapping.sourceColumn];
 
       // Apply default if empty
-      if (
-        (value === undefined || value === null || value === "") &&
-        mapping.defaultValue
-      ) {
+      if ((value === undefined || value === null || value === '') && mapping.defaultValue) {
         value = mapping.defaultValue;
       }
 
@@ -789,18 +714,18 @@ export class ImportService {
 
   private applyTransform(value: any, transform: string): any {
     switch (transform) {
-      case "uppercase":
+      case 'uppercase':
         return String(value).toUpperCase();
-      case "lowercase":
+      case 'lowercase':
         return String(value).toLowerCase();
-      case "trim":
+      case 'trim':
         return String(value).trim();
-      case "parseNumber":
+      case 'parseNumber':
         return Number(value);
-      case "parseDate":
+      case 'parseDate':
         return new Date(value);
-      case "parseBoolean":
-        return ["true", "1", "yes"].includes(String(value).toLowerCase());
+      case 'parseBoolean':
+        return ['true', '1', 'yes'].includes(String(value).toLowerCase());
       default:
         return value;
     }
@@ -814,9 +739,9 @@ export class ImportService {
 
     // Clean string values
     Object.keys(transformed).forEach((key) => {
-      if (typeof transformed[key] === "string") {
+      if (typeof transformed[key] === 'string') {
         transformed[key] = transformed[key].trim();
-        if (transformed[key] === "") {
+        if (transformed[key] === '') {
           transformed[key] = null;
         }
       }
@@ -825,35 +750,32 @@ export class ImportService {
     return transformed;
   }
 
-  async getAllRows(
-    buffer: Buffer,
-    filename: string,
-  ): Promise<Record<string, any>[]> {
-    const extension = filename.toLowerCase().split(".").pop();
+  async getAllRows(buffer: Buffer, filename: string): Promise<Record<string, any>[]> {
+    const extension = filename.toLowerCase().split('.').pop();
 
-    if (extension === "ofx" || extension === "qfx") {
+    if (extension === 'ofx' || extension === 'qfx') {
       return this.getOfxRows(buffer);
     }
 
-    if (extension === "csv") {
+    if (extension === 'csv') {
       return new Promise((resolve, reject) => {
         const rows: Record<string, any>[] = [];
         const stream = Readable.from(buffer.toString());
         stream
           .pipe(csv())
-          .on("data", (row) => rows.push(row))
-          .on("end", () => resolve(rows))
-          .on("error", reject);
+          .on('data', (row) => rows.push(row))
+          .on('end', () => resolve(rows))
+          .on('error', reject);
       });
     } else {
-      const workbook = XLSX.read(buffer, { type: "buffer" });
+      const workbook = XLSX.read(buffer, { type: 'buffer' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const data = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, {
         header: 1,
       });
 
-      const headers = (data[0] as string[]).map((h) => String(h || "").trim());
+      const headers = (data[0] as string[]).map((h) => String(h || '').trim());
       return data.slice(1).map((row: any[]) => {
         const obj: Record<string, any> = {};
         headers.forEach((header, index) => {
@@ -864,21 +786,19 @@ export class ImportService {
     }
   }
 
-  private async generateEmployeeNumber(
-    organizationId: string,
-  ): Promise<string> {
+  private async generateEmployeeNumber(organizationId: string): Promise<string> {
     const lastEmployee = await this.prisma.employee.findFirst({
       where: { organizationId },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
       select: { employeeNumber: true },
     });
 
     if (!lastEmployee?.employeeNumber) {
-      return "EMP-001";
+      return 'EMP-001';
     }
 
-    const lastNumber = parseInt(lastEmployee.employeeNumber.split("-")[1], 10);
-    return `EMP-${String(lastNumber + 1).padStart(3, "0")}`;
+    const lastNumber = parseInt(lastEmployee.employeeNumber.split('-')[1], 10);
+    return `EMP-${String(lastNumber + 1).padStart(3, '0')}`;
   }
 
   // ============ Get Field Definitions ============

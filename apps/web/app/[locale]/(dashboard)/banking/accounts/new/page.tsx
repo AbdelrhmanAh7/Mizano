@@ -54,9 +54,7 @@ export default function NewBankAccountPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">New Bank Account</h1>
-          <p className="text-muted-foreground">
-            Add a new bank account to track your finances
-          </p>
+          <p className="text-muted-foreground">Add a new bank account to track your finances</p>
         </div>
       </div>
 

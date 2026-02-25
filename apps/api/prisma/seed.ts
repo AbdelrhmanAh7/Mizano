@@ -1,4 +1,11 @@
-import { PrismaClient, UserStatus, AccountType, InvoiceStatus, BillStatus, ItemType } from '@prisma/client';
+import {
+  PrismaClient,
+  UserStatus,
+  AccountType,
+  InvoiceStatus,
+  BillStatus,
+  ItemType,
+} from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { Decimal } from '@prisma/client/runtime/library';
 import { seedAiTrainingData } from './seed-ai-training';
@@ -53,7 +60,12 @@ async function main() {
   await prisma.role.upsert({
     where: { name_organizationId: { name: 'Accountant', organizationId: orgId } },
     update: {},
-    create: { name: 'Accountant', description: 'Accountant', isDefault: false, organizationId: orgId },
+    create: {
+      name: 'Accountant',
+      description: 'Accountant',
+      isDefault: false,
+      organizationId: orgId,
+    },
   });
 
   await prisma.role.upsert({
@@ -65,7 +77,12 @@ async function main() {
   await prisma.role.upsert({
     where: { name_organizationId: { name: 'StoreKeeper', organizationId: orgId } },
     update: {},
-    create: { name: 'StoreKeeper', description: 'Store Keeper', isDefault: false, organizationId: orgId },
+    create: {
+      name: 'StoreKeeper',
+      description: 'Store Keeper',
+      isDefault: false,
+      organizationId: orgId,
+    },
   });
 
   console.log('  ✓ 5 roles created');
@@ -73,8 +90,18 @@ async function main() {
   // 2b. PERMISSIONS (Admin gets full access to all modules)
   console.log('\n2b. Creating permissions...');
   const allModules = [
-    'sales', 'purchases', 'accounting', 'inventory', 'banking',
-    'projects', 'manufacturing', 'hr', 'tax', 'crm', 'reports', 'settings',
+    'sales',
+    'purchases',
+    'accounting',
+    'inventory',
+    'banking',
+    'projects',
+    'manufacturing',
+    'hr',
+    'tax',
+    'crm',
+    'reports',
+    'settings',
   ];
   const allActions = ['view', 'create', 'edit', 'delete', 'export'];
 
@@ -145,9 +172,30 @@ async function main() {
   // 5. CUSTOMERS
   console.log('\n5. Creating customers...');
   const customers = [
-    { id: 'cust-001', name: 'TechCorp Egypt', email: 'hello@techcorp.eg', phone: '+201001234567', billingCity: 'Cairo', billingCountry: 'Egypt' },
-    { id: 'cust-002', name: 'Global Solutions', email: 'info@global.com', phone: '+201101234567', billingCity: 'Alexandria', billingCountry: 'Egypt' },
-    { id: 'cust-003', name: 'Retail Plus', email: 'contact@retail.eg', phone: '+201201234567', billingCity: 'Giza', billingCountry: 'Egypt' },
+    {
+      id: 'cust-001',
+      name: 'TechCorp Egypt',
+      email: 'hello@techcorp.eg',
+      phone: '+201001234567',
+      billingCity: 'Cairo',
+      billingCountry: 'Egypt',
+    },
+    {
+      id: 'cust-002',
+      name: 'Global Solutions',
+      email: 'info@global.com',
+      phone: '+201101234567',
+      billingCity: 'Alexandria',
+      billingCountry: 'Egypt',
+    },
+    {
+      id: 'cust-003',
+      name: 'Retail Plus',
+      email: 'contact@retail.eg',
+      phone: '+201201234567',
+      billingCity: 'Giza',
+      billingCountry: 'Egypt',
+    },
   ];
 
   const custMap: Record<string, string> = {};
@@ -164,8 +212,22 @@ async function main() {
   // 6. VENDORS
   console.log('\n6. Creating vendors...');
   const vendors = [
-    { id: 'vend-001', name: 'Supplier Alpha', email: 'sales@alpha.com', phone: '+201001111111', billingCity: 'Cairo', billingCountry: 'Egypt' },
-    { id: 'vend-002', name: 'Supplier Beta', email: 'contact@beta.com', phone: '+201101111111', billingCity: 'Alexandria', billingCountry: 'Egypt' },
+    {
+      id: 'vend-001',
+      name: 'Supplier Alpha',
+      email: 'sales@alpha.com',
+      phone: '+201001111111',
+      billingCity: 'Cairo',
+      billingCountry: 'Egypt',
+    },
+    {
+      id: 'vend-002',
+      name: 'Supplier Beta',
+      email: 'contact@beta.com',
+      phone: '+201101111111',
+      billingCity: 'Alexandria',
+      billingCountry: 'Egypt',
+    },
   ];
 
   const vendMap: Record<string, string> = {};
@@ -182,9 +244,27 @@ async function main() {
   // 7. ITEMS
   console.log('\n7. Creating inventory items...');
   const items = [
-    { id: 'item-001', sku: 'ITEM-001', name: 'Laptop Pro 15"', type: ItemType.GOODS, sellingPrice: new Decimal(1299.99) },
-    { id: 'item-002', sku: 'ITEM-002', name: 'Desktop Monitor', type: ItemType.GOODS, sellingPrice: new Decimal(349.99) },
-    { id: 'item-003', sku: 'ITEM-003', name: 'USB Cable', type: ItemType.GOODS, sellingPrice: new Decimal(9.99) },
+    {
+      id: 'item-001',
+      sku: 'ITEM-001',
+      name: 'Laptop Pro 15"',
+      type: ItemType.GOODS,
+      sellingPrice: new Decimal(1299.99),
+    },
+    {
+      id: 'item-002',
+      sku: 'ITEM-002',
+      name: 'Desktop Monitor',
+      type: ItemType.GOODS,
+      sellingPrice: new Decimal(349.99),
+    },
+    {
+      id: 'item-003',
+      sku: 'ITEM-003',
+      name: 'USB Cable',
+      type: ItemType.GOODS,
+      sellingPrice: new Decimal(9.99),
+    },
   ];
 
   const itemMap: Record<string, string> = {};
@@ -201,8 +281,24 @@ async function main() {
   // 8. WAREHOUSES
   console.log('\n8. Creating warehouses...');
   const warehouses = [
-    { id: 'wh-001', code: 'WH-MAIN', name: 'Main Warehouse', street: '10 Industrial Zone', city: 'Cairo', country: 'Egypt', isDefault: true },
-    { id: 'wh-002', code: 'WH-NORTH', name: 'North Center', street: '55 Alex-Cairo Rd', city: 'Alexandria', country: 'Egypt', isDefault: false },
+    {
+      id: 'wh-001',
+      code: 'WH-MAIN',
+      name: 'Main Warehouse',
+      street: '10 Industrial Zone',
+      city: 'Cairo',
+      country: 'Egypt',
+      isDefault: true,
+    },
+    {
+      id: 'wh-002',
+      code: 'WH-NORTH',
+      name: 'North Center',
+      street: '55 Alex-Cairo Rd',
+      city: 'Alexandria',
+      country: 'Egypt',
+      isDefault: false,
+    },
   ];
 
   const whMap: Record<string, string> = {};
@@ -219,8 +315,19 @@ async function main() {
   // 9. BANK ACCOUNTS
   console.log('\n9. Creating bank accounts...');
   const bankAccounts = [
-    { id: 'bank-001', name: 'Business Checking', type: 'BANK' as const, accountNumber: '1234567890', linkedAccountId: accountMap['1010'] },
-    { id: 'bank-002', name: 'Petty Cash', type: 'PETTY_CASH' as const, linkedAccountId: accountMap['1000'] },
+    {
+      id: 'bank-001',
+      name: 'Business Checking',
+      type: 'BANK' as const,
+      accountNumber: '1234567890',
+      linkedAccountId: accountMap['1010'],
+    },
+    {
+      id: 'bank-002',
+      name: 'Petty Cash',
+      type: 'PETTY_CASH' as const,
+      linkedAccountId: accountMap['1000'],
+    },
   ];
 
   const bankMap: Record<string, string> = {};
@@ -237,8 +344,22 @@ async function main() {
   // 10. INVOICES
   console.log('\n10. Creating invoices...');
   const invoices = [
-    { invoiceNumber: 'INV-001', customerId: custMap['cust-001'], date: new Date(Date.now() - 30 * 86400000), dueDate: new Date(), status: InvoiceStatus.DRAFT, grandTotal: new Decimal(1299.99) },
-    { invoiceNumber: 'INV-002', customerId: custMap['cust-002'], date: new Date(Date.now() - 20 * 86400000), dueDate: new Date(), status: InvoiceStatus.DRAFT, grandTotal: new Decimal(699.98) },
+    {
+      invoiceNumber: 'INV-001',
+      customerId: custMap['cust-001'],
+      date: new Date(Date.now() - 30 * 86400000),
+      dueDate: new Date(),
+      status: InvoiceStatus.DRAFT,
+      grandTotal: new Decimal(1299.99),
+    },
+    {
+      invoiceNumber: 'INV-002',
+      customerId: custMap['cust-002'],
+      date: new Date(Date.now() - 20 * 86400000),
+      dueDate: new Date(),
+      status: InvoiceStatus.DRAFT,
+      grandTotal: new Decimal(699.98),
+    },
   ];
 
   for (const invData of invoices) {
@@ -259,8 +380,22 @@ async function main() {
   // 11. BILLS
   console.log('\n11. Creating bills...');
   const bills = [
-    { billNumber: 'BILL-001', vendorId: vendMap['vend-001'], date: new Date(Date.now() - 25 * 86400000), dueDate: new Date(), status: BillStatus.DRAFT, grandTotal: new Decimal(5000) },
-    { billNumber: 'BILL-002', vendorId: vendMap['vend-002'], date: new Date(Date.now() - 15 * 86400000), dueDate: new Date(), status: BillStatus.DRAFT, grandTotal: new Decimal(3500) },
+    {
+      billNumber: 'BILL-001',
+      vendorId: vendMap['vend-001'],
+      date: new Date(Date.now() - 25 * 86400000),
+      dueDate: new Date(),
+      status: BillStatus.DRAFT,
+      grandTotal: new Decimal(5000),
+    },
+    {
+      billNumber: 'BILL-002',
+      vendorId: vendMap['vend-002'],
+      date: new Date(Date.now() - 15 * 86400000),
+      dueDate: new Date(),
+      status: BillStatus.DRAFT,
+      grandTotal: new Decimal(3500),
+    },
   ];
 
   for (const billData of bills) {

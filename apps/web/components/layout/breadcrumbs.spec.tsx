@@ -45,7 +45,9 @@ jest.mock('@/i18n/routing', () => ({
 // Mock lucide-react icons
 jest.mock('lucide-react', () => ({
   ChevronRight: ({ className }: { className?: string }) => (
-    <span data-testid="chevron" className={className}>{'>'}</span>
+    <span data-testid="chevron" className={className}>
+      {'>'}
+    </span>
   ),
   Home: ({ className }: { className?: string }) => (
     <span data-testid="home-icon" className={className} />

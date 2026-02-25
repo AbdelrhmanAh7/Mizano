@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import {
@@ -22,10 +18,7 @@ export class CurrencyService {
 
   // ============ Exchange Rate CRUD ============
 
-  async createExchangeRate(
-    organizationId: string,
-    dto: CreateExchangeRateDto,
-  ) {
+  async createExchangeRate(organizationId: string, dto: CreateExchangeRateDto) {
     // Validate currencies
     this.validateCurrencyCode(dto.fromCurrency);
     this.validateCurrencyCode(dto.toCurrency);
@@ -70,11 +63,7 @@ export class CurrencyService {
     });
   }
 
-  async updateExchangeRate(
-    organizationId: string,
-    id: string,
-    dto: UpdateExchangeRateDto,
-  ) {
+  async updateExchangeRate(organizationId: string, id: string, dto: UpdateExchangeRateDto) {
     const rate = await this.prisma.exchangeRate.findFirst({
       where: { id, organizationId },
     });
@@ -159,7 +148,7 @@ export class CurrencyService {
     queryDate.setHours(23, 59, 59, 999);
 
     // Try direct rate
-    let exchangeRate = await this.prisma.exchangeRate.findFirst({
+    const exchangeRate = await this.prisma.exchangeRate.findFirst({
       where: {
         organizationId,
         fromCurrency: from,
@@ -252,18 +241,10 @@ export class CurrencyService {
 
   // ============ Currency Conversion ============
 
-  async convertAmount(
-    organizationId: string,
-    dto: ConvertAmountDto,
-  ): Promise<ConversionResultDto> {
+  async convertAmount(organizationId: string, dto: ConvertAmountDto): Promise<ConversionResultDto> {
     const date = dto.date ? new Date(dto.date) : new Date();
 
-    const rateInfo = await this.getRate(
-      organizationId,
-      dto.fromCurrency,
-      dto.toCurrency,
-      date,
-    );
+    const rateInfo = await this.getRate(organizationId, dto.fromCurrency, dto.toCurrency, date);
 
     const convertedAmount = dto.amount * rateInfo.rate;
 
@@ -317,9 +298,10 @@ export class CurrencyService {
       gainLoss = originalBaseAmount - currentBaseAmount;
     }
 
-    const percentageChange = originalBaseAmount !== 0
-      ? ((dto.currentRate - dto.originalRate) / dto.originalRate) * 100
-      : 0;
+    const percentageChange =
+      originalBaseAmount !== 0
+        ? ((dto.currentRate - dto.originalRate) / dto.originalRate) * 100
+        : 0;
 
     return {
       originalBaseAmount: Math.round(originalBaseAmount * 10000) / 10000,

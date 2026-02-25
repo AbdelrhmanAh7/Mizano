@@ -8,11 +8,7 @@ import { EntityEventListener } from './entity-event.listener';
 @Module({
   imports: [PrismaModule],
   controllers: [NotificationsController],
-  providers: [
-    NotificationsService,
-    NotificationsGateway,
-    EntityEventListener,
-  ],
+  providers: [NotificationsService, NotificationsGateway, EntityEventListener],
   exports: [NotificationsService, NotificationsGateway],
 })
 export class NotificationsModule {}

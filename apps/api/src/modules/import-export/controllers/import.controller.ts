@@ -83,9 +83,7 @@ export class ImportController {
     },
   })
   @ApiResponse({ status: 200, type: ParseFileResultDto })
-  async parseFile(
-    @UploadedFile() file: Express.Multer.File,
-  ): Promise<ParseFileResultDto> {
+  async parseFile(@UploadedFile() file: Express.Multer.File): Promise<ParseFileResultDto> {
     if (!file) {
       throw new BadRequestException('File is required');
     }

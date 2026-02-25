@@ -2,12 +2,7 @@
 
 import { Sparkles, CircleDot, CircleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 export interface ConfidenceBadgeProps {
@@ -81,7 +76,7 @@ export function ConfidenceBadge({
         'inline-flex items-center gap-1 font-medium',
         config.color,
         sizeStyles.badge,
-        className
+        className,
       )}
     >
       <Icon className={cn(sizeStyles.icon, config.iconColor)} />
@@ -99,7 +94,9 @@ export function ConfidenceBadge({
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild><span className="inline-flex">{badge}</span></TooltipTrigger>
+        <TooltipTrigger asChild>
+          <span className="inline-flex">{badge}</span>
+        </TooltipTrigger>
         <TooltipContent>
           <div className="space-y-1">
             <div className="font-medium">{config.label} Confidence</div>
@@ -135,14 +132,8 @@ export function ConfidenceBar({
     <div className={cn('space-y-1', className)}>
       <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
         {/* Threshold markers */}
-        <div
-          className="absolute h-full border-l border-gray-300"
-          style={{ left: '60%' }}
-        />
-        <div
-          className="absolute h-full border-l border-gray-300"
-          style={{ left: '85%' }}
-        />
+        <div className="absolute h-full border-l border-gray-300" style={{ left: '60%' }} />
+        <div className="absolute h-full border-l border-gray-300" style={{ left: '85%' }} />
         {/* Confidence bar */}
         <div
           className={cn('h-full rounded-full transition-all duration-500', getBarColor())}

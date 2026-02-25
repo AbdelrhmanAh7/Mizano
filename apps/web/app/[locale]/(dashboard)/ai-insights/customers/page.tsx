@@ -46,9 +46,27 @@ const mockAnalysis = {
     { id: '5', name: 'Summit Enterprises', revenue: 65000, growth: 12, segment: 'Stable' },
   ],
   atRiskCustomers: [
-    { id: '6', name: 'Alpha Services', lastOrder: '45 days ago', riskScore: 85, reason: 'Declining orders' },
-    { id: '7', name: 'Beta Solutions', lastOrder: '60 days ago', riskScore: 78, reason: 'No engagement' },
-    { id: '8', name: 'Gamma Industries', lastOrder: '30 days ago', riskScore: 72, reason: 'Competitor switch' },
+    {
+      id: '6',
+      name: 'Alpha Services',
+      lastOrder: '45 days ago',
+      riskScore: 85,
+      reason: 'Declining orders',
+    },
+    {
+      id: '7',
+      name: 'Beta Solutions',
+      lastOrder: '60 days ago',
+      riskScore: 78,
+      reason: 'No engagement',
+    },
+    {
+      id: '8',
+      name: 'Gamma Industries',
+      lastOrder: '30 days ago',
+      riskScore: 72,
+      reason: 'Competitor switch',
+    },
   ],
   revenueBySegment: [
     { segment: 'High Value', current: 680000, previous: 620000 },
@@ -90,9 +108,7 @@ export default function CustomerAnalysisPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Customer Analysis</h1>
-          <p className="text-muted-foreground">
-            AI-powered customer segmentation and insights
-          </p>
+          <p className="text-muted-foreground">AI-powered customer segmentation and insights</p>
         </div>
       </div>
 
@@ -144,7 +160,9 @@ export default function CustomerAnalysisPage() {
         <Card className={analysis.summary.churnRate > 5 ? 'bg-red-50' : 'bg-green-50'}>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Churn Rate</p>
-            <p className={`text-2xl font-bold ${analysis.summary.churnRate > 5 ? 'text-red-600' : 'text-green-600'}`}>
+            <p
+              className={`text-2xl font-bold ${analysis.summary.churnRate > 5 ? 'text-red-600' : 'text-green-600'}`}
+            >
               {analysis.summary.churnRate}%
             </p>
           </CardContent>
@@ -217,14 +235,18 @@ export default function CustomerAnalysisPage() {
         <CardContent>
           <div className="space-y-4">
             {analysis.topCustomers.map((customer: any, index: number) => (
-              <div key={customer.id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+              <div
+                key={customer.id}
+                className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+              >
                 <div className="flex items-center gap-4">
-                  <div className="text-2xl font-bold text-muted-foreground w-8">
-                    #{index + 1}
-                  </div>
+                  <div className="text-2xl font-bold text-muted-foreground w-8">#{index + 1}</div>
                   <Avatar>
                     <AvatarFallback>
-                      {customer.name.split(' ').map((n: string) => n[0]).join('')}
+                      {customer.name
+                        .split(' ')
+                        .map((n: string) => n[0])
+                        .join('')}
                     </AvatarFallback>
                   </Avatar>
                   <div>
@@ -235,11 +257,12 @@ export default function CustomerAnalysisPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xl font-bold font-mono">
-                    {formatCurrency(customer.revenue)}
-                  </p>
-                  <p className={`text-sm ${customer.growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {customer.growth >= 0 ? '+' : ''}{customer.growth}% growth
+                  <p className="text-xl font-bold font-mono">{formatCurrency(customer.revenue)}</p>
+                  <p
+                    className={`text-sm ${customer.growth >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                  >
+                    {customer.growth >= 0 ? '+' : ''}
+                    {customer.growth}% growth
                   </p>
                 </div>
               </div>
@@ -255,18 +278,22 @@ export default function CustomerAnalysisPage() {
             <AlertTriangle className="h-5 w-5" />
             At-Risk Customers
           </CardTitle>
-          <CardDescription>
-            Customers that may need attention to prevent churn
-          </CardDescription>
+          <CardDescription>Customers that may need attention to prevent churn</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {analysis.atRiskCustomers.map((customer: any) => (
-              <div key={customer.id} className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
+              <div
+                key={customer.id}
+                className="flex items-center justify-between p-4 bg-orange-50 rounded-lg"
+              >
                 <div className="flex items-center gap-4">
                   <Avatar>
                     <AvatarFallback className="bg-orange-200 text-orange-800">
-                      {customer.name.split(' ').map((n: string) => n[0]).join('')}
+                      {customer.name
+                        .split(' ')
+                        .map((n: string) => n[0])
+                        .join('')}
                     </AvatarFallback>
                   </Avatar>
                   <div>
@@ -274,9 +301,7 @@ export default function CustomerAnalysisPage() {
                     <p className="text-sm text-muted-foreground">
                       Last order: {customer.lastOrder}
                     </p>
-                    <p className="text-sm text-orange-700">
-                      Reason: {customer.reason}
-                    </p>
+                    <p className="text-sm text-orange-700">Reason: {customer.reason}</p>
                   </div>
                 </div>
                 <div className="text-right">

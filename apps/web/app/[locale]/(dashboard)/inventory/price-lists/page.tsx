@@ -86,9 +86,7 @@ export default function PriceListsPage() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        {pl.type === 'SALES' ? 'Sales' : 'Purchase'}
-                      </Badge>
+                      <Badge variant="outline">{pl.type === 'SALES' ? 'Sales' : 'Purchase'}</Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant={pl.isActive ? 'default' : 'secondary'}>

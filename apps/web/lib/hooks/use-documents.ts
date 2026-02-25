@@ -291,8 +291,13 @@ export function useStatementPdf(customerId: string, params: StatementQueryDto) {
 export function useSendStatement() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ customerId, params }: { customerId: string; params: StatementQueryDto & SendDocumentDto }) =>
-      documentsApi.sendStatement(customerId, params),
+    mutationFn: ({
+      customerId,
+      params,
+    }: {
+      customerId: string;
+      params: StatementQueryDto & SendDocumentDto;
+    }) => documentsApi.sendStatement(customerId, params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['email-logs'] });
     },

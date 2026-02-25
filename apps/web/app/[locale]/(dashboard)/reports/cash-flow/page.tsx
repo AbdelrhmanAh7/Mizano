@@ -59,7 +59,12 @@ export default function CashFlowReportPage() {
             {section.items.map((item: any, i: number) => (
               <div key={i} className="flex justify-between py-1.5 border-b last:border-0">
                 <span className="text-sm">{item.name || item.description}</span>
-                <span className={cn('text-sm font-mono font-medium', item.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
+                <span
+                  className={cn(
+                    'text-sm font-mono font-medium',
+                    item.amount >= 0 ? 'text-green-600' : 'text-red-600',
+                  )}
+                >
                   {formatCurrency(Math.abs(item.amount))}
                 </span>
               </div>
@@ -92,11 +97,7 @@ export default function CashFlowReportPage() {
         </div>
       </div>
 
-      <ReportFilters
-        dateRange={dateRange}
-        onDateRangeChange={setDateRange}
-        showDateRange
-      />
+      <ReportFilters dateRange={dateRange} onDateRangeChange={setDateRange} showDateRange />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
@@ -105,9 +106,7 @@ export default function CashFlowReportPage() {
               <TrendingUp className="h-4 w-4" />
               Opening Balance
             </div>
-            <p className="text-2xl font-bold font-mono">
-              {formatCurrency(data.openingBalance)}
-            </p>
+            <p className="text-2xl font-bold font-mono">{formatCurrency(data.openingBalance)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -116,8 +115,14 @@ export default function CashFlowReportPage() {
               <DollarSign className="h-4 w-4" />
               Net Cash Flow
             </div>
-            <p className={cn('text-2xl font-bold font-mono', data.netCashFlow >= 0 ? 'text-green-600' : 'text-red-600')}>
-              {data.netCashFlow >= 0 ? '+' : '-'}{formatCurrency(Math.abs(data.netCashFlow))}
+            <p
+              className={cn(
+                'text-2xl font-bold font-mono',
+                data.netCashFlow >= 0 ? 'text-green-600' : 'text-red-600',
+              )}
+            >
+              {data.netCashFlow >= 0 ? '+' : '-'}
+              {formatCurrency(Math.abs(data.netCashFlow))}
             </p>
           </CardContent>
         </Card>
@@ -127,9 +132,7 @@ export default function CashFlowReportPage() {
               <TrendingDown className="h-4 w-4" />
               Closing Balance
             </div>
-            <p className="text-2xl font-bold font-mono">
-              {formatCurrency(data.closingBalance)}
-            </p>
+            <p className="text-2xl font-bold font-mono">{formatCurrency(data.closingBalance)}</p>
           </CardContent>
         </Card>
       </div>

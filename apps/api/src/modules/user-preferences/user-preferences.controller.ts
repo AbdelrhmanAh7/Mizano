@@ -86,10 +86,7 @@ export class UserPreferencesController {
     description: 'Tour dismissed successfully',
     type: UserPreferencesDto,
   })
-  async dismissTour(
-    @CurrentUser() user: CurrentUserData,
-    @Param('tourId') tourId: string,
-  ) {
+  async dismissTour(@CurrentUser() user: CurrentUserData, @Param('tourId') tourId: string) {
     return this.userPreferencesService.dismissTour(user.id, tourId);
   }
 }

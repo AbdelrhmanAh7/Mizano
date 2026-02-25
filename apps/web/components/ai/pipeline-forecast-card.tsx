@@ -21,9 +21,11 @@ export function PipelineForecastCard() {
   if (forecasts.length === 0 && conversions.length === 0) return null;
 
   const nextMonth = forecasts[0];
-  const avgConversion = conversions.length > 0
-    ? conversions.reduce((sum: number, c: any) => sum + (c.conversionRate || 0), 0) / conversions.length
-    : 0;
+  const avgConversion =
+    conversions.length > 0
+      ? conversions.reduce((sum: number, c: any) => sum + (c.conversionRate || 0), 0) /
+        conversions.length
+      : 0;
 
   return (
     <Card className="mb-6">
@@ -42,7 +44,9 @@ export function PipelineForecastCard() {
                 <TrendingUp className="h-4 w-4" />
                 <span>Forecasted Revenue</span>
               </div>
-              <div className="text-2xl font-bold">{formatRevenue(nextMonth.predictedRevenue || 0)}</div>
+              <div className="text-2xl font-bold">
+                {formatRevenue(nextMonth.predictedRevenue || 0)}
+              </div>
               <div className="text-xs text-muted-foreground">
                 {nextMonth.expectedDeals || 0} expected deals
               </div>
@@ -60,9 +64,12 @@ export function PipelineForecastCard() {
                 <span>Confidence Range</span>
               </div>
               <div className="text-sm font-medium">
-                {formatRevenue(nextMonth.lowerBound || 0)} - {formatRevenue(nextMonth.upperBound || 0)}
+                {formatRevenue(nextMonth.lowerBound || 0)} -{' '}
+                {formatRevenue(nextMonth.upperBound || 0)}
               </div>
-              <div className="text-xs text-muted-foreground">Expected range for {nextMonth.month}</div>
+              <div className="text-xs text-muted-foreground">
+                Expected range for {nextMonth.month}
+              </div>
             </div>
           )}
 
@@ -84,7 +91,9 @@ export function PipelineForecastCard() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {conversions.slice(0, 6).map((conv: any) => (
                 <div key={`${conv.fromStage}-${conv.toStage}`} className="text-xs">
-                  <span className="text-muted-foreground">{conv.fromStage} → {conv.toStage}</span>
+                  <span className="text-muted-foreground">
+                    {conv.fromStage} → {conv.toStage}
+                  </span>
                   <Badge variant="outline" className="ml-1">
                     {formatProbability(conv.conversionRate || 0)}
                   </Badge>

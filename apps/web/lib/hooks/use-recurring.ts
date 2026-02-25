@@ -283,9 +283,7 @@ export function getFrequencyDescription(frequency: RecurringFrequency): string {
 }
 
 export function getExecutionStatusColor(status: 'success' | 'failed'): string {
-  return status === 'success'
-    ? 'bg-green-100 text-green-800'
-    : 'bg-red-100 text-red-800';
+  return status === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
 }
 
 export function getExecutionStatusIcon(status: 'success' | 'failed'): string {
@@ -321,10 +319,7 @@ export function getDaysUntilNextRun(nextRunDate: string): number {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
-export function calculateNextRunDate(
-  currentDate: Date,
-  frequency: RecurringFrequency
-): Date {
+export function calculateNextRunDate(currentDate: Date, frequency: RecurringFrequency): Date {
   const nextDate = new Date(currentDate);
 
   switch (frequency) {

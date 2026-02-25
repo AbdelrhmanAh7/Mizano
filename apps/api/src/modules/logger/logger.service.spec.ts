@@ -1,11 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { LoggerService } from './logger.service';
-import {
-  LogLevel,
-  LogSource,
-  LogCategory,
-  LogStatus,
-} from '@mizano/shared-types';
+import { LogLevel, LogSource, LogCategory, LogStatus } from '@mizano/shared-types';
 
 describe('LoggerService', () => {
   let service: LoggerService;
@@ -169,11 +164,10 @@ describe('LoggerService', () => {
 
   describe('captureWarning', () => {
     it('should capture a warning message', () => {
-      const entry = service.captureWarning(
-        'Rate limit approaching',
-        LogSource.BACKEND,
-        { limit: 100, current: 95 },
-      );
+      const entry = service.captureWarning('Rate limit approaching', LogSource.BACKEND, {
+        limit: 100,
+        current: 95,
+      });
 
       expect(entry.level).toBe(LogLevel.WARN);
       expect(entry.message).toBe('Rate limit approaching');
@@ -182,10 +176,26 @@ describe('LoggerService', () => {
 
   describe('getLogs', () => {
     beforeEach(() => {
-      service.capture({ level: LogLevel.ERROR, source: LogSource.BACKEND, message: 'Backend error 1' });
-      service.capture({ level: LogLevel.WARN, source: LogSource.FRONTEND, message: 'Frontend warning 1' });
-      service.capture({ level: LogLevel.ERROR, source: LogSource.AI_MODEL, message: 'AI model error 1' });
-      service.capture({ level: LogLevel.WARN, source: LogSource.BACKEND, message: 'Backend warning 1' });
+      service.capture({
+        level: LogLevel.ERROR,
+        source: LogSource.BACKEND,
+        message: 'Backend error 1',
+      });
+      service.capture({
+        level: LogLevel.WARN,
+        source: LogSource.FRONTEND,
+        message: 'Frontend warning 1',
+      });
+      service.capture({
+        level: LogLevel.ERROR,
+        source: LogSource.AI_MODEL,
+        message: 'AI model error 1',
+      });
+      service.capture({
+        level: LogLevel.WARN,
+        source: LogSource.BACKEND,
+        message: 'Backend warning 1',
+      });
     });
 
     it('should return all logs sorted by timestamp desc', () => {
@@ -289,7 +299,11 @@ describe('LoggerService', () => {
     });
 
     it('should clear logs by IDs', () => {
-      const e1 = service.capture({ level: LogLevel.ERROR, source: LogSource.BACKEND, message: 'Error 1' });
+      const e1 = service.capture({
+        level: LogLevel.ERROR,
+        source: LogSource.BACKEND,
+        message: 'Error 1',
+      });
       service.capture({ level: LogLevel.ERROR, source: LogSource.BACKEND, message: 'Error 2' });
 
       const removed = service.clearLogs({ ids: [e1.id] });
@@ -298,7 +312,11 @@ describe('LoggerService', () => {
     });
 
     it('should clear logs by status', () => {
-      const e1 = service.capture({ level: LogLevel.ERROR, source: LogSource.BACKEND, message: 'Error 1' });
+      const e1 = service.capture({
+        level: LogLevel.ERROR,
+        source: LogSource.BACKEND,
+        message: 'Error 1',
+      });
       service.capture({ level: LogLevel.ERROR, source: LogSource.BACKEND, message: 'Error 2' });
       service.updateStatus([e1.id], LogStatus.FIXED);
 

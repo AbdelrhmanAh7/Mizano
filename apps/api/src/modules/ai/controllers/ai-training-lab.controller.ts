@@ -1,18 +1,5 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { AiFeature } from '@prisma/client';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -34,16 +21,39 @@ import { GenerateTrainingDataDto } from '../dto/generate-training-data.dto';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 const ALL_FEATURES: AiFeature[] = [
-  'CATEGORIZATION', 'RECONCILIATION', 'OCR_LAYOUT', 'DEMAND_FORECAST',
-  'LEAD_SCORING', 'ANOMALY', 'REORDER', 'PAYMENT_PREDICTION',
-  'CASH_FLOW', 'PATTERN_DETECTION', 'CHURN_PREDICTION', 'CLV_ANALYSIS',
-  'CROSS_SELL', 'DYNAMIC_PRICING', 'PIPELINE_FORECAST', 'FRAUD_DETECTION',
-  'COMPLIANCE_MONITORING', 'AUDIT_RISK', 'DOCUMENT_CLASSIFICATION',
-  'SENTIMENT_ANALYSIS', 'ENTITY_EXTRACTION', 'CONTRACT_ANALYSIS',
-  'EMPLOYEE_ATTRITION', 'COMPENSATION_BENCHMARK', 'SKILLS_GAP',
-  'QUALITY_PREDICTION', 'PREDICTIVE_MAINTENANCE', 'WORKFORCE_SCHEDULING',
-  'ROUTE_OPTIMIZATION', 'RESOURCE_OPTIMIZATION', 'CHATBOT',
-  'KNOWLEDGE_ASSISTANT', 'VOICE_COMMAND',
+  'CATEGORIZATION',
+  'RECONCILIATION',
+  'OCR_LAYOUT',
+  'DEMAND_FORECAST',
+  'LEAD_SCORING',
+  'ANOMALY',
+  'REORDER',
+  'PAYMENT_PREDICTION',
+  'CASH_FLOW',
+  'PATTERN_DETECTION',
+  'CHURN_PREDICTION',
+  'CLV_ANALYSIS',
+  'CROSS_SELL',
+  'DYNAMIC_PRICING',
+  'PIPELINE_FORECAST',
+  'FRAUD_DETECTION',
+  'COMPLIANCE_MONITORING',
+  'AUDIT_RISK',
+  'DOCUMENT_CLASSIFICATION',
+  'SENTIMENT_ANALYSIS',
+  'ENTITY_EXTRACTION',
+  'CONTRACT_ANALYSIS',
+  'EMPLOYEE_ATTRITION',
+  'COMPENSATION_BENCHMARK',
+  'SKILLS_GAP',
+  'QUALITY_PREDICTION',
+  'PREDICTIVE_MAINTENANCE',
+  'WORKFORCE_SCHEDULING',
+  'ROUTE_OPTIMIZATION',
+  'RESOURCE_OPTIMIZATION',
+  'CHATBOT',
+  'KNOWLEDGE_ASSISTANT',
+  'VOICE_COMMAND',
 ];
 
 @ApiTags('AI Training Lab')
@@ -77,11 +87,7 @@ export class AiTrainingLabController {
     @Param('feature') feature: AiFeature,
     @Body() dto: GenerateTrainingDataDto,
   ) {
-    const result = await this.generatorService.generate(
-      orgId,
-      feature,
-      dto.count || 100,
-    );
+    const result = await this.generatorService.generate(orgId, feature, dto.count || 100);
     return { data: result };
   }
 
@@ -96,9 +102,7 @@ export class AiTrainingLabController {
       _count: true,
     });
 
-    const trainingCountMap = new Map(
-      trainingCounts.map((tc) => [tc.feature, tc._count]),
-    );
+    const trainingCountMap = new Map(trainingCounts.map((tc) => [tc.feature, tc._count]));
 
     // Batch query: active models
     const activeModels = await this.prisma.aiModel.findMany({
@@ -112,9 +116,7 @@ export class AiTrainingLabController {
       },
     });
 
-    const activeModelMap = new Map(
-      activeModels.map((m) => [m.feature, m]),
-    );
+    const activeModelMap = new Map(activeModels.map((m) => [m.feature, m]));
 
     // Batch query: feedback counts by feature
     const feedbackCounts = await this.prisma.aiFeedback.groupBy({
@@ -123,9 +125,7 @@ export class AiTrainingLabController {
       _count: true,
     });
 
-    const feedbackCountMap = new Map(
-      feedbackCounts.map((fc) => [fc.feature, fc._count]),
-    );
+    const feedbackCountMap = new Map(feedbackCounts.map((fc) => [fc.feature, fc._count]));
 
     // Build dashboard items
     const models = ALL_FEATURES.map((feature) => {
@@ -144,11 +144,11 @@ export class AiTrainingLabController {
 
     const totalActive = models.filter((m) => m.hasActiveModel).length;
     const totalTrainingData = models.reduce((sum, m) => sum + m.trainingDataCount, 0);
-    const avgAccuracy = totalActive > 0
-      ? models
-          .filter((m) => m.accuracy !== null)
-          .reduce((sum, m) => sum + (m.accuracy || 0), 0) / totalActive
-      : 0;
+    const avgAccuracy =
+      totalActive > 0
+        ? models.filter((m) => m.accuracy !== null).reduce((sum, m) => sum + (m.accuracy || 0), 0) /
+          totalActive
+        : 0;
 
     return {
       data: {
@@ -168,10 +168,7 @@ export class AiTrainingLabController {
   @Permissions('ai.view')
   @ApiOperation({ summary: 'Get training data statistics for a feature' })
   @ApiParam({ name: 'feature', enum: ALL_FEATURES })
-  async getTrainingStats(
-    @CurrentOrg() orgId: string,
-    @Param('feature') feature: AiFeature,
-  ) {
+  async getTrainingStats(@CurrentOrg() orgId: string, @Param('feature') feature: AiFeature) {
     const [stats, distribution] = await Promise.all([
       this.trainingService.getTrainingStats(orgId, feature),
       this.trainingService.getLabelDistribution(orgId, feature),
@@ -184,14 +181,8 @@ export class AiTrainingLabController {
   @Permissions('ai.view')
   @ApiOperation({ summary: 'Check training readiness for a feature' })
   @ApiParam({ name: 'feature', enum: ALL_FEATURES })
-  async getReadiness(
-    @CurrentOrg() orgId: string,
-    @Param('feature') feature: AiFeature,
-  ) {
-    const readiness = await this.trainingService.validateTrainingReadiness(
-      orgId,
-      feature,
-    );
+  async getReadiness(@CurrentOrg() orgId: string, @Param('feature') feature: AiFeature) {
+    const readiness = await this.trainingService.validateTrainingReadiness(orgId, feature);
     return { data: readiness };
   }
 
@@ -265,7 +256,11 @@ export class AiTrainingLabController {
     const trainedCount = results.filter((r) => r.trained).length;
     return {
       data: {
-        summary: { total: ALL_FEATURES.length, trained: trainedCount, failed: trainable.length - trainedCount },
+        summary: {
+          total: ALL_FEATURES.length,
+          trained: trainedCount,
+          failed: trainable.length - trainedCount,
+        },
         results,
       },
     };

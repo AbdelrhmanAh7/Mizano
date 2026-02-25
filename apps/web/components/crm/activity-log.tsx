@@ -58,8 +58,8 @@ export function ActivityLog({ leadId, dealId }: ActivityLogProps) {
   const createActivity = useCreateActivity();
 
   const activities: ActivityLogType[] = leadId
-    ? (leadActivitiesData?.data || [])
-    : (dealActivitiesData?.data || []);
+    ? leadActivitiesData?.data || []
+    : dealActivitiesData?.data || [];
 
   const handleSubmit = async () => {
     if (!description.trim()) return;
@@ -88,11 +88,7 @@ export function ActivityLog({ leadId, dealId }: ActivityLogProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Activities</CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowForm(!showForm)}
-          >
+          <Button variant="outline" size="sm" onClick={() => setShowForm(!showForm)}>
             <Plus className="h-4 w-4 mr-1" />
             Add Activity
           </Button>
@@ -152,9 +148,7 @@ export function ActivityLog({ leadId, dealId }: ActivityLogProps) {
 
         {/* Activity Timeline */}
         {activities.length === 0 ? (
-          <div className="text-center py-6 text-muted-foreground">
-            No activities yet
-          </div>
+          <div className="text-center py-6 text-muted-foreground">No activities yet</div>
         ) : (
           <div className="space-y-3">
             {activities.map((activity) => (
@@ -171,13 +165,9 @@ export function ActivityLog({ leadId, dealId }: ActivityLogProps) {
                       {format(new Date(activity.date || activity.createdAt), 'MMM d, yyyy h:mm a')}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {activity.description}
-                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">{activity.description}</p>
                   {activity.user && (
-                    <span className="text-xs text-muted-foreground">
-                      by {activity.user.name}
-                    </span>
+                    <span className="text-xs text-muted-foreground">by {activity.user.name}</span>
                   )}
                 </div>
               </div>
