@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { auditLogsApi } from '@/lib/api';
 
 interface AuditLogParams {
+  [key: string]: unknown;
   page?: number;
   limit?: number;
   entityType?: string;

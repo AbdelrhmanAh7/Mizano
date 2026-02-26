@@ -112,11 +112,13 @@ jest.mock('@/lib/utils', () => ({
 
 const mockModel: AiModelConfig = {
   name: 'Account Classifier',
-  feature: 'account_suggestion',
+  feature: 'CATEGORIZATION',
   description: 'Suggests GL accounts for transactions',
+  category: 'Core Financial',
   icon: 'BarChart3',
-  seedEndpoint: '/ai/training/account-suggestion/seed',
-  trainingEndpoint: '/ai/training/account-suggestion/train',
+  color: 'blue',
+  trainEndpoint: '/ai/training/account-suggestion/train',
+  hasDirectTrain: true,
 };
 
 describe('ModelDetailDialog', () => {
