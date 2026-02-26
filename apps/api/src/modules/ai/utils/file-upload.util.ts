@@ -16,16 +16,55 @@ export const OCR_ALLOWED_MIMES = [
 export const OCR_FILE_TYPE_ERROR =
   'Invalid file type. Allowed: JPEG, PNG, GIF, WebP, TIFF, HEIC, PDF';
 
+/** Maps common file extensions to their canonical MIME types. */
+export const EXTENSION_TO_MIME: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.tiff': 'image/tiff',
+  '.tif': 'image/tiff',
+  '.heic': 'image/heic',
+  '.heif': 'image/heif',
+  '.pdf': 'application/pdf',
+};
+
+/**
+ * Resolves a MIME type from a filename's extension using the EXTENSION_TO_MIME map.
+ * Returns `undefined` if the extension is unknown or the filename has no extension.
+ */
+export function resolveMimeFromExtension(originalname: string): string | undefined {
+  const lastDot = originalname.lastIndexOf('.');
+  if (lastDot === -1) return undefined;
+  return EXTENSION_TO_MIME[originalname.slice(lastDot).toLowerCase()];
+}
+
 /**
  * Creates a multer-compatible fileFilter that accepts OCR_ALLOWED_MIMES.
  * Use as the `fileFilter` option in FileInterceptor / FilesInterceptor.
+ *
+ * When the browser sends `application/octet-stream` or an empty MIME type
+ * (common for HEIC files on Chrome/Windows/Linux), the filter falls back to
+ * resolving the MIME from the file extension. If the resolved MIME is allowed,
+ * `file.mimetype` is patched so downstream consumers receive the correct value.
  */
 export function createOcrFileFilter() {
   return (req: any, file: Express.Multer.File, cb: any) => {
     if (OCR_ALLOWED_MIMES.includes(file.mimetype)) {
       cb(null, true);
-    } else {
-      cb(new BadRequestException(OCR_FILE_TYPE_ERROR), false);
+      return;
     }
+
+    if (file.mimetype === 'application/octet-stream' || !file.mimetype) {
+      const resolved = resolveMimeFromExtension(file.originalname);
+      if (resolved && OCR_ALLOWED_MIMES.includes(resolved)) {
+        file.mimetype = resolved;
+        cb(null, true);
+        return;
+      }
+    }
+
+    cb(new BadRequestException(OCR_FILE_TYPE_ERROR), false);
   };
 }

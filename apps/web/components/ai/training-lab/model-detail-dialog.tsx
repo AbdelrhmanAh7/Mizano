@@ -13,7 +13,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   useModelHistory,
   useTrainingStats,
@@ -45,6 +51,9 @@ export function ModelDetailDialog({ model, open, onOpenChange }: ModelDetailDial
       <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{model?.name} - Details</DialogTitle>
+          <DialogDescription>
+            View model training data, version history, and feedback statistics
+          </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="overview" className="space-y-4">
