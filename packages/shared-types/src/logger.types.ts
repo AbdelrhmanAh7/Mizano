@@ -47,7 +47,7 @@ export interface LogEntry {
   status: LogStatus;
   message: string;
   stack?: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   url?: string;
   method?: string;
   statusCode?: number;

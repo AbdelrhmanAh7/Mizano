@@ -11,18 +11,21 @@
     "dev:vlm": "docker-compose --profile vlm up -d",
     "build": "turbo build",
     "lint": "turbo lint",
-    "lint:fix": "pnpm --filter api lint && pnpm --filter @mizano/web lint",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "lint:fix": "turbo lint:fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
     "type-check": "turbo type-check",
+    "validate": "turbo lint type-check",
     "test": "turbo test",
     "test:api": "pnpm --filter api test",
     "test:web": "pnpm --filter @mizano/web test",
+    "test:watch": "pnpm --filter api test:watch",
     "test:cov": "pnpm --filter api test:cov",
     "test:e2e": "pnpm --filter api test:e2e",
     "db:generate": "pnpm --filter api exec prisma generate",
     "db:push": "pnpm --filter api exec prisma db push",
     "db:migrate": "pnpm --filter api exec prisma migrate dev",
+    "db:reset": "pnpm --filter api exec prisma migrate reset --force && pnpm db:seed",
     "db:seed": "pnpm --filter api exec prisma db seed",
     "db:studio": "pnpm --filter api exec prisma studio",
     "docker:up": "docker-compose up -d",
@@ -33,7 +36,10 @@
     "docker:prod": "docker-compose -f docker-compose.production.yml up -d --build",
     "docker:prod:down": "docker-compose -f docker-compose.production.yml down",
     "generate:types": "pnpm --filter @mizano/shared-types build",
-    "clean": "turbo clean && rm -rf node_modules",
+    "generate:validators": "pnpm --filter @mizano/validators build",
+    "clean": "turbo clean && rm -rf node_modules .turbo",
+    "clean:full": "turbo clean && rm -rf node_modules .turbo apps/web/.next apps/api/dist packages/*/dist coverage",
+    "ci": "turbo lint type-check test",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -46,9 +52,10 @@
       "prettier --write"
     ],
     "packages/**/*.ts": [
+      "eslint --fix --cache",
       "prettier --write"
     ],
-    "*.{json,md}": [
+    "*.{json,md,css}": [
       "prettier --write"
     ]
   },

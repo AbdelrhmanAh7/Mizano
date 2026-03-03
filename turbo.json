@@ -17,6 +17,12 @@
       "inputs": ["src/**/*.ts", "src/**/*.tsx", ".eslintrc.*", "tsconfig.json"],
       "outputs": [".eslintcache"]
     },
+    "lint:fix": {
+      "dependsOn": [],
+      "inputs": ["src/**/*.ts", "src/**/*.tsx", ".eslintrc.*", "tsconfig.json"],
+      "outputs": [".eslintcache"],
+      "cache": false
+    },
     "test": {
       "dependsOn": ["^build"],
       "inputs": ["src/**", "test/**", "jest.config.*", "tsconfig.json"],

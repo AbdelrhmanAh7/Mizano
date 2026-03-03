@@ -2,8 +2,7 @@
 // System Types - Audit, Notifications, Search, Email
 // ============================================
 
-import { AuditAction, SearchEntityType } from '../enums';
-import { OrganizationEntity } from './base';
+import { AuditAction } from '../enums';
 
 // --- Audit Log ---
 

@@ -3,7 +3,7 @@
 // ============================================
 
 import { LeadStatus, LeadSource, LeadTier, DealStage, ActivityType } from '../enums';
-import { OrgSoftDeleteEntity, OrganizationEntity, PaginationQuery } from './base';
+import { OrgSoftDeleteEntity, PaginationQuery } from './base';
 
 // --- Lead ---
 
