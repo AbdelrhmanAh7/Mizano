@@ -1,13 +1,16 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { TaskStatus, TaskPriority } from '@prisma/client';
+import { Prisma, TaskStatus, TaskPriority } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { CreateTaskDto } from '../dto/create-task.dto';
+import { UpdateTaskDto } from '../dto/update-task.dto';
+import { TaskQueryDto } from '../dto/task-query.dto';
 
 @Injectable()
 export class TasksService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateTaskDto) {
     // Verify project exists
     const project = await this.prisma.project.findFirst({
       where: { id: dto.projectId, organizationId },
@@ -44,11 +47,8 @@ export class TasksService {
     });
   }
 
-  async findAll(
-    organizationId: string,
-    query: { projectId?: string; status?: string; assigneeId?: string },
-  ) {
-    const where: any = { organizationId };
+  async findAll(organizationId: string, query: TaskQueryDto) {
+    const where: Prisma.TaskWhereInput = { organizationId, deletedAt: null };
     if (query.projectId) where.projectId = query.projectId;
     if (query.status) where.status = query.status;
     if (query.assigneeId) where.assigneeId = query.assigneeId;
@@ -65,7 +65,7 @@ export class TasksService {
 
   async findOne(organizationId: string, id: string) {
     const task = await this.prisma.task.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: {
         project: true,
         assignee: true,
@@ -80,10 +80,10 @@ export class TasksService {
     return task;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateTaskDto) {
     await this.findOne(organizationId, id);
 
-    const data: any = { ...dto };
+    const data: Record<string, unknown> = { ...dto };
     if (dto.estimatedHours) data.estimatedHours = new Decimal(dto.estimatedHours);
     if (dto.dueDate) data.dueDate = new Date(dto.dueDate);
 
@@ -107,14 +107,17 @@ export class TasksService {
   async remove(organizationId: string, id: string) {
     const task = await this.prisma.task.findFirst({
       where: { id, organizationId },
-      include: { timesheetEntries: { take: 1 } },
+      include: { _count: { select: { timesheetEntries: true } } },
     });
     if (!task) throw new NotFoundException('Task not found');
-    if (task.timesheetEntries.length > 0) {
+    if (task._count.timesheetEntries > 0) {
       throw new BadRequestException('Cannot delete task with timesheet entries');
     }
 
-    await this.prisma.task.delete({ where: { id } });
+    await this.prisma.task.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return { message: 'Task deleted' };
   }
 
@@ -130,7 +133,7 @@ export class TasksService {
 
   async getTasksByProject(organizationId: string, projectId: string) {
     return this.prisma.task.findMany({
-      where: { projectId, organizationId },
+      where: { projectId, organizationId, deletedAt: null },
       include: {
         assignee: { select: { id: true, firstName: true, lastName: true } },
       },
@@ -140,7 +143,12 @@ export class TasksService {
 
   async getMyTasks(organizationId: string, userId: string) {
     return this.prisma.task.findMany({
-      where: { assigneeId: userId, organizationId, status: { not: TaskStatus.DONE } },
+      where: {
+        assigneeId: userId,
+        organizationId,
+        deletedAt: null,
+        status: { not: TaskStatus.DONE },
+      },
       include: {
         project: { select: { id: true, name: true, color: true } },
       },
@@ -149,7 +157,7 @@ export class TasksService {
   }
 
   async getTaskStats(organizationId: string, projectId?: string) {
-    const where: any = { organizationId };
+    const where: Prisma.TaskWhereInput = { organizationId, deletedAt: null };
     if (projectId) where.projectId = projectId;
 
     const tasks = await this.prisma.task.groupBy({
@@ -163,7 +171,7 @@ export class TasksService {
       _sum: { estimatedHours: true },
     });
 
-    const timesheetWhere: any = { organizationId };
+    const timesheetWhere: Prisma.TimesheetEntryWhereInput = { organizationId };
     if (projectId) timesheetWhere.projectId = projectId;
 
     const actualHours = await this.prisma.timesheetEntry.aggregate({

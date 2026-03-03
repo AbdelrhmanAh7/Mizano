@@ -1,13 +1,16 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { TaxType } from '@prisma/client';
+import { Prisma, TaxType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { CreateTaxRateDto } from '../dto/create-tax-rate.dto';
+import { UpdateTaxRateDto } from '../dto/update-tax-rate.dto';
+import { TaxRateQueryDto } from '../dto/tax-rate-query.dto';
 
 @Injectable()
 export class TaxRatesService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateTaxRateDto) {
     // Check for duplicate name
     const existing = await this.prisma.taxRate.findFirst({
       where: { organizationId, name: dto.name },
@@ -29,8 +32,8 @@ export class TaxRatesService {
     });
   }
 
-  async findAll(organizationId: string, query: { type?: string; isActive?: boolean }) {
-    const where: any = { organizationId };
+  async findAll(organizationId: string, query: TaxRateQueryDto) {
+    const where: Prisma.TaxRateWhereInput = { organizationId, deletedAt: null };
     if (query.type) where.type = query.type;
     if (query.isActive !== undefined) where.isActive = query.isActive;
 
@@ -46,7 +49,7 @@ export class TaxRatesService {
 
   async findOne(organizationId: string, id: string) {
     const taxRate = await this.prisma.taxRate.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: {
         linkedAccount: true,
         collectAccount: true,
@@ -56,10 +59,10 @@ export class TaxRatesService {
     return taxRate;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateTaxRateDto) {
     await this.findOne(organizationId, id);
 
-    const data: any = { ...dto };
+    const data: Record<string, unknown> = { ...dto };
     if (dto.rate !== undefined) data.rate = new Decimal(dto.rate);
 
     // If setting as default, unset other defaults
@@ -78,7 +81,7 @@ export class TaxRatesService {
 
   async remove(organizationId: string, id: string) {
     const taxRate = await this.prisma.taxRate.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
     });
     if (!taxRate) throw new NotFoundException('Tax rate not found');
 
@@ -90,13 +93,16 @@ export class TaxRatesService {
       throw new BadRequestException('Tax rate is in use and cannot be deleted');
     }
 
-    await this.prisma.taxRate.delete({ where: { id } });
+    await this.prisma.taxRate.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return { message: 'Tax rate deleted' };
   }
 
   async getDefaultTaxRate(organizationId: string) {
     return this.prisma.taxRate.findFirst({
-      where: { organizationId, isDefault: true, isActive: true },
+      where: { organizationId, isDefault: true, isActive: true, deletedAt: null },
     });
   }
 

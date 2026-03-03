@@ -701,3 +701,55 @@ Total Taxable: 260.88
 VAT 15%: 39.13
 صافي الفاتورة: 300.01
 فقط ثلاثمائة ريال سعودي و هللة لاغير`;
+
+/** Real OCR output from RAK Bank Tax Invoice V2 (live scan, split header with Arabic translations) */
+export const REAL_RAK_BANK_INVOICE_OCR_V2 = `TRANSIT HUB SHIPPING LLC
+
+101
+
+RAKBANK
+
+Hawai Building
+
+Al Nabad 1
+
+SHARJAH. United Arab Emiates
+
+Your Transactions
+Date of          Account/                 Transaction Narration
+Supply       Agreement No.
+
+14.12 2025     XX709353              Overdue Chy
+
+0312 2025
+
+XXXXXXX199998
+
+8373483199901
+
+Tax Invoice
+
+Date:
+Period:
+Invoice No:
+Tax Registration No:
+Transaction            FX Rate
+Amount
+
+pink
+fused)
+AED 420 00         1.0000
+AED 103.95           10000
+
+Total
+
+311122025
+0112/2025 - 3112/2025
+INV20251200095426
+104303905400003
+Transaction              VAT              Total {AED)
+Amount (AED)      Amount @
+5% (AED)
+40000         2000          42000
+9900              4.95               103.95
+499 00             24 95               52395`;

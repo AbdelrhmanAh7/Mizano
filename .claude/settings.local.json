@@ -58,7 +58,19 @@
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWxjZTZ3Y3IwMDBicnVreGhkZ3hxb2FkIiwiZW1haWwiOiJhZG1pbkBtaXphbm8uY29tIiwibmFtZSI6IkFkbWluIFVzZXIiLCJvcmdhbml6YXRpb25JZCI6InNlZWQtb3JnLTAwMSIsInJvbGVJZCI6ImNtbGNlNnc5bDAwMDFydWt4YWNkMHp5OWoiLCJpYXQiOjE3NzA2MDU0MTgsImV4cCI6MTc3MDYwNjMxOH0.4rqgrRuZE1se7uRV5T6UdsDXgf18g3FtILuwmG_Nadg\":*)",
       "Bash(pnpm --filter web build:*)",
       "Bash(node -e:*)",
-      "Bash(npx jest:*)"
+      "Bash(npx jest:*)",
+      "Bash(file:*)",
+      "Bash(npx prisma@5.22.0 migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm type-check:*)",
+      "Bash(git rm --cached tsconfig.json)",
+      "Bash(xxd)",
+      "Bash(xxd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/.husky/pre-commit)",
+      "Bash(printf 'NODE_OPTIONS=\"\"--max-old-space-size=8192\"\" node \"\"$\\(git rev-parse --show-toplevel\\)/_lint_staged.js\"\"\\\\n')",
+      "Bash(pnpm --filter api lint)",
+      "Bash(for f in apps/api/src/modules/purchases/dto/create-bill.dto.ts apps/api/src/modules/purchases/dto/update-bill.dto.ts apps/api/src/modules/purchases/dto/create-expense.dto.ts apps/api/src/modules/purchases/dto/create-payment-made.dto.ts apps/api/src/modules/purchases/dto/create-vendor-credit.dto.ts apps/api/src/modules/purchases/dto/create-vendor.dto.ts apps/api/src/modules/purchases/dto/update-vendor.dto.ts)",
+      "Bash(do sed -i 's/\\\\r$//' \"$f\")",
+      "Bash(done)"
     ]
   }
 }

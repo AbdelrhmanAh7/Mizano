@@ -4,6 +4,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "inputs": ["src/**", "prisma/**", "tsconfig.json", "package.json"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "dev": {
@@ -12,13 +13,19 @@
       "persistent": true
     },
     "lint": {
-      "dependsOn": []
+      "dependsOn": [],
+      "inputs": ["src/**/*.ts", "src/**/*.tsx", ".eslintrc.*", "tsconfig.json"],
+      "outputs": [".eslintcache"]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "inputs": ["src/**", "test/**", "jest.config.*", "tsconfig.json"],
+      "outputs": ["coverage/**"]
     },
     "type-check": {
-      "dependsOn": []
+      "dependsOn": ["^build"],
+      "inputs": ["src/**/*.ts", "src/**/*.tsx", "tsconfig.json", "package.json"],
+      "outputs": []
     },
     "clean": {
       "cache": false

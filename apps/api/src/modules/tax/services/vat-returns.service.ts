@@ -1,11 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { VATReturnStatus } from '@prisma/client';
+import { Prisma, VATReturnStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { JournalsService } from '../../accounting/services/journals.service';
 
 @Injectable()
 export class VatReturnsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private journalsService: JournalsService,
+  ) {}
 
   async create(organizationId: string, dto: { startDate: string; endDate: string }) {
     // Generate period string
@@ -99,8 +103,8 @@ export class VatReturnsService {
   }
 
   async findAll(organizationId: string, query: { status?: string; year?: number }) {
-    const where: any = { organizationId };
-    if (query.status) where.status = query.status;
+    const where: Prisma.VATReturnWhereInput = { organizationId, deletedAt: null };
+    if (query.status) where.status = query.status as VATReturnStatus;
     if (query.year) {
       where.startDate = {
         gte: new Date(query.year, 0, 1),
@@ -116,7 +120,7 @@ export class VatReturnsService {
 
   async findOne(organizationId: string, id: string) {
     const vatReturn = await this.prisma.vATReturn.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: { payment: true },
     });
     if (!vatReturn) throw new NotFoundException('VAT return not found');
@@ -179,6 +183,34 @@ export class VatReturnsService {
       where: { id: vatReturnId },
       data: { status: VATReturnStatus.FILED, filedAt: new Date() },
     });
+
+    // Create accounting entry: Dr VAT Payable / Cr Bank
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { defaultVatPayableAccountId: true },
+    });
+
+    if (org?.defaultVatPayableAccountId) {
+      await this.journalsService.create(organizationId, {
+        date: new Date(dto.date).toISOString(),
+        reference: `VAT Payment ${vatReturn.returnNumber}`,
+        notes: `VAT payment for return ${vatReturn.returnNumber}`,
+        lines: [
+          {
+            accountId: org.defaultVatPayableAccountId,
+            debit: dto.amount.toFixed(4),
+            credit: '0',
+            description: `VAT Payment - ${vatReturn.returnNumber}`,
+          },
+          {
+            accountId: dto.paidFromAccountId,
+            debit: '0',
+            credit: dto.amount.toFixed(4),
+            description: `VAT Payment - Bank/Cash`,
+          },
+        ],
+      });
+    }
 
     return payment;
   }
@@ -246,19 +278,24 @@ export class VatReturnsService {
       throw new BadRequestException('Only draft VAT returns can be deleted');
     }
 
-    await this.prisma.vATReturn.delete({ where: { id } });
+    await this.prisma.vATReturn.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return { message: 'VAT return deleted' };
   }
 
   // === Bulk Operations ===
 
   async bulkDelete(organizationId: string, ids: string[]) {
-    const result = await this.prisma.vATReturn.deleteMany({
+    const result = await this.prisma.vATReturn.updateMany({
       where: {
         id: { in: ids },
         organizationId,
         status: VATReturnStatus.DRAFT,
+        deletedAt: null,
       },
+      data: { deletedAt: new Date() },
     });
     return { deleted: result.count, total: ids.length };
   }

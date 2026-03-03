@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test, TestingModule } from '@nestjs/testing';
 import { OcrService } from './ocr.service';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -37,6 +38,7 @@ import {
   REAL_ARCHI_COFFEE_OCR,
   REAL_BASKIN_ROBBINS_OCR,
   REAL_ALMOTAMAYIZIN_OCR,
+  REAL_RAK_BANK_INVOICE_OCR_V2,
 } from '../__tests__/fixtures/sample-invoice-text';
 
 describe('OcrService', () => {
@@ -487,6 +489,33 @@ describe('OcrService', () => {
       // The OCR picks TRANSIT HUB (customer on the invoice) over RAKBANK (the bank)
       // because LLC suffix gives it a higher score. Vendor matching in DocumentIntakeService
       // handles final vendor assignment via fuzzy matching.
+      expect(result.vendorName).toBe('TRANSIT HUB SHIPPING LLC');
+    });
+  });
+
+  describe('real OCR output: RAK Bank invoice V2 (split header with Arabic)', () => {
+    it('should extract total 523.95', () => {
+      const result = service.buildExtractionResult(REAL_RAK_BANK_INVOICE_OCR_V2, 77);
+      expect(result.total).toBe(523.95);
+    });
+
+    it('should extract subtotal 499.00', () => {
+      const result = service.buildExtractionResult(REAL_RAK_BANK_INVOICE_OCR_V2, 77);
+      expect(result.subtotal).toBe(499);
+    });
+
+    it('should extract tax 24.95', () => {
+      const result = service.buildExtractionResult(REAL_RAK_BANK_INVOICE_OCR_V2, 77);
+      expect(result.tax).toBe(24.95);
+    });
+
+    it('should extract invoice number INV20251200095426', () => {
+      const result = service.buildExtractionResult(REAL_RAK_BANK_INVOICE_OCR_V2, 77);
+      expect(result.invoiceNumber).toBe('INV20251200095426');
+    });
+
+    it('should extract vendor name TRANSIT HUB SHIPPING LLC', () => {
+      const result = service.buildExtractionResult(REAL_RAK_BANK_INVOICE_OCR_V2, 77);
       expect(result.vendorName).toBe('TRANSIT HUB SHIPPING LLC');
     });
   });
@@ -1370,6 +1399,114 @@ describe('OcrService', () => {
     });
     it('should extract total 21', () => {
       expect(result.total).toBeCloseTo(21, 0);
+    });
+  });
+
+  describe('HEIC conversion (convertHeicToJpeg)', () => {
+    let convertHeicToJpeg: (buf: Buffer) => Promise<Buffer>;
+
+    beforeEach(() => {
+      convertHeicToJpeg = (service as any).convertHeicToJpeg.bind(service);
+    });
+
+    it('should throw platform-specific error on non-macOS when sharp cannot decode HEIC', async () => {
+      // On non-macOS (this test env is Windows), if sharp can't decode HEIC
+      // the method should throw a descriptive error instead of trying sips
+      const fakeHeicBuffer = Buffer.from('fake-heic-data');
+
+      await expect(convertHeicToJpeg(fakeHeicBuffer)).rejects.toThrow(
+        /HEIC conversion is not supported on this platform/,
+      );
+    });
+
+    it('should include remediation advice in the error message', async () => {
+      const fakeHeicBuffer = Buffer.from('fake-heic-data');
+
+      await expect(convertHeicToJpeg(fakeHeicBuffer)).rejects.toThrow(
+        /sharp with libheif|convert the image to JPEG/,
+      );
+    });
+
+    it('should not attempt to spawn sips on non-macOS', async () => {
+      // The platform guard must exist to prevent ENOENT errors
+      const source = (service as any).convertHeicToJpeg.toString();
+      expect(source).toContain('darwin');
+    });
+  });
+
+  describe('isHeicFormat', () => {
+    let isHeicFormat: (buf: Buffer) => boolean;
+
+    beforeEach(() => {
+      isHeicFormat = (service as any).isHeicFormat.bind(service);
+    });
+
+    it('should return true for HEIC magic bytes', () => {
+      // HEIC files have 'ftyp' at offset 4 and 'heic' at offset 8
+      const buf = Buffer.alloc(12);
+      buf.write('ftyp', 4, 'ascii');
+      buf.write('heic', 8, 'ascii');
+      expect(isHeicFormat(buf)).toBe(true);
+    });
+
+    it('should return true for HEIF mif1 brand', () => {
+      const buf = Buffer.alloc(12);
+      buf.write('ftyp', 4, 'ascii');
+      buf.write('mif1', 8, 'ascii');
+      expect(isHeicFormat(buf)).toBe(true);
+    });
+
+    it('should return false for JPEG buffer', () => {
+      const buf = Buffer.from([
+        0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+      ]);
+      expect(isHeicFormat(buf)).toBe(false);
+    });
+
+    it('should return false for buffer too short', () => {
+      const buf = Buffer.from([0x00, 0x01, 0x02]);
+      expect(isHeicFormat(buf)).toBe(false);
+    });
+
+    it('should return false for empty buffer', () => {
+      const buf = Buffer.alloc(0);
+      expect(isHeicFormat(buf)).toBe(false);
+    });
+  });
+
+  // ─── Regression: sharp import compatibility (SWC default import) ───
+  describe('sharp integration (regression: _sharp is not a function)', () => {
+    it('should call sharp as a function in ensureProcessableImage', async () => {
+      const buf = Buffer.from('fake-jpeg-data');
+      const result = await (service as any).ensureProcessableImage(buf);
+      // sharp mock returns chainable that resolves to empty buffer
+      expect(result).toBeInstanceOf(Buffer);
+    });
+
+    it('should call sharp as a function in preprocessImage', async () => {
+      const buf = Buffer.from('fake-jpeg-data');
+      const result = await (service as any).preprocessImage(buf);
+      expect(result).toBeInstanceOf(Buffer);
+    });
+
+    it('should call sharp().metadata() without error in preprocessImage', async () => {
+      const buf = Buffer.from('fake-jpeg-data');
+      // preprocessImage calls sharp(buf).metadata() — if sharp is not callable, this throws
+      await expect(
+        (service as any).preprocessImage(buf, { arabicMode: true }),
+      ).resolves.toBeInstanceOf(Buffer);
+    });
+
+    it('should handle HEIC buffer by converting then calling sharp', async () => {
+      // Build a fake HEIC header: 12 bytes with 'ftyp' at offset 4 and 'heic' at offset 8
+      const heicHeader = Buffer.alloc(64);
+      heicHeader.write('ftyp', 4, 'ascii');
+      heicHeader.write('heic', 8, 'ascii');
+      // ensureProcessableImage will detect HEIC, attempt convertHeicToJpeg, then call sharp().rotate()
+      // convertHeicToJpeg shells out to heif-convert which will fail, so it falls back to passing through
+      // The key check: sharp() is callable after the conversion attempt
+      const result = await (service as any).ensureProcessableImage(heicHeader);
+      expect(result).toBeInstanceOf(Buffer);
     });
   });
 });

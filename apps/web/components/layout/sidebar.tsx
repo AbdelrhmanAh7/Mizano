@@ -1,7 +1,14 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 import { localeDirections, type Locale } from '@/i18n/config';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
@@ -340,6 +347,7 @@ export function Sidebar() {
               <SheetTitle className="text-2xl font-bold text-primary">
                 {tCommon('appName')}
               </SheetTitle>
+              <SheetDescription className="sr-only">Main navigation menu</SheetDescription>
             </SheetHeader>
             <div className="flex flex-col h-[calc(100%-73px)] overflow-y-auto pt-4">
               <SidebarNav onItemClick={() => setMobileOpen(false)} />

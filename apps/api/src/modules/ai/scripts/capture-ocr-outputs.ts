@@ -14,9 +14,11 @@
  *   --file=NAME  Process only a specific file (e.g., --file=IMG_2560.HEIC)
  */
 
+/* eslint-disable no-console */
+
 import * as fs from 'fs';
 import * as path from 'path';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 import * as Tesseract from 'tesseract.js';
 import { GROUND_TRUTH } from '../__tests__/fixtures/ground-truth';
 

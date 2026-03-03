@@ -1,12 +1,35 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma, Item } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
+
+interface BomComponentData {
+  itemId: string;
+  quantity: string | number;
+}
+
+interface CreateBomData {
+  name: string;
+  outputItemId: string;
+  outputQuantity?: number;
+  operationsCost?: string | number;
+  isActive?: boolean;
+  components?: BomComponentData[];
+}
+
+interface UpdateBomData {
+  name?: string;
+  outputQuantity?: number;
+  operationsCost?: string | number;
+  isActive?: boolean;
+  components?: BomComponentData[];
+}
 
 @Injectable()
 export class BomService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateBomData) {
     // Verify output item exists
     const outputItem = await this.prisma.item.findFirst({
       where: { id: dto.outputItemId, organizationId },
@@ -43,7 +66,7 @@ export class BomService {
         isActive: dto.isActive ?? true,
         organizationId,
         items: {
-          create: (dto.components || []).map((c: any) => ({
+          create: (dto.components || []).map((c: BomComponentData) => ({
             itemId: c.itemId,
             quantity: new Decimal(c.quantity),
           })),
@@ -57,7 +80,7 @@ export class BomService {
   }
 
   async findAll(organizationId: string, query: { itemId?: string; isActive?: boolean }) {
-    const where: any = { organizationId };
+    const where: Prisma.BOMWhereInput = { organizationId, deletedAt: null };
     if (query.itemId) where.outputItemId = query.itemId;
     if (query.isActive !== undefined) where.isActive = query.isActive;
 
@@ -73,7 +96,7 @@ export class BomService {
 
   async findOne(organizationId: string, id: string) {
     const bom = await this.prisma.bOM.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: {
         outputItem: true,
         items: {
@@ -85,7 +108,7 @@ export class BomService {
     return bom;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateBomData) {
     const existing = await this.findOne(organizationId, id);
 
     // If setting as active, deactivate other BOMs for same item
@@ -101,15 +124,15 @@ export class BomService {
       });
     }
 
-    const data: any = { ...dto };
-    delete data.components;
+    const { components: _components, ...restDto } = dto;
+    const data: Prisma.BOMUncheckedUpdateInput = { ...restDto };
     if (dto.operationsCost !== undefined) data.operationsCost = new Decimal(dto.operationsCost);
 
     // Update components if provided
     if (dto.components) {
       await this.prisma.bOMItem.deleteMany({ where: { bomId: id } });
       await this.prisma.bOMItem.createMany({
-        data: dto.components.map((c: any) => ({
+        data: dto.components.map((c: BomComponentData) => ({
           bomId: id,
           itemId: c.itemId,
           quantity: new Decimal(c.quantity),
@@ -130,15 +153,18 @@ export class BomService {
   async remove(organizationId: string, id: string) {
     const bom = await this.prisma.bOM.findFirst({
       where: { id, organizationId },
-      include: { workOrders: { take: 1 } },
+      include: { _count: { select: { workOrders: true } } },
     });
     if (!bom) throw new NotFoundException('BOM not found');
-    if (bom.workOrders.length > 0) {
+    if (bom._count.workOrders > 0) {
       throw new BadRequestException('Cannot delete BOM with existing work orders');
     }
 
     await this.prisma.bOMItem.deleteMany({ where: { bomId: id } });
-    await this.prisma.bOM.delete({ where: { id } });
+    await this.prisma.bOM.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return { message: 'BOM deleted' };
   }
 
@@ -148,7 +174,7 @@ export class BomService {
     const multiplier = quantity / outputQty;
 
     const requirements: Array<{
-      item: any;
+      item: Item;
       requiredQuantity: number;
       currentStock: number;
       shortfall: number;

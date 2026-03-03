@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     # Engine selection: "transformers" or "vllm"
     ENGINE: str = "transformers"
 
+    # LoRA adapter settings
+    LORA_ENABLED: bool = False
+    LORA_ADAPTER_PATH: str | None = None  # Path to LoRA adapter directory
+
     # vLLM-specific settings
     VLLM_GPU_MEMORY_UTILIZATION: float = 0.85
     VLLM_MAX_MODEL_LEN: int = 4096

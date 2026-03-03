@@ -24,8 +24,25 @@ export interface OcrTrainingExtractResult {
 export interface OcrTrainingSubmitData {
   vendorId: string;
   rawText: string;
-  extractedFields: Record<string, any>;
-  correctedFields: Record<string, any>;
+  extractedFields: Record<string, unknown>;
+  correctedFields: Record<string, unknown>;
+  /** Extraction method used (for tracking which engine produced the data) */
+  extractionMethod?: 'vlm' | 'ocr' | 'paddleocr+tesseract';
+  /** Detailed confidence from Python OCR service */
+  detailedConfidence?: {
+    overall: number;
+    invoice_number: number;
+    dates: number;
+    vendor: number;
+    line_items: number;
+    totals: number;
+  } | null;
+  /** Validation results from Python OCR service */
+  validationResults?: {
+    all_passed: boolean;
+    checks: Array<{ name: string; passed: boolean; detail: string }>;
+    corrections_applied: string[];
+  } | null;
 }
 
 export interface OcrTrainingSubmitResult {
@@ -45,7 +62,7 @@ export interface VendorOcrHistory {
   vendorId: string;
   vendorName: string;
   layout: {
-    fieldPositions: any;
+    fieldPositions: unknown;
     sampleCount: number;
     lastUsedAt: string;
     isActive: boolean;
@@ -53,7 +70,7 @@ export interface VendorOcrHistory {
   corrections: Array<{
     id: string;
     createdAt: string;
-    aiSuggestion: any;
+    aiSuggestion: unknown;
     userAnswer: string;
     userAction: string;
   }>;

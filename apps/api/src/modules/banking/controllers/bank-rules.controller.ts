@@ -10,7 +10,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { BankRulesService } from '../services/bank-rules.service';
+import { BankRulesService, BankRuleCondition } from '../services/bank-rules.service';
+import { CreateBankRuleDto } from '../dto/create-bank-rule.dto';
+import { UpdateBankRuleDto } from '../dto/update-bank-rule.dto';
+import { BankRuleQueryDto } from '../dto/bank-rule-query.dto';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -25,14 +28,14 @@ export class BankRulesController {
   @Post()
   @Permissions('banking.create')
   @ApiOperation({ summary: 'Create a bank rule' })
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateBankRuleDto) {
     return this.bankRulesService.create(orgId, dto);
   }
 
   @Get()
   @Permissions('banking.view')
   @ApiOperation({ summary: 'Get all bank rules' })
-  findAll(@CurrentOrg() orgId: string, @Query() query: { search?: string; isActive?: boolean }) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: BankRuleQueryDto) {
     return this.bankRulesService.findAll(orgId, query);
   }
 
@@ -46,7 +49,7 @@ export class BankRulesController {
   @Patch(':id')
   @Permissions('banking.edit')
   @ApiOperation({ summary: 'Update bank rule' })
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateBankRuleDto) {
     return this.bankRulesService.update(orgId, id, dto);
   }
 
@@ -60,7 +63,10 @@ export class BankRulesController {
   @Post('test')
   @Permissions('banking.view')
   @ApiOperation({ summary: 'Test a bank rule against sample transaction' })
-  test(@CurrentOrg() orgId: string, @Body() dto: { conditions: any[]; transaction: any }) {
+  test(
+    @CurrentOrg() orgId: string,
+    @Body() dto: { conditions: BankRuleCondition[]; transaction: Record<string, unknown> },
+  ) {
     return this.bankRulesService.testRule(dto.conditions, dto.transaction);
   }
 

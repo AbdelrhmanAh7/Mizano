@@ -3,8 +3,9 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
-import * as compression from 'compression';
+import compression from 'compression';
 import { randomUUID } from 'crypto';
+import { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -13,7 +14,7 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
   // Request ID middleware
-  app.use((req: any, _res: any, next: any) => {
+  app.use((req: Request, _res: Response, next: NextFunction) => {
     if (!req.headers['x-request-id']) {
       req.headers['x-request-id'] = randomUUID();
     }
@@ -96,4 +97,4 @@ async function bootstrap() {
   }
 }
 
-bootstrap();
+void bootstrap();

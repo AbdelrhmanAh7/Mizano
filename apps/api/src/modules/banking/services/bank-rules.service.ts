@@ -1,25 +1,35 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { CreateBankRuleDto } from '../dto/create-bank-rule.dto';
+import { UpdateBankRuleDto } from '../dto/update-bank-rule.dto';
+import { BankRuleQueryDto } from '../dto/bank-rule-query.dto';
+
+export interface BankRuleCondition {
+  field: string;
+  operator: string;
+  value: string;
+}
 
 @Injectable()
 export class BankRulesService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateBankRuleDto) {
     return this.prisma.bankRule.create({
       data: {
         name: dto.name,
-        bankAccountId: dto.bankAccountId || null,
-        conditions: dto.conditions || [],
-        action: dto.action || {},
+        bankAccountId: dto.bankAccountId ?? null,
+        conditions: (dto.conditions as Prisma.InputJsonValue) ?? [],
+        action: (dto.action as Prisma.InputJsonValue) ?? {},
         isActive: dto.isActive !== false,
         organizationId,
       },
     });
   }
 
-  async findAll(organizationId: string, query: { search?: string; isActive?: boolean }) {
-    const where: any = { organizationId };
+  async findAll(organizationId: string, query: BankRuleQueryDto) {
+    const where: Prisma.BankRuleWhereInput = { organizationId, deletedAt: null };
     if (query.isActive !== undefined) where.isActive = query.isActive;
     if (query.search) {
       where.name = { contains: query.search, mode: 'insensitive' };
@@ -36,7 +46,7 @@ export class BankRulesService {
 
   async findOne(organizationId: string, id: string) {
     const rule = await this.prisma.bankRule.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: {
         bankAccount: { select: { id: true, name: true } },
       },
@@ -45,27 +55,33 @@ export class BankRulesService {
     return rule;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateBankRuleDto) {
     await this.findOne(organizationId, id);
+    const data: Prisma.BankRuleUncheckedUpdateInput = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.bankAccountId !== undefined) data.bankAccountId = dto.bankAccountId;
+    if (dto.conditions !== undefined) data.conditions = dto.conditions as Prisma.InputJsonValue;
+    if (dto.action !== undefined) data.action = dto.action as Prisma.InputJsonValue;
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
     return this.prisma.bankRule.update({
       where: { id },
-      data: {
-        ...(dto.name !== undefined && { name: dto.name }),
-        ...(dto.bankAccountId !== undefined && { bankAccountId: dto.bankAccountId }),
-        ...(dto.conditions !== undefined && { conditions: dto.conditions }),
-        ...(dto.action !== undefined && { action: dto.action }),
-        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
-      },
+      data,
     });
   }
 
   async remove(organizationId: string, id: string) {
     await this.findOne(organizationId, id);
-    await this.prisma.bankRule.delete({ where: { id } });
+    await this.prisma.bankRule.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return { message: 'Bank rule deleted' };
   }
 
-  testRule(conditions: any[], transaction: any): { matches: boolean; matchedConditions: number[] } {
+  testRule(
+    conditions: BankRuleCondition[],
+    transaction: Record<string, unknown>,
+  ): { matches: boolean; matchedConditions: number[] } {
     const matchedConditions: number[] = [];
 
     conditions.forEach((condition, index) => {

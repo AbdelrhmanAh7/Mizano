@@ -4,6 +4,8 @@ import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { CreateEmployeeDto } from '../dto/create-employee.dto';
+import { UpdateEmployeeDto } from '../dto/update-employee.dto';
 import { EmployeeCursorQueryDto } from '../dto/employee-cursor-query.dto';
 import { EmployeesService } from '../services/employees.service';
 
@@ -17,7 +19,7 @@ export class EmployeesController {
   @Post()
   @Permissions('hr.create')
   @ApiOperation({ summary: 'Create a new employee' })
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateEmployeeDto) {
     return this.employeesService.create(orgId, dto);
   }
 
@@ -62,7 +64,7 @@ export class EmployeesController {
   @Put(':id')
   @Permissions('hr.edit')
   @ApiOperation({ summary: 'Update employee' })
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateEmployeeDto) {
     return this.employeesService.update(orgId, id, dto);
   }
 

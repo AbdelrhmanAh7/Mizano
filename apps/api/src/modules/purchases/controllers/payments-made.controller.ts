@@ -21,6 +21,7 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { CreatePaymentMadeDto } from '../dto/create-payment-made.dto';
 import { PaymentsMadeService } from '../services/payments-made.service';
 
 @ApiTags('Payments Made')
@@ -34,7 +35,7 @@ export class PaymentsMadeController {
   @Post()
   @Permissions('purchases.create')
   @InvalidateCache('payments-made:*', 'bills:*')
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreatePaymentMadeDto) {
     return this.paymentsMadeService.create(orgId, dto);
   }
 

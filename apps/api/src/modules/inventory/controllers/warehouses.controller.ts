@@ -1,6 +1,8 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { WarehousesService } from '../services/warehouses.service';
+import { CreateWarehouseDto } from '../dto/create-warehouse.dto';
+import { UpdateWarehouseDto } from '../dto/update-warehouse.dto';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -14,7 +16,7 @@ export class WarehousesController {
 
   @Post()
   @Permissions('inventory.create')
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateWarehouseDto) {
     return this.warehousesService.create(orgId, dto);
   }
 
@@ -32,7 +34,7 @@ export class WarehousesController {
 
   @Patch(':id')
   @Permissions('inventory.edit')
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateWarehouseDto) {
     return this.warehousesService.update(orgId, id, dto);
   }
 

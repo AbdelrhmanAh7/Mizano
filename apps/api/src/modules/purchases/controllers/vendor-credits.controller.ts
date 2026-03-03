@@ -21,6 +21,7 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { CreateVendorCreditDto } from '../dto/create-vendor-credit.dto';
 import { VendorCreditsService } from '../services/vendor-credits.service';
 
 @ApiTags('Vendor Credits')
@@ -35,7 +36,7 @@ export class VendorCreditsController {
   @Permissions('purchases.create')
   @InvalidateCache('vendor-credits:*')
   @ApiOperation({ summary: 'Create a vendor credit' })
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateVendorCreditDto) {
     return this.vendorCreditsService.create(orgId, dto);
   }
 

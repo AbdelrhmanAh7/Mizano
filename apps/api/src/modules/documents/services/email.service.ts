@@ -95,8 +95,9 @@ export class EmailService {
       });
 
       return { success: true, emailLogId: emailLog.id };
-    } catch (error) {
+    } catch (error: unknown) {
       // Log the failed email
+      const errorMessage = error instanceof Error ? error.message : String(error);
       await this.prisma.emailLog.create({
         data: {
           to: dto.to,
@@ -104,12 +105,12 @@ export class EmailService {
           entityType: 'invoice',
           entityId: invoiceId,
           status: 'failed',
-          error: error.message,
+          error: errorMessage,
           organizationId,
         },
       });
 
-      return { success: false, error: error.message };
+      return { success: false, error: errorMessage };
     }
   }
 
@@ -189,7 +190,8 @@ export class EmailService {
       });
 
       return { success: true, emailLogId: emailLog.id };
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       await this.prisma.emailLog.create({
         data: {
           to: dto.to,
@@ -197,12 +199,12 @@ export class EmailService {
           entityType: 'quote',
           entityId: quoteId,
           status: 'failed',
-          error: error.message,
+          error: errorMessage,
           organizationId,
         },
       });
 
-      return { success: false, error: error.message };
+      return { success: false, error: errorMessage };
     }
   }
 
@@ -293,7 +295,8 @@ export class EmailService {
       });
 
       return { success: true, emailLogId: emailLog.id };
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const payslip = await this.prisma.payslip.findFirst({
         where: { id: payslipId },
         include: { employee: true },
@@ -306,12 +309,12 @@ export class EmailService {
           entityType: 'payslip',
           entityId: payslipId,
           status: 'failed',
-          error: error.message,
+          error: errorMessage,
           organizationId,
         },
       });
 
-      return { success: false, error: error.message };
+      return { success: false, error: errorMessage };
     }
   }
 
@@ -589,8 +592,8 @@ export class EmailService {
       limit?: number;
       offset?: number;
     },
-  ): Promise<{ data: any[]; total: number }> {
-    const where: any = { organizationId };
+  ): Promise<{ data: unknown[]; total: number }> {
+    const where: Record<string, unknown> = { organizationId };
 
     if (options?.entityType) where.entityType = options.entityType;
     if (options?.entityId) where.entityId = options.entityId;

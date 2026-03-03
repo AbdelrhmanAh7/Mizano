@@ -15,33 +15,56 @@ logger = logging.getLogger(__name__)
 # Realistic bilingual (Arabic/English) mock response used when VLM_MOCK=True.
 # This allows the NestJS backend and frontend to be developed without GPU access.
 MOCK_RESPONSE: dict[str, Any] = {
-    "vendor_name": "Al-Faisal Trading Co. / شركة الفيصل التجارية",
-    "vendor_tax_id": "300123456789003",
-    "customer_name": None,
+    "document_type": "invoice",
     "invoice_number": "INV-2024-001234",
     "invoice_date": "2024-12-15",
     "due_date": "2025-01-14",
     "currency": "SAR",
-    "subtotal": 5000.00,
-    "tax_amount": 750.00,
-    "total_amount": 5750.00,
     "payment_terms": "Net 30",
-    "items": [
+    "vendor": {
+        "name": "Al-Faisal Trading Co. / شركة الفيصل التجارية",
+        "address": "King Fahd Road, Riyadh 12345, Saudi Arabia",
+        "tax_id": "300123456789003",
+        "phone": "+966 11 234 5678",
+        "email": None,
+    },
+    "bill_to": {
+        "name": "Sample Customer LLC",
+        "address": "123 Business St, Riyadh, Saudi Arabia",
+        "tax_id": None,
+    },
+    "ship_to": {
+        "name": None,
+        "address": None,
+    },
+    "line_items": [
         {
+            "line_number": 1,
             "description": "Office Supplies / مستلزمات مكتبية",
             "quantity": 10,
             "unit_price": 300.0,
-            "total": 3000.0,
-            "tax_rate": 15.0,
+            "taxable_amount": 3000.0,
+            "tax_rate_percent": 15.0,
+            "tax_amount": 450.0,
+            "line_total": 3450.0,
         },
         {
+            "line_number": 2,
             "description": "Printer Paper A4 / ورق طباعة",
             "quantity": 20,
             "unit_price": 100.0,
-            "total": 2000.0,
-            "tax_rate": 15.0,
+            "taxable_amount": 2000.0,
+            "tax_rate_percent": 15.0,
+            "tax_amount": 300.0,
+            "line_total": 2300.0,
         },
     ],
+    "subtotal": 5000.00,
+    "tax_total": 750.00,
+    "discount": 0.00,
+    "total": 5750.00,
+    "amount_paid": 0.00,
+    "balance_due": 5750.00,
     "notes": None,
     "accounting_entry": {
         "debit_account": "Office Supplies",
@@ -59,12 +82,74 @@ MOCK_RESPONSE: dict[str, Any] = {
 
 
 # ------------------------------------------------------------------
-# Abstract base engine
+# Abstract base engine (with shared metrics & GPU helpers)
 # ------------------------------------------------------------------
 
 
 class BaseEngine(ABC):
-    """Abstract base for all VLM inference engines."""
+    """Abstract base for all VLM inference engines.
+
+    Provides shared metrics tracking (_total_requests, _total_inference_ms,
+    total_requests, average_inference_ms) and GPU stats so that subclasses
+    don't duplicate this boilerplate.
+    """
+
+    def __init__(self) -> None:
+        self._total_requests: int = 0
+        self._total_inference_ms: float = 0.0
+
+    # -- Metrics --
+
+    def _track_inference(self, elapsed_ms: float) -> None:
+        """Record one inference request's timing."""
+        self._total_requests += 1
+        self._total_inference_ms += elapsed_ms
+
+    @property
+    def total_requests(self) -> int:
+        return self._total_requests
+
+    @property
+    def average_inference_ms(self) -> float:
+        if self._total_requests == 0:
+            return 0.0
+        return round(self._total_inference_ms / self._total_requests, 1)
+
+    # -- GPU helpers --
+
+    def get_gpu_stats(self) -> dict:
+        """Return current GPU VRAM usage. Safe to call without a GPU."""
+        try:
+            import torch
+
+            if not torch.cuda.is_available():
+                return {}
+
+            device = torch.cuda.current_device()
+            used_bytes = torch.cuda.memory_allocated(device)
+            props = torch.cuda.get_device_properties(device)
+            total_bytes = props.total_memory
+
+            return {
+                "gpu_memory_used_mb": round(used_bytes / 1024 / 1024, 1),
+                "gpu_memory_total_mb": round(total_bytes / 1024 / 1024, 1),
+            }
+        except Exception:
+            return {}
+
+    @staticmethod
+    def _clear_cuda_cache() -> None:
+        """Release CUDA memory if available."""
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                logger.info("CUDA cache cleared.")
+        except ImportError:
+            pass
+
+    # -- Abstract interface --
 
     @abstractmethod
     async def load_model(self) -> None: ...
@@ -74,9 +159,6 @@ class BaseEngine(ABC):
 
     @abstractmethod
     async def extract_invoice(self, image: Image.Image) -> dict: ...
-
-    @abstractmethod
-    def get_gpu_stats(self) -> dict: ...
 
     @abstractmethod
     def is_loaded(self) -> bool: ...
@@ -94,9 +176,8 @@ class MockEngine(BaseEngine):
     """
 
     def __init__(self, settings: Settings) -> None:
+        super().__init__()
         self._settings = settings
-        self._total_requests: int = 0
-        self._total_inference_ms: float = 0.0
 
     async def load_model(self) -> None:
         logger.info("Mock mode enabled — VLM model will NOT be loaded.")
@@ -109,8 +190,7 @@ class MockEngine(BaseEngine):
         elapsed = time.perf_counter() * 1000 - start_ms
         result = dict(MOCK_RESPONSE)
         result["processing_time_ms"] = round(elapsed, 2)
-        self._total_requests += 1
-        self._total_inference_ms += result["processing_time_ms"]
+        self._track_inference(result["processing_time_ms"])
         return result
 
     def get_gpu_stats(self) -> dict:
@@ -118,16 +198,6 @@ class MockEngine(BaseEngine):
 
     def is_loaded(self) -> bool:
         return True
-
-    @property
-    def total_requests(self) -> int:
-        return self._total_requests
-
-    @property
-    def average_inference_ms(self) -> float:
-        if self._total_requests == 0:
-            return 0.0
-        return round(self._total_inference_ms / self._total_requests, 1)
 
 
 # ------------------------------------------------------------------
@@ -142,11 +212,10 @@ class TransformersEngine(BaseEngine):
     """
 
     def __init__(self, settings: Settings) -> None:
+        super().__init__()
         self._settings = settings
         self.model: Any = None
         self.processor: Any = None
-        self._total_requests: int = 0
-        self._total_inference_ms: float = 0.0
 
     async def load_model(self) -> None:
         logger.info("Loading model '%s' with transformers engine …", self._settings.MODEL_NAME)
@@ -172,6 +241,16 @@ class TransformersEngine(BaseEngine):
         )
         self.processor = AutoProcessor.from_pretrained(self._settings.MODEL_NAME)
 
+        # Load LoRA adapter if enabled
+        if self._settings.LORA_ENABLED and self._settings.LORA_ADAPTER_PATH:
+            from peft import PeftModel
+
+            adapter_path = self._settings.LORA_ADAPTER_PATH
+            logger.info("Loading LoRA adapter from %s", adapter_path)
+            self.model = PeftModel.from_pretrained(self.model, adapter_path)
+            self.model = self.model.merge_and_unload()
+            logger.info("LoRA adapter merged — zero-overhead inference enabled")
+
     async def unload_model(self) -> None:
         if self.model is not None:
             del self.model
@@ -180,15 +259,7 @@ class TransformersEngine(BaseEngine):
             del self.processor
             self.processor = None
 
-        try:
-            import torch
-
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                logger.info("CUDA cache cleared.")
-        except ImportError:
-            pass
-
+        self._clear_cuda_cache()
         logger.info("Transformers engine unloaded.")
 
     async def extract_invoice(self, image: Image.Image) -> dict:
@@ -206,8 +277,7 @@ class TransformersEngine(BaseEngine):
         result["raw_text"] = raw_output
         result["processing_time_ms"] = round(elapsed, 2)
 
-        self._total_requests += 1
-        self._total_inference_ms += result["processing_time_ms"]
+        self._track_inference(result["processing_time_ms"])
         return result
 
     def _run_inference_sync(self, image: Image.Image) -> str:
@@ -255,37 +325,8 @@ class TransformersEngine(BaseEngine):
 
         return output_text
 
-    def get_gpu_stats(self) -> dict:
-        try:
-            import torch
-
-            if not torch.cuda.is_available():
-                return {}
-
-            device = torch.cuda.current_device()
-            used_bytes = torch.cuda.memory_allocated(device)
-            props = torch.cuda.get_device_properties(device)
-            total_bytes = props.total_memory
-
-            return {
-                "gpu_memory_used_mb": round(used_bytes / 1024 / 1024, 1),
-                "gpu_memory_total_mb": round(total_bytes / 1024 / 1024, 1),
-            }
-        except Exception:
-            return {}
-
     def is_loaded(self) -> bool:
         return self.model is not None
-
-    @property
-    def total_requests(self) -> int:
-        return self._total_requests
-
-    @property
-    def average_inference_ms(self) -> float:
-        if self._total_requests == 0:
-            return 0.0
-        return round(self._total_inference_ms / self._total_requests, 1)
 
 
 # ------------------------------------------------------------------
@@ -300,10 +341,10 @@ class VllmEngine(BaseEngine):
     """
 
     def __init__(self, settings: Settings) -> None:
+        super().__init__()
         self._settings = settings
         self.llm: Any = None
-        self._total_requests: int = 0
-        self._total_inference_ms: float = 0.0
+        self._lora_request: Any = None  # vLLM LoRARequest for inference
 
     async def load_model(self) -> None:
         logger.info("Loading model '%s' with vLLM engine …", self._settings.MODEL_NAME)
@@ -323,6 +364,8 @@ class VllmEngine(BaseEngine):
     def _load_model_sync(self) -> None:
         from vllm import LLM
 
+        lora_enabled = self._settings.LORA_ENABLED and self._settings.LORA_ADAPTER_PATH
+
         self.llm = LLM(
             model=self._settings.MODEL_NAME,
             dtype="auto",
@@ -332,22 +375,26 @@ class VllmEngine(BaseEngine):
             max_num_seqs=self._settings.VLLM_MAX_NUM_SEQS,
             enforce_eager=self._settings.VLLM_ENFORCE_EAGER,
             trust_remote_code=True,
+            enable_lora=lora_enabled,
+            max_lora_rank=32 if lora_enabled else None,
         )
+
+        if lora_enabled:
+            from vllm.lora.request import LoRARequest
+
+            self._lora_request = LoRARequest(
+                lora_name="invoice-lora",
+                lora_int_id=1,
+                lora_path=self._settings.LORA_ADAPTER_PATH,
+            )
+            logger.info("vLLM LoRA adapter registered: %s", self._settings.LORA_ADAPTER_PATH)
 
     async def unload_model(self) -> None:
         if self.llm is not None:
             del self.llm
             self.llm = None
 
-        try:
-            import torch
-
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                logger.info("CUDA cache cleared.")
-        except ImportError:
-            pass
-
+        self._clear_cuda_cache()
         logger.info("vLLM engine unloaded.")
 
     async def extract_invoice(self, image: Image.Image) -> dict:
@@ -365,8 +412,7 @@ class VllmEngine(BaseEngine):
         result["raw_text"] = raw_output
         result["processing_time_ms"] = round(elapsed, 2)
 
-        self._total_requests += 1
-        self._total_inference_ms += result["processing_time_ms"]
+        self._track_inference(result["processing_time_ms"])
         return result
 
     def _run_inference_sync(self, image: Image.Image) -> str:
@@ -388,40 +434,15 @@ class VllmEngine(BaseEngine):
             }
         ]
 
-        outputs = self.llm.chat(messages, sampling_params=sampling_params)
+        kwargs = {"sampling_params": sampling_params}
+        if self._lora_request is not None:
+            kwargs["lora_request"] = self._lora_request
+
+        outputs = self.llm.chat(messages, **kwargs)
         return outputs[0].outputs[0].text
-
-    def get_gpu_stats(self) -> dict:
-        try:
-            import torch
-
-            if not torch.cuda.is_available():
-                return {}
-
-            device = torch.cuda.current_device()
-            used_bytes = torch.cuda.memory_allocated(device)
-            props = torch.cuda.get_device_properties(device)
-            total_bytes = props.total_memory
-
-            return {
-                "gpu_memory_used_mb": round(used_bytes / 1024 / 1024, 1),
-                "gpu_memory_total_mb": round(total_bytes / 1024 / 1024, 1),
-            }
-        except Exception:
-            return {}
 
     def is_loaded(self) -> bool:
         return self.llm is not None
-
-    @property
-    def total_requests(self) -> int:
-        return self._total_requests
-
-    @property
-    def average_inference_ms(self) -> float:
-        if self._total_requests == 0:
-            return 0.0
-        return round(self._total_inference_ms / self._total_requests, 1)
 
 
 # ------------------------------------------------------------------

@@ -4,6 +4,8 @@ import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { JournalsService } from '../../accounting/services/journals.service';
+import { CreatePaymentMadeDto } from '../dto/create-payment-made.dto';
 import { BillsService } from './bills.service';
 
 @Injectable()
@@ -11,18 +13,16 @@ export class PaymentsMadeService {
   constructor(
     private prisma: PrismaService,
     private billsService: BillsService,
+    private journalsService: JournalsService,
   ) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreatePaymentMadeDto) {
     const vendor = await this.prisma.vendor.findFirst({
       where: { id: dto.vendorId, organizationId, deletedAt: null },
     });
     if (!vendor) throw new BadRequestException('Vendor not found');
 
-    const totalAllocated = dto.allocations.reduce(
-      (sum: number, a: any) => sum + parseFloat(a.amount),
-      0,
-    );
+    const totalAllocated = dto.allocations.reduce((sum, a) => sum + parseFloat(a.amount), 0);
     if (Math.abs(totalAllocated - parseFloat(dto.amount)) > 0.01)
       throw new BadRequestException('Allocation must equal payment');
 
@@ -40,7 +40,7 @@ export class PaymentsMadeService {
         notes: dto.notes,
         organizationId,
         allocations: {
-          create: dto.allocations.map((a: any) => ({
+          create: dto.allocations.map((a) => ({
             billId: a.billId,
             amount: new Decimal(a.amount),
           })),
@@ -51,6 +51,37 @@ export class PaymentsMadeService {
 
     for (const alloc of dto.allocations) {
       await this.billsService.updateBalanceDue(alloc.billId);
+    }
+
+    // Create accounting entry: Dr AP / Cr Bank
+    if (dto.paidFromAccountId) {
+      const org = await this.prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { defaultApAccountId: true },
+      });
+
+      if (org?.defaultApAccountId) {
+        const amount = parseFloat(dto.amount);
+        await this.journalsService.create(organizationId, {
+          date: new Date(dto.date).toISOString(),
+          reference: `Payment ${payment.paymentNumber}`,
+          notes: `Vendor payment ${payment.paymentNumber}`,
+          lines: [
+            {
+              accountId: org.defaultApAccountId,
+              debit: amount.toFixed(4),
+              credit: '0',
+              description: `${payment.paymentNumber} - Accounts Payable`,
+            },
+            {
+              accountId: dto.paidFromAccountId,
+              debit: '0',
+              credit: amount.toFixed(4),
+              description: `${payment.paymentNumber} - Payment`,
+            },
+          ],
+        });
+      }
     }
 
     return payment;

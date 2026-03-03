@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PayrollStatus } from '@prisma/client';
+import { Prisma, PayrollStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
 
@@ -267,7 +267,18 @@ export class PayrollService {
     });
   }
 
-  private async generateJournalNumber(tx: any, organizationId: string): Promise<string> {
+  private async generateJournalNumber(
+    tx: {
+      journal: {
+        findFirst: (args: {
+          where: { organizationId: string };
+          orderBy: { createdAt: 'desc' };
+          select: { journalNumber: true };
+        }) => Promise<{ journalNumber: string } | null>;
+      };
+    },
+    organizationId: string,
+  ): Promise<string> {
     const lastJournal = await tx.journal.findFirst({
       where: { organizationId },
       orderBy: { createdAt: 'desc' },
@@ -283,8 +294,8 @@ export class PayrollService {
   }
 
   async getPayrollRuns(organizationId: string, query: { status?: string; year?: number }) {
-    const where: any = { organizationId };
-    if (query.status) where.status = query.status;
+    const where: Prisma.PayrollRunWhereInput = { organizationId, deletedAt: null };
+    if (query.status) where.status = query.status as PayrollStatus;
     if (query.year) where.year = query.year;
 
     return this.prisma.payrollRun.findMany({
@@ -298,7 +309,7 @@ export class PayrollService {
 
   async getPayrollRun(organizationId: string, id: string) {
     const payrollRun = await this.prisma.payrollRun.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: {
         payslips: {
           include: {
@@ -345,25 +356,30 @@ export class PayrollService {
     }
 
     await this.prisma.payslip.deleteMany({ where: { payrollRunId: id } });
-    await this.prisma.payrollRun.delete({ where: { id } });
+    await this.prisma.payrollRun.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return { message: 'Payroll run deleted' };
   }
 
   // === Bulk Operations ===
 
   async bulkDelete(organizationId: string, ids: string[]) {
-    // Delete payslips first, then runs
+    // Delete payslips first, then soft-delete runs
     await this.prisma.payslip.deleteMany({
       where: {
         payrollRun: { id: { in: ids }, organizationId, status: { not: PayrollStatus.PAID } },
       },
     });
-    const result = await this.prisma.payrollRun.deleteMany({
+    const result = await this.prisma.payrollRun.updateMany({
       where: {
         id: { in: ids },
         organizationId,
         status: { not: PayrollStatus.PAID },
+        deletedAt: null,
       },
+      data: { deletedAt: new Date() },
     });
     return { deleted: result.count, total: ids.length };
   }

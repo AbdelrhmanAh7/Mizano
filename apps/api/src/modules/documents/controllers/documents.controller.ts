@@ -80,6 +80,29 @@ export class DocumentsController {
     return this.emailService.sendInvoice(orgId, id, dto);
   }
 
+  // ============ Bill Documents ============
+
+  @Get('bill/:id/pdf')
+  @Permissions('purchases.view')
+  @ApiOperation({ summary: 'Generate bill PDF' })
+  @ApiParam({ name: 'id', description: 'Bill ID' })
+  @ApiResponse({ status: 200, description: 'PDF file' })
+  async getBillPdf(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const pdfBuffer = await this.pdfService.generateBillPdf(orgId, id);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="bill-${id}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    });
+
+    res.send(pdfBuffer);
+  }
+
   // ============ Quote Documents ============
 
   @Get('quote/:id/pdf')
@@ -216,7 +239,7 @@ export class DocumentsController {
     @Query('entityId') entityId?: string,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
-  ): Promise<{ data: any[]; total: number }> {
+  ): Promise<{ data: unknown[]; total: number }> {
     return this.emailService.getEmailLogs(orgId, {
       entityType,
       entityId,

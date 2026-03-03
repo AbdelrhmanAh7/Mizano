@@ -10,9 +10,11 @@
  * Usage: cd apps/api && npx ts-node -r tsconfig-paths/register src/modules/ai/scripts/ocr-benchmark.ts
  */
 
+/* eslint-disable no-console */
+
 import * as fs from 'fs';
 import * as path from 'path';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 import { execFileSync } from 'child_process';
 import * as Tesseract from 'tesseract.js';
 import { getVerifiableEntries, GroundTruthEntry } from '../__tests__/fixtures/ground-truth';
@@ -24,13 +26,19 @@ const CONVERTED_DIR = path.join(TEST_DATA_DIR, 'converted');
 interface BenchmarkResult {
   file: string;
   ocrConfidence: number;
-  fields: Record<string, { extracted: any; expected: any; match: boolean }>;
+  fields: Record<
+    string,
+    { extracted: string | number | null; expected: string | number | null; match: boolean }
+  >;
   overallAccuracy: number;
 }
 
 // Instantiate OcrService with null deps — only buildExtractionResult() is used,
 // which calls private extraction methods with no DB or PaddleOCR interaction.
-const ocrService = new (OcrService as any)(null, null) as OcrService;
+const ocrService = new (OcrService as unknown as new (...args: unknown[]) => OcrService)(
+  null,
+  null,
+);
 
 function isHeicFile(filename: string): boolean {
   return /\.heic$/i.test(filename);
@@ -88,7 +96,11 @@ async function preprocessImage(imageBuffer: Buffer, arabicMode: boolean = false)
   return pipeline.png().toBuffer();
 }
 
-function compareField(extracted: any, expected: any, fieldName: string): boolean {
+function compareField(
+  extracted: string | number | null | undefined,
+  expected: string | number | null | undefined,
+  fieldName: string,
+): boolean {
   if (expected === null || expected === undefined) return true;
   if (extracted === null || extracted === undefined) return false;
 
@@ -114,12 +126,15 @@ function buildBenchmarkResult(
   extraction: ExtractedInvoiceData,
   ocrConfidence: number,
 ): BenchmarkResult {
-  const fields: Record<string, { extracted: any; expected: any; match: boolean }> = {};
+  const fields: Record<
+    string,
+    { extracted: string | number | null; expected: string | number | null; match: boolean }
+  > = {};
   let matches = 0;
   let comparisons = 0;
 
   // Core fields
-  const fieldMap: Array<[string, any, any]> = [
+  const fieldMap: Array<[string, string | number | null, string | number | null]> = [
     ['total', extraction.total, entry.total],
     ['subtotal', extraction.subtotal, entry.subtotal],
     ['tax', extraction.tax, entry.tax],
@@ -207,8 +222,12 @@ async function processPdf(entry: GroundTruthEntry): Promise<BenchmarkResult | nu
     const fullPath = path.join(TEST_DATA_DIR, entry.file);
     const buf = fs.readFileSync(fullPath);
 
-    const pdfModule = require('pdf-parse');
-    const PDFParse = pdfModule.PDFParse || pdfModule.default || pdfModule;
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pdfModule = require('pdf-parse') as Record<string, unknown>;
+    const PDFParse = (pdfModule.PDFParse || pdfModule.default || pdfModule) as (new (
+      data: Uint8Array,
+    ) => { getText: () => Promise<{ text?: string; total?: number }> }) &
+      ((buf: Buffer) => Promise<{ text?: string; numpages?: number }>);
 
     let text = '';
     let pageCount = 1;

@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import type { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import * as Tesseract from 'tesseract.js';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 import { execFile } from 'child_process';
 import { promises as fsPromises } from 'fs';
 import { tmpdir } from 'os';
@@ -43,6 +44,27 @@ export interface VendorLayoutHint {
   totalRegion?: { x: number; y: number; width: number; height: number };
   lineItemsRegion?: { x: number; y: number; width: number; height: number };
 }
+
+/** A context-aware pattern stored during vendor layout learning. */
+interface FieldPositionPattern {
+  value: string;
+  contextBefore: string;
+  contextAfter: string;
+  extractedValue?: unknown;
+  timestamp?: string;
+}
+
+/** Per-field position data stored in VendorOcrLayout.fieldPositions JSON. */
+interface FieldPositionEntry {
+  value?: unknown;
+  pattern?: string;
+  learned?: boolean;
+  patterns?: FieldPositionPattern[];
+  lastCorrectedValue?: string;
+}
+
+/** The full fieldPositions JSON structure keyed by field name. */
+type VendorFieldPositions = Record<string, FieldPositionEntry>;
 
 @Injectable()
 export class OcrService {
@@ -124,8 +146,15 @@ export class OcrService {
     try {
       return await sharp(imageBuffer).jpeg({ quality: 95 }).toBuffer();
     } catch {
-      // Fallback: use macOS sips command
-      this.logger.debug('Sharp cannot decode HEIC, falling back to macOS sips');
+      this.logger.debug('Sharp cannot decode HEIC, trying platform-specific fallback');
+    }
+
+    // sips is only available on macOS
+    if (process.platform !== 'darwin') {
+      throw new Error(
+        'HEIC conversion is not supported on this platform. ' +
+          'Install sharp with libheif support or convert the image to JPEG/PNG before uploading.',
+      );
     }
 
     const tmpIn = join(tmpdir(), `ocr-heic-${Date.now()}.heic`);
@@ -372,6 +401,12 @@ export class OcrService {
       }
       return match;
     });
+
+    // Fix run-together day+month: "31Jan" → "31 Jan", "15December" → "15 December"
+    normalized = normalized.replace(
+      /(\d{1,2})(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)/gi,
+      '$1 $2',
+    );
 
     // Arabic comma as decimal separator: ،  (U+060C)
     normalized = normalized.replace(/(\d)\u060C(\d{2})\b/g, '$1.$2');
@@ -621,8 +656,10 @@ export class OcrService {
             this.logger.log(`✓ PaddleOCR produced better result, using it`);
             return this.buildExtractionResult(paddleResult.text, paddleConfidencePercent);
           }
-        } catch (error) {
-          this.logger.warn(`[PaddleOCR] Extraction failed: ${error.message}`);
+        } catch (error: unknown) {
+          this.logger.warn(
+            `[PaddleOCR] Extraction failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
           // Fall through to use best Tesseract result
         }
       } else if (!this.paddleOcrService.available()) {
@@ -735,7 +772,14 @@ export class OcrService {
     const subtotal = this.extractSubtotal(normalizedText);
     fieldConfidence['subtotal'] = subtotal !== null ? 0.75 : 0;
 
-    const tax = this.extractTax(normalizedText);
+    let tax = this.extractTax(normalizedText);
+    // Fallback: calculate tax from total and subtotal
+    if (tax === null && total !== null && subtotal !== null && total > subtotal) {
+      const diff = +(total - subtotal).toFixed(4);
+      if (diff > 0 && diff < subtotal) {
+        tax = diff;
+      }
+    }
     fieldConfidence['tax'] = tax !== null ? 0.7 : 0;
 
     const invoiceNumber = this.extractInvoiceNumber(normalizedText);
@@ -744,7 +788,18 @@ export class OcrService {
     const vendorName = this.extractVendorName(lines);
     fieldConfidence['vendorName'] = vendorName ? 0.7 : 0;
 
-    const lineItems = this.extractLineItems(lines);
+    let lineItems = this.extractLineItems(lines);
+
+    // Post-validate: if single line item total doesn't match subtotal, correct it
+    if (lineItems.length === 1 && subtotal !== null) {
+      const item = lineItems[0];
+      const tolerance = Math.max(0.02 * subtotal, 0.01);
+      if (Math.abs(item.total - subtotal) > tolerance) {
+        lineItems = [
+          { description: item.description, quantity: 1, unitPrice: subtotal, total: subtotal },
+        ];
+      }
+    }
     fieldConfidence['lineItems'] = lineItems.length > 0 ? 0.65 : 0;
 
     // If we have due date from payment terms but no explicit due date
@@ -856,10 +911,8 @@ export class OcrService {
       if (match) {
         try {
           const parsed = this.parseDate(match[1]);
-          // Ensure due date is different from invoice date
-          if (parsed !== invoiceDate) {
-            return parsed;
-          }
+          // Due date can equal invoice date (e.g., "Due on Receipt")
+          return parsed;
         } catch {
           continue;
         }
@@ -1190,21 +1243,15 @@ export class OcrService {
       return lastTotalAmount;
     }
 
-    // Strategy 2b: Table-aware extraction.
-    // When "Total" appears as a column header (multi-keyword header row),
-    // find the last data row with amounts and take the largest.
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const tableKw = ['total', 'amount', 'vat', 'tax', 'price', 'rate', 'qty', 'description'];
-      const kwCount = tableKw.filter((kw) => new RegExp(`\\b${kw}\\b`, 'i').test(line)).length;
-
-      if (kwCount >= 3) {
-        // Found a table header row. Find data rows below it.
+    // Strategy 2b: Table-aware extraction with multi-line header merge.
+    // When "Total" appears as a column header, find the last data row and take the largest amount.
+    {
+      const headerIdx = this.findStrategy2bHeaderIndex(lines);
+      if (headerIdx >= 0) {
         let lastDataRow: string | null = null;
-        for (let j = i + 1; j < Math.min(i + 12, lines.length); j++) {
+        for (let j = headerIdx + 1; j < Math.min(headerIdx + 15, lines.length); j++) {
           const dataLine = lines[j].trim();
           if (!dataLine) continue;
-          // A "data row" has at least 2 numbers
           const nums = dataLine.match(/\d[\d,]*(?:\.\d+)?/g);
           if (nums && nums.length >= 2) {
             lastDataRow = dataLine;
@@ -1212,22 +1259,7 @@ export class OcrService {
         }
 
         if (lastDataRow) {
-          const amounts: number[] = [];
-          const decimalAmts = lastDataRow.match(/(\d[\d,]*\.\d{2})/g);
-          if (decimalAmts) {
-            for (const a of decimalAmts) {
-              const val = this.parseAmount(a);
-              if (val > 0 && val < 100_000_000) amounts.push(val);
-            }
-          }
-          const rawNums = lastDataRow.match(/\b(\d{4,})\b/g);
-          if (rawNums) {
-            for (const raw of rawNums) {
-              if (decimalAmts?.some((d) => d.replace(/[.,]/g, '').includes(raw))) continue;
-              const inferred = this.inferDecimalFromContext(raw, lastDataRow);
-              if (inferred > 0 && inferred < 100_000_000) amounts.push(inferred);
-            }
-          }
+          const amounts = this.collectAmountsFromDataRow(lastDataRow);
           if (amounts.length > 0) {
             return Math.max(...amounts);
           }
@@ -1300,17 +1332,13 @@ export class OcrService {
       }
     }
 
-    // Strategy 2b: Table-aware extraction.
-    // When amounts are in a tabular grid, find the last data row and take the first amount
-    // (columns are typically: Transaction Amount | VAT | Total)
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const tableKw = ['total', 'amount', 'vat', 'tax', 'price', 'rate', 'qty', 'description'];
-      const kwCount = tableKw.filter((kw) => new RegExp(`\\b${kw}\\b`, 'i').test(line)).length;
-
-      if (kwCount >= 3) {
+    // Strategy 2b: Table-aware extraction with multi-line header merge.
+    // Find the last data row and take the first amount (subtotal column).
+    {
+      const headerIdx = this.findStrategy2bHeaderIndex(lines);
+      if (headerIdx >= 0) {
         let lastDataRow: string | null = null;
-        for (let j = i + 1; j < Math.min(i + 12, lines.length); j++) {
+        for (let j = headerIdx + 1; j < Math.min(headerIdx + 15, lines.length); j++) {
           const dataLine = lines[j].trim();
           if (!dataLine) continue;
           const nums = dataLine.match(/\d[\d,]*(?:\.\d+)?/g);
@@ -1320,10 +1348,13 @@ export class OcrService {
         }
 
         if (lastDataRow) {
-          const amounts = lastDataRow.match(/(\d[\d,]*\.\d{2})/g);
-          if (amounts && amounts.length >= 3) {
-            const first = this.parseAmount(amounts[0]);
-            if (first > 0) return first;
+          const amounts = this.collectAmountsFromDataRow(lastDataRow);
+          if (amounts.length >= 3) {
+            // Sort ascending: [tax, subtotal, total] — first (smallest non-tax) is subtotal
+            const sorted = [...amounts].sort((a, b) => a - b);
+            // Subtotal is the second largest (between tax and total)
+            const subtotal = sorted[sorted.length - 2];
+            if (subtotal > 0) return subtotal;
           }
         }
       }
@@ -1399,17 +1430,13 @@ export class OcrService {
       }
     }
 
-    // Strategy 2b: Table-aware extraction.
-    // When amounts are in a tabular grid, find the last data row and take the second amount
-    // (columns are typically: Transaction Amount | VAT | Total)
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const tableKw = ['total', 'amount', 'vat', 'tax', 'price', 'rate', 'qty', 'description'];
-      const kwCount = tableKw.filter((kw) => new RegExp(`\\b${kw}\\b`, 'i').test(line)).length;
-
-      if (kwCount >= 3) {
+    // Strategy 2b: Table-aware extraction with multi-line header merge.
+    // Find the last data row and take the smallest amount (tax column).
+    {
+      const headerIdx = this.findStrategy2bHeaderIndex(lines);
+      if (headerIdx >= 0) {
         let lastDataRow: string | null = null;
-        for (let j = i + 1; j < Math.min(i + 12, lines.length); j++) {
+        for (let j = headerIdx + 1; j < Math.min(headerIdx + 15, lines.length); j++) {
           const dataLine = lines[j].trim();
           if (!dataLine) continue;
           const nums = dataLine.match(/\d[\d,]*(?:\.\d+)?/g);
@@ -1419,13 +1446,14 @@ export class OcrService {
         }
 
         if (lastDataRow) {
-          const amounts = lastDataRow.match(/(\d[\d,]*\.\d{2})/g);
-          if (amounts && amounts.length >= 3) {
-            const first = this.parseAmount(amounts[0]);
-            const second = this.parseAmount(amounts[1]);
-            // Second amount is typically the VAT/tax column
-            if (second > 0 && second < first) {
-              return second;
+          const amounts = this.collectAmountsFromDataRow(lastDataRow);
+          if (amounts.length >= 3) {
+            // Sort ascending: smallest is tax
+            const sorted = [...amounts].sort((a, b) => a - b);
+            const tax = sorted[0];
+            const subtotal = sorted[sorted.length - 2];
+            if (tax > 0 && tax < subtotal) {
+              return tax;
             }
           }
         }
@@ -1616,6 +1644,26 @@ export class OcrService {
     // Remove trailing TRN/TIN numbers
     cleaned = cleaned.replace(/\s*\b(?:TRN|TIN)\b\s*[:;]?\s*\d+$/i, '');
 
+    // Remove trailing currency amounts (e.g., "AED0.00", "SAR1,234.56")
+    cleaned = cleaned.replace(
+      /\s+(?:AED|SAR|USD|EUR|GBP|EGP|QAR|BHD|KWD|OMR)\s*[\d,]+\.?\d*\s*$/i,
+      '',
+    );
+
+    return cleaned.trim();
+  }
+
+  /**
+   * Clean a line-item description by stripping row numbers, Arabic noise, etc.
+   */
+  private cleanLineItemDescription(desc: string): string {
+    let cleaned = desc;
+    // Strip leading table row numbers: "1 Description" → "Description"
+    cleaned = cleaned.replace(/^\d+[\s.)\-]+/, '');
+    // Remove Arabic/Hebrew script characters (U+0590-U+08FF)
+    cleaned = cleaned.replace(/[\u0590-\u08FF]+/g, '');
+    // Collapse multiple spaces
+    cleaned = cleaned.replace(/\s{2,}/g, ' ');
     return cleaned.trim();
   }
 
@@ -1657,47 +1705,79 @@ export class OcrService {
     const summaryPattern =
       /\b(subtotal|sub[\s-]*total|grand\s*total|net\s*(?:amount|total)|balance\s*due|amount\s*due|tax\s*summary)\b/i;
 
-    for (const line of lines) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       // Skip summary/total lines
       if (summaryPattern.test(line)) continue;
+
+      let matched = false;
 
       let match = line.match(tabPattern);
       if (match) {
         const [, description, qty, price, total] = match;
         items.push({
-          description: description.trim(),
+          description: this.cleanLineItemDescription(description),
           quantity: parseFloat(qty.replace(/,/g, '')),
           unitPrice: this.parseAmount(price),
           total: this.parseAmount(total),
         });
-        continue;
+        matched = true;
       }
 
-      match = line.match(lineItemPattern);
-      if (match) {
-        const [, description, qty, price] = match;
-        const quantity = parseFloat(qty);
-        const unitPrice = this.parseAmount(price);
-        items.push({
-          description: description.trim(),
-          quantity,
-          unitPrice,
-          total: quantity * unitPrice,
-        });
-        continue;
+      if (!matched) {
+        match = line.match(lineItemPattern);
+        if (match) {
+          const [, description, qty, price] = match;
+          const quantity = parseFloat(qty);
+          const unitPrice = this.parseAmount(price);
+          items.push({
+            description: this.cleanLineItemDescription(description),
+            quantity,
+            unitPrice,
+            total: quantity * unitPrice,
+          });
+          matched = true;
+        }
       }
 
-      match = line.match(simplePattern);
-      if (match) {
-        const [, description, qty, price, total] = match;
-        // Skip if description looks like a summary line
-        if (/\b(total|tax|vat|gst)\b/i.test(description)) continue;
-        items.push({
-          description: description.trim(),
-          quantity: parseFloat(qty.replace(/,/g, '')),
-          unitPrice: this.parseAmount(price),
-          total: this.parseAmount(total),
-        });
+      if (!matched) {
+        match = line.match(simplePattern);
+        if (match) {
+          const [, description, qty, price, total] = match;
+          // Skip if description looks like a summary line
+          if (/\b(total|tax|vat|gst)\b/i.test(description)) continue;
+          // Apply decimal inference for raw numbers missing decimal points
+          const parsedQty = this.inferDecimalFromContext(qty.replace(/,/g, ''), line);
+          const parsedTotal = this.inferDecimalFromContext(total.replace(/,/g, ''), line);
+          items.push({
+            description: this.cleanLineItemDescription(description),
+            quantity: parsedQty,
+            unitPrice: this.parseAmount(price),
+            total: parsedTotal,
+          });
+          matched = true;
+        }
+      }
+
+      // Look ahead for continuation description lines (non-numeric text after an item)
+      if (matched && items.length > 0) {
+        while (i + 1 < lines.length) {
+          const nextLine = lines[i + 1].trim();
+          if (
+            !nextLine ||
+            /\d+(?:,\d{3})*\.\d{2}/.test(nextLine) ||
+            summaryPattern.test(nextLine) ||
+            nextLine.match(simplePattern) ||
+            nextLine.match(tabPattern)
+          ) {
+            break;
+          }
+          const cleanedNext = this.cleanLineItemDescription(nextLine);
+          if (cleanedNext) {
+            items[items.length - 1].description += ' | ' + cleanedNext;
+          }
+          i++;
+        }
       }
     }
 
@@ -1790,9 +1870,33 @@ export class OcrService {
       // Skip separator lines (dashes, equals, etc.)
       if (/^[\-=_]{3,}$/.test(line)) continue;
 
-      // Skip pure-number rows (likely summary/total rows without labels)
+      // Skip pure-number rows in item-detail tables (they're likely totals without labels).
+      // For financial summary tables (no description column), pure-number rows ARE the data.
       const nonDigitContent = line.replace(/[\d,.\s]/g, '').trim();
-      if (nonDigitContent.length === 0) continue;
+      if (nonDigitContent.length === 0) {
+        const hasDescColumn = /\b(description|item|particular|narration|product|service)\b/i.test(
+          headerLine,
+        );
+        if (hasDescColumn) {
+          continue;
+        }
+        // Financial summary table: include pure-number rows with generated descriptions
+        const numbers = this.extractNumbersFromLine(line);
+        if (numbers.length >= 2) {
+          const total = numbers[numbers.length - 1];
+          const unitPrice = numbers.length >= 3 ? numbers[numbers.length - 2] : total;
+          const quantity = numbers.length >= 3 ? numbers[numbers.length - 3] : 1;
+          if (total > 0) {
+            items.push({
+              description: `Line item ${items.length + 1}`,
+              quantity,
+              unitPrice,
+              total,
+            });
+          }
+        }
+        continue;
+      }
 
       // Try to extract numbers from the line
       const numbers = this.extractNumbersFromLine(line);
@@ -1808,7 +1912,7 @@ export class OcrService {
 
         if (description && total > 0) {
           items.push({
-            description: description.replace(/[\|│]$/g, '').trim(),
+            description: this.cleanLineItemDescription(description.replace(/[\|│]$/g, '')),
             quantity: quantity,
             unitPrice: unitPrice,
             total: total,
@@ -1891,8 +1995,9 @@ export class OcrService {
    */
   private inferDecimalFromContext(rawNumber: string, contextLine: string): number {
     const parsed = parseFloat(rawNumber.replace(/,/g, ''));
-    // Only infer if the raw number has no decimal point and is at least 4 digits
-    if (!rawNumber.includes('.') && rawNumber.replace(/,/g, '').length >= 4) {
+    // Only infer if the raw number has no decimal point and is at least 3 digits
+    // (e.g., "645" → 6.45 when other amounts on the line have .XX format)
+    if (!rawNumber.includes('.') && rawNumber.replace(/,/g, '').length >= 3) {
       // Check if other numbers on the same line have .XX format
       const otherAmounts = contextLine.match(/\d[\d,]*\.\d{2}/g);
       if (otherAmounts && otherAmounts.length > 0) {
@@ -1908,14 +2013,17 @@ export class OcrService {
    */
   private findStrategy2bHeaderIndex(lines: string[]): number {
     const tableKw = ['total', 'amount', 'vat', 'tax', 'price', 'rate', 'qty', 'description'];
+    // Return the LAST match: the amounts table is typically at the bottom,
+    // and earlier matches may be false positives from label merging
+    // (e.g., "Tax Registration No:" + "Transaction FX Rate" + "Amount").
+    let lastFoundIdx = -1;
 
     for (let i = 0; i < lines.length; i++) {
-      const kwCount = tableKw.filter((kw) =>
-        new RegExp(`\\b${kw}\\b`, 'i').test(lines[i]),
-      ).length;
+      const kwCount = tableKw.filter((kw) => new RegExp(`\\b${kw}\\b`, 'i').test(lines[i])).length;
 
       if (kwCount >= 3) {
-        return i;
+        lastFoundIdx = i;
+        continue;
       }
 
       // Multi-line header: merge 2 consecutive lines
@@ -1925,7 +2033,8 @@ export class OcrService {
           new RegExp(`\\b${kw}\\b`, 'i').test(merged2),
         ).length;
         if (kwCount2 >= 3) {
-          return i + 1;
+          lastFoundIdx = i + 1;
+          continue;
         }
 
         // Three-line header merge
@@ -1935,12 +2044,13 @@ export class OcrService {
             new RegExp(`\\b${kw}\\b`, 'i').test(merged3),
           ).length;
           if (kwCount3 >= 3) {
-            return i + 2;
+            lastFoundIdx = i + 2;
+            continue;
           }
         }
       }
     }
-    return -1;
+    return lastFoundIdx;
   }
 
   /**
@@ -2162,7 +2272,8 @@ export class OcrService {
       },
     });
 
-    const fieldPositions = (existing?.fieldPositions as any) || {};
+    const fieldPositions: VendorFieldPositions =
+      (existing?.fieldPositions as VendorFieldPositions) || {};
 
     // Store all corrected fields
     const fieldsToLearn = [
@@ -2190,6 +2301,7 @@ export class OcrService {
       }
     }
 
+    const jsonFieldPositions = fieldPositions as unknown as Prisma.InputJsonValue;
     await this.prisma.vendorOcrLayout.upsert({
       where: {
         organizationId_vendorId: {
@@ -2198,14 +2310,14 @@ export class OcrService {
         },
       },
       update: {
-        fieldPositions,
+        fieldPositions: jsonFieldPositions,
         sampleCount: { increment: 1 },
         lastUsedAt: new Date(),
       },
       create: {
         organizationId,
         vendorId,
-        fieldPositions,
+        fieldPositions: jsonFieldPositions,
         sampleCount: 1,
       },
     });
@@ -2216,7 +2328,10 @@ export class OcrService {
   /**
    * Get vendor layout hints.
    */
-  async getVendorLayoutHints(organizationId: string, vendorId: string): Promise<any | null> {
+  async getVendorLayoutHints(
+    organizationId: string,
+    vendorId: string,
+  ): Promise<VendorFieldPositions | null> {
     const layout = await this.prisma.vendorOcrLayout.findUnique({
       where: {
         organizationId_vendorId: {
@@ -2230,7 +2345,7 @@ export class OcrService {
       return null;
     }
 
-    return layout.fieldPositions;
+    return layout.fieldPositions as VendorFieldPositions;
   }
 
   /**
@@ -2240,8 +2355,8 @@ export class OcrService {
     organizationId: string,
     vendorId: string,
     rawText: string,
-    extractedFields: Record<string, any>,
-    correctedFields: Record<string, any>,
+    extractedFields: Record<string, unknown>,
+    correctedFields: Record<string, unknown>,
   ): Promise<void> {
     const existing = await this.prisma.vendorOcrLayout.findUnique({
       where: {
@@ -2249,7 +2364,8 @@ export class OcrService {
       },
     });
 
-    const fieldPositions = (existing?.fieldPositions as any) || {};
+    const fieldPositions: VendorFieldPositions =
+      (existing?.fieldPositions as VendorFieldPositions) || {};
 
     for (const [field, correctedValue] of Object.entries(correctedFields)) {
       if (correctedValue === null || correctedValue === undefined) continue;
@@ -2295,19 +2411,20 @@ export class OcrService {
       fieldPositions[field].lastCorrectedValue = correctedStr;
     }
 
+    const jsonFieldPositions = fieldPositions as unknown as Prisma.InputJsonValue;
     await this.prisma.vendorOcrLayout.upsert({
       where: {
         organizationId_vendorId: { organizationId, vendorId },
       },
       update: {
-        fieldPositions,
+        fieldPositions: jsonFieldPositions,
         sampleCount: { increment: 1 },
         lastUsedAt: new Date(),
       },
       create: {
         organizationId,
         vendorId,
-        fieldPositions,
+        fieldPositions: jsonFieldPositions,
         sampleCount: 1,
       },
     });
@@ -2399,12 +2516,12 @@ export class OcrService {
 
     this.logger.debug(
       `Applying vendor hints for ${vendorId}: ${Object.keys(hints)
-        .filter((k) => (hints as any)[k]?.learned)
+        .filter((k) => hints[k]?.learned)
         .join(', ')}`,
     );
 
     for (const [field, hint] of Object.entries(hints)) {
-      const hintData = hint as any;
+      const hintData = hint as FieldPositionEntry;
       if (!hintData?.learned || !hintData?.patterns?.length) continue;
 
       const contextResult = this.extractWithContext(

@@ -553,6 +553,7 @@ model Organization {
   deepSearchJobs                 DeepSearchJob[]
   deepSearchSuggestions          DeepSearchSuggestion[]
   searchHistories                SearchHistory[]
+  documentSequences              DocumentSequence[]
   deliveryChallans               DeliveryChallan[]
   exchangeRates       ExchangeRate[]
   emailLogs           EmailLog[]
@@ -728,6 +729,7 @@ model Account {
   organizationId String
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
+  deletedAt      DateTime?
 
   // Relations
   organization            Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -751,6 +753,7 @@ model Account {
   @@unique([code, organizationId])
   @@index([organizationId])
   @@index([type])
+  @@index([organizationId, type, isActive])
   @@map("accounts")
 }
 
@@ -820,6 +823,7 @@ model RecurringProfile {
   organizationId String
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
+  deletedAt      DateTime?
 
   // Relations
   organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1399,6 +1403,7 @@ model Warehouse {
   organizationId String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
 
   // Relations
   organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1602,6 +1607,7 @@ model BankAccount {
   organizationId  String
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
 
   // Relations
   organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1671,6 +1677,7 @@ model BankTransaction {
   @@index([date])
   @@index([organizationId, status])
   @@index([organizationId, bankAccountId, status])
+  @@index([organizationId, bankAccountId, status, date])
   @@map("bank_transactions")
 }
 
@@ -1684,6 +1691,7 @@ model BankRule {
   organizationId String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1720,6 +1728,7 @@ model Employee {
   organizationId String
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1751,6 +1760,7 @@ model Attendance {
   @@unique([employeeId, date])
   @@index([organizationId])
   @@index([date])
+  @@index([organizationId, employeeId, date])
   @@map("attendances")
 }
 
@@ -1771,6 +1781,7 @@ model PayrollRun {
   organizationId  String
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1779,6 +1790,7 @@ model PayrollRun {
 
   @@unique([month, year, organizationId])
   @@index([organizationId])
+  @@index([organizationId, status])
   @@map("payroll_runs")
 }
 
@@ -1832,6 +1844,7 @@ model BOM {
   organizationId String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1871,6 +1884,7 @@ model WorkOrder {
   organizationId   String
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
+  deletedAt        DateTime?
 
   // Relations
   organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1935,6 +1949,7 @@ model Project {
   organizationId String
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
 
   // Relations
   organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1947,6 +1962,7 @@ model Project {
 
   @@index([organizationId])
   @@index([status])
+  @@index([organizationId, status])
   @@map("projects")
 }
 
@@ -1967,6 +1983,7 @@ model Task {
   organizationId String
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
 
   // Relations
   organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1977,6 +1994,7 @@ model Task {
   @@index([organizationId])
   @@index([projectId])
   @@index([assigneeId])
+  @@index([organizationId, projectId, status])
   @@map("tasks")
 }
 
@@ -2013,6 +2031,8 @@ model TimesheetEntry {
   @@index([projectId])
   @@index([date])
   @@index([status])
+  @@index([organizationId, projectId, date])
+  @@index([organizationId, status, date])
   @@map("timesheet_entries")
 }
 
@@ -2034,6 +2054,7 @@ model TaxRate {
   organizationId   String
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  deletedAt        DateTime?
 
   // Relations
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -2064,6 +2085,7 @@ model VATReturn {
   organizationId String
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -2725,6 +2747,7 @@ model DeliveryChallan {
 
   @@unique([organizationId, challanNumber])
   @@index([organizationId])
+  @@index([organizationId, status])
   @@map("delivery_challans")
 }
 
@@ -3022,4 +3045,22 @@ model SearchHistory {
   @@unique([organizationId, userId, query])
   @@index([organizationId, userId, clickedAt])
   @@map("search_histories")
+}
+
+// ============================================
+// DOCUMENT SEQUENCE
+// ============================================
+
+model DocumentSequence {
+  id             String       @id @default(cuid())
+  prefix         String       // INV, BILL, JRN, QT, CN, PMT, VPMT, ADJ, WO, DC, VC, AST
+  nextNumber     Int          @default(1)
+  padLength      Int          @default(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, prefix])
+  @@map("document_sequences")
 }

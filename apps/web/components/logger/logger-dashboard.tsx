@@ -42,7 +42,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useGlobalErrorCapture } from '@/lib/hooks/use-global-error-capture';
 import { useLogger } from '@/lib/hooks/use-logger';
@@ -394,6 +394,9 @@ export function LoggerDashboard() {
               <div className="flex items-center gap-2">
                 <Bug className="h-5 w-5 text-destructive" />
                 <SheetTitle>Error Logger</SheetTitle>
+                <SheetDescription className="sr-only">
+                  View and filter application errors and warnings
+                </SheetDescription>
               </div>
               <div className="flex items-center gap-1">
                 <Button

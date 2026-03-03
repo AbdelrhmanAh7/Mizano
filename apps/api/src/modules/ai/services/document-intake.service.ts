@@ -4,11 +4,12 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { AiFeature, AiFeedbackAction } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { OcrService, ExtractedInvoiceData } from './ocr.service';
+import { OcrMicroserviceClient } from './ocr-microservice-client.service';
 import { DocumentClassificationService, DocumentCategory } from './document-classification.service';
 import { EntityExtractionService } from './entity-extraction.service';
 import { AiFeedbackService } from './ai-feedback.service';
 import { VlmService } from './vlm.service';
-import { VlmFeedbackService } from './vlm-feedback.service';
+import { VlmFeedbackService, VlmCorrectionData } from './vlm-feedback.service';
 import { extractTextFromPdf } from '../utils/pdf-extractor.util';
 import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.util';
 
@@ -86,7 +87,24 @@ export interface DocumentIntakeResult {
   } | null;
 
   /** Which AI engine extracted the data */
-  extractionMethod: 'vlm' | 'ocr';
+  extractionMethod: 'vlm' | 'ocr' | 'paddleocr+tesseract';
+
+  /** Per-field confidence breakdown from Python OCR service */
+  detailedConfidence?: {
+    overall: number;
+    invoice_number: number;
+    dates: number;
+    vendor: number;
+    line_items: number;
+    totals: number;
+  } | null;
+
+  /** Mathematical validation results from Python OCR service */
+  validationResults?: {
+    all_passed: boolean;
+    checks: Array<{ name: string; passed: boolean; detail: string }>;
+    corrections_applied: string[];
+  } | null;
 }
 
 export interface ConfirmIntakeLineDto {
@@ -109,7 +127,7 @@ export interface ConfirmIntakeDto {
   notes?: string;
   projectId?: string;
   /** User corrections for vendor layout learning */
-  corrections?: Record<string, any>;
+  corrections?: Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------
@@ -123,6 +141,7 @@ export class DocumentIntakeService {
   constructor(
     private prisma: PrismaService,
     private ocrService: OcrService,
+    private ocrMicroservice: OcrMicroserviceClient,
     private classificationService: DocumentClassificationService,
     private entityExtractionService: EntityExtractionService,
     private feedbackService: AiFeedbackService,
@@ -156,7 +175,9 @@ export class DocumentIntakeService {
     let rawText = '';
     let ocrResult: ExtractedInvoiceData | null = null;
     let accountingEntry: DocumentIntakeResult['accountingEntry'] = null;
-    let extractionMethod: 'vlm' | 'ocr' = 'ocr';
+    let extractionMethod: DocumentIntakeResult['extractionMethod'] = 'ocr';
+    let detailedConfidence: DocumentIntakeResult['detailedConfidence'] = null;
+    let validationResults: DocumentIntakeResult['validationResults'] = null;
 
     // ── Step 1a: Try VLM extraction first (primary) ──
     const vlmResult = await this.vlmService.extractFromImage(fileBuffer, mimeType, filename);
@@ -170,9 +191,25 @@ export class DocumentIntakeService {
       );
     }
 
-    // ── Step 1b: Fall back to existing OCR if VLM failed ──
+    // ── Step 1b: Try Python OCR microservice (PaddleOCR + Tesseract) ──
     if (!ocrResult) {
-      this.logger.log('VLM unavailable or failed, falling back to OCR');
+      this.logger.log('VLM unavailable or failed, trying Python OCR microservice');
+      const microserviceResult = await this.ocrMicroservice.extract(fileBuffer, mimeType, filename);
+      if (microserviceResult) {
+        ocrResult = microserviceResult.extractedData;
+        rawText = microserviceResult.rawText;
+        extractionMethod = 'paddleocr+tesseract';
+        detailedConfidence = microserviceResult.detailedConfidence;
+        validationResults = microserviceResult.validationResults;
+        this.logger.log(
+          `Python OCR extraction succeeded: confidence=${detailedConfidence?.overall ?? 0}%, items=${ocrResult.lineItems.length}`,
+        );
+      }
+    }
+
+    // ── Step 1c: Fall back to existing Node.js OCR if Python service unavailable ──
+    if (!ocrResult) {
+      this.logger.log('Python OCR unavailable, falling back to Node.js OCR');
       const isPdf = mimeType === 'application/pdf';
 
       if (isPdf) {
@@ -264,9 +301,9 @@ export class DocumentIntakeService {
       }
     }
 
-    // Step 6: Derive dueDate if possible (30 days from date by default)
-    let dueDate: string | null = null;
-    if (ocrResult?.date) {
+    // Step 6: Use OCR-extracted dueDate, fall back to +30 days from invoice date
+    let dueDate: string | null = ocrResult?.dueDate || null;
+    if (!dueDate && ocrResult?.date) {
       try {
         const dateObj = new Date(ocrResult.date);
         if (!isNaN(dateObj.getTime())) {
@@ -308,6 +345,8 @@ export class DocumentIntakeService {
       rawText,
       accountingEntry,
       extractionMethod,
+      detailedConfidence,
+      validationResults,
     };
   }
 
@@ -421,9 +460,14 @@ export class DocumentIntakeService {
     if (dto.corrections?._extractionMethod) {
       try {
         const correctedFields = this.detectCorrectedFields(dto);
+        const originalExtraction = (dto.corrections._originalExtraction ??
+          {}) as VlmCorrectionData['originalExtraction'];
+        const fieldConfidence = (dto.corrections._fieldConfidence ?? {}) as Record<string, number>;
+        const accountingEntryAccepted = (dto.corrections._accountingEntryAccepted ??
+          false) as boolean;
         await this.vlmFeedbackService.logVlmFeedback(organizationId, bill.id, {
           extractionMethod: dto.corrections._extractionMethod as 'vlm' | 'ocr',
-          originalExtraction: dto.corrections._originalExtraction || {},
+          originalExtraction,
           confirmedValues: {
             vendorId: dto.vendorId!,
             documentNumber: dto.documentNumber || null,
@@ -433,8 +477,8 @@ export class DocumentIntakeService {
             totalAmount: grandTotal,
           },
           correctedFields,
-          fieldConfidence: dto.corrections._fieldConfidence || {},
-          accountingEntryAccepted: dto.corrections._accountingEntryAccepted ?? false,
+          fieldConfidence,
+          accountingEntryAccepted,
         });
       } catch (error) {
         this.logger.warn(`Failed to log VLM feedback: ${error}`);

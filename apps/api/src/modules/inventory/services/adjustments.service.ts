@@ -3,16 +3,29 @@ import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { JournalsService } from '../../accounting/services/journals.service';
 import { ItemsService } from './items.service';
+
+interface CreateAdjustmentData {
+  date: string;
+  warehouseId: string;
+  itemId: string;
+  type: 'INCREASE' | 'DECREASE';
+  quantity: number;
+  reason: 'DAMAGED' | 'STOLEN' | 'STOCKTAKE' | 'RETURNED' | 'EXPIRED' | 'OTHER';
+  accountId: string;
+  notes?: string;
+}
 
 @Injectable()
 export class AdjustmentsService {
   constructor(
     private prisma: PrismaService,
     private itemsService: ItemsService,
+    private journalsService: JournalsService,
   ) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateAdjustmentData) {
     const adjustmentNumber = await this.generateNumber(organizationId);
 
     const adjustment = await this.prisma.inventoryAdjustment.create({
@@ -39,6 +52,41 @@ export class AdjustmentsService {
       dto.quantity,
       dto.type === 'INCREASE' ? 'increase' : 'decrease',
     );
+
+    // Create accounting entry for inventory adjustment
+    if (dto.accountId) {
+      const item = await this.prisma.item.findUnique({
+        where: { id: dto.itemId },
+        select: { costPrice: true, inventoryAccountId: true },
+      });
+
+      if (item?.inventoryAccountId && item.costPrice) {
+        const amount = dto.quantity * parseFloat(item.costPrice.toString());
+        const debitAccountId = dto.type === 'INCREASE' ? item.inventoryAccountId : dto.accountId;
+        const creditAccountId = dto.type === 'INCREASE' ? dto.accountId : item.inventoryAccountId;
+
+        await this.journalsService.create(organizationId, {
+          date: new Date(dto.date).toISOString(),
+          reference: `Adjustment ${adjustment.adjustmentNumber}`,
+          notes: `Inventory adjustment ${adjustment.adjustmentNumber}`,
+          lines: [
+            {
+              accountId: debitAccountId,
+              debit: amount.toFixed(4),
+              credit: '0',
+              description: `${adjustment.adjustmentNumber} - ${dto.type === 'INCREASE' ? 'Inventory' : 'Adjustment variance'}`,
+            },
+            {
+              accountId: creditAccountId,
+              debit: '0',
+              credit: amount.toFixed(4),
+              description: `${adjustment.adjustmentNumber} - ${dto.type === 'INCREASE' ? 'Adjustment variance' : 'Inventory'}`,
+            },
+          ],
+        });
+      }
+    }
+
     return adjustment;
   }
 

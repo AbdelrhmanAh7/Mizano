@@ -1,18 +1,40 @@
 from pydantic import BaseModel, Field
 
 
+class VendorInfo(BaseModel):
+    name: str | None = None
+    address: str | None = None
+    tax_id: str | None = None
+    phone: str | None = None
+    email: str | None = None
+
+
+class PartyInfo(BaseModel):
+    name: str | None = None
+    address: str | None = None
+    tax_id: str | None = None
+
+
+class ShipToInfo(BaseModel):
+    name: str | None = None
+    address: str | None = None
+
+
 class InvoiceLineItem(BaseModel):
+    line_number: int | None = None
     description: str = ""
     quantity: float = 1.0
     unit_price: float = 0.0
-    total: float = 0.0
-    tax_rate: float | None = None
+    taxable_amount: float | None = None
+    tax_rate_percent: float | None = None
+    tax_amount: float | None = None
+    line_total: float = 0.0
 
 
 class AccountingEntry(BaseModel):
-    debit_account: str | None = None  # e.g., "Purchases", "Office Supplies", "Fixed Assets"
-    credit_account: str | None = None  # e.g., "Accounts Payable"
-    tax_account: str | None = None  # e.g., "Input VAT"
+    debit_account: str | None = None
+    credit_account: str | None = None
+    tax_account: str | None = None
 
 
 class ConfidenceScores(BaseModel):
@@ -24,21 +46,25 @@ class ConfidenceScores(BaseModel):
 
 
 class InvoiceExtractionResult(BaseModel):
-    vendor_name: str | None = None
-    vendor_tax_id: str | None = None
-    customer_name: str | None = None
+    document_type: str | None = None
     invoice_number: str | None = None
-    invoice_date: str | None = None  # ISO format: YYYY-MM-DD
+    invoice_date: str | None = None
     due_date: str | None = None
-    currency: str | None = None  # 3-letter ISO code
-    subtotal: float | None = None
-    tax_amount: float | None = None
-    total_amount: float | None = None
+    currency: str | None = None
     payment_terms: str | None = None
-    items: list[InvoiceLineItem] = []
+    vendor: VendorInfo = Field(default_factory=VendorInfo)
+    bill_to: PartyInfo = Field(default_factory=PartyInfo)
+    ship_to: ShipToInfo = Field(default_factory=ShipToInfo)
+    line_items: list[InvoiceLineItem] = []
+    subtotal: float | None = None
+    tax_total: float | None = None
+    discount: float | None = None
+    total: float | None = None
+    amount_paid: float | None = None
+    balance_due: float | None = None
     notes: str | None = None
     accounting_entry: AccountingEntry | None = None
-    confidence: ConfidenceScores = ConfidenceScores()
+    confidence: ConfidenceScores = Field(default_factory=ConfidenceScores)
     raw_text: str | None = None
     processing_time_ms: float = 0.0
 

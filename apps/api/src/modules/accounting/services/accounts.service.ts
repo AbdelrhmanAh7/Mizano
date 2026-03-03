@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AccountType } from '@prisma/client';
+import { AccountType, Prisma } from '@prisma/client';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
@@ -64,6 +64,7 @@ export class AccountsService {
 
     const where = {
       organizationId,
+      deletedAt: null,
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' as const } },
@@ -100,7 +101,7 @@ export class AccountsService {
 
   async findAllCursor(organizationId: string, query: CursorPaginationDto) {
     const { cursor, take, search, sortBy = 'code', sortOrder = 'asc' } = query;
-    const where: any = { organizationId };
+    const where: Prisma.AccountWhereInput = { organizationId, deletedAt: null };
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -121,7 +122,7 @@ export class AccountsService {
 
   async getTree(organizationId: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { organizationId, parentId: null },
+      where: { organizationId, parentId: null, deletedAt: null },
       include: {
         children: {
           include: {
@@ -143,7 +144,7 @@ export class AccountsService {
     const accountType = type.toUpperCase() as AccountType;
 
     const accounts = await this.prisma.account.findMany({
-      where: { organizationId, type: accountType, isActive: true },
+      where: { organizationId, type: accountType, isActive: true, deletedAt: null },
       orderBy: { code: 'asc' },
     });
 
@@ -152,7 +153,7 @@ export class AccountsService {
 
   async findOne(organizationId: string, id: string) {
     const account = await this.prisma.account.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: {
         parent: {
           select: { id: true, code: true, name: true },
@@ -228,8 +229,7 @@ export class AccountsService {
     const account = await this.prisma.account.findFirst({
       where: { id, organizationId },
       include: {
-        children: true,
-        journalLines: { take: 1 },
+        _count: { select: { children: true, journalLines: true } },
       },
     });
 
@@ -241,15 +241,18 @@ export class AccountsService {
       throw new BadRequestException('System accounts cannot be deleted');
     }
 
-    if (account.children.length > 0) {
+    if (account._count.children > 0) {
       throw new BadRequestException('Cannot delete account with child accounts');
     }
 
-    if (account.journalLines.length > 0) {
+    if (account._count.journalLines > 0) {
       throw new BadRequestException('Cannot delete account with transactions');
     }
 
-    await this.prisma.account.delete({ where: { id } });
+    await this.prisma.account.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
 
     return { message: 'Account deleted successfully' };
   }

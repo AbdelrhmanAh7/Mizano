@@ -28,6 +28,7 @@ Mizano is an AI-powered ERP system (Autonomous Accounting Platform) designed for
 pnpm dev              # Start infra (postgres+redis) + all apps (web: 5001, api: 6001)
 pnpm dev:api          # API only
 pnpm dev:web          # Web only
+pnpm dev:ocr          # Start OCR service (PaddleOCR + Tesseract, no GPU needed)
 pnpm dev:vlm          # Start VLM service (requires GPU)
 pnpm build            # Build all packages
 pnpm lint             # Lint all packages
@@ -48,6 +49,7 @@ pnpm test:e2e         # API end-to-end tests
 
 # Infrastructure
 pnpm docker:up        # Start PostgreSQL + Redis
+pnpm docker:up:ocr    # Start PostgreSQL + Redis + OCR service
 pnpm docker:up:vlm    # Start PostgreSQL + Redis + VLM
 pnpm docker:down      # Stop infrastructure
 pnpm docker:prod      # Build & start production stack
@@ -79,10 +81,11 @@ mizano/
 ├── packages/
 │   ├── shared-types/           # Shared TypeScript types
 │   └── validators/             # Shared Zod schemas
+├── ocr-service/                  # Python FastAPI OCR microservice (port 7001)
 ├── services/
 │   └── vlm-service/            # Python FastAPI VLM microservice (port 8100)
 ├── prompts/                    # AI feature design specifications
-├── docker-compose.yml          # PostgreSQL + Redis + VLM
+├── docker-compose.yml          # PostgreSQL + Redis + OCR + VLM
 └── turbo.json                  # Turborepo config
 ```
 
@@ -223,6 +226,7 @@ NEXTAUTH_SECRET="your-nextauth-secret"
 NEXTAUTH_URL="http://localhost:5001"
 API_URL="http://localhost:6001"
 NEXT_PUBLIC_API_URL="http://localhost:6001"
+OCR_SERVICE_URL=http://localhost:7001
 VLM_SERVICE_URL=http://localhost:8100
 ```
 

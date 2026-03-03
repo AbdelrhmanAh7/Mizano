@@ -1,16 +1,29 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { TransferStatus } from '@prisma/client';
+import { Prisma, TransferStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { TransferCursorQueryDto } from '../dto/transfer-cursor-query.dto';
 
+interface TransferLineData {
+  itemId: string;
+  quantity: number | string;
+}
+
+interface CreateTransferData {
+  fromWarehouseId: string;
+  toWarehouseId: string;
+  date: string;
+  notes?: string;
+  lines?: TransferLineData[];
+}
+
 @Injectable()
 export class TransfersService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateTransferData) {
     const { fromWarehouseId, toWarehouseId, date, notes, lines } = dto;
 
     if (fromWarehouseId === toWarehouseId) {
@@ -44,7 +57,7 @@ export class TransfersService {
         notes,
         organizationId,
         lines: {
-          create: (lines || []).map((line: any) => ({
+          create: (lines || []).map((line: TransferLineData) => ({
             itemId: line.itemId,
             quantity: new Decimal(line.quantity),
           })),
@@ -73,8 +86,8 @@ export class TransfersService {
       fromWarehouseId,
       toWarehouseId,
     } = query;
-    const where: any = { organizationId };
-    if (status) where.status = status;
+    const where: Prisma.InventoryTransferWhereInput = { organizationId };
+    if (status) where.status = status as TransferStatus;
     if (fromWarehouseId) where.fromWarehouseId = fromWarehouseId;
     if (toWarehouseId) where.toWarehouseId = toWarehouseId;
 
@@ -108,8 +121,8 @@ export class TransfersService {
       fromWarehouseId,
       toWarehouseId,
     } = query;
-    const where: any = { organizationId };
-    if (status) where.status = status;
+    const where: Prisma.InventoryTransferWhereInput = { organizationId };
+    if (status) where.status = status as TransferStatus;
     if (fromWarehouseId) where.fromWarehouseId = fromWarehouseId;
     if (toWarehouseId) where.toWarehouseId = toWarehouseId;
     return cursorPaginate(
@@ -151,6 +164,28 @@ export class TransfersService {
       transfer.status !== TransferStatus.IN_TRANSIT
     ) {
       throw new BadRequestException('Only pending or in-transit transfers can be completed');
+    }
+
+    // Validate stock levels at source warehouse before processing
+    for (const line of transfer.lines) {
+      const qty = parseFloat(line.quantity.toString());
+      const level = await this.prisma.inventoryLevel.findUnique({
+        where: {
+          itemId_warehouseId: {
+            itemId: line.itemId,
+            warehouseId: transfer.fromWarehouseId,
+          },
+        },
+        select: { quantity: true },
+      });
+
+      const available = level ? parseFloat(level.quantity.toString()) : 0;
+      if (available < qty) {
+        const itemName = line.item?.name || line.itemId;
+        throw new BadRequestException(
+          `Insufficient stock for "${itemName}" in source warehouse. Available: ${available}, Requested: ${qty}`,
+        );
+      }
     }
 
     return this.prisma.$transaction(async (tx) => {

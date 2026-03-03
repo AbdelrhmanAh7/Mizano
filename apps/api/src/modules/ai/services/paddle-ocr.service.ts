@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as ort from 'onnxruntime-node';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
@@ -34,9 +34,9 @@ export class PaddleOcrService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.loadModels();
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.warn(
-        `PaddleOCR models not available: ${error.message}. OCR will fall back to Tesseract.js only.`,
+        `PaddleOCR models not available: ${error instanceof Error ? error.message : String(error)}. OCR will fall back to Tesseract.js only.`,
       );
       this.isAvailable = false;
     }
@@ -116,8 +116,10 @@ export class PaddleOcrService implements OnModuleInit {
         confidence: avgConfidence,
         boxes: recognizedBoxes,
       };
-    } catch (error) {
-      this.logger.error(`PaddleOCR extraction failed: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(
+        `PaddleOCR extraction failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw error;
     }
   }
@@ -378,8 +380,10 @@ export class PaddleOcrService implements OnModuleInit {
             bbox: box.bbox,
           });
         }
-      } catch (error) {
-        this.logger.warn(`Failed to recognize text box: ${error.message}`);
+      } catch (error: unknown) {
+        this.logger.warn(
+          `Failed to recognize text box: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 

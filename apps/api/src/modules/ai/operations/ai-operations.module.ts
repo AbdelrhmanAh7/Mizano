@@ -11,6 +11,7 @@ import { VlmFeedbackService } from '../services/vlm-feedback.service';
 import { OcrService } from '../services/ocr.service';
 import { PaddleOcrService } from '../services/paddle-ocr.service';
 import { DocumentIntakeService } from '../services/document-intake.service';
+import { OcrMicroserviceClient } from '../services/ocr-microservice-client.service';
 import { ReorderPointsService } from '../services/reorder-points.service';
 import { PatternDetectionService } from '../services/pattern-detection.service';
 import { AnomalyDetectionService } from '../services/anomaly-detection.service';
@@ -44,6 +45,7 @@ import { VlmStatsController } from '../controllers/vlm-stats.controller';
     OcrService,
     PaddleOcrService,
     DocumentIntakeService,
+    OcrMicroserviceClient,
     ReorderPointsService,
     PatternDetectionService,
     AnomalyDetectionService,
@@ -55,6 +57,7 @@ import { VlmStatsController } from '../controllers/vlm-stats.controller';
     OcrService,
     PaddleOcrService,
     DocumentIntakeService,
+    OcrMicroserviceClient,
     ReorderPointsService,
     PatternDetectionService,
     AnomalyDetectionService,

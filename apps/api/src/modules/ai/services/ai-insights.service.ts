@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import type { AIInsight, AlertCategory, AlertSource, Prisma } from '@prisma/client';
@@ -71,6 +71,8 @@ function mapPriority(numericPriority: number): InsightPriority {
 
 @Injectable()
 export class AiInsightsService {
+  private readonly logger = new Logger(AiInsightsService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async getInsights(
@@ -179,24 +181,27 @@ export class AiInsightsService {
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    // Generate insights from analysis
-    const cashFlowInsight = await this.analyzeCashFlow(organizationId, startOfMonth);
-    if (cashFlowInsight) rawInsights.push(cashFlowInsight);
+    // Generate insights from analysis — each analyzer is wrapped individually
+    // so that a single failure (e.g. missing DB column) doesn't crash all insights.
+    const analyzers: Array<{ name: string; fn: () => Promise<RawInsight | null> }> = [
+      { name: 'cashFlow', fn: () => this.analyzeCashFlow(organizationId, startOfMonth) },
+      { name: 'revenueTrend', fn: () => this.analyzeRevenueTrend(organizationId) },
+      { name: 'expenseAnomalies', fn: () => this.detectExpenseAnomalies(organizationId) },
+      { name: 'paymentPatterns', fn: () => this.analyzePaymentPatterns(organizationId) },
+      { name: 'inventory', fn: () => this.analyzeInventory(organizationId) },
+      { name: 'projectProfitability', fn: () => this.analyzeProjectProfitability(organizationId) },
+    ];
 
-    const revenueTrend = await this.analyzeRevenueTrend(organizationId);
-    if (revenueTrend) rawInsights.push(revenueTrend);
-
-    const expenseAnomalies = await this.detectExpenseAnomalies(organizationId);
-    if (expenseAnomalies) rawInsights.push(expenseAnomalies);
-
-    const paymentPatterns = await this.analyzePaymentPatterns(organizationId);
-    if (paymentPatterns) rawInsights.push(paymentPatterns);
-
-    const inventoryInsight = await this.analyzeInventory(organizationId);
-    if (inventoryInsight) rawInsights.push(inventoryInsight);
-
-    const projectInsight = await this.analyzeProjectProfitability(organizationId);
-    if (projectInsight) rawInsights.push(projectInsight);
+    for (const analyzer of analyzers) {
+      try {
+        const result = await analyzer.fn();
+        if (result) rawInsights.push(result);
+      } catch (error) {
+        this.logger.warn(
+          `Insight analyzer "${analyzer.name}" failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
 
     // Persist new insights (avoid duplicates by checking title + type within last 24h)
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);

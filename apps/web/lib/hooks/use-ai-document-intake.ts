@@ -59,8 +59,25 @@ export interface DocumentIntakeResult {
     taxAccount: string | null;
   } | null;
 
-  /** Which AI engine was used: 'vlm' (Vision-Language Model) or 'ocr' (Tesseract/PaddleOCR) */
-  extractionMethod?: 'vlm' | 'ocr';
+  /** Which AI engine was used */
+  extractionMethod?: 'vlm' | 'ocr' | 'paddleocr+tesseract';
+
+  /** Per-field confidence breakdown from Python OCR service (0-100 scale) */
+  detailedConfidence?: {
+    overall: number;
+    invoice_number: number;
+    dates: number;
+    vendor: number;
+    line_items: number;
+    totals: number;
+  } | null;
+
+  /** Mathematical validation results from Python OCR service */
+  validationResults?: {
+    all_passed: boolean;
+    checks: Array<{ name: string; passed: boolean; detail: string }>;
+    corrections_applied: string[];
+  } | null;
 }
 
 export interface ConfirmIntakeLineData {
@@ -82,7 +99,7 @@ export interface ConfirmIntakeData {
   lines: ConfirmIntakeLineData[];
   notes?: string;
   projectId?: string;
-  corrections?: Record<string, any>;
+  corrections?: Record<string, unknown>;
 }
 
 export interface ConfirmIntakeResponse {

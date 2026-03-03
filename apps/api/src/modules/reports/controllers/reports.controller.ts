@@ -8,6 +8,7 @@ import { PdfService } from '../../documents/services/pdf.service';
 import { AgingReportsService } from '../services/aging-reports.service';
 import { DashboardService } from '../services/dashboard.service';
 import { FinancialReportsService } from '../services/financial-reports.service';
+import { FinancialNarrativeService } from '../../ai/services/financial-narrative.service';
 
 @ApiTags('Reports')
 @ApiBearerAuth()
@@ -19,6 +20,7 @@ export class ReportsController {
     private readonly agingReportsService: AgingReportsService,
     private readonly dashboardService: DashboardService,
     private readonly pdfService: PdfService,
+    private readonly narrativeService: FinancialNarrativeService,
   ) {}
 
   // Dashboard
@@ -108,12 +110,25 @@ export class ReportsController {
   @CacheResponse('reports:pnl')
   @CacheTTL(600)
   @ApiOperation({ summary: 'Get Profit & Loss statement' })
-  getProfitAndLoss(
+  async getProfitAndLoss(
     @CurrentOrg() orgId: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
+    @Query('includeNarrative') includeNarrative?: string,
   ) {
-    return this.financialReportsService.getProfitAndLoss(orgId, startDate, endDate);
+    const report = await this.financialReportsService.getProfitAndLoss(orgId, startDate, endDate);
+
+    if (includeNarrative === 'true') {
+      const endDateObj = new Date(endDate);
+      const narrative = await this.narrativeService.generateMonthlyNarrative(
+        orgId,
+        endDateObj.getMonth() + 1,
+        endDateObj.getFullYear(),
+      );
+      return { ...report, narrative };
+    }
+
+    return report;
   }
 
   @Get('balance-sheet')
@@ -130,12 +145,24 @@ export class ReportsController {
   @CacheResponse('reports:cash-flow')
   @CacheTTL(600)
   @ApiOperation({ summary: 'Get Cash Flow Statement' })
-  getCashFlow(
+  async getCashFlow(
     @CurrentOrg() orgId: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
+    @Query('includeNarrative') includeNarrative?: string,
   ) {
-    return this.financialReportsService.getCashFlowStatement(orgId, startDate, endDate);
+    const report = await this.financialReportsService.getCashFlowStatement(
+      orgId,
+      startDate,
+      endDate,
+    );
+
+    if (includeNarrative === 'true') {
+      const narrative = await this.narrativeService.generateCashFlowNarrative(orgId);
+      return { ...report, narrative };
+    }
+
+    return report;
   }
 
   @Get('trial-balance')

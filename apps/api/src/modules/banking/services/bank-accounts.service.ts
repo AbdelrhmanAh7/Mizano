@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
+import { CreateBankAccountDto } from '../dto/create-bank-account.dto';
+import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
 
 @Injectable()
 export class BankAccountsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateBankAccountDto) {
     return this.prisma.bankAccount.create({
       data: {
         name: dto.name,
@@ -23,7 +25,7 @@ export class BankAccountsService {
 
   async findAll(organizationId: string) {
     return this.prisma.bankAccount.findMany({
-      where: { organizationId, isActive: true },
+      where: { organizationId, isActive: true, deletedAt: null },
       include: { linkedAccount: { select: { id: true, code: true, name: true } } },
       orderBy: { name: 'asc' },
     });
@@ -31,32 +33,35 @@ export class BankAccountsService {
 
   async findOne(organizationId: string, id: string) {
     const account = await this.prisma.bankAccount.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: { linkedAccount: true },
     });
     if (!account) throw new NotFoundException('Bank account not found');
     return account;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateBankAccountDto) {
     await this.findOne(organizationId, id);
     return this.prisma.bankAccount.update({ where: { id }, data: dto });
   }
 
   async remove(organizationId: string, id: string) {
     const account = await this.prisma.bankAccount.findFirst({
-      where: { id, organizationId },
-      include: { transactions: { take: 1 } },
+      where: { id, organizationId, deletedAt: null },
+      include: { _count: { select: { transactions: true } } },
     });
     if (!account) throw new NotFoundException('Bank account not found');
-    if (account.transactions.length > 0) throw new BadRequestException('Account has transactions');
-    await this.prisma.bankAccount.delete({ where: { id } });
+    if (account._count.transactions > 0) throw new BadRequestException('Account has transactions');
+    await this.prisma.bankAccount.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return { message: 'Bank account deleted' };
   }
 
   async updateBalance(id: string, amount: number, type: 'add' | 'subtract') {
     const account = await this.prisma.bankAccount.findUnique({ where: { id } });
-    if (!account) return;
+    if (!account) throw new NotFoundException(`Bank account ${id} not found for balance update`);
     const newBalance =
       type === 'add'
         ? parseFloat(account.systemBalance.toString()) + amount

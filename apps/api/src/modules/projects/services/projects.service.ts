@@ -1,13 +1,16 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { BillingMethod, ProjectStatus } from '@prisma/client';
+import { BillingMethod, Prisma, ProjectStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { CreateProjectDto } from '../dto/create-project.dto';
+import { UpdateProjectDto } from '../dto/update-project.dto';
+import { ProjectQueryDto } from '../dto/project-query.dto';
 
 @Injectable()
 export class ProjectsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateProjectDto) {
     const projectNumber = await this.generateProjectNumber(organizationId);
 
     // Verify customer if provided
@@ -41,8 +44,8 @@ export class ProjectsService {
     });
   }
 
-  async findAll(organizationId: string, query: { status?: string; customerId?: string }) {
-    const where: any = { organizationId };
+  async findAll(organizationId: string, query: ProjectQueryDto) {
+    const where: Prisma.ProjectWhereInput = { organizationId, deletedAt: null };
     if (query.status) where.status = query.status;
     if (query.customerId) where.customerId = query.customerId;
 
@@ -58,7 +61,7 @@ export class ProjectsService {
 
   async findOne(organizationId: string, id: string) {
     const project = await this.prisma.project.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: {
         customer: true,
         tasks: { orderBy: { sortOrder: 'asc' } },
@@ -73,10 +76,10 @@ export class ProjectsService {
     return project;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateProjectDto) {
     await this.findOne(organizationId, id);
 
-    const data: any = { ...dto };
+    const data: Record<string, unknown> = { ...dto };
     if (dto.hourlyRate) data.hourlyRate = new Decimal(dto.hourlyRate);
     if (dto.fixedPrice) data.fixedPrice = new Decimal(dto.fixedPrice);
     if (dto.budget) data.budget = new Decimal(dto.budget);
@@ -94,17 +97,22 @@ export class ProjectsService {
     const project = await this.prisma.project.findFirst({
       where: { id, organizationId },
       include: {
-        timesheetEntries: { take: 1 },
-        invoices: { take: 1 },
+        _count: { select: { timesheetEntries: true, invoices: true } },
       },
     });
     if (!project) throw new NotFoundException('Project not found');
-    if (project.timesheetEntries.length > 0 || project.invoices.length > 0) {
+    if (project._count.timesheetEntries > 0 || project._count.invoices > 0) {
       throw new BadRequestException('Cannot delete project with timesheet entries or invoices');
     }
 
-    await this.prisma.task.deleteMany({ where: { projectId: id } });
-    await this.prisma.project.delete({ where: { id } });
+    await this.prisma.task.updateMany({
+      where: { projectId: id },
+      data: { deletedAt: new Date() },
+    });
+    await this.prisma.project.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return { message: 'Project deleted' };
   }
 
@@ -114,14 +122,18 @@ export class ProjectsService {
     // Only delete projects without timesheet entries or invoices
     const projects = await this.prisma.project.findMany({
       where: { id: { in: ids }, organizationId },
-      include: { timesheetEntries: { take: 1 }, invoices: { take: 1 } },
+      include: { _count: { select: { timesheetEntries: true, invoices: true } } },
     });
     const deletableIds = projects
-      .filter((p) => p.timesheetEntries.length === 0 && p.invoices.length === 0)
+      .filter((p) => p._count.timesheetEntries === 0 && p._count.invoices === 0)
       .map((p) => p.id);
-    await this.prisma.task.deleteMany({ where: { projectId: { in: deletableIds } } });
-    const result = await this.prisma.project.deleteMany({
+    await this.prisma.task.updateMany({
+      where: { projectId: { in: deletableIds } },
+      data: { deletedAt: new Date() },
+    });
+    const result = await this.prisma.project.updateMany({
       where: { id: { in: deletableIds }, organizationId },
+      data: { deletedAt: new Date() },
     });
     return { deleted: result.count, total: ids.length };
   }
@@ -200,12 +212,12 @@ export class ProjectsService {
   async getProjectSummary(organizationId: string) {
     const projects = await this.prisma.project.groupBy({
       by: ['status'],
-      where: { organizationId },
+      where: { organizationId, deletedAt: null },
       _count: { id: true },
     });
 
     const totalBudget = await this.prisma.project.aggregate({
-      where: { organizationId },
+      where: { organizationId, deletedAt: null },
       _sum: { budget: true },
     });
 

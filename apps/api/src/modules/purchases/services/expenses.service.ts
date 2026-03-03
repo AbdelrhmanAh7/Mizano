@@ -4,16 +4,21 @@ import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { JournalsService } from '../../accounting/services/journals.service';
+import { CreateExpenseDto } from '../dto/create-expense.dto';
 
 @Injectable()
 export class ExpensesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private journalsService: JournalsService,
+  ) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateExpenseDto) {
     const taxAmount = dto.taxInclusive
       ? 0
       : parseFloat(dto.amount) * (parseFloat(dto.taxRate || '0') / 100);
-    return this.prisma.expense.create({
+    const expense = await this.prisma.expense.create({
       data: {
         date: new Date(dto.date),
         accountId: dto.accountId,
@@ -32,6 +37,56 @@ export class ExpensesService {
         vendor: { select: { id: true, name: true } },
       },
     });
+
+    // Create accounting entry: Dr Expense / Dr VAT Receivable / Cr Paid-Through
+    if (dto.accountId && dto.paidThroughAccountId) {
+      const amount = parseFloat(dto.amount);
+      const journalLines: Array<{
+        accountId: string;
+        debit: string;
+        credit: string;
+        description?: string;
+      }> = [
+        {
+          accountId: dto.accountId,
+          debit: amount.toFixed(4),
+          credit: '0',
+          description: `Expense - ${dto.description || 'General expense'}`,
+        },
+      ];
+
+      if (!dto.taxInclusive && taxAmount > 0) {
+        const org = await this.prisma.organization.findUnique({
+          where: { id: organizationId },
+          select: { defaultVatReceivableAccountId: true },
+        });
+
+        if (org?.defaultVatReceivableAccountId) {
+          journalLines.push({
+            accountId: org.defaultVatReceivableAccountId,
+            debit: taxAmount.toFixed(4),
+            credit: '0',
+            description: `Expense - VAT Receivable`,
+          });
+        }
+      }
+
+      journalLines.push({
+        accountId: dto.paidThroughAccountId,
+        debit: '0',
+        credit: (amount + taxAmount).toFixed(4),
+        description: `Expense - Payment`,
+      });
+
+      await this.journalsService.create(organizationId, {
+        date: new Date(dto.date).toISOString(),
+        reference: `Expense ${expense.id.slice(-6)}`,
+        notes: `Expense entry - ${dto.description || 'General expense'}`,
+        lines: journalLines,
+      });
+    }
+
+    return expense;
   }
 
   async findAll(organizationId: string, query: PaginationDto) {

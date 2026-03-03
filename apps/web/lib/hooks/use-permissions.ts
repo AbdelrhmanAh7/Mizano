@@ -135,3 +135,23 @@ export const ACTIONS = ['view', 'create', 'edit', 'delete', 'export'] as const;
 
 export type Module = (typeof MODULES)[number];
 export type Action = (typeof ACTIONS)[number];
+
+/**
+ * Convenience hook that returns boolean flags for common CRUD permissions on a module.
+ *
+ * @example
+ * const { canView, canCreate, canEdit, canDelete } = useModulePermissions('sales');
+ * if (canCreate) { ... }
+ */
+export function useModulePermissions(module: string) {
+  const { hasPermission, isLoading } = usePermissions();
+
+  return {
+    canView: hasPermission(`${module}.view`),
+    canCreate: hasPermission(`${module}.create`),
+    canEdit: hasPermission(`${module}.edit`),
+    canDelete: hasPermission(`${module}.delete`),
+    canExport: hasPermission(`${module}.export`),
+    isLoading,
+  };
+}

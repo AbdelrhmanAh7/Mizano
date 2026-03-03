@@ -1,6 +1,9 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { TaxRatesService } from '../services/tax-rates.service';
+import { CreateTaxRateDto } from '../dto/create-tax-rate.dto';
+import { UpdateTaxRateDto } from '../dto/update-tax-rate.dto';
+import { TaxRateQueryDto } from '../dto/tax-rate-query.dto';
 import { CurrentOrg, HttpCache, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -15,7 +18,7 @@ export class TaxRatesController {
   @Post()
   @Permissions('tax.create')
   @ApiOperation({ summary: 'Create a new tax rate' })
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateTaxRateDto) {
     return this.taxRatesService.create(orgId, dto);
   }
 
@@ -23,7 +26,7 @@ export class TaxRatesController {
   @Permissions('tax.view')
   @HttpCache('static')
   @ApiOperation({ summary: 'Get all tax rates' })
-  findAll(@CurrentOrg() orgId: string, @Query() query: { type?: string; isActive?: boolean }) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: TaxRateQueryDto) {
     return this.taxRatesService.findAll(orgId, query);
   }
 
@@ -44,7 +47,7 @@ export class TaxRatesController {
   @Put(':id')
   @Permissions('tax.edit')
   @ApiOperation({ summary: 'Update tax rate' })
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateTaxRateDto) {
     return this.taxRatesService.update(orgId, id, dto);
   }
 

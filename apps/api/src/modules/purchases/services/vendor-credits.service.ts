@@ -4,12 +4,17 @@ import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { JournalsService } from '../../accounting/services/journals.service';
+import { CreateVendorCreditDto } from '../dto/create-vendor-credit.dto';
 
 @Injectable()
 export class VendorCreditsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private journalsService: JournalsService,
+  ) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateVendorCreditDto) {
     const vendor = await this.prisma.vendor.findFirst({
       where: { id: dto.vendorId, organizationId, deletedAt: null },
     });
@@ -22,7 +27,7 @@ export class VendorCreditsService {
 
     const creditNumber = await this.generateCreditNumber(organizationId);
 
-    return this.prisma.vendorCredit.create({
+    const credit = await this.prisma.vendorCredit.create({
       data: {
         creditNumber,
         vendorId: dto.vendorId,
@@ -37,10 +42,51 @@ export class VendorCreditsService {
         bill: { select: { id: true, billNumber: true } },
       },
     });
+
+    // Create accounting entry: Dr AP / Cr Expense (reversal)
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { defaultApAccountId: true },
+    });
+
+    if (org?.defaultApAccountId) {
+      const billLine = await this.prisma.billLine.findFirst({
+        where: { billId: dto.billId },
+        select: { accountId: true },
+      });
+
+      if (billLine?.accountId) {
+        const amount = parseFloat(dto.amount);
+        await this.journalsService.create(organizationId, {
+          date: (dto.date ? new Date(dto.date) : new Date()).toISOString(),
+          reference: `Vendor Credit ${creditNumber}`,
+          notes: `Vendor credit ${creditNumber} against bill`,
+          lines: [
+            {
+              accountId: org.defaultApAccountId,
+              debit: amount.toFixed(4),
+              credit: '0',
+              description: `${creditNumber} - Accounts Payable (reduction)`,
+            },
+            {
+              accountId: billLine.accountId,
+              debit: '0',
+              credit: amount.toFixed(4),
+              description: `${creditNumber} - Expense reversal`,
+            },
+          ],
+        });
+      }
+    }
+
+    return credit;
   }
 
   async findAll(organizationId: string, query: PaginationDto & { vendorId?: string }) {
-    const where: any = { organizationId, deletedAt: null };
+    const where: { organizationId: string; deletedAt: null; vendorId?: string } = {
+      organizationId,
+      deletedAt: null,
+    };
     if (query.vendorId) where.vendorId = query.vendorId;
 
     const page = query.page || 1;

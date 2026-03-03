@@ -21,6 +21,10 @@ import { AiTrainingLabController } from './controllers/ai-training-lab.controlle
 import { AiController } from './controllers/ai.controller';
 import { CategorizationController } from './controllers/categorization.controller';
 import { DeepSearchController } from './controllers/deep-search.controller';
+import { NarrativeController } from './controllers/narrative.controller';
+
+// Financial narrative
+import { FinancialNarrativeService } from './services/financial-narrative.service';
 
 // Cross-cutting scheduler (depends on services from many sub-modules)
 import { AiRetrainingScheduler } from './schedulers/ai-retraining.scheduler';
@@ -41,6 +45,7 @@ import { AiRetrainingScheduler } from './schedulers/ai-retraining.scheduler';
     AiTrainingLabController,
     CategorizationController,
     DeepSearchController,
+    NarrativeController,
   ],
   providers: [
     // Legacy orchestration services
@@ -50,6 +55,8 @@ import { AiRetrainingScheduler } from './schedulers/ai-retraining.scheduler';
     TransactionCategorizerService,
     // DeepSearch is standalone
     DeepSearchService,
+    // Financial narrative
+    FinancialNarrativeService,
     // Cross-cutting scheduler (uses services from core, operations, forecasting, sales-crm)
     AiRetrainingScheduler,
   ],
@@ -67,6 +74,7 @@ import { AiRetrainingScheduler } from './schedulers/ai-retraining.scheduler';
     AiForecastingService,
     TransactionCategorizerService,
     DeepSearchService,
+    FinancialNarrativeService,
   ],
 })
 export class AiModule {}

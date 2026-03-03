@@ -5,7 +5,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AcceptLanguageResolver, HeaderResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
-import * as path from 'path';
+import path from 'path';
 import { CacheModule } from './cache/cache.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { CacheResponseInterceptor } from './common/interceptors/cache-response.interceptor';
@@ -39,6 +39,7 @@ import { TaxModule } from './modules/tax/tax.module';
 import { UserPreferencesModule } from './modules/user-preferences/user-preferences.module';
 import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
@@ -65,7 +66,7 @@ import { PrismaModule } from './prisma/prisma.module';
     I18nModule.forRoot({
       fallbackLanguage: 'en',
       loaderOptions: {
-        path: path.join(__dirname, '..', 'i18n'),
+        path: path.join(__dirname, 'i18n'),
         watch: true,
       },
       resolvers: [
@@ -77,6 +78,7 @@ import { PrismaModule } from './prisma/prisma.module';
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
     PrismaModule,
+    CommonModule,
     AuthModule,
     UsersModule,
     OrganizationsModule,

@@ -1,17 +1,23 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { BillStatus } from '@prisma/client';
+import { BillStatus, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { JournalsService } from '../../accounting/services/journals.service';
+import { CreateBillDto } from '../dto/create-bill.dto';
+import { UpdateBillDto } from '../dto/update-bill.dto';
 
 @Injectable()
 export class BillsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private journalsService: JournalsService,
+  ) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateBillDto) {
     const vendor = await this.prisma.vendor.findFirst({
       where: { id: dto.vendorId, organizationId, deletedAt: null },
     });
@@ -19,7 +25,7 @@ export class BillsService {
 
     let subtotal = 0,
       taxAmount = 0;
-    const lines = dto.lines.map((line: any) => {
+    const lines = dto.lines.map((line) => {
       const qty = parseFloat(line.quantity);
       const rate = parseFloat(line.rate);
       const tax = parseFloat(line.taxRate || '0');
@@ -43,10 +49,10 @@ export class BillsService {
         projectId: dto.projectId,
         organizationId,
         lines: {
-          create: lines.map((line: any) => ({
-            itemId: line.itemId,
-            accountId: line.accountId,
-            description: line.description,
+          create: lines.map((line) => ({
+            ...(line.itemId && { itemId: line.itemId }),
+            ...(line.accountId && { accountId: line.accountId }),
+            description: line.description || '',
             quantity: new Decimal(line.quantity),
             rate: new Decimal(line.rate),
             taxRate: new Decimal(line.taxRate || '0'),
@@ -98,13 +104,23 @@ export class BillsService {
     return bill;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateBillDto) {
     const bill = await this.prisma.bill.findFirst({
       where: { id, organizationId, deletedAt: null },
     });
     if (!bill) throw new NotFoundException('Bill not found');
     if (bill.status !== 'DRAFT') throw new BadRequestException('Only draft bills can be updated');
-    return this.prisma.bill.update({ where: { id }, data: dto });
+
+    const { lines: _lines, ...rest } = dto;
+    const data: Prisma.BillUpdateInput = {};
+    if (rest.billNumber !== undefined) data.billNumber = rest.billNumber;
+    if (rest.date !== undefined) data.date = new Date(rest.date);
+    if (rest.dueDate !== undefined) data.dueDate = new Date(rest.dueDate);
+    if (rest.notes !== undefined) data.notes = rest.notes;
+    if (rest.vendorId !== undefined) data.vendor = { connect: { id: rest.vendorId } };
+    if (rest.projectId !== undefined) data.project = { connect: { id: rest.projectId } };
+
+    return this.prisma.bill.update({ where: { id }, data });
   }
 
   async updateBalanceDue(billId: string) {
@@ -112,7 +128,7 @@ export class BillsService {
       where: { id: billId },
       include: { billAllocations: true },
     });
-    if (!bill) return;
+    if (!bill) throw new NotFoundException(`Bill ${billId} not found for balance update`);
 
     const totalPayments = bill.billAllocations.reduce(
       (sum, a) => sum + parseFloat(a.amount.toString()),
@@ -210,11 +226,81 @@ export class BillsService {
   async approve(organizationId: string, id: string) {
     const bill = await this.prisma.bill.findFirst({
       where: { id, organizationId, deletedAt: null },
+      include: { lines: true },
     });
     if (!bill) throw new NotFoundException('Bill not found');
     if (bill.status !== BillStatus.DRAFT) {
       throw new BadRequestException('Only draft bills can be approved');
     }
+
+    // Validate all lines have expense accounts assigned
+    const linesWithoutAccount = bill.lines.filter((l) => !l.accountId);
+    if (linesWithoutAccount.length > 0) {
+      throw new BadRequestException(
+        'All bill lines must have an expense account assigned before approval',
+      );
+    }
+
+    // Get organization default accounts
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        defaultApAccountId: true,
+        defaultVatReceivableAccountId: true,
+      },
+    });
+
+    if (!org?.defaultApAccountId) {
+      throw new BadRequestException(
+        'Please configure default Accounts Payable account in organization settings before approving bills',
+      );
+    }
+
+    // Create accounting entry: Dr Expense lines / Dr VAT Receivable / Cr AP
+    const grandTotal = parseFloat(bill.grandTotal.toString());
+    const taxAmount = parseFloat(bill.taxAmount.toString());
+
+    const journalLines: Array<{
+      accountId: string;
+      debit: string;
+      credit: string;
+      description?: string;
+    }> = [];
+
+    // Debit expense accounts from bill lines
+    for (const line of bill.lines) {
+      journalLines.push({
+        accountId: line.accountId as string,
+        debit: parseFloat(line.amount.toString()).toFixed(4),
+        credit: '0',
+        description: `Bill ${bill.billNumber} - ${(line.description as string) || 'Expense'}`,
+      });
+    }
+
+    // Debit VAT Receivable if applicable
+    if (taxAmount > 0 && org.defaultVatReceivableAccountId) {
+      journalLines.push({
+        accountId: org.defaultVatReceivableAccountId,
+        debit: taxAmount.toFixed(4),
+        credit: '0',
+        description: `Bill ${bill.billNumber} - VAT Receivable`,
+      });
+    }
+
+    // Credit AP for grand total
+    journalLines.push({
+      accountId: org.defaultApAccountId,
+      debit: '0',
+      credit: grandTotal.toFixed(4),
+      description: `Bill ${bill.billNumber} - Accounts Payable`,
+    });
+
+    await this.journalsService.create(organizationId, {
+      date: new Date().toISOString(),
+      reference: `Bill ${bill.billNumber}`,
+      notes: `Accounting entry for bill ${bill.billNumber}`,
+      lines: journalLines,
+    });
 
     return this.prisma.bill.update({
       where: { id },

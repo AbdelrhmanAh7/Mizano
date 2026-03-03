@@ -22,6 +22,7 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { CreateExpenseDto } from '../dto/create-expense.dto';
 import { ExpensesService } from '../services/expenses.service';
 
 @ApiTags('Expenses')
@@ -35,7 +36,7 @@ export class ExpensesController {
   @Post()
   @Permissions('purchases.create')
   @InvalidateCache('expenses:*')
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateExpenseDto) {
     return this.expensesService.create(orgId, dto);
   }
 

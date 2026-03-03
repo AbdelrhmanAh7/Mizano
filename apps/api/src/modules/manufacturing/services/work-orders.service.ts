@@ -1,13 +1,46 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { WorkOrderStatus } from '@prisma/client';
+import { Item, Prisma, WorkOrderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
+
+interface CreateWorkOrderData {
+  bomId: string;
+  quantity: number;
+  plannedStartDate?: string;
+  notes?: string;
+}
+
+interface UpdateWorkOrderData {
+  quantity?: number;
+  plannedStartDate?: string;
+  notes?: string;
+  bomId?: string;
+}
+
+interface WorkOrderWithBom {
+  id: string;
+  workOrderNumber: string;
+  quantity: number;
+  notes: string | null;
+  bom: {
+    outputItemId: string;
+    outputQuantity: number;
+    operationsCost: Decimal;
+    items: Array<{
+      itemId: string;
+      quantity: Decimal;
+      item: {
+        costPrice: Decimal;
+      };
+    }>;
+  };
+}
 
 @Injectable()
 export class WorkOrdersService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateWorkOrderData) {
     const bom = await this.prisma.bOM.findFirst({
       where: { id: dto.bomId, organizationId },
       include: { items: { include: { item: true } } },
@@ -38,8 +71,8 @@ export class WorkOrdersService {
   }
 
   async findAll(organizationId: string, query: { status?: string; bomId?: string }) {
-    const where: any = { organizationId };
-    if (query.status) where.status = query.status;
+    const where: Prisma.WorkOrderWhereInput = { organizationId, deletedAt: null };
+    if (query.status) where.status = query.status as WorkOrderStatus;
     if (query.bomId) where.bomId = query.bomId;
 
     return this.prisma.workOrder.findMany({
@@ -55,7 +88,7 @@ export class WorkOrdersService {
 
   async findOne(organizationId: string, id: string) {
     const workOrder = await this.prisma.workOrder.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: {
         bom: {
           include: {
@@ -69,7 +102,7 @@ export class WorkOrdersService {
     return workOrder;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateWorkOrderData) {
     const workOrder = await this.findOne(organizationId, id);
     if (
       workOrder.status === WorkOrderStatus.COMPLETED ||
@@ -78,7 +111,7 @@ export class WorkOrdersService {
       throw new BadRequestException('Cannot update completed or cancelled work order');
     }
 
-    const data: any = { ...dto };
+    const data: Prisma.WorkOrderUncheckedUpdateInput = { ...dto };
     if (dto.plannedStartDate) data.plannedStartDate = new Date(dto.plannedStartDate);
 
     return this.prisma.workOrder.update({
@@ -121,7 +154,7 @@ export class WorkOrdersService {
     const multiplier = plannedQty / outputQty;
 
     const materials: Array<{
-      item: any;
+      item: Item;
       required: number;
       available: number;
       shortfall: number;
@@ -193,7 +226,7 @@ export class WorkOrdersService {
 
   private async createCOGMJournal(
     organizationId: string,
-    workOrder: any,
+    workOrder: WorkOrderWithBom,
     quantityProduced: number,
   ): Promise<string | null> {
     const bom = workOrder.bom;
@@ -331,7 +364,10 @@ export class WorkOrdersService {
     });
   }
 
-  private async generateJournalNumberTx(tx: any, organizationId: string): Promise<string> {
+  private async generateJournalNumberTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<string> {
     const lastJournal = await tx.journal.findFirst({
       where: { organizationId },
       orderBy: { createdAt: 'desc' },
@@ -346,7 +382,11 @@ export class WorkOrdersService {
     return `JRN-${String(lastNumber + 1).padStart(3, '0')}`;
   }
 
-  private async consumeMaterials(organizationId: string, workOrder: any, quantityProduced: number) {
+  private async consumeMaterials(
+    organizationId: string,
+    workOrder: WorkOrderWithBom,
+    quantityProduced: number,
+  ) {
     const bom = workOrder.bom;
     const outputQty = bom.outputQuantity;
     const multiplier = quantityProduced / outputQty;
@@ -380,7 +420,11 @@ export class WorkOrdersService {
     }
   }
 
-  private async addFinishedGoods(organizationId: string, workOrder: any, quantityProduced: number) {
+  private async addFinishedGoods(
+    organizationId: string,
+    workOrder: WorkOrderWithBom,
+    quantityProduced: number,
+  ) {
     // Get default warehouse
     const defaultWarehouse = await this.prisma.warehouse.findFirst({
       where: { organizationId, isDefault: true },
@@ -503,19 +547,24 @@ export class WorkOrdersService {
     if (workOrder.status !== WorkOrderStatus.DRAFT) {
       throw new BadRequestException('Only draft work orders can be deleted');
     }
-    await this.prisma.workOrder.delete({ where: { id } });
+    await this.prisma.workOrder.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return { message: 'Work order deleted' };
   }
 
   // === Bulk Operations ===
 
   async bulkDelete(organizationId: string, ids: string[]) {
-    const result = await this.prisma.workOrder.deleteMany({
+    const result = await this.prisma.workOrder.updateMany({
       where: {
         id: { in: ids },
         organizationId,
         status: WorkOrderStatus.DRAFT,
+        deletedAt: null,
       },
+      data: { deletedAt: new Date() },
     });
     return { deleted: result.count, total: ids.length };
   }

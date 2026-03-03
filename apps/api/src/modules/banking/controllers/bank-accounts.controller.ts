@@ -21,6 +21,8 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import { BankAccountsService } from '../services/bank-accounts.service';
+import { CreateBankAccountDto } from '../dto/create-bank-account.dto';
+import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
 
 @ApiTags('Bank Accounts')
 @ApiBearerAuth()
@@ -33,7 +35,7 @@ export class BankAccountsController {
   @Post()
   @Permissions('banking.create')
   @InvalidateCache('bank-accounts:*')
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateBankAccountDto) {
     return this.bankAccountsService.create(orgId, dto);
   }
 
@@ -54,7 +56,7 @@ export class BankAccountsController {
   @Patch(':id')
   @Permissions('banking.edit')
   @InvalidateCache('bank-accounts:*')
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateBankAccountDto) {
     return this.bankAccountsService.update(orgId, id, dto);
   }
 

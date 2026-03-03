@@ -71,8 +71,8 @@ async def process_invoice(request: Request, file: UploadFile) -> ProcessInvoiceR
 
         logger.info(
             "Invoice processed: vendor=%r total=%s time=%.0f ms",
-            extraction.vendor_name,
-            extraction.total_amount,
+            extraction.vendor.name if extraction.vendor else None,
+            extraction.total,
             latency_ms,
         )
         return ProcessInvoiceResponse(success=True, data=extraction)
@@ -114,6 +114,8 @@ async def model_status(request: Request) -> dict:
         "model_name": settings.MODEL_NAME,
         "model_loaded": vlm_engine.is_loaded,
         "mock_mode": settings.VLM_MOCK,
+        "lora_enabled": settings.LORA_ENABLED,
+        "lora_adapter_path": settings.LORA_ADAPTER_PATH,
         "total_requests": vlm_engine.total_requests,
         "average_inference_ms": vlm_engine.average_inference_ms,
         **gpu_stats,

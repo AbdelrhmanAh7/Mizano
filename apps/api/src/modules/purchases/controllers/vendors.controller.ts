@@ -24,6 +24,8 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { CreateVendorDto } from '../dto/create-vendor.dto';
+import { UpdateVendorDto } from '../dto/update-vendor.dto';
 import { VendorsService } from '../services/vendors.service';
 
 @ApiTags('Vendors')
@@ -37,7 +39,7 @@ export class VendorsController {
   @Post()
   @Permissions('purchases.create')
   @InvalidateCache('vendors:*')
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateVendorDto) {
     return this.vendorsService.create(orgId, dto);
   }
 
@@ -66,7 +68,7 @@ export class VendorsController {
   @Patch(':id')
   @Permissions('purchases.edit')
   @InvalidateCache('vendors:*')
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateVendorDto) {
     return this.vendorsService.update(orgId, id, dto);
   }
 

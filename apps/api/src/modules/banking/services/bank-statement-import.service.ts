@@ -1,6 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ImportService } from '../../import-export/services/import.service';
+import { BankRulesService, BankRuleCondition } from './bank-rules.service';
+import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 interface ColumnMapping {
@@ -26,6 +28,7 @@ export class BankStatementImportService {
   constructor(
     private prisma: PrismaService,
     private importService: ImportService,
+    private bankRulesService: BankRulesService,
   ) {}
 
   async importStatement(
@@ -33,7 +36,13 @@ export class BankStatementImportService {
     bankAccountId: string,
     buffer: Buffer,
     filename: string,
-  ): Promise<{ imported: number; skipped: number; duplicates: number; total: number }> {
+  ): Promise<{
+    imported: number;
+    skipped: number;
+    duplicates: number;
+    rulesApplied: number;
+    total: number;
+  }> {
     // Validate bank account
     const bankAccount = await this.prisma.bankAccount.findFirst({
       where: { id: bankAccountId, organizationId },
@@ -62,6 +71,7 @@ export class BankStatementImportService {
     );
 
     // Import new transactions
+    let rulesApplied = 0;
     if (newTransactions.length > 0) {
       await this.prisma.bankTransaction.createMany({
         data: newTransactions.map((t) => ({
@@ -75,12 +85,16 @@ export class BankStatementImportService {
           organizationId,
         })),
       });
+
+      // Auto-apply bank rules to newly imported transactions
+      rulesApplied = await this.applyBankRules(organizationId, bankAccountId, newTransactions);
     }
 
     return {
       imported: newTransactions.length,
       skipped: 0,
       duplicates: duplicateCount,
+      rulesApplied,
       total: normalized.length,
     };
   }
@@ -184,7 +198,7 @@ export class BankStatementImportService {
    * Handles split debit/credit columns and flexible date parsing.
    */
   normalizeTransactions(
-    rows: Record<string, any>[],
+    rows: Record<string, unknown>[],
     mapping: ColumnMapping,
   ): NormalizedTransaction[] {
     const transactions: NormalizedTransaction[] = [];
@@ -235,7 +249,7 @@ export class BankStatementImportService {
   /**
    * Parse amount from various formats: "1,234.56", "(1234.56)", "-1234.56", "1.234,56"
    */
-  private parseAmount(value: any): number {
+  private parseAmount(value: unknown): number {
     if (value === null || value === undefined || value === '') return 0;
     const str = String(value).trim();
 
@@ -264,7 +278,7 @@ export class BankStatementImportService {
   /**
    * Parse date from various formats.
    */
-  private parseDate(value: any): string | null {
+  private parseDate(value: unknown): string | null {
     if (!value) return null;
     const str = String(value).trim();
 
@@ -393,5 +407,79 @@ export class BankStatementImportService {
     }
 
     return { newTransactions, duplicateCount };
+  }
+
+  /**
+   * Apply active bank rules to newly imported transactions.
+   * For each transaction, test against all active rules (in order).
+   * First matching rule wins — applies the rule's action (e.g., set accountId/category).
+   */
+  private async applyBankRules(
+    organizationId: string,
+    bankAccountId: string,
+    newTransactions: NormalizedTransaction[],
+  ): Promise<number> {
+    // Fetch active rules for this bank account (or global rules with no bankAccountId)
+    const rules = await this.prisma.bankRule.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+        isActive: true,
+        OR: [{ bankAccountId }, { bankAccountId: null }],
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (rules.length === 0) return 0;
+
+    // Fetch the newly created transactions from DB (we need their IDs)
+    const dates = newTransactions.map((t) => new Date(t.date));
+    const minDate = new Date(Math.min(...dates.map((d) => d.getTime())));
+    const maxDate = new Date(Math.max(...dates.map((d) => d.getTime())));
+    minDate.setDate(minDate.getDate() - 1);
+    maxDate.setDate(maxDate.getDate() + 1);
+
+    const createdTxs = await this.prisma.bankTransaction.findMany({
+      where: {
+        organizationId,
+        bankAccountId,
+        status: 'PENDING',
+        date: { gte: minDate, lte: maxDate },
+      },
+    });
+
+    let appliedCount = 0;
+
+    for (const tx of createdTxs) {
+      for (const rule of rules) {
+        const conditions = (rule.conditions as unknown as BankRuleCondition[]) || [];
+        const { matches } = this.bankRulesService.testRule(conditions, {
+          description: tx.description,
+          payee: tx.payee,
+          reference: tx.reference,
+          amount: tx.amount.toString(),
+          type: tx.type,
+        });
+
+        if (matches) {
+          const action = (rule.action as Record<string, unknown>) || {};
+          const updateData: Record<string, unknown> = {};
+          if (action.accountId) updateData.matchedEntityType = 'account';
+          if (action.categoryId) updateData.matchedEntityId = action.categoryId;
+          if (action.description) updateData.description = action.description;
+
+          if (Object.keys(updateData).length > 0) {
+            await this.prisma.bankTransaction.update({
+              where: { id: tx.id },
+              data: updateData as Prisma.BankTransactionUncheckedUpdateInput,
+            });
+          }
+          appliedCount++;
+          break; // First matching rule wins
+        }
+      }
+    }
+
+    return appliedCount;
   }
 }

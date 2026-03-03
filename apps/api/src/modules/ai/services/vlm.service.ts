@@ -121,11 +121,11 @@ export class VlmService {
       tax: vlm.taxAmount,
       invoiceNumber: vlm.invoiceNumber,
       vendorName: vlm.vendorName,
-      lineItems: vlm.items.map((item: VlmLineItem) => ({
+      lineItems: vlm.lineItems.map((item: VlmLineItem) => ({
         description: item.description,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        total: item.total,
+        total: item.lineTotal,
       })),
       ocrConfidence: vlm.confidence.overall,
       rawText: vlm.rawText || '',
@@ -147,27 +147,63 @@ export class VlmService {
    */
   private mapResponseToResult(data: Record<string, unknown>): VlmExtractionResult {
     const confidence = (data.confidence as Record<string, number>) || {};
-    const rawItems = (data.items as Array<Record<string, unknown>>) || [];
+    const vendorRaw = (data.vendor as Record<string, string | null>) || {};
+    const billToRaw = (data.bill_to as Record<string, string | null>) || {};
+    const shipToRaw = (data.ship_to as Record<string, string | null>) || {};
+    // Support both new schema (line_items) and old schema (items) for backward compat
+    const rawItems = ((data.line_items ?? data.items) as Array<Record<string, unknown>>) || [];
     const accountingRaw = data.accounting_entry as Record<string, string | null> | null;
 
+    // Resolve vendor name: new schema uses vendor.name, old uses vendor_name
+    const vendorName = vendorRaw.name ?? (data.vendor_name as string | null) ?? null;
+    const vendorTaxId = vendorRaw.tax_id ?? (data.vendor_tax_id as string | null) ?? null;
+
     return {
-      vendorName: (data.vendor_name as string | null) ?? null,
-      vendorTaxId: (data.vendor_tax_id as string | null) ?? null,
-      customerName: (data.customer_name as string | null) ?? null,
+      documentType: (data.document_type as string | null) ?? null,
+      vendorName,
+      vendorTaxId,
+      vendor: {
+        name: vendorName,
+        address: vendorRaw.address ?? null,
+        taxId: vendorTaxId,
+        phone: vendorRaw.phone ?? null,
+        email: vendorRaw.email ?? null,
+      },
+      billTo: {
+        name: billToRaw.name ?? (data.customer_name as string | null) ?? null,
+        address: billToRaw.address ?? null,
+        taxId: billToRaw.tax_id ?? null,
+      },
+      shipTo: {
+        name: shipToRaw.name ?? null,
+        address: shipToRaw.address ?? null,
+      },
+      customerName: billToRaw.name ?? (data.customer_name as string | null) ?? null,
       invoiceNumber: (data.invoice_number as string | null) ?? null,
       invoiceDate: (data.invoice_date as string | null) ?? null,
       dueDate: (data.due_date as string | null) ?? null,
       currency: (data.currency as string | null) ?? null,
-      subtotal: (data.subtotal as number | null) ?? null,
-      taxAmount: (data.tax_amount as number | null) ?? null,
-      totalAmount: (data.total_amount as number | null) ?? null,
       paymentTerms: (data.payment_terms as string | null) ?? null,
-      items: rawItems.map((item) => ({
+      subtotal: (data.subtotal as number | null) ?? null,
+      // Support both new schema (tax_total) and old schema (tax_amount)
+      taxAmount: (data.tax_total as number | null) ?? (data.tax_amount as number | null) ?? null,
+      // Support both new schema (total) and old schema (total_amount)
+      totalAmount: (data.total as number | null) ?? (data.total_amount as number | null) ?? null,
+      discount: (data.discount as number | null) ?? null,
+      amountPaid: (data.amount_paid as number | null) ?? null,
+      balanceDue: (data.balance_due as number | null) ?? null,
+      lineItems: rawItems.map((item) => ({
+        lineNumber: (item.line_number as number | null) ?? null,
         description: (item.description as string) || '',
         quantity: (item.quantity as number) ?? 1,
         unitPrice: (item.unit_price as number) ?? 0,
-        total: (item.total as number) ?? 0,
-        taxRate: (item.tax_rate as number | null) ?? null,
+        taxableAmount: (item.taxable_amount as number | null) ?? null,
+        // Support both new schema (tax_rate_percent) and old schema (tax_rate)
+        taxRatePercent:
+          (item.tax_rate_percent as number | null) ?? (item.tax_rate as number | null) ?? null,
+        taxAmount: (item.tax_amount as number | null) ?? null,
+        // Support both new schema (line_total) and old schema (total)
+        lineTotal: (item.line_total as number) ?? (item.total as number) ?? 0,
       })),
       notes: (data.notes as string | null) ?? null,
       accountingEntry: accountingRaw

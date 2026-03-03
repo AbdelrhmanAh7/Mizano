@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BillStatus, InvoiceStatus, ProjectStatus } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { CacheService } from '../../../cache/cache.service';
 import { ReadReplicaService } from '../../../prisma/read-replica.service';
 
@@ -525,7 +526,7 @@ export class DashboardService {
     let currentValue = 0;
     for (const item of items) {
       const quantity = item.inventoryLevels.reduce(
-        (sum: number, il: { quantity: any }) => sum + parseFloat((il.quantity ?? 0).toString()),
+        (sum: number, il: { quantity: Decimal }) => sum + parseFloat((il.quantity ?? 0).toString()),
         0,
       );
       const costPrice = parseFloat((item.costPrice ?? 0).toString());

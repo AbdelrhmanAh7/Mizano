@@ -21,11 +21,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useToast } from '@/components/ui/use-toast';
 import { DataTableSearch } from '@/components/data-table';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { AccountTree } from '@/components/accounting/account-tree';
-import { AccountFormDialog } from '@/components/accounting/account-form-dialog';
+import dynamic from 'next/dynamic';
+
+const AccountFormDialog = dynamic(
+  () => import('@/components/accounting/account-form-dialog').then((m) => m.AccountFormDialog),
+  { ssr: false },
+);
 import {
   useAccountsTree,
   useCreateAccount,
@@ -33,11 +37,11 @@ import {
   useDeleteAccount,
   useSeedAccounts,
   Account,
+  AccountType,
 } from '@/lib/hooks/use-accounts';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 
 function AccountsPageContent() {
-  const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'code' });
 
@@ -100,14 +104,21 @@ function AccountsPageContent() {
     setDeleteDialogOpen(true);
   };
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: {
+    code: string;
+    name: string;
+    type: string;
+    parentId?: string;
+    currency?: string;
+    description?: string;
+  }) => {
     if (selectedAccount) {
       await updateAccount.mutateAsync({
         id: selectedAccount.id,
         data,
       });
     } else {
-      await createAccount.mutateAsync(data);
+      await createAccount.mutateAsync(data as typeof data & { type: AccountType });
     }
     setDialogOpen(false);
   };

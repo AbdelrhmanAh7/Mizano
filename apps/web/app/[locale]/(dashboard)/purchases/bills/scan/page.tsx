@@ -16,6 +16,9 @@ import {
   Trash2,
   Sparkles,
   GraduationCap,
+  ShieldCheck,
+  ShieldAlert,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,14 +50,25 @@ import {
   useDocumentIntakeProcess,
   useDocumentIntakeConfirm,
   DocumentIntakeResult,
-  VendorCandidate,
-  IntakeLineItem,
   ConfirmIntakeData,
 } from '@/lib/hooks/use-ai';
-import { useVendors } from '@/lib/hooks/use-vendors';
+import { useVendors, useCreateVendor } from '@/lib/hooks/use-vendors';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { QuickTrainDialog } from '@/components/ai/ocr-training/quick-train-dialog';
+import dynamic from 'next/dynamic';
+
+const QuickTrainDialog = dynamic(
+  () => import('@/components/ai/ocr-training/quick-train-dialog').then((m) => m.QuickTrainDialog),
+  { ssr: false },
+);
 
 type Step = 'upload' | 'review' | 'creating';
 
@@ -82,8 +96,11 @@ export default function ScanBillPage() {
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [lineItems, setLineItems] = useState<EditableLineItem[]>([]);
-  const [corrections, setCorrections] = useState<Record<string, any>>({});
+  const [corrections, setCorrections] = useState<Record<string, unknown>>({});
   const [showTrainDialog, setShowTrainDialog] = useState(false);
+  const [showCreateVendor, setShowCreateVendor] = useState(false);
+  const [newVendorName, setNewVendorName] = useState('');
+  const [newVendorDisplayName, setNewVendorDisplayName] = useState('');
 
   // Mutations
   const processDocument = useDocumentIntakeProcess();
@@ -92,6 +109,7 @@ export default function ScanBillPage() {
   // Vendors list for dropdown
   const { data: vendorsData } = useVendors();
   const vendors = vendorsData?.data || [];
+  const createVendor = useCreateVendor();
 
   // ---------------------------------------------------------------------------
   // File upload
@@ -149,6 +167,14 @@ export default function ScanBillPage() {
         setNotes('');
         setCorrections({});
 
+        // Compute effective tax rate % from extracted tax and subtotal
+        const extractedTax = result.extractedFields.tax;
+        const extractedSubtotal = result.extractedFields.subtotal;
+        let effectiveTaxRate = 0;
+        if (extractedTax && extractedSubtotal && extractedSubtotal > 0) {
+          effectiveTaxRate = Math.round((extractedTax / extractedSubtotal) * 100 * 100) / 100;
+        }
+
         // Convert line items to editable format
         if (result.extractedFields.lineItems.length > 0) {
           setLineItems(
@@ -156,32 +182,39 @@ export default function ScanBillPage() {
               description: item.description,
               quantity: String(item.quantity),
               rate: String(item.unitPrice),
-              taxRate: '0',
+              taxRate: String(effectiveTaxRate),
             })),
           );
         } else {
-          // If no line items extracted, add a default line with the total
+          // If no line items extracted, add a default line with the subtotal
           setLineItems([
             {
               description: 'Scanned item',
               quantity: '1',
-              rate: String(result.extractedFields.total || 0),
-              taxRate: '0',
+              rate: String(extractedSubtotal || result.extractedFields.total || 0),
+              taxRate: String(effectiveTaxRate),
             },
           ]);
         }
 
         setStep('review');
+        const methodLabel =
+          result.extractionMethod === 'vlm'
+            ? 'VLM'
+            : result.extractionMethod === 'paddleocr+tesseract'
+              ? 'PaddleOCR + Tesseract'
+              : 'OCR';
         toast({
           title: 'Document processed',
-          description: `Classified as ${result.documentType} with ${Math.round(result.ocrConfidence * 100)}% confidence (${result.extractionMethod === 'vlm' ? 'VLM' : 'OCR'})`,
+          description: `Classified as ${result.documentType} with ${Math.round(result.ocrConfidence * 100)}% confidence (${methodLabel})`,
         });
       },
-      onError: (error: any) => {
+      onError: (error: unknown) => {
+        const err = error as { response?: { data?: { message?: string } } };
         toast({
           variant: 'destructive',
           title: 'Processing failed',
-          description: error.response?.data?.message || 'Failed to process document',
+          description: err.response?.data?.message || 'Failed to process document',
         });
       },
     });
@@ -241,6 +274,9 @@ export default function ScanBillPage() {
         },
         _fieldConfidence: intakeResult?.fieldConfidence,
         _accountingEntryAccepted: intakeResult?.accountingEntry != null,
+        // Python OCR service metadata
+        _detailedConfidence: intakeResult?.detailedConfidence ?? null,
+        _validationResults: intakeResult?.validationResults ?? null,
       },
     };
 
@@ -253,12 +289,13 @@ export default function ScanBillPage() {
         });
         router.push(`/purchases/bills/${result.id}`);
       },
-      onError: (error: any) => {
+      onError: (error: unknown) => {
+        const err = error as { response?: { data?: { message?: string } } };
         setStep('review');
         toast({
           variant: 'destructive',
           title: 'Creation failed',
-          description: error.response?.data?.message || 'Failed to create bill',
+          description: err.response?.data?.message || 'Failed to create bill',
         });
       },
     });
@@ -277,7 +314,7 @@ export default function ScanBillPage() {
   };
 
   // Track corrections for vendor layout learning
-  const trackCorrection = (field: string, originalValue: any, newValue: any) => {
+  const trackCorrection = (field: string, originalValue: unknown, newValue: unknown) => {
     if (String(originalValue ?? '') !== String(newValue ?? '')) {
       setCorrections((prev) => ({ ...prev, [field]: newValue }));
     } else {
@@ -288,6 +325,29 @@ export default function ScanBillPage() {
         return next;
       });
     }
+  };
+
+  const handleOpenCreateVendor = () => {
+    setNewVendorName(intakeResult?.extractedFields.vendorName || '');
+    setNewVendorDisplayName('');
+    setShowCreateVendor(true);
+  };
+
+  const handleCreateVendor = () => {
+    if (!newVendorName.trim()) return;
+    createVendor.mutate(
+      { name: newVendorName.trim(), displayName: newVendorDisplayName.trim() || null },
+      {
+        onSuccess: (data: unknown) => {
+          const d = data as { id?: string; data?: { id?: string } };
+          const vendorId = d?.id || d?.data?.id;
+          if (vendorId) {
+            setSelectedVendorId(vendorId);
+          }
+          setShowCreateVendor(false);
+        },
+      },
+    );
   };
 
   const updateLineItem = (index: number, field: keyof EditableLineItem, value: string) => {
@@ -399,6 +459,7 @@ export default function ScanBillPage() {
                 <div className="space-y-4">
                   {preview ? (
                     <div className="relative aspect-[4/3] bg-muted rounded-lg overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={preview}
                         alt="Document preview"
@@ -518,18 +579,14 @@ export default function ScanBillPage() {
                 Document
                 <div className="flex items-center gap-2">
                   <ConfidenceBadge confidence={intakeResult.ocrConfidence} size="sm" />
-                  <Badge
-                    variant={intakeResult.extractionMethod === 'vlm' ? 'default' : 'secondary'}
-                    className="text-xs"
-                  >
-                    {intakeResult.extractionMethod === 'vlm' ? '🧠 VLM' : '📝 OCR'}
-                  </Badge>
+                  <ExtractionMethodBadge method={intakeResult.extractionMethod} />
                 </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
               {preview ? (
                 <div className="aspect-[3/4] bg-muted rounded-lg overflow-hidden mb-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={preview} alt="Document" className="w-full h-full object-contain" />
                 </div>
               ) : (
@@ -554,6 +611,16 @@ export default function ScanBillPage() {
                   <span>{Math.round(intakeResult.ocrConfidence * 100)}%</span>
                 </div>
               </div>
+
+              {/* Detailed confidence breakdown (from Python OCR service) */}
+              {intakeResult.detailedConfidence && (
+                <DetailedConfidencePanel confidence={intakeResult.detailedConfidence} />
+              )}
+
+              {/* Validation results (from Python OCR service) */}
+              {intakeResult.validationResults && (
+                <ValidationResultsPanel validation={intakeResult.validationResults} />
+              )}
             </CardContent>
           </Card>
 
@@ -597,7 +664,10 @@ export default function ScanBillPage() {
                       // Track vendor name correction (use display name, not ID)
                       const selectedVendor =
                         intakeResult.vendorCandidates.find((c) => c.id === value) ||
-                        vendors.find((v: any) => v.id === value);
+                        vendors.find(
+                          (v: { id: string; displayName?: string | null; name: string }) =>
+                            v.id === value,
+                        );
                       const selectedName =
                         selectedVendor?.displayName || selectedVendor?.name || value;
                       trackCorrection(
@@ -623,18 +693,32 @@ export default function ScanBillPage() {
                         </>
                       )}
                       {/* Show all vendors */}
-                      {vendors.map((vendor: any) => (
-                        <SelectItem key={vendor.id} value={vendor.id}>
-                          {vendor.displayName || vendor.name}
-                        </SelectItem>
-                      ))}
+                      {vendors.map(
+                        (vendor: { id: string; displayName?: string | null; name: string }) => (
+                          <SelectItem key={vendor.id} value={vendor.id}>
+                            {vendor.displayName || vendor.name}
+                          </SelectItem>
+                        ),
+                      )}
                     </SelectContent>
                   </Select>
-                  {intakeResult.extractedFields.vendorName && (
-                    <p className="text-xs text-muted-foreground">
-                      Detected vendor name: &quot;{intakeResult.extractedFields.vendorName}&quot;
-                    </p>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {intakeResult.extractedFields.vendorName && (
+                      <p className="text-xs text-muted-foreground flex-1">
+                        Detected vendor name: &quot;{intakeResult.extractedFields.vendorName}&quot;
+                      </p>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={handleOpenCreateVendor}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      New vendor
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -728,8 +812,14 @@ export default function ScanBillPage() {
                     {lineItems.map((item, index) => {
                       const lineTotal =
                         (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0);
+                      const isLowConfidence =
+                        intakeResult.detailedConfidence &&
+                        intakeResult.detailedConfidence.line_items < 80;
                       return (
-                        <TableRow key={index}>
+                        <TableRow
+                          key={index}
+                          className={isLowConfidence ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''}
+                        >
                           <TableCell>
                             <Input
                               value={item.description}
@@ -903,6 +993,48 @@ export default function ScanBillPage() {
         vendorId={selectedVendorId}
         corrections={corrections}
       />
+
+      {/* Create Vendor Dialog */}
+      <Dialog open={showCreateVendor} onOpenChange={setShowCreateVendor}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Vendor</DialogTitle>
+            <DialogDescription>
+              Add a new vendor from the detected name on the scanned document.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Vendor Name *</Label>
+              <Input
+                value={newVendorName}
+                onChange={(e) => setNewVendorName(e.target.value)}
+                placeholder="Company name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Display Name</Label>
+              <Input
+                value={newVendorDisplayName}
+                onChange={(e) => setNewVendorDisplayName(e.target.value)}
+                placeholder="Optional short name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateVendor(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateVendor}
+              disabled={!newVendorName.trim() || createVendor.isPending}
+            >
+              {createVendor.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -920,4 +1052,154 @@ function FieldConfidence({ confidence }: { confidence?: number }) {
     confidence >= 0.8 ? 'text-green-600' : confidence >= 0.6 ? 'text-yellow-600' : 'text-red-600';
 
   return <span className={cn('ml-1 text-xs font-normal', color)}>({pct}%)</span>;
+}
+
+// ---------------------------------------------------------------------------
+// Extraction method badge
+// ---------------------------------------------------------------------------
+
+function ExtractionMethodBadge({ method }: { method?: string }) {
+  if (method === 'vlm') {
+    return (
+      <Badge variant="default" className="text-xs">
+        VLM
+      </Badge>
+    );
+  }
+  if (method === 'paddleocr+tesseract') {
+    return (
+      <Badge variant="default" className="text-xs bg-blue-600 hover:bg-blue-700">
+        PaddleOCR + Tesseract
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="secondary" className="text-xs">
+      OCR
+    </Badge>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Detailed confidence breakdown panel
+// ---------------------------------------------------------------------------
+
+function DetailedConfidencePanel({
+  confidence,
+}: {
+  confidence: {
+    overall: number;
+    invoice_number: number;
+    dates: number;
+    vendor: number;
+    line_items: number;
+    totals: number;
+  };
+}) {
+  const fields = [
+    { label: 'Invoice #', value: confidence.invoice_number },
+    { label: 'Dates', value: confidence.dates },
+    { label: 'Vendor', value: confidence.vendor },
+    { label: 'Line Items', value: confidence.line_items },
+    { label: 'Totals', value: confidence.totals },
+  ];
+
+  return (
+    <div className="mt-4 space-y-2">
+      <Separator />
+      <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+        <Info className="h-3 w-3" />
+        Field Confidence
+      </p>
+      <div className="space-y-1.5">
+        {fields.map(({ label, value }) => {
+          const pct = Math.round(value);
+          const barColor =
+            pct >= 80
+              ? 'bg-green-500'
+              : pct >= 60
+                ? 'bg-yellow-500'
+                : pct >= 30
+                  ? 'bg-orange-500'
+                  : 'bg-red-500';
+          return (
+            <div key={label} className="flex items-center gap-2 text-xs">
+              <span className="w-20 text-muted-foreground truncate">{label}</span>
+              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={cn('h-full rounded-full transition-all', barColor)}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className="w-8 text-right tabular-nums">{pct}%</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between text-xs font-medium pt-1">
+        <span>Overall</span>
+        <span>{Math.round(confidence.overall)}%</span>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Validation results panel
+// ---------------------------------------------------------------------------
+
+function ValidationResultsPanel({
+  validation,
+}: {
+  validation: {
+    all_passed: boolean;
+    checks: Array<{ name: string; passed: boolean; detail: string }>;
+    corrections_applied: string[];
+  };
+}) {
+  const passedCount = validation.checks.filter((c) => c.passed).length;
+  const failedCount = validation.checks.filter((c) => !c.passed).length;
+
+  return (
+    <div className="mt-4 space-y-2">
+      <Separator />
+      <div className="flex items-center gap-1.5 text-xs font-medium">
+        {validation.all_passed ? (
+          <ShieldCheck className="h-3.5 w-3.5 text-green-600" />
+        ) : (
+          <ShieldAlert className="h-3.5 w-3.5 text-yellow-600" />
+        )}
+        <span className={validation.all_passed ? 'text-green-600' : 'text-yellow-600'}>
+          Math Validation: {passedCount} passed{failedCount > 0 ? `, ${failedCount} failed` : ''}
+        </span>
+      </div>
+
+      {/* Show failed checks */}
+      {failedCount > 0 && (
+        <div className="space-y-1">
+          {validation.checks
+            .filter((c) => !c.passed)
+            .map((check, i) => (
+              <p key={i} className="text-xs text-yellow-700 dark:text-yellow-400 pl-5">
+                {check.detail}
+              </p>
+            ))}
+        </div>
+      )}
+
+      {/* Auto-corrections applied */}
+      {validation.corrections_applied.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-blue-600 dark:text-blue-400 pl-5">
+            Auto-corrections applied:
+          </p>
+          {validation.corrections_applied.map((correction, i) => (
+            <p key={i} className="text-xs text-blue-600 dark:text-blue-400 pl-5">
+              {correction}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

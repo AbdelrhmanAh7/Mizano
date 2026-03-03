@@ -4,7 +4,6 @@ import { useState } from 'react';
 import {
   Brain,
   Play,
-  RefreshCw,
   CheckCircle2,
   XCircle,
   AlertTriangle,
@@ -42,8 +41,17 @@ import {
   useGenerateTrainingData,
 } from '@/lib/hooks/use-ai-training-lab';
 import { ModelCard } from '@/components/ai/training-lab/model-card';
-import { GenerateDataDialog } from '@/components/ai/training-lab/generate-data-dialog';
-import { ModelDetailDialog } from '@/components/ai/training-lab/model-detail-dialog';
+import dynamic from 'next/dynamic';
+
+const GenerateDataDialog = dynamic(
+  () =>
+    import('@/components/ai/training-lab/generate-data-dialog').then((m) => m.GenerateDataDialog),
+  { ssr: false },
+);
+const ModelDetailDialog = dynamic(
+  () => import('@/components/ai/training-lab/model-detail-dialog').then((m) => m.ModelDetailDialog),
+  { ssr: false },
+);
 import { FeedbackCorrectionPanel } from '@/components/ai/training-lab/feedback-correction-panel';
 import { OcrTrainingLabPanel } from '@/components/ai/ocr-training/ocr-training-lab-panel';
 import {
@@ -63,13 +71,13 @@ interface TestableFeature {
   icon: React.ReactNode;
   endpoint: string;
   method: 'GET' | 'POST';
-  bodyTemplate?: Record<string, any>;
+  bodyTemplate?: Record<string, unknown>;
   color: string;
 }
 
 interface ActionResult {
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: string;
   duration?: number;
 }
@@ -298,12 +306,13 @@ export default function AiLabPage() {
         ...prev,
         [feature.id]: { success: true, data: response.data, duration: Date.now() - start },
       }));
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
       setTestResults((prev) => ({
         ...prev,
         [feature.id]: {
           success: false,
-          error: err?.response?.data?.message || err.message || 'Request failed',
+          error: axiosErr?.response?.data?.message || axiosErr?.message || 'Request failed',
           duration: Date.now() - start,
         },
       }));
@@ -662,7 +671,11 @@ export default function AiLabPage() {
                               Success
                             </div>
                             <pre className="text-[10px] overflow-auto max-h-48 mt-1 whitespace-pre-wrap">
-                              {JSON.stringify(result.data?.data || result.data, null, 2)}
+                              {JSON.stringify(
+                                (result.data as Record<string, unknown>)?.data || result.data,
+                                null,
+                                2,
+                              )}
                             </pre>
                           </div>
                         ) : (

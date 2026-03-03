@@ -13,7 +13,7 @@ import {
   Code2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -27,7 +27,12 @@ import {
 } from '@/lib/hooks/use-deep-search';
 import { SearchProgress } from '@/components/ai/deep-search/search-progress';
 import { SuggestionCard } from '@/components/ai/deep-search/suggestion-card';
-import { PromptModal } from '@/components/ai/deep-search/prompt-modal';
+import dynamic from 'next/dynamic';
+
+const PromptModal = dynamic(
+  () => import('@/components/ai/deep-search/prompt-modal').then((m) => m.PromptModal),
+  { ssr: false },
+);
 
 type CategoryFilter = 'ALL' | 'FEATURE_GAP' | 'PERFORMANCE_UX' | 'AI_CAPABILITY';
 

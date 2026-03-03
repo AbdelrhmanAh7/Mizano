@@ -14,6 +14,13 @@ import { ReconciliationService } from '../services/reconciliation.service';
 export class ReconciliationController {
   constructor(private readonly reconciliationService: ReconciliationService) {}
 
+  @Get('summary/:bankAccountId')
+  @Permissions('banking.view')
+  @ApiOperation({ summary: 'Get reconciliation summary for a bank account' })
+  getSummary(@CurrentOrg() orgId: string, @Param('bankAccountId') bankAccountId: string) {
+    return this.reconciliationService.getSummary(orgId, bankAccountId);
+  }
+
   @Get('suggestions/:bankAccountId')
   @Permissions('banking.view')
   @ApiOperation({ summary: 'Get AI reconciliation suggestions' })

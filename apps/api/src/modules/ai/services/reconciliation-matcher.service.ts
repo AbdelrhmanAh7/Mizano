@@ -384,7 +384,7 @@ export class ReconciliationMatcherService {
   }
 
   // Helper methods to extract data from different entity types
-  private getCandidateAmount(candidate: { entityType: string; entity: any }): number {
+  private getCandidateAmount(candidate: { entityType: string; entity: MatchableEntity }): number {
     switch (candidate.entityType) {
       case 'invoice':
         return Number(candidate.entity.grandTotal);
@@ -399,36 +399,43 @@ export class ReconciliationMatcherService {
     }
   }
 
-  private getCandidateReference(candidate: { entityType: string; entity: any }): string {
+  private getCandidateReference(candidate: {
+    entityType: string;
+    entity: MatchableEntity;
+  }): string {
     switch (candidate.entityType) {
       case 'invoice':
-        return candidate.entity.invoiceNumber;
+        return String(candidate.entity.invoiceNumber ?? '');
       case 'bill':
-        return candidate.entity.billNumber;
+        return String(candidate.entity.billNumber ?? '');
       case 'expense':
-        return candidate.entity.reference || '';
+        return String(candidate.entity.reference ?? '');
       case 'payment':
-        return candidate.entity.paymentNumber;
+        return String(candidate.entity.paymentNumber ?? '');
       default:
         return '';
     }
   }
 
-  private getCandidateName(candidate: { entityType: string; entity: any }): string {
+  private getCandidateName(candidate: { entityType: string; entity: MatchableEntity }): string {
     switch (candidate.entityType) {
       case 'invoice':
-      case 'payment':
-        return candidate.entity.customer?.name || '';
+      case 'payment': {
+        const customer = candidate.entity.customer as Record<string, unknown> | undefined;
+        return String(customer?.name ?? '');
+      }
       case 'bill':
-      case 'expense':
-        return candidate.entity.vendor?.name || '';
+      case 'expense': {
+        const vendor = candidate.entity.vendor as Record<string, unknown> | undefined;
+        return String(vendor?.name ?? '');
+      }
       default:
         return '';
     }
   }
 
-  private getCandidateDate(candidate: { entityType: string; entity: any }): Date {
-    return candidate.entity.date || candidate.entity.createdAt;
+  private getCandidateDate(candidate: { entityType: string; entity: MatchableEntity }): Date {
+    return (candidate.entity.date as Date) || (candidate.entity.createdAt as Date);
   }
 
   /**
@@ -726,11 +733,9 @@ export class ReconciliationMatcherService {
    * Delete a rule
    */
   async deleteRule(organizationId: string, ruleId: string): Promise<void> {
-    await this.prisma.bankRule.delete({
-      where: {
-        id: ruleId,
-        organizationId,
-      },
+    await this.prisma.bankRule.update({
+      where: { id: ruleId },
+      data: { deletedAt: new Date() },
     });
   }
 

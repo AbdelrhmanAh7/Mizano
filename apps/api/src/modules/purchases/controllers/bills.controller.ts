@@ -25,6 +25,8 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import { CheckDuplicateBillDto } from '../dto/check-duplicate-bill.dto';
+import { CreateBillDto } from '../dto/create-bill.dto';
+import { UpdateBillDto } from '../dto/update-bill.dto';
 import { BillsService } from '../services/bills.service';
 
 @ApiTags('Bills')
@@ -46,7 +48,7 @@ export class BillsController {
   @Permissions('purchases.create')
   @InvalidateCache('bills:*')
   @ApiOperation({ summary: 'Create a new bill' })
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateBillDto) {
     return this.billsService.create(orgId, dto);
   }
 
@@ -78,7 +80,7 @@ export class BillsController {
   @Permissions('purchases.edit')
   @InvalidateCache('bills:*')
   @ApiOperation({ summary: 'Update bill' })
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateBillDto) {
     return this.billsService.update(orgId, id, dto);
   }
 

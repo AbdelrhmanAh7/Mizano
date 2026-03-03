@@ -1,15 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsOptional, IsString } from 'class-validator';
+import { InvoiceStatus } from '@prisma/client';
+import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 
 export class InvoiceCursorQueryDto extends CursorPaginationDto {
   @ApiProperty({
     required: false,
-    enum: ['DRAFT', 'SENT', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'VOID'],
+    enum: InvoiceStatus,
   })
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsEnum(InvoiceStatus)
+  status?: InvoiceStatus;
 
   @ApiProperty({ required: false })
   @IsOptional()

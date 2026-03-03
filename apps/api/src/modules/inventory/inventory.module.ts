@@ -12,8 +12,10 @@ import { PriceListsService } from './services/price-lists.service';
 import { CostingService } from './services/costing.service';
 import { CompositeItemsService } from './services/composite-items.service';
 import { TransfersService } from './services/transfers.service';
+import { AccountingModule } from '../accounting/accounting.module';
 
 @Module({
+  imports: [AccountingModule],
   controllers: [
     ItemsController,
     WarehousesController,

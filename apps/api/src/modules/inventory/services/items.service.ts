@@ -4,17 +4,20 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { CreateItemDto } from '../dto/create-item.dto';
+import { UpdateItemDto } from '../dto/update-item.dto';
 
 @Injectable()
 export class ItemsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateItemDto) {
     const existing = await this.prisma.item.findFirst({ where: { sku: dto.sku, organizationId } });
     if (existing) throw new ConflictException('SKU already exists');
 
@@ -39,7 +42,7 @@ export class ItemsService {
 
   async findAll(organizationId: string, query: PaginationDto) {
     const { page = 1, limit = 20, search, sortBy = 'name', sortOrder = 'asc' } = query;
-    const where: any = { organizationId, deletedAt: null };
+    const where: Prisma.ItemWhereInput = { organizationId, deletedAt: null };
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -62,7 +65,7 @@ export class ItemsService {
 
   async findAllCursor(organizationId: string, query: CursorPaginationDto) {
     const { cursor, take, search, sortBy = 'name', sortOrder = 'asc' } = query;
-    const where: any = { organizationId, deletedAt: null };
+    const where: Prisma.ItemWhereInput = { organizationId, deletedAt: null };
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -80,7 +83,7 @@ export class ItemsService {
     return item;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateItemDto) {
     await this.findOne(organizationId, id);
     if (dto.sku) {
       const existing = await this.prisma.item.findFirst({
@@ -94,10 +97,10 @@ export class ItemsService {
   async remove(organizationId: string, id: string) {
     const item = await this.prisma.item.findFirst({
       where: { id, organizationId, deletedAt: null },
-      include: { invoiceLines: { take: 1 }, billLines: { take: 1 } },
+      include: { _count: { select: { invoiceLines: true, billLines: true } } },
     });
     if (!item) throw new NotFoundException('Item not found');
-    if (item.invoiceLines.length > 0 || item.billLines.length > 0)
+    if (item._count.invoiceLines > 0 || item._count.billLines > 0)
       throw new BadRequestException('Item has transactions');
     await this.prisma.item.update({ where: { id }, data: { deletedAt: new Date() } });
     return { message: 'Item deleted' };
@@ -105,7 +108,7 @@ export class ItemsService {
 
   async updateStock(itemId: string, quantity: number, type: 'increase' | 'decrease') {
     const item = await this.prisma.item.findUnique({ where: { id: itemId } });
-    if (!item) return;
+    if (!item) throw new NotFoundException(`Item ${itemId} not found for stock update`);
     const newStock =
       type === 'increase' ? item.currentStock + quantity : item.currentStock - quantity;
     await this.prisma.item.update({

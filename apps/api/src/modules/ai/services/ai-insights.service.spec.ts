@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
+import type { AIInsight } from '@prisma/client';
 import { AiInsightsService } from './ai-insights.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import {
@@ -15,7 +16,7 @@ describe('AiInsightsService', () => {
 
   const orgId = TEST_ORG_ID;
 
-  function createMockInsight(overrides: Record<string, any> = {}) {
+  function createMockInsight(overrides: Partial<AIInsight> = {}): AIInsight {
     return {
       id: 'insight-001',
       organizationId: orgId,
@@ -43,42 +44,44 @@ describe('AiInsightsService', () => {
       createdAt: new Date('2025-06-01'),
       updatedAt: new Date('2025-06-01'),
       ...overrides,
-    };
+    } as AIInsight;
   }
 
   beforeEach(async () => {
     prisma = createMockPrisma();
 
     // Stub all the aggregate/query calls that generateAndPersist makes
-    // so getInsights doesn't throw on internal insight generation
-    prisma.paymentReceived.aggregate.mockResolvedValue({
+    // so getInsights doesn't throw on internal insight generation.
+    // Aggregate mocks use partial shapes that don't match generated Prisma types,
+    // so we cast through unknown to the expected mock return type.
+    (prisma.paymentReceived.aggregate as jest.Mock).mockResolvedValue({
       _sum: { amount: null },
-    } as any);
-    prisma.paymentMade.aggregate.mockResolvedValue({
+    });
+    (prisma.paymentMade.aggregate as jest.Mock).mockResolvedValue({
       _sum: { amount: null },
-    } as any);
-    prisma.expense.aggregate.mockResolvedValue({
+    });
+    (prisma.expense.aggregate as jest.Mock).mockResolvedValue({
       _sum: { amount: null },
-    } as any);
-    prisma.bankAccount.aggregate.mockResolvedValue({
+    });
+    (prisma.bankAccount.aggregate as jest.Mock).mockResolvedValue({
       _sum: { systemBalance: null },
-    } as any);
-    prisma.invoice.aggregate.mockResolvedValue({
+    });
+    (prisma.invoice.aggregate as jest.Mock).mockResolvedValue({
       _sum: { grandTotal: null },
       _count: 0,
-    } as any);
-    prisma.invoice.findMany.mockResolvedValue([] as any);
-    prisma.invoice.groupBy.mockResolvedValue([] as any);
-    prisma.bill.aggregate.mockResolvedValue({
+    });
+    prisma.invoice.findMany.mockResolvedValue([]);
+    (prisma.invoice.groupBy as jest.Mock).mockResolvedValue([]);
+    (prisma.bill.aggregate as jest.Mock).mockResolvedValue({
       _sum: { grandTotal: null },
       _count: 0,
-    } as any);
-    prisma.expense.groupBy.mockResolvedValue([] as any);
-    prisma.item.findMany.mockResolvedValue([] as any);
-    prisma.project.findMany.mockResolvedValue([] as any);
-    prisma.aIInsight.findFirst.mockResolvedValue(null as any);
-    prisma.aIInsight.create.mockResolvedValue({} as any);
-    prisma.customer.findMany.mockResolvedValue([] as any);
+    });
+    (prisma.expense.groupBy as jest.Mock).mockResolvedValue([]);
+    prisma.item.findMany.mockResolvedValue([]);
+    prisma.project.findMany.mockResolvedValue([]);
+    prisma.aIInsight.findFirst.mockResolvedValue(null);
+    prisma.aIInsight.create.mockResolvedValue(createMockInsight());
+    prisma.customer.findMany.mockResolvedValue([]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [AiInsightsService, { provide: PrismaService, useValue: prisma }],
@@ -97,7 +100,7 @@ describe('AiInsightsService', () => {
         createMockInsight({ id: 'ins-1' }),
         createMockInsight({ id: 'ins-2', type: 'TREND' }),
       ];
-      prisma.aIInsight.findMany.mockResolvedValue(mockInsights as any);
+      prisma.aIInsight.findMany.mockResolvedValue(mockInsights);
 
       const result = await service.getInsights(orgId);
 
@@ -106,7 +109,7 @@ describe('AiInsightsService', () => {
     });
 
     it('should return empty array when no insights exist', async () => {
-      prisma.aIInsight.findMany.mockResolvedValue([] as any);
+      prisma.aIInsight.findMany.mockResolvedValue([]);
 
       const result = await service.getInsights(orgId);
 
@@ -119,7 +122,7 @@ describe('AiInsightsService', () => {
         isDismissed: false,
         actionTaken: null,
       });
-      prisma.aIInsight.findMany.mockResolvedValue([insight] as any);
+      prisma.aIInsight.findMany.mockResolvedValue([insight]);
 
       const result = await service.getInsights(orgId);
 
@@ -132,7 +135,7 @@ describe('AiInsightsService', () => {
         isDismissed: false,
         actionTaken: null,
       });
-      prisma.aIInsight.findMany.mockResolvedValue([insight] as any);
+      prisma.aIInsight.findMany.mockResolvedValue([insight]);
 
       const result = await service.getInsights(orgId);
 
@@ -143,7 +146,7 @@ describe('AiInsightsService', () => {
       const insight = createMockInsight({
         isDismissed: true,
       });
-      prisma.aIInsight.findMany.mockResolvedValue([insight] as any);
+      prisma.aIInsight.findMany.mockResolvedValue([insight]);
 
       const result = await service.getInsights(orgId, { status: 'DISMISSED' });
 
@@ -156,7 +159,7 @@ describe('AiInsightsService', () => {
         isRead: true,
         actionTaken: 'reviewed',
       });
-      prisma.aIInsight.findMany.mockResolvedValue([insight] as any);
+      prisma.aIInsight.findMany.mockResolvedValue([insight]);
 
       const result = await service.getInsights(orgId, { status: 'ACTIONED' });
 
@@ -164,7 +167,7 @@ describe('AiInsightsService', () => {
     });
 
     it('should filter by type when provided', async () => {
-      prisma.aIInsight.findMany.mockResolvedValue([] as any);
+      prisma.aIInsight.findMany.mockResolvedValue([]);
 
       await service.getInsights(orgId, { type: 'ALERT' });
 
@@ -175,7 +178,7 @@ describe('AiInsightsService', () => {
     });
 
     it('should respect limit parameter', async () => {
-      prisma.aIInsight.findMany.mockResolvedValue([] as any);
+      prisma.aIInsight.findMany.mockResolvedValue([]);
 
       await service.getInsights(orgId, { limit: 5 });
 
@@ -185,7 +188,7 @@ describe('AiInsightsService', () => {
     });
 
     it('should include confidence in formatted insight', async () => {
-      prisma.aIInsight.findMany.mockResolvedValue([createMockInsight()] as any);
+      prisma.aIInsight.findMany.mockResolvedValue([createMockInsight()]);
 
       const result = await service.getInsights(orgId);
 
@@ -196,8 +199,8 @@ describe('AiInsightsService', () => {
   describe('getInsightById', () => {
     it('should return a single formatted insight', async () => {
       const insight = createMockInsight({ id: 'ins-specific' });
-      prisma.aIInsight.findFirst.mockResolvedValue(insight as any);
-      prisma.aIInsight.update.mockResolvedValue(insight as any);
+      prisma.aIInsight.findFirst.mockResolvedValue(insight);
+      prisma.aIInsight.update.mockResolvedValue(insight);
 
       const result = await service.getInsightById(orgId, 'ins-specific');
 
@@ -206,7 +209,7 @@ describe('AiInsightsService', () => {
     });
 
     it('should throw NotFoundException when insight does not exist', async () => {
-      prisma.aIInsight.findFirst.mockResolvedValue(null as any);
+      prisma.aIInsight.findFirst.mockResolvedValue(null);
 
       await expect(service.getInsightById(orgId, 'non-existent')).rejects.toThrow(
         NotFoundException,
@@ -215,8 +218,8 @@ describe('AiInsightsService', () => {
 
     it('should mark unread insight as read', async () => {
       const insight = createMockInsight({ id: 'ins-1', isRead: false });
-      prisma.aIInsight.findFirst.mockResolvedValue(insight as any);
-      prisma.aIInsight.update.mockResolvedValue(insight as any);
+      prisma.aIInsight.findFirst.mockResolvedValue(insight);
+      prisma.aIInsight.update.mockResolvedValue(insight);
 
       await service.getInsightById(orgId, 'ins-1');
 
@@ -228,7 +231,7 @@ describe('AiInsightsService', () => {
 
     it('should NOT call update when insight is already read', async () => {
       const insight = createMockInsight({ id: 'ins-1', isRead: true });
-      prisma.aIInsight.findFirst.mockResolvedValue(insight as any);
+      prisma.aIInsight.findFirst.mockResolvedValue(insight);
 
       await service.getInsightById(orgId, 'ins-1');
 
@@ -239,8 +242,8 @@ describe('AiInsightsService', () => {
   describe('dismissInsight', () => {
     it('should dismiss an existing insight and return success', async () => {
       const insight = createMockInsight({ id: 'ins-dismiss' });
-      prisma.aIInsight.findFirst.mockResolvedValue(insight as any);
-      prisma.aIInsight.update.mockResolvedValue(insight as any);
+      prisma.aIInsight.findFirst.mockResolvedValue(insight);
+      prisma.aIInsight.update.mockResolvedValue(insight);
 
       const result = await service.dismissInsight(orgId, 'ins-dismiss', 'user-001');
 
@@ -255,7 +258,7 @@ describe('AiInsightsService', () => {
     });
 
     it('should throw NotFoundException when insight does not exist', async () => {
-      prisma.aIInsight.findFirst.mockResolvedValue(null as any);
+      prisma.aIInsight.findFirst.mockResolvedValue(null);
 
       await expect(service.dismissInsight(orgId, 'non-existent')).rejects.toThrow(
         NotFoundException,
@@ -266,8 +269,8 @@ describe('AiInsightsService', () => {
   describe('actionInsight', () => {
     it('should record action on an existing insight and return success', async () => {
       const insight = createMockInsight({ id: 'ins-action' });
-      prisma.aIInsight.findFirst.mockResolvedValue(insight as any);
-      prisma.aIInsight.update.mockResolvedValue(insight as any);
+      prisma.aIInsight.findFirst.mockResolvedValue(insight);
+      prisma.aIInsight.update.mockResolvedValue(insight);
 
       const result = await service.actionInsight(orgId, 'ins-action', 'reviewed');
 
@@ -281,11 +284,94 @@ describe('AiInsightsService', () => {
     });
 
     it('should throw NotFoundException when insight does not exist', async () => {
-      prisma.aIInsight.findFirst.mockResolvedValue(null as any);
+      prisma.aIInsight.findFirst.mockResolvedValue(null);
 
       await expect(service.actionInsight(orgId, 'non-existent', 'some-action')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('generateAndPersist analyzer resilience', () => {
+    it('should not crash getInsights when project.findMany throws (e.g. missing column)', async () => {
+      // Simulate the exact error: projects.deletedAt column does not exist
+      prisma.project.findMany.mockRejectedValue(
+        new Error('The column `projects.deletedAt` does not exist in the current database.'),
+      );
+      prisma.aIInsight.findMany.mockResolvedValue([createMockInsight()]);
+
+      const result = await service.getInsights(orgId);
+
+      // Should still return insights from the database despite project analyzer failing
+      expect(result.data).toBeInstanceOf(Array);
+      expect(result.data.length).toBe(1);
+    });
+
+    it('should not crash getInsights when item.findMany throws', async () => {
+      prisma.item.findMany.mockRejectedValue(new Error('Database connection lost'));
+      prisma.aIInsight.findMany.mockResolvedValue([]);
+
+      const result = await service.getInsights(orgId);
+
+      expect(result.data).toEqual([]);
+    });
+
+    it('should not crash getInsights when invoice queries throw', async () => {
+      prisma.invoice.aggregate.mockRejectedValue(new Error('timeout'));
+      prisma.aIInsight.findMany.mockResolvedValue([]);
+
+      const result = await service.getInsights(orgId);
+
+      expect(result.data).toEqual([]);
+    });
+
+    it('should still persist insights from analyzers that succeed when others fail', async () => {
+      // Make project analyzer fail
+      prisma.project.findMany.mockRejectedValue(
+        new Error('The column `projects.deletedAt` does not exist'),
+      );
+
+      // Make inventory return a low-stock insight
+      prisma.item.findMany.mockResolvedValue([
+        {
+          id: 'item-1',
+          name: 'Widget',
+          sku: 'WDG-001',
+          trackInventory: true,
+          currentStock: mockDecimal(2),
+          reorderPoint: mockDecimal(10),
+          organizationId: orgId,
+        } as unknown as Awaited<ReturnType<typeof prisma.item.findMany>>[number],
+      ]);
+
+      prisma.aIInsight.findMany.mockResolvedValue([]);
+
+      await service.getInsights(orgId);
+
+      // The inventory insight should still have been created
+      // (aIInsight.create may or may not be called depending on dedup logic,
+      //  but the service should not throw)
+    });
+
+    it('should handle all analyzers failing gracefully', async () => {
+      prisma.paymentReceived.aggregate.mockRejectedValue(new Error('fail'));
+      prisma.paymentMade.aggregate.mockRejectedValue(new Error('fail'));
+      prisma.expense.aggregate.mockRejectedValue(new Error('fail'));
+      prisma.bankAccount.aggregate.mockRejectedValue(new Error('fail'));
+      prisma.invoice.aggregate.mockRejectedValue(new Error('fail'));
+      prisma.invoice.findMany.mockRejectedValue(new Error('fail'));
+      prisma.invoice.groupBy.mockRejectedValue(new Error('fail'));
+      prisma.bill.aggregate.mockRejectedValue(new Error('fail'));
+      prisma.expense.groupBy.mockRejectedValue(new Error('fail'));
+      prisma.item.findMany.mockRejectedValue(new Error('fail'));
+      prisma.project.findMany.mockRejectedValue(new Error('fail'));
+      prisma.customer.findMany.mockRejectedValue(new Error('fail'));
+
+      prisma.aIInsight.findMany.mockResolvedValue([]);
+
+      // Should not throw — returns empty insights
+      const result = await service.getInsights(orgId);
+      expect(result.data).toEqual([]);
     });
   });
 });

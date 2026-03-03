@@ -1,14 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { generateInvoiceHtml, InvoiceData } from '../templates/invoice.template';
 import { generateQuoteHtml, QuoteData } from '../templates/quote.template';
 import { generatePayslipHtml, PayslipData } from '../templates/payslip.template';
-import {
-  OrganizationInfo,
-  DocumentLineItem,
-  formatCurrency,
-  formatDate,
-} from '../templates/base.template';
+import { generateBillHtml, BillData } from '../templates/bill.template';
+import { OrganizationInfo, formatCurrency, formatDate } from '../templates/base.template';
 import * as puppeteer from 'puppeteer';
 
 @Injectable()
@@ -71,6 +67,56 @@ export class PdfService {
     };
 
     const html = generateInvoiceHtml(org, invoiceData);
+    return this.htmlToPdf(html);
+  }
+
+  // ============ Bill PDF ============
+
+  async generateBillPdf(organizationId: string, billId: string): Promise<Buffer> {
+    const bill = await this.prisma.bill.findFirst({
+      where: { id: billId, organizationId, deletedAt: null },
+      include: {
+        vendor: true,
+        lines: true,
+      },
+    });
+
+    if (!bill) {
+      throw new NotFoundException('Bill not found');
+    }
+
+    const org = await this.getOrganizationInfo(organizationId);
+
+    const billData: BillData = {
+      billNumber: bill.billNumber,
+      date: bill.date,
+      dueDate: bill.dueDate,
+      status: bill.status,
+      vendor: {
+        name: bill.vendor.name,
+        email: bill.vendor.email || undefined,
+        phone: bill.vendor.phone || undefined,
+        address: bill.vendor.address || undefined,
+        city: bill.vendor.city || undefined,
+        country: bill.vendor.country || undefined,
+        taxId: bill.vendor.taxId || undefined,
+      },
+      lines: bill.lines.map((line) => ({
+        description: line.description || '',
+        quantity: parseFloat(line.quantity.toString()),
+        rate: parseFloat(line.rate.toString()),
+        taxRate: line.taxRate ? parseFloat(line.taxRate.toString()) : undefined,
+        amount: parseFloat(line.amount.toString()),
+      })),
+      subtotal: parseFloat(bill.subtotal.toString()),
+      taxAmount: parseFloat(bill.taxAmount.toString()),
+      grandTotal: parseFloat(bill.grandTotal.toString()),
+      balanceDue: parseFloat(bill.balanceDue.toString()),
+      currency: org.currency || 'SAR',
+      notes: bill.notes || undefined,
+    };
+
+    const html = generateBillHtml(org, billData);
     return this.htmlToPdf(html);
   }
 
@@ -568,8 +614,8 @@ export class PdfService {
           b = parseFloat(i.balanceDue.toString());
         if (!grp[n]) grp[n] = eb();
         for (const [k, v] of Object.entries(cat(i.dueDate, b))) {
-          (grp[n] as any)[k] += v;
-          (tot as any)[k] += v;
+          grp[n][k as keyof ReturnType<typeof eb>] += v;
+          tot[k as keyof ReturnType<typeof eb>] += v;
         }
         grp[n].total += b;
         tot.total += b;
@@ -584,8 +630,8 @@ export class PdfService {
           b = parseFloat(bl.balanceDue.toString());
         if (!grp[n]) grp[n] = eb();
         for (const [k, v] of Object.entries(cat(bl.dueDate, b))) {
-          (grp[n] as any)[k] += v;
-          (tot as any)[k] += v;
+          grp[n][k as keyof ReturnType<typeof eb>] += v;
+          tot[k as keyof ReturnType<typeof eb>] += v;
         }
         grp[n].total += b;
         tot.total += b;
@@ -654,7 +700,7 @@ export class PdfService {
   }
 
   private async htmlToPdf(html: string): Promise<Buffer> {
-    let browser;
+    let browser: puppeteer.Browser | undefined;
     try {
       browser = await puppeteer.launch({
         headless: true,
