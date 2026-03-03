@@ -70,7 +70,10 @@
       "Bash(pnpm --filter api lint)",
       "Bash(for f in apps/api/src/modules/purchases/dto/create-bill.dto.ts apps/api/src/modules/purchases/dto/update-bill.dto.ts apps/api/src/modules/purchases/dto/create-expense.dto.ts apps/api/src/modules/purchases/dto/create-payment-made.dto.ts apps/api/src/modules/purchases/dto/create-vendor-credit.dto.ts apps/api/src/modules/purchases/dto/create-vendor.dto.ts apps/api/src/modules/purchases/dto/update-vendor.dto.ts)",
       "Bash(do sed -i 's/\\\\r$//' \"$f\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(pnpm list turbo)",
+      "Bash(/mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/node_modules/.bin/tsc --noEmit)",
+      "Bash(git -C /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano log --oneline -10)"
     ]
   }
 }
