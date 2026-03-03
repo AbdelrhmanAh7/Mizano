@@ -15,17 +15,20 @@ module.exports = {
   rootDir: 'src',
   testRegex: '.*\\.spec\\.ts$',
   transform: {
-    '^.+\\.(t|j)s$': [tsJestPath, {
-      diagnostics: false,
-      tsconfig: {
-        types: ['jest', 'node'],
-        module: 'commonjs',
-        esModuleInterop: true,
-        emitDecoratorMetadata: true,
-        experimentalDecorators: true,
-        skipLibCheck: true,
+    '^.+\\.(t|j)s$': [
+      tsJestPath,
+      {
+        diagnostics: false,
+        tsconfig: {
+          types: ['jest', 'node'],
+          module: 'commonjs',
+          esModuleInterop: true,
+          emitDecoratorMetadata: true,
+          experimentalDecorators: true,
+          skipLibCheck: true,
+        },
       },
-    }],
+    ],
   },
   collectCoverageFrom: ['**/*.(t|j)s'],
   coverageDirectory: '../coverage',

@@ -7,19 +7,12 @@ const createJestConfig = nextJest({
 /** @type {import('jest').Config} */
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
-  transformIgnorePatterns: [
-    'node_modules/(?!(lucide-react)/)',
-  ],
+  transformIgnorePatterns: ['node_modules/(?!(lucide-react)/)'],
   testEnvironment: 'jsdom',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },
-  testMatch: [
-    '**/*.spec.tsx',
-    '**/*.spec.ts',
-    '**/*.test.tsx',
-    '**/*.test.ts',
-  ],
+  testMatch: ['**/*.spec.tsx', '**/*.spec.ts', '**/*.test.tsx', '**/*.test.ts'],
 };
 
 module.exports = createJestConfig(customJestConfig);

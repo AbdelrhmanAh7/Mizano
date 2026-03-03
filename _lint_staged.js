@@ -27,9 +27,13 @@ try {
 let stagedFiles = [];
 try {
   const output = execSync('git diff --cached --name-only --diff-filter=ACMR', {
-    encoding: 'utf8', cwd: root,
+    encoding: 'utf8',
+    cwd: root,
   }).trim();
-  stagedFiles = output.split('\n').map((f) => f.trim()).filter(Boolean);
+  stagedFiles = output
+    .split('\n')
+    .map((f) => f.trim())
+    .filter(Boolean);
 } catch (e) {
   console.error('Failed to get staged files:', e.message);
   process.exit(1);
@@ -59,9 +63,13 @@ const jsonMdCssFiles = stagedFiles
 function runTool(label, bin, args, cwd) {
   console.log(`[lint-staged] ${label}...`);
   const result = spawnSync('node', [bin, ...args], {
-    stdio: 'inherit', cwd: cwd || root,
+    stdio: 'inherit',
+    cwd: cwd || root,
   });
-  if (result.error) { console.error(`Failed to run ${label}:`, result.error.message); return false; }
+  if (result.error) {
+    console.error(`Failed to run ${label}:`, result.error.message);
+    return false;
+  }
   return result.status === 0;
 }
 
@@ -69,27 +77,36 @@ let hasErrors = false;
 
 if (apiTsFiles.length > 0) {
   console.log(`\nLinting ${apiTsFiles.length} API TypeScript file(s)...`);
-  const ok = runTool('eslint --fix (api)', eslintBin,
+  const ok = runTool(
+    'eslint --fix (api)',
+    eslintBin,
     ['--fix', '--cache', '--no-error-on-unmatched-pattern', ...apiTsFiles],
-    path.join(root, 'apps', 'api'));
+    path.join(root, 'apps', 'api'),
+  );
   if (!ok) hasErrors = true;
   runTool('prettier --write (api ts)', prettierBin, ['--write', ...apiTsFiles], root);
 }
 
 if (webTsFiles.length > 0) {
   console.log(`\nLinting ${webTsFiles.length} Web TypeScript file(s)...`);
-  const ok = runTool('eslint --fix (web)', eslintBin,
+  const ok = runTool(
+    'eslint --fix (web)',
+    eslintBin,
     ['--fix', '--cache', '--no-error-on-unmatched-pattern', ...webTsFiles],
-    path.join(root, 'apps', 'web'));
+    path.join(root, 'apps', 'web'),
+  );
   if (!ok) hasErrors = true;
   runTool('prettier --write (web ts)', prettierBin, ['--write', ...webTsFiles], root);
 }
 
 if (pkgTsFiles.length > 0) {
   console.log(`\nLinting ${pkgTsFiles.length} package TypeScript file(s)...`);
-  const ok = runTool('eslint --fix (packages)', eslintBin,
+  const ok = runTool(
+    'eslint --fix (packages)',
+    eslintBin,
     ['--fix', '--cache', '--no-error-on-unmatched-pattern', ...pkgTsFiles],
-    root);
+    root,
+  );
   if (!ok) hasErrors = true;
   runTool('prettier --write (packages)', prettierBin, ['--write', ...pkgTsFiles], root);
 }
@@ -107,7 +124,9 @@ if (allFiles.length > 0) {
       const batch = allFiles.slice(i, i + 50);
       execSync(`git add ${batch.map((f) => `"${f}"`).join(' ')}`, { cwd: root, stdio: 'pipe' });
     }
-  } catch (_e) { /* non-fatal */ }
+  } catch (_e) {
+    /* non-fatal */
+  }
 }
 
 if (!hasErrors) {

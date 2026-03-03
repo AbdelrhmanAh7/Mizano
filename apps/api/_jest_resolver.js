@@ -14,19 +14,23 @@ function findAllPkgDirs(pkgName) {
   const cacheKey = '__all__' + pkgName;
   if (dirCache.has(cacheKey)) return dirCache.get(cacheKey);
   try {
-    const prefix = pkgName.startsWith('@')
-      ? pkgName.replace('/', '+') + '@'
-      : pkgName + '@';
+    const prefix = pkgName.startsWith('@') ? pkgName.replace('/', '+') + '@' : pkgName + '@';
     const entries = fs.readdirSync(pnpmStore);
     const matches = entries.filter((e) => e.startsWith(prefix));
     const dirs = [];
     for (const m of matches) {
       const d = path.join(pnpmStore, m, 'node_modules', pkgName);
-      try { fs.readdirSync(d); dirs.push(d); } catch {}
+      try {
+        fs.readdirSync(d);
+        dirs.push(d);
+      } catch {}
     }
     dirCache.set(cacheKey, dirs);
     return dirs;
-  } catch { dirCache.set('__all__' + pkgName, []); return []; }
+  } catch {
+    dirCache.set('__all__' + pkgName, []);
+    return [];
+  }
 }
 
 function findPkgDir(pkgName) {
@@ -39,7 +43,10 @@ function findPkgDir(pkgName) {
 
 function tryExts(base) {
   for (const ext of ['.js', '.cjs', '.json', '/index.js', '/index.cjs', '/index.json']) {
-    try { const s = fs.statSync(base + ext); if (s.isFile()) return base + ext; } catch {}
+    try {
+      const s = fs.statSync(base + ext);
+      if (s.isFile()) return base + ext;
+    } catch {}
   }
   return null;
 }
@@ -64,7 +71,10 @@ function resolveExportsField(pkg, subpath, pkgDir) {
   }
   if (!resolved || typeof resolved !== 'string') return null;
   const full = path.join(pkgDir, resolved);
-  try { const s = fs.statSync(full); if (s.isFile()) return full; } catch {}
+  try {
+    const s = fs.statSync(full);
+    if (s.isFile()) return full;
+  } catch {}
   return tryExts(full);
 }
 
@@ -80,14 +90,20 @@ function resolveFile(pkgDir, subpath) {
 
     if (subpath) {
       const full = path.join(pkgDir, subpath);
-      try { const s = fs.statSync(full); if (s.isFile()) return full; } catch {}
+      try {
+        const s = fs.statSync(full);
+        if (s.isFile()) return full;
+      } catch {}
       return tryExts(full) || tryExts(path.join(full, 'index'));
     }
 
     // No subpath — use package.json main
     const main = pkg.main || 'index';
     const mainPath = path.join(pkgDir, main);
-    try { const s = fs.statSync(mainPath); if (s.isFile()) return mainPath; } catch {}
+    try {
+      const s = fs.statSync(mainPath);
+      if (s.isFile()) return mainPath;
+    } catch {}
     return tryExts(mainPath) || tryExts(path.join(pkgDir, 'index'));
   } catch {
     if (subpath) {

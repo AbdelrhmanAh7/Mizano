@@ -2,7 +2,14 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..', '..');
-const symlinkPath = path.join(root, 'node_modules', '.pnpm', 'source-map-support@0.5.13', 'node_modules', 'source-map');
+const symlinkPath = path.join(
+  root,
+  'node_modules',
+  '.pnpm',
+  'source-map-support@0.5.13',
+  'node_modules',
+  'source-map',
+);
 
 console.log('Checking path:', symlinkPath);
 try {

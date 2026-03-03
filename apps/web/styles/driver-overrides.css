@@ -7,7 +7,9 @@
   background-color: hsl(var(--background)) !important;
   border: 1px solid hsl(var(--border)) !important;
   border-radius: var(--radius) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08) !important;
   padding: 1.25rem !important;
   max-width: 360px !important;
 }
@@ -104,12 +106,12 @@
 }
 
 /* RTL Support for Driver.js (dir attribute fallback) */
-[dir="rtl"] .driver-popover {
+[dir='rtl'] .driver-popover {
   direction: rtl;
   text-align: right;
 }
 
-[dir="rtl"] .driver-popover-navigation-btns {
+[dir='rtl'] .driver-popover-navigation-btns {
   flex-direction: row-reverse;
 }
 
@@ -117,7 +119,9 @@
 .dark .driver-popover {
   background-color: hsl(var(--background)) !important;
   border-color: hsl(var(--border)) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.2) !important;
 }
 
 .dark .driver-popover-title {

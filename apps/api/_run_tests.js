@@ -37,10 +37,7 @@ const jestBin = path.join(
 const configFile = path.join(__dirname, '_jest.config.js');
 
 const args = process.argv.slice(2);
-const fullArgs = [
-  `--config="${configFile}"`,
-  ...args,
-].join(' ');
+const fullArgs = [`--config="${configFile}"`, ...args].join(' ');
 
 console.log(`Using jest from: ${jestBin}`);
 
