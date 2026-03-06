@@ -77,11 +77,11 @@ function CustomersPageContent() {
           title: 'Customer deleted',
           description: `${customerToDelete.name} has been deleted.`,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: 'Error',
           description:
-            error.response?.data?.message ||
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
             'Failed to delete customer. They may have associated transactions.',
           variant: 'destructive',
         });

@@ -30,10 +30,10 @@ export type AiFeature =
 export interface AiFeedbackWidgetProps {
   feature: AiFeature;
   predictionId?: string;
-  suggestion: string | Record<string, any>;
+  suggestion: string | Record<string, unknown>;
   confidence: number;
-  inputData: Record<string, any>;
-  onAccept?: (suggestion: any) => void;
+  inputData: Record<string, unknown>;
+  onAccept?: (suggestion: string | Record<string, unknown>) => void;
   onReject?: () => void;
   onCorrect?: (correctedValue: string) => void;
   className?: string;

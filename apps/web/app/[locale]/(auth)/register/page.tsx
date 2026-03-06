@@ -65,11 +65,13 @@ export default function RegisterPage() {
       });
 
       router.push(`/${locale}/login`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         variant: 'destructive',
         title: tErrors('generic'),
-        description: error.response?.data?.message || tErrors('generic'),
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          tErrors('generic'),
       });
     } finally {
       setIsLoading(false);

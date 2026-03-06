@@ -91,19 +91,22 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
         startDate: data.startDate,
         dueDate: data.dueDate || undefined,
         notes: data.notes || undefined,
-      } as any);
+      });
       toast({ title: 'Work order created successfully' });
-      router.push(`/manufacturing/work-orders/${result.id || result.data?.id}`);
-    } catch (error: any) {
+      router.push(
+        `/manufacturing/work-orders/${(result as { id?: string; data?: { id?: string } }).id || (result as { id?: string; data?: { id?: string } }).data?.id}`,
+      );
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to create work order',
+        description: err.response?.data?.message || 'Failed to create work order',
         variant: 'destructive',
       });
     }
   };
 
-  const hasShortages = requirements.some((r: any) => r.shortage > 0);
+  const hasShortages = requirements.some((r: { shortage: number }) => r.shortage > 0);
 
   return (
     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -126,7 +129,7 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
                   <SelectValue placeholder="Select a BOM" />
                 </SelectTrigger>
                 <SelectContent>
-                  {boms.map((bom: any) => (
+                  {boms.map((bom) => (
                     <SelectItem key={bom.id} value={bom.id}>
                       {bom.name} ({bom.outputItem?.name || 'Unknown'})
                     </SelectItem>
@@ -206,7 +209,7 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {requirements.map((req: any) => (
+                {requirements.map((req) => (
                   <TableRow key={req.itemId}>
                     <TableCell className="font-medium">
                       <span className="text-xs text-muted-foreground">{req.itemCode}</span>{' '}

@@ -334,32 +334,44 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {schedule.map((item: any) => (
-                  <TableRow key={item.id}>
-                    <TableCell>{format(new Date(item.year, item.month - 1), 'MMM yyyy')}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(item.amount)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(item.accumulatedTotal)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(item.bookValue)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={
-                          item.executedAt
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }
-                      >
-                        {item.executedAt ? 'Posted' : 'Pending'}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {schedule.map(
+                  (item: {
+                    id: string;
+                    year: number;
+                    month: number;
+                    amount: number;
+                    accumulatedTotal: number;
+                    bookValue: number;
+                    executedAt?: string | null;
+                  }) => (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        {format(new Date(item.year, item.month - 1), 'MMM yyyy')}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(item.amount)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(item.accumulatedTotal)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(item.bookValue)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={
+                            item.executedAt
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }
+                        >
+                          {item.executedAt ? 'Posted' : 'Pending'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ),
+                )}
               </TableBody>
             </Table>
           </CardContent>

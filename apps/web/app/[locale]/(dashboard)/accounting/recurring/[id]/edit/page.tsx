@@ -23,7 +23,7 @@ export default function EditRecurringProfilePage() {
 
   const isLoading = accountsLoading || profileLoading;
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await updateProfile.mutateAsync({ id: profileId, data });
       toast({
@@ -31,10 +31,12 @@ export default function EditRecurringProfilePage() {
         description: 'The recurring profile has been updated successfully.',
       });
       router.push(`/accounting/recurring/${profileId}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to update recurring profile.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to update recurring profile.',
         variant: 'destructive',
       });
     }

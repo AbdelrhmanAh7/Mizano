@@ -196,34 +196,44 @@ export function ModelDetailDialog({ model, open, onOpenChange }: ModelDetailDial
           <TabsContent value="history" className="space-y-4">
             {Array.isArray(historyEntries) && historyEntries.length > 0 ? (
               <div className="space-y-2">
-                {historyEntries.map((entry: any) => (
-                  <div
-                    key={entry.version}
-                    className="flex items-center justify-between p-3 rounded-lg border"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Badge variant={entry.status === 'ACTIVE' ? 'default' : 'secondary'}>
-                        v{entry.version}
-                      </Badge>
-                      <div>
-                        <p className="text-sm font-medium">
-                          {entry.accuracy
-                            ? `${(Number(entry.accuracy) * 100).toFixed(1)}% accuracy`
-                            : 'No accuracy data'}
+                {historyEntries.map(
+                  (entry: {
+                    version: number | string;
+                    status: string;
+                    accuracy?: number | string | null;
+                    sampleCount?: number;
+                    trainedAt?: string;
+                  }) => (
+                    <div
+                      key={entry.version}
+                      className="flex items-center justify-between p-3 rounded-lg border"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Badge variant={entry.status === 'ACTIVE' ? 'default' : 'secondary'}>
+                          v{entry.version}
+                        </Badge>
+                        <div>
+                          <p className="text-sm font-medium">
+                            {entry.accuracy
+                              ? `${(Number(entry.accuracy) * 100).toFixed(1)}% accuracy`
+                              : 'No accuracy data'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {entry.sampleCount} samples
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="outline" className="text-xs">
+                          {entry.status}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {entry.trainedAt ? new Date(entry.trainedAt).toLocaleDateString() : ''}
                         </p>
-                        <p className="text-xs text-muted-foreground">{entry.sampleCount} samples</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <Badge variant="outline" className="text-xs">
-                        {entry.status}
-                      </Badge>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {entry.trainedAt ? new Date(entry.trainedAt).toLocaleDateString() : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  ),
+                )}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground text-sm">
@@ -263,33 +273,41 @@ export function ModelDetailDialog({ model, open, onOpenChange }: ModelDetailDial
             {Array.isArray(feedbackEntries) && feedbackEntries.length > 0 ? (
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 <h4 className="text-sm font-medium">Recent Feedback</h4>
-                {feedbackEntries.map((entry: any) => (
-                  <div key={entry.id} className="p-3 rounded-lg border text-xs space-y-1">
-                    <div className="flex items-center justify-between">
-                      <Badge
-                        variant={
-                          entry.userAction === 'ACCEPTED'
-                            ? 'default'
-                            : entry.userAction === 'REJECTED'
-                              ? 'destructive'
-                              : 'outline'
-                        }
-                        className="text-[10px]"
-                      >
-                        {entry.userAction}
-                      </Badge>
-                      <span className="text-muted-foreground">
-                        {new Date(entry.createdAt).toLocaleDateString()}
-                      </span>
+                {feedbackEntries.map(
+                  (entry: {
+                    id: string;
+                    userAction: string;
+                    createdAt: string;
+                    userAnswer?: string;
+                    aiSuggestion: unknown;
+                  }) => (
+                    <div key={entry.id} className="p-3 rounded-lg border text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <Badge
+                          variant={
+                            entry.userAction === 'ACCEPTED'
+                              ? 'default'
+                              : entry.userAction === 'REJECTED'
+                                ? 'destructive'
+                                : 'outline'
+                          }
+                          className="text-[10px]"
+                        >
+                          {entry.userAction}
+                        </Badge>
+                        <span className="text-muted-foreground">
+                          {new Date(entry.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {entry.userAnswer && (
+                        <p className="text-amber-600">Correction: {entry.userAnswer}</p>
+                      )}
+                      <pre className="text-[10px] text-muted-foreground truncate">
+                        {JSON.stringify(entry.aiSuggestion).slice(0, 100)}
+                      </pre>
                     </div>
-                    {entry.userAnswer && (
-                      <p className="text-amber-600">Correction: {entry.userAnswer}</p>
-                    )}
-                    <pre className="text-[10px] text-muted-foreground truncate">
-                      {JSON.stringify(entry.aiSuggestion).slice(0, 100)}
-                    </pre>
-                  </div>
-                ))}
+                  ),
+                )}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground text-sm">

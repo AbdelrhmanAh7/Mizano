@@ -14,7 +14,7 @@ export default function NewCustomerPage() {
 
   const createCustomer = useCreateCustomer();
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createCustomer.mutateAsync(data);
       toast({
@@ -22,10 +22,12 @@ export default function NewCustomerPage() {
         description: 'The customer has been created successfully.',
       });
       router.push('/sales/customers');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to create customer.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to create customer.',
         variant: 'destructive',
       });
     }

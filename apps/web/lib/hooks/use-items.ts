@@ -6,6 +6,8 @@ import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type ItemType = 'GOODS' | 'SERVICE' | 'DIGITAL';
 
 export interface Item {
@@ -159,7 +161,7 @@ export function useCreateItem() {
         description: 'The item has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating item',
@@ -189,7 +191,7 @@ export function useUpdateItem() {
         description: 'The item has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating item',
@@ -218,7 +220,7 @@ export function useDeleteItem() {
         description: 'The item has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting item',

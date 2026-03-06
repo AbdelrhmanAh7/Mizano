@@ -58,7 +58,7 @@ interface BillAllocation {
 interface PaymentMadeFormProps {
   vendors: Array<{ id: string; name: string; currency: string }>;
   accounts: Array<{ id: string; name: string; code: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
   preselectedVendorId?: string;
@@ -104,16 +104,25 @@ export function PaymentMadeForm({
   // Update allocations when bills data changes
   useEffect(() => {
     if (billsData?.data) {
-      const bills = billsData.data.map((bill: any) => ({
-        billId: bill.id,
-        billNumber: bill.billNumber,
-        date: bill.date,
-        dueDate: bill.dueDate,
-        grandTotal: parseFloat(bill.grandTotal || '0'),
-        balanceDue: parseFloat(bill.balanceDue || '0'),
-        allocated: 0,
-        selected: preselectedBillId === bill.id,
-      }));
+      const bills = billsData.data.map(
+        (bill: {
+          id: string;
+          billNumber: string;
+          date: string;
+          dueDate: string;
+          grandTotal?: string;
+          balanceDue?: string;
+        }) => ({
+          billId: bill.id,
+          billNumber: bill.billNumber,
+          date: bill.date,
+          dueDate: bill.dueDate,
+          grandTotal: parseFloat(bill.grandTotal || '0'),
+          balanceDue: parseFloat(bill.balanceDue || '0'),
+          allocated: 0,
+          selected: preselectedBillId === bill.id,
+        }),
+      );
       setAllocations(bills);
 
       // If preselected bill, set the amount

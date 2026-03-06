@@ -122,10 +122,12 @@ function LeadsPageContent() {
       try {
         await deleteLead.mutateAsync(selectedLead.id);
         toast({ title: 'Lead deleted successfully' });
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: 'Error',
-          description: error.response?.data?.message || 'Failed to delete lead',
+          description:
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+            'Failed to delete lead',
           variant: 'destructive',
         });
       }

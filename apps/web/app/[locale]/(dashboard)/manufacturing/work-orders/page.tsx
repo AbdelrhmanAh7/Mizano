@@ -167,10 +167,12 @@ function WorkOrdersPageContent() {
       try {
         await deleteWorkOrder.mutateAsync(selectedWO.id);
         toast({ title: 'Work order deleted successfully' });
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: 'Error',
-          description: error.response?.data?.message || 'Failed to delete work order',
+          description:
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+            'Failed to delete work order',
           variant: 'destructive',
         });
       }

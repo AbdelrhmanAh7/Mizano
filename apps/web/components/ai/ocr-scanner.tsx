@@ -93,14 +93,14 @@ export function OcrScanner({ vendorId, onExtract, onApply, className }: OcrScann
         onExtract?.(data);
 
         // Check for duplicate warning (this would come from the API)
-        if ((response as any).isDuplicate) {
+        if ((response as { isDuplicate?: boolean }).isDuplicate) {
           setIsDuplicateWarning(true);
         }
       },
     });
   };
 
-  const handleFieldChange = (field: keyof OcrExtractedData, value: any) => {
+  const handleFieldChange = (field: keyof OcrExtractedData, value: string | number | null) => {
     setEditedData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -117,7 +117,7 @@ export function OcrScanner({ vendorId, onExtract, onApply, className }: OcrScann
   const handleLearn = () => {
     if (!vendorId || !extractedData) return;
 
-    const corrections: Record<string, any> = {};
+    const corrections: Record<string, unknown> = {};
     Object.keys(editedData).forEach((key) => {
       if (editedData[key as keyof typeof editedData] !== undefined) {
         corrections[key] = editedData[key as keyof typeof editedData];
@@ -370,8 +370,8 @@ export function OcrScanner({ vendorId, onExtract, onApply, className }: OcrScann
 
 interface ExtractedFieldProps {
   label: string;
-  value: any;
-  originalValue: any;
+  value: string | number | null | undefined;
+  originalValue: string | number | null | undefined;
   isCorrected: boolean;
   onChange: (value: string) => void;
   type?: 'text' | 'number' | 'date';

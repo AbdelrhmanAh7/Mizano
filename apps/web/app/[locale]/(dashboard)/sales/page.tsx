@@ -22,25 +22,26 @@ export default function SalesPage() {
 
   // Calculate metrics
   const totalOutstanding = customers.reduce(
-    (sum: number, c: any) => sum + parseFloat(c.outstandingBalance || '0'),
+    (sum: number, c: { outstandingBalance?: string }) =>
+      sum + parseFloat(c.outstandingBalance || '0'),
     0,
   );
 
-  const overdueInvoices = invoices.filter((i: any) => i.status === 'OVERDUE');
+  const overdueInvoices = invoices.filter((i: { status: string }) => i.status === 'OVERDUE');
   const overdueAmount = overdueInvoices.reduce(
-    (sum: number, i: any) => sum + parseFloat(i.balanceDue || '0'),
+    (sum: number, i: { balanceDue?: string }) => sum + parseFloat(i.balanceDue || '0'),
     0,
   );
 
-  const pendingQuotes = quotes.filter((q: any) => q.status === 'SENT');
+  const pendingQuotes = quotes.filter((q: { status: string }) => q.status === 'SENT');
   const pendingQuotesTotal = pendingQuotes.reduce(
-    (sum: number, q: any) => sum + parseFloat(q.grandTotal || '0'),
+    (sum: number, q: { grandTotal?: string }) => sum + parseFloat(q.grandTotal || '0'),
     0,
   );
 
   const paidThisMonth = invoices
-    .filter((i: any) => i.status === 'PAID')
-    .reduce((sum: number, i: any) => sum + parseFloat(i.grandTotal || '0'), 0);
+    .filter((i: { status: string }) => i.status === 'PAID')
+    .reduce((sum: number, i: { grandTotal?: string }) => sum + parseFloat(i.grandTotal || '0'), 0);
 
   const modules = [
     {
@@ -65,7 +66,7 @@ export default function SalesPage() {
       icon: Receipt,
       href: '/sales/invoices',
       color: 'bg-green-500',
-      stats: `${invoices.filter((i: any) => i.status === 'SENT').length} unpaid`,
+      stats: `${invoices.filter((i: { status: string }) => i.status === 'SENT').length} unpaid`,
     },
     {
       title: 'Credit Notes',

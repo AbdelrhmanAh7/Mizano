@@ -24,7 +24,7 @@ interface QuickTrainDialogProps {
   onOpenChange: (open: boolean) => void;
   extractionResult?: OcrTrainingExtractResult;
   vendorId?: string;
-  corrections?: Record<string, any>;
+  corrections?: Record<string, unknown>;
 }
 
 const FIELD_LABELS: Record<string, string> = {
@@ -45,7 +45,7 @@ export function QuickTrainDialog({
 }: QuickTrainDialogProps) {
   const { toast } = useToast();
   const submitMutation = useOcrTrainingSubmit();
-  const [additionalCorrections, setAdditionalCorrections] = useState<Record<string, any>>({});
+  const [additionalCorrections, setAdditionalCorrections] = useState<Record<string, unknown>>({});
 
   // Merge external corrections with any additional ones from this dialog
   const allCorrections = useMemo(
@@ -87,7 +87,7 @@ export function QuickTrainDialog({
           setAdditionalCorrections({});
           onOpenChange(false);
         },
-        onError: (error: any) => {
+        onError: (error: { response?: { data?: { message?: string } } }) => {
           toast({
             variant: 'destructive',
             title: 'Submission failed',

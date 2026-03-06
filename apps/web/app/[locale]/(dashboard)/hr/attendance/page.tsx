@@ -65,7 +65,8 @@ function AttendancePageContent() {
 
   const getAttendanceForDay = (employeeId: string, date: Date) => {
     return attendance.find(
-      (a: any) => a.employeeId === employeeId && isSameDay(new Date(a.date), date),
+      (a: { employeeId: string; date: string }) =>
+        a.employeeId === employeeId && isSameDay(new Date(a.date), date),
     );
   };
 
@@ -85,17 +86,28 @@ function AttendancePageContent() {
   };
 
   // Calculate summary for selected date
-  const selectedDateAttendance = attendance.filter((a: any) =>
+  const selectedDateAttendance = attendance.filter((a: { date: string; status: string }) =>
     isSameDay(new Date(a.date), selectedDate),
   );
-  const presentCount = selectedDateAttendance.filter((a: any) => a.status === 'PRESENT').length;
-  const absentCount = selectedDateAttendance.filter((a: any) => a.status === 'ABSENT').length;
-  const leaveCount = selectedDateAttendance.filter((a: any) => a.status === 'LEAVE').length;
+  const presentCount = selectedDateAttendance.filter(
+    (a: { status: string }) => a.status === 'PRESENT',
+  ).length;
+  const absentCount = selectedDateAttendance.filter(
+    (a: { status: string }) => a.status === 'ABSENT',
+  ).length;
+  const leaveCount = selectedDateAttendance.filter(
+    (a: { status: string }) => a.status === 'LEAVE',
+  ).length;
 
   const isLoading = employeesLoading || attendanceLoading;
 
   // Columns for the selected date details table
-  const detailColumns: ColumnDef<any>[] = [
+  const detailColumns: ColumnDef<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    jobTitle?: string;
+  }>[] = [
     {
       accessorKey: 'firstName',
       header: 'Employee',
@@ -327,7 +339,7 @@ function AttendancePageContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {employees.map((employee: any) => (
+                {employees.map((employee: { id: string; firstName: string; lastName: string }) => (
                   <TableRow key={employee.id}>
                     <TableCell className="sticky left-0 bg-background">
                       <div className="flex items-center gap-2">

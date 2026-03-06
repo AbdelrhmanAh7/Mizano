@@ -54,7 +54,7 @@ interface BankRuleFormProps {
   accounts: Array<{ id: string; name: string; code: string }>;
   vendors: Array<{ id: string; name: string }>;
   customers: Array<{ id: string; name: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: BankRuleFormData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -168,7 +168,9 @@ export function BankRuleForm({
               <div className="flex-1 grid grid-cols-3 gap-3">
                 <Select
                   value={form.watch(`conditions.${index}.field`)}
-                  onValueChange={(value: any) => form.setValue(`conditions.${index}.field`, value)}
+                  onValueChange={(value: BankRuleFormData['conditions'][number]['field']) =>
+                    form.setValue(`conditions.${index}.field`, value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Field" />
@@ -184,7 +186,7 @@ export function BankRuleForm({
 
                 <Select
                   value={form.watch(`conditions.${index}.operator`)}
-                  onValueChange={(value: any) =>
+                  onValueChange={(value: BankRuleFormData['conditions'][number]['operator']) =>
                     form.setValue(`conditions.${index}.operator`, value)
                   }
                 >
@@ -231,7 +233,9 @@ export function BankRuleForm({
             <Label>Action Type *</Label>
             <Select
               value={form.watch('action.type')}
-              onValueChange={(value: any) => form.setValue('action.type', value)}
+              onValueChange={(value: BankRuleFormData['action']['type']) =>
+                form.setValue('action.type', value)
+              }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select action" />

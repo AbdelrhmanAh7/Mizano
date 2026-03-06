@@ -50,7 +50,7 @@ interface OcrBatchTrainerProps {
 }
 
 interface FileCorrections {
-  [filename: string]: Record<string, any>;
+  [filename: string]: Record<string, unknown>;
 }
 
 const EDITABLE_FIELDS = [
@@ -137,7 +137,7 @@ export function OcrBatchTrainer({
           description: `Processed ${response.data.length} file(s)`,
         });
       },
-      onError: (error: any) => {
+      onError: (error: { response?: { data?: { message?: string } } }) => {
         toast({
           variant: 'destructive',
           title: 'Batch extraction failed',
@@ -161,7 +161,12 @@ export function OcrBatchTrainer({
   };
 
   // Update correction for a specific file and field
-  const updateCorrection = (filename: string, field: string, value: any, originalValue: any) => {
+  const updateCorrection = (
+    filename: string,
+    field: string,
+    value: string | number | null,
+    originalValue: string | number | null,
+  ) => {
     setCorrections((prev) => {
       const fileCorrections = { ...(prev[filename] || {}) };
       const normalizedOriginal = originalValue === null ? '' : String(originalValue);
@@ -239,7 +244,7 @@ export function OcrBatchTrainer({
               <SelectValue placeholder="Select vendor..." />
             </SelectTrigger>
             <SelectContent>
-              {vendors.map((vendor: any) => (
+              {vendors.map((vendor: { id: string; displayName?: string; name: string }) => (
                 <SelectItem key={vendor.id} value={vendor.id}>
                   {vendor.displayName || vendor.name}
                 </SelectItem>

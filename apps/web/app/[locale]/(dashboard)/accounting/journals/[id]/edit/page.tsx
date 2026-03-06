@@ -23,7 +23,7 @@ export default function EditJournalPage() {
 
   const isLoading = accountsLoading || journalLoading;
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await updateJournal.mutateAsync({ id: journalId, data });
       toast({
@@ -31,10 +31,12 @@ export default function EditJournalPage() {
         description: 'The journal entry has been updated successfully.',
       });
       router.push(`/accounting/journals/${journalId}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to update journal entry.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to update journal entry.',
         variant: 'destructive',
       });
     }

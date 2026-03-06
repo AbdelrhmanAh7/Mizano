@@ -83,9 +83,9 @@ export function BOMForm({ bom }: BOMFormProps) {
   const handleSubmit = async (data: BOMFormData) => {
     try {
       if (bom) {
-        await updateBOM.mutateAsync({ id: bom.id, data: data as any });
+        await updateBOM.mutateAsync({ id: bom.id, data });
       } else {
-        await createBOM.mutateAsync(data as any);
+        await createBOM.mutateAsync(data);
       }
       router.push('/manufacturing/bom');
     } catch (error) {
@@ -97,7 +97,7 @@ export function BOMForm({ bom }: BOMFormProps) {
 
   // Filter out selected output item from components
   const outputItemId = form.watch('outputItemId');
-  const availableItems = items.filter((item: any) => item.id !== outputItemId);
+  const availableItems = items.filter((item) => item.id !== outputItemId);
 
   return (
     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -128,7 +128,7 @@ export function BOMForm({ bom }: BOMFormProps) {
                   <SelectValue placeholder="Select output item" />
                 </SelectTrigger>
                 <SelectContent>
-                  {items.map((item: any) => (
+                  {items.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.code} - {item.name}
                     </SelectItem>
@@ -230,7 +230,7 @@ export function BOMForm({ bom }: BOMFormProps) {
                         <SelectValue placeholder="Select item" />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableItems.map((item: any) => (
+                        {availableItems.map((item) => (
                           <SelectItem key={item.id} value={item.id}>
                             {item.code} - {item.name}
                           </SelectItem>

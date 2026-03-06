@@ -19,7 +19,7 @@ export default function NewTaskPage({ params }: NewTaskPageProps) {
   const { data: project, isLoading } = useProject(id);
   const createTask = useCreateTask();
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createTask.mutateAsync({ projectId: id, data });
       router.push(`/projects/${id}`);

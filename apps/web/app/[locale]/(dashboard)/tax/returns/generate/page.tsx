@@ -33,10 +33,12 @@ export default function GenerateVATReturnPage() {
       } else {
         router.push('/tax/returns');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to generate VAT return',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to generate VAT return',
         variant: 'destructive',
       });
     }

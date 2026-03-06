@@ -91,7 +91,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
 
   const unpaidBills = billsData?.data || [];
   const bankAccounts = (accountsData?.data || []).filter(
-    (a: any) => a.code.startsWith('1'), // Asset accounts
+    (a: { code: string }) => a.code.startsWith('1'), // Asset accounts
   );
 
   const handleApplyToBill = async () => {
@@ -183,11 +183,17 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                             No unpaid bills found
                           </SelectItem>
                         ) : (
-                          unpaidBills.map((bill: any) => (
-                            <SelectItem key={bill.id} value={bill.id}>
-                              {bill.billNumber} - {formatCurrency(bill.balanceDue, currency)}
-                            </SelectItem>
-                          ))
+                          unpaidBills.map(
+                            (bill: {
+                              id: string;
+                              billNumber: string;
+                              balanceDue: string | number;
+                            }) => (
+                              <SelectItem key={bill.id} value={bill.id}>
+                                {bill.billNumber} - {formatCurrency(bill.balanceDue, currency)}
+                              </SelectItem>
+                            ),
+                          )
                         )}
                       </SelectContent>
                     </Select>
@@ -227,7 +233,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                         <SelectValue placeholder="Select account" />
                       </SelectTrigger>
                       <SelectContent>
-                        {bankAccounts.map((account: any) => (
+                        {bankAccounts.map((account: { id: string; code: string; name: string }) => (
                           <SelectItem key={account.id} value={account.id}>
                             {account.code} - {account.name}
                           </SelectItem>

@@ -94,12 +94,19 @@ export default function PayrollDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const payslips = payrollRun.payslips || [];
-  const totalGross = payslips.reduce((sum: number, p: any) => sum + (p.gross || 0), 0);
-  const totalDeductions = payslips.reduce(
-    (sum: number, p: any) => sum + (p.totalDeductions || 0) + (p.taxAmount || 0),
+  const totalGross = payslips.reduce(
+    (sum: number, p: { gross?: number }) => sum + (p.gross || 0),
     0,
   );
-  const totalNetPay = payslips.reduce((sum: number, p: any) => sum + (p.netPay || 0), 0);
+  const totalDeductions = payslips.reduce(
+    (sum: number, p: { totalDeductions?: number; taxAmount?: number }) =>
+      sum + (p.totalDeductions || 0) + (p.taxAmount || 0),
+    0,
+  );
+  const totalNetPay = payslips.reduce(
+    (sum: number, p: { netPay?: number }) => sum + (p.netPay || 0),
+    0,
+  );
 
   return (
     <div className="space-y-6">
@@ -229,56 +236,68 @@ export default function PayrollDetailPage({ params }: { params: Promise<{ id: st
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payslips.map((slip: any) => (
-                <TableRow key={slip.id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">
-                        {slip.employee?.firstName} {slip.employee?.lastName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {slip.employee?.employeeNumber}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatCurrency(slip.basicSalary || 0)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-green-600">
-                    +
-                    {formatCurrency(
-                      Object.values(slip.allowances || {}).reduce(
-                        (sum: number, a: any) => sum + (a || 0),
-                        0,
-                      ),
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatCurrency(slip.gross || 0)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {slip.lopDays > 0 ? (
-                      <span className="text-red-600">{slip.lopDays} days</span>
-                    ) : (
-                      '-'
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-red-600">
-                    -{formatCurrency(slip.totalDeductions || 0)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-red-600">
-                    -{formatCurrency(slip.taxAmount || 0)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono font-medium">
-                    {formatCurrency(slip.netPay || 0)}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/hr/payslips/${slip.id}`}>View</Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {payslips.map(
+                (slip: {
+                  id: string;
+                  employee?: { firstName?: string; lastName?: string; employeeNumber?: string };
+                  basicSalary?: number;
+                  allowances?: Record<string, number>;
+                  gross?: number;
+                  lopDays?: number;
+                  totalDeductions?: number;
+                  taxAmount?: number;
+                  netPay?: number;
+                }) => (
+                  <TableRow key={slip.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">
+                          {slip.employee?.firstName} {slip.employee?.lastName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {slip.employee?.employeeNumber}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(slip.basicSalary || 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-green-600">
+                      +
+                      {formatCurrency(
+                        Object.values(slip.allowances || {}).reduce(
+                          (sum: number, a: number) => sum + (a || 0),
+                          0,
+                        ),
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(slip.gross || 0)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {slip.lopDays > 0 ? (
+                        <span className="text-red-600">{slip.lopDays} days</span>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-red-600">
+                      -{formatCurrency(slip.totalDeductions || 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-red-600">
+                      -{formatCurrency(slip.taxAmount || 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-medium">
+                      {formatCurrency(slip.netPay || 0)}
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/hr/payslips/${slip.id}`}>View</Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ),
+              )}
             </TableBody>
           </Table>
         </CardContent>

@@ -31,11 +31,11 @@ const priceListsApi = {
     const response = await api.get(`/price-lists/${id}`);
     return response.data;
   },
-  create: async (data: any) => {
+  create: async (data: Record<string, unknown>) => {
     const response = await api.post('/price-lists', data);
     return response.data;
   },
-  update: async ({ id, data }: { id: string; data: any }) => {
+  update: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
     const response = await api.patch(`/price-lists/${id}`, data);
     return response.data;
   },

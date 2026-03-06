@@ -42,7 +42,7 @@ export default function EditBillPage({ params }: EditBillPageProps) {
   const accounts = accountsData?.data || [];
   const items = itemsData?.data || [];
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await updateBill.mutateAsync({ id, data });
       router.push(`/purchases/bills/${id}`);

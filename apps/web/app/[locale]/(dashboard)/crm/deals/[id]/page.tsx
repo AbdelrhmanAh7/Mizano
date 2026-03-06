@@ -108,10 +108,12 @@ export default function DealDetailPage() {
       await deleteDeal.mutateAsync(dealId);
       toast({ title: 'Deal deleted' });
       router.push('/crm/deals');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to delete deal',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to delete deal',
         variant: 'destructive',
       });
     }
@@ -123,10 +125,12 @@ export default function DealDetailPage() {
       await markWon.mutateAsync({ id: dealId });
       toast({ title: 'Deal marked as won!' });
       setWonDialogOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to mark deal as won',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to mark deal as won',
         variant: 'destructive',
       });
     }
@@ -138,10 +142,12 @@ export default function DealDetailPage() {
       await markLost.mutateAsync({ id: dealId, reason: lostReason });
       toast({ title: 'Deal marked as lost' });
       setLostDialogOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to mark deal as lost',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to mark deal as lost',
         variant: 'destructive',
       });
     }
@@ -152,10 +158,12 @@ export default function DealDetailPage() {
       await updateStage.mutateAsync({ id: dealId, stage: newStage });
       toast({ title: `Deal moved to ${getDealStageLabel(newStage)}` });
       setStageDialogOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to update stage',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to update stage',
         variant: 'destructive',
       });
     }

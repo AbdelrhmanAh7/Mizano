@@ -17,7 +17,15 @@ jest.mock('cmdk', () => {
     return Comp;
   };
 
-  const CommandPrimitive = forwardRefDiv('Command') as any;
+  const CommandPrimitive = forwardRefDiv('Command') as ReturnType<typeof forwardRefDiv> & {
+    Input: ReturnType<typeof forwardRefDiv>;
+    List: ReturnType<typeof forwardRefDiv>;
+    Empty: ReturnType<typeof forwardRefDiv>;
+    Group: ReturnType<typeof forwardRefDiv>;
+    Item: ReturnType<typeof forwardRefDiv>;
+    Separator: ReturnType<typeof forwardRefDiv>;
+    displayName: string;
+  };
   CommandPrimitive.Input = forwardRefDiv('CommandInput');
   CommandPrimitive.List = forwardRefDiv('CommandList');
   CommandPrimitive.Empty = forwardRefDiv('CommandEmpty');

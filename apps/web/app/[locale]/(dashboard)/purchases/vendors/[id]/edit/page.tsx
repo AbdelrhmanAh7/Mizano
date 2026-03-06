@@ -19,7 +19,7 @@ export default function EditVendorPage({ params }: EditVendorPageProps) {
   const { data: vendor, isLoading } = useVendor(id);
   const updateVendor = useUpdateVendor();
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await updateVendor.mutateAsync({ id, data });
       router.push(`/purchases/vendors/${id}`);

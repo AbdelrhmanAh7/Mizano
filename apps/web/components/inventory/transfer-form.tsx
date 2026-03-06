@@ -54,7 +54,7 @@ type TransferFormData = z.infer<typeof transferSchema>;
 interface TransferFormProps {
   items: Array<{ id: string; name: string; sku: string | null; stockLevel: number }>;
   warehouses: Array<{ id: string; name: string; code: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }

@@ -25,7 +25,7 @@ export default function NewBankAccountPage() {
 
   const glAccounts = accountsData?.data || [];
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createBankAccount.mutateAsync(data);
       router.push('/banking/accounts');

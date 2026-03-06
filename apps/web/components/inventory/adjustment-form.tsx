@@ -51,7 +51,7 @@ type AdjustmentFormData = z.infer<typeof adjustmentSchema>;
 interface AdjustmentFormProps {
   items: Array<{ id: string; name: string; sku: string | null; stockLevel: number }>;
   warehouses: Array<{ id: string; name: string; code: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -171,7 +171,9 @@ export function AdjustmentForm({
               <Label htmlFor="reason">Reason *</Label>
               <Select
                 value={form.watch('reason')}
-                onValueChange={(value: any) => form.setValue('reason', value)}
+                onValueChange={(value: AdjustmentFormData['reason']) =>
+                  form.setValue('reason', value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select reason" />

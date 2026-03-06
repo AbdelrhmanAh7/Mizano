@@ -5,6 +5,9 @@ import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+// Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 // Employee Types
 export interface Employee {
   id: string;
@@ -80,8 +83,18 @@ export type EmployeeStatus = Employee['status'];
 export type AttendanceStatus = Attendance['status'];
 export type PayrollStatus = PayrollRun['status'];
 
+export interface EmployeeParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: EmployeeStatus;
+  departmentId?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
 // Employee Hooks
-export function useEmployees(params?: any) {
+export function useEmployees(params?: EmployeeParams) {
   return useQuery({
     queryKey: ['employees', params],
     queryFn: async () => {
@@ -122,7 +135,7 @@ export function useCreateEmployee() {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       toast.success('Employee created successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create employee');
     },
   });
@@ -132,12 +145,13 @@ export function useUpdateEmployee() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => employeesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      employeesApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       toast.success('Employee updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to update employee');
     },
   });
@@ -152,14 +166,21 @@ export function useDeleteEmployee() {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       toast.success('Employee deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to delete employee');
     },
   });
 }
 
+export interface AttendanceParams {
+  startDate?: string;
+  endDate?: string;
+  employeeId?: string;
+  status?: AttendanceStatus;
+}
+
 // Attendance Hooks
-export function useAttendance(startDateOrParams?: string | any, endDate?: string) {
+export function useAttendance(startDateOrParams?: string | AttendanceParams, endDate?: string) {
   // Support both (params) and (startDate, endDate) call signatures
   const params =
     typeof startDateOrParams === 'string'
@@ -184,7 +205,7 @@ export function useMarkAttendance() {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
       toast.success('Attendance marked');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to mark attendance');
     },
   });
@@ -199,7 +220,7 @@ export function useMarkBulkAttendance() {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
       toast.success('Attendance marked for all employees');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to mark attendance');
     },
   });
@@ -208,8 +229,16 @@ export function useMarkBulkAttendance() {
 // Alias for backward compatibility
 export const useBulkMarkAttendance = useMarkBulkAttendance;
 
+export interface PayrollRunParams {
+  page?: number;
+  limit?: number;
+  status?: PayrollStatus;
+  year?: number;
+  month?: number;
+}
+
 // Payroll Hooks
-export function usePayrollRuns(params?: any) {
+export function usePayrollRuns(params?: PayrollRunParams) {
   return useQuery({
     queryKey: ['payroll', params],
     queryFn: async () => {
@@ -242,7 +271,7 @@ export function useRunPayroll() {
       queryClient.invalidateQueries({ queryKey: ['payroll'] });
       toast.success('Payroll run created');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to run payroll');
     },
   });
@@ -257,7 +286,7 @@ export function useConfirmPayroll() {
       queryClient.invalidateQueries({ queryKey: ['payroll'] });
       toast.success('Payroll confirmed');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to confirm payroll');
     },
   });
@@ -272,7 +301,7 @@ export function useMarkPayrollPaid() {
       queryClient.invalidateQueries({ queryKey: ['payroll'] });
       toast.success('Payroll marked as paid');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to mark payroll as paid');
     },
   });

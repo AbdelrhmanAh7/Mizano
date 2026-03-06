@@ -41,7 +41,7 @@ type ProjectFormData = z.infer<typeof projectSchema>;
 interface ProjectFormProps {
   project?: Project | null;
   customers: Array<{ id: string; name: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -155,7 +155,7 @@ export function ProjectForm({
               <Label htmlFor="status">Status</Label>
               <Select
                 value={form.watch('status')}
-                onValueChange={(value: any) => form.setValue('status', value)}
+                onValueChange={(value: ProjectFormData['status']) => form.setValue('status', value)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -240,7 +240,9 @@ export function ProjectForm({
             <Label>Billing Method *</Label>
             <Select
               value={form.watch('billingMethod')}
-              onValueChange={(value: any) => form.setValue('billingMethod', value)}
+              onValueChange={(value: ProjectFormData['billingMethod']) =>
+                form.setValue('billingMethod', value)
+              }
             >
               <SelectTrigger>
                 <SelectValue />
@@ -279,7 +281,9 @@ export function ProjectForm({
               <Label>Budget Type</Label>
               <Select
                 value={form.watch('budgetType')}
-                onValueChange={(value: any) => form.setValue('budgetType', value)}
+                onValueChange={(value: ProjectFormData['budgetType']) =>
+                  form.setValue('budgetType', value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue />

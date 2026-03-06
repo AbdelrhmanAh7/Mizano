@@ -59,10 +59,12 @@ export default function BOMDetailPage() {
       await deleteBOM.mutateAsync(bomId);
       toast({ title: 'BOM deleted successfully' });
       router.push('/manufacturing/bom');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to delete BOM',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to delete BOM',
         variant: 'destructive',
       });
     }

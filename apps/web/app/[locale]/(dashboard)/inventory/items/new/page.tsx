@@ -39,7 +39,7 @@ export default function NewItemPage() {
   const accounts = accountsData?.data || [];
   const taxRates = taxRatesData?.data || [];
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createItem.mutateAsync(data);
       router.push('/inventory/items');

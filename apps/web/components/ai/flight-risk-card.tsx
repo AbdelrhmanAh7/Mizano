@@ -33,43 +33,55 @@ export function FlightRiskCard() {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {employees.map((employee: any) => (
-            <div
-              key={employee.id}
-              className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <Link
-                    href={`/hr/employees/${employee.id}`}
-                    className="text-sm font-medium hover:underline truncate"
-                  >
-                    {employee.name}
-                  </Link>
-                  <Badge variant="outline" className={getRiskLevelColor(employee.riskLevel)}>
-                    {employee.riskLevel}
-                  </Badge>
+          {employees.map(
+            (employee: {
+              id: string;
+              name: string;
+              riskLevel: string;
+              department: string;
+              attritionRisk: number;
+              tenure?: number;
+              recommendations?: string[];
+            }) => (
+              <div
+                key={employee.id}
+                className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Link
+                      href={`/hr/employees/${employee.id}`}
+                      className="text-sm font-medium hover:underline truncate"
+                    >
+                      {employee.name}
+                    </Link>
+                    <Badge variant="outline" className={getRiskLevelColor(employee.riskLevel)}>
+                      {employee.riskLevel}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      {employee.department}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      {formatAttritionRisk(employee.attritionRisk)}
+                    </span>
+                    <span>Tenure: {formatTenure(employee.tenure || 0)}</span>
+                  </div>
+                  {employee.recommendations && employee.recommendations.length > 0 && (
+                    <div className="text-xs text-blue-600 mt-1">
+                      💡 {employee.recommendations[0]}
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    {employee.department}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" />
-                    {formatAttritionRisk(employee.attritionRisk)}
-                  </span>
-                  <span>Tenure: {formatTenure(employee.tenure || 0)}</span>
-                </div>
-                {employee.recommendations && employee.recommendations.length > 0 && (
-                  <div className="text-xs text-blue-600 mt-1">💡 {employee.recommendations[0]}</div>
-                )}
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/hr/employees/${employee.id}`}>Review</Link>
+                </Button>
               </div>
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/hr/employees/${employee.id}`}>Review</Link>
-              </Button>
-            </div>
-          ))}
+            ),
+          )}
         </div>
       </CardContent>
     </Card>

@@ -18,7 +18,7 @@ export default function EditCustomerPage() {
   const { data: customer, isLoading } = useCustomer(customerId);
   const updateCustomer = useUpdateCustomer();
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await updateCustomer.mutateAsync({ id: customerId, data });
       toast({
@@ -26,10 +26,12 @@ export default function EditCustomerPage() {
         description: 'The customer has been updated successfully.',
       });
       router.push(`/sales/customers/${customerId}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to update customer.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to update customer.',
         variant: 'destructive',
       });
     }

@@ -66,7 +66,7 @@ export type PaymentReceivedFormData = z.infer<typeof paymentReceivedSchema>;
 interface PaymentReceivedFormProps {
   defaultCustomerId?: string;
   defaultInvoiceId?: string;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }

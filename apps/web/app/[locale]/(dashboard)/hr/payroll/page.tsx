@@ -35,7 +35,7 @@ function PayrollPageContent() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkProcessOpen, setBulkProcessOpen] = useState(false);
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
-  const [bulkSelectedRows, setBulkSelectedRows] = useState<any[]>([]);
+  const [bulkSelectedRows, setBulkSelectedRows] = useState<{ id: string }[]>([]);
 
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => payrollApi.bulkDelete(ids).then((r) => r.data),
@@ -61,7 +61,7 @@ function PayrollPageContent() {
           {
             label: 'Process',
             icon: Play,
-            onClick: (rows: any[]) => {
+            onClick: (rows: { id: string }[]) => {
               setBulkSelectedRows(rows);
               setBulkProcessOpen(true);
             },
@@ -69,7 +69,7 @@ function PayrollPageContent() {
           {
             label: 'Mark as Paid',
             icon: DollarSign,
-            onClick: (rows: any[]) => {
+            onClick: (rows: { id: string }[]) => {
               setBulkSelectedRows(rows);
               setBulkPayOpen(true);
             },
@@ -82,7 +82,7 @@ function PayrollPageContent() {
             label: 'Delete',
             icon: Trash2,
             variant: 'destructive' as const,
-            onClick: (rows: any[]) => {
+            onClick: (rows: { id: string }[]) => {
               setBulkSelectedRows(rows);
               setBulkDeleteOpen(true);
             },
@@ -93,12 +93,24 @@ function PayrollPageContent() {
 
   // Calculate summary
   const totalPaid = payrollRuns
-    .filter((p: any) => p.status === 'PAID')
-    .reduce((sum: number, p: any) => sum + (p.totalNetPay || 0), 0);
-  const pendingRuns = payrollRuns.filter((p: any) => p.status === 'DRAFT').length;
-  const confirmedRuns = payrollRuns.filter((p: any) => p.status === 'CONFIRMED').length;
+    .filter((p: { status: string }) => p.status === 'PAID')
+    .reduce((sum: number, p: { totalNetPay?: number }) => sum + (p.totalNetPay || 0), 0);
+  const pendingRuns = payrollRuns.filter((p: { status: string }) => p.status === 'DRAFT').length;
+  const confirmedRuns = payrollRuns.filter(
+    (p: { status: string }) => p.status === 'CONFIRMED',
+  ).length;
 
-  const columns: ColumnDef<any>[] = [
+  const columns: ColumnDef<{
+    id: string;
+    year: number;
+    month: number;
+    employeeCount?: number;
+    totalGross?: number;
+    totalDeductions?: number;
+    totalNetPay?: number;
+    status: string;
+    createdAt: string;
+  }>[] = [
     {
       id: 'period',
       header: () => (

@@ -6,6 +6,8 @@ import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type PaymentMode =
   | 'CASH'
   | 'BANK_TRANSFER'
@@ -142,7 +144,7 @@ export function useCreatePaymentReceived() {
         description: 'The payment has been recorded successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error recording payment',

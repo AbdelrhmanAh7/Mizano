@@ -25,7 +25,7 @@ export default function NewProjectPage() {
 
   const customers = customersData?.data || [];
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createProject.mutateAsync(data);
       router.push('/projects');

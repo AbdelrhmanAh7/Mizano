@@ -62,7 +62,19 @@ jest.mock('lucide-react', () => {
 
 // Mock UI components
 jest.mock('@/components/ui/button', () => ({
-  Button: ({ children, onClick, disabled, className, title, ...props }: any) => (
+  Button: ({
+    children,
+    onClick,
+    disabled,
+    className,
+    title,
+  }: {
+    children?: React.ReactNode;
+    onClick?: () => void;
+    disabled?: boolean;
+    className?: string;
+    title?: string;
+  }) => (
     <button onClick={onClick} disabled={disabled} className={className} title={title}>
       {children}
     </button>
@@ -70,30 +82,51 @@ jest.mock('@/components/ui/button', () => ({
 }));
 
 jest.mock('@/components/ui/badge', () => ({
-  Badge: ({ children, ...props }: any) => <span {...props}>{children}</span>,
+  Badge: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <span {...(props as Record<string, unknown>)}>{children}</span>
+  ),
 }));
 
 jest.mock('@/components/ui/card', () => ({
-  Card: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardHeader: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardTitle: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  Card: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...(props as Record<string, unknown>)}>{children}</div>
+  ),
+  CardContent: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...(props as Record<string, unknown>)}>{children}</div>
+  ),
+  CardHeader: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...(props as Record<string, unknown>)}>{children}</div>
+  ),
+  CardTitle: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
+    <div {...(props as Record<string, unknown>)}>{children}</div>
+  ),
 }));
 
 jest.mock('@/components/ui/sheet', () => ({
-  Sheet: ({ children, open }: any) => (open ? <div data-testid="sheet">{children}</div> : null),
-  SheetContent: ({ children }: any) => <div data-testid="sheet-content">{children}</div>,
-  SheetHeader: ({ children }: any) => <div>{children}</div>,
-  SheetTitle: ({ children }: any) => <h2>{children}</h2>,
-  SheetTrigger: ({ children }: any) => <div>{children}</div>,
+  Sheet: ({ children, open }: { children?: React.ReactNode; open?: boolean }) =>
+    open ? <div data-testid="sheet">{children}</div> : null,
+  SheetContent: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="sheet-content">{children}</div>
+  ),
+  SheetHeader: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  SheetTitle: ({ children }: { children?: React.ReactNode }) => <h2>{children}</h2>,
+  SheetTrigger: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
 }));
 
 jest.mock('@/components/ui/scroll-area', () => ({
-  ScrollArea: ({ children }: any) => <div data-testid="scroll-area">{children}</div>,
+  ScrollArea: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="scroll-area">{children}</div>
+  ),
 }));
 
 jest.mock('@/components/ui/checkbox', () => ({
-  Checkbox: ({ checked, onCheckedChange }: any) => (
+  Checkbox: ({
+    checked,
+    onCheckedChange,
+  }: {
+    checked?: boolean;
+    onCheckedChange?: (v: boolean) => void;
+  }) => (
     <input
       type="checkbox"
       checked={checked}
@@ -104,7 +137,17 @@ jest.mock('@/components/ui/checkbox', () => ({
 }));
 
 jest.mock('@/components/ui/input', () => ({
-  Input: ({ value, onChange, placeholder, className }: any) => (
+  Input: ({
+    value,
+    onChange,
+    placeholder,
+    className,
+  }: {
+    value?: string;
+    onChange?: React.ChangeEventHandler<HTMLInputElement>;
+    placeholder?: string;
+    className?: string;
+  }) => (
     <input
       value={value}
       onChange={onChange}
@@ -120,34 +163,57 @@ jest.mock('@/components/ui/separator', () => ({
 }));
 
 jest.mock('@/components/ui/tooltip', () => ({
-  Tooltip: ({ children }: any) => <div>{children}</div>,
-  TooltipContent: ({ children }: any) => <div>{children}</div>,
-  TooltipProvider: ({ children }: any) => <div>{children}</div>,
-  TooltipTrigger: ({ children, asChild }: any) => <div>{children}</div>,
+  Tooltip: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  TooltipContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  TooltipProvider: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  TooltipTrigger: ({ children }: { children?: React.ReactNode; asChild?: boolean }) => (
+    <div>{children}</div>
+  ),
 }));
 
 jest.mock('@/components/ui/dropdown-menu', () => ({
-  DropdownMenu: ({ children }: any) => <div>{children}</div>,
-  DropdownMenuContent: ({ children }: any) => <div>{children}</div>,
-  DropdownMenuItem: ({ children, onClick, className }: any) => (
+  DropdownMenu: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: ({
+    children,
+    onClick,
+    className,
+  }: {
+    children?: React.ReactNode;
+    onClick?: () => void;
+    className?: string;
+  }) => (
     <button onClick={onClick} className={className}>
       {children}
     </button>
   ),
   DropdownMenuSeparator: () => <hr />,
-  DropdownMenuTrigger: ({ children }: any) => <div>{children}</div>,
-  DropdownMenuCheckboxItem: ({ children, checked, onCheckedChange }: any) => (
+  DropdownMenuTrigger: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuCheckboxItem: ({
+    children,
+    checked,
+    onCheckedChange,
+  }: {
+    children?: React.ReactNode;
+    checked?: boolean;
+    onCheckedChange?: (v: boolean) => void;
+  }) => (
     <label>
       <input type="checkbox" checked={checked} onChange={() => onCheckedChange?.(!checked)} />
       {children}
     </label>
   ),
-  DropdownMenuLabel: ({ children }: any) => <span>{children}</span>,
+  DropdownMenuLabel: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
 }));
 
 // Mock hooks
-const mockUseLogger: any = {
-  logs: [] as any[],
+const mockUseLogger: Record<string, unknown> & {
+  logs: Record<string, unknown>[];
+  selectedIds: string[];
+  stats: Record<string, unknown>;
+  filter: Record<string, unknown>;
+} = {
+  logs: [] as Record<string, unknown>[],
   stats: {
     totalErrors: 0,
     totalWarnings: 0,

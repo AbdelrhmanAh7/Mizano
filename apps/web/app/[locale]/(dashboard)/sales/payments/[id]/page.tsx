@@ -243,30 +243,36 @@ export default function PaymentReceivedDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {payment.allocations.map((allocation: any) => (
-                  <TableRow key={allocation.invoiceId}>
-                    <TableCell>
-                      <Link
-                        href={`/sales/invoices/${allocation.invoiceId}`}
-                        className="font-medium hover:underline"
-                      >
-                        {allocation.invoice?.invoiceNumber || allocation.invoiceId}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(allocation.invoice?.grandTotal || '0')}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(
-                        parseFloat(allocation.invoice?.balanceDue || '0') +
-                          parseFloat(allocation.amount || '0'),
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-green-600 font-semibold">
-                      {formatCurrency(allocation.amount)}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {payment.allocations.map(
+                  (allocation: {
+                    invoiceId: string;
+                    invoice?: { invoiceNumber?: string; grandTotal?: string; balanceDue?: string };
+                    amount?: string;
+                  }) => (
+                    <TableRow key={allocation.invoiceId}>
+                      <TableCell>
+                        <Link
+                          href={`/sales/invoices/${allocation.invoiceId}`}
+                          className="font-medium hover:underline"
+                        >
+                          {allocation.invoice?.invoiceNumber || allocation.invoiceId}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(allocation.invoice?.grandTotal || '0')}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(
+                          parseFloat(allocation.invoice?.balanceDue || '0') +
+                            parseFloat(allocation.amount || '0'),
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-green-600 font-semibold">
+                        {formatCurrency(allocation.amount)}
+                      </TableCell>
+                    </TableRow>
+                  ),
+                )}
               </TableBody>
             </Table>
           </CardContent>

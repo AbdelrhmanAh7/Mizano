@@ -74,7 +74,7 @@ export default function MarkAttendancePage() {
     setSelectAll(checked);
     if (checked) {
       const newEntries = new Map<string, AttendanceEntry>();
-      employees.forEach((emp: any) => {
+      employees.forEach((emp: { id: string }) => {
         newEntries.set(emp.id, {
           employeeId: emp.id,
           status: defaultStatus,
@@ -90,7 +90,7 @@ export default function MarkAttendancePage() {
     setDefaultStatus(status);
     if (selectAll) {
       const newEntries = new Map<string, AttendanceEntry>();
-      employees.forEach((emp: any) => {
+      employees.forEach((emp: { id: string }) => {
         const existing = entries.get(emp.id);
         newEntries.set(emp.id, {
           employeeId: emp.id,
@@ -222,96 +222,103 @@ export default function MarkAttendancePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {employees.map((employee: any) => {
-                const entry = entries.get(employee.id);
-                const isSelected = !!entry;
-                return (
-                  <TableRow key={employee.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            updateEntry(employee.id, { status: defaultStatus });
-                          } else {
-                            setEntries((prev) => {
-                              const newEntries = new Map(prev);
-                              newEntries.delete(employee.id);
-                              return newEntries;
-                            });
-                            setSelectAll(false);
-                          }
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs">
-                            {employee.firstName[0]}
-                            {employee.lastName[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">
-                            {employee.firstName} {employee.lastName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {employee.jobTitle || 'No title'}
-                          </p>
+              {employees.map(
+                (employee: {
+                  id: string;
+                  firstName: string;
+                  lastName: string;
+                  jobTitle?: string;
+                }) => {
+                  const entry = entries.get(employee.id);
+                  const isSelected = !!entry;
+                  return (
+                    <TableRow key={employee.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              updateEntry(employee.id, { status: defaultStatus });
+                            } else {
+                              setEntries((prev) => {
+                                const newEntries = new Map(prev);
+                                newEntries.delete(employee.id);
+                                return newEntries;
+                              });
+                              setSelectAll(false);
+                            }
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="text-xs">
+                              {employee.firstName[0]}
+                              {employee.lastName[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">
+                              {employee.firstName} {employee.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {employee.jobTitle || 'No title'}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={entry?.status || ''}
-                        onValueChange={(value: AttendanceStatus) =>
-                          updateEntry(employee.id, { status: value })
-                        }
-                        disabled={!isSelected}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {attendanceStatuses.map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {getAttendanceStatusLabel(status)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="time"
-                        value={entry?.checkIn || ''}
-                        onChange={(e) => updateEntry(employee.id, { checkIn: e.target.value })}
-                        disabled={!isSelected}
-                        className="w-28"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="time"
-                        value={entry?.checkOut || ''}
-                        onChange={(e) => updateEntry(employee.id, { checkOut: e.target.value })}
-                        disabled={!isSelected}
-                        className="w-28"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        placeholder="Notes"
-                        value={entry?.notes || ''}
-                        onChange={(e) => updateEntry(employee.id, { notes: e.target.value })}
-                        disabled={!isSelected}
-                        className="w-40"
-                      />
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={entry?.status || ''}
+                          onValueChange={(value: AttendanceStatus) =>
+                            updateEntry(employee.id, { status: value })
+                          }
+                          disabled={!isSelected}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {attendanceStatuses.map((status) => (
+                              <SelectItem key={status} value={status}>
+                                {getAttendanceStatusLabel(status)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="time"
+                          value={entry?.checkIn || ''}
+                          onChange={(e) => updateEntry(employee.id, { checkIn: e.target.value })}
+                          disabled={!isSelected}
+                          className="w-28"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="time"
+                          value={entry?.checkOut || ''}
+                          onChange={(e) => updateEntry(employee.id, { checkOut: e.target.value })}
+                          disabled={!isSelected}
+                          className="w-28"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          placeholder="Notes"
+                          value={entry?.notes || ''}
+                          onChange={(e) => updateEntry(employee.id, { notes: e.target.value })}
+                          disabled={!isSelected}
+                          className="w-40"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                },
+              )}
             </TableBody>
           </Table>
         </CardContent>

@@ -82,7 +82,10 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
   }
 
   const totalQty =
-    transfer.lines?.reduce((sum: number, line: any) => sum + (line.quantity || 0), 0) || 0;
+    transfer.lines?.reduce(
+      (sum: number, line: { quantity?: number }) => sum + (line.quantity || 0),
+      0,
+    ) || 0;
 
   const canComplete = transfer.status === 'PENDING' || transfer.status === 'IN_TRANSIT';
   const canCancel = transfer.status === 'PENDING' || transfer.status === 'IN_TRANSIT';
@@ -240,15 +243,21 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transfer.lines?.map((line: any) => (
-                <TableRow key={line.id}>
-                  <TableCell className="font-medium">{line.item?.name || '-'}</TableCell>
-                  <TableCell className="font-mono text-sm">{line.item?.sku || '-'}</TableCell>
-                  <TableCell className="text-right font-mono font-medium">
-                    {line.quantity}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {transfer.lines?.map(
+                (line: {
+                  id: string;
+                  item?: { name?: string; sku?: string };
+                  quantity: number;
+                }) => (
+                  <TableRow key={line.id}>
+                    <TableCell className="font-medium">{line.item?.name || '-'}</TableCell>
+                    <TableCell className="font-mono text-sm">{line.item?.sku || '-'}</TableCell>
+                    <TableCell className="text-right font-mono font-medium">
+                      {line.quantity}
+                    </TableCell>
+                  </TableRow>
+                ),
+              )}
             </TableBody>
           </Table>
         </CardContent>

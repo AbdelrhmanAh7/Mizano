@@ -92,8 +92,14 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
       : employee.basicSalary;
   const allowances = employee.allowances || [];
   const deductions = employee.deductions || [];
-  const totalAllowances = allowances.reduce((sum: number, a: any) => sum + (a.amount || 0), 0);
-  const totalDeductions = deductions.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
+  const totalAllowances = allowances.reduce(
+    (sum: number, a: { amount?: number }) => sum + (a.amount || 0),
+    0,
+  );
+  const totalDeductions = deductions.reduce(
+    (sum: number, d: { amount?: number }) => sum + (d.amount || 0),
+    0,
+  );
   const grossSalary = basicSalary + totalAllowances;
   const netSalary = grossSalary - totalDeductions;
 
@@ -261,7 +267,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
                         {formatCurrency(basicSalary)}
                       </TableCell>
                     </TableRow>
-                    {allowances.map((a: any, i: number) => (
+                    {allowances.map((a: { name: string; amount: number }, i: number) => (
                       <TableRow key={i}>
                         <TableCell>{a.name}</TableCell>
                         <TableCell className="text-right font-mono">
@@ -289,7 +295,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
                 {deductions.length > 0 ? (
                   <Table>
                     <TableBody>
-                      {deductions.map((d: any, i: number) => (
+                      {deductions.map((d: { name: string; amount: number }, i: number) => (
                         <TableRow key={i}>
                           <TableCell>{d.name}</TableCell>
                           <TableCell className="text-right font-mono text-red-600">
@@ -339,30 +345,40 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {payslips.map((slip: any) => (
-                      <TableRow key={slip.id}>
-                        <TableCell>
-                          {format(new Date(slip.year, slip.month - 1), 'MMMM yyyy')}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(slip.gross)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-red-600">
-                          -{formatCurrency(slip.totalDeductions)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
-                          {formatCurrency(slip.netPay)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{slip.status}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/hr/payslips/${slip.id}`}>View</Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {payslips.map(
+                      (slip: {
+                        id: string;
+                        year: number;
+                        month: number;
+                        gross: number;
+                        totalDeductions: number;
+                        netPay: number;
+                        status: string;
+                      }) => (
+                        <TableRow key={slip.id}>
+                          <TableCell>
+                            {format(new Date(slip.year, slip.month - 1), 'MMMM yyyy')}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatCurrency(slip.gross)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-red-600">
+                            -{formatCurrency(slip.totalDeductions)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium">
+                            {formatCurrency(slip.netPay)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{slip.status}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm" asChild>
+                              <Link href={`/hr/payslips/${slip.id}`}>View</Link>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>

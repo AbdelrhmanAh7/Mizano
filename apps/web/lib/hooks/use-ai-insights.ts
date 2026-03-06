@@ -23,7 +23,7 @@ export interface AIInsight {
   description: string;
   impact?: string;
   recommendation?: string;
-  data?: any;
+  data?: unknown;
   module?: string;
   entityType?: string;
   entityId?: string;

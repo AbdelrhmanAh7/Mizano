@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bankAccountsApi } from '@/lib/api';
 import { toast } from 'sonner';
 
+type ApiError = { response?: { data?: { message?: string } } };
+
 export interface BankAccount {
   id: string;
   accountName: string;
@@ -55,7 +57,7 @@ export function useBankAccount(id: string) {
   });
 }
 
-export function useBankAccountTransactions(id: string, params?: any) {
+export function useBankAccountTransactions(id: string, params?: Record<string, unknown>) {
   return useQuery({
     queryKey: ['bank-accounts', id, 'transactions', params],
     queryFn: async () => {
@@ -75,7 +77,7 @@ export function useCreateBankAccount() {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       toast.success('Bank account created successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create bank account');
     },
   });
@@ -85,12 +87,13 @@ export function useUpdateBankAccount() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => bankAccountsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      bankAccountsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       toast.success('Bank account updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to update bank account');
     },
   });
@@ -105,7 +108,7 @@ export function useDeleteBankAccount() {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       toast.success('Bank account deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to delete bank account');
     },
   });

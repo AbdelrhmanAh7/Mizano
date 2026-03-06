@@ -3,7 +3,7 @@ import api from '@/lib/api';
 export interface UserPreferences {
   id: string;
   userId: string;
-  tourProgress?: Record<string, any>;
+  tourProgress?: Record<string, unknown>;
   tourDismissed: string[];
   lastTourSeenAt?: string;
   theme?: string;

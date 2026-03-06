@@ -117,7 +117,7 @@ export default function NewTimesheetPage() {
                     <SelectValue placeholder="Select project" />
                   </SelectTrigger>
                   <SelectContent>
-                    {projects.map((project: any) => (
+                    {projects.map((project: { id: string; name: string }) => (
                       <SelectItem key={project.id} value={project.id}>
                         {project.name}
                       </SelectItem>
@@ -140,7 +140,7 @@ export default function NewTimesheetPage() {
                     <SelectValue placeholder={tasksLoading ? 'Loading...' : 'Select task'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {tasks.map((task: any) => (
+                    {tasks.map((task: { id: string; name: string }) => (
                       <SelectItem key={task.id} value={task.id}>
                         {task.name}
                       </SelectItem>

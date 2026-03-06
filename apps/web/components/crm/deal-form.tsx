@@ -74,10 +74,11 @@ export function DealForm({ deal }: DealFormProps) {
       });
       toast({ title: 'Deal created successfully' });
       router.push(`/crm/deals/${result?.id || result?.data?.id}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to create deal',
+        description: err.response?.data?.message || 'Failed to create deal',
         variant: 'destructive',
       });
     }
@@ -115,7 +116,7 @@ export function DealForm({ deal }: DealFormProps) {
                   <SelectValue placeholder="Select a lead (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {leads.map((lead: any) => (
+                  {leads.map((lead) => (
                     <SelectItem key={lead.id} value={lead.id}>
                       {lead.leadName} {lead.companyName ? `(${lead.companyName})` : ''}
                     </SelectItem>

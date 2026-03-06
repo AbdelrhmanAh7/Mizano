@@ -6,6 +6,8 @@ import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type JournalStatus = 'DRAFT' | 'POSTED' | 'VOIDED';
 
 export interface JournalLine {
@@ -77,10 +79,12 @@ interface UpdateJournalData {
   }>;
 }
 
+type RawJournal = Omit<Journal, 'entryDate' | 'description' | 'status'>;
+
 /**
  * Transform raw journal data to include computed fields
  */
-function transformJournal(journal: any): Journal {
+function transformJournal(journal: RawJournal): Journal {
   const status: JournalStatus = journal.deletedAt
     ? 'VOIDED'
     : journal.isPosted
@@ -173,7 +177,7 @@ export function useCreateJournal() {
         description: 'The journal entry has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating journal',
@@ -203,7 +207,7 @@ export function useUpdateJournal() {
         description: 'The journal entry has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating journal',
@@ -232,7 +236,7 @@ export function useDeleteJournal() {
         description: 'The journal entry has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting journal',
@@ -262,7 +266,7 @@ export function usePostJournal() {
         description: 'The journal entry has been posted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error posting journal',

@@ -86,10 +86,12 @@ function BOMListPageContent() {
       try {
         await deleteBOM.mutateAsync(selectedBOM.id);
         toast({ title: 'BOM deleted successfully' });
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: 'Error',
-          description: error.response?.data?.message || 'Failed to delete BOM',
+          description:
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+            'Failed to delete BOM',
           variant: 'destructive',
         });
       }

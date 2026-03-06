@@ -25,7 +25,7 @@ export default function NewPriceListPage() {
     defaultValues: { name: '', description: '', type: 'SALES' },
   });
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: Record<string, unknown>) => {
     try {
       await createPriceList.mutateAsync(data);
       router.push('/inventory/price-lists');

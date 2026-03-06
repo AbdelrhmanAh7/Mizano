@@ -11,13 +11,13 @@ export default function NewAssetPage() {
   const router = useRouter();
   const createAsset = useCreateAsset();
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createAsset.mutateAsync({
         ...data,
-        purchasePrice: parseFloat(data.purchasePrice),
-        salvageValue: data.salvageValue ? parseFloat(data.salvageValue) : 0,
-        usefulLifeMonths: parseInt(data.usefulLifeMonths, 10),
+        purchasePrice: parseFloat(data.purchasePrice as string),
+        salvageValue: data.salvageValue ? parseFloat(data.salvageValue as string) : 0,
+        usefulLifeMonths: parseInt(data.usefulLifeMonths as string, 10),
       });
       router.push('/assets');
     } catch {

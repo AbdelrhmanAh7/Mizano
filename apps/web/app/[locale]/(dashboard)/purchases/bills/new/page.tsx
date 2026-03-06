@@ -38,7 +38,7 @@ export default function NewBillPage() {
   const accounts = accountsData?.data || [];
   const items = itemsData?.data || [];
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createBill.mutateAsync(data);
       router.push('/purchases/bills');

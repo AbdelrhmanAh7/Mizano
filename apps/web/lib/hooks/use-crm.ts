@@ -33,7 +33,7 @@ export interface Lead {
   assignedToId?: string;
   assignedTo?: { id: string; name: string; email: string };
   notes?: string;
-  customFields?: Record<string, any>;
+  customFields?: Record<string, unknown>;
   convertedToCustomerId?: string;
   convertedAt?: string;
   createdAt: string;
@@ -87,7 +87,7 @@ export interface CreateLeadDto {
   source: LeadSource;
   assignedToId?: string;
   notes?: string;
-  customFields?: Record<string, any>;
+  customFields?: Record<string, unknown>;
 }
 
 export interface UpdateLeadDto {
@@ -99,7 +99,7 @@ export interface UpdateLeadDto {
   status?: LeadStatus;
   assignedToId?: string;
   notes?: string;
-  customFields?: Record<string, any>;
+  customFields?: Record<string, unknown>;
 }
 
 export interface CreateDealDto {

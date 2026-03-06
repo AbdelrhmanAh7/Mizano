@@ -67,10 +67,12 @@ export default function QuoteDetailPage() {
         description: 'The quote has been deleted.',
       });
       router.push('/sales/quotes');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to delete quote.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to delete quote.',
         variant: 'destructive',
       });
     }
@@ -84,10 +86,12 @@ export default function QuoteDetailPage() {
         title: 'Quote sent',
         description: 'The quote has been marked as sent.',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to send quote.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to send quote.',
         variant: 'destructive',
       });
     }
@@ -100,10 +104,12 @@ export default function QuoteDetailPage() {
         title: 'Quote accepted',
         description: 'The quote has been marked as accepted.',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to accept quote.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to accept quote.',
         variant: 'destructive',
       });
     }
@@ -116,10 +122,12 @@ export default function QuoteDetailPage() {
         title: 'Quote declined',
         description: 'The quote has been marked as declined.',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to decline quote.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to decline quote.',
         variant: 'destructive',
       });
     }
@@ -137,10 +145,12 @@ export default function QuoteDetailPage() {
       if (result.data?.id) {
         router.push(`/sales/invoices/${result.data.id}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to convert quote.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to convert quote.',
         variant: 'destructive',
       });
     }

@@ -96,48 +96,57 @@ export default function BankTransactionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.map((txn: any) => {
-                  const amount = parseFloat(txn.amount?.toString() || '0');
-                  const isDeposit = amount >= 0;
-                  return (
-                    <TableRow key={txn.id}>
-                      <TableCell className="text-sm">
-                        {txn.date ? format(new Date(txn.date), 'MMM d, yyyy') : '-'}
-                      </TableCell>
-                      <TableCell className="max-w-[300px] truncate">
-                        {txn.description || '-'}
-                      </TableCell>
-                      <TableCell>{txn.payee || '-'}</TableCell>
-                      <TableCell className="text-right">
-                        <span
-                          className={cn(
-                            'font-mono font-medium flex items-center justify-end gap-1',
-                            isDeposit ? 'text-green-600' : 'text-red-600',
-                          )}
-                        >
-                          {isDeposit ? (
-                            <ArrowDownLeft className="h-3 w-3" />
-                          ) : (
-                            <ArrowUpRight className="h-3 w-3" />
-                          )}
-                          ${Math.abs(amount).toFixed(2)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={getStatusColor(txn.status)}>
-                          {getStatusLabel(txn.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button size="sm" variant="ghost" asChild>
-                          <Link href={`/banking/transactions/${txn.id}`}>
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {transactions.map(
+                  (txn: {
+                    id: string;
+                    date?: string;
+                    description?: string;
+                    payee?: string;
+                    amount?: string | number;
+                    status: string;
+                  }) => {
+                    const amount = parseFloat(txn.amount?.toString() || '0');
+                    const isDeposit = amount >= 0;
+                    return (
+                      <TableRow key={txn.id}>
+                        <TableCell className="text-sm">
+                          {txn.date ? format(new Date(txn.date), 'MMM d, yyyy') : '-'}
+                        </TableCell>
+                        <TableCell className="max-w-[300px] truncate">
+                          {txn.description || '-'}
+                        </TableCell>
+                        <TableCell>{txn.payee || '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <span
+                            className={cn(
+                              'font-mono font-medium flex items-center justify-end gap-1',
+                              isDeposit ? 'text-green-600' : 'text-red-600',
+                            )}
+                          >
+                            {isDeposit ? (
+                              <ArrowDownLeft className="h-3 w-3" />
+                            ) : (
+                              <ArrowUpRight className="h-3 w-3" />
+                            )}
+                            ${Math.abs(amount).toFixed(2)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getStatusColor(txn.status)}>
+                            {getStatusLabel(txn.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="ghost" asChild>
+                            <Link href={`/banking/transactions/${txn.id}`}>
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  },
+                )}
               </TableBody>
             </Table>
           )}

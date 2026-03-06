@@ -11,7 +11,7 @@ export default function NewVendorPage() {
   const router = useRouter();
   const createVendor = useCreateVendor();
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createVendor.mutateAsync(data);
       router.push('/purchases/vendors');

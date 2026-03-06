@@ -72,7 +72,7 @@ export function AssetForm({ defaultValues, onSubmit, isLoading, mode = 'create' 
               <Label htmlFor="assetType">Asset Type *</Label>
               <Select
                 value={watch('assetType')}
-                onValueChange={(v) => setValue('assetType', v as any)}
+                onValueChange={(v) => setValue('assetType', v as AssetFormData['assetType'])}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -145,7 +145,9 @@ export function AssetForm({ defaultValues, onSubmit, isLoading, mode = 'create' 
               <Label htmlFor="depreciationMethod">Depreciation Method *</Label>
               <Select
                 value={watch('depreciationMethod')}
-                onValueChange={(v) => setValue('depreciationMethod', v as any)}
+                onValueChange={(v) =>
+                  setValue('depreciationMethod', v as AssetFormData['depreciationMethod'])
+                }
               >
                 <SelectTrigger>
                   <SelectValue />

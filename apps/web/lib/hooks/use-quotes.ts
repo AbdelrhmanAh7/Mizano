@@ -6,6 +6,8 @@ import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type QuoteStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'INVOICED' | 'DECLINED' | 'EXPIRED';
 
 export interface QuoteLine {
@@ -144,7 +146,7 @@ export function useCreateQuote() {
         description: 'The quote has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating quote',
@@ -174,7 +176,7 @@ export function useUpdateQuote() {
         description: 'The quote has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating quote',
@@ -203,7 +205,7 @@ export function useDeleteQuote() {
         description: 'The quote has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting quote',
@@ -233,7 +235,7 @@ export function useSendQuote() {
         description: 'The quote has been sent successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error sending quote',
@@ -263,7 +265,7 @@ export function useAcceptQuote() {
         description: 'The quote has been marked as accepted.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error accepting quote',
@@ -293,7 +295,7 @@ export function useDeclineQuote() {
         description: 'The quote has been marked as declined.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error declining quote',
@@ -324,7 +326,7 @@ export function useConvertToInvoice() {
         description: 'The quote has been converted to an invoice.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error converting quote',

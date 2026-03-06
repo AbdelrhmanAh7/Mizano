@@ -5,6 +5,8 @@ import { warehousesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export interface Warehouse {
   id: string;
   name: string;
@@ -118,7 +120,7 @@ export function useCreateWarehouse() {
         description: 'The warehouse has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating warehouse',
@@ -148,7 +150,7 @@ export function useUpdateWarehouse() {
         description: 'The warehouse has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating warehouse',
@@ -177,7 +179,7 @@ export function useDeleteWarehouse() {
         description: 'The warehouse has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting warehouse',

@@ -195,10 +195,12 @@ function BillsPageContent() {
           title: 'Bill deleted',
           description: `Bill ${billToDelete.billNumber} has been deleted.`,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: 'Error',
-          description: error.response?.data?.message || 'Failed to delete bill.',
+          description:
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+            'Failed to delete bill.',
           variant: 'destructive',
         });
       }

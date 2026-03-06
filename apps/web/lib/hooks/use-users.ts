@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
+type ApiError = { response?: { data?: { message?: string } } };
+
 interface UserParams {
   page?: number;
   limit?: number;
@@ -75,7 +77,7 @@ export function useCreateUser() {
         description: 'The user has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating user',
@@ -105,7 +107,7 @@ export function useUpdateUser() {
         description: 'The user has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating user',
@@ -134,7 +136,7 @@ export function useDeleteUser() {
         description: 'The user has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting user',

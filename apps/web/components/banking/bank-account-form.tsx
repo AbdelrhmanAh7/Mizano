@@ -34,7 +34,7 @@ type BankAccountFormData = z.infer<typeof bankAccountSchema>;
 interface BankAccountFormProps {
   account?: BankAccount | null;
   glAccounts: Array<{ id: string; name: string; code: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: BankAccountFormData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -105,7 +105,9 @@ export function BankAccountForm({
               <Label htmlFor="accountType">Account Type *</Label>
               <Select
                 value={form.watch('accountType')}
-                onValueChange={(value: any) => form.setValue('accountType', value)}
+                onValueChange={(value: BankAccountFormData['accountType']) =>
+                  form.setValue('accountType', value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />

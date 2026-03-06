@@ -73,10 +73,12 @@ export default function LeadDetailPage() {
       await deleteLead.mutateAsync(leadId);
       toast({ title: 'Lead deleted' });
       router.push('/crm/leads');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to delete lead',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to delete lead',
         variant: 'destructive',
       });
     }
@@ -89,10 +91,12 @@ export default function LeadDetailPage() {
       toast({ title: 'Lead converted to customer successfully' });
       setConvertDialogOpen(false);
       router.push('/crm/leads');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to convert lead',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to convert lead',
         variant: 'destructive',
       });
     }

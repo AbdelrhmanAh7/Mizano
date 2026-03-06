@@ -172,68 +172,79 @@ export default function AssetsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {assets.map((asset: any) => (
-                  <TableRow key={asset.id}>
-                    <TableCell className="font-mono text-sm">{asset.assetNumber}</TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/assets/${asset.id}`}
-                        className="font-medium text-blue-600 hover:underline"
-                      >
-                        {asset.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{getAssetTypeLabel(asset.assetType)}</TableCell>
-                    <TableCell>{getDepreciationMethodLabel(asset.depreciationMethod)}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(asset.purchasePrice)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(asset.currentBookValue)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={getAssetStatusColor(asset.status)}>
-                        {getAssetStatusLabel(asset.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="ghost" asChild>
-                          <Link href={`/assets/${asset.id}`}>
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        {asset.status === 'ACTIVE' && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="sm" variant="ghost" className="text-red-600">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Asset</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure? This can only be done if no depreciation has been
-                                  posted.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deleteAsset.mutate(asset.id)}
-                                  className="bg-red-600 hover:bg-red-700"
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {assets.map(
+                  (asset: {
+                    id: string;
+                    assetNumber: string;
+                    name: string;
+                    assetType: string;
+                    depreciationMethod: string;
+                    purchasePrice: number;
+                    currentBookValue: number;
+                    status: string;
+                  }) => (
+                    <TableRow key={asset.id}>
+                      <TableCell className="font-mono text-sm">{asset.assetNumber}</TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/assets/${asset.id}`}
+                          className="font-medium text-blue-600 hover:underline"
+                        >
+                          {asset.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{getAssetTypeLabel(asset.assetType)}</TableCell>
+                      <TableCell>{getDepreciationMethodLabel(asset.depreciationMethod)}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(asset.purchasePrice)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(asset.currentBookValue)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={getAssetStatusColor(asset.status)}>
+                          {getAssetStatusLabel(asset.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="ghost" asChild>
+                            <Link href={`/assets/${asset.id}`}>
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          {asset.status === 'ACTIVE' && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="ghost" className="text-red-600">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Asset</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure? This can only be done if no depreciation has been
+                                    posted.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteAsset.mutate(asset.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ),
+                )}
               </TableBody>
             </Table>
           )}

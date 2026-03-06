@@ -66,17 +66,18 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
   const handleSubmit = async (data: TaxRateFormData) => {
     try {
       if (taxRate) {
-        await updateTaxRate.mutateAsync({ id: taxRate.id, data: data as any });
+        await updateTaxRate.mutateAsync({ id: taxRate.id, data });
         toast({ title: 'Tax rate updated successfully' });
       } else {
-        await createTaxRate.mutateAsync(data as any);
+        await createTaxRate.mutateAsync(data);
         toast({ title: 'Tax rate created successfully' });
       }
       onSuccess?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to save tax rate',
+        description: err.response?.data?.message || 'Failed to save tax rate',
         variant: 'destructive',
       });
     }
@@ -114,7 +115,7 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
           <Label>Type *</Label>
           <Select
             value={form.watch('type')}
-            onValueChange={(value) => form.setValue('type', value as any)}
+            onValueChange={(value) => form.setValue('type', value as TaxRateFormData['type'])}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select type" />
@@ -139,7 +140,7 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
             <SelectValue placeholder="Select account" />
           </SelectTrigger>
           <SelectContent>
-            {accounts.map((account: any) => (
+            {accounts.map((account) => (
               <SelectItem key={account.id} value={account.id}>
                 {account.code} - {account.name}
               </SelectItem>

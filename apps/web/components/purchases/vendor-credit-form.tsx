@@ -56,7 +56,7 @@ interface VendorCreditFormProps {
   vendors: Array<{ id: string; name: string; currency: string }>;
   accounts: Array<{ id: string; name: string; code: string; type: string }>;
   items: Array<{ id: string; name: string; sku: string | null; purchasePrice: string | null }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
   preselectedVendorId?: string;

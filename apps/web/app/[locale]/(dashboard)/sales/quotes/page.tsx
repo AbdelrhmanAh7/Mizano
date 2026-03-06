@@ -161,10 +161,12 @@ function QuotesPageContent() {
           title: 'Quote deleted',
           description: `Quote ${quoteToDelete.quoteNumber} has been deleted.`,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: 'Error',
-          description: error.response?.data?.message || 'Failed to delete quote.',
+          description:
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+            'Failed to delete quote.',
           variant: 'destructive',
         });
       }
@@ -180,10 +182,12 @@ function QuotesPageContent() {
         title: 'Quote sent',
         description: `Quote ${quote.quoteNumber} has been marked as sent.`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to send quote.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to send quote.',
         variant: 'destructive',
       });
     }
@@ -196,10 +200,12 @@ function QuotesPageContent() {
         title: 'Quote accepted',
         description: `Quote ${quote.quoteNumber} has been marked as accepted.`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to accept quote.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to accept quote.',
         variant: 'destructive',
       });
     }
@@ -212,10 +218,12 @@ function QuotesPageContent() {
         title: 'Quote declined',
         description: `Quote ${quote.quoteNumber} has been marked as declined.`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to decline quote.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to decline quote.',
         variant: 'destructive',
       });
     }
@@ -229,10 +237,12 @@ function QuotesPageContent() {
         description: `Quote ${quote.quoteNumber} has been converted to invoice.`,
       });
       // Optionally navigate to the new invoice
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to convert quote.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to convert quote.',
         variant: 'destructive',
       });
     }

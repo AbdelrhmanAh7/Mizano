@@ -60,7 +60,7 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
 
   const [editDialogOpen, setEditDialogOpen] = useState(isEditing);
 
-  const handleUpdate = async (data: any) => {
+  const handleUpdate = async (data: Record<string, unknown>) => {
     await updateWarehouse.mutateAsync({ id, data });
     setEditDialogOpen(false);
     router.replace(`/inventory/warehouses/${id}`);

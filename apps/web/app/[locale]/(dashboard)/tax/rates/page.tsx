@@ -80,10 +80,12 @@ export default function TaxRatesPage() {
       try {
         await deleteTaxRate.mutateAsync(selectedRate.id);
         toast({ title: 'Tax rate deleted successfully' });
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: 'Error',
-          description: error.response?.data?.message || 'Failed to delete tax rate',
+          description:
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+            'Failed to delete tax rate',
           variant: 'destructive',
         });
       }

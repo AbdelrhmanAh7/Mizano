@@ -5,6 +5,8 @@ import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+type ApiError = { response?: { data?: { message?: string } } };
+
 export interface BankTransaction {
   id: string;
   bankAccountId: string;
@@ -122,7 +124,7 @@ export function useMatchTransaction() {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       toast.success('Transaction matched successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to match transaction');
     },
   });
@@ -138,7 +140,7 @@ export function useUnmatchTransaction() {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       toast.success('Transaction unmatched successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to unmatch transaction');
     },
   });
@@ -153,7 +155,7 @@ export function useExcludeTransaction() {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       toast.success('Transaction excluded');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to exclude transaction');
     },
   });
@@ -163,14 +165,14 @@ export function useCreateExpenseFromTransaction() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
       bankTransactionsApi.createExpense(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       toast.success('Expense created and matched');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create expense');
     },
   });
@@ -190,7 +192,7 @@ export function useImportTransactions() {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       toast.success('Transactions imported successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to import transactions');
     },
   });

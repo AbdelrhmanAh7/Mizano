@@ -83,10 +83,12 @@ export default function InvoiceDetailPage() {
     try {
       await deleteInvoice.mutateAsync(invoiceId);
       router.push('/sales/invoices');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to delete invoice',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to delete invoice',
         variant: 'destructive',
       });
     }
@@ -96,10 +98,12 @@ export default function InvoiceDetailPage() {
   const confirmSend = async () => {
     try {
       await sendInvoice.mutateAsync(invoiceId);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to send invoice',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to send invoice',
         variant: 'destructive',
       });
     }
@@ -109,10 +113,12 @@ export default function InvoiceDetailPage() {
   const confirmVoid = async () => {
     try {
       await voidInvoice.mutateAsync(invoiceId);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to void invoice',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to void invoice',
         variant: 'destructive',
       });
     }
@@ -173,8 +179,9 @@ export default function InvoiceDetailPage() {
   const isPaid = invoice.status === 'PAID';
 
   // Get payment allocations and credit notes from the invoice response
-  const paymentAllocations = (invoice as any).paymentAllocations || [];
-  const creditNotes = (invoice as any).creditNotes || [];
+  const paymentAllocations =
+    (invoice as { paymentAllocations?: unknown[] }).paymentAllocations || [];
+  const creditNotes = (invoice as { creditNotes?: unknown[] }).creditNotes || [];
 
   return (
     <div className="space-y-6">
@@ -316,35 +323,49 @@ export default function InvoiceDetailPage() {
               </TableHeader>
               <TableBody>
                 {invoice.lines && invoice.lines.length > 0 ? (
-                  invoice.lines.map((line: any, index: number) => (
-                    <TableRow key={line.id || index}>
-                      <TableCell>
-                        <div>
-                          {line.item && (
-                            <span className="text-xs text-muted-foreground block">
-                              {line.item.sku}
-                            </span>
-                          )}
-                          {line.description}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {parseFloat(line.quantity || '0').toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatCurrency(line.rate || '0')}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {parseFloat(line.discount || '0').toFixed(0)}%
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {parseFloat(line.taxRate || '0').toFixed(0)}%
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        {formatCurrency(line.amount || '0')}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  invoice.lines.map(
+                    (
+                      line: {
+                        id?: string;
+                        item?: { sku?: string };
+                        description?: string;
+                        quantity?: string;
+                        rate?: string;
+                        discount?: string;
+                        taxRate?: string;
+                        amount?: string;
+                      },
+                      index: number,
+                    ) => (
+                      <TableRow key={line.id || index}>
+                        <TableCell>
+                          <div>
+                            {line.item && (
+                              <span className="text-xs text-muted-foreground block">
+                                {line.item.sku}
+                              </span>
+                            )}
+                            {line.description}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {parseFloat(line.quantity || '0').toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatCurrency(line.rate || '0')}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {parseFloat(line.discount || '0').toFixed(0)}%
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {parseFloat(line.taxRate || '0').toFixed(0)}%
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-medium">
+                          {formatCurrency(line.amount || '0')}
+                        </TableCell>
+                      </TableRow>
+                    ),
+                  )
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
@@ -499,26 +520,32 @@ export default function InvoiceDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paymentAllocations.map((allocation: any) => (
-                  <TableRow key={allocation.id}>
-                    <TableCell>
-                      <Link
-                        href={`/sales/payments/${allocation.payment?.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {allocation.payment?.paymentNumber}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {allocation.payment?.date
-                        ? format(new Date(allocation.payment.date), 'MMM d, yyyy')
-                        : '-'}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-green-600">
-                      {formatCurrency(allocation.amount || '0')}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {paymentAllocations.map(
+                  (allocation: {
+                    id: string;
+                    payment?: { id?: string; paymentNumber?: string; date?: string };
+                    amount?: string;
+                  }) => (
+                    <TableRow key={allocation.id}>
+                      <TableCell>
+                        <Link
+                          href={`/sales/payments/${allocation.payment?.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {allocation.payment?.paymentNumber}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        {allocation.payment?.date
+                          ? format(new Date(allocation.payment.date), 'MMM d, yyyy')
+                          : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-green-600">
+                        {formatCurrency(allocation.amount || '0')}
+                      </TableCell>
+                    </TableRow>
+                  ),
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -544,24 +571,31 @@ export default function InvoiceDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {creditNotes.map((creditNote: any) => (
-                  <TableRow key={creditNote.id}>
-                    <TableCell>
-                      <Link
-                        href={`/sales/credit-notes/${creditNote.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {creditNote.creditNoteNumber}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {creditNote.date ? format(new Date(creditNote.date), 'MMM d, yyyy') : '-'}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-orange-600">
-                      {formatCurrency(creditNote.amount || '0')}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {creditNotes.map(
+                  (creditNote: {
+                    id: string;
+                    creditNoteNumber?: string;
+                    date?: string;
+                    total?: string;
+                  }) => (
+                    <TableRow key={creditNote.id}>
+                      <TableCell>
+                        <Link
+                          href={`/sales/credit-notes/${creditNote.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {creditNote.creditNoteNumber}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        {creditNote.date ? format(new Date(creditNote.date), 'MMM d, yyyy') : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-orange-600">
+                        {formatCurrency(creditNote.amount || '0')}
+                      </TableCell>
+                    </TableRow>
+                  ),
+                )}
               </TableBody>
             </Table>
           </CardContent>

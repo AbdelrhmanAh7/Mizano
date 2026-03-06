@@ -22,7 +22,7 @@ export default function NewQuotePage() {
     { id: 'vat-0', name: 'VAT 0%', rate: 0 },
   ];
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       const result = await createQuote.mutateAsync(data);
       toast({
@@ -30,10 +30,12 @@ export default function NewQuotePage() {
         description: 'The quote has been created successfully.',
       });
       router.push(`/sales/quotes/${result.data?.id || ''}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to create quote.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to create quote.',
         variant: 'destructive',
       });
     }

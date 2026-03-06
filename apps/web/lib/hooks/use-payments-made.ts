@@ -6,6 +6,8 @@ import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export interface BillAllocation {
   billId: string;
   amount: string;
@@ -156,7 +158,7 @@ export function useCreatePaymentMade() {
         description: 'The payment has been recorded successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error recording payment',
@@ -187,7 +189,7 @@ export function useDeletePaymentMade() {
         description: 'The payment has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting payment',

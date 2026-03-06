@@ -103,16 +103,52 @@ export interface DashboardStatsResult {
  * Transform raw dashboard API response into the typed result.
  * Shared between client-side hook and server-side prefetch.
  */
-export function transformDashboardOverview(overview: any): DashboardStatsResult {
+interface DashboardOverviewResponse {
+  bankBalances?: Array<{ systemBalance?: number }>;
+  alerts?: { overdueInvoices?: number; overdueBills?: number; activeProjects?: number };
+  recentActivity?: {
+    invoices?: Array<{
+      id: string;
+      invoiceNumber: string;
+      customer?: { name: string };
+      grandTotal?: string;
+      total?: string;
+      createdAt: string;
+    }>;
+    bills?: Array<{
+      id: string;
+      billNumber: string;
+      vendor?: { name: string };
+      grandTotal?: string;
+      total?: string;
+      createdAt: string;
+    }>;
+  };
+  overview?: {
+    monthlyRevenue?: number;
+    monthlyExpenses?: number;
+    monthlyProfit?: number;
+    totalReceivables?: number;
+    totalPayables?: number;
+  };
+  trends?: { revenue?: Trend; expenses?: Trend; profit?: Trend };
+}
+
+export function transformDashboardOverview(
+  overview: DashboardOverviewResponse,
+): DashboardStatsResult {
   const now = new Date();
 
   const bankBalanceTotal = Array.isArray(overview.bankBalances)
-    ? overview.bankBalances.reduce((sum: number, b: any) => sum + (b.systemBalance || 0), 0)
+    ? overview.bankBalances.reduce(
+        (sum: number, b: { systemBalance?: number }) => sum + (b.systemBalance || 0),
+        0,
+      )
     : 0;
 
   // Build alerts from overview
   const alerts: AIAlert[] = [];
-  if (overview.alerts?.overdueInvoices > 0) {
+  if ((overview.alerts?.overdueInvoices ?? 0) > 0) {
     alerts.push({
       id: 'overdue-invoices',
       type: 'OVERDUE_INVOICE',
@@ -122,7 +158,7 @@ export function transformDashboardOverview(overview: any): DashboardStatsResult 
       createdAt: now.toISOString(),
     });
   }
-  if (overview.alerts?.overdueBills > 0) {
+  if ((overview.alerts?.overdueBills ?? 0) > 0) {
     alerts.push({
       id: 'overdue-bills',
       type: 'OVERDUE_BILL',
@@ -222,12 +258,14 @@ export function useDashboardRevenue() {
       const res = await api.get('/reports/dashboard/revenue-chart?months=6');
       const data = res.data?.data ?? res.data;
       return Array.isArray(data)
-        ? data.map((r: any) => ({
-            month: r.month,
-            revenue: r.revenue || 0,
-            expenses: r.expenses || 0,
-            profit: r.profit || 0,
-          }))
+        ? data.map(
+            (r: { month: string; revenue?: number; expenses?: number; profit?: number }) => ({
+              month: r.month,
+              revenue: r.revenue || 0,
+              expenses: r.expenses || 0,
+              profit: r.profit || 0,
+            }),
+          )
         : [];
     },
     refetchInterval: REFETCH_INTERVAL,
@@ -269,9 +307,11 @@ export function useDashboardExpenses() {
         `/reports/dashboard/expenses-by-category?startDate=${startOfMonth}&endDate=${endOfMonth}`,
       );
       const data = res.data?.data ?? res.data;
-      const expenseArray = Array.isArray(data) ? data : [];
-      const total = expenseArray.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
-      return expenseArray.slice(0, 5).map((e: any) => ({
+      const expenseArray: Array<{ category?: string; amount?: number }> = Array.isArray(data)
+        ? data
+        : [];
+      const total = expenseArray.reduce((sum: number, e) => sum + (e.amount || 0), 0);
+      return expenseArray.slice(0, 5).map((e) => ({
         name: e.category || 'Other',
         amount: e.amount || 0,
         percentage: total > 0 ? Math.round(((e.amount || 0) / total) * 100) : 0,
@@ -292,12 +332,14 @@ export function useDashboardCustomers() {
       const res = await api.get('/reports/dashboard/top-customers?limit=5');
       const data = res.data?.data ?? res.data;
       return Array.isArray(data)
-        ? data.map((c: any) => ({
-            id: c.id,
-            name: c.name,
-            totalRevenue: c.totalRevenue || 0,
-            invoiceCount: c.invoiceCount || 0,
-          }))
+        ? data.map(
+            (c: { id: string; name: string; totalRevenue?: number; invoiceCount?: number }) => ({
+              id: c.id,
+              name: c.name,
+              totalRevenue: c.totalRevenue || 0,
+              invoiceCount: c.invoiceCount || 0,
+            }),
+          )
         : [];
     },
     refetchInterval: REFETCH_INTERVAL,
@@ -315,7 +357,10 @@ export function useDashboardBanking() {
       const res = await api.get('/reports/dashboard/bank-balance-trend?months=6');
       const data = res.data?.data ?? res.data;
       return Array.isArray(data)
-        ? data.map((b: any) => ({ month: b.month, balance: b.balance || 0 }))
+        ? data.map((b: { month: string; balance?: number }) => ({
+            month: b.month,
+            balance: b.balance || 0,
+          }))
         : [];
     },
     refetchInterval: REFETCH_INTERVAL,
@@ -333,7 +378,7 @@ export function useDashboardInventory() {
       const res = await api.get('/reports/dashboard/inventory-value-trend?months=6');
       const data = res.data?.data ?? res.data;
       return Array.isArray(data)
-        ? data.map((i: any) => ({
+        ? data.map((i: { month: string; value?: number; itemCount?: number }) => ({
             month: i.month,
             value: i.value || 0,
             itemCount: i.itemCount || 0,
@@ -383,7 +428,9 @@ export function useDashboard() {
 /**
  * Aggregate daily cash flow data into monthly buckets.
  */
-function aggregateCashFlowByMonth(daily: any[]): CashFlowPoint[] {
+function aggregateCashFlowByMonth(
+  daily: Array<{ date: string; cashIn?: number; cashOut?: number }>,
+): CashFlowPoint[] {
   const byMonth: Record<string, { inflow: number; outflow: number }> = {};
   const monthFormatter = new Intl.DateTimeFormat('default', { month: 'short' });
 

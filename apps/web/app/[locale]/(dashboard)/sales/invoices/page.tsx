@@ -208,10 +208,12 @@ function InvoicesPageContent() {
     if (selectedInvoice) {
       try {
         await deleteInvoice.mutateAsync(selectedInvoice.id);
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: 'Error',
-          description: error.response?.data?.message || 'Failed to delete invoice',
+          description:
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+            'Failed to delete invoice',
           variant: 'destructive',
         });
       }
@@ -224,10 +226,12 @@ function InvoicesPageContent() {
     if (selectedInvoice) {
       try {
         await sendInvoice.mutateAsync(selectedInvoice.id);
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: 'Error',
-          description: error.response?.data?.message || 'Failed to send invoice',
+          description:
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+            'Failed to send invoice',
           variant: 'destructive',
         });
       }
@@ -240,10 +244,12 @@ function InvoicesPageContent() {
     if (selectedInvoice) {
       try {
         await voidInvoice.mutateAsync(selectedInvoice.id);
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: 'Error',
-          description: error.response?.data?.message || 'Failed to void invoice',
+          description:
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+            'Failed to void invoice',
           variant: 'destructive',
         });
       }

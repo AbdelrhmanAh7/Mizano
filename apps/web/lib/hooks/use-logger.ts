@@ -44,7 +44,7 @@ async function captureToBackend(params: {
   source: LogSource;
   message: string;
   stack?: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   url?: string;
   statusCode?: number;
 }) {
@@ -141,7 +141,7 @@ export function useLogger() {
   });
 
   // Capture frontend error
-  const captureError = useCallback((error: Error, context?: Record<string, any>) => {
+  const captureError = useCallback((error: Error, context?: Record<string, unknown>) => {
     const fp = createClientFingerprint(error.message, LogSource.FRONTEND);
     if (capturedErrors.current.has(fp)) return;
     capturedErrors.current.add(fp);
@@ -166,7 +166,7 @@ export function useLogger() {
   }, []);
 
   // Capture frontend warning
-  const captureWarning = useCallback((message: string, context?: Record<string, any>) => {
+  const captureWarning = useCallback((message: string, context?: Record<string, unknown>) => {
     const fp = createClientFingerprint(message, LogSource.FRONTEND);
     if (capturedErrors.current.has(fp)) return;
     capturedErrors.current.add(fp);
@@ -189,7 +189,7 @@ export function useLogger() {
   }, []);
 
   // Capture AI model error
-  const captureAiError = useCallback((error: Error, modelContext?: Record<string, any>) => {
+  const captureAiError = useCallback((error: Error, modelContext?: Record<string, unknown>) => {
     captureToBackend({
       level: LogLevel.ERROR,
       source: LogSource.AI_MODEL,

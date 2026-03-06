@@ -75,11 +75,11 @@ function VendorsPageContent() {
           title: 'Vendor deleted',
           description: `${vendorToDelete.name} has been deleted.`,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: 'Error',
           description:
-            error.response?.data?.message ||
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
             'Failed to delete vendor. They may have associated transactions.',
           variant: 'destructive',
         });

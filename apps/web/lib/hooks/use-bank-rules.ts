@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bankRulesApi } from '@/lib/api';
 import { toast } from 'sonner';
 
+type ApiError = { response?: { data?: { message?: string } } };
+
 export interface BankRule {
   id: string;
   name: string;
@@ -68,7 +70,7 @@ export function useCreateBankRule() {
       queryClient.invalidateQueries({ queryKey: ['bank-rules'] });
       toast.success('Bank rule created successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create bank rule');
     },
   });
@@ -78,12 +80,13 @@ export function useUpdateBankRule() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => bankRulesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      bankRulesApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-rules'] });
       toast.success('Bank rule updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to update bank rule');
     },
   });
@@ -98,7 +101,7 @@ export function useDeleteBankRule() {
       queryClient.invalidateQueries({ queryKey: ['bank-rules'] });
       toast.success('Bank rule deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to delete bank rule');
     },
   });
@@ -107,7 +110,7 @@ export function useDeleteBankRule() {
 export function useTestBankRule() {
   return useMutation({
     mutationFn: bankRulesApi.test,
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to test bank rule');
     },
   });
@@ -122,7 +125,7 @@ export function useReorderBankRules() {
       queryClient.invalidateQueries({ queryKey: ['bank-rules'] });
       toast.success('Rules reordered successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to reorder rules');
     },
   });

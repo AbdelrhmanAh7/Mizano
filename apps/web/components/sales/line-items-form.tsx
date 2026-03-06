@@ -12,7 +12,13 @@ import {
 } from '@/components/ui/select';
 import { Item, useActiveItems } from '@/lib/hooks/use-items';
 import { Plus, Trash2 } from 'lucide-react';
-import { Control, useFieldArray, UseFormSetValue, UseFormWatch } from 'react-hook-form';
+import {
+  Control,
+  FieldValues,
+  useFieldArray,
+  UseFormSetValue,
+  UseFormWatch,
+} from 'react-hook-form';
 
 export interface LineItem {
   itemId?: string;
@@ -31,9 +37,9 @@ interface TaxRate {
 }
 
 interface LineItemsFormProps {
-  control: Control<any>;
-  watch: UseFormWatch<any>;
-  setValue: UseFormSetValue<any>;
+  control: Control<FieldValues>;
+  watch: UseFormWatch<FieldValues>;
+  setValue: UseFormSetValue<FieldValues>;
   name: string;
   taxRates?: TaxRate[];
   currency?: string;

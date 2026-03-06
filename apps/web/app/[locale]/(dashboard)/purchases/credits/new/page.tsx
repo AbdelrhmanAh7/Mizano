@@ -44,7 +44,7 @@ export default function NewVendorCreditPage() {
   const accounts = accountsData?.data || [];
   const items = itemsData?.data || [];
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createCredit.mutateAsync(data);
       router.push('/purchases/credits');

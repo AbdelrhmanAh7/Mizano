@@ -35,7 +35,7 @@ export default function NewPaymentMadePage() {
   const vendors = vendorsData?.data || [];
   const accounts = accountsData?.data || [];
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createPayment.mutateAsync(data);
       router.push('/purchases/payments');

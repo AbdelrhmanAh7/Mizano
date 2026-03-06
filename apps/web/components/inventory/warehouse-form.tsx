@@ -29,7 +29,7 @@ type WarehouseFormData = z.infer<typeof warehouseSchema>;
 
 interface WarehouseFormProps {
   warehouse?: Warehouse | null;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: WarehouseFormData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }

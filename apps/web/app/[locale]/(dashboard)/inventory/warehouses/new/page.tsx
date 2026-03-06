@@ -11,7 +11,7 @@ export default function NewWarehousePage() {
   const router = useRouter();
   const createWarehouse = useCreateWarehouse();
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createWarehouse.mutateAsync(data);
       router.push('/inventory/warehouses');

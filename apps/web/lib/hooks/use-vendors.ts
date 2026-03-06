@@ -6,6 +6,8 @@ import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export interface VendorAddress {
   street: string | null;
   city: string | null;
@@ -155,7 +157,7 @@ export function useCreateVendor() {
         description: 'The vendor has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating vendor',
@@ -200,7 +202,7 @@ export function useUpdateVendor() {
         description: 'The vendor has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating vendor',
@@ -229,7 +231,7 @@ export function useDeleteVendor() {
         description: 'The vendor has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting vendor',

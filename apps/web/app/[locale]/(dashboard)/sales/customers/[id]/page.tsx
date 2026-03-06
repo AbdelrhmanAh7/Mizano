@@ -80,11 +80,11 @@ export default function CustomerDetailPage() {
         description: 'The customer has been deleted.',
       });
       router.push('/sales/customers');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
         description:
-          error.response?.data?.message ||
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           'Failed to delete customer. They may have associated transactions.',
         variant: 'destructive',
       });
@@ -336,31 +336,47 @@ export default function CustomerDetailPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {invoices.map((invoice: any) => (
-                      <TableRow key={invoice.id}>
-                        <TableCell>
-                          <Link
-                            href={`/sales/invoices/${invoice.id}`}
-                            className="font-medium hover:underline"
-                          >
-                            {invoice.invoiceNumber}
-                          </Link>
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(invoice.invoiceDate), 'MMM d, yyyy')}
-                        </TableCell>
-                        <TableCell>{format(new Date(invoice.dueDate), 'MMM d, yyyy')}</TableCell>
-                        <TableCell>
-                          <InvoiceStatusBadge status={invoice.status} />
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(parseFloat(invoice.grandTotal || '0'), customer.currency)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(parseFloat(invoice.balanceDue || '0'), customer.currency)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {invoices.map(
+                      (invoice: {
+                        id: string;
+                        invoiceNumber: string;
+                        invoiceDate: string;
+                        dueDate: string;
+                        status: string;
+                        grandTotal?: string;
+                        balanceDue?: string;
+                      }) => (
+                        <TableRow key={invoice.id}>
+                          <TableCell>
+                            <Link
+                              href={`/sales/invoices/${invoice.id}`}
+                              className="font-medium hover:underline"
+                            >
+                              {invoice.invoiceNumber}
+                            </Link>
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(invoice.invoiceDate), 'MMM d, yyyy')}
+                          </TableCell>
+                          <TableCell>{format(new Date(invoice.dueDate), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>
+                            <InvoiceStatusBadge status={invoice.status} />
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatCurrency(
+                              parseFloat(invoice.grandTotal || '0'),
+                              customer.currency,
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatCurrency(
+                              parseFloat(invoice.balanceDue || '0'),
+                              customer.currency,
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )}
                   </TableBody>
                 </Table>
               )}
@@ -397,26 +413,35 @@ export default function CustomerDetailPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {payments.map((payment: any) => (
-                      <TableRow key={payment.id}>
-                        <TableCell>
-                          <Link
-                            href={`/sales/payments/${payment.id}`}
-                            className="font-medium hover:underline"
-                          >
-                            {payment.paymentNumber}
-                          </Link>
-                        </TableCell>
-                        <TableCell>
-                          {format(new Date(payment.paymentDate), 'MMM d, yyyy')}
-                        </TableCell>
-                        <TableCell>{payment.paymentMode?.replace('_', ' ')}</TableCell>
-                        <TableCell>{payment.reference || '-'}</TableCell>
-                        <TableCell className="text-right font-mono text-green-600">
-                          {formatCurrency(parseFloat(payment.amount || '0'), customer.currency)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {payments.map(
+                      (payment: {
+                        id: string;
+                        paymentNumber: string;
+                        paymentDate: string;
+                        paymentMode?: string;
+                        reference?: string;
+                        amount?: string;
+                      }) => (
+                        <TableRow key={payment.id}>
+                          <TableCell>
+                            <Link
+                              href={`/sales/payments/${payment.id}`}
+                              className="font-medium hover:underline"
+                            >
+                              {payment.paymentNumber}
+                            </Link>
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(payment.paymentDate), 'MMM d, yyyy')}
+                          </TableCell>
+                          <TableCell>{payment.paymentMode?.replace('_', ' ')}</TableCell>
+                          <TableCell>{payment.reference || '-'}</TableCell>
+                          <TableCell className="text-right font-mono text-green-600">
+                            {formatCurrency(parseFloat(payment.amount || '0'), customer.currency)}
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )}
                   </TableBody>
                 </Table>
               )}

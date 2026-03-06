@@ -75,60 +75,70 @@ export default function PriceListsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {priceLists.map((pl: any) => (
-                  <TableRow key={pl.id}>
-                    <TableCell>
-                      <Link
-                        href={`/inventory/price-lists/${pl.id}`}
-                        className="font-medium text-blue-600 hover:underline"
-                      >
-                        {pl.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{pl.type === 'SALES' ? 'Sales' : 'Purchase'}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={pl.isActive ? 'default' : 'secondary'}>
-                        {pl.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{pl.items?.length || 0} items</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="ghost" asChild>
-                          <Link href={`/inventory/price-lists/${pl.id}`}>
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="ghost" className="text-red-600">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Price List</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure? This will permanently delete this price list.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deletePriceList.mutate(pl.id)}
-                                className="bg-red-600 hover:bg-red-700"
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {priceLists.map(
+                  (pl: {
+                    id: string;
+                    name: string;
+                    type: string;
+                    isActive: boolean;
+                    items?: unknown[];
+                  }) => (
+                    <TableRow key={pl.id}>
+                      <TableCell>
+                        <Link
+                          href={`/inventory/price-lists/${pl.id}`}
+                          className="font-medium text-blue-600 hover:underline"
+                        >
+                          {pl.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {pl.type === 'SALES' ? 'Sales' : 'Purchase'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={pl.isActive ? 'default' : 'secondary'}>
+                          {pl.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{pl.items?.length || 0} items</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="ghost" asChild>
+                            <Link href={`/inventory/price-lists/${pl.id}`}>
+                              <Eye className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="ghost" className="text-red-600">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Price List</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure? This will permanently delete this price list.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deletePriceList.mutate(pl.id)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ),
+                )}
               </TableBody>
             </Table>
           )}

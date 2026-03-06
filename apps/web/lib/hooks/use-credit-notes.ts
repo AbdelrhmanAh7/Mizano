@@ -6,6 +6,8 @@ import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type CreditNoteType = 'REFUND' | 'APPLY_TO_INVOICE';
 
 export interface CreditNote {
@@ -124,7 +126,7 @@ export function useCreateCreditNote() {
         description: 'The credit note has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating credit note',

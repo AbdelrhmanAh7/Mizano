@@ -39,7 +39,7 @@ type TaskFormData = z.infer<typeof taskSchema>;
 
 interface TaskFormProps {
   task?: Task | null;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -114,7 +114,7 @@ export function TaskForm({ task, onSubmit, onCancel, isSubmitting }: TaskFormPro
               <Label>Status</Label>
               <Select
                 value={form.watch('status')}
-                onValueChange={(value: any) => form.setValue('status', value)}
+                onValueChange={(value: TaskFormData['status']) => form.setValue('status', value)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -133,7 +133,9 @@ export function TaskForm({ task, onSubmit, onCancel, isSubmitting }: TaskFormPro
               <Label>Priority</Label>
               <Select
                 value={form.watch('priority')}
-                onValueChange={(value: any) => form.setValue('priority', value)}
+                onValueChange={(value: TaskFormData['priority']) =>
+                  form.setValue('priority', value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue />

@@ -17,7 +17,7 @@ export default function NewRecurringProfilePage() {
   const { data: accounts = [], isLoading: accountsLoading } = useAccountsTree();
   const createProfile = useCreateRecurringProfile();
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createProfile.mutateAsync(data);
       toast({
@@ -25,10 +25,12 @@ export default function NewRecurringProfilePage() {
         description: 'The recurring profile has been created successfully.',
       });
       router.push('/accounting/recurring');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to create recurring profile.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to create recurring profile.',
         variant: 'destructive',
       });
     }

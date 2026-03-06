@@ -92,7 +92,9 @@ export const useDashboardLayout = create<DashboardLayoutState>()(
             const serverWidgets = res.data.widgets;
             // Merge server data with local labels
             const merged = DEFAULT_WIDGETS.map((dw) => {
-              const sw = serverWidgets.find((s: any) => s.id === dw.id);
+              const sw = serverWidgets.find(
+                (s: { id: string; visible: boolean; order: number }) => s.id === dw.id,
+              );
               return sw ? { ...dw, visible: sw.visible, order: sw.order } : dw;
             });
             set({ widgets: merged });

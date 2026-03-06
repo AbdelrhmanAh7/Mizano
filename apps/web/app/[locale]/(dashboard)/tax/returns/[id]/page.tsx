@@ -85,10 +85,12 @@ export default function VATReturnDetailPage() {
       await fileReturn.mutateAsync(returnId);
       toast({ title: 'VAT return filed successfully' });
       setFileDialogOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to file VAT return',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to file VAT return',
         variant: 'destructive',
       });
     }
@@ -99,10 +101,12 @@ export default function VATReturnDetailPage() {
       await deleteReturn.mutateAsync(returnId);
       toast({ title: 'VAT return deleted' });
       router.push('/tax/returns');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to delete VAT return',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to delete VAT return',
         variant: 'destructive',
       });
     }
@@ -120,10 +124,12 @@ export default function VATReturnDetailPage() {
       });
       toast({ title: 'Payment recorded successfully' });
       setPaymentDialogOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to record payment',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to record payment',
         variant: 'destructive',
       });
     }

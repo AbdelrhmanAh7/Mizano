@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rolesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
+type ApiError = { response?: { data?: { message?: string } } };
+
 interface RoleParams {
   page?: number;
   limit?: number;
@@ -75,7 +77,7 @@ export function useCreateRole() {
         description: 'The role has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating role',
@@ -105,7 +107,7 @@ export function useUpdateRole() {
         description: 'The role has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating role',
@@ -134,7 +136,7 @@ export function useDeleteRole() {
         description: 'The role has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting role',
@@ -163,7 +165,7 @@ export function useSeedDefaultRoles() {
         description: data.message || 'Default roles have been created.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error seeding roles',
@@ -192,7 +194,7 @@ export function useAssignRole() {
         description: data.message || 'The role has been assigned successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error assigning role',

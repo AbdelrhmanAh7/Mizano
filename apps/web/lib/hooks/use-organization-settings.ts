@@ -5,6 +5,8 @@ import api from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export interface AccountSettings {
   defaultArAccountId: string | null;
   defaultRevenueAccountId: string | null;
@@ -59,7 +61,7 @@ export function useUpdateAccountSettings() {
         description: 'Account settings have been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error saving settings',

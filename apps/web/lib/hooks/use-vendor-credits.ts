@@ -6,6 +6,8 @@ import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type VendorCreditStatus = 'OPEN' | 'APPLIED' | 'REFUNDED';
 export type VendorCreditType = 'CREDIT' | 'REFUND';
 
@@ -150,7 +152,7 @@ export function useCreateVendorCredit() {
         description: 'The vendor credit has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating vendor credit',
@@ -181,7 +183,7 @@ export function useApplyVendorCredit() {
         description: 'The vendor credit has been applied to the bill.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error applying credit',
@@ -211,7 +213,7 @@ export function useRefundVendorCredit() {
         description: 'The vendor credit has been refunded.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error processing refund',

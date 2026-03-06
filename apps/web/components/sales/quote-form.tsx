@@ -47,7 +47,7 @@ interface QuoteFormProps {
   quote?: Quote | null;
   customerId?: string;
   taxRates?: { id: string; name: string; rate: number }[];
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }

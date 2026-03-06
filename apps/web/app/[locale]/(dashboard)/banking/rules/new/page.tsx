@@ -47,7 +47,7 @@ export default function NewBankRulePage() {
 
   const isLoading = accountsLoading || vendorsLoading || customersLoading;
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createBankRule.mutateAsync(data);
       router.push('/banking/rules');

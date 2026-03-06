@@ -17,20 +17,24 @@ export default function NewTransferPage() {
   const { data: itemsData, isLoading: itemsLoading } = useItems();
   const { data: warehousesData, isLoading: warehousesLoading } = useWarehouses();
 
-  const items = (itemsData?.data || []).map((item: any) => ({
-    id: item.id,
-    name: item.name,
-    sku: item.sku,
-    stockLevel: item.stockLevel || 0,
-  }));
+  const items = (itemsData?.data || []).map(
+    (item: { id: string; name: string; sku: string; stockLevel?: number }) => ({
+      id: item.id,
+      name: item.name,
+      sku: item.sku,
+      stockLevel: item.stockLevel || 0,
+    }),
+  );
 
-  const warehouses = (warehousesData?.data || []).map((wh: any) => ({
-    id: wh.id,
-    name: wh.name,
-    code: wh.code,
-  }));
+  const warehouses = (warehousesData?.data || []).map(
+    (wh: { id: string; name: string; code: string }) => ({
+      id: wh.id,
+      name: wh.name,
+      code: wh.code,
+    }),
+  );
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createTransfer.mutateAsync(data);
       router.push('/inventory/transfers');

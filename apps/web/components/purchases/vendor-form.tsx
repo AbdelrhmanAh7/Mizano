@@ -44,7 +44,7 @@ type VendorFormData = z.infer<typeof vendorSchema>;
 
 interface VendorFormProps {
   vendor?: Vendor | null;
-  onSubmit: (data: VendorFormData) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -126,7 +126,7 @@ export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorF
       billingPostalCode: data.billingAddress?.postalCode || null,
       billingCountry: data.billingAddress?.country || null,
     };
-    onSubmit(submitData as any);
+    onSubmit(submitData as Record<string, unknown>);
   };
 
   return (

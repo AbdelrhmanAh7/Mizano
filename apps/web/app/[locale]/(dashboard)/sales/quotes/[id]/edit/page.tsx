@@ -25,7 +25,7 @@ export default function EditQuotePage() {
     { id: 'vat-0', name: 'VAT 0%', rate: 0 },
   ];
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await updateQuote.mutateAsync({ id: quoteId, data });
       toast({
@@ -33,10 +33,12 @@ export default function EditQuotePage() {
         description: 'The quote has been updated successfully.',
       });
       router.push(`/sales/quotes/${quoteId}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to update quote.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to update quote.',
         variant: 'destructive',
       });
     }

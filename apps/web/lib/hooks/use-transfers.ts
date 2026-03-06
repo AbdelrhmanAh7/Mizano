@@ -6,6 +6,8 @@ import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type TransferStatus = 'PENDING' | 'IN_TRANSIT' | 'COMPLETED' | 'CANCELLED';
 
 export interface TransferLine {
@@ -128,7 +130,7 @@ export function useCreateTransfer() {
         description: 'The stock transfer has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating transfer',
@@ -159,7 +161,7 @@ export function useCompleteTransfer() {
         description: 'The stock transfer has been completed.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error completing transfer',
@@ -188,7 +190,7 @@ export function useCancelTransfer() {
         description: 'The stock transfer has been cancelled.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error cancelling transfer',

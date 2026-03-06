@@ -46,7 +46,7 @@ type CustomerFormData = z.infer<typeof customerSchema>;
 
 interface CustomerFormProps {
   customer?: Customer | null;
-  onSubmit: (data: CustomerFormData) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -150,7 +150,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isSubmitting }: Cus
       shippingPostalCode: data.shippingAddress?.postalCode || null,
       shippingCountry: data.shippingAddress?.country || null,
     };
-    onSubmit(submitData as any);
+    onSubmit(submitData as Record<string, unknown>);
   };
 
   const copyBillingToShipping = () => {

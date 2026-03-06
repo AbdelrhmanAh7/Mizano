@@ -139,16 +139,23 @@ export default function PriceListDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item: any) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.item?.name || '-'}</TableCell>
-                    <TableCell className="font-mono text-sm">{item.item?.sku || '-'}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${parseFloat(item.price?.toString() || '0').toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right">{item.minQuantity || 1}</TableCell>
-                  </TableRow>
-                ))}
+                {items.map(
+                  (item: {
+                    id: string;
+                    item?: { name?: string; sku?: string };
+                    price?: string | number;
+                    minQuantity?: number;
+                  }) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.item?.name || '-'}</TableCell>
+                      <TableCell className="font-mono text-sm">{item.item?.sku || '-'}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        ${parseFloat(item.price?.toString() || '0').toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right">{item.minQuantity || 1}</TableCell>
+                    </TableRow>
+                  ),
+                )}
               </TableBody>
             </Table>
           )}

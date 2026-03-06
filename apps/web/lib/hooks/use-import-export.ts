@@ -35,7 +35,7 @@ export interface ColumnMapping {
 
 export interface ParseFileResult {
   headers: string[];
-  sampleRows: Record<string, any>[];
+  sampleRows: Record<string, unknown>[];
   totalRows: number;
   suggestedMappings: ColumnMapping[];
 }
@@ -43,7 +43,7 @@ export interface ParseFileResult {
 export interface ValidationError {
   row: number;
   field: string;
-  value: any;
+  value: unknown;
   error: string;
 }
 
@@ -323,7 +323,7 @@ function getDefaultTransform(fieldType: string): ColumnMapping['transform'] {
 }
 
 export function validateRow(
-  row: Record<string, any>,
+  row: Record<string, unknown>,
   mappings: ColumnMapping[],
   fieldDefinitions: FieldDefinition[],
 ): ValidationError[] {
@@ -343,7 +343,7 @@ export function validateRow(
       continue;
     }
 
-    const value = row[mapping.sourceColumn];
+    const value = row[mapping.sourceColumn] as string | undefined | null;
 
     // Check required
     if (field.required && (value === undefined || value === null || value === '')) {

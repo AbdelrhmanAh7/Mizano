@@ -17,7 +17,7 @@ export default function NewJournalPage() {
   const { data: accounts = [], isLoading: accountsLoading } = useAccountsTree();
   const createJournal = useCreateJournal();
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createJournal.mutateAsync(data);
       toast({
@@ -25,10 +25,12 @@ export default function NewJournalPage() {
         description: 'The journal entry has been created successfully.',
       });
       router.push('/accounting/journals');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to create journal entry.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to create journal entry.',
         variant: 'destructive',
       });
     }

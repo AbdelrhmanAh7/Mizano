@@ -86,10 +86,12 @@ export default function WorkOrderDetailPage() {
     try {
       await startWorkOrder.mutateAsync(workOrderId);
       toast({ title: 'Work order started' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to start work order',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to start work order',
         variant: 'destructive',
       });
     }
@@ -100,10 +102,12 @@ export default function WorkOrderDetailPage() {
       await completeWorkOrder.mutateAsync({ id: workOrderId, producedQuantity });
       toast({ title: 'Work order completed' });
       setCompleteDialogOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to complete work order',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to complete work order',
         variant: 'destructive',
       });
     }
@@ -114,10 +118,12 @@ export default function WorkOrderDetailPage() {
       await cancelWorkOrder.mutateAsync(workOrderId);
       toast({ title: 'Work order cancelled' });
       setCancelDialogOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to cancel work order',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to cancel work order',
         variant: 'destructive',
       });
     }
@@ -128,10 +134,12 @@ export default function WorkOrderDetailPage() {
       await deleteWorkOrder.mutateAsync(workOrderId);
       toast({ title: 'Work order deleted' });
       router.push('/manufacturing/work-orders');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to delete work order',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to delete work order',
         variant: 'destructive',
       });
     }

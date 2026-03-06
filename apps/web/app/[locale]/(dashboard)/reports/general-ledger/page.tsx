@@ -80,7 +80,7 @@ export default function GeneralLedgerPage() {
             </SelectTrigger>
             <SelectContent>
               {Array.isArray(accountList) &&
-                accountList.map((account: any) => (
+                accountList.map((account: { id: string; code: string; name: string }) => (
                   <SelectItem key={account.id} value={account.id}>
                     {account.code} - {account.name}
                   </SelectItem>
@@ -140,33 +140,47 @@ export default function GeneralLedgerPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {entries.map((entry: any, i: number) => (
-                      <TableRow key={i}>
-                        <TableCell>{format(new Date(entry.date), 'MMM d, yyyy')}</TableCell>
-                        <TableCell>
-                          {entry.journalNumber ? (
-                            <Link
-                              href={`/accounting/journals/${entry.journalId}`}
-                              className="text-blue-600 hover:underline"
-                            >
-                              {entry.journalNumber}
-                            </Link>
-                          ) : (
-                            '-'
-                          )}
-                        </TableCell>
-                        <TableCell>{entry.description || entry.reference || '-'}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {entry.debit > 0 ? formatCurrency(entry.debit) : '-'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {entry.credit > 0 ? formatCurrency(entry.credit) : '-'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
-                          {formatCurrency(entry.runningBalance || 0)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {entries.map(
+                      (
+                        entry: {
+                          date: string;
+                          journalNumber?: string;
+                          journalId?: string;
+                          description?: string;
+                          reference?: string;
+                          debit: number;
+                          credit: number;
+                          runningBalance?: number;
+                        },
+                        i: number,
+                      ) => (
+                        <TableRow key={i}>
+                          <TableCell>{format(new Date(entry.date), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>
+                            {entry.journalNumber ? (
+                              <Link
+                                href={`/accounting/journals/${entry.journalId}`}
+                                className="text-blue-600 hover:underline"
+                              >
+                                {entry.journalNumber}
+                              </Link>
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
+                          <TableCell>{entry.description || entry.reference || '-'}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {entry.debit > 0 ? formatCurrency(entry.debit) : '-'}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {entry.credit > 0 ? formatCurrency(entry.credit) : '-'}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium">
+                            {formatCurrency(entry.runningBalance || 0)}
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )}
                   </TableBody>
                 </Table>
               )}

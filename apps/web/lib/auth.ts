@@ -147,7 +147,7 @@ export const authOptions: NextAuthOptions = {
       session.user.firstName = token.firstName as string;
       session.user.lastName = token.lastName as string;
       session.user.organizationId = token.organizationId as string;
-      session.user.role = token.role as any;
+      session.user.role = token.role as string;
       session.accessToken = token.accessToken as string;
       session.refreshToken = token.refreshToken as string;
 
@@ -177,7 +177,7 @@ declare module 'next-auth' {
       firstName: string;
       lastName: string;
       organizationId: string;
-      role: any;
+      role: string;
     };
     accessToken: string;
     refreshToken: string;
@@ -191,7 +191,7 @@ declare module 'next-auth' {
     firstName: string;
     lastName: string;
     organizationId: string;
-    role: any;
+    role: string;
     accessToken: string;
     refreshToken: string;
   }
@@ -203,7 +203,7 @@ declare module 'next-auth/jwt' {
     firstName: string;
     lastName: string;
     organizationId: string;
-    role: any;
+    role: string;
     accessToken: string;
     refreshToken: string;
     accessTokenExpires?: number;

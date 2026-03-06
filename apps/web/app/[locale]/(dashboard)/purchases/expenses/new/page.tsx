@@ -28,7 +28,7 @@ export default function NewExpensePage() {
 
   const accounts = accountsData?.data || [];
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createExpense.mutateAsync(data);
       router.push('/purchases/expenses');

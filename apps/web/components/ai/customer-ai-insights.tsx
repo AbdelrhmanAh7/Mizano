@@ -43,29 +43,39 @@ export function CustomerAIInsights() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {churnCustomers.slice(0, 5).map((customer: any) => (
-                <div
-                  key={customer.id}
-                  className="flex items-center justify-between p-2 rounded-lg border hover:bg-accent/50 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <Link
-                      href={`/sales/customers/${customer.id}`}
-                      className="text-sm font-medium hover:underline truncate block"
+              {churnCustomers
+                .slice(0, 5)
+                .map(
+                  (customer: {
+                    id: string;
+                    name: string;
+                    totalRevenue?: number;
+                    riskLevel: string;
+                    churnRisk: number;
+                  }) => (
+                    <div
+                      key={customer.id}
+                      className="flex items-center justify-between p-2 rounded-lg border hover:bg-accent/50 transition-colors"
                     >
-                      {customer.name}
-                    </Link>
-                    <span className="text-xs text-muted-foreground">
-                      Revenue: ${customer.totalRevenue?.toLocaleString() || '0'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className={getRiskLevelColor(customer.riskLevel)}>
-                      {formatChurnRisk(customer.churnRisk)}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+                      <div className="flex-1 min-w-0">
+                        <Link
+                          href={`/sales/customers/${customer.id}`}
+                          className="text-sm font-medium hover:underline truncate block"
+                        >
+                          {customer.name}
+                        </Link>
+                        <span className="text-xs text-muted-foreground">
+                          Revenue: ${customer.totalRevenue?.toLocaleString() || '0'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={getRiskLevelColor(customer.riskLevel)}>
+                          {formatChurnRisk(customer.churnRisk)}
+                        </Badge>
+                      </div>
+                    </div>
+                  ),
+                )}
             </div>
           </CardContent>
         </Card>
@@ -82,23 +92,30 @@ export function CustomerAIInsights() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {segments.map((segment: any) => (
-                <div key={segment.segment} className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Award className="h-4 w-4" />
-                      <span className="text-sm font-medium">{segment.segment}</span>
+              {segments.map(
+                (segment: {
+                  segment: string;
+                  count: number;
+                  averageCLV?: number;
+                  percentage?: number;
+                }) => (
+                  <div key={segment.segment} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Award className="h-4 w-4" />
+                        <span className="text-sm font-medium">{segment.segment}</span>
+                      </div>
+                      <Badge variant="outline" className={getSegmentColor(segment.segment)}>
+                        {segment.count} customers
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className={getSegmentColor(segment.segment)}>
-                      {segment.count} customers
-                    </Badge>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground pl-6">
+                      <span>Avg CLV: {formatCLV(segment.averageCLV || 0)}</span>
+                      <span>{segment.percentage?.toFixed(1)}% of total</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground pl-6">
-                    <span>Avg CLV: {formatCLV(segment.averageCLV || 0)}</span>
-                    <span>{segment.percentage?.toFixed(1)}% of total</span>
-                  </div>
-                </div>
-              ))}
+                ),
+              )}
             </div>
           </CardContent>
         </Card>

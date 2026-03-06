@@ -46,7 +46,7 @@ export default function EditItemPage({ params }: EditItemPageProps) {
   const accounts = accountsData?.data || [];
   const taxRates = taxRatesData?.data || [];
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await updateItem.mutateAsync({ id, data });
       router.push(`/inventory/items/${id}`);

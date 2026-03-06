@@ -43,7 +43,7 @@ interface ItemFormProps {
   item?: Item | null;
   accounts: Array<{ id: string; name: string; code: string; type: string }>;
   taxRates?: Array<{ id: string; name: string; rate: number }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: ItemFormData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }

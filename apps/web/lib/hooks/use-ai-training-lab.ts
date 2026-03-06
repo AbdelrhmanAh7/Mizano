@@ -76,10 +76,10 @@ export interface FeedbackEntry {
   id: string;
   feature: AiFeature;
   predictionId?: string;
-  aiSuggestion: Record<string, any>;
+  aiSuggestion: Record<string, unknown>;
   userAction: 'ACCEPTED' | 'REJECTED' | 'CORRECTED';
   userAnswer?: string;
-  inputData: Record<string, any>;
+  inputData: Record<string, unknown>;
   createdAt: string;
 }
 

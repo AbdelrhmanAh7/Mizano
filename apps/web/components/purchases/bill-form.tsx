@@ -68,7 +68,7 @@ interface BillFormProps {
   accounts?: Array<{ id: string; code: string; name: string; type: string }>;
   items?: Array<{ id: string; name: string; sku: string; costPrice: string }>;
   projects?: Array<{ id: string; name: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
   defaultVendorId?: string;

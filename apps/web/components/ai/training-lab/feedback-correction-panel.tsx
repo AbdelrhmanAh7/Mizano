@@ -208,25 +208,31 @@ export function FeedbackCorrectionPanel() {
           </CardHeader>
           <CardContent>
             <div className="flex items-end gap-0.5 h-24">
-              {trendEntries.map((entry: any, idx: number) => {
-                const total =
-                  (entry.accepted || 0) + (entry.rejected || 0) + (entry.corrected || 0);
-                const maxVal = Math.max(
-                  ...trendEntries.map(
-                    (e: any) => (e.accepted || 0) + (e.rejected || 0) + (e.corrected || 0),
-                  ),
-                  1,
-                );
-                const height = total > 0 ? (total / maxVal) * 100 : 0;
-                return (
-                  <div
-                    key={idx}
-                    className="flex-1 bg-primary/20 hover:bg-primary/40 rounded-t transition-colors"
-                    style={{ height: `${Math.max(2, height)}%` }}
-                    title={`${entry.date}: ${total} feedback`}
-                  />
-                );
-              })}
+              {trendEntries.map(
+                (
+                  entry: { accepted?: number; rejected?: number; corrected?: number; date: string },
+                  idx: number,
+                ) => {
+                  const total =
+                    (entry.accepted || 0) + (entry.rejected || 0) + (entry.corrected || 0);
+                  const maxVal = Math.max(
+                    ...trendEntries.map(
+                      (e: { accepted?: number; rejected?: number; corrected?: number }) =>
+                        (e.accepted || 0) + (e.rejected || 0) + (e.corrected || 0),
+                    ),
+                    1,
+                  );
+                  const height = total > 0 ? (total / maxVal) * 100 : 0;
+                  return (
+                    <div
+                      key={idx}
+                      className="flex-1 bg-primary/20 hover:bg-primary/40 rounded-t transition-colors"
+                      style={{ height: `${Math.max(2, height)}%` }}
+                      title={`${entry.date}: ${total} feedback`}
+                    />
+                  );
+                },
+              )}
             </div>
           </CardContent>
         </Card>
@@ -244,44 +250,52 @@ export function FeedbackCorrectionPanel() {
             </div>
           ) : Array.isArray(feedbackEntries) && feedbackEntries.length > 0 ? (
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {feedbackEntries.map((entry: any) => (
-                <div
-                  key={entry.id}
-                  className="flex items-start gap-3 p-3 rounded-lg border text-sm"
-                >
-                  <Badge
-                    variant={
-                      entry.userAction === 'ACCEPTED'
-                        ? 'default'
-                        : entry.userAction === 'REJECTED'
-                          ? 'destructive'
-                          : 'outline'
-                    }
-                    className="text-[10px] mt-0.5 shrink-0"
+              {feedbackEntries.map(
+                (entry: {
+                  id: string;
+                  userAction: string;
+                  aiSuggestion: unknown;
+                  userAnswer?: string;
+                  createdAt: string;
+                }) => (
+                  <div
+                    key={entry.id}
+                    className="flex items-start gap-3 p-3 rounded-lg border text-sm"
                   >
-                    {entry.userAction}
-                  </Badge>
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>AI suggested:</span>
-                      <code className="text-[10px] bg-muted px-1 rounded truncate max-w-[200px] inline-block">
-                        {typeof entry.aiSuggestion === 'object'
-                          ? JSON.stringify(entry.aiSuggestion).slice(0, 60)
-                          : String(entry.aiSuggestion).slice(0, 60)}
-                      </code>
-                    </div>
-                    {entry.userAction === 'CORRECTED' && entry.userAnswer && (
-                      <div className="flex items-center gap-1 text-xs text-amber-600">
-                        <ArrowRight className="h-3 w-3" />
-                        Corrected to: <strong>{entry.userAnswer}</strong>
+                    <Badge
+                      variant={
+                        entry.userAction === 'ACCEPTED'
+                          ? 'default'
+                          : entry.userAction === 'REJECTED'
+                            ? 'destructive'
+                            : 'outline'
+                      }
+                      className="text-[10px] mt-0.5 shrink-0"
+                    >
+                      {entry.userAction}
+                    </Badge>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>AI suggested:</span>
+                        <code className="text-[10px] bg-muted px-1 rounded truncate max-w-[200px] inline-block">
+                          {typeof entry.aiSuggestion === 'object'
+                            ? JSON.stringify(entry.aiSuggestion).slice(0, 60)
+                            : String(entry.aiSuggestion).slice(0, 60)}
+                        </code>
                       </div>
-                    )}
+                      {entry.userAction === 'CORRECTED' && entry.userAnswer && (
+                        <div className="flex items-center gap-1 text-xs text-amber-600">
+                          <ArrowRight className="h-3 w-3" />
+                          Corrected to: <strong>{entry.userAnswer}</strong>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {new Date(entry.createdAt).toLocaleDateString()}
+                    </span>
                   </div>
-                  <span className="text-[10px] text-muted-foreground shrink-0">
-                    {new Date(entry.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-              ))}
+                ),
+              )}
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground text-sm">

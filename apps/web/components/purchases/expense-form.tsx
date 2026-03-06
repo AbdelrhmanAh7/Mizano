@@ -44,7 +44,7 @@ interface ExpenseFormProps {
   expense?: Expense | null;
   accounts?: Array<{ id: string; code: string; name: string; type: string }>;
   projects?: Array<{ id: string; name: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
   defaultVendorId?: string;
@@ -204,7 +204,7 @@ export function ExpenseForm({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No Vendor</SelectItem>
-                  {vendors.map((vendor: any) => (
+                  {vendors.map((vendor) => (
                     <SelectItem key={vendor.id} value={vendor.id}>
                       {vendor.name}
                     </SelectItem>

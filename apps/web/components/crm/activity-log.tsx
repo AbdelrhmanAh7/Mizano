@@ -74,10 +74,11 @@ export function ActivityLog({ leadId, dealId }: ActivityLogProps) {
       toast({ title: 'Activity added' });
       setDescription('');
       setShowForm(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to add activity',
+        description: err.response?.data?.message || 'Failed to add activity',
         variant: 'destructive',
       });
     }

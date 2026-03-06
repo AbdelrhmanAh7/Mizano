@@ -141,10 +141,12 @@ function ExpensesPageContent() {
           title: 'Expense deleted',
           description: 'The expense has been deleted.',
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: 'Error',
-          description: error.response?.data?.message || 'Failed to delete expense.',
+          description:
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+            'Failed to delete expense.',
           variant: 'destructive',
         });
       }

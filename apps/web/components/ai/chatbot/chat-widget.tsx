@@ -116,9 +116,14 @@ export function ChatWidget() {
             </div>
           )}
 
-          {messages.map((msg: any, i: number) => (
-            <ChatMessage key={i} message={msg} />
-          ))}
+          {messages.map(
+            (
+              msg: { role: 'user' | 'assistant'; content: string; timestamp: string },
+              i: number,
+            ) => (
+              <ChatMessage key={i} message={msg} />
+            ),
+          )}
 
           {sendMessage.isPending && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">

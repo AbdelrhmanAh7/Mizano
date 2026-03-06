@@ -72,7 +72,7 @@ export function VendorTrainingHistory({ vendorId, className }: VendorTrainingHis
   // Extract learned field names from layout
   const learnedFields = history.layout?.fieldPositions
     ? Object.entries(history.layout.fieldPositions)
-        .filter(([, v]: [string, any]) => v?.learned)
+        .filter(([, v]: [string, { learned?: boolean }]) => v?.learned)
         .map(([k]) => k)
     : [];
 
@@ -161,47 +161,57 @@ export function VendorTrainingHistory({ vendorId, className }: VendorTrainingHis
           ) : (
             <ScrollArea className="h-[200px]">
               <div className="space-y-2">
-                {history.corrections.map((correction: any) => {
-                  let correctedFields: Record<string, any> = {};
-                  try {
-                    correctedFields =
-                      typeof correction.userAnswer === 'string'
-                        ? JSON.parse(correction.userAnswer)
-                        : correction.userAnswer || {};
-                  } catch {
-                    // ignore
-                  }
+                {history.corrections.map(
+                  (correction: {
+                    id: string;
+                    userAnswer: string | Record<string, unknown>;
+                    userAction: string;
+                    createdAt: string;
+                  }) => {
+                    let correctedFields: Record<string, unknown> = {};
+                    try {
+                      correctedFields =
+                        typeof correction.userAnswer === 'string'
+                          ? JSON.parse(correction.userAnswer)
+                          : correction.userAnswer || {};
+                    } catch {
+                      // ignore
+                    }
 
-                  return (
-                    <div key={correction.id} className="border rounded-md p-2 text-xs space-y-1">
-                      <div className="flex items-center justify-between">
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            'text-xs',
-                            correction.userAction === 'CORRECTED'
-                              ? 'bg-amber-50 text-amber-700 border-amber-200'
-                              : 'bg-green-50 text-green-700 border-green-200',
-                          )}
-                        >
-                          {correction.userAction}
-                        </Badge>
-                        <span className="text-muted-foreground">
-                          {formatRelativeTime(correction.createdAt)}
-                        </span>
-                      </div>
-                      {Object.keys(correctedFields).length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {Object.entries(correctedFields).map(([key, val]) => (
-                            <span key={key} className="text-muted-foreground bg-muted px-1 rounded">
-                              {key}: {String(val).slice(0, 20)}
-                            </span>
-                          ))}
+                    return (
+                      <div key={correction.id} className="border rounded-md p-2 text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              'text-xs',
+                              correction.userAction === 'CORRECTED'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : 'bg-green-50 text-green-700 border-green-200',
+                            )}
+                          >
+                            {correction.userAction}
+                          </Badge>
+                          <span className="text-muted-foreground">
+                            {formatRelativeTime(correction.createdAt)}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        {Object.keys(correctedFields).length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {Object.entries(correctedFields).map(([key, val]) => (
+                              <span
+                                key={key}
+                                className="text-muted-foreground bg-muted px-1 rounded"
+                              >
+                                {key}: {String(val).slice(0, 20)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  },
+                )}
               </div>
             </ScrollArea>
           )}

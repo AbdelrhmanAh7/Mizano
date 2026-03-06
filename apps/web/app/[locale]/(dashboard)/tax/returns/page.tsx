@@ -143,10 +143,12 @@ function VATReturnsPageContent() {
       try {
         await deleteReturn.mutateAsync(selectedReturn.id);
         toast({ title: 'VAT return deleted' });
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: 'Error',
-          description: error.response?.data?.message || 'Failed to delete VAT return',
+          description:
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+            'Failed to delete VAT return',
           variant: 'destructive',
         });
       }
@@ -160,10 +162,12 @@ function VATReturnsPageContent() {
       try {
         await fileReturn.mutateAsync(selectedReturn.id);
         toast({ title: 'VAT return filed successfully' });
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: 'Error',
-          description: error.response?.data?.message || 'Failed to file VAT return',
+          description:
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+            'Failed to file VAT return',
           variant: 'destructive',
         });
       }

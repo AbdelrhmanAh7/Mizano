@@ -72,7 +72,7 @@ export function OcrTrainingViewer({
   const [internalFile, setInternalFile] = useState<File | null>(null);
   const [internalPreview, setInternalPreview] = useState<string | null>(null);
   const [internalVendorId, setInternalVendorId] = useState('');
-  const [correctedFields, setCorrectedFields] = useState<Record<string, any>>({});
+  const [correctedFields, setCorrectedFields] = useState<Record<string, unknown>>({});
 
   // Mutations
   const extractMutation = useOcrTrainingExtract();
@@ -154,7 +154,7 @@ export function OcrTrainingViewer({
     if (vendorId) formData.append('vendorId', vendorId);
 
     extractMutation.mutate(formData, {
-      onError: (error: any) => {
+      onError: (error: { response?: { data?: { message?: string } } }) => {
         toast({
           variant: 'destructive',
           title: 'Extraction failed',
@@ -165,7 +165,7 @@ export function OcrTrainingViewer({
   };
 
   // Update correction
-  const handleFieldChange = (field: string, value: any) => {
+  const handleFieldChange = (field: string, value: string | number | null) => {
     const original = originalValues[field as keyof typeof originalValues];
     const normalizedOriginal = original === null ? '' : String(original);
     const normalizedValue = String(value);
@@ -215,7 +215,7 @@ export function OcrTrainingViewer({
           isActive: res.isActive,
         });
       },
-      onError: (error: any) => {
+      onError: (error: { response?: { data?: { message?: string } } }) => {
         toast({
           variant: 'destructive',
           title: 'Submission failed',
@@ -296,7 +296,7 @@ export function OcrTrainingViewer({
                 <SelectValue placeholder="Select vendor for training..." />
               </SelectTrigger>
               <SelectContent>
-                {vendors.map((vendor: any) => (
+                {vendors.map((vendor: { id: string; displayName?: string; name: string }) => (
                   <SelectItem key={vendor.id} value={vendor.id}>
                     {vendor.displayName || vendor.name}
                   </SelectItem>

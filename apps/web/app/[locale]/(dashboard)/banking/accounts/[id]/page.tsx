@@ -291,40 +291,54 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.slice(0, 10).map((tx: any) => (
-                  <TableRow key={tx.id}>
-                    <TableCell>{format(new Date(tx.date), 'MMM d, yyyy')}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{tx.description}</p>
-                        {tx.payee && <p className="text-sm text-muted-foreground">{tx.payee}</p>}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={getStatusColor(tx.status)}>
-                        {getStatusLabel(tx.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {tx.type === 'DEPOSIT' ? (
-                          <ArrowDownRight className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <ArrowUpRight className="h-4 w-4 text-red-600" />
-                        )}
-                        <span
-                          className={cn(
-                            'font-mono font-medium',
-                            tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600',
-                          )}
-                        >
-                          {tx.type === 'DEPOSIT' ? '+' : '-'}
-                          {formatCurrency(Math.abs(parseFloat(tx.amount)))}
-                        </span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {transactions
+                  .slice(0, 10)
+                  .map(
+                    (tx: {
+                      id: string;
+                      date: string;
+                      description: string;
+                      payee?: string;
+                      status: string;
+                      type: string;
+                      amount: string | number;
+                    }) => (
+                      <TableRow key={tx.id}>
+                        <TableCell>{format(new Date(tx.date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{tx.description}</p>
+                            {tx.payee && (
+                              <p className="text-sm text-muted-foreground">{tx.payee}</p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getStatusColor(tx.status)}>
+                            {getStatusLabel(tx.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {tx.type === 'DEPOSIT' ? (
+                              <ArrowDownRight className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <ArrowUpRight className="h-4 w-4 text-red-600" />
+                            )}
+                            <span
+                              className={cn(
+                                'font-mono font-medium',
+                                tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600',
+                              )}
+                            >
+                              {tx.type === 'DEPOSIT' ? '+' : '-'}
+                              {formatCurrency(Math.abs(parseFloat(tx.amount)))}
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ),
+                  )}
               </TableBody>
             </Table>
           )}

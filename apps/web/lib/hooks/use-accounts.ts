@@ -5,6 +5,8 @@ import { accountsApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+type ApiError = { response?: { data?: { message?: string } } };
+
 // Types
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'INCOME' | 'EXPENSE';
 
@@ -142,7 +144,7 @@ export function useCreateAccount() {
         description: 'The account has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating account',
@@ -172,7 +174,7 @@ export function useUpdateAccount() {
         description: 'The account has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating account',
@@ -201,7 +203,7 @@ export function useDeleteAccount() {
         description: 'The account has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting account',
@@ -232,7 +234,7 @@ export function useSeedAccounts() {
         description: 'Default accounts have been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error seeding accounts',

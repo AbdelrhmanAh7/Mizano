@@ -97,10 +97,11 @@ export function LeadForm({ lead }: LeadFormProps) {
         toast({ title: 'Lead created successfully' });
         router.push(`/crm/leads/${result?.id || result?.data?.id}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to save lead',
+        description: err.response?.data?.message || 'Failed to save lead',
         variant: 'destructive',
       });
     }

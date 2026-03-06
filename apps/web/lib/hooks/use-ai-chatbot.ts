@@ -13,7 +13,7 @@ export interface ChatResponse {
   response: string;
   intent: string;
   confidence: number;
-  data?: any;
+  data?: unknown;
   suggestions?: string[];
   timestamp: string;
 }
@@ -68,16 +68,19 @@ export function useSendChatMessage() {
       const previous = queryClient.getQueriesData({ queryKey: ['ai-chatbot-history'] });
 
       // Optimistically add the user's message to the history cache
-      queryClient.setQueriesData({ queryKey: ['ai-chatbot-history'] }, (old: any) => {
-        const existing = Array.isArray(old?.data) ? old.data : [];
-        return {
-          ...old,
-          data: [
-            ...existing,
-            { role: 'user', content: userMessage, timestamp: new Date().toISOString() },
-          ],
-        };
-      });
+      queryClient.setQueriesData(
+        { queryKey: ['ai-chatbot-history'] },
+        (old: { data?: ChatMessage[] } | undefined) => {
+          const existing = Array.isArray(old?.data) ? old.data : [];
+          return {
+            ...old,
+            data: [
+              ...existing,
+              { role: 'user', content: userMessage, timestamp: new Date().toISOString() },
+            ],
+          };
+        },
+      );
 
       return { previous };
     },
@@ -85,21 +88,24 @@ export function useSendChatMessage() {
       const chatResponse = responseData?.data || responseData;
 
       // Optimistically add the assistant's response to the history cache
-      queryClient.setQueriesData({ queryKey: ['ai-chatbot-history'] }, (old: any) => {
-        const existing = Array.isArray(old?.data) ? old.data : [];
-        return {
-          ...old,
-          data: [
-            ...existing,
-            {
-              role: 'assistant',
-              content: chatResponse.response,
-              intent: chatResponse.intent,
-              timestamp: new Date().toISOString(),
-            },
-          ],
-        };
-      });
+      queryClient.setQueriesData(
+        { queryKey: ['ai-chatbot-history'] },
+        (old: { data?: ChatMessage[] } | undefined) => {
+          const existing = Array.isArray(old?.data) ? old.data : [];
+          return {
+            ...old,
+            data: [
+              ...existing,
+              {
+                role: 'assistant',
+                content: chatResponse.response,
+                intent: chatResponse.intent,
+                timestamp: new Date().toISOString(),
+              },
+            ],
+          };
+        },
+      );
 
       // Sync with server truth
       queryClient.invalidateQueries({ queryKey: ['ai-chatbot-history'] });

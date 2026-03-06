@@ -5,6 +5,8 @@ import { recurringProfilesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type RecurringFrequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
 
 export interface RecurringProfileLine {
@@ -118,7 +120,7 @@ export function useCreateRecurringProfile() {
         description: 'The recurring profile has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating profile',
@@ -148,7 +150,7 @@ export function useUpdateRecurringProfile() {
         description: 'The recurring profile has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating profile',
@@ -178,7 +180,7 @@ export function useToggleRecurringProfile() {
         description: `The recurring profile has been ${data.isActive ? 'activated' : 'deactivated'} successfully.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error toggling profile',
@@ -207,7 +209,7 @@ export function useDeleteRecurringProfile() {
         description: 'The recurring profile has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting profile',

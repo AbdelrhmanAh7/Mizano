@@ -36,13 +36,13 @@ export interface QueryTemplate {
   parameters?: Array<{
     name: string;
     type: 'date-range' | 'number' | 'currency' | 'string';
-    default?: any;
+    default?: unknown;
   }>;
 }
 
 export interface QueryResult {
   answer: string;
-  data: any;
+  data: unknown;
   chartType?: 'bar' | 'line' | 'pie' | 'table';
 }
 
@@ -77,7 +77,7 @@ const narrativeApi = {
     const response = await api.get('/ai/narrative/queries');
     return response.data;
   },
-  executeQuery: async (queryId: string, params?: Record<string, any>) => {
+  executeQuery: async (queryId: string, params?: Record<string, unknown>) => {
     const response = await api.get(`/ai/narrative/query/${queryId}`, {
       params,
     });
@@ -138,7 +138,7 @@ export function useAvailableQueries() {
 
 export function useExecuteQuery() {
   return useMutation({
-    mutationFn: ({ queryId, params }: { queryId: string; params?: Record<string, any> }) =>
+    mutationFn: ({ queryId, params }: { queryId: string; params?: Record<string, unknown> }) =>
       narrativeApi.executeQuery(queryId, params),
   });
 }

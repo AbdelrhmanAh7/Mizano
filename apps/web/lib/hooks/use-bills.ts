@@ -5,6 +5,8 @@ import { billsApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+type ApiError = { response?: { data?: { message?: string } } };
+
 // Types
 export type BillStatus = 'DRAFT' | 'OPEN' | 'OVERDUE' | 'PARTIAL' | 'PAID' | 'VOID';
 
@@ -150,7 +152,7 @@ export function useCreateBill() {
         description: 'The bill has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating bill',
@@ -180,7 +182,7 @@ export function useUpdateBill() {
         description: 'The bill has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating bill',
@@ -210,7 +212,7 @@ export function useOpenBill() {
         description: 'The bill is now open and ready for payment.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error opening bill',
@@ -239,7 +241,7 @@ export function useDeleteBill() {
         description: 'The bill has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting bill',

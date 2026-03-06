@@ -75,7 +75,7 @@ export function ModelCard({
   const trainModel = useTrainModel();
   const [trainResult, setTrainResult] = useState<{
     success: boolean;
-    data?: any;
+    data?: unknown;
     error?: string;
     duration?: number;
   } | null>(null);
@@ -95,7 +95,7 @@ export function ModelCard({
         onSuccess: (data) => {
           setTrainResult({ success: true, data, duration: Date.now() - start });
         },
-        onError: (err: any) => {
+        onError: (err: { response?: { data?: { message?: string } }; message?: string }) => {
           setTrainResult({
             success: false,
             error: err?.response?.data?.message || err.message || 'Training failed',

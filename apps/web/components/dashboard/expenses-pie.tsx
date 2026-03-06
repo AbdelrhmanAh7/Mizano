@@ -51,9 +51,10 @@ export const ExpensesPie = memo(function ExpensesPie({ data, currency = 'USD' }:
                 layout="vertical"
                 align="right"
                 verticalAlign="middle"
-                formatter={(value, entry: any) => (
+                formatter={(value, entry) => (
                   <span className="text-sm">
-                    {value} ({entry.payload.percentage}%)
+                    {value} ({(entry as { payload?: { percentage?: number } }).payload?.percentage}
+                    %)
                   </span>
                 )}
               />

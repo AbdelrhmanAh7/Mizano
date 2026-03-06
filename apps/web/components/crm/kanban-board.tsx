@@ -63,10 +63,11 @@ export function KanbanBoard({ deals }: KanbanBoardProps) {
     try {
       await updateStage.mutateAsync({ id: draggedDeal, stage });
       toast({ title: `Deal moved to ${getDealStageLabel(stage)}` });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to update stage',
+        description: err.response?.data?.message || 'Failed to update stage',
         variant: 'destructive',
       });
     }

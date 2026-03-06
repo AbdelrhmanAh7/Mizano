@@ -6,6 +6,8 @@ import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type InvoiceStatus = 'DRAFT' | 'SENT' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'VOID';
 
 export interface InvoiceLine {
@@ -153,7 +155,7 @@ export function useCreateInvoice() {
         description: 'The invoice has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating invoice',
@@ -183,7 +185,7 @@ export function useUpdateInvoice() {
         description: 'The invoice has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating invoice',
@@ -213,7 +215,7 @@ export function useDeleteInvoice() {
         description: 'The invoice has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting invoice',
@@ -244,7 +246,7 @@ export function useSendInvoice() {
         description: 'The invoice has been sent successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error sending invoice',
@@ -275,7 +277,7 @@ export function useVoidInvoice() {
         description: 'The invoice has been voided successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error voiding invoice',

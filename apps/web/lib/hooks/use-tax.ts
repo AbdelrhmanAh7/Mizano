@@ -33,10 +33,10 @@ export interface VATReturn {
   status: VATReturnStatus;
   filedAt?: string;
   breakdown?: {
-    invoices?: any[];
-    creditNotes?: any[];
-    bills?: any[];
-    expenses?: any[];
+    invoices?: unknown[];
+    creditNotes?: unknown[];
+    bills?: unknown[];
+    expenses?: unknown[];
   };
   createdAt: string;
   updatedAt: string;

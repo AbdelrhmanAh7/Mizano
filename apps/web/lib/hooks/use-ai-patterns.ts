@@ -60,7 +60,7 @@ export interface PatternAnalysisResult {
 
 export interface DuplicateCheckResult {
   isDuplicate: boolean;
-  matchingTransaction?: any;
+  matchingTransaction?: unknown;
   warning?: string;
 }
 

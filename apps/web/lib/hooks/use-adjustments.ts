@@ -5,6 +5,8 @@ import { adjustmentsApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+type ApiError = { response?: { data?: { message?: string } } };
+
 // Types
 export type AdjustmentType = 'INCREASE' | 'DECREASE';
 export type AdjustmentReason = 'STOCKTAKE' | 'DAMAGE' | 'THEFT' | 'RETURN' | 'OTHER';
@@ -131,7 +133,7 @@ export function useCreateAdjustment() {
         description: 'The inventory adjustment has been created.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating adjustment',
@@ -162,7 +164,7 @@ export function usePostAdjustment() {
         description: 'The inventory adjustment has been posted and stock levels updated.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error posting adjustment',
@@ -191,7 +193,7 @@ export function useDeleteAdjustment() {
         description: 'The inventory adjustment has been deleted.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting adjustment',

@@ -85,32 +85,47 @@ export default function RunPayrollPage() {
   const handleGeneratePreview = async () => {
     // In real implementation, this would call an API to generate preview
     // For now, simulate with local calculation
-    const previewData: PayslipPreview[] = employees.map((emp: any) => {
-      const basicSalary =
-        typeof emp.basicSalary === 'string' ? parseFloat(emp.basicSalary) : emp.basicSalary;
-      const allowances = emp.allowances || [];
-      const deductions = emp.deductions || [];
-      const totalAllowances = allowances.reduce((sum: number, a: any) => sum + (a.amount || 0), 0);
-      const totalDeductions = deductions.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
-      const gross = basicSalary + totalAllowances;
-      const lopDays = 0; // Would be calculated from attendance
-      const lopAmount = 0;
-      const taxAmount = gross * 0.1; // Simplified tax calculation
-      const netPay = gross - lopAmount - totalDeductions - taxAmount;
+    const previewData: PayslipPreview[] = employees.map(
+      (emp: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        basicSalary: string | number;
+        allowances?: { amount?: number }[];
+        deductions?: { amount?: number }[];
+      }) => {
+        const basicSalary =
+          typeof emp.basicSalary === 'string' ? parseFloat(emp.basicSalary) : emp.basicSalary;
+        const allowances = emp.allowances || [];
+        const deductions = emp.deductions || [];
+        const totalAllowances = allowances.reduce(
+          (sum: number, a: { amount?: number }) => sum + (a.amount || 0),
+          0,
+        );
+        const totalDeductions = deductions.reduce(
+          (sum: number, d: { amount?: number }) => sum + (d.amount || 0),
+          0,
+        );
+        const gross = basicSalary + totalAllowances;
+        const lopDays = 0; // Would be calculated from attendance
+        const lopAmount = 0;
+        const taxAmount = gross * 0.1; // Simplified tax calculation
+        const netPay = gross - lopAmount - totalDeductions - taxAmount;
 
-      return {
-        employeeId: emp.id,
-        employeeName: `${emp.firstName} ${emp.lastName}`,
-        basicSalary,
-        totalAllowances,
-        gross,
-        lopDays,
-        lopAmount,
-        totalDeductions,
-        taxAmount,
-        netPay,
-      };
-    });
+        return {
+          employeeId: emp.id,
+          employeeName: `${emp.firstName} ${emp.lastName}`,
+          basicSalary,
+          totalAllowances,
+          gross,
+          lopDays,
+          lopAmount,
+          totalDeductions,
+          taxAmount,
+          netPay,
+        };
+      },
+    );
 
     setPreview(previewData);
     setStep('preview');

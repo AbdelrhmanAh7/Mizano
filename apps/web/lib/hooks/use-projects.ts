@@ -88,28 +88,32 @@ export interface TimesheetFilters {
   dateTo?: string;
 }
 
+// Error type for API responses
+type ApiError = { response?: { data?: { message?: string } } };
+
 // API functions
 const projectsApi = {
   getAll: (params?: ProjectFilters) => api.get('/projects', { params }),
   getOne: (id: string) => api.get(`/projects/${id}`),
-  create: (data: any) => api.post('/projects', data),
-  update: (id: string, data: any) => api.put(`/projects/${id}`, data),
+  create: (data: Record<string, unknown>) => api.post('/projects', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/projects/${id}`, data),
   delete: (id: string) => api.delete(`/projects/${id}`),
   getProfitability: (id: string) => api.get(`/projects/${id}/profitability`),
-  createInvoice: (id: string, data: any) => api.post(`/projects/${id}/invoice`, data),
+  createInvoice: (id: string, data: Record<string, unknown>) =>
+    api.post(`/projects/${id}/invoice`, data),
 };
 
 const tasksApi = {
   getAll: (projectId: string) => api.get(`/tasks/project/${projectId}`),
-  create: (data: any) => api.post('/tasks', data),
-  update: (taskId: string, data: any) => api.put(`/tasks/${taskId}`, data),
+  create: (data: Record<string, unknown>) => api.post('/tasks', data),
+  update: (taskId: string, data: Record<string, unknown>) => api.put(`/tasks/${taskId}`, data),
   delete: (taskId: string) => api.delete(`/tasks/${taskId}`),
 };
 
 const timesheetsApi = {
   getAll: (params?: TimesheetFilters) => api.get('/timesheets', { params }),
-  create: (data: any) => api.post('/timesheets', data),
-  update: (id: string, data: any) => api.put(`/timesheets/${id}`, data),
+  create: (data: Record<string, unknown>) => api.post('/timesheets', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/timesheets/${id}`, data),
   delete: (id: string) => api.delete(`/timesheets/${id}`),
   startTimer: (data: { projectId: string; taskId?: string; description?: string }) =>
     api.post('/timesheets/timer/start', data),
@@ -159,7 +163,7 @@ export function useCreateProject() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Project created successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create project');
     },
   });
@@ -169,12 +173,13 @@ export function useUpdateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => projectsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      projectsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Project updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to update project');
     },
   });
@@ -189,7 +194,7 @@ export function useDeleteProject() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Project deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to delete project');
     },
   });
@@ -199,13 +204,14 @@ export function useCreateProjectInvoice() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => projectsApi.createInvoice(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      projectsApi.createInvoice(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success('Invoice created from project');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create invoice');
     },
   });
@@ -227,14 +233,14 @@ export function useCreateTask() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ projectId, data }: { projectId: string; data: any }) =>
+    mutationFn: ({ projectId, data }: { projectId: string; data: Record<string, unknown> }) =>
       tasksApi.create({ ...data, projectId }),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
       toast.success('Task created successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create task');
     },
   });
@@ -244,14 +250,21 @@ export function useUpdateTask() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ projectId, taskId, data }: { projectId: string; taskId: string; data: any }) =>
-      tasksApi.update(taskId, data),
+    mutationFn: ({
+      projectId,
+      taskId,
+      data,
+    }: {
+      projectId: string;
+      taskId: string;
+      data: Record<string, unknown>;
+    }) => tasksApi.update(taskId, data),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
       toast.success('Task updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to update task');
     },
   });
@@ -268,7 +281,7 @@ export function useDeleteTask() {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
       toast.success('Task deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to delete task');
     },
   });
@@ -295,7 +308,7 @@ export function useCreateTimesheet() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Time entry created successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create time entry');
     },
   });
@@ -311,7 +324,7 @@ export function useDeleteTimesheet() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Time entry deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to delete time entry');
     },
   });
@@ -337,7 +350,7 @@ export function useStartTimer() {
       queryClient.invalidateQueries({ queryKey: ['timesheets', 'timer'] });
       toast.success('Timer started');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to start timer');
     },
   });
@@ -353,7 +366,7 @@ export function useStopTimer() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Timer stopped and time entry created');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to stop timer');
     },
   });

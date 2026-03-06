@@ -28,7 +28,7 @@ export interface RecurringProfile {
   isActive: boolean;
   autoPost: boolean;
   autoSend: boolean;
-  templateData: Record<string, any>;
+  templateData: Record<string, unknown>;
   entityType?: string;
   executionCount: number;
   lastExecutedAt?: string;
@@ -45,7 +45,7 @@ export interface CreateRecurringProfileDto {
   endDate?: string;
   autoPost?: boolean;
   autoSend?: boolean;
-  templateData: Record<string, any>;
+  templateData: Record<string, unknown>;
   entityType?: string;
 }
 
@@ -56,7 +56,7 @@ export interface UpdateRecurringProfileDto {
   endDate?: string;
   autoPost?: boolean;
   autoSend?: boolean;
-  templateData?: Record<string, any>;
+  templateData?: Record<string, unknown>;
 }
 
 export interface RecurringQueryParams {

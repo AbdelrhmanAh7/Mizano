@@ -31,7 +31,7 @@ export default function EditProjectPage({ params }: EditProjectPageProps) {
 
   const customers = customersData?.data || [];
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await updateProject.mutateAsync({ id, data });
       router.push(`/projects/${id}`);

@@ -23,8 +23,10 @@ export function PipelineForecastCard() {
   const nextMonth = forecasts[0];
   const avgConversion =
     conversions.length > 0
-      ? conversions.reduce((sum: number, c: any) => sum + (c.conversionRate || 0), 0) /
-        conversions.length
+      ? conversions.reduce(
+          (sum: number, c: { conversionRate?: number }) => sum + (c.conversionRate || 0),
+          0,
+        ) / conversions.length
       : 0;
 
   return (
@@ -89,16 +91,18 @@ export function PipelineForecastCard() {
           <div className="mt-4 pt-4 border-t">
             <div className="text-sm font-medium mb-2">Stage Conversion Rates</div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {conversions.slice(0, 6).map((conv: any) => (
-                <div key={`${conv.fromStage}-${conv.toStage}`} className="text-xs">
-                  <span className="text-muted-foreground">
-                    {conv.fromStage} → {conv.toStage}
-                  </span>
-                  <Badge variant="outline" className="ml-1">
-                    {formatProbability(conv.conversionRate || 0)}
-                  </Badge>
-                </div>
-              ))}
+              {conversions
+                .slice(0, 6)
+                .map((conv: { fromStage: string; toStage: string; conversionRate?: number }) => (
+                  <div key={`${conv.fromStage}-${conv.toStage}`} className="text-xs">
+                    <span className="text-muted-foreground">
+                      {conv.fromStage} → {conv.toStage}
+                    </span>
+                    <Badge variant="outline" className="ml-1">
+                      {formatProbability(conv.conversionRate || 0)}
+                    </Badge>
+                  </div>
+                ))}
             </div>
           </div>
         )}
