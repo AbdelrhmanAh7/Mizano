@@ -389,7 +389,7 @@ export class InvoicesService {
     // Update invoice status
     const updatedInvoice = await this.prisma.invoice.update({
       where: { id },
-      data: { status: InvoiceStatus.SENT },
+      data: { status: InvoiceStatus.SENT, issueDate: new Date() },
       include: {
         customer: { select: { id: true, name: true, email: true } },
         lines: true,

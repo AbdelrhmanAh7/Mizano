@@ -14,7 +14,7 @@ export default function SalesError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('Sales module error:', error);
+    console.error('Sales module error:', error.message, error.stack);
   }, [error]);
 
   return (
@@ -29,7 +29,7 @@ export default function SalesError({
           <div>
             <h2 className="text-lg font-semibold">Sales Module Error</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              An error occurred while loading this page. Please try again.
+              {error.message || 'An error occurred while loading this page. Please try again.'}
             </p>
             {error.digest && (
               <p className="text-xs text-muted-foreground mt-2 font-mono">

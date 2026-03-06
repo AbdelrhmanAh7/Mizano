@@ -55,10 +55,10 @@ export type ReorderStatus = 'OK' | 'LOW_STOCK' | 'CRITICAL' | 'DEAD_STOCK';
 export interface SubmitFeedbackDto {
   feature: AiFeature;
   predictionId?: string;
-  aiSuggestion: Record<string, any>;
+  aiSuggestion: Record<string, unknown>;
   userAction: AiFeedbackAction;
   userAnswer?: string;
-  inputData: Record<string, any>;
+  inputData: Record<string, unknown>;
 }
 
 export interface AiAnomaly {
@@ -101,7 +101,7 @@ export interface ItemReorderAnalysis {
 export interface ReconciliationMatch {
   entityType: 'invoice' | 'bill' | 'expense' | 'payment';
   entityId: string;
-  entity: any;
+  entity: Record<string, unknown>;
   totalScore: number;
   breakdown: {
     amountScore: number;
@@ -289,7 +289,8 @@ export function useSubmitAiFeedback() {
 export function useAiFeedbackStats(feature?: AiFeature) {
   return useQuery({
     queryKey: ['ai-feedback-stats', feature],
-    queryFn: () => newAiApi.getFeedbackStats(feature),
+    queryFn: () => newAiApi.getFeedbackStats(feature!),
+    enabled: !!feature,
   });
 }
 

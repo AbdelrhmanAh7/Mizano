@@ -14,7 +14,7 @@ export default function PurchasesError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('Purchases module error:', error);
+    console.error('Purchases module error:', error.message, error.stack);
   }, [error]);
 
   return (
@@ -29,7 +29,7 @@ export default function PurchasesError({
           <div>
             <h2 className="text-lg font-semibold">Purchases Module Error</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              An error occurred while loading this page. Please try again.
+              {error.message || 'An error occurred while loading this page. Please try again.'}
             </p>
             {error.digest && (
               <p className="text-xs text-muted-foreground mt-2 font-mono">

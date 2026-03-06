@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { format, addMonths, subMonths } from 'date-fns';
+import { format } from 'date-fns';
 import { ArrowLeft, TrendingUp, Target, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -29,56 +29,43 @@ import {
 } from 'recharts';
 import { useRevenueForecast, formatCurrency } from '@/lib/hooks/use-ai';
 
+interface ForecastDataPoint {
+  date: string;
+  label?: string;
+  isHistorical: boolean;
+  actualRevenue?: number;
+  predictedRevenue?: number;
+}
+
 export default function RevenueForecastPage() {
   const [months, setMonths] = useState<number>(6);
   const { data, isLoading } = useRevenueForecast(months);
 
-  // Mock data combining historical and predicted
-  const today = new Date();
-  const mockData = [
-    // Historical (past 6 months)
-    ...Array.from({ length: 6 }, (_, i) => {
-      const date = subMonths(today, 6 - i);
-      const base = 80000 + Math.random() * 30000;
-      return {
-        date: format(date, 'yyyy-MM'),
-        label: format(date, 'MMM yyyy'),
-        actualRevenue: base,
-        predictedRevenue: null,
-        isHistorical: true,
-      };
-    }),
-    // Predicted (future months)
-    ...Array.from({ length: months }, (_, i) => {
-      const date = addMonths(today, i);
-      const base = 90000 + Math.random() * 40000 + i * 2000; // slight growth trend
-      return {
-        date: format(date, 'yyyy-MM'),
-        label: format(date, 'MMM yyyy'),
-        actualRevenue: null,
-        predictedRevenue: base,
-        isHistorical: false,
-      };
-    }),
-  ];
-
-  const forecastData = data?.data || mockData;
+  const forecastData = Array.isArray(data?.data) ? data.data : [];
 
   // Calculate summary
-  const historicalData = forecastData.filter((d: any) => d.isHistorical);
-  const predictedData = forecastData.filter((d: any) => !d.isHistorical);
+  const historicalData = forecastData.filter((d: ForecastDataPoint) => d.isHistorical);
+  const predictedData = forecastData.filter((d: ForecastDataPoint) => !d.isHistorical);
 
   const avgHistorical =
-    historicalData.reduce((sum: number, d: any) => sum + (d.actualRevenue || 0), 0) /
-    historicalData.length;
+    historicalData.length > 0
+      ? historicalData.reduce(
+          (sum: number, d: ForecastDataPoint) => sum + (d.actualRevenue || 0),
+          0,
+        ) / historicalData.length
+      : 0;
   const avgPredicted =
-    predictedData.reduce((sum: number, d: any) => sum + (d.predictedRevenue || 0), 0) /
-    predictedData.length;
+    predictedData.length > 0
+      ? predictedData.reduce(
+          (sum: number, d: ForecastDataPoint) => sum + (d.predictedRevenue || 0),
+          0,
+        ) / predictedData.length
+      : 0;
   const totalPredicted = predictedData.reduce(
-    (sum: number, d: any) => sum + (d.predictedRevenue || 0),
+    (sum: number, d: ForecastDataPoint) => sum + (d.predictedRevenue || 0),
     0,
   );
-  const growthRate = ((avgPredicted - avgHistorical) / avgHistorical) * 100;
+  const growthRate = avgHistorical > 0 ? ((avgPredicted - avgHistorical) / avgHistorical) * 100 : 0;
 
   if (isLoading) {
     return (
@@ -91,6 +78,44 @@ export default function RevenueForecastPage() {
           <Skeleton className="h-24" />
         </div>
         <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  if (forecastData.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" asChild>
+              <Link href="/ai-insights">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Revenue Forecast</h1>
+              <p className="text-muted-foreground">
+                AI-powered revenue predictions based on historical data
+              </p>
+            </div>
+          </div>
+          <Select value={months.toString()} onValueChange={(v) => setMonths(parseInt(v))}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="3">3 Months</SelectItem>
+              <SelectItem value="6">6 Months</SelectItem>
+              <SelectItem value="12">12 Months</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Card>
+          <CardContent className="pt-6 text-center text-muted-foreground">
+            No revenue forecast data available yet. Add more transaction history to generate
+            predictions.
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -225,7 +250,7 @@ export default function RevenueForecastPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {predictedData.map((month: any, index: number) => (
+            {predictedData.map((month: ForecastDataPoint, index: number) => (
               <div
                 key={month.date}
                 className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"

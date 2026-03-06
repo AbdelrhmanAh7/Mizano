@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -32,30 +32,14 @@ export default function CashFlowForecastPage() {
   const [days, setDays] = useState<number>(30);
   const { data, isLoading } = useCashFlowForecast(days);
 
-  // Mock data for display if no API data
-  const mockForecast: CashFlowForecast[] = Array.from({ length: days }, (_, i) => {
-    const date = addDays(new Date(), i);
-    const baseBalance = 50000 + Math.random() * 20000;
-    const inflow = 5000 + Math.random() * 3000;
-    const outflow = 4000 + Math.random() * 2500;
-    return {
-      date: format(date, 'yyyy-MM-dd'),
-      predictedInflow: inflow,
-      predictedOutflow: outflow,
-      predictedBalance: baseBalance + inflow - outflow,
-      lowerBound: baseBalance + inflow - outflow - 5000,
-      upperBound: baseBalance + inflow - outflow + 5000,
-    };
-  });
-
-  const forecast: CashFlowForecast[] = data?.data || mockForecast;
+  const forecast: CashFlowForecast[] = Array.isArray(data?.data) ? data.data : [];
 
   // Calculate summary
   const totalInflow = forecast.reduce((sum, f) => sum + f.predictedInflow, 0);
   const totalOutflow = forecast.reduce((sum, f) => sum + f.predictedOutflow, 0);
   const netCashFlow = totalInflow - totalOutflow;
   const endingBalance = forecast[forecast.length - 1]?.predictedBalance || 0;
-  const lowestBalance = Math.min(...forecast.map((f) => f.lowerBound));
+  const lowestBalance = forecast.length > 0 ? Math.min(...forecast.map((f) => f.lowerBound)) : 0;
 
   const chartData = forecast.map((f) => ({
     date: format(new Date(f.date), 'MMM d'),
@@ -77,6 +61,44 @@ export default function CashFlowForecastPage() {
           <Skeleton className="h-24" />
         </div>
         <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  if (forecast.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" aria-label="Go back" asChild>
+              <Link href="/ai-insights">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Cash Flow Forecast</h1>
+              <p className="text-muted-foreground">AI-powered prediction of future cash flows</p>
+            </div>
+          </div>
+          <Select value={days.toString()} onValueChange={(v) => setDays(parseInt(v))}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">7 Days</SelectItem>
+              <SelectItem value="14">14 Days</SelectItem>
+              <SelectItem value="30">30 Days</SelectItem>
+              <SelectItem value="60">60 Days</SelectItem>
+              <SelectItem value="90">90 Days</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Card>
+          <CardContent className="pt-6 text-center text-muted-foreground">
+            No cash flow forecast data available yet. Add more transaction history to generate
+            predictions.
+          </CardContent>
+        </Card>
       </div>
     );
   }

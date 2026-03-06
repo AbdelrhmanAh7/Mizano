@@ -32,7 +32,7 @@ export class AuthController {
 
   @Public()
   @Post('refresh')
-  @SkipThrottle()
+  @SkipThrottle({ short: true, long: true })
   @UseGuards(JwtRefreshGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })

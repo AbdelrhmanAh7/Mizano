@@ -7,7 +7,24 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { InvoiceForm } from '@/components/sales/invoice-form';
-import { useInvoice, useUpdateInvoice } from '@/lib/hooks/use-invoices';
+import { useInvoice, useUpdateInvoice, Invoice, InvoiceLine } from '@/lib/hooks/use-invoices';
+
+interface InvoiceSubmitData {
+  customerId: string;
+  invoiceDate: string;
+  dueDate: string;
+  shippingCharge?: string;
+  notes?: string;
+  terms?: string;
+  lines: Array<{
+    itemId?: string;
+    description: string;
+    quantity: string;
+    rate: string;
+    discountPercent?: string;
+    taxRateId?: string;
+  }>;
+}
 
 export default function EditInvoicePage() {
   const params = useParams();
@@ -17,7 +34,7 @@ export default function EditInvoicePage() {
   const { data: invoice, isLoading } = useInvoice(invoiceId);
   const updateInvoice = useUpdateInvoice();
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: InvoiceSubmitData) => {
     try {
       // Transform the data to match API expectations
       const invoiceData = {
@@ -27,7 +44,7 @@ export default function EditInvoicePage() {
         shippingAmount: data.shippingCharge || '0',
         notes: data.notes,
         terms: data.terms,
-        lines: data.lines.map((line: any) => ({
+        lines: (data.lines ?? []).map((line: InvoiceSubmitData['lines'][number]) => ({
           itemId: line.itemId || undefined,
           description: line.description,
           quantity: line.quantity,
@@ -119,7 +136,7 @@ export default function EditInvoicePage() {
     ...invoice,
     invoiceDate: invoice.date,
     shippingCharge: invoice.shippingAmount,
-    lines: invoice.lines?.map((line: any) => ({
+    lines: invoice.lines?.map((line: InvoiceLine & { discount?: string }) => ({
       ...line,
       discountPercent: line.discount,
     })),
@@ -144,7 +161,7 @@ export default function EditInvoicePage() {
 
       {/* Form */}
       <InvoiceForm
-        invoice={formInvoice as any}
+        invoice={formInvoice as Invoice}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         isSubmitting={updateInvoice.isPending}

@@ -14,7 +14,7 @@ export default function HRError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('HR module error:', error);
+    console.error('HR module error:', error.message, error.stack);
   }, [error]);
 
   return (
@@ -29,7 +29,7 @@ export default function HRError({
           <div>
             <h2 className="text-lg font-semibold">HR Module Error</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              An error occurred while loading this page. Please try again.
+              {error.message || 'An error occurred while loading this page. Please try again.'}
             </p>
             {error.digest && (
               <p className="text-xs text-muted-foreground mt-2 font-mono">

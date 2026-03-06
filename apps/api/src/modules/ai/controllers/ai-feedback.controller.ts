@@ -1,4 +1,13 @@
-import { Controller, Post, Get, Body, Query, UseGuards, Param } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Query,
+  UseGuards,
+  Param,
+  BadRequestException,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -36,6 +45,9 @@ export class AiFeedbackController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
+    if (!feature) {
+      throw new BadRequestException('feature query parameter is required');
+    }
     return this.feedbackService.getFeedbackStats(orgId, feature, {
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,

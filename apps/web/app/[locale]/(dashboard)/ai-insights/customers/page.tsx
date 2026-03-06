@@ -23,64 +23,10 @@ import {
 } from 'recharts';
 import { useCustomerAnalysis, formatCurrency } from '@/lib/hooks/use-ai';
 
-// Mock customer analysis data
-const mockAnalysis = {
-  summary: {
-    totalCustomers: 256,
-    activeCustomers: 198,
-    churnRate: 5.2,
-    avgLifetimeValue: 12500,
-  },
-  segments: [
-    { name: 'High Value', count: 45, revenue: 680000, color: '#22c55e' },
-    { name: 'Growing', count: 78, revenue: 420000, color: '#3b82f6' },
-    { name: 'Stable', count: 85, revenue: 310000, color: '#8b5cf6' },
-    { name: 'At Risk', count: 32, revenue: 120000, color: '#f59e0b' },
-    { name: 'Dormant', count: 16, revenue: 25000, color: '#ef4444' },
-  ],
-  topCustomers: [
-    { id: '1', name: 'Acme Corporation', revenue: 125000, growth: 15, segment: 'High Value' },
-    { id: '2', name: 'TechStart Inc', revenue: 98000, growth: 28, segment: 'Growing' },
-    { id: '3', name: 'Global Trade Co', revenue: 87000, growth: 5, segment: 'High Value' },
-    { id: '4', name: 'Innovate Labs', revenue: 76000, growth: -8, segment: 'At Risk' },
-    { id: '5', name: 'Summit Enterprises', revenue: 65000, growth: 12, segment: 'Stable' },
-  ],
-  atRiskCustomers: [
-    {
-      id: '6',
-      name: 'Alpha Services',
-      lastOrder: '45 days ago',
-      riskScore: 85,
-      reason: 'Declining orders',
-    },
-    {
-      id: '7',
-      name: 'Beta Solutions',
-      lastOrder: '60 days ago',
-      riskScore: 78,
-      reason: 'No engagement',
-    },
-    {
-      id: '8',
-      name: 'Gamma Industries',
-      lastOrder: '30 days ago',
-      riskScore: 72,
-      reason: 'Competitor switch',
-    },
-  ],
-  revenueBySegment: [
-    { segment: 'High Value', current: 680000, previous: 620000 },
-    { segment: 'Growing', current: 420000, previous: 350000 },
-    { segment: 'Stable', current: 310000, previous: 300000 },
-    { segment: 'At Risk', current: 120000, previous: 180000 },
-    { segment: 'Dormant', current: 25000, previous: 50000 },
-  ],
-};
-
 export default function CustomerAnalysisPage() {
   const { data, isLoading } = useCustomerAnalysis();
 
-  const analysis = data?.data || mockAnalysis;
+  const analysis = data?.data;
 
   if (isLoading) {
     return (
@@ -96,6 +42,37 @@ export default function CustomerAnalysisPage() {
       </div>
     );
   }
+
+  if (!analysis) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/ai-insights">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Customer Analysis</h1>
+            <p className="text-muted-foreground">AI-powered customer segmentation and insights</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="pt-6 text-center text-muted-foreground">
+            No customer analysis data available yet. Add customers and transactions to generate
+            insights.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const segments = Array.isArray(analysis.segments) ? analysis.segments : [];
+  const topCustomers = Array.isArray(analysis.topCustomers) ? analysis.topCustomers : [];
+  const atRiskCustomers = Array.isArray(analysis.atRiskCustomers) ? analysis.atRiskCustomers : [];
+  const revenueBySegment = Array.isArray(analysis.revenueBySegment)
+    ? analysis.revenueBySegment
+    : [];
 
   return (
     <div className="space-y-6">
@@ -181,7 +158,7 @@ export default function CustomerAnalysisPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={analysis.segments}
+                    data={segments}
                     dataKey="count"
                     nameKey="name"
                     cx="50%"
@@ -189,7 +166,7 @@ export default function CustomerAnalysisPage() {
                     outerRadius={100}
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
-                    {analysis.segments.map((segment: any, index: number) => (
+                    {segments.map((segment: { color: string }, index: number) => (
                       <Cell key={index} fill={segment.color} />
                     ))}
                   </Pie>
@@ -208,7 +185,7 @@ export default function CustomerAnalysisPage() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={analysis.revenueBySegment} layout="vertical">
+                <BarChart data={revenueBySegment} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                   <YAxis type="category" dataKey="segment" width={80} tick={{ fontSize: 12 }} />
@@ -234,39 +211,52 @@ export default function CustomerAnalysisPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {analysis.topCustomers.map((customer: any, index: number) => (
-              <div
-                key={customer.id}
-                className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="text-2xl font-bold text-muted-foreground w-8">#{index + 1}</div>
-                  <Avatar>
-                    <AvatarFallback>
-                      {customer.name
-                        .split(' ')
-                        .map((n: string) => n[0])
-                        .join('')}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">{customer.name}</p>
-                    <Badge variant="outline" className="mt-1">
-                      {customer.segment}
-                    </Badge>
+            {topCustomers.map(
+              (
+                customer: {
+                  id: string;
+                  name: string;
+                  segment: string;
+                  revenue: number;
+                  growth: number;
+                },
+                index: number,
+              ) => (
+                <div
+                  key={customer.id}
+                  className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="text-2xl font-bold text-muted-foreground w-8">#{index + 1}</div>
+                    <Avatar>
+                      <AvatarFallback>
+                        {customer.name
+                          .split(' ')
+                          .map((n: string) => n[0])
+                          .join('')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{customer.name}</p>
+                      <Badge variant="outline" className="mt-1">
+                        {customer.segment}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-bold font-mono">
+                      {formatCurrency(customer.revenue)}
+                    </p>
+                    <p
+                      className={`text-sm ${customer.growth >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                    >
+                      {customer.growth >= 0 ? '+' : ''}
+                      {customer.growth}% growth
+                    </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xl font-bold font-mono">{formatCurrency(customer.revenue)}</p>
-                  <p
-                    className={`text-sm ${customer.growth >= 0 ? 'text-green-600' : 'text-red-600'}`}
-                  >
-                    {customer.growth >= 0 ? '+' : ''}
-                    {customer.growth}% growth
-                  </p>
-                </div>
-              </div>
-            ))}
+              ),
+            )}
           </div>
         </CardContent>
       </Card>
@@ -282,40 +272,48 @@ export default function CustomerAnalysisPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {analysis.atRiskCustomers.map((customer: any) => (
-              <div
-                key={customer.id}
-                className="flex items-center justify-between p-4 bg-orange-50 rounded-lg"
-              >
-                <div className="flex items-center gap-4">
-                  <Avatar>
-                    <AvatarFallback className="bg-orange-200 text-orange-800">
-                      {customer.name
-                        .split(' ')
-                        .map((n: string) => n[0])
-                        .join('')}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">{customer.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Last order: {customer.lastOrder}
-                    </p>
-                    <p className="text-sm text-orange-700">Reason: {customer.reason}</p>
+            {atRiskCustomers.map(
+              (customer: {
+                id: string;
+                name: string;
+                lastOrder: string;
+                reason: string;
+                riskScore: number;
+              }) => (
+                <div
+                  key={customer.id}
+                  className="flex items-center justify-between p-4 bg-orange-50 rounded-lg"
+                >
+                  <div className="flex items-center gap-4">
+                    <Avatar>
+                      <AvatarFallback className="bg-orange-200 text-orange-800">
+                        {customer.name
+                          .split(' ')
+                          .map((n: string) => n[0])
+                          .join('')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{customer.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Last order: {customer.lastOrder}
+                      </p>
+                      <p className="text-sm text-orange-700">Reason: {customer.reason}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground mb-1">Risk Score</p>
+                    <div className="flex items-center gap-2">
+                      <Progress value={customer.riskScore} className="w-24 h-2" />
+                      <span className="font-bold text-orange-700">{customer.riskScore}%</span>
+                    </div>
+                    <Button variant="outline" size="sm" className="mt-2">
+                      Take Action
+                    </Button>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground mb-1">Risk Score</p>
-                  <div className="flex items-center gap-2">
-                    <Progress value={customer.riskScore} className="w-24 h-2" />
-                    <span className="font-bold text-orange-700">{customer.riskScore}%</span>
-                  </div>
-                  <Button variant="outline" size="sm" className="mt-2">
-                    Take Action
-                  </Button>
-                </div>
-              </div>
-            ))}
+              ),
+            )}
           </div>
         </CardContent>
       </Card>

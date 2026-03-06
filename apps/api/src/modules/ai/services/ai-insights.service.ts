@@ -326,6 +326,11 @@ export class AiInsightsService {
   private async analyzeCashFlow(organizationId: string, startOfMonth: Date) {
     const today = new Date();
 
+    // Skip if no financial data exists
+    const txCount = await this.prisma.paymentReceived.count({ where: { organizationId } });
+    const expCount = await this.prisma.expense.count({ where: { organizationId } });
+    if (txCount === 0 && expCount === 0) return null;
+
     const paymentsReceived = await this.prisma.paymentReceived.aggregate({
       where: { organizationId, date: { gte: startOfMonth, lte: today } },
       _sum: { amount: true },
@@ -373,6 +378,12 @@ export class AiInsightsService {
   }
 
   private async analyzeRevenueTrend(organizationId: string) {
+    // Skip if no invoices exist
+    const invoiceCount = await this.prisma.invoice.count({
+      where: { organizationId, deletedAt: null },
+    });
+    if (invoiceCount === 0) return null;
+
     const months: Array<{ month: string; revenue: number }> = [];
     const today = new Date();
 
@@ -420,6 +431,9 @@ export class AiInsightsService {
   }
 
   private async detectExpenseAnomalies(organizationId: string) {
+    const expenseCount = await this.prisma.expense.count({ where: { organizationId } });
+    if (expenseCount === 0) return null;
+
     const today = new Date();
     const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
@@ -473,6 +487,11 @@ export class AiInsightsService {
   }
 
   private async analyzePaymentPatterns(organizationId: string) {
+    const paidCount = await this.prisma.invoice.count({
+      where: { organizationId, deletedAt: null, status: { in: ['PAID', 'PARTIALLY_PAID'] } },
+    });
+    if (paidCount === 0) return null;
+
     const paidInvoices = await this.prisma.invoice.findMany({
       where: {
         organizationId,
@@ -538,6 +557,8 @@ export class AiInsightsService {
       where: { organizationId, type: 'GOODS' },
     });
 
+    if (items.length === 0) return null;
+
     const lowStockItems = [];
     for (const item of items) {
       const movements = await this.prisma.inventoryMovement.findMany({
@@ -577,6 +598,8 @@ export class AiInsightsService {
         tasks: true,
       },
     });
+
+    if (projects.length === 0) return null;
 
     const unprofitableProjects: Array<{
       id: string;

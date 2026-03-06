@@ -30,7 +30,8 @@ import { SuggestionCard } from '@/components/ai/deep-search/suggestion-card';
 import dynamic from 'next/dynamic';
 
 const PromptModal = dynamic(
-  () => import('@/components/ai/deep-search/prompt-modal').then((m) => m.PromptModal),
+  () =>
+    import('@/components/ai/deep-search/prompt-modal').then((m) => ({ default: m.PromptModal })),
   { ssr: false },
 );
 

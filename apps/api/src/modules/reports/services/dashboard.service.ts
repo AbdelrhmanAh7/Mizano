@@ -120,9 +120,9 @@ export class DashboardService {
     // 3 aggregate queries instead of months * 3 individual queries
     const [invoicesByMonth, expensesByMonth, billsByMonth] = await Promise.all([
       this.prisma.invoice.groupBy({
-        by: ['issueDate'],
-        where: { organizationId, deletedAt: null, issueDate: { gte: startDate } },
-        _sum: { total: true },
+        by: ['date'],
+        where: { organizationId, deletedAt: null, date: { gte: startDate } },
+        _sum: { grandTotal: true },
       }),
       this.prisma.expense.groupBy({
         by: ['date'],
@@ -130,9 +130,9 @@ export class DashboardService {
         _sum: { amount: true },
       }),
       this.prisma.bill.groupBy({
-        by: ['billDate'],
-        where: { organizationId, deletedAt: null, billDate: { gte: startDate } },
-        _sum: { total: true },
+        by: ['date'],
+        where: { organizationId, deletedAt: null, date: { gte: startDate } },
+        _sum: { grandTotal: true },
       }),
     ]);
 
@@ -141,10 +141,9 @@ export class DashboardService {
     const expenseByMonth: Record<string, number> = {};
 
     for (const inv of invoicesByMonth) {
-      if (!inv.issueDate) continue;
-      const key = `${inv.issueDate.getFullYear()}-${inv.issueDate.getMonth()}`;
+      const key = `${inv.date.getFullYear()}-${inv.date.getMonth()}`;
       revenueByMonth[key] =
-        (revenueByMonth[key] || 0) + parseFloat(inv._sum.total?.toString() || '0');
+        (revenueByMonth[key] || 0) + parseFloat(inv._sum.grandTotal?.toString() || '0');
     }
     for (const exp of expensesByMonth) {
       const key = `${exp.date.getFullYear()}-${exp.date.getMonth()}`;
@@ -152,10 +151,9 @@ export class DashboardService {
         (expenseByMonth[key] || 0) + parseFloat(exp._sum.amount?.toString() || '0');
     }
     for (const bill of billsByMonth) {
-      if (!bill.billDate) continue;
-      const key = `${bill.billDate.getFullYear()}-${bill.billDate.getMonth()}`;
+      const key = `${bill.date.getFullYear()}-${bill.date.getMonth()}`;
       expenseByMonth[key] =
-        (expenseByMonth[key] || 0) + parseFloat(bill._sum.total?.toString() || '0');
+        (expenseByMonth[key] || 0) + parseFloat(bill._sum.grandTotal?.toString() || '0');
     }
 
     // Build the result array
@@ -235,7 +233,7 @@ export class DashboardService {
       include: {
         invoices: {
           where: { deletedAt: null },
-          select: { total: true },
+          select: { grandTotal: true },
         },
       },
     });
@@ -244,7 +242,7 @@ export class DashboardService {
       id: c.id,
       name: c.name,
       totalRevenue: c.invoices.reduce(
-        (sum, inv) => sum + parseFloat((inv.total ?? 0).toString()),
+        (sum, inv) => sum + parseFloat((inv.grandTotal ?? 0).toString()),
         0,
       ),
       invoiceCount: c.invoices.length,
@@ -290,7 +288,7 @@ export class DashboardService {
         0,
       );
       const revenue = p.invoices.reduce(
-        (sum, inv) => sum + parseFloat((inv.total ?? inv.grandTotal).toString()),
+        (sum, inv) => sum + parseFloat(inv.grandTotal.toString()),
         0,
       );
       const budget = p.budget ? parseFloat(p.budget.toString()) : 0;
@@ -317,10 +315,10 @@ export class DashboardService {
 
   private async getRevenueInRange(organizationId: string, start: Date, end: Date) {
     const invoices = await this.prisma.invoice.aggregate({
-      where: { organizationId, deletedAt: null, issueDate: { gte: start, lte: end } },
-      _sum: { total: true },
+      where: { organizationId, deletedAt: null, date: { gte: start, lte: end } },
+      _sum: { grandTotal: true },
     });
-    return parseFloat(invoices._sum.total?.toString() || '0');
+    return parseFloat(invoices._sum.grandTotal?.toString() || '0');
   }
 
   private async getExpensesInRange(organizationId: string, start: Date, end: Date) {
@@ -330,13 +328,13 @@ export class DashboardService {
         _sum: { amount: true },
       }),
       this.prisma.bill.aggregate({
-        where: { organizationId, deletedAt: null, billDate: { gte: start, lte: end } },
-        _sum: { total: true },
+        where: { organizationId, deletedAt: null, date: { gte: start, lte: end } },
+        _sum: { grandTotal: true },
       }),
     ]);
     return (
       parseFloat(expenses._sum.amount?.toString() || '0') +
-      parseFloat(bills._sum.total?.toString() || '0')
+      parseFloat(bills._sum.grandTotal?.toString() || '0')
     );
   }
 
@@ -358,10 +356,10 @@ export class DashboardService {
 
   private async getMonthlyRevenue(organizationId: string, startOfMonth: Date) {
     const invoices = await this.prisma.invoice.aggregate({
-      where: { organizationId, deletedAt: null, issueDate: { gte: startOfMonth } },
-      _sum: { total: true },
+      where: { organizationId, deletedAt: null, date: { gte: startOfMonth } },
+      _sum: { grandTotal: true },
     });
-    return parseFloat(invoices._sum.total?.toString() || '0');
+    return parseFloat(invoices._sum.grandTotal?.toString() || '0');
   }
 
   private async getMonthlyExpenses(organizationId: string, startOfMonth: Date) {
@@ -370,21 +368,21 @@ export class DashboardService {
       _sum: { amount: true },
     });
     const bills = await this.prisma.bill.aggregate({
-      where: { organizationId, deletedAt: null, billDate: { gte: startOfMonth } },
-      _sum: { total: true },
+      where: { organizationId, deletedAt: null, date: { gte: startOfMonth } },
+      _sum: { grandTotal: true },
     });
     return (
       parseFloat(expenses._sum.amount?.toString() || '0') +
-      parseFloat(bills._sum.total?.toString() || '0')
+      parseFloat(bills._sum.grandTotal?.toString() || '0')
     );
   }
 
   private async getYearlyRevenue(organizationId: string, startOfYear: Date) {
     const invoices = await this.prisma.invoice.aggregate({
-      where: { organizationId, deletedAt: null, issueDate: { gte: startOfYear } },
-      _sum: { total: true },
+      where: { organizationId, deletedAt: null, date: { gte: startOfYear } },
+      _sum: { grandTotal: true },
     });
-    return parseFloat(invoices._sum.total?.toString() || '0');
+    return parseFloat(invoices._sum.grandTotal?.toString() || '0');
   }
 
   private async getBankBalances(organizationId: string) {

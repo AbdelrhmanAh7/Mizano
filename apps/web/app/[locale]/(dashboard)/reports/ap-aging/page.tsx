@@ -42,7 +42,11 @@ export default function APAgingReportPage() {
     );
   }
 
-  const reportData = report || { buckets: [], total: 0, totalCount: 0 };
+  const reportData = {
+    buckets: Array.isArray(report?.buckets) ? report.buckets : [],
+    total: report?.total ?? 0,
+    totalCount: report?.totalCount ?? 0,
+  };
 
   return (
     <div className="space-y-6">
@@ -145,41 +149,50 @@ export default function APAgingReportPage() {
                 <TableBody>
                   {reportData.buckets
                     .find((b: AgingBucket) => b.range === expandedBucket)
-                    ?.items?.map((item: any) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <Link
-                            href={`/purchases/bills/${item.id}`}
-                            className="font-medium hover:text-blue-600 hover:underline"
-                          >
-                            {item.number}
-                          </Link>
-                        </TableCell>
-                        <TableCell>{item.counterpartyName}</TableCell>
-                        <TableCell>{format(new Date(item.date), 'MMM d, yyyy')}</TableCell>
-                        <TableCell>{format(new Date(item.dueDate), 'MMM d, yyyy')}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(item.amount)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
-                          {formatCurrency(item.balanceDue)}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              item.daysOverdue > 30
-                                ? 'bg-red-100 text-red-800'
-                                : item.daysOverdue > 0
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-green-100 text-green-800',
-                            )}
-                          >
-                            {item.daysOverdue}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    ?.items?.map(
+                      (item: {
+                        id: string;
+                        number: string;
+                        counterpartyName: string;
+                        date: string;
+                        dueDate: string;
+                        amount: number;
+                      }) => (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            <Link
+                              href={`/purchases/bills/${item.id}`}
+                              className="font-medium hover:text-blue-600 hover:underline"
+                            >
+                              {item.number}
+                            </Link>
+                          </TableCell>
+                          <TableCell>{item.counterpartyName}</TableCell>
+                          <TableCell>{format(new Date(item.date), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>{format(new Date(item.dueDate), 'MMM d, yyyy')}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatCurrency(item.amount)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium">
+                            {formatCurrency(item.balanceDue)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                item.daysOverdue > 30
+                                  ? 'bg-red-100 text-red-800'
+                                  : item.daysOverdue > 0
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-green-100 text-green-800',
+                              )}
+                            >
+                              {item.daysOverdue}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )}
                 </TableBody>
               </Table>
             ) : (

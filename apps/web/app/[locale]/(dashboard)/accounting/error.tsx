@@ -14,7 +14,7 @@ export default function AccountingError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('Accounting module error:', error);
+    console.error('Accounting module error:', error.message, error.stack);
   }, [error]);
 
   return (
@@ -29,7 +29,7 @@ export default function AccountingError({
           <div>
             <h2 className="text-lg font-semibold">Accounting Module Error</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              An error occurred while loading this page. Please try again.
+              {error.message || 'An error occurred while loading this page. Please try again.'}
             </p>
             {error.digest && (
               <p className="text-xs text-muted-foreground mt-2 font-mono">

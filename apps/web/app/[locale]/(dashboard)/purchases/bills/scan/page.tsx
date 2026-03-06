@@ -63,12 +63,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
-
-const QuickTrainDialog = dynamic(
-  () => import('@/components/ai/ocr-training/quick-train-dialog').then((m) => m.QuickTrainDialog),
-  { ssr: false },
-);
+import { QuickTrainDialog } from '@/components/ai/ocr-training/quick-train-dialog';
 
 type Step = 'upload' | 'review' | 'creating';
 
@@ -176,9 +171,12 @@ export default function ScanBillPage() {
         }
 
         // Convert line items to editable format
-        if (result.extractedFields.lineItems.length > 0) {
+        const lineItemsArr = Array.isArray(result.extractedFields.lineItems)
+          ? result.extractedFields.lineItems
+          : [];
+        if (lineItemsArr.length > 0) {
           setLineItems(
-            result.extractedFields.lineItems.map((item) => ({
+            lineItemsArr.map((item) => ({
               description: item.description,
               quantity: String(item.quantity),
               rate: String(item.unitPrice),

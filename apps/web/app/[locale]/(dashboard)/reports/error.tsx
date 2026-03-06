@@ -14,7 +14,7 @@ export default function ReportsError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('Reports module error:', error);
+    console.error('Reports module error:', error.message, error.stack);
   }, [error]);
 
   return (
@@ -29,7 +29,7 @@ export default function ReportsError({
           <div>
             <h2 className="text-lg font-semibold">Report Error</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              An error occurred while generating this report. Please try again.
+              {error.message || 'An error occurred while generating this report. Please try again.'}
             </p>
             {error.digest && (
               <p className="text-xs text-muted-foreground mt-2 font-mono">

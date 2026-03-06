@@ -130,11 +130,19 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
+      const oldToken = originalRequest.headers.Authorization?.toString().replace('Bearer ', '');
       invalidateSessionCache();
       const newSession = await getSession();
 
       if (!newSession?.accessToken || newSession.error === 'RefreshAccessTokenError') {
         processQueue(new Error('Refresh failed'), null);
+        redirectToLogin();
+        return Promise.reject(error);
+      }
+
+      // Stale token check: if refresh returned the same token, it's invalid
+      if (newSession.accessToken === oldToken) {
+        processQueue(new Error('Token refresh returned stale token'), null);
         redirectToLogin();
         return Promise.reject(error);
       }

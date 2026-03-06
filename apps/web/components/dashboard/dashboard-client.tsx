@@ -1,6 +1,7 @@
 'use client';
 
 import { AIBusinessPulse } from '@/components/dashboard/ai-business-pulse';
+import { WidgetErrorBoundary } from '@/components/dashboard/widget-error-boundary';
 import { DateRangePicker } from '@/components/dashboard/date-range-picker';
 import { EnhancedAIInsights } from '@/components/dashboard/enhanced-ai-insights';
 import { RecentTransactions } from '@/components/dashboard/recent-transactions';
@@ -36,10 +37,18 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import dynamic from 'next/dynamic';
 import { useEffect } from 'react';
+import { CashFlowChart } from '@/components/dashboard/cash-flow-chart';
+import { RevenueChart } from '@/components/dashboard/revenue-chart';
+import { ARAPChart } from '@/components/dashboard/ar-ap-chart';
+import { ExpensesPie } from '@/components/dashboard/expenses-pie';
+import { ProfitMarginChart } from '@/components/dashboard/profit-margin-chart';
+import { TopCustomersChart } from '@/components/dashboard/top-customers-chart';
+import { BankBalanceChart } from '@/components/dashboard/bank-balance-chart';
+import { InventoryValueChart } from '@/components/dashboard/inventory-value-chart';
+import { CashFlowForecastChart } from '@/components/dashboard/cash-flow-forecast-chart';
+import { RevenueForecastChart } from '@/components/dashboard/revenue-forecast-chart';
 
-// Lazy-load chart components — Recharts (~200KB) only loads when needed
 function ChartSkeleton() {
   return (
     <Card>
@@ -52,66 +61,6 @@ function ChartSkeleton() {
     </Card>
   );
 }
-
-const CashFlowChart = dynamic(
-  () =>
-    import('@/components/dashboard/cash-flow-chart').then((m) => ({ default: m.CashFlowChart })),
-  { ssr: false, loading: () => <ChartSkeleton /> },
-);
-const RevenueChart = dynamic(
-  () => import('@/components/dashboard/revenue-chart').then((m) => ({ default: m.RevenueChart })),
-  { ssr: false, loading: () => <ChartSkeleton /> },
-);
-const ARAPChart = dynamic(
-  () => import('@/components/dashboard/ar-ap-chart').then((m) => ({ default: m.ARAPChart })),
-  { ssr: false, loading: () => <ChartSkeleton /> },
-);
-const ExpensesPie = dynamic(
-  () => import('@/components/dashboard/expenses-pie').then((m) => ({ default: m.ExpensesPie })),
-  { ssr: false, loading: () => <ChartSkeleton /> },
-);
-const ProfitMarginChart = dynamic(
-  () =>
-    import('@/components/dashboard/profit-margin-chart').then((m) => ({
-      default: m.ProfitMarginChart,
-    })),
-  { ssr: false, loading: () => <ChartSkeleton /> },
-);
-const TopCustomersChart = dynamic(
-  () =>
-    import('@/components/dashboard/top-customers-chart').then((m) => ({
-      default: m.TopCustomersChart,
-    })),
-  { ssr: false, loading: () => <ChartSkeleton /> },
-);
-const BankBalanceChart = dynamic(
-  () =>
-    import('@/components/dashboard/bank-balance-chart').then((m) => ({
-      default: m.BankBalanceChart,
-    })),
-  { ssr: false, loading: () => <ChartSkeleton /> },
-);
-const InventoryValueChart = dynamic(
-  () =>
-    import('@/components/dashboard/inventory-value-chart').then((m) => ({
-      default: m.InventoryValueChart,
-    })),
-  { ssr: false, loading: () => <ChartSkeleton /> },
-);
-const CashFlowForecastChart = dynamic(
-  () =>
-    import('@/components/dashboard/cash-flow-forecast-chart').then((m) => ({
-      default: m.CashFlowForecastChart,
-    })),
-  { ssr: false, loading: () => <ChartSkeleton /> },
-);
-const RevenueForecastChart = dynamic(
-  () =>
-    import('@/components/dashboard/revenue-forecast-chart').then((m) => ({
-      default: m.RevenueForecastChart,
-    })),
-  { ssr: false, loading: () => <ChartSkeleton /> },
-);
 
 function ChartDrillLink({ href, label }: { href: string; label: string }) {
   return (
@@ -406,7 +355,11 @@ export function DashboardClient() {
       {/* Render widgets in user-defined order */}
       {sortedWidgets.map((widget) => {
         if (!widget.visible) return null;
-        return renderWidget(widget.id);
+        return (
+          <WidgetErrorBoundary key={widget.id} widgetId={widget.id}>
+            {renderWidget(widget.id)}
+          </WidgetErrorBoundary>
+        );
       })}
     </div>
   );

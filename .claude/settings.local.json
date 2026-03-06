@@ -73,7 +73,17 @@
       "Bash(done)",
       "Bash(pnpm list turbo)",
       "Bash(/mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/node_modules/.bin/tsc --noEmit)",
-      "Bash(git -C /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano log --oneline -10)"
+      "Bash(git -C /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano log --oneline -10)",
+      "Bash(find /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/app/[locale]/'\\(dashboard\\)' -type f -name \"page.tsx\")",
+      "Bash(ls -la /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/app/[locale]/'\\(dashboard\\)'/manufacturing/)",
+      "Bash(ls -la /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/app/[locale]/\\\\\\(dashboard\\\\\\)/)",
+      "Bash(ls -la /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/app/[locale]/'\\(dashboard\\)'/hr/)",
+      "Bash(ls -la /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/app/[locale]/'\\(dashboard\\)'/crm/)",
+      "Bash(ls -la /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/app/[locale]/'\\(dashboard\\)'/tax/)",
+      "Bash(ls -la /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/app/[locale]/'\\(dashboard\\)'/banking/)",
+      "Bash(ls -la /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/app/[locale]/'\\(dashboard\\)'/inventory/)",
+      "Bash(find /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/app/[locale]/'\\(dashboard\\)' -maxdepth 2 -name \"page.tsx\" -o -name \"error.tsx\")",
+      "Bash(node:*)"
     ]
   }
 }

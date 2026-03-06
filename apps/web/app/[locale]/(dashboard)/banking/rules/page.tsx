@@ -83,7 +83,7 @@ function BankRulesPageContent() {
       header: 'Conditions',
       cell: ({ row }) => (
         <div className="space-y-1">
-          {row.original.conditions.map((condition, idx) => (
+          {(row.original.conditions ?? []).map((condition, idx) => (
             <p key={idx} className="text-sm">
               <span className="text-muted-foreground">
                 {getConditionFieldLabel(condition.field)}

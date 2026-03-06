@@ -37,11 +37,21 @@ export function useGlobalErrorCapture() {
       });
     };
 
+    const serializeArg = (a: unknown): string => {
+      if (typeof a === 'string') return a;
+      if (a instanceof Error) return a.message + (a.stack ? '\n' + a.stack : '');
+      try {
+        return JSON.stringify(a);
+      } catch {
+        return String(a);
+      }
+    };
+
     // Capture console.error calls
     const originalError = console.error;
-    console.error = (...args: any[]) => {
+    console.error = (...args: unknown[]) => {
       originalError.apply(console, args);
-      const message = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+      const message = args.map(serializeArg).join(' ');
       // Skip React internals and our own logs
       if (
         !message.includes('[Mizano Logger]') &&
@@ -57,9 +67,9 @@ export function useGlobalErrorCapture() {
 
     // Capture console.warn calls
     const originalWarn = console.warn;
-    console.warn = (...args: any[]) => {
+    console.warn = (...args: unknown[]) => {
       originalWarn.apply(console, args);
-      const message = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+      const message = args.map(serializeArg).join(' ');
       if (!message.includes('[Mizano Logger]')) {
         captureWarning(message, {
           source: 'console.warn',

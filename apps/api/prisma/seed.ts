@@ -151,6 +151,7 @@ async function main() {
     { code: '1000', name: 'Cash', type: AccountType.ASSET },
     { code: '1010', name: 'Bank Account', type: AccountType.ASSET },
     { code: '1100', name: 'Inventory', type: AccountType.ASSET },
+    { code: '1200', name: 'Accounts Receivable', type: AccountType.ASSET },
     { code: '2000', name: 'Accounts Payable', type: AccountType.LIABILITY },
     { code: '3000', name: 'Owner Capital', type: AccountType.EQUITY },
     { code: '4000', name: 'Sales Revenue', type: AccountType.REVENUE },
@@ -174,7 +175,7 @@ async function main() {
   const customers = [
     {
       id: 'cust-001',
-      name: 'TechCorp Egypt',
+      name: 'Nile Tech Solutions',
       email: 'hello@techcorp.eg',
       phone: '+201001234567',
       billingCity: 'Cairo',
@@ -182,7 +183,7 @@ async function main() {
     },
     {
       id: 'cust-002',
-      name: 'Global Solutions',
+      name: 'Delta Logistics Egypt',
       email: 'info@global.com',
       phone: '+201101234567',
       billingCity: 'Alexandria',
@@ -190,7 +191,7 @@ async function main() {
     },
     {
       id: 'cust-003',
-      name: 'Retail Plus',
+      name: 'Cairo Digital Store',
       email: 'contact@retail.eg',
       phone: '+201201234567',
       billingCity: 'Giza',
@@ -377,6 +378,36 @@ async function main() {
   }
   console.log(`  ✓ ${invoices.length} invoices created`);
 
+  // 10b. INVOICE LINES
+  console.log('\n10b. Creating invoice lines...');
+  await prisma.invoiceLine.upsert({
+    where: { id: 'inv-line-001' },
+    update: {},
+    create: {
+      id: 'inv-line-001',
+      invoiceId: 'inv-INV-001',
+      itemId: itemMap['item-001'],
+      description: 'Laptop Pro 15"',
+      quantity: new Decimal(1),
+      rate: new Decimal(1299.99),
+      amount: new Decimal(1299.99),
+    },
+  });
+  await prisma.invoiceLine.upsert({
+    where: { id: 'inv-line-002' },
+    update: {},
+    create: {
+      id: 'inv-line-002',
+      invoiceId: 'inv-INV-002',
+      itemId: itemMap['item-002'],
+      description: 'Desktop Monitor',
+      quantity: new Decimal(2),
+      rate: new Decimal(349.99),
+      amount: new Decimal(699.98),
+    },
+  });
+  console.log('  ✓ Invoice lines created for INV-001, INV-002');
+
   // 11. BILLS
   console.log('\n11. Creating bills...');
   const bills = [
@@ -414,7 +445,21 @@ async function main() {
   console.log(`  ✓ ${bills.length} bills created`);
 
   // 12. AI TRAINING DATA
-  await seedAiTrainingData(prisma, orgId, accountMap, custMap, vendMap, itemMap, whMap);
+  await seedAiTrainingData(prisma, orgId, accountMap, custMap, vendMap, itemMap, whMap, bankMap);
+
+  // 13. SET ORGANIZATION DEFAULT ACCOUNTS
+  console.log('\n13. Setting organization default accounts...');
+  await prisma.organization.update({
+    where: { id: orgId },
+    data: {
+      defaultArAccountId: accountMap['1200'],
+      defaultRevenueAccountId: accountMap['4000'],
+      defaultApAccountId: accountMap['2000'],
+      defaultBankAccountId: accountMap['1010'],
+      defaultCashAccountId: accountMap['1000'],
+    },
+  });
+  console.log('  ✓ Organization default accounts configured');
 
   console.log('\n' + '='.repeat(60));
   console.log('✅ Seed completed successfully!');

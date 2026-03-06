@@ -11,6 +11,12 @@ import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
 import { useCashFlowReport, formatCurrency } from '@/lib/hooks/use-reports';
 
+interface CashFlowItem {
+  name?: string;
+  description?: string;
+  amount: number;
+}
+
 export default function CashFlowReportPage() {
   const [dateRange, setDateRange] = useState({
     startDate: startOfMonth(new Date()),
@@ -37,16 +43,20 @@ export default function CashFlowReportPage() {
     );
   }
 
-  const data = report || {
-    operatingActivities: { items: [], total: 0 },
-    investingActivities: { items: [], total: 0 },
-    financingActivities: { items: [], total: 0 },
-    netCashFlow: 0,
-    openingBalance: 0,
-    closingBalance: 0,
+  const safeSection = (s: { items?: CashFlowItem[]; total?: number } | undefined | null) => ({
+    items: Array.isArray(s?.items) ? s.items : ([] as CashFlowItem[]),
+    total: s?.total ?? 0,
+  });
+  const data = {
+    operatingActivities: safeSection(report?.operatingActivities),
+    investingActivities: safeSection(report?.investingActivities),
+    financingActivities: safeSection(report?.financingActivities),
+    netCashFlow: report?.netCashFlow ?? 0,
+    openingBalance: report?.openingBalance ?? 0,
+    closingBalance: report?.closingBalance ?? 0,
   };
 
-  const renderSection = (title: string, section: { items: any[]; total: number }) => (
+  const renderSection = (title: string, section: { items: CashFlowItem[]; total: number }) => (
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">{title}</CardTitle>
@@ -56,7 +66,7 @@ export default function CashFlowReportPage() {
           <p className="text-center py-4 text-muted-foreground text-sm">No items</p>
         ) : (
           <div className="space-y-2">
-            {section.items.map((item: any, i: number) => (
+            {section.items.map((item: CashFlowItem, i: number) => (
               <div key={i} className="flex justify-between py-1.5 border-b last:border-0">
                 <span className="text-sm">{item.name || item.description}</span>
                 <span

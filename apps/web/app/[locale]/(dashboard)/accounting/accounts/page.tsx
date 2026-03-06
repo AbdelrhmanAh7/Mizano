@@ -27,7 +27,10 @@ import { AccountTree } from '@/components/accounting/account-tree';
 import dynamic from 'next/dynamic';
 
 const AccountFormDialog = dynamic(
-  () => import('@/components/accounting/account-form-dialog').then((m) => m.AccountFormDialog),
+  () =>
+    import('@/components/accounting/account-form-dialog').then((m) => ({
+      default: m.AccountFormDialog,
+    })),
   { ssr: false },
 );
 import {

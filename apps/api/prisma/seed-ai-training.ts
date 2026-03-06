@@ -20,6 +20,7 @@ export async function seedAiTrainingData(
   vendMap: Record<string, string>,
   itemMap: Record<string, string>,
   whMap: Record<string, string>,
+  bankMap: Record<string, string> = {},
 ) {
   console.log('\n12. Seeding AI training data...');
 
@@ -36,7 +37,6 @@ export async function seedAiTrainingData(
     { code: '6500', name: 'Insurance', type: AccountType.EXPENSE },
     { code: '6600', name: 'Rent & Lease', type: AccountType.EXPENSE },
     { code: '6700', name: 'Professional Fees', type: AccountType.EXPENSE },
-    { code: '1200', name: 'Accounts Receivable', type: AccountType.ASSET },
   ];
 
   for (const accData of extraAccounts) {
@@ -119,7 +119,7 @@ export async function seedAiTrainingData(
   // Maps transaction descriptions → account codes
   // ──────────────────────────────────────────────────────────────────
   console.log('  → Seeding categorization training data...');
-  const categorizationRecords: Array<{ inputData: Record<string, any>; label: string }> = [];
+  const categorizationRecords: Array<{ inputData: Record<string, unknown>; label: string }> = [];
 
   const categorizationSamples: Array<{
     descriptions: string[];
@@ -951,7 +951,7 @@ export async function seedAiTrainingData(
   // ──────────────────────────────────────────────────────────────────
   console.log('  → Seeding paid invoices for payment prediction...');
   const customerIds = [custMap['cust-001'], custMap['cust-002'], custMap['cust-003']];
-  const customerNames = ['TechCorp Egypt', 'Global Solutions', 'Retail Plus'];
+  const customerNames = ['Nile Tech Solutions', 'Delta Logistics Egypt', 'Cairo Digital Store'];
 
   // Payment behavior profiles per customer
   const paymentProfiles = [
@@ -987,7 +987,11 @@ export async function seedAiTrainingData(
       const paymentDate = new Date(invoiceDate);
       paymentDate.setDate(paymentDate.getDate() + daysToPayment);
 
-      // Create PAID invoice
+      // Future date guard: if payment would be in the future, create as SENT instead
+      const isFuture = paymentDate > new Date();
+      const invoiceStatus = isFuture ? InvoiceStatus.SENT : InvoiceStatus.PAID;
+
+      // Create invoice
       await prisma.invoice.upsert({
         where: { id: invoiceId },
         update: {},
@@ -996,48 +1000,69 @@ export async function seedAiTrainingData(
           invoiceNumber: invoiceNum,
           customerId: custId,
           date: invoiceDate,
+          issueDate: invoiceDate,
           dueDate,
-          status: InvoiceStatus.PAID,
+          status: invoiceStatus,
           subtotal: new Decimal(amount),
           grandTotal: new Decimal(amount),
-          balanceDue: new Decimal(0),
+          balanceDue: isFuture ? new Decimal(amount) : new Decimal(0),
           organizationId: orgId,
         },
       });
 
-      // Create payment
-      const paymentId = `pay-seed-${paymentIdx}`;
-      const paymentNum = `PAY-SEED-${paymentIdx++}`;
+      // Create invoice line items (1-2 items per invoice)
+      const itemKeys = ['item-001', 'item-002', 'item-003'];
+      const itemPrices = [1299.99, 349.99, 9.99];
+      const primaryItem = i % 3;
+      const qty = Math.max(1, Math.round(amount / itemPrices[primaryItem]));
+      const adjustedRate = Math.round((amount / qty) * 10000) / 10000;
 
-      await prisma.paymentReceived.upsert({
-        where: { id: paymentId },
-        update: {},
-        create: {
-          id: paymentId,
-          paymentNumber: paymentNum,
-          customerId: custId,
-          date: paymentDate,
-          amount: new Decimal(amount),
-          paymentMode: i % 3 === 0 ? 'BANK_TRANSFER' : i % 3 === 1 ? 'CHEQUE' : 'ONLINE',
-          depositToAccountId: accountMap['1010'],
-          organizationId: orgId,
-        },
-      });
-
-      // Link payment to invoice
-      await prisma.paymentAllocation.upsert({
-        where: { id: `pa-seed-${paymentIdx}` },
-        update: {},
-        create: {
-          id: `pa-seed-${paymentIdx}`,
-          paymentId,
+      await prisma.invoiceLine.create({
+        data: {
           invoiceId,
+          itemId: itemMap[itemKeys[primaryItem]],
+          description: ['Laptop Pro 15"', 'Desktop Monitor', 'USB Cable'][primaryItem],
+          quantity: new Decimal(qty),
+          rate: new Decimal(adjustedRate),
           amount: new Decimal(amount),
         },
       });
+
+      if (!isFuture) {
+        // Create payment
+        const paymentId = `pay-seed-${paymentIdx}`;
+        const paymentNum = `PAY-SEED-${paymentIdx++}`;
+
+        await prisma.paymentReceived.upsert({
+          where: { id: paymentId },
+          update: {},
+          create: {
+            id: paymentId,
+            paymentNumber: paymentNum,
+            customerId: custId,
+            date: paymentDate,
+            amount: new Decimal(amount),
+            paymentMode: i % 3 === 0 ? 'BANK_TRANSFER' : i % 3 === 1 ? 'CHEQUE' : 'ONLINE',
+            depositToAccountId: accountMap['1010'],
+            organizationId: orgId,
+          },
+        });
+
+        // Link payment to invoice
+        await prisma.paymentAllocation.upsert({
+          where: { id: `pa-seed-${paymentIdx}` },
+          update: {},
+          create: {
+            id: `pa-seed-${paymentIdx}`,
+            paymentId,
+            invoiceId,
+            amount: new Decimal(amount),
+          },
+        });
+      }
     }
   }
-  console.log(`  ✓ 45 paid invoices with payments created (15 per customer)`);
+  console.log(`  ✓ 45 invoices with payments created (15 per customer, future-guarded)`);
 
   // ──────────────────────────────────────────────────────────────────
   // 12i. OUTSTANDING INVOICES + BILLS for cash flow prediction
@@ -1055,20 +1080,38 @@ export async function seedAiTrainingData(
     const amount = Math.round((1000 + Math.random() * 9000) * 100) / 100;
     const status = dueDate < new Date() ? InvoiceStatus.OVERDUE : InvoiceStatus.SENT;
 
+    const outInvId = `inv-outstanding-${i}`;
     await prisma.invoice.upsert({
-      where: { id: `inv-outstanding-${i}` },
+      where: { id: outInvId },
       update: {},
       create: {
-        id: `inv-outstanding-${i}`,
+        id: outInvId,
         invoiceNumber: `INV-OUT-${(200 + i).toString().padStart(3, '0')}`,
         customerId: customerIds[i % 3],
         date,
+        issueDate: date,
         dueDate,
         status,
         subtotal: new Decimal(amount),
         grandTotal: new Decimal(amount),
         balanceDue: new Decimal(amount),
         organizationId: orgId,
+      },
+    });
+
+    // Add invoice line
+    const outItemIdx = i % 3;
+    const outItemPrices = [1299.99, 349.99, 9.99];
+    const outQty = Math.max(1, Math.round(amount / outItemPrices[outItemIdx]));
+    const outRate = Math.round((amount / outQty) * 10000) / 10000;
+    await prisma.invoiceLine.create({
+      data: {
+        invoiceId: outInvId,
+        itemId: itemMap[['item-001', 'item-002', 'item-003'][outItemIdx]],
+        description: ['Laptop Pro 15"', 'Desktop Monitor', 'USB Cable'][outItemIdx],
+        quantity: new Decimal(outQty),
+        rate: new Decimal(outRate),
+        amount: new Decimal(amount),
       },
     });
   }
@@ -1084,11 +1127,12 @@ export async function seedAiTrainingData(
     const amount = Math.round((500 + Math.random() * 7000) * 100) / 100;
     const status = dueDate < new Date() ? BillStatus.OVERDUE : BillStatus.OPEN;
 
+    const outBillId = `bill-outstanding-${i}`;
     await prisma.bill.upsert({
-      where: { id: `bill-outstanding-${i}` },
+      where: { id: outBillId },
       update: {},
       create: {
-        id: `bill-outstanding-${i}`,
+        id: outBillId,
         billNumber: `BILL-OUT-${(200 + i).toString().padStart(3, '0')}`,
         vendorId: vendMap[`vend-00${(i % 2) + 1}`],
         date,
@@ -1098,6 +1142,19 @@ export async function seedAiTrainingData(
         grandTotal: new Decimal(amount),
         balanceDue: new Decimal(amount),
         organizationId: orgId,
+      },
+    });
+
+    // Add bill line
+    const billExpAcct = i % 2 === 0 ? '5000' : '6000';
+    await prisma.billLine.create({
+      data: {
+        billId: outBillId,
+        accountId: accountMap[billExpAcct],
+        description: i % 2 === 0 ? 'Raw materials purchase' : 'Office supplies order',
+        quantity: new Decimal(1),
+        rate: new Decimal(amount),
+        amount: new Decimal(amount),
       },
     });
   }
@@ -1151,6 +1208,248 @@ export async function seedAiTrainingData(
   }
   console.log(`  ✓ ${recurringCount} recurring expenses created (4 patterns × 6 months)`);
 
+  // ──────────────────────────────────────────────────────────────────
+  // 12k. JOURNAL ENTRIES for all financial transactions
+  // ──────────────────────────────────────────────────────────────────
+  console.log('  → Creating journal entries...');
+  let journalIdx = 1;
+
+  async function createSeedJournal(
+    date: Date,
+    reference: string,
+    lines: Array<{ accountId: string; debit: number; credit: number; description: string }>,
+  ) {
+    const jrnNum = `JRN-SEED-${journalIdx.toString().padStart(3, '0')}`;
+    const jrnId = `jrn-seed-${journalIdx++}`;
+
+    await prisma.journal.upsert({
+      where: { id: jrnId },
+      update: {},
+      create: {
+        id: jrnId,
+        journalNumber: jrnNum,
+        date,
+        reference,
+        isPosted: true,
+        organizationId: orgId,
+        lines: {
+          create: lines.map((l) => ({
+            accountId: l.accountId,
+            debit: new Decimal(l.debit),
+            credit: new Decimal(l.credit),
+            description: l.description,
+          })),
+        },
+      },
+    });
+  }
+
+  // Journal entries for paid invoices (revenue recognition + payment receipt)
+  const paidInvoices = await prisma.invoice.findMany({
+    where: { organizationId: orgId, status: InvoiceStatus.PAID, deletedAt: null },
+    select: { id: true, invoiceNumber: true, date: true, grandTotal: true },
+  });
+
+  for (const inv of paidInvoices) {
+    const total = parseFloat(inv.grandTotal.toString());
+    if (total <= 0) continue;
+
+    // Revenue recognition: Dr AR / Cr Revenue
+    await createSeedJournal(inv.date, `Invoice ${inv.invoiceNumber}`, [
+      {
+        accountId: accountMap['1200'],
+        debit: total,
+        credit: 0,
+        description: `${inv.invoiceNumber} - Accounts Receivable`,
+      },
+      {
+        accountId: accountMap['4000'],
+        debit: 0,
+        credit: total,
+        description: `${inv.invoiceNumber} - Sales Revenue`,
+      },
+    ]);
+
+    // Payment receipt: Dr Bank / Cr AR
+    await createSeedJournal(inv.date, `Payment for ${inv.invoiceNumber}`, [
+      {
+        accountId: accountMap['1010'],
+        debit: total,
+        credit: 0,
+        description: `Payment received - ${inv.invoiceNumber}`,
+      },
+      {
+        accountId: accountMap['1200'],
+        debit: 0,
+        credit: total,
+        description: `Clear AR - ${inv.invoiceNumber}`,
+      },
+    ]);
+  }
+
+  // Journal entries for outstanding invoices (revenue recognition only)
+  const sentInvoices = await prisma.invoice.findMany({
+    where: {
+      organizationId: orgId,
+      status: { in: [InvoiceStatus.SENT, InvoiceStatus.OVERDUE] },
+      deletedAt: null,
+    },
+    select: { invoiceNumber: true, date: true, grandTotal: true },
+  });
+
+  for (const inv of sentInvoices) {
+    const total = parseFloat(inv.grandTotal.toString());
+    if (total <= 0) continue;
+
+    await createSeedJournal(inv.date, `Invoice ${inv.invoiceNumber}`, [
+      {
+        accountId: accountMap['1200'],
+        debit: total,
+        credit: 0,
+        description: `${inv.invoiceNumber} - Accounts Receivable`,
+      },
+      {
+        accountId: accountMap['4000'],
+        debit: 0,
+        credit: total,
+        description: `${inv.invoiceNumber} - Sales Revenue`,
+      },
+    ]);
+  }
+
+  // Journal entries for outstanding bills: Dr Expense / Cr AP
+  const outBills = await prisma.bill.findMany({
+    where: {
+      organizationId: orgId,
+      status: { in: [BillStatus.OPEN, BillStatus.OVERDUE] },
+      deletedAt: null,
+    },
+    select: { billNumber: true, date: true, grandTotal: true },
+  });
+
+  for (const bill of outBills) {
+    const total = parseFloat(bill.grandTotal.toString());
+    if (total <= 0) continue;
+
+    await createSeedJournal(bill.date, `Bill ${bill.billNumber}`, [
+      {
+        accountId: accountMap['5000'],
+        debit: total,
+        credit: 0,
+        description: `${bill.billNumber} - COGS`,
+      },
+      {
+        accountId: accountMap['2000'],
+        debit: 0,
+        credit: total,
+        description: `${bill.billNumber} - Accounts Payable`,
+      },
+    ]);
+  }
+
+  // Journal entries for expenses: Dr Expense acct / Cr Bank
+  const allExpenses = await prisma.expense.findMany({
+    where: { organizationId: orgId },
+    select: { id: true, description: true, date: true, amount: true, accountId: true },
+  });
+
+  for (const exp of allExpenses) {
+    const total = parseFloat(exp.amount.toString());
+    if (total <= 0) continue;
+
+    await createSeedJournal(exp.date, `Expense: ${exp.description}`, [
+      {
+        accountId: exp.accountId,
+        debit: total,
+        credit: 0,
+        description: exp.description || 'Expense',
+      },
+      {
+        accountId: accountMap['1010'],
+        debit: 0,
+        credit: total,
+        description: `Bank payment - ${exp.description}`,
+      },
+    ]);
+  }
+
+  console.log(`  ✓ ${journalIdx - 1} journal entries created`);
+
+  // ──────────────────────────────────────────────────────────────────
+  // 12l. BANK TRANSACTIONS
+  // ──────────────────────────────────────────────────────────────────
+  console.log('  → Creating bank transactions...');
+  let bankTxCount = 0;
+  let runningBalance = new Decimal(0);
+  const bankAccountId = bankMap['bank-001'] || 'bank-001';
+
+  // Deposits from paid invoices
+  const payments = await prisma.paymentReceived.findMany({
+    where: { organizationId: orgId },
+    select: { id: true, paymentNumber: true, date: true, amount: true },
+    orderBy: { date: 'asc' },
+  });
+
+  for (const pmt of payments) {
+    await prisma.bankTransaction.create({
+      data: {
+        bankAccountId,
+        date: pmt.date,
+        type: 'DEPOSIT',
+        amount: pmt.amount,
+        description: `Customer payment ${pmt.paymentNumber}`,
+        reference: pmt.paymentNumber,
+        status: 'MATCHED',
+        isReconciled: true,
+        matchedEntityType: 'payment_received',
+        matchedEntityId: pmt.id,
+        organizationId: orgId,
+      },
+    });
+    runningBalance = runningBalance.add(pmt.amount);
+    bankTxCount++;
+  }
+
+  // Withdrawals from expenses (those paid through bank)
+  const bankExpenses = await prisma.expense.findMany({
+    where: { organizationId: orgId, paidThroughAccountId: accountMap['1010'] },
+    select: { id: true, description: true, date: true, amount: true },
+    orderBy: { date: 'asc' },
+  });
+
+  for (const exp of bankExpenses) {
+    await prisma.bankTransaction.create({
+      data: {
+        bankAccountId,
+        date: exp.date,
+        type: 'WITHDRAWAL',
+        amount: exp.amount,
+        description: exp.description || 'Expense payment',
+        reference: exp.id,
+        status: 'MATCHED',
+        isReconciled: true,
+        matchedEntityType: 'expense',
+        matchedEntityId: exp.id,
+        organizationId: orgId,
+      },
+    });
+    runningBalance = runningBalance.sub(exp.amount);
+    bankTxCount++;
+  }
+
+  // Update bank account balance
+  await prisma.bankAccount.update({
+    where: { id: bankAccountId },
+    data: {
+      systemBalance: runningBalance,
+      bankBalance: runningBalance,
+    },
+  });
+
+  console.log(
+    `  ✓ ${bankTxCount} bank transactions created, balance: ${runningBalance.toString()}`,
+  );
+
   console.log('\n  ✅ AI training data seeding complete!');
   console.log(`  Summary:`);
   console.log(`    • ${categorizationRecords.length} categorization training records`);
@@ -1158,7 +1457,9 @@ export async function seedAiTrainingData(
   console.log(`    • ${leadData.length} leads (30 WON + 30 LOST)`);
   console.log(`    • ${expenseCount} expenses (with anomaly outliers)`);
   console.log(`    • ${movementCount} inventory movements (24 months)`);
-  console.log(`    • 45 paid invoices + payments (payment prediction)`);
+  console.log(`    • 45 invoices with payments (payment prediction)`);
   console.log(`    • 20 outstanding invoices/bills (cash flow)`);
   console.log(`    • ${recurringCount} recurring expenses (pattern detection)`);
+  console.log(`    • ${journalIdx - 1} journal entries`);
+  console.log(`    • ${bankTxCount} bank transactions`);
 }

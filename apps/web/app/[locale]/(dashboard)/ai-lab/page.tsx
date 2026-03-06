@@ -45,11 +45,16 @@ import dynamic from 'next/dynamic';
 
 const GenerateDataDialog = dynamic(
   () =>
-    import('@/components/ai/training-lab/generate-data-dialog').then((m) => m.GenerateDataDialog),
+    import('@/components/ai/training-lab/generate-data-dialog').then((m) => ({
+      default: m.GenerateDataDialog,
+    })),
   { ssr: false },
 );
 const ModelDetailDialog = dynamic(
-  () => import('@/components/ai/training-lab/model-detail-dialog').then((m) => m.ModelDetailDialog),
+  () =>
+    import('@/components/ai/training-lab/model-detail-dialog').then((m) => ({
+      default: m.ModelDetailDialog,
+    })),
   { ssr: false },
 );
 import { FeedbackCorrectionPanel } from '@/components/ai/training-lab/feedback-correction-panel';

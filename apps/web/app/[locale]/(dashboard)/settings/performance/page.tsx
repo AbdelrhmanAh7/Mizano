@@ -470,20 +470,22 @@ function SlowQueriesTable() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.data.map((entry: QueryMetricEntry, idx: number) => (
-                      <TableRow key={idx}>
-                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                          {new Date(entry.timestamp).toLocaleString()}
-                        </TableCell>
-                        <TableCell className="font-medium">{entry.model}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{entry.action}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DurationBadge duration={entry.duration} />
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {(Array.isArray(data?.data) ? data.data : []).map(
+                      (entry: QueryMetricEntry, idx: number) => (
+                        <TableRow key={idx}>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {new Date(entry.timestamp).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="font-medium">{entry.model}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{entry.action}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DurationBadge duration={entry.duration} />
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )}
                   </TableBody>
                 </Table>
               </div>

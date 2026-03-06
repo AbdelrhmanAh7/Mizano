@@ -12,7 +12,7 @@ export default function LocaleError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('Application error:', error);
+    console.error('Application error:', error.message, error.stack);
   }, [error]);
 
   return (
@@ -25,7 +25,8 @@ export default function LocaleError({
         </div>
         <h1 className="text-2xl font-bold">Something went wrong</h1>
         <p className="text-muted-foreground">
-          An unexpected error occurred. Please try again or contact support if the problem persists.
+          {error.message ||
+            'An unexpected error occurred. Please try again or contact support if the problem persists.'}
         </p>
         <Button onClick={reset} className="gap-2">
           <RotateCcw className="h-4 w-4" />

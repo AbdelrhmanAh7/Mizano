@@ -7,6 +7,23 @@ import { Button } from '@/components/ui/button';
 import { InvoiceForm } from '@/components/sales/invoice-form';
 import { useCreateInvoice } from '@/lib/hooks/use-invoices';
 
+interface InvoiceSubmitData {
+  customerId: string;
+  invoiceDate: string;
+  dueDate: string;
+  shippingCharge?: string;
+  notes?: string;
+  terms?: string;
+  lines: Array<{
+    itemId?: string;
+    description: string;
+    quantity: string;
+    rate: string;
+    discountPercent?: string;
+    taxRateId?: string;
+  }>;
+}
+
 export default function NewInvoicePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -14,7 +31,7 @@ export default function NewInvoicePage() {
 
   const createInvoice = useCreateInvoice();
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: InvoiceSubmitData) => {
     try {
       // Transform the data to match API expectations
       const invoiceData = {
@@ -24,7 +41,7 @@ export default function NewInvoicePage() {
         shippingAmount: data.shippingCharge || '0',
         notes: data.notes,
         terms: data.terms,
-        lines: data.lines.map((line: any) => ({
+        lines: (data.lines ?? []).map((line: InvoiceSubmitData['lines'][number]) => ({
           itemId: line.itemId || undefined,
           description: line.description,
           quantity: line.quantity,

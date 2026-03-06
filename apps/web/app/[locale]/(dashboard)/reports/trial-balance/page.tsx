@@ -40,54 +40,11 @@ export default function TrialBalanceReportPage() {
     );
   }
 
-  // Mock data for display
-  const mockReport = report || {
-    accounts: [
-      { id: '1', code: '1000', name: 'Cash', type: 'ASSET', debit: 50000, credit: 0 },
-      {
-        id: '2',
-        code: '1100',
-        name: 'Accounts Receivable',
-        type: 'ASSET',
-        debit: 35000,
-        credit: 0,
-      },
-      { id: '3', code: '1200', name: 'Inventory', type: 'ASSET', debit: 25000, credit: 0 },
-      { id: '4', code: '1500', name: 'Fixed Assets', type: 'ASSET', debit: 100000, credit: 0 },
-      {
-        id: '5',
-        code: '2000',
-        name: 'Accounts Payable',
-        type: 'LIABILITY',
-        debit: 0,
-        credit: 20000,
-      },
-      { id: '6', code: '2100', name: 'Loans Payable', type: 'LIABILITY', debit: 0, credit: 50000 },
-      { id: '7', code: '3000', name: "Owner's Capital", type: 'EQUITY', debit: 0, credit: 100000 },
-      { id: '8', code: '3100', name: 'Retained Earnings', type: 'EQUITY', debit: 0, credit: 15000 },
-      { id: '9', code: '4000', name: 'Revenue', type: 'INCOME', debit: 0, credit: 125000 },
-      {
-        id: '10',
-        code: '5000',
-        name: 'Cost of Goods Sold',
-        type: 'EXPENSE',
-        debit: 45000,
-        credit: 0,
-      },
-      {
-        id: '11',
-        code: '6000',
-        name: 'Operating Expenses',
-        type: 'EXPENSE',
-        debit: 35000,
-        credit: 0,
-      },
-      { id: '12', code: '6100', name: 'Salaries', type: 'EXPENSE', debit: 20000, credit: 0 },
-    ],
-    totalDebits: 310000,
-    totalCredits: 310000,
-    isBalanced: true,
-  };
+  const accounts = Array.isArray(report?.accounts) ? report.accounts : [];
+  const totalDebits = report?.totalDebits ?? 0;
+  const totalCredits = report?.totalCredits ?? 0;
+  const isBalanced = report?.isBalanced ?? true;
+  const hasData = accounts.length > 0;
 
   const getAccountTypeColor = (type: string) => {
     const colors: Record<string, string> = {
@@ -123,100 +80,102 @@ export default function TrialBalanceReportPage() {
         showAsOfDate
       />
 
-      {/* Balance Status */}
-      <Card
-        className={cn('border-2', mockReport.isBalanced ? 'border-green-500' : 'border-red-500')}
-      >
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {mockReport.isBalanced ? (
-                <CheckCircle className="h-8 w-8 text-green-600" />
-              ) : (
-                <XCircle className="h-8 w-8 text-red-600" />
-              )}
-              <div>
-                <p className="font-semibold">
-                  {mockReport.isBalanced
-                    ? 'Trial Balance is Balanced'
-                    : 'Trial Balance is Not Balanced'}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {mockReport.isBalanced
-                    ? 'Total debits equal total credits'
-                    : `Difference: ${formatCurrency(Math.abs(mockReport.totalDebits - mockReport.totalCredits))}`}
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="grid grid-cols-2 gap-8">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Debits</p>
-                  <p className="text-xl font-bold font-mono">
-                    {formatCurrency(mockReport.totalDebits)}
-                  </p>
+      {!hasData ? (
+        <Card>
+          <CardContent className="pt-6 text-center text-muted-foreground">
+            No trial balance data available. Create some transactions first.
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Balance Status */}
+          <Card className={cn('border-2', isBalanced ? 'border-green-500' : 'border-red-500')}>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {isBalanced ? (
+                    <CheckCircle className="h-8 w-8 text-green-600" />
+                  ) : (
+                    <XCircle className="h-8 w-8 text-red-600" />
+                  )}
+                  <div>
+                    <p className="font-semibold">
+                      {isBalanced ? 'Trial Balance is Balanced' : 'Trial Balance is Not Balanced'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {isBalanced
+                        ? 'Total debits equal total credits'
+                        : `Difference: ${formatCurrency(Math.abs(totalDebits - totalCredits))}`}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Credits</p>
-                  <p className="text-xl font-bold font-mono">
-                    {formatCurrency(mockReport.totalCredits)}
-                  </p>
+                <div className="text-right">
+                  <div className="grid grid-cols-2 gap-8">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Debits</p>
+                      <p className="text-xl font-bold font-mono">{formatCurrency(totalDebits)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Credits</p>
+                      <p className="text-xl font-bold font-mono">{formatCurrency(totalCredits)}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      {/* Trial Balance Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Account Balances</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Code</TableHead>
-                <TableHead>Account Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="text-right">Debit</TableHead>
-                <TableHead className="text-right">Credit</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mockReport.accounts.map((account: any) => (
-                <TableRow key={account.id}>
-                  <TableCell className="font-mono">{account.code}</TableCell>
-                  <TableCell className="font-medium">{account.name}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={getAccountTypeColor(account.type)}>
-                      {account.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {account.debit > 0 ? formatCurrency(account.debit) : '-'}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {account.credit > 0 ? formatCurrency(account.credit) : '-'}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter>
-              <TableRow className="font-bold">
-                <TableCell colSpan={3}>Total</TableCell>
-                <TableCell className="text-right font-mono">
-                  {formatCurrency(mockReport.totalDebits)}
-                </TableCell>
-                <TableCell className="text-right font-mono">
-                  {formatCurrency(mockReport.totalCredits)}
-                </TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
-        </CardContent>
-      </Card>
+          {/* Trial Balance Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Account Balances</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Account Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Debit</TableHead>
+                    <TableHead className="text-right">Credit</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accounts.map((account: TrialBalanceAccount) => (
+                    <TableRow key={account.id}>
+                      <TableCell className="font-mono">{account.code}</TableCell>
+                      <TableCell className="font-medium">{account.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={getAccountTypeColor(account.type)}>
+                          {account.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {account.debit > 0 ? formatCurrency(account.debit) : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {account.credit > 0 ? formatCurrency(account.credit) : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <TableFooter>
+                  <TableRow className="font-bold">
+                    <TableCell colSpan={3}>Total</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(totalDebits)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(totalCredits)}
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
