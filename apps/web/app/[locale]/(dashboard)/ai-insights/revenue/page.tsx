@@ -276,16 +276,16 @@ export default function RevenueForecastPage() {
                 <Badge
                   variant="outline"
                   className={
-                    month.predictedRevenue > avgHistorical * 1.1
+                    (month.predictedRevenue ?? 0) > avgHistorical * 1.1
                       ? 'bg-green-100 text-green-800'
-                      : month.predictedRevenue < avgHistorical * 0.9
+                      : (month.predictedRevenue ?? 0) < avgHistorical * 0.9
                         ? 'bg-red-100 text-red-800'
                         : 'bg-gray-100 text-gray-800'
                   }
                 >
-                  {month.predictedRevenue > avgHistorical * 1.1
+                  {(month.predictedRevenue ?? 0) > avgHistorical * 1.1
                     ? 'Above Average'
-                    : month.predictedRevenue < avgHistorical * 0.9
+                    : (month.predictedRevenue ?? 0) < avgHistorical * 0.9
                       ? 'Below Average'
                       : 'On Track'}
                 </Badge>

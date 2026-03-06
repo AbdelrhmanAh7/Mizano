@@ -157,6 +157,8 @@ export default function APAgingReportPage() {
                         date: string;
                         dueDate: string;
                         amount: number;
+                        balanceDue: number;
+                        daysOverdue: number;
                       }) => (
                         <TableRow key={item.id}>
                           <TableCell>

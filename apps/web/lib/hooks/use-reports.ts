@@ -532,12 +532,24 @@ export function useBalanceSheetReport(asOfDate: string) {
   });
 }
 
+interface CashFlowSection {
+  items?: Array<{ name?: string; description?: string; amount: number }>;
+  total?: number;
+}
+interface CashFlowRawReport {
+  operatingActivities?: CashFlowSection;
+  investingActivities?: CashFlowSection;
+  financingActivities?: CashFlowSection;
+  netCashFlow?: number;
+  openingBalance?: number;
+  closingBalance?: number;
+}
 export function useCashFlowReport(params: DateRange) {
-  return useQuery({
+  return useQuery<CashFlowRawReport>({
     queryKey: ['reports', 'cash-flow', params],
     queryFn: async () => {
       const response = await reportsApi.getCashFlow(params);
-      return unwrap(response);
+      return unwrap<CashFlowRawReport>(response);
     },
     enabled: !!params.startDate && !!params.endDate,
   });
@@ -564,11 +576,11 @@ export function useAPAgingReport(asOfDate?: string) {
 }
 
 export function useGeneralLedgerReport(accountId: string, params: DateRange) {
-  return useQuery({
+  return useQuery<GeneralLedgerReport>({
     queryKey: ['reports', 'general-ledger', accountId, params],
     queryFn: async () => {
       const response = await reportsApi.getGeneralLedger(accountId, params);
-      return unwrap(response);
+      return unwrap<GeneralLedgerReport>(response);
     },
     enabled: !!accountId && !!params.startDate && !!params.endDate,
   });

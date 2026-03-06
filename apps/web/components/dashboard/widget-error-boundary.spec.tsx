@@ -50,7 +50,7 @@ function ThrowingWidget({ shouldThrow }: { shouldThrow: boolean }) {
   return <div>Widget content</div>;
 }
 
-function ThrowingChartWidget() {
+function ThrowingChartWidget(): React.ReactNode {
   throw new Error('options.factory is not a function');
 }
 

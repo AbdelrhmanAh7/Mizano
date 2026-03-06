@@ -164,6 +164,8 @@ export default function ARAgingReportPage() {
                             date: string;
                             dueDate: string;
                             amount: number;
+                            balanceDue: number;
+                            daysOverdue: number;
                           }) => (
                             <TableRow key={item.id}>
                               <TableCell>
