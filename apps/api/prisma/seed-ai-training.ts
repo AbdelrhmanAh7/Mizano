@@ -6,7 +6,7 @@ import {
   LeadSource,
   LeadStatus,
 } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal, type InputJsonValue } from '@prisma/client/runtime/library';
 
 /**
  * Seed AI training data for all trainable models.
@@ -119,7 +119,7 @@ export async function seedAiTrainingData(
   // Maps transaction descriptions → account codes
   // ──────────────────────────────────────────────────────────────────
   console.log('  → Seeding categorization training data...');
-  const categorizationRecords: Array<{ inputData: Record<string, unknown>; label: string }> = [];
+  const categorizationRecords: Array<{ inputData: InputJsonValue; label: string }> = [];
 
   const categorizationSamples: Array<{
     descriptions: string[];
