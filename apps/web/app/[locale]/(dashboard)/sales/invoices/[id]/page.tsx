@@ -182,9 +182,18 @@ export default function InvoiceDetailPage() {
   const isPaid = invoice.status === 'PAID';
 
   // Get payment allocations and credit notes from the invoice response
-  const paymentAllocations =
-    (invoice as { paymentAllocations?: unknown[] }).paymentAllocations || [];
-  const creditNotes = (invoice as { creditNotes?: unknown[] }).creditNotes || [];
+  const paymentAllocations = ((invoice as { paymentAllocations?: unknown[] }).paymentAllocations ||
+    []) as Array<{
+    id: string;
+    payment?: { id?: string; paymentNumber?: string; date?: string };
+    amount?: string;
+  }>;
+  const creditNotes = ((invoice as { creditNotes?: unknown[] }).creditNotes || []) as Array<{
+    id: string;
+    creditNoteNumber?: string;
+    date?: string;
+    total?: string;
+  }>;
 
   return (
     <div className="space-y-6">
@@ -523,32 +532,26 @@ export default function InvoiceDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paymentAllocations.map(
-                  (allocation: {
-                    id: string;
-                    payment?: { id?: string; paymentNumber?: string; date?: string };
-                    amount?: string;
-                  }) => (
-                    <TableRow key={allocation.id}>
-                      <TableCell>
-                        <Link
-                          href={`/sales/payments/${allocation.payment?.id}`}
-                          className="font-medium hover:underline"
-                        >
-                          {allocation.payment?.paymentNumber}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        {allocation.payment?.date
-                          ? format(new Date(allocation.payment.date), 'MMM d, yyyy')
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-green-600">
-                        {formatCurrency(allocation.amount || '0')}
-                      </TableCell>
-                    </TableRow>
-                  ),
-                )}
+                {paymentAllocations.map((allocation) => (
+                  <TableRow key={allocation.id}>
+                    <TableCell>
+                      <Link
+                        href={`/sales/payments/${allocation.payment?.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        {allocation.payment?.paymentNumber}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      {allocation.payment?.date
+                        ? format(new Date(allocation.payment.date), 'MMM d, yyyy')
+                        : '-'}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-green-600">
+                      {formatCurrency(allocation.amount || '0')}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </CardContent>
@@ -574,31 +577,24 @@ export default function InvoiceDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {creditNotes.map(
-                  (creditNote: {
-                    id: string;
-                    creditNoteNumber?: string;
-                    date?: string;
-                    total?: string;
-                  }) => (
-                    <TableRow key={creditNote.id}>
-                      <TableCell>
-                        <Link
-                          href={`/sales/credit-notes/${creditNote.id}`}
-                          className="font-medium hover:underline"
-                        >
-                          {creditNote.creditNoteNumber}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        {creditNote.date ? format(new Date(creditNote.date), 'MMM d, yyyy') : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-orange-600">
-                        {formatCurrency(creditNote.amount || '0')}
-                      </TableCell>
-                    </TableRow>
-                  ),
-                )}
+                {creditNotes.map((creditNote) => (
+                  <TableRow key={creditNote.id}>
+                    <TableCell>
+                      <Link
+                        href={`/sales/credit-notes/${creditNote.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        {creditNote.creditNoteNumber}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      {creditNote.date ? format(new Date(creditNote.date), 'MMM d, yyyy') : '-'}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-orange-600">
+                      {formatCurrency(creditNote.total || '0')}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </CardContent>

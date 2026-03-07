@@ -15,7 +15,9 @@ export default function NewVendorPage() {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
-      await createVendor.mutateAsync(data);
+      await createVendor.mutateAsync(
+        data as unknown as Parameters<typeof createVendor.mutateAsync>[0],
+      );
       router.push('/purchases/vendors');
     } catch (error) {
       // Error is handled in the hook

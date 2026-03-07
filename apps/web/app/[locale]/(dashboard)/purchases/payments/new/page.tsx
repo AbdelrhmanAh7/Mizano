@@ -39,7 +39,9 @@ export default function NewPaymentMadePage() {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
-      await createPayment.mutateAsync(data);
+      await createPayment.mutateAsync(
+        data as unknown as Parameters<typeof createPayment.mutateAsync>[0],
+      );
       router.push('/purchases/payments');
     } catch (error) {
       // Error is handled in the hook

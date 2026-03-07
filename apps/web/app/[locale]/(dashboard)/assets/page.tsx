@@ -45,6 +45,7 @@ import {
   formatCurrency,
   AssetStatus,
   AssetType,
+  DepreciationMethod,
 } from '@/lib/hooks/use-assets';
 import { useTranslations } from 'next-intl';
 
@@ -196,8 +197,10 @@ export default function AssetsPage() {
                           {asset.name}
                         </Link>
                       </TableCell>
-                      <TableCell>{getAssetTypeLabel(asset.assetType)}</TableCell>
-                      <TableCell>{getDepreciationMethodLabel(asset.depreciationMethod)}</TableCell>
+                      <TableCell>{getAssetTypeLabel(asset.assetType as AssetType)}</TableCell>
+                      <TableCell>
+                        {getDepreciationMethodLabel(asset.depreciationMethod as DepreciationMethod)}
+                      </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(asset.purchasePrice)}
                       </TableCell>
@@ -205,8 +208,11 @@ export default function AssetsPage() {
                         {formatCurrency(asset.currentBookValue)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={getAssetStatusColor(asset.status)}>
-                          {getAssetStatusLabel(asset.status)}
+                        <Badge
+                          variant="outline"
+                          className={getAssetStatusColor(asset.status as AssetStatus)}
+                        >
+                          {getAssetStatusLabel(asset.status as AssetStatus)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">

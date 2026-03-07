@@ -142,9 +142,10 @@ export function OcrScanner({ vendorId, onExtract, onApply, className }: OcrScann
     return editedData[field] !== undefined;
   };
 
-  const getFieldValue = (field: keyof OcrExtractedData) => {
-    if (editedData[field] !== undefined) return editedData[field];
-    return extractedData?.[field] ?? '';
+  const getFieldValue = (field: keyof OcrExtractedData): string | number | null | undefined => {
+    if (editedData[field] !== undefined)
+      return editedData[field] as string | number | null | undefined;
+    return (extractedData?.[field] as string | number | null | undefined) ?? '';
   };
 
   const clearFile = () => {

@@ -87,11 +87,12 @@ export function QuickTrainDialog({
           setAdditionalCorrections({});
           onOpenChange(false);
         },
-        onError: (error: { response?: { data?: { message?: string } } }) => {
+        onError: (error: Error) => {
+          const err = error as Error & { response?: { data?: { message?: string } } };
           toast({
             variant: 'destructive',
             title: 'Submission failed',
-            description: error.response?.data?.message || 'Failed to submit training data',
+            description: err.response?.data?.message || 'Failed to submit training data',
           });
         },
       },

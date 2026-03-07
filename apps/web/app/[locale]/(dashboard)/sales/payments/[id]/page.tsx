@@ -268,7 +268,7 @@ export default function PaymentReceivedDetailPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right font-mono text-green-600 font-semibold">
-                        {formatCurrency(allocation.amount)}
+                        {formatCurrency(allocation.amount || '0')}
                       </TableCell>
                     </TableRow>
                   ),

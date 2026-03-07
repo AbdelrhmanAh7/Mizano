@@ -177,6 +177,7 @@ export interface AttendanceParams {
   endDate?: string;
   employeeId?: string;
   status?: AttendanceStatus;
+  [key: string]: unknown;
 }
 
 // Attendance Hooks
@@ -235,6 +236,7 @@ export interface PayrollRunParams {
   status?: PayrollStatus;
   year?: number;
   month?: number;
+  [key: string]: unknown;
 }
 
 // Payroll Hooks

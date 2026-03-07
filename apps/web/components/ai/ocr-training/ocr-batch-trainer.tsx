@@ -137,11 +137,12 @@ export function OcrBatchTrainer({
           description: `Processed ${response.data.length} file(s)`,
         });
       },
-      onError: (error: { response?: { data?: { message?: string } } }) => {
+      onError: (error: Error) => {
+        const err = error as Error & { response?: { data?: { message?: string } } };
         toast({
           variant: 'destructive',
           title: 'Batch extraction failed',
-          description: error.response?.data?.message || 'Processing failed',
+          description: err.response?.data?.message || 'Processing failed',
         });
       },
     });
@@ -388,8 +389,9 @@ export function OcrBatchTrainer({
                             ) : result.extraction ? (
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                 {EDITABLE_FIELDS.map((field) => {
-                                  const original =
-                                    result.extraction![field as keyof OcrTrainingExtractResult];
+                                  const original = result.extraction![
+                                    field as keyof OcrTrainingExtractResult
+                                  ] as string | number | null;
                                   const corrected = fileCorr[field];
                                   const isCorrected = corrected !== undefined;
 

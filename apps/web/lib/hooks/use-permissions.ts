@@ -28,8 +28,12 @@ export function usePermissions() {
   const { data: session, status } = useSession();
 
   const permissions: Permission[] = useMemo(() => {
-    return session?.user?.role?.permissions || [];
-  }, [session?.user?.role?.permissions]);
+    const role = session?.user?.role as string | { permissions?: Permission[] } | undefined;
+    if (typeof role === 'object' && role !== null) {
+      return role.permissions || [];
+    }
+    return [];
+  }, [session?.user?.role]);
 
   const isLoading = status === 'loading';
   const isAuthenticated = status === 'authenticated';

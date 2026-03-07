@@ -154,11 +154,12 @@ export function OcrTrainingViewer({
     if (vendorId) formData.append('vendorId', vendorId);
 
     extractMutation.mutate(formData, {
-      onError: (error: { response?: { data?: { message?: string } } }) => {
+      onError: (error: Error) => {
+        const err = error as Error & { response?: { data?: { message?: string } } };
         toast({
           variant: 'destructive',
           title: 'Extraction failed',
-          description: error.response?.data?.message || 'Failed to extract data',
+          description: err.response?.data?.message || 'Failed to extract data',
         });
       },
     });
@@ -215,11 +216,12 @@ export function OcrTrainingViewer({
           isActive: res.isActive,
         });
       },
-      onError: (error: { response?: { data?: { message?: string } } }) => {
+      onError: (error: Error) => {
+        const err = error as Error & { response?: { data?: { message?: string } } };
         toast({
           variant: 'destructive',
           title: 'Submission failed',
-          description: error.response?.data?.message || 'Failed to submit training data',
+          description: err.response?.data?.message || 'Failed to submit training data',
         });
       },
     });
@@ -462,9 +464,7 @@ export function OcrTrainingViewer({
                             variant="ghost"
                             size="sm"
                             className="h-5 w-5 p-0"
-                            onClick={() =>
-                              handleFieldChange(key, original === null ? '' : original)
-                            }
+                            onClick={() => handleFieldChange(key, original == null ? '' : original)}
                           >
                             <RotateCcw className="h-3 w-3" />
                           </Button>

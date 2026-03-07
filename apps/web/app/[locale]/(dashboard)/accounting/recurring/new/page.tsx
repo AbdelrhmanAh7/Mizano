@@ -21,7 +21,9 @@ export default function NewRecurringProfilePage() {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
-      await createProfile.mutateAsync(data);
+      await createProfile.mutateAsync(
+        data as unknown as Parameters<typeof createProfile.mutateAsync>[0],
+      );
       toast({
         title: 'Profile created',
         description: 'The recurring profile has been created successfully.',

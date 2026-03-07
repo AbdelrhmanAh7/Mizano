@@ -258,31 +258,31 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
               </TableRow>
             </TableHeader>
             <TableBody>
-              {adjustment.lines?.map(
-                (line: {
+              {(
+                adjustment.lines as {
                   id: string;
                   item?: { name?: string; sku?: string };
                   warehouse?: { name?: string };
                   quantityAdjusted: number;
-                }) => (
-                  <TableRow key={line.id}>
-                    <TableCell className="font-medium">{line.item?.name || '-'}</TableCell>
-                    <TableCell className="font-mono text-sm">{line.item?.sku || '-'}</TableCell>
-                    <TableCell>{line.warehouse?.name || '-'}</TableCell>
-                    <TableCell className="text-right">
-                      <span
-                        className={cn(
-                          'font-mono font-medium',
-                          adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
-                        )}
-                      >
-                        {adjustment.type === 'INCREASE' ? '+' : '-'}
-                        {line.quantityAdjusted}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ),
-              )}
+                }[]
+              )?.map((line) => (
+                <TableRow key={line.id}>
+                  <TableCell className="font-medium">{line.item?.name || '-'}</TableCell>
+                  <TableCell className="font-mono text-sm">{line.item?.sku || '-'}</TableCell>
+                  <TableCell>{line.warehouse?.name || '-'}</TableCell>
+                  <TableCell className="text-right">
+                    <span
+                      className={cn(
+                        'font-mono font-medium',
+                        adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
+                      )}
+                    >
+                      {adjustment.type === 'INCREASE' ? '+' : '-'}
+                      {line.quantityAdjusted}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </CardContent>

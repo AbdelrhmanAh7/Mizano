@@ -33,8 +33,9 @@ export default function NewInvoicePage() {
 
   const createInvoice = useCreateInvoice();
 
-  const handleSubmit = async (data: InvoiceSubmitData) => {
+  const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
+      const data = formData as unknown as InvoiceSubmitData;
       // Transform the data to match API expectations
       const invoiceData = {
         customerId: data.customerId,
@@ -53,7 +54,9 @@ export default function NewInvoicePage() {
         })),
       };
 
-      const result = await createInvoice.mutateAsync(invoiceData);
+      const result = await createInvoice.mutateAsync(
+        invoiceData as Parameters<typeof createInvoice.mutateAsync>[0],
+      );
       router.push(`/sales/invoices/${result.id}`);
     } catch (error) {
       // Error is handled by the mutation

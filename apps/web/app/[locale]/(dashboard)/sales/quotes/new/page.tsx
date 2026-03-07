@@ -26,7 +26,9 @@ export default function NewQuotePage() {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
-      const result = await createQuote.mutateAsync(data);
+      const result = await createQuote.mutateAsync(
+        data as unknown as Parameters<typeof createQuote.mutateAsync>[0],
+      );
       toast({
         title: t('quotes.toast.created'),
         description: t('quotes.toast.createdDescription'),

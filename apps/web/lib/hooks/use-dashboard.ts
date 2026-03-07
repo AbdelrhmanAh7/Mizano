@@ -153,7 +153,7 @@ export function transformDashboardOverview(
       id: 'overdue-invoices',
       type: 'OVERDUE_INVOICE',
       severity: 'error',
-      message: `${overview.alerts.overdueInvoices} overdue invoice(s) need attention`,
+      message: `${overview.alerts?.overdueInvoices} overdue invoice(s) need attention`,
       link: '/sales/invoices?status=OVERDUE',
       createdAt: now.toISOString(),
     });
@@ -163,7 +163,7 @@ export function transformDashboardOverview(
       id: 'overdue-bills',
       type: 'OVERDUE_BILL',
       severity: 'warning',
-      message: `${overview.alerts.overdueBills} overdue bill(s) need attention`,
+      message: `${overview.alerts?.overdueBills} overdue bill(s) need attention`,
       link: '/purchases/bills?status=OVERDUE',
       createdAt: now.toISOString(),
     });

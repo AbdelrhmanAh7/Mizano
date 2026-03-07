@@ -48,7 +48,9 @@ export default function NewVendorCreditPage() {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
-      await createCredit.mutateAsync(data);
+      await createCredit.mutateAsync(
+        data as unknown as Parameters<typeof createCredit.mutateAsync>[0],
+      );
       router.push('/purchases/credits');
     } catch (error) {
       // Error is handled in the hook

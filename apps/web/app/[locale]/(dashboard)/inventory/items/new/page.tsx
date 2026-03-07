@@ -43,7 +43,7 @@ export default function NewItemPage() {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
-      await createItem.mutateAsync(data);
+      await createItem.mutateAsync(data as unknown as Parameters<typeof createItem.mutateAsync>[0]);
       router.push('/inventory/items');
     } catch (error) {
       // Error is handled in the hook

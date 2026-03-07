@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DealStage } from '@prisma/client';
+import { DealStage, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
@@ -70,16 +70,17 @@ export class DealsService {
   }
 
   async findAll(organizationId: string, query: DealQueryDto) {
-    const where: any = { organizationId, deletedAt: null };
-
-    if (query.stage) where.stage = query.stage;
-    if (query.assignedToId) where.assignedToId = query.assignedToId;
-    if (query.customerId) where.customerId = query.customerId;
-    if (query.leadId) where.leadId = query.leadId;
-
-    if (query.search) {
-      where.OR = [{ dealName: { contains: query.search, mode: 'insensitive' } }];
-    }
+    const where: Prisma.DealWhereInput = {
+      organizationId,
+      deletedAt: null,
+      ...(query.stage ? { stage: query.stage } : {}),
+      ...(query.assignedToId ? { assignedToId: query.assignedToId } : {}),
+      ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.leadId ? { leadId: query.leadId } : {}),
+      ...(query.search
+        ? { OR: [{ dealName: { contains: query.search, mode: 'insensitive' } }] }
+        : {}),
+    };
 
     const [data, total] = await Promise.all([
       this.prisma.deal.findMany({
@@ -143,16 +144,16 @@ export class DealsService {
   async update(organizationId: string, id: string, dto: UpdateDealDto) {
     const deal = await this.findOne(organizationId, id);
 
-    const data: any = {};
+    const data: Prisma.DealUpdateInput = {};
 
     if (dto.dealName !== undefined) data.dealName = dto.dealName;
     if (dto.expectedAmount !== undefined) data.expectedAmount = new Decimal(dto.expectedAmount);
     if (dto.probability !== undefined) data.probability = dto.probability;
     if (dto.expectedCloseDate !== undefined)
       data.expectedCloseDate = new Date(dto.expectedCloseDate);
-    if (dto.customerId !== undefined) data.customerId = dto.customerId;
-    if (dto.leadId !== undefined) data.leadId = dto.leadId;
-    if (dto.assignedToId !== undefined) data.assignedToId = dto.assignedToId;
+    if (dto.customerId !== undefined) data.customer = { connect: { id: dto.customerId } };
+    if (dto.leadId !== undefined) data.lead = { connect: { id: dto.leadId } };
+    if (dto.assignedToId !== undefined) data.assignedTo = { connect: { id: dto.assignedToId } };
 
     // Track stage changes
     if (dto.stage && dto.stage !== deal.stage) {
@@ -288,7 +289,7 @@ export class DealsService {
     const stages = Object.values(DealStage);
     const pipeline: Array<{
       stage: DealStage;
-      deals: any[];
+      deals: Record<string, unknown>[];
       count: number;
       totalValue: number;
       weightedValue: number;
@@ -419,7 +420,7 @@ export class DealsService {
       throw new BadRequestException('Cannot change stage of closed deal');
     }
 
-    const data: any = {
+    const data: Prisma.DealUpdateInput = {
       stage,
       probability: this.stageProbability[stage],
     };

@@ -21,7 +21,9 @@ export default function NewJournalPage() {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
-      await createJournal.mutateAsync(data);
+      await createJournal.mutateAsync(
+        data as unknown as Parameters<typeof createJournal.mutateAsync>[0],
+      );
       toast({
         title: 'Journal created',
         description: 'The journal entry has been created successfully.',

@@ -1,13 +1,15 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { Decimal } from '@prisma/client/runtime/library';
+import { CreateCompositeItemDto, UpdateCompositeItemDto } from '../dto/composite-item.dto';
 
 @Injectable()
 export class CompositeItemsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateCompositeItemDto) {
     const existing = await this.prisma.compositeItem.findFirst({
       where: { sku: dto.sku, organizationId },
     });
@@ -24,12 +26,12 @@ export class CompositeItemsService {
     return this.prisma.compositeItem.create({
       data: {
         name: dto.name,
-        sku: dto.sku,
+        sku: dto.sku || '',
         sellingPrice: new Decimal(dto.sellingPrice || '0'),
         description: dto.description,
         organizationId,
         components: {
-          create: (dto.components || []).map((comp: any) => ({
+          create: (dto.components || []).map((comp) => ({
             itemId: comp.itemId,
             quantity: comp.quantity,
           })),
@@ -56,7 +58,7 @@ export class CompositeItemsService {
 
   async findAll(organizationId: string, query: PaginationDto) {
     const { page = 1, limit = 20, search, sortBy = 'name', sortOrder = 'asc' } = query;
-    const where: any = { organizationId };
+    const where: Prisma.CompositeItemWhereInput = { organizationId };
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -106,7 +108,7 @@ export class CompositeItemsService {
     return item;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateCompositeItemDto) {
     await this.findOne(organizationId, id);
 
     if (dto.sku) {
@@ -137,7 +139,7 @@ export class CompositeItemsService {
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.components && {
           components: {
-            create: dto.components.map((comp: any) => ({
+            create: dto.components.map((comp) => ({
               itemId: comp.itemId,
               quantity: comp.quantity,
             })),

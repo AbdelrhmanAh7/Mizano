@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Control, FieldValues, UseFormWatch, UseFormSetValue } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -294,9 +294,9 @@ export function InvoiceForm({
 
       {/* Line Items */}
       <LineItemsForm
-        control={form.control}
-        watch={form.watch}
-        setValue={form.setValue}
+        control={form.control as unknown as Control<FieldValues>}
+        watch={form.watch as unknown as UseFormWatch<FieldValues>}
+        setValue={form.setValue as unknown as UseFormSetValue<FieldValues>}
         name="lines"
         taxRates={taxRates}
         currency={selectedCustomer?.currency || 'USD'}

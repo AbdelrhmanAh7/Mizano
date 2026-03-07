@@ -36,8 +36,9 @@ export default function EditInvoicePage() {
   const { data: invoice, isLoading } = useInvoice(invoiceId);
   const updateInvoice = useUpdateInvoice();
 
-  const handleSubmit = async (data: InvoiceSubmitData) => {
+  const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
+      const data = formData as unknown as InvoiceSubmitData;
       // Transform the data to match API expectations
       const invoiceData = {
         customerId: data.customerId,
@@ -56,7 +57,10 @@ export default function EditInvoicePage() {
         })),
       };
 
-      await updateInvoice.mutateAsync({ id: invoiceId, data: invoiceData });
+      await updateInvoice.mutateAsync({
+        id: invoiceId,
+        data: invoiceData as Parameters<typeof updateInvoice.mutateAsync>[0]['data'],
+      });
       router.push(`/sales/invoices/${invoiceId}`);
     } catch (error) {
       // Error is handled by the mutation

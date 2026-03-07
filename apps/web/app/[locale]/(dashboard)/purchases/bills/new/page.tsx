@@ -42,7 +42,7 @@ export default function NewBillPage() {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
-      await createBill.mutateAsync(data);
+      await createBill.mutateAsync(data as unknown as Parameters<typeof createBill.mutateAsync>[0]);
       router.push('/purchases/bills');
     } catch (error) {
       // Error is handled in the hook

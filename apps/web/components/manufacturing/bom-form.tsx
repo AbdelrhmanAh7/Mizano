@@ -20,6 +20,12 @@ import { Switch } from '@/components/ui/switch';
 import { useCreateBOM, useUpdateBOM, BOM } from '@/lib/hooks/use-manufacturing';
 import { useItems } from '@/lib/hooks/use-items';
 
+interface BOMItem {
+  id: string;
+  name: string;
+  code: string;
+}
+
 const componentSchema = z.object({
   itemId: z.string().min(1, 'Item is required'),
   quantity: z.number().min(0.01, 'Quantity must be greater than 0'),
@@ -46,7 +52,7 @@ export function BOMForm({ bom }: BOMFormProps) {
   const updateBOM = useUpdateBOM();
 
   const { data: itemsData, isLoading: itemsLoading } = useItems({ type: 'GOODS' });
-  const items = itemsData?.data || [];
+  const items: BOMItem[] = itemsData?.data || [];
 
   const form = useForm<BOMFormData>({
     resolver: zodResolver(bomSchema),
@@ -83,9 +89,9 @@ export function BOMForm({ bom }: BOMFormProps) {
   const handleSubmit = async (data: BOMFormData) => {
     try {
       if (bom) {
-        await updateBOM.mutateAsync({ id: bom.id, data });
+        await updateBOM.mutateAsync({ id: bom.id, data: data as unknown as Partial<BOM> });
       } else {
-        await createBOM.mutateAsync(data);
+        await createBOM.mutateAsync(data as unknown as Partial<BOM>);
       }
       router.push('/manufacturing/bom');
     } catch (error) {

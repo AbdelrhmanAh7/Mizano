@@ -37,10 +37,8 @@ export interface CursorPaginatedResult<T> {
  * @returns Paginated result with `data`, `meta.total`, `meta.nextCursor`, and `meta.hasMore`.
  */
 export async function cursorPaginate<T extends { id: string }>(
-  model: {
-    findMany: (args: Record<string, unknown>) => Promise<T[]>;
-    count: (args: Record<string, unknown>) => Promise<number>;
-  },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  model: { findMany: (args: any) => Promise<T[]>; count: (args: any) => Promise<number> },
   where: Record<string, unknown>,
   orderBy: Record<string, string> | Record<string, string>[],
   options: CursorPaginateOptions = {},

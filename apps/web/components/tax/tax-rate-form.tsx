@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useCreateTaxRate, useUpdateTaxRate, TaxRate } from '@/lib/hooks/use-tax';
-import { useAccounts } from '@/lib/hooks/use-accounts';
+import { useAccounts, Account } from '@/lib/hooks/use-accounts';
 import { useToast } from '@/components/ui/use-toast';
 
 const taxRateSchema = z.object({
@@ -40,7 +40,7 @@ export function TaxRateForm({ taxRate, onSuccess }: TaxRateFormProps) {
   const updateTaxRate = useUpdateTaxRate();
 
   const { data: accountsData, isLoading: accountsLoading } = useAccounts();
-  const accounts = accountsData?.data || [];
+  const accounts: Account[] = accountsData?.data || [];
 
   const form = useForm<TaxRateFormData>({
     resolver: zodResolver(taxRateSchema),

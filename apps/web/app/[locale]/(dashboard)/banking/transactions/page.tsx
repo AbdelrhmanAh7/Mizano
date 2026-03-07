@@ -134,8 +134,11 @@ export default function BankTransactionsPage() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={getStatusColor(txn.status)}>
-                            {getStatusLabel(txn.status)}
+                          <Badge
+                            variant="outline"
+                            className={getStatusColor(txn.status as TransactionStatus)}
+                          >
+                            {getStatusLabel(txn.status as TransactionStatus)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">

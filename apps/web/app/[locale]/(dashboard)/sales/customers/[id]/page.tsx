@@ -48,7 +48,7 @@ import { useInvoices } from '@/lib/hooks/use-invoices';
 import { usePaymentsReceived } from '@/lib/hooks/use-payments-received';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { CustomerStatement } from '@/components/sales/customer-statement';
-import { InvoiceStatusBadge } from '@/components/sales/status-badge';
+import { InvoiceStatusBadge, type InvoiceStatus } from '@/components/sales/status-badge';
 import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -363,7 +363,7 @@ export default function CustomerDetailPage() {
                           </TableCell>
                           <TableCell>{format(new Date(invoice.dueDate), 'MMM d, yyyy')}</TableCell>
                           <TableCell>
-                            <InvoiceStatusBadge status={invoice.status} />
+                            <InvoiceStatusBadge status={invoice.status as InvoiceStatus} />
                           </TableCell>
                           <TableCell className="text-right font-mono">
                             {formatCurrency(

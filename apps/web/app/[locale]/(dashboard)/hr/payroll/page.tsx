@@ -11,6 +11,7 @@ import {
   formatCurrency,
   getPayrollStatusColor,
   getPayrollStatusLabel,
+  type PayrollStatus,
   usePayrollRuns,
 } from '@/lib/hooks/use-hr';
 import { usePermissions } from '@/lib/hooks/use-permissions';
@@ -167,8 +168,11 @@ function PayrollPageContent() {
       accessorKey: 'status',
       header: 'Status',
       cell: ({ row }) => (
-        <Badge variant="outline" className={getPayrollStatusColor(row.original.status)}>
-          {getPayrollStatusLabel(row.original.status)}
+        <Badge
+          variant="outline"
+          className={getPayrollStatusColor(row.original.status as PayrollStatus)}
+        >
+          {getPayrollStatusLabel(row.original.status as PayrollStatus)}
         </Badge>
       ),
     },

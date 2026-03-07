@@ -327,7 +327,7 @@ describe('LoggerDashboard', () => {
 
   it('should call generateClaudePrompt when button is clicked', async () => {
     mockUseLogger.selectedIds = ['abc123'];
-    mockUseLogger.generateClaudePrompt.mockResolvedValue({
+    (mockUseLogger.generateClaudePrompt as jest.Mock).mockResolvedValue({
       prompt: '# Fix Errors',
       logCount: 1,
     });

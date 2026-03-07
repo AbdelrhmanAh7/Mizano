@@ -46,7 +46,11 @@ import {
   getAccountTypeColor,
   formatCurrency,
 } from '@/lib/hooks/use-bank-accounts';
-import { getStatusLabel, getStatusColor } from '@/lib/hooks/use-bank-transactions';
+import {
+  getStatusLabel,
+  getStatusColor,
+  type TransactionStatus,
+} from '@/lib/hooks/use-bank-transactions';
 import { useTranslations } from 'next-intl';
 
 interface BankAccountDetailPageProps {
@@ -316,8 +320,11 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={getStatusColor(tx.status)}>
-                            {getStatusLabel(tx.status)}
+                          <Badge
+                            variant="outline"
+                            className={getStatusColor(tx.status as TransactionStatus)}
+                          >
+                            {getStatusLabel(tx.status as TransactionStatus)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
@@ -334,7 +341,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                               )}
                             >
                               {tx.type === 'DEPOSIT' ? '+' : '-'}
-                              {formatCurrency(Math.abs(parseFloat(tx.amount)))}
+                              {formatCurrency(Math.abs(parseFloat(String(tx.amount))))}
                             </span>
                           </div>
                         </TableCell>

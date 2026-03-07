@@ -15,7 +15,9 @@ export default function NewWarehousePage() {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
-      await createWarehouse.mutateAsync(data);
+      await createWarehouse.mutateAsync(
+        data as unknown as Parameters<typeof createWarehouse.mutateAsync>[0],
+      );
       router.push('/inventory/warehouses');
     } catch (error) {
       // Error is handled in the hook

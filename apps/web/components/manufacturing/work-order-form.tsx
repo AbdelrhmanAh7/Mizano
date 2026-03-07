@@ -30,7 +30,17 @@ import {
   useBOMs,
   useBOMRequirements,
   WorkOrder,
+  BOM,
 } from '@/lib/hooks/use-manufacturing';
+
+interface MaterialRequirement {
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  required: number;
+  available: number;
+  shortage: number;
+}
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -56,7 +66,7 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
 
   const createWorkOrder = useCreateWorkOrder();
   const { data: bomsData, isLoading: bomsLoading } = useBOMs({ status: 'ACTIVE' });
-  const boms = bomsData?.data || [];
+  const boms: BOM[] = bomsData?.data || [];
 
   const form = useForm<WorkOrderFormData>({
     resolver: zodResolver(workOrderSchema),
@@ -81,7 +91,7 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
   const selectedQuantity = form.watch('quantity');
 
   const { data: requirementsData } = useBOMRequirements(selectedBomId, selectedQuantity || 1);
-  const requirements = requirementsData?.data || [];
+  const requirements: MaterialRequirement[] = requirementsData?.data || [];
 
   const handleSubmit = async (data: WorkOrderFormData) => {
     try {
@@ -106,7 +116,7 @@ export function WorkOrderForm({ workOrder }: WorkOrderFormProps) {
     }
   };
 
-  const hasShortages = requirements.some((r: { shortage: number }) => r.shortage > 0);
+  const hasShortages = requirements.some((r) => r.shortage > 0);
 
   return (
     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">

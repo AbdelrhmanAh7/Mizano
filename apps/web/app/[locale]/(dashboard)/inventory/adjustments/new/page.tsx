@@ -38,7 +38,9 @@ export default function NewAdjustmentPage() {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
-      await createAdjustment.mutateAsync(data);
+      await createAdjustment.mutateAsync(
+        data as unknown as Parameters<typeof createAdjustment.mutateAsync>[0],
+      );
       router.push('/inventory/adjustments');
     } catch (error) {
       // Error handled by mutation

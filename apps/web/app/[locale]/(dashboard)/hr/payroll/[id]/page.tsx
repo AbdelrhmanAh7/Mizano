@@ -277,7 +277,7 @@ export default function PayrollDetailPage({ params }: { params: Promise<{ id: st
                       {formatCurrency(slip.gross || 0)}
                     </TableCell>
                     <TableCell className="text-right">
-                      {slip.lopDays > 0 ? (
+                      {(slip.lopDays ?? 0) > 0 ? (
                         <span className="text-red-600">{slip.lopDays} days</span>
                       ) : (
                         '-'

@@ -19,8 +19,8 @@ export default function NewAssetPage() {
         ...data,
         purchasePrice: parseFloat(data.purchasePrice as string),
         salvageValue: data.salvageValue ? parseFloat(data.salvageValue as string) : 0,
-        usefulLifeMonths: parseInt(data.usefulLifeMonths as string, 10),
-      });
+        usefulLifeYears: parseInt(data.usefulLifeYears as string, 10),
+      } as unknown as Parameters<typeof createAsset.mutateAsync>[0]);
       router.push('/assets');
     } catch {
       // Error handled by hook

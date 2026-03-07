@@ -25,9 +25,8 @@ export default function EditAssetPage() {
         id,
         data: {
           ...data,
-          purchasePrice: parseFloat(data.purchasePrice as string),
           salvageValue: data.salvageValue ? parseFloat(data.salvageValue as string) : 0,
-          usefulLifeMonths: parseInt(data.usefulLifeMonths as string, 10),
+          usefulLifeYears: parseInt(data.usefulLifeYears as string, 10),
         },
       });
       router.push(`/assets/${id}`);

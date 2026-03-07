@@ -254,7 +254,7 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
               {transfer.lines?.map(
                 (line: {
                   id: string;
-                  item?: { name?: string; sku?: string };
+                  item?: { name?: string; sku?: string | null };
                   quantity: number;
                 }) => (
                   <TableRow key={line.id}>

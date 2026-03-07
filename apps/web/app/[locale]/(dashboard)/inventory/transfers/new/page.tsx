@@ -38,7 +38,9 @@ export default function NewTransferPage() {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
-      await createTransfer.mutateAsync(data);
+      await createTransfer.mutateAsync(
+        data as unknown as Parameters<typeof createTransfer.mutateAsync>[0],
+      );
       router.push('/inventory/transfers');
     } catch (error) {
       // Error handled by mutation

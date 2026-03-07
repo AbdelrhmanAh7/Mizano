@@ -22,7 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Expense } from '@/lib/hooks/use-expenses';
-import { useVendors } from '@/lib/hooks/use-vendors';
+import { useVendors, Vendor } from '@/lib/hooks/use-vendors';
 import { cn } from '@/lib/utils';
 
 const expenseSchema = z.object({
@@ -69,7 +69,7 @@ export function ExpenseForm({
 }: ExpenseFormProps) {
   const isEditing = !!expense;
   const { data: vendorsData } = useVendors({ limit: 100 });
-  const vendors = vendorsData?.data || [];
+  const vendors: Vendor[] = vendorsData?.data || [];
 
   // Filter accounts by type
   const expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE');

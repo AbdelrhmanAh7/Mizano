@@ -72,7 +72,7 @@ export function VendorTrainingHistory({ vendorId, className }: VendorTrainingHis
   // Extract learned field names from layout
   const learnedFields = history.layout?.fieldPositions
     ? Object.entries(history.layout.fieldPositions)
-        .filter(([, v]: [string, { learned?: boolean }]) => v?.learned)
+        .filter(([, v]) => (v as { learned?: boolean })?.learned)
         .map(([k]) => k)
     : [];
 

@@ -18,7 +18,9 @@ export default function NewCustomerPage() {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
-      await createCustomer.mutateAsync(data);
+      await createCustomer.mutateAsync(
+        data as unknown as Parameters<typeof createCustomer.mutateAsync>[0],
+      );
       toast({
         title: t('customers.toast.created'),
         description: t('customers.toast.createdDescription'),

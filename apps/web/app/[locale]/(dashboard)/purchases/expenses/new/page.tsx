@@ -32,7 +32,9 @@ export default function NewExpensePage() {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
-      await createExpense.mutateAsync(data);
+      await createExpense.mutateAsync(
+        data as unknown as Parameters<typeof createExpense.mutateAsync>[0],
+      );
       router.push('/purchases/expenses');
     } catch (error) {
       // Error is handled in the hook

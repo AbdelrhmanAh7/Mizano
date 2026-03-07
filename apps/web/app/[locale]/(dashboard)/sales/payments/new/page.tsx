@@ -20,8 +20,9 @@ export default function NewPaymentReceivedPage() {
 
   const createPayment = useCreatePaymentReceived();
 
-  const handleSubmit = async (data: PaymentReceivedFormData) => {
+  const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
+      const data = formData as unknown as PaymentReceivedFormData;
       const result = await createPayment.mutateAsync({
         customerId: data.customerId,
         date: data.date,
@@ -33,7 +34,7 @@ export default function NewPaymentReceivedPage() {
         allocations: data.allocations
           .filter((a) => a.selected && parseFloat(a.amount) > 0)
           .map((a) => ({ invoiceId: a.invoiceId, amount: a.amount })),
-      });
+      } as Parameters<typeof createPayment.mutateAsync>[0]);
       router.push(`/sales/payments/${result.id}`);
     } catch (error) {
       // Error is handled by the mutation

@@ -15,7 +15,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useCreateDeal, useLeads, Deal, DealStage, getDealStageLabel } from '@/lib/hooks/use-crm';
+import {
+  useCreateDeal,
+  useLeads,
+  Deal,
+  Lead,
+  DealStage,
+  getDealStageLabel,
+} from '@/lib/hooks/use-crm';
 import { useToast } from '@/components/ui/use-toast';
 
 const STAGES: DealStage[] = ['NEW', 'MEETING_SCHEDULED', 'PROPOSAL_SENT', 'NEGOTIATION'];
@@ -42,7 +49,7 @@ export function DealForm({ deal }: DealFormProps) {
 
   const createDeal = useCreateDeal();
   const { data: leadsData, isLoading: leadsLoading } = useLeads({ status: 'QUALIFIED' });
-  const leads = leadsData?.data || [];
+  const leads: Lead[] = leadsData?.data || [];
 
   const form = useForm<DealFormData>({
     resolver: zodResolver(dealSchema),
