@@ -218,6 +218,15 @@ function LoginForm() {
                 {t('signUp')}
               </Link>
             </div>
+
+            <div className="text-center">
+              <Link
+                href="/onboarding"
+                className="text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                {t('learnMore')}
+              </Link>
+            </div>
           </div>
         </div>
       </div>

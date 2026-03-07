@@ -2,6 +2,7 @@
 
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,8 @@ interface EditVendorPageProps {
 export default function EditVendorPage({ params }: EditVendorPageProps) {
   const { id } = use(params);
   const router = useRouter();
+  const t = useTranslations('purchases');
+  const tCommon = useTranslations('common');
   const { data: vendor, isLoading } = useVendor(id);
   const updateVendor = useUpdateVendor();
 
@@ -40,9 +43,9 @@ export default function EditVendorPage({ params }: EditVendorPageProps) {
   if (!vendor) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Vendor not found</p>
+        <p className="text-muted-foreground">{tCommon('errors.notFound')}</p>
         <Button asChild className="mt-4">
-          <Link href="/purchases/vendors">Back to Vendors</Link>
+          <Link href="/purchases/vendors">{tCommon('buttons.back')}</Link>
         </Button>
       </div>
     );
@@ -58,8 +61,8 @@ export default function EditVendorPage({ params }: EditVendorPageProps) {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edit Vendor</h1>
-          <p className="text-muted-foreground">Update vendor information for {vendor.name}</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('vendors.editVendor')}</h1>
+          <p className="text-muted-foreground">{vendor.name}</p>
         </div>
       </div>
 

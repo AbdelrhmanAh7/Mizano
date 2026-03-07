@@ -10,8 +10,10 @@ import { useToast } from '@/components/ui/use-toast';
 import { RecurringProfileForm } from '@/components/accounting/recurring-profile-form';
 import { useAccountsTree } from '@/lib/hooks/use-accounts';
 import { useRecurringProfile, useUpdateRecurringProfile } from '@/lib/hooks/use-recurring-profiles';
+import { useTranslations } from 'next-intl';
 
 export default function EditRecurringProfilePage() {
+  const t = useTranslations('accounting');
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -95,7 +97,9 @@ export default function EditRecurringProfilePage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edit {profile.name}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t('recurring.editProfile')} - {profile.name}
+          </h1>
           <p className="text-muted-foreground">Update the recurring profile details</p>
         </div>
       </div>

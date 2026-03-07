@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +30,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { usePriceList, useDeletePriceList } from '@/lib/hooks/use-price-lists';
 
 export default function PriceListDetailPage() {
+  const t = useTranslations('inventory');
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -53,7 +55,9 @@ export default function PriceListDetailPage() {
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <h1 className="text-3xl font-bold">Price List Not Found</h1>
+          <h1 className="text-3xl font-bold">
+            {t('priceLists.title')} {t('common.notFound')}
+          </h1>
         </div>
       </div>
     );
@@ -79,7 +83,7 @@ export default function PriceListDetailPage() {
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">{priceList.name}</h1>
               <Badge variant={priceList.isActive ? 'default' : 'secondary'}>
-                {priceList.isActive ? 'Active' : 'Inactive'}
+                {priceList.isActive ? t('common.active') : t('common.inactive')}
               </Badge>
             </div>
             <p className="text-muted-foreground">
@@ -91,20 +95,18 @@ export default function PriceListDetailPage() {
           <AlertDialogTrigger asChild>
             <Button variant="destructive">
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              {t('common.delete')}
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Price List</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure? This will permanently delete this price list.
-              </AlertDialogDescription>
+              <AlertDialogTitle>{t('priceLists.deletePriceList')}</AlertDialogTitle>
+              <AlertDialogDescription>{t('common.confirmDelete')}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
               <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-                Delete
+                {t('common.delete')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -121,7 +123,7 @@ export default function PriceListDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Price List Items</CardTitle>
+          <CardTitle>{t('priceLists.priceListDetails')}</CardTitle>
         </CardHeader>
         <CardContent>
           {items.length === 0 ? (

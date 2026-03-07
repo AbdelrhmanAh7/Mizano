@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +27,7 @@ import {
 } from '@/lib/hooks/use-reports';
 
 export default function TrialBalanceReportPage() {
+  const t = useTranslations('reports');
   const [asOfDate, setAsOfDate] = useState(new Date());
 
   const { data: report, isLoading } = useTrialBalanceReport(format(asOfDate, 'yyyy-MM-dd'));
@@ -67,7 +69,7 @@ export default function TrialBalanceReportPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Trial Balance</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('trialBalance.title')}</h1>
           <p className="text-muted-foreground">As of {format(asOfDate, 'MMMM d, yyyy')}</p>
         </div>
       </div>
@@ -112,11 +114,15 @@ export default function TrialBalanceReportPage() {
                 <div className="text-right">
                   <div className="grid grid-cols-2 gap-8">
                     <div>
-                      <p className="text-sm text-muted-foreground">Total Debits</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('trialBalance.totalDebit')}
+                      </p>
                       <p className="text-xl font-bold font-mono">{formatCurrency(totalDebits)}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Total Credits</p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('trialBalance.totalCredit')}
+                      </p>
                       <p className="text-xl font-bold font-mono">{formatCurrency(totalCredits)}</p>
                     </div>
                   </div>
@@ -135,10 +141,10 @@ export default function TrialBalanceReportPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Code</TableHead>
-                    <TableHead>Account Name</TableHead>
+                    <TableHead>{t('trialBalance.account')}</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Debit</TableHead>
-                    <TableHead className="text-right">Credit</TableHead>
+                    <TableHead className="text-right">{t('trialBalance.debit')}</TableHead>
+                    <TableHead className="text-right">{t('trialBalance.credit')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

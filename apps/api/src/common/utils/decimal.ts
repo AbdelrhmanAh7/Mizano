@@ -3,8 +3,19 @@ import { Decimal } from '@prisma/client/runtime/library';
 /**
  * Safe Decimal utilities for financial calculations.
  *
- * Replaces the anti-pattern: parseFloat(someDecimal.toString())
- * which loses precision on large monetary values.
+ * Wraps Prisma's `Decimal` (based on decimal.js) with null-safe, type-coercing
+ * helpers. All methods accept `Decimal | string | number` for convenience.
+ *
+ * Replaces the anti-pattern `parseFloat(someDecimal.toString())` which loses
+ * precision on large monetary values. Use {@link DecimalUtils.toNumber} only
+ * for display purposes, never for further arithmetic.
+ *
+ * @example
+ * ```ts
+ * const tax = DecimalUtils.percent(subtotal, taxRate); // subtotal * (taxRate / 100)
+ * const total = DecimalUtils.add(subtotal, tax);
+ * const formatted = DecimalUtils.toFixed(total, 2); // "1234.56"
+ * ```
  */
 export class DecimalUtils {
   static readonly ZERO = new Decimal(0);
@@ -21,18 +32,22 @@ export class DecimalUtils {
     return values.reduce<Decimal>((acc, v) => acc.add(DecimalUtils.from(v)), DecimalUtils.ZERO);
   }
 
+  /** Add two Decimal-compatible values. */
   static add(a: Decimal | string | number, b: Decimal | string | number): Decimal {
     return DecimalUtils.from(a).add(DecimalUtils.from(b));
   }
 
+  /** Subtract b from a. */
   static subtract(a: Decimal | string | number, b: Decimal | string | number): Decimal {
     return DecimalUtils.from(a).sub(DecimalUtils.from(b));
   }
 
+  /** Multiply two Decimal-compatible values. */
   static multiply(a: Decimal | string | number, b: Decimal | string | number): Decimal {
     return DecimalUtils.from(a).mul(DecimalUtils.from(b));
   }
 
+  /** Divide a by b. Throws if b is zero (Prisma Decimal behavior). */
   static divide(a: Decimal | string | number, b: Decimal | string | number): Decimal {
     return DecimalUtils.from(a).div(DecimalUtils.from(b));
   }

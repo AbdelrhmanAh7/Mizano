@@ -9,8 +9,10 @@ import { BankAccountForm } from '@/components/banking/bank-account-form';
 import { useCreateBankAccount } from '@/lib/hooks/use-bank-accounts';
 import { useQuery } from '@tanstack/react-query';
 import { accountsApi } from '@/lib/api';
+import { useTranslations } from 'next-intl';
 
 export default function NewBankAccountPage() {
+  const t = useTranslations('banking');
   const router = useRouter();
   const createBankAccount = useCreateBankAccount();
 
@@ -53,7 +55,7 @@ export default function NewBankAccountPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Bank Account</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('accounts.newAccount')}</h1>
           <p className="text-muted-foreground">Add a new bank account to track your finances</p>
         </div>
       </div>

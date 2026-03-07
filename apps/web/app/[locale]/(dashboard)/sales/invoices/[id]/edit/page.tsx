@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ interface InvoiceSubmitData {
 export default function EditInvoicePage() {
   const params = useParams();
   const router = useRouter();
+  const t = useTranslations('sales');
   const invoiceId = params.id as string;
 
   const { data: invoice, isLoading } = useInvoice(invoiceId);
@@ -81,22 +83,20 @@ export default function EditInvoicePage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/sales/invoices">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Invoice Not Found</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('invoices.invoiceNotFound')}</h1>
           </div>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              The invoice you&apos;re looking for doesn&apos;t exist.
-            </p>
+            <p className="text-muted-foreground">{t('invoices.notFoundMessage')}</p>
             <Button asChild className="mt-4">
-              <Link href="/sales/invoices">Back to Invoices</Link>
+              <Link href="/sales/invoices">{t('invoices.backToInvoices')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -108,22 +108,20 @@ export default function EditInvoicePage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href={`/sales/invoices/${invoiceId}`}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Cannot Edit Invoice</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('invoices.cannotEdit')}</h1>
           </div>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              Only draft invoices can be edited. This invoice has already been sent.
-            </p>
+            <p className="text-muted-foreground">{t('invoices.cannotEditMessage')}</p>
             <Button asChild className="mt-4">
-              <Link href={`/sales/invoices/${invoiceId}`}>View Invoice</Link>
+              <Link href={`/sales/invoices/${invoiceId}`}>{t('invoices.viewInvoice')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -146,16 +144,16 @@ export default function EditInvoicePage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
           <Link href={`/sales/invoices/${invoiceId}`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Edit Invoice {invoice.invoiceNumber}
+            {t('invoices.editTitle', { number: invoice.invoiceNumber })}
           </h1>
-          <p className="text-muted-foreground">Update invoice details</p>
+          <p className="text-muted-foreground">{t('invoices.updateDetails')}</p>
         </div>
       </div>
 

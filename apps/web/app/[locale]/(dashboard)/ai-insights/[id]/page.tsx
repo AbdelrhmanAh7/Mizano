@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { useTranslations } from 'next-intl';
 import {
   useAIInsight,
   useDismissInsight,
@@ -44,6 +45,8 @@ const insightIcons: Record<InsightType, React.ReactNode> = {
 };
 
 export default function InsightDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const t = useTranslations('ai.insights.detail');
+  const tInsights = useTranslations('ai.insights');
   const { id } = use(params);
   const router = useRouter();
   const { data: insight, isLoading } = useAIInsight(id);
@@ -72,9 +75,9 @@ export default function InsightDetailPage({ params }: { params: Promise<{ id: st
   if (!insight) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold">Insight not found</h2>
+        <h2 className="text-xl font-semibold">{t('notFound')}</h2>
         <Button asChild className="mt-4">
-          <Link href="/ai-insights">Back to Insights</Link>
+          <Link href="/ai-insights">{t('backToInsights')}</Link>
         </Button>
       </div>
     );
@@ -117,11 +120,11 @@ export default function InsightDetailPage({ params }: { params: Promise<{ id: st
             <>
               <Button variant="outline" onClick={handleDismiss}>
                 <X className="mr-2 h-4 w-4" />
-                Dismiss
+                {t('dismiss')}
               </Button>
               <Button onClick={() => handleAction('acknowledge')}>
                 <CheckCircle2 className="mr-2 h-4 w-4" />
-                Acknowledge
+                {t('acknowledge')}
               </Button>
             </>
           )}
@@ -134,7 +137,7 @@ export default function InsightDetailPage({ params }: { params: Promise<{ id: st
         <div className="md:col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Description</CardTitle>
+              <CardTitle>{t('description')}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-lg">{insight.description}</p>
@@ -146,7 +149,7 @@ export default function InsightDetailPage({ params }: { params: Promise<{ id: st
               <CardHeader>
                 <CardTitle className="text-red-600 flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5" />
-                  Impact
+                  {tInsights('impact')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -160,7 +163,7 @@ export default function InsightDetailPage({ params }: { params: Promise<{ id: st
               <CardHeader>
                 <CardTitle className="text-blue-800 flex items-center gap-2">
                   <Lightbulb className="h-5 w-5" />
-                  Recommendation
+                  {tInsights('recommendation')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -169,7 +172,7 @@ export default function InsightDetailPage({ params }: { params: Promise<{ id: st
                   <Button variant="outline" className="mt-4" asChild>
                     <Link href={`/${insight.entityType}/${insight.entityId}`}>
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      View Related {insight.entityType}
+                      {tInsights('viewRelated', { entityType: insight.entityType })}
                     </Link>
                   </Button>
                 )}
@@ -180,7 +183,7 @@ export default function InsightDetailPage({ params }: { params: Promise<{ id: st
           {insight.data && (
             <Card>
               <CardHeader>
-                <CardTitle>Supporting Data</CardTitle>
+                <CardTitle>{t('supportingData')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <pre className="bg-muted p-4 rounded-lg overflow-auto text-sm">
@@ -197,24 +200,24 @@ export default function InsightDetailPage({ params }: { params: Promise<{ id: st
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Brain className="h-5 w-5" />
-                AI Confidence
+                {t('aiConfidence')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Confidence Level</span>
+                  <span className="text-sm text-muted-foreground">{t('confidenceLevel')}</span>
                   <span className="font-mono font-bold">{confidencePercent}%</span>
                 </div>
                 <Progress value={confidencePercent} className="h-3" />
                 <p className="text-xs text-muted-foreground">
                   {confidencePercent >= 90
-                    ? 'Very high confidence in this analysis'
+                    ? t('confidenceVeryHigh')
                     : confidencePercent >= 70
-                      ? 'Good confidence in this analysis'
+                      ? t('confidenceGood')
                       : confidencePercent >= 50
-                        ? 'Moderate confidence - review recommended'
-                        : 'Low confidence - manual verification needed'}
+                        ? t('confidenceModerate')
+                        : t('confidenceLow')}
                 </p>
               </div>
             </CardContent>
@@ -222,30 +225,30 @@ export default function InsightDetailPage({ params }: { params: Promise<{ id: st
 
           <Card>
             <CardHeader>
-              <CardTitle>Details</CardTitle>
+              <CardTitle>{t('details')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <p className="text-sm text-muted-foreground">Status</p>
+                <p className="text-sm text-muted-foreground">{t('status')}</p>
                 <p className="font-medium">{insight.status}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Type</p>
+                <p className="text-sm text-muted-foreground">{t('type')}</p>
                 <p className="font-medium">{getInsightTypeLabel(insight.type)}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Priority</p>
+                <p className="text-sm text-muted-foreground">{t('priority')}</p>
                 <p className="font-medium">{getInsightPriorityLabel(insight.priority)}</p>
               </div>
               {insight.module && (
                 <div>
-                  <p className="text-sm text-muted-foreground">Module</p>
+                  <p className="text-sm text-muted-foreground">{tInsights('module')}</p>
                   <p className="font-medium">{insight.module}</p>
                 </div>
               )}
               {insight.expiresAt && (
                 <div>
-                  <p className="text-sm text-muted-foreground">Expires</p>
+                  <p className="text-sm text-muted-foreground">{t('expires')}</p>
                   <p className="font-medium">
                     {format(new Date(insight.expiresAt), 'MMM d, yyyy')}
                   </p>
@@ -258,7 +261,7 @@ export default function InsightDetailPage({ params }: { params: Promise<{ id: st
           {insight.status === 'NEW' && (
             <Card>
               <CardHeader>
-                <CardTitle>Actions</CardTitle>
+                <CardTitle>{t('actions')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <Button
@@ -267,7 +270,7 @@ export default function InsightDetailPage({ params }: { params: Promise<{ id: st
                   onClick={() => handleAction('investigate')}
                 >
                   <ExternalLink className="mr-2 h-4 w-4" />
-                  Investigate
+                  {t('investigate')}
                 </Button>
                 <Button
                   variant="outline"
@@ -275,7 +278,7 @@ export default function InsightDetailPage({ params }: { params: Promise<{ id: st
                   onClick={() => handleAction('fix')}
                 >
                   <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Mark as Fixed
+                  {t('markAsFixed')}
                 </Button>
                 <Button
                   variant="outline"
@@ -283,7 +286,7 @@ export default function InsightDetailPage({ params }: { params: Promise<{ id: st
                   onClick={handleDismiss}
                 >
                   <X className="mr-2 h-4 w-4" />
-                  Dismiss as False Positive
+                  {t('dismissFalsePositive')}
                 </Button>
               </CardContent>
             </Card>

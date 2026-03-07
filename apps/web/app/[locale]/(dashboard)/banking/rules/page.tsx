@@ -33,8 +33,11 @@ import {
   getActionTypeLabel,
   BankRule,
 } from '@/lib/hooks/use-bank-rules';
+import { useTranslations } from 'next-intl';
 
 function BankRulesPageContent() {
+  const t = useTranslations('banking');
+  const tc = useTranslations('common');
   const tableParams = useTableParams({ defaultSortBy: 'name' });
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -64,7 +67,7 @@ function BankRulesPageContent() {
       accessorKey: 'name',
       header: () => (
         <SortableHeader
-          label="Name"
+          label={t('rules.table.name')}
           columnId="name"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -80,7 +83,7 @@ function BankRulesPageContent() {
     },
     {
       id: 'conditions',
-      header: 'Conditions',
+      header: t('rules.table.conditions'),
       cell: ({ row }) => (
         <div className="space-y-1">
           {(row.original.conditions ?? []).map((condition, idx) => (
@@ -97,20 +100,20 @@ function BankRulesPageContent() {
     },
     {
       id: 'action',
-      header: 'Action',
+      header: t('rules.table.action'),
       cell: ({ row }) => (
         <Badge variant="outline">{getActionTypeLabel(row.original.action.type)}</Badge>
       ),
     },
     {
       accessorKey: 'hitCount',
-      header: 'Hits',
+      header: t('rules.hits'),
       meta: { headerClassName: 'text-center', cellClassName: 'text-center font-mono' },
       cell: ({ row }) => row.original.hitCount,
     },
     {
       accessorKey: 'isActive',
-      header: 'Status',
+      header: t('rules.table.status'),
       meta: { headerClassName: 'text-center', cellClassName: 'text-center' },
       cell: ({ row }) => {
         const rule = row.original;
@@ -119,12 +122,12 @@ function BankRulesPageContent() {
             {rule.isActive ? (
               <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
                 <ToggleRight className="mr-1 h-3 w-3" />
-                Active
+                {t('rules.active')}
               </Badge>
             ) : (
               <Badge variant="secondary" className="hover:bg-secondary/80">
                 <ToggleLeft className="mr-1 h-3 w-3" />
-                Inactive
+                {t('rules.inactive')}
               </Badge>
             )}
           </button>
@@ -148,12 +151,12 @@ function BankRulesPageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/banking/rules/${rule.id}/edit`}>
                   <Pencil className="mr-2 h-4 w-4" />
-                  Edit
+                  {tc('buttons.edit')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(rule.id)}>
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                {tc('buttons.delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -167,15 +170,13 @@ function BankRulesPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bank Rules</h1>
-          <p className="text-muted-foreground">
-            Automate transaction categorization with custom rules
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('rules.title')}</h1>
+          <p className="text-muted-foreground">{t('rules.description')}</p>
         </div>
         <Button asChild>
           <Link href="/banking/rules/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Rule
+            {t('rules.newRule')}
           </Link>
         </Button>
       </div>
@@ -185,7 +186,7 @@ function BankRulesPageContent() {
         <DataTableSearch
           value={tableParams.search}
           onChange={tableParams.setSearch}
-          placeholder="Search rules..."
+          placeholder={t('rules.searchPlaceholder')}
         />
       </div>
 
@@ -200,10 +201,10 @@ function BankRulesPageContent() {
         onPageChange={tableParams.setPage}
         onLimitChange={tableParams.setLimit}
         isLoading={isLoading}
-        emptyMessage="No rules yet"
+        emptyMessage={t('rules.empty.title')}
         emptyAction={
           <Button asChild>
-            <Link href="/banking/rules/new">Create Rule</Link>
+            <Link href="/banking/rules/new">{t('rules.createRule')}</Link>
           </Button>
         }
       />
@@ -212,15 +213,13 @@ function BankRulesPageContent() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Rule</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this rule? This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('rules.confirmDeleteTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('rules.confirmDeleteDescription')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tc('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tc('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -33,8 +33,11 @@ import {
   formatHours,
   TimesheetEntry,
 } from '@/lib/hooks/use-projects';
+import { useTranslations } from 'next-intl';
 
 function TimesheetsPageContent() {
+  const t = useTranslations('projects');
+  const tc = useTranslations('common');
   const tableParams = useTableParams({ defaultSortBy: 'date' });
 
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -75,7 +78,7 @@ function TimesheetsPageContent() {
       accessorKey: 'date',
       header: () => (
         <SortableHeader
-          label="Date"
+          label={t('timesheets.table.date')}
           columnId="date"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -86,17 +89,17 @@ function TimesheetsPageContent() {
     },
     {
       accessorKey: 'task.project.name',
-      header: 'Project',
+      header: t('timesheets.table.project'),
       cell: ({ row }) => row.original.task?.project?.name || '-',
     },
     {
       accessorKey: 'task.name',
-      header: 'Task',
+      header: t('timesheets.table.task'),
       cell: ({ row }) => <span className="font-medium">{row.original.task?.name || '-'}</span>,
     },
     {
       accessorKey: 'description',
-      header: 'Description',
+      header: t('timesheets.table.description'),
       meta: { cellClassName: 'max-w-[200px] truncate' },
       cell: ({ row }) => row.original.description || '-',
     },
@@ -104,7 +107,7 @@ function TimesheetsPageContent() {
       accessorKey: 'hours',
       header: () => (
         <SortableHeader
-          label="Hours"
+          label={t('timesheets.table.hours')}
           columnId="hours"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -116,7 +119,7 @@ function TimesheetsPageContent() {
     },
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: t('timesheets.table.status'),
       cell: ({ row }) => (
         <Badge
           variant="outline"
@@ -126,7 +129,9 @@ function TimesheetsPageContent() {
               : 'bg-green-100 text-green-800'
           }
         >
-          {row.original.status === 'UNBILLED' ? 'Unbilled' : 'Invoiced'}
+          {row.original.status === 'UNBILLED'
+            ? t('timesheets.status.unbilled')
+            : t('timesheets.status.invoiced')}
         </Badge>
       ),
     },
@@ -155,13 +160,13 @@ function TimesheetsPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Timesheets</h1>
-          <p className="text-muted-foreground">Track time spent on projects and tasks</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('timesheets.title')}</h1>
+          <p className="text-muted-foreground">{t('timesheets.description')}</p>
         </div>
         <Button asChild>
           <Link href="/projects/timesheets/new">
             <Plus className="mr-2 h-4 w-4" />
-            Log Time
+            {t('timesheets.logTime')}
           </Link>
         </Button>
       </div>
@@ -175,7 +180,9 @@ function TimesheetsPageContent() {
                 <Clock className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Hours</p>
+                <p className="text-sm text-muted-foreground">
+                  {t('timesheets.summary.totalHours')}
+                </p>
                 <p className="text-2xl font-bold font-mono">{formatHours(totalHours)}</p>
               </div>
             </div>
@@ -188,7 +195,9 @@ function TimesheetsPageContent() {
                 <Calendar className="h-5 w-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Unbilled Hours</p>
+                <p className="text-sm text-muted-foreground">
+                  {t('timesheets.summary.unbilledHours')}
+                </p>
                 <p className="text-2xl font-bold font-mono">{formatHours(unbilledHours)}</p>
               </div>
             </div>
@@ -203,16 +212,16 @@ function TimesheetsPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search entries..."
+              placeholder={t('timesheets.searchPlaceholder')}
             />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-36">
-                <SelectValue placeholder="Status" />
+                <SelectValue placeholder={t('timesheets.table.status')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="UNBILLED">Unbilled</SelectItem>
-                <SelectItem value="INVOICED">Invoiced</SelectItem>
+                <SelectItem value="all">{t('timesheets.allStatus')}</SelectItem>
+                <SelectItem value="UNBILLED">{t('timesheets.status.unbilled')}</SelectItem>
+                <SelectItem value="INVOICED">{t('timesheets.status.invoiced')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -222,7 +231,7 @@ function TimesheetsPageContent() {
       {/* Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Time Entries</CardTitle>
+          <CardTitle>{t('timesheets.timeEntries')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -235,10 +244,10 @@ function TimesheetsPageContent() {
             onPageChange={tableParams.setPage}
             onLimitChange={tableParams.setLimit}
             isLoading={isLoading}
-            emptyMessage="No time entries found"
+            emptyMessage={t('timesheets.empty.noResults')}
             emptyAction={
               <Button asChild>
-                <Link href="/projects/timesheets/new">Log Time</Link>
+                <Link href="/projects/timesheets/new">{t('timesheets.logTime')}</Link>
               </Button>
             }
           />
@@ -249,15 +258,15 @@ function TimesheetsPageContent() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Time Entry</AlertDialogTitle>
+            <AlertDialogTitle>{t('timesheets.confirmDelete.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this time entry? This action cannot be undone.
+              {t('timesheets.confirmDelete.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tc('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tc('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -28,9 +28,11 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { Eye, MoreHorizontal, Plus } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
 
 function TransfersPageContent() {
+  const t = useTranslations('inventory');
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -83,17 +85,17 @@ function TransfersPageContent() {
     },
     {
       id: 'from',
-      header: 'From',
+      header: t('transfers.table.from'),
       cell: ({ row }) => row.original.fromWarehouse?.name || '-',
     },
     {
       id: 'to',
-      header: 'To',
+      header: t('transfers.table.to'),
       cell: ({ row }) => row.original.toWarehouse?.name || '-',
     },
     {
       id: 'itemCount',
-      header: 'Items',
+      header: t('transfers.table.items'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => row.original.lines?.length || 0,
     },
@@ -131,7 +133,7 @@ function TransfersPageContent() {
             <DropdownMenuItem asChild>
               <Link href={`/inventory/transfers/${row.original.id}`}>
                 <Eye className="mr-2 h-4 w-4" />
-                View
+                {t('common.view')}
               </Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -145,13 +147,13 @@ function TransfersPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Stock Transfers</h1>
-          <p className="text-muted-foreground">Transfer inventory between warehouses</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('transfers.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <Button asChild>
           <Link href="/inventory/transfers/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Transfer
+            {t('transfers.newTransfer')}
           </Link>
         </Button>
       </div>
@@ -189,10 +191,10 @@ function TransfersPageContent() {
         onLoadMore={() => fetchNextPage()}
         enableColumnResizing
         tableId="transfers"
-        emptyMessage="No transfers found"
+        emptyMessage={t('transfers.empty.title')}
         emptyAction={
           <Button asChild>
-            <Link href="/inventory/transfers/new">Create Transfer</Link>
+            <Link href="/inventory/transfers/new">{t('transfers.empty.createAction')}</Link>
           </Button>
         }
       />

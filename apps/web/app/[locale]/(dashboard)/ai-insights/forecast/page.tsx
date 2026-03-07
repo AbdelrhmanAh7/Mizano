@@ -26,9 +26,11 @@ import {
   ComposedChart,
   Legend,
 } from 'recharts';
+import { useTranslations } from 'next-intl';
 import { useCashFlowForecast, formatCurrency, CashFlowForecast } from '@/lib/hooks/use-ai';
 
 export default function CashFlowForecastPage() {
+  const t = useTranslations('ai.insights.forecastPage');
   const [days, setDays] = useState<number>(30);
   const { data, isLoading } = useCashFlowForecast(days);
 
@@ -76,8 +78,8 @@ export default function CashFlowForecastPage() {
               </Link>
             </Button>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Cash Flow Forecast</h1>
-              <p className="text-muted-foreground">AI-powered prediction of future cash flows</p>
+              <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+              <p className="text-muted-foreground">{t('subtitle')}</p>
             </div>
           </div>
           <Select value={days.toString()} onValueChange={(v) => setDays(parseInt(v))}>
@@ -85,18 +87,17 @@ export default function CashFlowForecastPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="7">7 Days</SelectItem>
-              <SelectItem value="14">14 Days</SelectItem>
-              <SelectItem value="30">30 Days</SelectItem>
-              <SelectItem value="60">60 Days</SelectItem>
-              <SelectItem value="90">90 Days</SelectItem>
+              <SelectItem value="7">{t('days7')}</SelectItem>
+              <SelectItem value="14">{t('days14')}</SelectItem>
+              <SelectItem value="30">{t('days30')}</SelectItem>
+              <SelectItem value="60">{t('days60')}</SelectItem>
+              <SelectItem value="90">{t('days90')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No cash flow forecast data available yet. Add more transaction history to generate
-            predictions.
+            {t('noData')}
           </CardContent>
         </Card>
       </div>
@@ -114,8 +115,8 @@ export default function CashFlowForecastPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Cash Flow Forecast</h1>
-            <p className="text-muted-foreground">AI-powered prediction of future cash flows</p>
+            <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+            <p className="text-muted-foreground">{t('subtitle')}</p>
           </div>
         </div>
         <Select value={days.toString()} onValueChange={(v) => setDays(parseInt(v))}>
@@ -123,11 +124,11 @@ export default function CashFlowForecastPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="7">7 Days</SelectItem>
-            <SelectItem value="14">14 Days</SelectItem>
-            <SelectItem value="30">30 Days</SelectItem>
-            <SelectItem value="60">60 Days</SelectItem>
-            <SelectItem value="90">90 Days</SelectItem>
+            <SelectItem value="7">{t('days7')}</SelectItem>
+            <SelectItem value="14">{t('days14')}</SelectItem>
+            <SelectItem value="30">{t('days30')}</SelectItem>
+            <SelectItem value="60">{t('days60')}</SelectItem>
+            <SelectItem value="90">{t('days90')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -141,7 +142,7 @@ export default function CashFlowForecastPage() {
                 <TrendingUp className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Inflow</p>
+                <p className="text-sm text-muted-foreground">{t('totalInflow')}</p>
                 <p className="text-2xl font-bold font-mono text-green-600">
                   {formatCurrency(totalInflow)}
                 </p>
@@ -156,7 +157,7 @@ export default function CashFlowForecastPage() {
                 <TrendingDown className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Outflow</p>
+                <p className="text-sm text-muted-foreground">{t('totalOutflow')}</p>
                 <p className="text-2xl font-bold font-mono text-red-600">
                   {formatCurrency(totalOutflow)}
                 </p>
@@ -166,7 +167,7 @@ export default function CashFlowForecastPage() {
         </Card>
         <Card className={netCashFlow >= 0 ? 'bg-green-50' : 'bg-red-50'}>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Net Cash Flow</p>
+            <p className="text-sm text-muted-foreground">{t('netCashFlow')}</p>
             <p
               className={`text-2xl font-bold font-mono ${netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}
             >
@@ -182,7 +183,7 @@ export default function CashFlowForecastPage() {
                 <DollarSign className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Ending Balance</p>
+                <p className="text-sm text-muted-foreground">{t('endingBalance')}</p>
                 <p className="text-2xl font-bold font-mono">{formatCurrency(endingBalance)}</p>
               </div>
             </div>
@@ -197,11 +198,9 @@ export default function CashFlowForecastPage() {
             <div className="flex items-center gap-3">
               <AlertTriangle className="h-6 w-6 text-yellow-600" />
               <div>
-                <p className="font-semibold text-yellow-800">Cash Flow Warning</p>
+                <p className="font-semibold text-yellow-800">{t('cashFlowWarning')}</p>
                 <p className="text-sm text-yellow-700">
-                  Your projected cash balance may drop to {formatCurrency(lowestBalance)} during
-                  this period. Consider delaying non-essential expenses or accelerating receivables
-                  collection.
+                  {t('cashFlowWarningDescription', { amount: formatCurrency(lowestBalance) })}
                 </p>
               </div>
             </div>
@@ -212,10 +211,8 @@ export default function CashFlowForecastPage() {
       {/* Balance Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Projected Cash Balance</CardTitle>
-          <CardDescription>
-            Predicted balance with confidence interval (shaded area)
-          </CardDescription>
+          <CardTitle>{t('projectedCashBalance')}</CardTitle>
+          <CardDescription>{t('projectedCashBalanceDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[400px]">
@@ -237,14 +234,14 @@ export default function CashFlowForecastPage() {
                   dataKey="upperBound"
                   fill="#e0f2fe"
                   stroke="none"
-                  name="Upper Bound"
+                  name={t('upperBound')}
                 />
                 <Area
                   type="monotone"
                   dataKey="lowerBound"
                   fill="#ffffff"
                   stroke="none"
-                  name="Lower Bound"
+                  name={t('lowerBound')}
                 />
                 <Line
                   type="monotone"
@@ -252,7 +249,7 @@ export default function CashFlowForecastPage() {
                   stroke="#3b82f6"
                   strokeWidth={2}
                   dot={false}
-                  name="Predicted Balance"
+                  name={t('predictedBalance')}
                 />
               </ComposedChart>
             </ResponsiveContainer>
@@ -263,8 +260,8 @@ export default function CashFlowForecastPage() {
       {/* Inflow/Outflow Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Cash Inflows vs Outflows</CardTitle>
-          <CardDescription>Daily predicted cash movements</CardDescription>
+          <CardTitle>{t('cashInflowsVsOutflows')}</CardTitle>
+          <CardDescription>{t('cashInflowsVsOutflowsDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
@@ -283,14 +280,14 @@ export default function CashFlowForecastPage() {
                   dataKey="inflow"
                   stroke="#22c55e"
                   strokeWidth={2}
-                  name="Inflow"
+                  name={t('inflow')}
                 />
                 <Line
                   type="monotone"
                   dataKey="outflow"
                   stroke="#ef4444"
                   strokeWidth={2}
-                  name="Outflow"
+                  name={t('outflow')}
                 />
               </ComposedChart>
             </ResponsiveContainer>
@@ -301,7 +298,7 @@ export default function CashFlowForecastPage() {
       {/* Assumptions */}
       <Card>
         <CardHeader>
-          <CardTitle>Forecast Assumptions</CardTitle>
+          <CardTitle>{t('forecastAssumptions')}</CardTitle>
         </CardHeader>
         <CardContent>
           <ul className="space-y-2 text-sm text-muted-foreground">

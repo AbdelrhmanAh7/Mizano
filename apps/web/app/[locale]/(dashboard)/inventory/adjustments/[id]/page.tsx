@@ -3,6 +3,7 @@
 import { use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { ArrowLeft, CheckCircle, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,7 @@ interface AdjustmentDetailPageProps {
 }
 
 export default function AdjustmentDetailPage({ params }: AdjustmentDetailPageProps) {
+  const t = useTranslations('inventory');
   const { id } = use(params);
   const router = useRouter();
   const { data: adjustment, isLoading } = useAdjustment(id);
@@ -68,9 +70,13 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
   if (!adjustment) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Adjustment not found</p>
+        <p className="text-muted-foreground">
+          {t('adjustments.title')} {t('common.notFound')}
+        </p>
         <Button asChild className="mt-4">
-          <Link href="/inventory/adjustments">Back to Adjustments</Link>
+          <Link href="/inventory/adjustments">
+            {t('common.backTo')} {t('adjustments.title')}
+          </Link>
         </Button>
       </div>
     );
@@ -198,7 +204,7 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Adjustment Details</CardTitle>
+            <CardTitle>{t('adjustments.adjustmentDetails')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between">

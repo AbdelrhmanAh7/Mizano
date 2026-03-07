@@ -45,6 +45,7 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { CheckCircle, Eye, Filter, Play, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
@@ -56,6 +57,8 @@ const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
 ];
 
 function WorkOrdersPageContent() {
+  const t = useTranslations('manufacturing');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'createdAt' });
@@ -166,7 +169,7 @@ function WorkOrdersPageContent() {
     if (selectedWO) {
       try {
         await deleteWorkOrder.mutateAsync(selectedWO.id);
-        toast({ title: 'Work order deleted successfully' });
+        toast({ title: t('workOrders.deleteWorkOrder') });
       } catch (error: unknown) {
         toast({
           title: 'Error',
@@ -186,7 +189,7 @@ function WorkOrdersPageContent() {
       accessorKey: 'workOrderNumber',
       header: () => (
         <SortableHeader
-          label="WO #"
+          label={t('workOrders.table.workOrderNumber')}
           columnId="workOrderNumber"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -204,7 +207,7 @@ function WorkOrdersPageContent() {
     },
     {
       id: 'outputItem',
-      header: 'Output Item',
+      header: t('bom.table.outputItem'),
       cell: ({ row }) => {
         const wo = row.original;
         return wo.outputItem ? (
@@ -219,7 +222,7 @@ function WorkOrdersPageContent() {
     },
     {
       accessorKey: 'quantity',
-      header: 'Quantity',
+      header: t('workOrders.table.quantity'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => <span className="font-mono">{row.original.quantity}</span>,
     },
@@ -227,7 +230,7 @@ function WorkOrdersPageContent() {
       accessorKey: 'startDate',
       header: () => (
         <SortableHeader
-          label="Start Date"
+          label={t('workOrders.table.plannedStart')}
           columnId="startDate"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -238,13 +241,13 @@ function WorkOrdersPageContent() {
     },
     {
       accessorKey: 'dueDate',
-      header: 'Due Date',
+      header: tCommon('date'),
       cell: ({ row }) =>
         row.original.dueDate ? format(new Date(row.original.dueDate), 'MMM d, yyyy') : '-',
     },
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: t('workOrders.table.status'),
       cell: ({ row }) => (
         <Badge className={getWorkOrderStatusColor(row.original.status)}>
           {getWorkOrderStatusLabel(row.original.status)}
@@ -268,7 +271,7 @@ function WorkOrdersPageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/manufacturing/work-orders/${wo.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
-                  View
+                  {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
               {canDelete && wo.status === 'DRAFT' && (
@@ -276,7 +279,7 @@ function WorkOrdersPageContent() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => handleDelete(wo)} className="text-red-600">
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
+                    {tCommon('buttons.delete')}
                   </DropdownMenuItem>
                 </>
               )}
@@ -292,15 +295,15 @@ function WorkOrdersPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Work Orders</h1>
-          <p className="text-muted-foreground">Manage production work orders</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('workOrders.title')}</h1>
+          <p className="text-muted-foreground">{t('workOrders.empty.description')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
             <Button asChild>
               <Link href="/manufacturing/work-orders/new">
                 <Plus className="mr-2 h-4 w-4" />
-                New Work Order
+                {t('workOrders.newWorkOrder')}
               </Link>
             </Button>
           )}
@@ -339,7 +342,7 @@ function WorkOrdersPageContent() {
       {/* Work Orders Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Work Orders</CardTitle>
+          <CardTitle>{t('workOrders.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -354,13 +357,13 @@ function WorkOrdersPageContent() {
             isLoading={isLoading}
             enableSelection
             bulkActions={bulkActions}
-            emptyMessage="No work orders found"
+            emptyMessage={t('workOrders.empty.title')}
             emptyAction={
               canCreate ? (
                 <Button asChild>
                   <Link href="/manufacturing/work-orders/new">
                     <Plus className="mr-2 h-4 w-4" />
-                    Create Your First Work Order
+                    {t('workOrders.newWorkOrder')}
                   </Link>
                 </Button>
               ) : undefined
@@ -373,16 +376,13 @@ function WorkOrdersPageContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete work order &quot;{selectedWO?.workOrderNumber}&quot;?
-              This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('workOrders.deleteWorkOrder')}</AlertDialogTitle>
+            <AlertDialogDescription>{tCommon('confirm.deleteMessage')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

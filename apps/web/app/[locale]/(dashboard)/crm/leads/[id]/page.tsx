@@ -49,8 +49,10 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { ActivityLog } from '@/components/crm/activity-log';
 import { LeadForm } from '@/components/crm/lead-form';
 import { format } from 'date-fns';
+import { useTranslations } from 'next-intl';
 
 export default function LeadDetailPage() {
+  const t = useTranslations('crm');
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -150,7 +152,7 @@ export default function LeadDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit Lead</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('leads.editLead')}</h1>
             <p className="text-muted-foreground">{lead.leadName}</p>
           </div>
         </div>
@@ -195,13 +197,13 @@ export default function LeadDetailPage() {
           {canEdit && (
             <Button variant="outline" onClick={() => setIsEditing(true)}>
               <Edit className="mr-2 h-4 w-4" />
-              Edit
+              {t('leads.editLead')}
             </Button>
           )}
           {canEdit && !lead.convertedToCustomerId && (
             <Button onClick={() => setConvertDialogOpen(true)}>
               <UserPlus className="mr-2 h-4 w-4" />
-              Convert to Customer
+              {t('leads.convertToDeal')}
             </Button>
           )}
           {lead.convertedToCustomerId && (
@@ -210,7 +212,7 @@ export default function LeadDetailPage() {
           {canDelete && (
             <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              {t('leads.deleteLead')}
             </Button>
           )}
         </div>
@@ -263,7 +265,7 @@ export default function LeadDetailPage() {
           {lead.notes && (
             <Card>
               <CardHeader>
-                <CardTitle>Notes</CardTitle>
+                <CardTitle>{t('leads.form.notes')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm whitespace-pre-wrap">{lead.notes}</p>
@@ -281,7 +283,7 @@ export default function LeadDetailPage() {
       <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Convert Lead to Customer</DialogTitle>
+            <DialogTitle>{t('leads.convertToDeal')}</DialogTitle>
             <DialogDescription>
               This will create a new customer record from this lead&apos;s information and
               optionally create a deal.
@@ -302,7 +304,7 @@ export default function LeadDetailPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Lead</AlertDialogTitle>
+            <AlertDialogTitle>{t('leads.deleteLead')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete &quot;{lead.leadName}&quot;? This cannot be undone.
             </AlertDialogDescription>

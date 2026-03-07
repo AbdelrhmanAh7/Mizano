@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TaskForm } from '@/components/projects/task-form';
 import { useProject, useCreateTask } from '@/lib/hooks/use-projects';
+import { useTranslations } from 'next-intl';
 
 interface NewTaskPageProps {
   params: Promise<{ id: string }>;
@@ -15,6 +16,7 @@ interface NewTaskPageProps {
 
 export default function NewTaskPage({ params }: NewTaskPageProps) {
   const { id } = use(params);
+  const t = useTranslations('projects');
   const router = useRouter();
   const { data: project, isLoading } = useProject(id);
   const createTask = useCreateTask();
@@ -57,7 +59,7 @@ export default function NewTaskPage({ params }: NewTaskPageProps) {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Task</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('tasks.newTask')}</h1>
           <p className="text-muted-foreground">Add a task to {project.name}</p>
         </div>
       </div>

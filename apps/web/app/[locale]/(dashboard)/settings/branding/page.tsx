@@ -12,6 +12,7 @@ import {
 } from '@/lib/hooks/use-all-settings';
 import { ArrowLeft, Palette, Save } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 
@@ -21,6 +22,7 @@ interface FormData {
 }
 
 export default function BrandingSettingsPage() {
+  const t = useTranslations('settings');
   const { data: settings, isLoading } = useAllOrganizationSettings();
   const updateBranding = useUpdateBrandingSettings();
 
@@ -60,16 +62,14 @@ export default function BrandingSettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={t('common.goBack')}>
           <Link href="/settings">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Branding</h1>
-          <p className="text-muted-foreground text-sm">
-            Customize your organization&apos;s visual identity
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t('branding.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('branding.description')}</p>
         </div>
       </div>
 
@@ -78,16 +78,14 @@ export default function BrandingSettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Palette className="h-5 w-5" />
-              Brand Settings
+              {t('branding.brandSettings')}
             </CardTitle>
-            <CardDescription>
-              Colors and text that appear on your documents and invoices
-            </CardDescription>
+            <CardDescription>{t('branding.brandSettingsDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Primary Color */}
             <div className="space-y-2">
-              <Label>Primary Color</Label>
+              <Label>{t('branding.primaryColor')}</Label>
               <div className="flex items-center gap-3">
                 <input
                   type="color"
@@ -107,34 +105,29 @@ export default function BrandingSettingsPage() {
                   className="h-10 flex-1 rounded-lg flex items-center justify-center text-white text-sm font-medium"
                   style={{ backgroundColor: form.watch('primaryColor') }}
                 >
-                  Preview
+                  {t('branding.preview')}
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Used as accent color on invoices, quotes, and emails
-              </p>
+              <p className="text-xs text-muted-foreground">{t('branding.primaryColorHint')}</p>
             </div>
 
             {/* Logo note */}
             <div className="rounded-lg border p-4 bg-muted/30">
               <p className="text-sm text-muted-foreground">
-                <strong>Logo upload:</strong> Logo can be uploaded via the Organization settings
-                page or the onboarding wizard. Supported formats: JPEG, PNG, GIF, WebP (max 2MB).
+                <strong>{t('branding.logoNote')}</strong> {t('branding.logoNoteDescription')}
               </p>
             </div>
 
             {/* Footer Text */}
             <div className="space-y-2">
-              <Label htmlFor="footerText">Invoice Footer Text</Label>
+              <Label htmlFor="footerText">{t('branding.footerText')}</Label>
               <Textarea
                 id="footerText"
                 {...form.register('footerText')}
                 placeholder="Thank you for your business! Please contact us with any questions."
                 rows={3}
               />
-              <p className="text-xs text-muted-foreground">
-                Displayed at the bottom of all generated invoices and documents
-              </p>
+              <p className="text-xs text-muted-foreground">{t('branding.footerTextHint')}</p>
             </div>
           </CardContent>
         </Card>
@@ -147,7 +140,7 @@ export default function BrandingSettingsPage() {
             className="gap-2"
           >
             <Save className="h-4 w-4" />
-            {updateBranding.isPending ? 'Saving...' : 'Save Changes'}
+            {updateBranding.isPending ? t('common.saving') : t('common.saveChanges')}
           </Button>
         </div>
       </form>

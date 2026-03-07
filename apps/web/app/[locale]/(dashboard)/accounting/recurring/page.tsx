@@ -42,8 +42,10 @@ import {
 } from '@/lib/hooks/use-recurring-profiles';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { format } from 'date-fns';
+import { useTranslations } from 'next-intl';
 
 function RecurringProfilesPageContent() {
+  const t = useTranslations('accounting');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'nextExecutionDate' });
@@ -136,7 +138,7 @@ function RecurringProfilesPageContent() {
     },
     {
       accessorKey: 'frequency',
-      header: 'Frequency',
+      header: t('recurring.table.frequency'),
       cell: ({ row }) => (
         <Badge variant="outline">{getFrequencyLabel(row.original.frequency)}</Badge>
       ),
@@ -145,7 +147,7 @@ function RecurringProfilesPageContent() {
       accessorKey: 'nextExecutionDate',
       header: () => (
         <SortableHeader
-          label="Next Execution"
+          label={t('recurring.table.nextRun')}
           columnId="nextExecutionDate"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -161,7 +163,7 @@ function RecurringProfilesPageContent() {
     },
     {
       accessorKey: 'autoPost',
-      header: 'Auto Post',
+      header: t('recurring.form.autoPost'),
       cell: ({ row }) => (
         <Badge variant={row.original.autoPost ? 'default' : 'secondary'}>
           {row.original.autoPost ? 'Yes' : 'No'}
@@ -170,7 +172,7 @@ function RecurringProfilesPageContent() {
     },
     {
       accessorKey: 'isActive',
-      header: 'Status',
+      header: t('recurring.table.status'),
       cell: ({ row }) => (
         <Badge
           className={
@@ -242,7 +244,7 @@ function RecurringProfilesPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Recurring Journals</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('recurring.title')}</h1>
           <p className="text-muted-foreground">Automate journal entries with recurring profiles</p>
         </div>
         <div className="flex items-center gap-2">
@@ -250,7 +252,7 @@ function RecurringProfilesPageContent() {
             <Button asChild>
               <Link href="/accounting/recurring/new">
                 <Plus className="mr-2 h-4 w-4" />
-                New Profile
+                {t('recurring.newProfile')}
               </Link>
             </Button>
           )}
@@ -291,7 +293,7 @@ function RecurringProfilesPageContent() {
       {/* Profiles Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Recurring Profiles</CardTitle>
+          <CardTitle>{t('recurring.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -304,7 +306,7 @@ function RecurringProfilesPageContent() {
             onPageChange={tableParams.setPage}
             onLimitChange={tableParams.setLimit}
             isLoading={isLoading}
-            emptyMessage="No recurring profiles found"
+            emptyMessage={t('recurring.empty.title')}
             emptyAction={
               canCreate ? (
                 <Button asChild>
@@ -323,7 +325,7 @@ function RecurringProfilesPageContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Recurring Profile</AlertDialogTitle>
+            <AlertDialogTitle>{t('recurring.deleteProfile')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete &quot;{profileToDelete?.name}&quot;? This action
               cannot be undone. Previously created journals will not be affected.

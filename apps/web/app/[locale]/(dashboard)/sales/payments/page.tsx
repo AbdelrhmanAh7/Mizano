@@ -22,10 +22,12 @@ import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { Eye, Filter, Plus, RefreshCw } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function PaymentsReceivedPageContent() {
+  const t = useTranslations('sales');
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
@@ -61,7 +63,7 @@ function PaymentsReceivedPageContent() {
       accessorKey: 'paymentNumber',
       header: () => (
         <SortableHeader
-          label="Payment #"
+          label={t('payments.table.paymentNumber')}
           columnId="paymentNumber"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -76,7 +78,7 @@ function PaymentsReceivedPageContent() {
     },
     {
       accessorKey: 'customer.name',
-      header: 'Customer',
+      header: t('payments.table.customer'),
       cell: ({ row }) => {
         const payment = row.original;
         return payment.customer ? (
@@ -92,7 +94,7 @@ function PaymentsReceivedPageContent() {
       accessorKey: 'date',
       header: () => (
         <SortableHeader
-          label="Date"
+          label={t('payments.table.date')}
           columnId="date"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -103,19 +105,19 @@ function PaymentsReceivedPageContent() {
     },
     {
       accessorKey: 'paymentMode',
-      header: 'Mode',
+      header: t('payments.table.mode'),
       cell: ({ row }) => <PaymentModeBadge mode={row.original.paymentMode} />,
     },
     {
       accessorKey: 'reference',
-      header: 'Reference',
+      header: t('payments.form.reference'),
       cell: ({ row }) => row.original.reference || '-',
     },
     {
       accessorKey: 'amount',
       header: () => (
         <SortableHeader
-          label="Amount"
+          label={t('payments.table.amount')}
           columnId="amount"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -147,15 +149,15 @@ function PaymentsReceivedPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Payments Received</h1>
-          <p className="text-muted-foreground">Track and manage customer payments</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('payments.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
             <Button asChild>
               <Link href="/sales/payments/new">
                 <Plus className="mr-2 h-4 w-4" />
-                Record Payment
+                {t('invoices.recordPayment')}
               </Link>
             </Button>
           )}
@@ -200,7 +202,7 @@ function PaymentsReceivedPageContent() {
       {/* Payments Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Payments</CardTitle>
+          <CardTitle>{t('payments.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -214,7 +216,7 @@ function PaymentsReceivedPageContent() {
             onLoadMore={() => fetchNextPage()}
             enableColumnResizing
             tableId="payments-received"
-            emptyMessage="No payments found"
+            emptyMessage={t('payments.empty.title')}
             emptyAction={
               canCreate ? (
                 <Button asChild>

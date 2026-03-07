@@ -1,3 +1,8 @@
+/**
+ * @module create-api-client
+ * Generic CRUD API client factory. Generates standard REST methods (list, get,
+ * create, update, delete) for any entity endpoint, reducing per-module boilerplate.
+ */
 import type { AxiosInstance, AxiosResponse } from 'axios';
 
 /**
@@ -47,7 +52,9 @@ export interface CrudApi<TCreate = unknown, TUpdate = unknown> {
  * ```
  */
 export function createCrudApi<TCreate = unknown, TUpdate = unknown>(
+  /** @param config - Endpoint path and optional behavior overrides. */
   config: CrudApiConfig,
+  /** @param apiInstance - Authenticated Axios instance for making requests. */
   apiInstance: AxiosInstance,
 ): CrudApi<TCreate, TUpdate> {
   const { endpoint, updateMethod = 'patch', hasCursor = true } = config;
@@ -72,6 +79,9 @@ export function createCrudApi<TCreate = unknown, TUpdate = unknown>(
 
 /**
  * Creates bulk operation helpers for an entity.
+ * @param endpoint - The API endpoint path, e.g. '/invoices'.
+ * @param apiInstance - Authenticated Axios instance for making requests.
+ * @returns Object with a `bulkAction` method for batch operations (e.g. bulk-delete, bulk-approve).
  */
 export function createBulkApi(endpoint: string, apiInstance: AxiosInstance) {
   return {

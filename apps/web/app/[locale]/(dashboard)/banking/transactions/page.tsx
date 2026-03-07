@@ -31,8 +31,10 @@ import {
   getStatusColor,
   type TransactionStatus,
 } from '@/lib/hooks/use-bank-transactions';
+import { useTranslations } from 'next-intl';
 
 export default function BankTransactionsPage() {
+  const t = useTranslations('banking');
   const [statusFilter, setStatusFilter] = useState<TransactionStatus | ''>('');
   const [bankAccountId, setBankAccountId] = useState('');
 
@@ -55,7 +57,7 @@ export default function BankTransactionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Bank Transactions</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t('transactions.title')}</h1>
         <p className="text-muted-foreground">View and manage imported bank transactions</p>
       </div>
 
@@ -81,17 +83,17 @@ export default function BankTransactionsPage() {
         <CardContent className="p-0">
           {transactions.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              No transactions found. Import a bank statement to get started.
+              {t('transactions.empty.title')}. {t('transactions.empty.description')}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Payee</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{t('transactions.table.date')}</TableHead>
+                  <TableHead>{t('transactions.table.description')}</TableHead>
+                  <TableHead>{t('transactions.table.payee')}</TableHead>
+                  <TableHead className="text-right">{t('transactions.table.amount')}</TableHead>
+                  <TableHead>{t('transactions.table.status')}</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>

@@ -4,39 +4,42 @@ import Link from 'next/link';
 import { BookOpen, FileText, Clock, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-
-const accountingModules = [
-  {
-    title: 'Chart of Accounts',
-    description: 'Manage your accounts hierarchy, create new accounts, and view account balances.',
-    icon: BookOpen,
-    href: '/accounting/accounts',
-    color: 'text-blue-600',
-  },
-  {
-    title: 'Journal Entries',
-    description: 'Create manual journal entries, record adjustments, and maintain accurate books.',
-    icon: FileText,
-    href: '/accounting/journals',
-    color: 'text-green-600',
-  },
-  {
-    title: 'Recurring Journals',
-    description: 'Automate repetitive journal entries with scheduled recurring transactions.',
-    icon: Clock,
-    href: '/accounting/recurring',
-    color: 'text-purple-600',
-  },
-];
+import { useTranslations } from 'next-intl';
 
 export default function AccountingPage() {
+  const t = useTranslations('accounting');
+
+  const accountingModules = [
+    {
+      title: t('accounts.title'),
+      description:
+        'Manage your accounts hierarchy, create new accounts, and view account balances.',
+      icon: BookOpen,
+      href: '/accounting/accounts',
+      color: 'text-blue-600',
+    },
+    {
+      title: t('journals.title'),
+      description:
+        'Create manual journal entries, record adjustments, and maintain accurate books.',
+      icon: FileText,
+      href: '/accounting/journals',
+      color: 'text-green-600',
+    },
+    {
+      title: t('recurring.title'),
+      description: 'Automate repetitive journal entries with scheduled recurring transactions.',
+      icon: Clock,
+      href: '/accounting/recurring',
+      color: 'text-purple-600',
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Accounting</h1>
-        <p className="text-muted-foreground">
-          Manage your chart of accounts, journal entries, and recurring transactions.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+        <p className="text-muted-foreground">{t('description')}</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

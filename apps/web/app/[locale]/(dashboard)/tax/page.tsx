@@ -1,40 +1,44 @@
 'use client';
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Percent, FileText, DollarSign, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
-const modules = [
-  {
-    title: 'Tax Rates',
-    description: 'Configure tax rates, VAT codes, and tax group settings.',
-    icon: Percent,
-    href: '/tax/rates',
-    color: 'text-blue-600',
-  },
-  {
-    title: 'VAT Returns',
-    description: 'Generate and file VAT returns with calculated tax summaries.',
-    icon: FileText,
-    href: '/tax/returns',
-    color: 'text-green-600',
-  },
-  {
-    title: 'Tax Payments',
-    description: 'Record tax payments and track payment history.',
-    icon: DollarSign,
-    href: '/tax/payments',
-    color: 'text-purple-600',
-  },
-];
-
 export default function TaxPage() {
+  const t = useTranslations('tax');
+  const tCommon = useTranslations('common');
+
+  const modules = [
+    {
+      title: t('rates.title'),
+      description: t('rates.description'),
+      icon: Percent,
+      href: '/tax/rates',
+      color: 'text-blue-600',
+    },
+    {
+      title: t('returns.title'),
+      description: t('returns.description'),
+      icon: FileText,
+      href: '/tax/returns',
+      color: 'text-green-600',
+    },
+    {
+      title: t('payments.title'),
+      description: t('payments.description'),
+      icon: DollarSign,
+      href: '/tax/payments',
+      color: 'text-purple-600',
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Tax</h1>
-        <p className="text-muted-foreground">Manage tax rates, VAT returns, and tax payments.</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+        <p className="text-muted-foreground">{t('description')}</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -52,7 +56,7 @@ export default function TaxPage() {
               <CardDescription className="text-sm">{module.description}</CardDescription>
               <Link href={module.href}>
                 <Button variant="outline" className="w-full group">
-                  Open
+                  {tCommon('buttons.open')}
                   <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>

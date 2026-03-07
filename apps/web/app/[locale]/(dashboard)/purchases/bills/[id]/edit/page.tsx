@@ -2,6 +2,7 @@
 
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,8 @@ interface EditBillPageProps {
 export default function EditBillPage({ params }: EditBillPageProps) {
   const { id } = use(params);
   const router = useRouter();
+  const t = useTranslations('purchases');
+  const tCommon = useTranslations('common');
   const { data: bill, isLoading: billLoading } = useBill(id);
   const updateBill = useUpdateBill();
 
@@ -63,9 +66,9 @@ export default function EditBillPage({ params }: EditBillPageProps) {
   if (!bill) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Bill not found</p>
+        <p className="text-muted-foreground">{tCommon('errors.notFound')}</p>
         <Button asChild className="mt-4">
-          <Link href="/purchases/bills">Back to Bills</Link>
+          <Link href="/purchases/bills">{tCommon('buttons.back')}</Link>
         </Button>
       </div>
     );
@@ -76,7 +79,7 @@ export default function EditBillPage({ params }: EditBillPageProps) {
       <div className="text-center py-12">
         <p className="text-muted-foreground">Only draft bills can be edited</p>
         <Button asChild className="mt-4">
-          <Link href={`/purchases/bills/${id}`}>View Bill</Link>
+          <Link href={`/purchases/bills/${id}`}>{t('bills.billDetails')}</Link>
         </Button>
       </div>
     );
@@ -92,8 +95,8 @@ export default function EditBillPage({ params }: EditBillPageProps) {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edit Bill</h1>
-          <p className="text-muted-foreground">Update bill {bill.billNumber}</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('bills.editBill')}</h1>
+          <p className="text-muted-foreground">{bill.billNumber}</p>
         </div>
       </div>
 

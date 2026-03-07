@@ -20,8 +20,10 @@ import { format } from 'date-fns';
 import { CheckCircle2, DollarSign, Eye, FileText, Play, Trash2, Users } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 function PayrollPageContent() {
+  const t = useTranslations('hr');
   const tableParams = useTableParams({ defaultSortBy: 'createdAt' });
   const { hasPermission } = usePermissions();
   const { data: payrollData, isLoading, refetch } = usePayrollRuns(tableParams.queryParams);
@@ -197,13 +199,13 @@ function PayrollPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Payroll</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('payroll.title')}</h1>
           <p className="text-muted-foreground">Manage payroll runs and process employee salaries</p>
         </div>
         <Button asChild>
           <Link href="/hr/payroll/run">
             <Play className="mr-2 h-4 w-4" />
-            Run Payroll
+            {t('payroll.newRun')}
           </Link>
         </Button>
       </div>
@@ -282,12 +284,12 @@ function PayrollPageContent() {
             isLoading={isLoading}
             enableSelection
             bulkActions={bulkActions}
-            emptyMessage="No payroll runs yet"
+            emptyMessage={t('payroll.empty.title')}
             emptyAction={
               <Button asChild>
                 <Link href="/hr/payroll/run">
                   <Play className="mr-2 h-4 w-4" />
-                  Run Payroll
+                  {t('payroll.newRun')}
                 </Link>
               </Button>
             }

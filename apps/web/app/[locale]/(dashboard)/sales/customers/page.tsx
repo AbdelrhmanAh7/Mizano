@@ -35,10 +35,13 @@ import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Edit, Eye, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function CustomersPageContent() {
+  const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const { onExportAll } = useExportAll('customers', 'customers');
@@ -96,7 +99,7 @@ function CustomersPageContent() {
       accessorKey: 'name',
       header: () => (
         <SortableHeader
-          label="Name"
+          label={t('customers.table.name')}
           columnId="name"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -119,23 +122,23 @@ function CustomersPageContent() {
     },
     {
       accessorKey: 'email',
-      header: 'Email',
+      header: t('customers.table.email'),
       cell: ({ row }) => row.original.email || '-',
     },
     {
       accessorKey: 'phone',
-      header: 'Phone',
+      header: t('customers.table.phone'),
       cell: ({ row }) => row.original.phone || '-',
     },
     {
       accessorKey: 'currency',
-      header: 'Currency',
+      header: tCommon('currency'),
     },
     {
       accessorKey: 'outstandingBalance',
       header: () => (
         <SortableHeader
-          label="Outstanding Balance"
+          label={t('customers.table.outstanding')}
           columnId="outstandingBalance"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -199,15 +202,15 @@ function CustomersPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
-          <p className="text-muted-foreground">Manage your customer accounts and track balances</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('customers.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
             <Button asChild data-tour="create-customer-btn">
               <Link href="/sales/customers/new">
                 <Plus className="mr-2 h-4 w-4" />
-                New Customer
+                {t('customers.newCustomer')}
               </Link>
             </Button>
           )}
@@ -241,7 +244,7 @@ function CustomersPageContent() {
       {/* Customers Table */}
       <Card data-tour="customer-list">
         <CardHeader>
-          <CardTitle>All Customers</CardTitle>
+          <CardTitle>{t('customers.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -260,7 +263,7 @@ function CustomersPageContent() {
             enableColumnVisibility
             exportFilename="customers"
             onExportAll={onExportAll}
-            emptyMessage="No customers found"
+            emptyMessage={t('customers.empty.title')}
             emptyAction={
               canCreate ? (
                 <Button asChild>
@@ -279,16 +282,16 @@ function CustomersPageContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+            <AlertDialogTitle>{t('customers.deleteCustomer')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete &quot;{customerToDelete?.name}&quot;? This action
               cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

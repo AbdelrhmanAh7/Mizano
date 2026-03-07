@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Plus, Trash2, Edit, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +44,8 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { TaxRateForm } from '@/components/tax/tax-rate-form';
 
 export default function TaxRatesPage() {
+  const t = useTranslations('tax');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
 
@@ -79,13 +82,13 @@ export default function TaxRatesPage() {
     if (selectedRate) {
       try {
         await deleteTaxRate.mutateAsync(selectedRate.id);
-        toast({ title: 'Tax rate deleted successfully' });
+        toast({ title: t('rates.deleteSuccess') });
       } catch (error: unknown) {
         toast({
-          title: 'Error',
+          title: tCommon('errors.generic'),
           description:
             (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-            'Failed to delete tax rate',
+            t('rates.deleteFail'),
           variant: 'destructive',
         });
       }
@@ -99,14 +102,14 @@ export default function TaxRatesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Tax Rates</h1>
-          <p className="text-muted-foreground">Manage tax rates for invoices and bills</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('rates.title')}</h1>
+          <p className="text-muted-foreground">{t('rates.description')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
             <Button onClick={handleCreate}>
               <Plus className="mr-2 h-4 w-4" />
-              New Tax Rate
+              {t('rates.newTaxRate')}
             </Button>
           )}
         </div>
@@ -115,7 +118,7 @@ export default function TaxRatesPage() {
       {/* Tax Rates Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Tax Rates</CardTitle>
+          <CardTitle>{t('rates.allRates')}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -126,11 +129,11 @@ export default function TaxRatesPage() {
             </div>
           ) : taxRates.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No tax rates configured</p>
+              <p className="text-muted-foreground mb-4">{t('rates.noRates')}</p>
               {canCreate && (
                 <Button onClick={handleCreate}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Create Your First Tax Rate
+                  {t('rates.createFirst')}
                 </Button>
               )}
             </div>
@@ -138,13 +141,13 @@ export default function TaxRatesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-right">Rate</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Linked Account</TableHead>
-                  <TableHead className="text-center">Default</TableHead>
-                  <TableHead className="text-center">Active</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t('rates.table.name')}</TableHead>
+                  <TableHead className="text-right">{t('rates.table.rate')}</TableHead>
+                  <TableHead>{t('rates.table.type')}</TableHead>
+                  <TableHead>{t('rates.table.linkedAccount')}</TableHead>
+                  <TableHead className="text-center">{t('rates.table.default')}</TableHead>
+                  <TableHead className="text-center">{t('rates.table.active')}</TableHead>
+                  <TableHead className="text-right">{t('rates.table.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -180,7 +183,7 @@ export default function TaxRatesPage() {
                             : 'bg-gray-100 text-gray-800 border-gray-200'
                         }
                       >
-                        {rate.isActive ? 'Active' : 'Inactive'}
+                        {rate.isActive ? tCommon('status.active') : tCommon('status.inactive')}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -219,9 +222,11 @@ export default function TaxRatesPage() {
       <Dialog open={formDialogOpen} onOpenChange={setFormDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingRate ? 'Edit Tax Rate' : 'New Tax Rate'}</DialogTitle>
+            <DialogTitle>
+              {editingRate ? t('rates.editTaxRate') : t('rates.newTaxRate')}
+            </DialogTitle>
             <DialogDescription>
-              {editingRate ? 'Update the tax rate details below.' : 'Create a new tax rate.'}
+              {editingRate ? t('rates.editDescription') : t('rates.createDescription')}
             </DialogDescription>
           </DialogHeader>
           <TaxRateForm taxRate={editingRate} onSuccess={() => setFormDialogOpen(false)} />
@@ -232,16 +237,15 @@ export default function TaxRatesPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Tax Rate</AlertDialogTitle>
+            <AlertDialogTitle>{t('rates.deleteTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete tax rate &quot;{selectedRate?.name}&quot;? This action
-              cannot be undone.
+              {t('rates.deleteDescription', { name: selectedRate?.name ?? '' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

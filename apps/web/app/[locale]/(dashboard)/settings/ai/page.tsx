@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { useAllOrganizationSettings, useUpdateAISettings } from '@/lib/hooks/use-all-settings';
 import { ArrowLeft, Brain, Save } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 
@@ -31,39 +32,16 @@ interface FormData {
 }
 
 const AI_FEATURES = [
-  {
-    key: 'aiCategorizationEnabled' as const,
-    label: 'Auto-Categorization',
-    description: 'Automatically categorize expenses and transactions using ML',
-  },
-  {
-    key: 'aiReconciliationEnabled' as const,
-    label: 'Smart Reconciliation',
-    description: 'AI-powered matching of bank transactions to invoices/bills',
-  },
-  {
-    key: 'aiOcrEnabled' as const,
-    label: 'OCR Document Scanning',
-    description: 'Extract data from receipts and invoices using computer vision',
-  },
-  {
-    key: 'aiForecastingEnabled' as const,
-    label: 'Cash Flow Forecasting',
-    description: 'Predict future cash flows using historical data patterns',
-  },
-  {
-    key: 'aiAnomalyEnabled' as const,
-    label: 'Anomaly Detection',
-    description: 'Flag unusual transactions or patterns for review',
-  },
-  {
-    key: 'aiLeadScoringEnabled' as const,
-    label: 'Lead Scoring',
-    description: 'Score CRM leads based on engagement and conversion likelihood',
-  },
+  { key: 'aiCategorizationEnabled' as const, labelKey: 'categorization' },
+  { key: 'aiReconciliationEnabled' as const, labelKey: 'reconciliation' },
+  { key: 'aiOcrEnabled' as const, labelKey: 'ocr' },
+  { key: 'aiForecastingEnabled' as const, labelKey: 'forecasting' },
+  { key: 'aiAnomalyEnabled' as const, labelKey: 'anomaly' },
+  { key: 'aiLeadScoringEnabled' as const, labelKey: 'leadScoring' },
 ];
 
 export default function AISettingsPage() {
+  const t = useTranslations('settings');
   const { data: settings, isLoading } = useAllOrganizationSettings();
   const updateAI = useUpdateAISettings();
 
@@ -116,16 +94,14 @@ export default function AISettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={t('common.goBack')}>
           <Link href="/settings">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">AI Features</h1>
-          <p className="text-muted-foreground text-sm">
-            Toggle AI-powered features and configure model parameters
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t('ai.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('ai.description')}</p>
         </div>
       </div>
 
@@ -135,9 +111,9 @@ export default function AISettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Brain className="h-5 w-5" />
-              AI Feature Toggles
+              {t('ai.featureToggles')}
             </CardTitle>
-            <CardDescription>Enable or disable individual AI capabilities</CardDescription>
+            <CardDescription>{t('ai.featureTogglesDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1">
             {AI_FEATURES.map((feature) => (
@@ -146,8 +122,12 @@ export default function AISettingsPage() {
                 className="flex items-center justify-between rounded-lg border p-4"
               >
                 <div>
-                  <Label className="text-sm font-medium">{feature.label}</Label>
-                  <p className="text-xs text-muted-foreground">{feature.description}</p>
+                  <Label className="text-sm font-medium">
+                    {t(`ai.features.${feature.labelKey}`)}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {t(`ai.features.${feature.labelKey}Description`)}
+                  </p>
                 </div>
                 <Switch
                   checked={form.watch(feature.key)}
@@ -161,12 +141,12 @@ export default function AISettingsPage() {
         {/* Model Parameters */}
         <Card>
           <CardHeader>
-            <CardTitle>Model Parameters</CardTitle>
-            <CardDescription>Configure how AI models learn and detect anomalies</CardDescription>
+            <CardTitle>{t('ai.modelParameters')}</CardTitle>
+            <CardDescription>{t('ai.modelParametersDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label>Retraining Frequency</Label>
+              <Label>{t('ai.retrainingFrequency')}</Label>
               <Select
                 value={form.watch('aiRetrainingFrequency')}
                 onValueChange={(v) =>
@@ -177,20 +157,18 @@ export default function AISettingsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="biweekly">Every 2 Weeks</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="daily">{t('ai.retrainingOptions.daily')}</SelectItem>
+                  <SelectItem value="weekly">{t('ai.retrainingOptions.weekly')}</SelectItem>
+                  <SelectItem value="biweekly">{t('ai.retrainingOptions.biweekly')}</SelectItem>
+                  <SelectItem value="monthly">{t('ai.retrainingOptions.monthly')}</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                How often AI models retrain on your latest data
-              </p>
+              <p className="text-xs text-muted-foreground">{t('ai.retrainingFrequencyHint')}</p>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>Anomaly Detection Sensitivity</Label>
+                <Label>{t('ai.anomalySensitivity')}</Label>
                 <span className="text-sm font-medium">{form.watch('anomalySensitivity')}%</span>
               </div>
               <Slider
@@ -203,9 +181,7 @@ export default function AISettingsPage() {
                 }
                 className="max-w-md"
               />
-              <p className="text-xs text-muted-foreground">
-                Higher values flag more transactions. Lower values only flag the most unusual ones.
-              </p>
+              <p className="text-xs text-muted-foreground">{t('ai.anomalySensitivityHint')}</p>
             </div>
           </CardContent>
         </Card>
@@ -218,7 +194,7 @@ export default function AISettingsPage() {
             className="gap-2"
           >
             <Save className="h-4 w-4" />
-            {updateAI.isPending ? 'Saving...' : 'Save Changes'}
+            {updateAI.isPending ? t('common.saving') : t('common.saveChanges')}
           </Button>
         </div>
       </form>

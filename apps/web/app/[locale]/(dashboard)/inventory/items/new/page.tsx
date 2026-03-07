@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { accountsApi, taxRatesApi } from '@/lib/api';
 
 export default function NewItemPage() {
+  const t = useTranslations('inventory');
   const router = useRouter();
   const createItem = useCreateItem();
 
@@ -67,8 +69,8 @@ export default function NewItemPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Item</h1>
-          <p className="text-muted-foreground">Add a new product or service</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('items.newItem')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
       </div>
 

@@ -1,35 +1,36 @@
 'use client';
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Layers, Wrench, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
-const modules = [
-  {
-    title: 'Bill of Materials',
-    description: 'Define product recipes, component lists, and material requirements.',
-    icon: Layers,
-    href: '/manufacturing/bom',
-    color: 'text-blue-600',
-  },
-  {
-    title: 'Work Orders',
-    description: 'Create and track manufacturing work orders through production stages.',
-    icon: Wrench,
-    href: '/manufacturing/work-orders',
-    color: 'text-green-600',
-  },
-];
-
 export default function ManufacturingPage() {
+  const t = useTranslations('manufacturing');
+
+  const modules = [
+    {
+      title: t('bom.title'),
+      description: 'Define product recipes, component lists, and material requirements.',
+      icon: Layers,
+      href: '/manufacturing/bom',
+      color: 'text-blue-600',
+    },
+    {
+      title: t('workOrders.title'),
+      description: 'Create and track manufacturing work orders through production stages.',
+      icon: Wrench,
+      href: '/manufacturing/work-orders',
+      color: 'text-green-600',
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Manufacturing</h1>
-        <p className="text-muted-foreground">
-          Manage bills of materials and production work orders.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+        <p className="text-muted-foreground">{t('description')}</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

@@ -12,9 +12,11 @@ import {
 import type { ColumnDef } from '@tanstack/react-table';
 import { endOfMonth, format, startOfMonth } from 'date-fns';
 import { DollarSign, Receipt, Users, Wallet } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { Suspense, useMemo, useState } from 'react';
 
 function SalesByCustomerContent() {
+  const t = useTranslations('reports');
   const today = new Date();
   const [dateRange, setDateRange] = useState({
     startDate: startOfMonth(today),
@@ -73,10 +75,8 @@ function SalesByCustomerContent() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Sales by Customer</h1>
-        <p className="text-muted-foreground">
-          Breakdown of sales revenue by customer for the selected period
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('salesByCustomer.title')}</h1>
+        <p className="text-muted-foreground">{t('salesByCustomer.description')}</p>
       </div>
 
       <ReportFilters dateRange={dateRange} onDateRangeChange={setDateRange} showDateRange />

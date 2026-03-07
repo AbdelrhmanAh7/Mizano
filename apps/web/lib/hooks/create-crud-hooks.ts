@@ -1,3 +1,9 @@
+/**
+ * @module create-crud-hooks
+ * Factory for generating TanStack Query hooks (list, get, create, update, delete)
+ * for any CRUD entity. Handles cache invalidation, toast notifications, and
+ * both offset and cursor-based pagination out of the box.
+ */
 'use client';
 
 import { useToast } from '@/components/ui/use-toast';
@@ -10,6 +16,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 // Types
 // ---------------------------------------------------------------------------
 
+/** Internal mirror of the CrudApi shape expected from `create-api-client`. */
 interface CrudApi<TCreate, TUpdate> {
   getAll: (params?: Record<string, unknown>) => Promise<AxiosResponse>;
   getAllCursor: (params?: Record<string, unknown>) => Promise<AxiosResponse>;
@@ -32,6 +39,7 @@ export interface CrudHooksConfig<_TEntity, TCreate, TUpdate> {
   hasCursor?: boolean;
 }
 
+/** Shape of Axios error responses used for extracting server error messages. */
 interface MutationError {
   response?: { data?: { message?: string } };
 }
@@ -68,7 +76,7 @@ export function createCrudHooks<TEntity, TCreate, TUpdate>(
 
   const lowerName = entityName.toLowerCase();
 
-  // ---- useList (offset pagination) ----
+  /** Fetches a paginated list using offset pagination. */
   function useList(params?: Record<string, unknown>) {
     return useQuery({
       queryKey: [...queryKey, params],
@@ -79,7 +87,7 @@ export function createCrudHooks<TEntity, TCreate, TUpdate>(
     });
   }
 
-  // ---- useInfiniteList (cursor pagination) ----
+  /** Fetches an infinite-scroll list using cursor-based pagination. */
   function useInfiniteList(params?: Record<string, unknown>) {
     return useInfiniteTableData<TEntity, Record<string, unknown>>({
       queryKey,
@@ -92,7 +100,7 @@ export function createCrudHooks<TEntity, TCreate, TUpdate>(
     });
   }
 
-  // ---- useOne ----
+  /** Fetches a single entity by ID. Disabled when `id` is undefined. */
   function useOne(id: string | undefined) {
     return useQuery({
       queryKey: [...queryKey, id],
@@ -105,7 +113,7 @@ export function createCrudHooks<TEntity, TCreate, TUpdate>(
     });
   }
 
-  // ---- useCreate ----
+  /** Creates a new entity and invalidates related query caches on success. */
   function useCreate() {
     const queryClient = useQueryClient();
     const { toast } = useToast();
@@ -135,7 +143,7 @@ export function createCrudHooks<TEntity, TCreate, TUpdate>(
     });
   }
 
-  // ---- useUpdate ----
+  /** Updates an existing entity by ID and invalidates related query caches on success. */
   function useUpdate() {
     const queryClient = useQueryClient();
     const { toast } = useToast();
@@ -166,7 +174,7 @@ export function createCrudHooks<TEntity, TCreate, TUpdate>(
     });
   }
 
-  // ---- useDelete ----
+  /** Deletes an entity by ID and invalidates related query caches on success. */
   function useDelete() {
     const queryClient = useQueryClient();
     const { toast } = useToast();

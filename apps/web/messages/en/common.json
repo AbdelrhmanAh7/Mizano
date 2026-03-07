@@ -50,6 +50,16 @@
       "title": "Recent Transactions",
       "noTransactions": "No recent transactions",
       "viewAll": "View All"
+    },
+    "drillLinks": {
+      "viewTransactions": "View Transactions",
+      "viewInvoices": "View Invoices",
+      "viewOverdue": "View Overdue",
+      "viewExpenses": "View Expenses",
+      "viewPL": "View P&L",
+      "viewCustomers": "View Customers",
+      "viewAccounts": "View Accounts",
+      "viewItems": "View Items"
     }
   },
   "header": {
@@ -86,7 +96,8 @@
     "reject": "Reject",
     "reset": "Reset",
     "apply": "Apply",
-    "clear": "Clear"
+    "clear": "Clear",
+    "open": "Open"
   },
   "loading": {
     "default": "Loading...",
@@ -116,7 +127,8 @@
     "accepted": "Accepted",
     "declined": "Declined",
     "expired": "Expired",
-    "invoiced": "Invoiced"
+    "invoiced": "Invoiced",
+    "filed": "Filed"
   },
   "table": {
     "noResults": "No results found",

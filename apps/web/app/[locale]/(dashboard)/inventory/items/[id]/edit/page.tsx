@@ -3,6 +3,7 @@
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,6 +17,7 @@ interface EditItemPageProps {
 }
 
 export default function EditItemPage({ params }: EditItemPageProps) {
+  const t = useTranslations('inventory');
   const { id } = use(params);
   const router = useRouter();
   const { data: item, isLoading: itemLoading } = useItem(id);
@@ -67,9 +69,13 @@ export default function EditItemPage({ params }: EditItemPageProps) {
   if (!item) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Item not found</p>
+        <p className="text-muted-foreground">
+          {t('items.title')} {t('common.notFound')}
+        </p>
         <Button asChild className="mt-4">
-          <Link href="/inventory/items">Back to Items</Link>
+          <Link href="/inventory/items">
+            {t('common.backTo')} {t('items.title')}
+          </Link>
         </Button>
       </div>
     );
@@ -85,7 +91,7 @@ export default function EditItemPage({ params }: EditItemPageProps) {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edit Item</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('items.editItem')}</h1>
           <p className="text-muted-foreground">Update {item.name}</p>
         </div>
       </div>

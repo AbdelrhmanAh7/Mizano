@@ -4,39 +4,40 @@ import Link from 'next/link';
 import { DollarSign, BarChart3, FileText, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-
-const modules = [
-  {
-    title: 'Bank Accounts',
-    description: 'View and manage your bank accounts, balances, and transactions.',
-    icon: DollarSign,
-    href: '/banking/accounts',
-    color: 'text-blue-600',
-  },
-  {
-    title: 'Reconciliation',
-    description: 'Match bank statements with your records for accurate bookkeeping.',
-    icon: BarChart3,
-    href: '/banking/reconcile',
-    color: 'text-green-600',
-  },
-  {
-    title: 'Bank Rules',
-    description: 'Automate transaction categorization with custom bank rules.',
-    icon: FileText,
-    href: '/banking/rules',
-    color: 'text-purple-600',
-  },
-];
+import { useTranslations } from 'next-intl';
 
 export default function BankingPage() {
+  const t = useTranslations('banking');
+
+  const modules = [
+    {
+      title: t('accounts.title'),
+      description: 'View and manage your bank accounts, balances, and transactions.',
+      icon: DollarSign,
+      href: '/banking/accounts',
+      color: 'text-blue-600',
+    },
+    {
+      title: t('reconciliation.title'),
+      description: 'Match bank statements with your records for accurate bookkeeping.',
+      icon: BarChart3,
+      href: '/banking/reconcile',
+      color: 'text-green-600',
+    },
+    {
+      title: t('rules.title'),
+      description: 'Automate transaction categorization with custom bank rules.',
+      icon: FileText,
+      href: '/banking/rules',
+      color: 'text-purple-600',
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Banking</h1>
-        <p className="text-muted-foreground">
-          Manage bank accounts, reconcile transactions, and automate categorization.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+        <p className="text-muted-foreground">{t('description')}</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

@@ -17,6 +17,7 @@ import { useAllOrganizationSettings, useUpdateGeneralSettings } from '@/lib/hook
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, Building2, Save } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -64,6 +65,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function OrganizationSettingsPage() {
+  const t = useTranslations('settings');
   const { data: settings, isLoading } = useAllOrganizationSettings();
   const updateGeneral = useUpdateGeneralSettings();
 
@@ -121,14 +123,14 @@ export default function OrganizationSettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={t('common.goBack')}>
           <Link href="/settings">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Organization</h1>
-          <p className="text-muted-foreground text-sm">Company information and general settings</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t('organization.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('organization.description')}</p>
         </div>
       </div>
 
@@ -138,14 +140,14 @@ export default function OrganizationSettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5" />
-              Company Information
+              {t('organization.companyInfo')}
             </CardTitle>
-            <CardDescription>Basic information about your organization</CardDescription>
+            <CardDescription>{t('organization.companyInfoDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Organization Name *</Label>
+                <Label htmlFor="name">{t('organization.form.nameRequired')}</Label>
                 <Input id="name" {...form.register('name')} placeholder="Acme Corp" />
                 {form.formState.errors.name && (
                   <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
@@ -153,7 +155,7 @@ export default function OrganizationSettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('organization.form.email')}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -166,12 +168,12 @@ export default function OrganizationSettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
+                <Label htmlFor="phone">{t('organization.form.phone')}</Label>
                 <Input id="phone" {...form.register('phone')} placeholder="+1 (555) 000-0000" />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="website">Website</Label>
+                <Label htmlFor="website">{t('organization.form.website')}</Label>
                 <Input id="website" {...form.register('website')} placeholder="https://acme.com" />
                 {form.formState.errors.website && (
                   <p className="text-sm text-destructive">
@@ -182,7 +184,7 @@ export default function OrganizationSettingsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
+              <Label htmlFor="address">{t('organization.form.address')}</Label>
               <Textarea
                 id="address"
                 {...form.register('address')}
@@ -196,13 +198,15 @@ export default function OrganizationSettingsPage() {
         {/* Tax & Currency */}
         <Card>
           <CardHeader>
-            <CardTitle>Tax & Currency</CardTitle>
-            <CardDescription>Tax registration and base currency settings</CardDescription>
+            <CardTitle>{t('organization.taxCurrency')}</CardTitle>
+            <CardDescription>{t('organization.taxCurrencyDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="taxRegistrationNumber">Tax Registration Number</Label>
+                <Label htmlFor="taxRegistrationNumber">
+                  {t('organization.taxRegistrationNumber')}
+                </Label>
                 <Input
                   id="taxRegistrationNumber"
                   {...form.register('taxRegistrationNumber')}
@@ -211,13 +215,13 @@ export default function OrganizationSettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Base Currency</Label>
+                <Label>{t('organization.baseCurrency')}</Label>
                 <Select
                   value={form.watch('baseCurrency')}
                   onValueChange={(v) => form.setValue('baseCurrency', v)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select currency" />
+                    <SelectValue placeholder={t('organization.selectCurrency')} />
                   </SelectTrigger>
                   <SelectContent>
                     {CURRENCIES.map((c) => (
@@ -230,13 +234,13 @@ export default function OrganizationSettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Industry</Label>
+                <Label>{t('organization.industry')}</Label>
                 <Select
                   value={form.watch('industry') || ''}
                   onValueChange={(v) => form.setValue('industry', v)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select industry" />
+                    <SelectValue placeholder={t('organization.selectIndustry')} />
                   </SelectTrigger>
                   <SelectContent>
                     {INDUSTRIES.map((ind) => (
@@ -259,7 +263,7 @@ export default function OrganizationSettingsPage() {
             className="gap-2"
           >
             <Save className="h-4 w-4" />
-            {updateGeneral.isPending ? 'Saving...' : 'Save Changes'}
+            {updateGeneral.isPending ? t('common.saving') : t('common.saveChanges')}
           </Button>
         </div>
       </form>

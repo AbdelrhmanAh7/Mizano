@@ -14,8 +14,10 @@ import {
   getStatusLabel,
   getStatusColor,
 } from '@/lib/hooks/use-bank-transactions';
+import { useTranslations } from 'next-intl';
 
 export default function BankTransactionDetailPage() {
+  const t = useTranslations('banking');
   const params = useParams();
   const id = params.id as string;
 
@@ -62,7 +64,9 @@ export default function BankTransactionDetailPage() {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">Transaction Detail</h1>
+              <h1 className="text-3xl font-bold tracking-tight">
+                {t('transactions.transactionDetails')}
+              </h1>
               <Badge variant="outline" className={getStatusColor(txn.status)}>
                 {getStatusLabel(txn.status)}
               </Badge>
@@ -75,15 +79,15 @@ export default function BankTransactionDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Transaction Info</CardTitle>
+            <CardTitle>{t('transactions.transactionDetails')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Date</span>
+              <span className="text-muted-foreground">{t('transactions.form.date')}</span>
               <span>{txn.date ? format(new Date(txn.date), 'MMMM d, yyyy') : '-'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Amount</span>
+              <span className="text-muted-foreground">{t('transactions.form.amount')}</span>
               <span
                 className={cn(
                   'font-mono font-bold text-lg flex items-center gap-1',
@@ -99,15 +103,17 @@ export default function BankTransactionDetailPage() {
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Type</span>
-              <span>{isDeposit ? 'Deposit' : 'Withdrawal'}</span>
+              <span className="text-muted-foreground">{t('transactions.form.type')}</span>
+              <span>
+                {isDeposit ? t('transactions.types.deposit') : t('transactions.types.withdrawal')}
+              </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Payee</span>
+              <span className="text-muted-foreground">{t('transactions.form.payee')}</span>
               <span>{txn.payee || '-'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Reference</span>
+              <span className="text-muted-foreground">{t('transactions.form.reference')}</span>
               <span>{txn.reference || '-'}</span>
             </div>
           </CardContent>

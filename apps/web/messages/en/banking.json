@@ -80,10 +80,20 @@
   },
   "rules": {
     "title": "Bank Rules",
+    "description": "Automate transaction categorization with custom rules",
     "newRule": "New Rule",
+    "newRuleTitle": "New Bank Rule",
+    "newRuleDescription": "Create a rule to automate transaction categorization",
     "editRule": "Edit Rule",
     "deleteRule": "Delete Rule",
     "ruleDetails": "Rule Details",
+    "createRule": "Create Rule",
+    "searchPlaceholder": "Search rules...",
+    "hits": "Hits",
+    "active": "Active",
+    "inactive": "Inactive",
+    "confirmDeleteTitle": "Delete Rule",
+    "confirmDeleteDescription": "Are you sure you want to delete this rule? This action cannot be undone.",
     "form": {
       "name": "Rule Name",
       "namePlaceholder": "Enter rule name",
@@ -130,8 +140,35 @@
   },
   "reconciliation": {
     "title": "Reconciliation",
+    "pageTitle": "Bank Reconciliation",
+    "pageDescription": "Select a bank account to reconcile transactions",
     "newReconciliation": "New Reconciliation",
     "reconciliationDetails": "Reconciliation Details",
+    "reconcile": "Reconcile",
+    "reconcileAccount": "Reconcile {name}",
+    "matchDescription": "Match bank transactions with your records",
+    "unmatched": "{count} Unmatched",
+    "bookBalance": "Book Balance",
+    "bankBalance": "Bank Balance",
+    "toReconcile": "To Reconcile",
+    "transactionsCount": "{count} transactions",
+    "needsReview": "Needs Review",
+    "allCaughtUp": "All Caught Up!",
+    "allMatched": "All bank transactions have been matched.",
+    "viewAccountDetails": "View Account Details",
+    "bankTransactions": "Bank Transactions",
+    "suggestedMatches": "Suggested Matches",
+    "selectTransaction": "Select a Transaction",
+    "selectTransactionHint": "Select a transaction to see suggested matches",
+    "noSuggestedMatches": "No suggested matches found",
+    "confidence": "confidence",
+    "match": "Match",
+    "matchPercent": "{value}% match",
+    "balanceDue": "Balance due: {amount}",
+    "createExpense": "Create Expense",
+    "excludeTransaction": "Exclude Transaction",
+    "accountNotFound": "Bank account not found",
+    "backToReconciliation": "Back to Reconciliation",
     "form": {
       "bankAccount": "Bank Account",
       "reconciliationDate": "Reconciliation Date",
@@ -155,7 +192,10 @@
     },
     "empty": {
       "title": "No reconciliations yet",
-      "description": "Start reconciling your bank accounts"
+      "description": "Start reconciling your bank accounts",
+      "noAccounts": "No bank accounts",
+      "noAccountsDescription": "Add a bank account first to start reconciliation.",
+      "addBankAccount": "Add Bank Account"
     }
   }
 }

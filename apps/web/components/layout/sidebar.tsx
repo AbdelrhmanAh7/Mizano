@@ -312,7 +312,7 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
   };
 
   return (
-    <nav className="flex-1 px-2 pb-4 space-y-1">
+    <nav aria-label="Main navigation" className="flex-1 px-2 pb-4 space-y-1">
       {filteredNavigation.map((item) => renderNavItem(item))}
     </nav>
   );

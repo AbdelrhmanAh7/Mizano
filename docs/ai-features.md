@@ -986,3 +986,59 @@ VOICE_COMMAND           -- Voice Command (placeholder)
 6. **Continuous Learning**: The feedback loop (prediction -> user action -> training data -> retraining -> improved prediction) runs automatically via schedulers. Retraining thresholds are configurable per feature.
 
 7. **Audit Trail**: All AI predictions, feedback, and model training events are logged and queryable.
+
+---
+
+## AI Lab Guide
+
+The AI Lab (`/ai-lab`) provides a unified interface for managing all 33 AI models.
+
+### Model Status
+
+- **Always Active** (green): Algorithmic models that work without training (e.g., anomaly detection, cash flow forecasting). These use statistical algorithms and don't require ML training data.
+- **Trained** (blue): ML models that have been trained on organization data (e.g., transaction categorizer, lead scoring).
+- **Ready to Train** (yellow): ML models that are ready to accept training data and be trained.
+
+### Tabs
+
+1. **Overview**: Grid view of all 33 models across 7 categories with status indicators
+2. **Training**: Generate training data, train individual models, and monitor accuracy
+3. **OCR Training**: Train OCR layout recognition for vendor-specific invoice formats
+4. **Feedback**: Review and manage user feedback on AI predictions
+5. **Testing**: Run live tests against any AI endpoint with custom inputs
+
+### Model Categories
+
+| Category              | Models | Description                                                                 |
+| --------------------- | ------ | --------------------------------------------------------------------------- |
+| Core Financial        | 10     | Transaction categorization, reconciliation, forecasting, anomaly detection  |
+| Sales & CRM           | 5      | Lead scoring, churn prediction, CLV, cross-sell, pipeline forecast          |
+| Security & Compliance | 3      | Fraud detection, compliance monitoring, audit risk scoring                  |
+| NLP & Documents       | 4      | Document classification, sentiment, entity extraction, contract analysis    |
+| HR & Workforce        | 3      | Employee attrition, compensation benchmark, skills gap                      |
+| Operations            | 5      | Quality prediction, maintenance, scheduling, routing, resource optimization |
+| Chat & Voice          | 3      | AI chatbot, knowledge assistant, voice commands                             |
+
+### Training Workflow
+
+1. **Generate Data**: Use the "Generate" button to create synthetic training data for a model
+2. **Train**: Click "Train" to train the model on accumulated data
+3. **Test**: Use the Testing tab to verify predictions
+4. **Monitor**: Track accuracy and feedback in the Overview tab
+
+---
+
+## AI Roadmap
+
+Mizano's AI capabilities will continue expanding toward full autonomous accounting:
+
+| Feature                   | Description                                                                      | Timeline |
+| ------------------------- | -------------------------------------------------------------------------------- | -------- |
+| Self-Hosted LLM           | Integrate Llama/Mistral for advanced NLP — no external API calls                 | Q3 2027  |
+| AI Copilot                | Natural language interface ("Create an invoice for TechCorp for $5,000")         | Q4 2026  |
+| Cross-Tenant Benchmarking | Anonymized industry comparisons ("Your AR days are 15% above average")           | Q2 2027  |
+| AI Financial Advisory     | Proactive recommendations ("Cash flow dips in 2 weeks — delay vendor payments?") | Q3 2027  |
+| Predictive Compliance     | Auto-detect regulatory risks before filing deadlines                             | Q4 2027  |
+| AI-Powered Onboarding     | Auto-detect business type, configure chart of accounts from uploaded documents   | Q4 2026  |
+
+See `docs/roadmap.md` for the complete product roadmap, timeline, and success metrics.

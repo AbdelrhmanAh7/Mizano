@@ -4,30 +4,33 @@ import Link from 'next/link';
 import { Users, DollarSign, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-
-const modules = [
-  {
-    title: 'Leads',
-    description: 'Track and manage sales leads through your pipeline stages.',
-    icon: Users,
-    href: '/crm/leads',
-    color: 'text-blue-600',
-  },
-  {
-    title: 'Deals',
-    description: 'Manage deals, track progress, and forecast revenue.',
-    icon: DollarSign,
-    href: '/crm/deals',
-    color: 'text-green-600',
-  },
-];
+import { useTranslations } from 'next-intl';
 
 export default function CRMPage() {
+  const t = useTranslations('crm');
+
+  const modules = [
+    {
+      title: t('leads.title'),
+      description: 'Track and manage sales leads through your pipeline stages.',
+      icon: Users,
+      href: '/crm/leads',
+      color: 'text-blue-600',
+    },
+    {
+      title: t('deals.title'),
+      description: 'Manage deals, track progress, and forecast revenue.',
+      icon: DollarSign,
+      href: '/crm/deals',
+      color: 'text-green-600',
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">CRM</h1>
-        <p className="text-muted-foreground">Manage leads, deals, and customer relationships.</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+        <p className="text-muted-foreground">{t('description')}</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

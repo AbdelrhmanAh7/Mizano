@@ -36,8 +36,10 @@ import {
 import { formatJournalAmount } from '@/lib/hooks/use-journals';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { format } from 'date-fns';
+import { useTranslations } from 'next-intl';
 
 export default function RecurringProfileDetailPage() {
+  const t = useTranslations('accounting');
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -174,7 +176,7 @@ export default function RecurringProfileDetailPage() {
               <Button variant="outline" asChild>
                 <Link href={`/accounting/recurring/${profileId}/edit`}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  {t('recurring.editProfile')}
                 </Link>
               </Button>
             </>
@@ -182,7 +184,7 @@ export default function RecurringProfileDetailPage() {
           {canDelete && (
             <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              {t('recurring.deleteProfile')}
             </Button>
           )}
         </div>
@@ -191,25 +193,31 @@ export default function RecurringProfileDetailPage() {
       {/* Profile Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Profile Details</CardTitle>
+          <CardTitle>{t('recurring.profileDetails')}</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Frequency</dt>
+              <dt className="text-sm font-medium text-muted-foreground">
+                {t('recurring.form.frequency')}
+              </dt>
               <dd className="mt-1">
                 <Badge variant="outline">{getFrequencyLabel(profile.frequency)}</Badge>
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Next Execution</dt>
+              <dt className="text-sm font-medium text-muted-foreground">
+                {t('recurring.table.nextRun')}
+              </dt>
               <dd className="mt-1 flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 {format(new Date(profile.nextExecutionDate), 'MMMM d, yyyy')}
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Auto Post</dt>
+              <dt className="text-sm font-medium text-muted-foreground">
+                {t('recurring.form.autoPost')}
+              </dt>
               <dd className="mt-1">
                 <Badge variant={profile.autoPost ? 'default' : 'secondary'}>
                   {profile.autoPost ? 'Yes - Auto Post' : 'No - Save as Draft'}
@@ -217,7 +225,9 @@ export default function RecurringProfileDetailPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Status</dt>
+              <dt className="text-sm font-medium text-muted-foreground">
+                {t('recurring.table.status')}
+              </dt>
               <dd className="mt-1">
                 <Badge
                   className={
@@ -249,10 +259,10 @@ export default function RecurringProfileDetailPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Account</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Debit</TableHead>
-                <TableHead className="text-right">Credit</TableHead>
+                <TableHead>{t('journals.form.account')}</TableHead>
+                <TableHead>{t('journals.form.description')}</TableHead>
+                <TableHead className="text-right">{t('journals.form.debit')}</TableHead>
+                <TableHead className="text-right">{t('journals.form.credit')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -295,7 +305,7 @@ export default function RecurringProfileDetailPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Recurring Profile</AlertDialogTitle>
+            <AlertDialogTitle>{t('recurring.deleteProfile')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete this recurring profile? This action cannot be undone.
               Previously created journals will not be affected.

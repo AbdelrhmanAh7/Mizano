@@ -22,6 +22,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { ArrowLeft, Calendar, Lock, Save } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -49,6 +50,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function FinancialSettingsPage() {
+  const t = useTranslations('settings');
   const { data: settings, isLoading } = useAllOrganizationSettings();
   const updateFinancial = useUpdateFinancialSettings();
   const updateLockDate = useUpdateLockDate();
@@ -104,16 +106,14 @@ export default function FinancialSettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={t('common.goBack')}>
           <Link href="/settings">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Financial Settings</h1>
-          <p className="text-muted-foreground text-sm">
-            Fiscal year, payment terms, and transaction lock date
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t('financial.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('financial.description')}</p>
         </div>
       </div>
 
@@ -123,16 +123,14 @@ export default function FinancialSettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Fiscal Year & Defaults
+              {t('financial.fiscalYearDefaults')}
             </CardTitle>
-            <CardDescription>
-              Configure your financial year and default payment terms
-            </CardDescription>
+            <CardDescription>{t('financial.fiscalYearDefaultsDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Fiscal Year Start Month</Label>
+                <Label>{t('financial.fiscalYearStartMonth')}</Label>
                 <Select
                   value={String(form.watch('fiscalYearStartMonth'))}
                   onValueChange={(v) =>
@@ -151,12 +149,12 @@ export default function FinancialSettingsPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  The month your fiscal year begins (e.g., January for calendar year)
+                  {t('financial.fiscalYearStartMonthHint')}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="paymentTerms">Default Payment Terms (days)</Label>
+                <Label htmlFor="paymentTerms">{t('financial.paymentTerms')}</Label>
                 <Input
                   id="paymentTerms"
                   type="number"
@@ -164,9 +162,7 @@ export default function FinancialSettingsPage() {
                   max={365}
                   {...form.register('defaultPaymentTermsDays')}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Default due date offset for new invoices and bills
-                </p>
+                <p className="text-xs text-muted-foreground">{t('financial.paymentTermsHint')}</p>
               </div>
             </div>
           </CardContent>
@@ -177,11 +173,9 @@ export default function FinancialSettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Lock className="h-5 w-5" />
-              Transaction Lock Date
+              {t('financial.lockDate')}
             </CardTitle>
-            <CardDescription>
-              Prevent modifications to transactions before this date
-            </CardDescription>
+            <CardDescription>{t('financial.lockDateDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
@@ -189,13 +183,13 @@ export default function FinancialSettingsPage() {
                 {settings?.financial?.lockDate ? (
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className="text-sm">
-                      Locked through {format(new Date(settings.financial.lockDate), 'MMMM d, yyyy')}
+                      {t('financial.lockedThrough', {
+                        date: format(new Date(settings.financial.lockDate), 'MMMM d, yyyy'),
+                      })}
                     </Badge>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No lock date set — all transactions can be edited
-                  </p>
+                  <p className="text-sm text-muted-foreground">{t('financial.noLockDate')}</p>
                 )}
               </div>
               <div className="flex gap-2">
@@ -207,7 +201,7 @@ export default function FinancialSettingsPage() {
                     onClick={handleClearLockDate}
                     disabled={updateLockDate.isPending}
                   >
-                    Remove Lock
+                    {t('financial.removeLock')}
                   </Button>
                 ) : (
                   <Button
@@ -217,15 +211,12 @@ export default function FinancialSettingsPage() {
                     onClick={handleSetLockDate}
                     disabled={updateLockDate.isPending}
                   >
-                    Lock Previous Month
+                    {t('financial.lockPreviousMonth')}
                   </Button>
                 )}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              When set, users cannot create or edit transactions dated before the lock date. This is
-              commonly used after month-end close.
-            </p>
+            <p className="text-xs text-muted-foreground">{t('financial.lockDateExplanation')}</p>
           </CardContent>
         </Card>
 
@@ -237,7 +228,7 @@ export default function FinancialSettingsPage() {
             className="gap-2"
           >
             <Save className="h-4 w-4" />
-            {updateFinancial.isPending ? 'Saving...' : 'Save Changes'}
+            {updateFinancial.isPending ? t('common.saving') : t('common.saveChanges')}
           </Button>
         </div>
       </form>

@@ -52,19 +52,22 @@ import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { Ban, DollarSign, Edit, Eye, Plus, RefreshCw, Send, Trash2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
-const STATUS_OPTIONS = [
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'SENT', label: 'Sent' },
-  { value: 'PARTIALLY_PAID', label: 'Partially Paid' },
-  { value: 'PAID', label: 'Paid' },
-  { value: 'OVERDUE', label: 'Overdue' },
-  { value: 'VOID', label: 'Void' },
-];
-
 function InvoicesPageContent() {
+  const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
+
+  const STATUS_OPTIONS = [
+    { value: 'DRAFT', label: t('invoices.status.draft') },
+    { value: 'SENT', label: t('invoices.status.sent') },
+    { value: 'PARTIALLY_PAID', label: t('invoices.status.partiallyPaid') },
+    { value: 'PAID', label: t('invoices.status.paid') },
+    { value: 'OVERDUE', label: t('invoices.status.overdue') },
+    { value: 'VOID', label: t('invoices.status.void') },
+  ];
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const { onExportAll } = useExportAll('invoices', 'invoices');
@@ -271,7 +274,7 @@ function InvoicesPageContent() {
       accessorKey: 'invoiceNumber',
       header: () => (
         <SortableHeader
-          label="Invoice #"
+          label={t('invoices.table.invoiceNumber')}
           columnId="invoiceNumber"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -286,14 +289,14 @@ function InvoicesPageContent() {
     },
     {
       accessorKey: 'customer.name',
-      header: 'Customer',
+      header: t('invoices.table.customer'),
       cell: ({ row }) => row.original.customer?.name || '-',
     },
     {
       accessorKey: 'date',
       header: () => (
         <SortableHeader
-          label="Date"
+          label={t('invoices.table.date')}
           columnId="date"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -306,7 +309,7 @@ function InvoicesPageContent() {
       accessorKey: 'dueDate',
       header: () => (
         <SortableHeader
-          label="Due Date"
+          label={t('invoices.table.dueDate')}
           columnId="dueDate"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -324,7 +327,7 @@ function InvoicesPageContent() {
     },
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: t('invoices.table.status'),
       cell: ({ row }) => (
         <Badge className={getInvoiceStatusColor(row.original.status)}>
           {getInvoiceStatusLabel(row.original.status)}
@@ -335,7 +338,7 @@ function InvoicesPageContent() {
       accessorKey: 'grandTotal',
       header: () => (
         <SortableHeader
-          label="Total"
+          label={tCommon('total')}
           columnId="grandTotal"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -347,7 +350,7 @@ function InvoicesPageContent() {
     },
     {
       accessorKey: 'balanceDue',
-      header: 'Balance Due',
+      header: t('invoices.table.balance'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
       cell: ({ row }) => {
         const balanceDue = parseFloat(row.original.balanceDue || '0');
@@ -420,15 +423,15 @@ function InvoicesPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
-          <p className="text-muted-foreground">Manage your invoices and track payments</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('invoices.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
             <Button asChild data-tour="create-invoice-btn">
               <Link href="/sales/invoices/new">
                 <Plus className="mr-2 h-4 w-4" />
-                New Invoice
+                {t('invoices.newInvoice')}
               </Link>
             </Button>
           )}
@@ -485,7 +488,7 @@ function InvoicesPageContent() {
       {/* Invoices Table */}
       <Card data-tour="invoice-list">
         <CardHeader>
-          <CardTitle>All Invoices</CardTitle>
+          <CardTitle>{t('invoices.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -505,7 +508,7 @@ function InvoicesPageContent() {
             exportFilename="invoices"
             onExportAll={onExportAll}
             bulkActions={bulkActions}
-            emptyMessage="No invoices found"
+            emptyMessage={t('invoices.empty.title')}
             emptyAction={
               canCreate ? (
                 <Button asChild>
@@ -524,16 +527,16 @@ function InvoicesPageContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+            <AlertDialogTitle>{t('invoices.deleteInvoice')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete invoice &quot;{selectedInvoice?.invoiceNumber}&quot;?
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -543,7 +546,7 @@ function InvoicesPageContent() {
       <AlertDialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Send Invoice</AlertDialogTitle>
+            <AlertDialogTitle>{t('invoices.sendInvoice')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to mark invoice &quot;{selectedInvoice?.invoiceNumber}&quot; as
               sent? This will create an accounting entry and you won&apos;t be able to edit it
@@ -551,8 +554,8 @@ function InvoicesPageContent() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSend}>Send Invoice</AlertDialogAction>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSend}>{t('invoices.sendInvoice')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -561,16 +564,16 @@ function InvoicesPageContent() {
       <AlertDialog open={voidDialogOpen} onOpenChange={setVoidDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Void Invoice</AlertDialogTitle>
+            <AlertDialogTitle>{t('invoices.voidInvoice')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to void invoice &quot;{selectedInvoice?.invoiceNumber}&quot;?
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmVoid} className="bg-orange-600 hover:bg-orange-700">
-              Void Invoice
+              {t('invoices.voidInvoice')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

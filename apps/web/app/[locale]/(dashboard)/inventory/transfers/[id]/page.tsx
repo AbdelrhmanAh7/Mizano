@@ -3,6 +3,7 @@
 import { use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { ArrowLeft, CheckCircle, XCircle, Truck, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,7 @@ interface TransferDetailPageProps {
 }
 
 export default function TransferDetailPage({ params }: TransferDetailPageProps) {
+  const t = useTranslations('inventory');
   const { id } = use(params);
   const router = useRouter();
   const { data: transfer, isLoading } = useTransfer(id);
@@ -73,9 +75,13 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
   if (!transfer) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Transfer not found</p>
+        <p className="text-muted-foreground">
+          {t('transfers.title')} {t('common.notFound')}
+        </p>
         <Button asChild className="mt-4">
-          <Link href="/inventory/transfers">Back to Transfers</Link>
+          <Link href="/inventory/transfers">
+            {t('common.backTo')} {t('transfers.title')}
+          </Link>
         </Button>
       </div>
     );
@@ -119,20 +125,22 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
               <AlertDialogTrigger asChild>
                 <Button>
                   <CheckCircle className="mr-2 h-4 w-4" />
-                  Complete Transfer
+                  {t('transfers.completeTransfer')}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Complete Transfer</AlertDialogTitle>
+                  <AlertDialogTitle>{t('transfers.completeTransfer')}</AlertDialogTitle>
                   <AlertDialogDescription>
                     This will finalize the transfer and update inventory levels in both warehouses.
                     This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleComplete}>Complete Transfer</AlertDialogAction>
+                  <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleComplete}>
+                    {t('transfers.completeTransfer')}
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -142,21 +150,21 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
               <AlertDialogTrigger asChild>
                 <Button variant="outline" className="text-red-600">
                   <XCircle className="mr-2 h-4 w-4" />
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Cancel Transfer</AlertDialogTitle>
+                  <AlertDialogTitle>{t('transfers.cancelTransfer')}</AlertDialogTitle>
                   <AlertDialogDescription>
                     Are you sure you want to cancel this transfer? If items were already in transit,
                     no stock changes will be made.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Keep Transfer</AlertDialogCancel>
+                  <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                   <AlertDialogAction onClick={handleCancel} className="bg-red-600 hover:bg-red-700">
-                    Cancel Transfer
+                    {t('transfers.cancelTransfer')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -231,7 +239,7 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
       {/* Line Items */}
       <Card>
         <CardHeader>
-          <CardTitle>Transfer Items</CardTitle>
+          <CardTitle>{t('transfers.transferDetails')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCreatePriceList } from '@/lib/hooks/use-price-lists';
 
 export default function NewPriceListPage() {
+  const t = useTranslations('inventory');
   const router = useRouter();
   const createPriceList = useCreatePriceList();
   const { register, handleSubmit, setValue, watch } = useForm({
@@ -43,15 +45,15 @@ export default function NewPriceListPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Price List</h1>
-          <p className="text-muted-foreground">Create a new pricing tier</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('priceLists.newPriceList')}</h1>
+          <p className="text-muted-foreground">{t('priceLists.empty.description')}</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Price List Details</CardTitle>
+            <CardTitle>{t('priceLists.priceListDetails')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -80,7 +82,7 @@ export default function NewPriceListPage() {
         </Card>
         <div className="flex justify-end">
           <Button type="submit" disabled={createPriceList.isPending}>
-            {createPriceList.isPending ? 'Creating...' : 'Create Price List'}
+            {createPriceList.isPending ? 'Creating...' : t('priceLists.newPriceList')}
           </Button>
         </div>
       </form>

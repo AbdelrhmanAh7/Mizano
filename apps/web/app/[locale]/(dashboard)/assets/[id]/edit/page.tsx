@@ -8,10 +8,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAsset, useUpdateAsset } from '@/lib/hooks/use-assets';
 import { AssetForm } from '@/components/assets/asset-form';
 import { format } from 'date-fns';
+import { useTranslations } from 'next-intl';
 
 export default function EditAssetPage() {
   const params = useParams();
   const router = useRouter();
+  const t = useTranslations('assets');
   const id = params.id as string;
 
   const { data: asset, isLoading } = useAsset(id);
@@ -46,7 +48,7 @@ export default function EditAssetPage() {
   if (!asset) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Asset Not Found</h1>
+        <h1 className="text-3xl font-bold">{t('assetNotFoundTitle')}</h1>
       </div>
     );
   }
@@ -60,7 +62,7 @@ export default function EditAssetPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edit Asset</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('editAsset')}</h1>
           <p className="text-muted-foreground">{asset.name}</p>
         </div>
       </div>

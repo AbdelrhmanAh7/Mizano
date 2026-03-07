@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # PostgreSQL 16 - Primary database (exposed on port 5435)
   postgres:
     image: postgres:16-alpine
     container_name: mizano-postgres
@@ -29,6 +30,7 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis 7 - Cache and BullMQ queue backend (exposed on port 6380)
   redis:
     image: redis:7-alpine
     container_name: mizano-redis
@@ -48,6 +50,7 @@ services:
       timeout: 5s
       retries: 5
 
+  # OCR Service - PaddleOCR + Tesseract for document text extraction
   ocr-service:
     profiles:
       - ocr
@@ -72,6 +75,7 @@ services:
       retries: 5
       start_period: 60s
 
+  # VLM Service - Qwen2.5-VL for intelligent invoice processing (requires NVIDIA GPU)
   vlm-service:
     profiles:
       - vlm

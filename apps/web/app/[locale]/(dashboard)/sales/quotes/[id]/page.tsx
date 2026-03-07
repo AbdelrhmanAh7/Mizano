@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { ArrowLeft, Edit, Trash2, Send, FileText, Ban, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,7 @@ import { format } from 'date-fns';
 export default function QuoteDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const t = useTranslations('sales');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const quoteId = params.id as string;
@@ -63,8 +65,8 @@ export default function QuoteDetailPage() {
     try {
       await deleteQuote.mutateAsync(quoteId);
       toast({
-        title: 'Quote deleted',
-        description: 'The quote has been deleted.',
+        title: t('quotes.toast.deleted'),
+        description: t('quotes.toast.deletedDescription'),
       });
       router.push('/sales/quotes');
     } catch (error: unknown) {
@@ -72,7 +74,7 @@ export default function QuoteDetailPage() {
         title: 'Error',
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to delete quote.',
+          t('quotes.toast.deleteError'),
         variant: 'destructive',
       });
     }
@@ -83,15 +85,15 @@ export default function QuoteDetailPage() {
     try {
       await sendQuote.mutateAsync(quoteId);
       toast({
-        title: 'Quote sent',
-        description: 'The quote has been marked as sent.',
+        title: t('quotes.toast.sent'),
+        description: t('quotes.toast.sentDescription'),
       });
     } catch (error: unknown) {
       toast({
         title: 'Error',
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to send quote.',
+          t('quotes.toast.sendError'),
         variant: 'destructive',
       });
     }
@@ -101,15 +103,15 @@ export default function QuoteDetailPage() {
     try {
       await acceptQuote.mutateAsync(quoteId);
       toast({
-        title: 'Quote accepted',
-        description: 'The quote has been marked as accepted.',
+        title: t('quotes.toast.accepted'),
+        description: t('quotes.toast.acceptedDescription'),
       });
     } catch (error: unknown) {
       toast({
         title: 'Error',
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to accept quote.',
+          t('quotes.toast.acceptError'),
         variant: 'destructive',
       });
     }
@@ -119,15 +121,15 @@ export default function QuoteDetailPage() {
     try {
       await declineQuote.mutateAsync(quoteId);
       toast({
-        title: 'Quote declined',
-        description: 'The quote has been marked as declined.',
+        title: t('quotes.toast.declined'),
+        description: t('quotes.toast.declinedDescription'),
       });
     } catch (error: unknown) {
       toast({
         title: 'Error',
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to decline quote.',
+          t('quotes.toast.declineError'),
         variant: 'destructive',
       });
     }
@@ -137,8 +139,8 @@ export default function QuoteDetailPage() {
     try {
       const result = await convertToInvoice.mutateAsync(quoteId);
       toast({
-        title: 'Invoice created',
-        description: 'The quote has been converted to an invoice.',
+        title: t('quotes.toast.invoiceCreated'),
+        description: t('quotes.toast.invoiceCreatedDescription'),
       });
       setConvertDialogOpen(false);
       // Navigate to the new invoice
@@ -150,7 +152,7 @@ export default function QuoteDetailPage() {
         title: 'Error',
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to convert quote.',
+          t('quotes.toast.convertError'),
         variant: 'destructive',
       });
     }
@@ -173,22 +175,20 @@ export default function QuoteDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/sales/quotes">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Quote Not Found</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('quotes.quoteNotFound')}</h1>
           </div>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              The quote you&apos;re looking for doesn&apos;t exist.
-            </p>
+            <p className="text-muted-foreground">{t('quotes.notFoundMessage')}</p>
             <Button asChild className="mt-4">
-              <Link href="/sales/quotes">Back to Quotes</Link>
+              <Link href="/sales/quotes">{t('quotes.backToQuotes')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -204,7 +204,7 @@ export default function QuoteDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/sales/quotes">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -225,12 +225,12 @@ export default function QuoteDetailPage() {
               <Button variant="outline" asChild>
                 <Link href={`/sales/quotes/${quoteId}/edit`}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  {t('quotes.editQuote')}
                 </Link>
               </Button>
               <Button onClick={handleSend}>
                 <Send className="mr-2 h-4 w-4" />
-                Mark as Sent
+                {t('quotes.markAsSent')}
               </Button>
             </>
           )}
@@ -238,18 +238,18 @@ export default function QuoteDetailPage() {
             <>
               <Button variant="outline" onClick={handleDecline}>
                 <Ban className="mr-2 h-4 w-4" />
-                Decline
+                {t('quotes.decline')}
               </Button>
               <Button onClick={handleAccept}>
                 <CheckCircle className="mr-2 h-4 w-4" />
-                Accept
+                {t('quotes.accept')}
               </Button>
             </>
           )}
           {canEdit && quote.status === 'ACCEPTED' && (
             <Button onClick={() => setConvertDialogOpen(true)}>
               <FileText className="mr-2 h-4 w-4" />
-              Convert to Invoice
+              {t('quotes.convertToInvoice')}
             </Button>
           )}
           {canDelete && quote.status === 'DRAFT' && (
@@ -264,24 +264,28 @@ export default function QuoteDetailPage() {
       {/* Quote Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Quote Details</CardTitle>
+          <CardTitle>{t('quotes.quoteDetails')}</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Quote Number</dt>
+              <dt className="text-sm font-medium text-muted-foreground">
+                {t('quotes.quoteNumber')}
+              </dt>
               <dd className="text-lg font-semibold">{quote.quoteNumber}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Quote Date</dt>
+              <dt className="text-sm font-medium text-muted-foreground">{t('quotes.quoteDate')}</dt>
               <dd className="text-lg">{format(new Date(quote.date), 'MMMM d, yyyy')}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Expiry Date</dt>
+              <dt className="text-sm font-medium text-muted-foreground">
+                {t('quotes.expiryDate')}
+              </dt>
               <dd className="text-lg">{format(new Date(quote.expiryDate), 'MMMM d, yyyy')}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Customer</dt>
+              <dt className="text-sm font-medium text-muted-foreground">{t('quotes.customer')}</dt>
               <dd className="text-lg">
                 <Link
                   href={`/sales/customers/${quote.customerId}`}
@@ -293,13 +297,15 @@ export default function QuoteDetailPage() {
             </div>
             {quote.reference && (
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">Reference</dt>
+                <dt className="text-sm font-medium text-muted-foreground">
+                  {t('quotes.reference')}
+                </dt>
                 <dd className="text-lg">{quote.reference}</dd>
               </div>
             )}
             {quote.subject && (
               <div className="col-span-full">
-                <dt className="text-sm font-medium text-muted-foreground">Subject</dt>
+                <dt className="text-sm font-medium text-muted-foreground">{t('quotes.subject')}</dt>
                 <dd className="text-lg">{quote.subject}</dd>
               </div>
             )}
@@ -310,17 +316,17 @@ export default function QuoteDetailPage() {
       {/* Line Items */}
       <Card>
         <CardHeader>
-          <CardTitle>Line Items</CardTitle>
+          <CardTitle>{t('lineItems.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Qty</TableHead>
-                <TableHead className="text-right">Rate</TableHead>
-                <TableHead className="text-right">Discount</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>{t('quotes.table.description')}</TableHead>
+                <TableHead className="text-right">{t('quotes.table.qty')}</TableHead>
+                <TableHead className="text-right">{t('quotes.table.rate')}</TableHead>
+                <TableHead className="text-right">{t('quotes.table.discount')}</TableHead>
+                <TableHead className="text-right">{t('quotes.table.amount')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -347,7 +353,7 @@ export default function QuoteDetailPage() {
               {/* Totals */}
               <TableRow className="border-t">
                 <TableCell colSpan={4} className="text-right font-medium">
-                  Subtotal
+                  {t('quotes.table.subtotal')}
                 </TableCell>
                 <TableCell className="text-right font-mono">
                   {formatCurrency(parseFloat(quote.subtotal || '0'), currency)}
@@ -356,7 +362,7 @@ export default function QuoteDetailPage() {
               {parseFloat(quote.discountAmount || '0') > 0 && (
                 <TableRow>
                   <TableCell colSpan={4} className="text-right font-medium">
-                    Discount
+                    {t('quotes.table.discount')}
                   </TableCell>
                   <TableCell className="text-right font-mono text-red-600">
                     -{formatCurrency(parseFloat(quote.discountAmount || '0'), currency)}
@@ -366,7 +372,7 @@ export default function QuoteDetailPage() {
               {parseFloat(quote.taxAmount || '0') > 0 && (
                 <TableRow>
                   <TableCell colSpan={4} className="text-right font-medium">
-                    Tax
+                    {t('quotes.table.tax')}
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {formatCurrency(parseFloat(quote.taxAmount), currency)}
@@ -375,7 +381,7 @@ export default function QuoteDetailPage() {
               )}
               <TableRow className="border-t-2 font-semibold">
                 <TableCell colSpan={4} className="text-right">
-                  Total
+                  {t('quotes.table.total')}
                 </TableCell>
                 <TableCell className="text-right font-mono text-lg">
                   {formatCurrency(parseFloat(quote.grandTotal || '0'), currency)}
@@ -392,7 +398,7 @@ export default function QuoteDetailPage() {
           {quote.notes && (
             <Card>
               <CardHeader>
-                <CardTitle>Notes</CardTitle>
+                <CardTitle>{t('quotes.form.notes')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="whitespace-pre-wrap">{quote.notes}</p>
@@ -402,7 +408,7 @@ export default function QuoteDetailPage() {
           {quote.terms && (
             <Card>
               <CardHeader>
-                <CardTitle>Terms & Conditions</CardTitle>
+                <CardTitle>{t('quotes.form.terms')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="whitespace-pre-wrap">{quote.terms}</p>
@@ -416,10 +422,8 @@ export default function QuoteDetailPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Quote</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this quote? This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('quotes.deleteQuote')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('quotes.deleteConfirmation')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -434,15 +438,14 @@ export default function QuoteDetailPage() {
       <AlertDialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Convert to Invoice</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will create a new invoice from this quote. The quote will be marked as invoiced.
-              Do you want to proceed?
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('quotes.convertToInvoice')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('quotes.convertDescription')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConvert}>Convert to Invoice</AlertDialogAction>
+            <AlertDialogAction onClick={handleConvert}>
+              {t('quotes.convertToInvoice')}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

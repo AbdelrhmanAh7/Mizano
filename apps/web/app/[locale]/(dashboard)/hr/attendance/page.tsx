@@ -41,10 +41,12 @@ import {
   getAttendanceStatusColor,
   AttendanceStatus,
 } from '@/lib/hooks/use-hr';
+import { useTranslations } from 'next-intl';
 
 const attendanceStatuses: AttendanceStatus[] = ['PRESENT', 'ABSENT', 'LEAVE', 'HALF_DAY'];
 
 function AttendancePageContent() {
+  const t = useTranslations('hr');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -202,13 +204,13 @@ function AttendancePageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Attendance</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('attendance.title')}</h1>
           <p className="text-muted-foreground">Track employee attendance and working hours</p>
         </div>
         <Button asChild>
           <Link href="/hr/attendance/mark">
             <UserCheck className="mr-2 h-4 w-4" />
-            Mark Attendance
+            {t('attendance.newAttendance')}
           </Link>
         </Button>
       </div>
@@ -413,25 +415,25 @@ function AttendancePageContent() {
           <Badge variant="outline" className="bg-green-100 text-green-800">
             P
           </Badge>
-          <span>Present</span>
+          <span>{t('attendance.status.present')}</span>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="bg-red-100 text-red-800">
             A
           </Badge>
-          <span>Absent</span>
+          <span>{t('attendance.status.absent')}</span>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
             L
           </Badge>
-          <span>Leave</span>
+          <span>{t('attendance.status.leave')}</span>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="bg-orange-100 text-orange-800">
             H
           </Badge>
-          <span>Half Day</span>
+          <span>{t('attendance.status.halfDay')}</span>
         </div>
       </div>
     </div>

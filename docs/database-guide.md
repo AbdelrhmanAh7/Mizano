@@ -943,3 +943,31 @@ prisma.$queryRaw`
   ORDER BY month DESC
 `;
 ```
+
+---
+
+## Database Testing
+
+### Migration Testing
+
+All database migrations should be tested in the CI pipeline before production deployment:
+
+1. **Forward migration**: Apply migration to a clean database and verify schema
+2. **Seed compatibility**: Ensure seed script works after migration
+3. **Rollback verification**: Test that rollback procedures work for critical migrations
+
+### Data Integrity Tests
+
+E2E tests verify database constraints and business rules:
+
+- Multi-tenancy isolation (cross-org data never leaks)
+- Soft delete enforcement (deleted records excluded from queries)
+- Decimal precision (monetary values maintain 4 decimal places)
+- Unique constraints (document numbers, account codes per org)
+- Foreign key integrity (cascading deletes/updates work correctly)
+
+### Performance Regression
+
+Track query performance across releases using the Performance module (`/performance/slow-queries`). Alert if any query regresses beyond the slow query threshold (default: 100ms).
+
+See `docs/testing-strategy.md` for the full testing strategy and `docs/roadmap.md` for the product roadmap.

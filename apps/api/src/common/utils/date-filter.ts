@@ -5,9 +5,14 @@
  *   if (dateFrom) where.date = { ...where.date, gte: new Date(dateFrom) };
  *   if (dateTo)   where.date = { ...where.date, lte: new Date(dateTo) };
  *
- * Usage:
- *   const dateFilter = buildDateFilter(dateFrom, dateTo);
- *   // dateFilter = { gte: Date, lte: Date } or undefined
+ * @param from - Start date (inclusive). Accepts ISO string, Date, or null/undefined.
+ * @param to - End date (inclusive). Accepts ISO string, Date, or null/undefined.
+ * @returns A `{ gte?, lte? }` object for Prisma where clauses, or `undefined` if both params are absent.
+ *
+ * @example
+ * ```ts
+ * const where = { date: buildDateFilter(dto.dateFrom, dto.dateTo) };
+ * ```
  */
 export function buildDateFilter(
   from?: string | Date | null,

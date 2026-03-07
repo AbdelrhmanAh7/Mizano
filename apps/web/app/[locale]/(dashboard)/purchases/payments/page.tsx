@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import {
   AlertDialog,
@@ -34,6 +35,8 @@ import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function PaymentsMadePageContent() {
+  const t = useTranslations('purchases');
+  const tCommon = useTranslations('common');
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -62,7 +65,7 @@ function PaymentsMadePageContent() {
       accessorKey: 'paymentNumber',
       header: () => (
         <SortableHeader
-          label="Payment #"
+          label={t('payments.table.paymentNumber')}
           columnId="paymentNumber"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -80,14 +83,14 @@ function PaymentsMadePageContent() {
     },
     {
       accessorKey: 'vendor.name',
-      header: 'Vendor',
+      header: t('payments.table.vendor'),
       cell: ({ row }) => row.original.vendor?.name || '-',
     },
     {
       accessorKey: 'date',
       header: () => (
         <SortableHeader
-          label="Date"
+          label={t('payments.table.date')}
           columnId="date"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -98,12 +101,12 @@ function PaymentsMadePageContent() {
     },
     {
       accessorKey: 'paymentMode',
-      header: 'Mode',
+      header: t('payments.table.mode'),
       cell: ({ row }) => formatPaymentMode(row.original.paymentMode),
     },
     {
       accessorKey: 'reference',
-      header: 'Reference',
+      header: t('payments.table.reference'),
       meta: { cellClassName: 'font-mono text-sm' },
       cell: ({ row }) => row.original.reference || '-',
     },
@@ -111,7 +114,7 @@ function PaymentsMadePageContent() {
       accessorKey: 'amount',
       header: () => (
         <SortableHeader
-          label="Amount"
+          label={t('payments.table.amount')}
           columnId="amount"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -139,12 +142,12 @@ function PaymentsMadePageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/purchases/payments/${payment.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
-                  View
+                  {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(payment.id)}>
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                {tCommon('buttons.delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -158,13 +161,13 @@ function PaymentsMadePageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Payments Made</h1>
-          <p className="text-muted-foreground">Track payments made to vendors</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('payments.title')}</h1>
+          <p className="text-muted-foreground">{t('payments.pageDescription')}</p>
         </div>
         <Button asChild>
           <Link href="/purchases/payments/new">
             <Plus className="mr-2 h-4 w-4" />
-            Record Payment
+            {t('payments.recordPayment')}
           </Link>
         </Button>
       </div>
@@ -176,7 +179,7 @@ function PaymentsMadePageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search payments..."
+              placeholder={t('payments.searchPlaceholder')}
             />
           </div>
         </CardContent>
@@ -185,7 +188,7 @@ function PaymentsMadePageContent() {
       {/* Payments Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Payments</CardTitle>
+          <CardTitle>{t('payments.allPayments')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -199,10 +202,10 @@ function PaymentsMadePageContent() {
             onLoadMore={() => fetchNextPage()}
             enableColumnResizing
             tableId="payments-made"
-            emptyMessage="No payments found"
+            emptyMessage={t('payments.noPayments')}
             emptyAction={
               <Button asChild>
-                <Link href="/purchases/payments/new">Record your first payment</Link>
+                <Link href="/purchases/payments/new">{t('payments.recordFirst')}</Link>
               </Button>
             }
           />
@@ -213,16 +216,13 @@ function PaymentsMadePageContent() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Payment</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this payment? This will also update the associated
-              bill balances. This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('payments.deleteTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('payments.deleteConfirmation')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

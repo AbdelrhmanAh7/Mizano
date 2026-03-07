@@ -8,13 +8,15 @@ dist
 out
 build
 
-# Environment files
+# Environment files (actual secrets)
 .env
-.env.local
 .env.production
-.env.*.local
-!.env.example
-!.env.production.example
+
+# Allow environment templates (no secrets, only placeholders)
+!.env.local
+!.env.dev
+!.env.sit
+!.env.prod
 
 # IDE
 .idea

@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { ArrowLeft, User, Calendar, FileText, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import { format } from 'date-fns';
 
 export default function CreditNoteDetailPage() {
   const params = useParams();
+  const t = useTranslations('sales');
   const creditNoteId = params.id as string;
 
   const { data: creditNote, isLoading } = useCreditNote(creditNoteId);
@@ -49,22 +51,22 @@ export default function CreditNoteDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/sales/credit-notes">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Credit Note Not Found</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              {t('creditNotes.creditNoteNotFound')}
+            </h1>
           </div>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              The credit note you&apos;re looking for doesn&apos;t exist.
-            </p>
+            <p className="text-muted-foreground">{t('creditNotes.notFoundMessage')}</p>
             <Button asChild className="mt-4">
-              <Link href="/sales/credit-notes">Back to Credit Notes</Link>
+              <Link href="/sales/credit-notes">{t('creditNotes.backToCreditNotes')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -77,7 +79,7 @@ export default function CreditNoteDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/sales/credit-notes">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -107,7 +109,7 @@ export default function CreditNoteDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <DollarSign className="h-4 w-4" />
-              Credit Amount
+              {t('creditNotes.creditAmount')}
             </div>
             <div className="text-2xl font-bold font-mono text-orange-600">
               {formatCurrency(creditNote.amount)}
@@ -119,7 +121,7 @@ export default function CreditNoteDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Calendar className="h-4 w-4" />
-              Date
+              {t('creditNotes.date')}
             </div>
             <div className="text-2xl font-bold">
               {format(new Date(creditNote.date), 'MMM d, yyyy')}
@@ -131,7 +133,7 @@ export default function CreditNoteDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <FileText className="h-4 w-4" />
-              Type
+              {t('creditNotes.type')}
             </div>
             <div className="text-xl font-bold">{getCreditNoteTypeLabel(creditNote.type)}</div>
           </CardContent>
@@ -145,14 +147,16 @@ export default function CreditNoteDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
-              Customer Details
+              {t('creditNotes.customerDetails')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {creditNote.customer ? (
               <>
                 <div>
-                  <div className="text-sm text-muted-foreground">Customer Name</div>
+                  <div className="text-sm text-muted-foreground">
+                    {t('creditNotes.customerName')}
+                  </div>
                   <Link
                     href={`/sales/customers/${creditNote.customer.id}`}
                     className="font-medium hover:underline"
@@ -162,7 +166,7 @@ export default function CreditNoteDetailPage() {
                 </div>
                 {creditNote.customer.email && (
                   <div>
-                    <div className="text-sm text-muted-foreground">Email</div>
+                    <div className="text-sm text-muted-foreground">{t('customers.form.email')}</div>
                     <a
                       href={`mailto:${creditNote.customer.email}`}
                       className="text-blue-600 hover:underline"
@@ -173,7 +177,7 @@ export default function CreditNoteDetailPage() {
                 )}
               </>
             ) : (
-              <p className="text-muted-foreground">No customer assigned</p>
+              <p className="text-muted-foreground">{t('creditNotes.noCustomerAssigned')}</p>
             )}
           </CardContent>
         </Card>
@@ -183,14 +187,16 @@ export default function CreditNoteDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Invoice Details
+              {t('creditNotes.invoiceDetails')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {creditNote.invoice ? (
               <>
                 <div>
-                  <div className="text-sm text-muted-foreground">Original Invoice</div>
+                  <div className="text-sm text-muted-foreground">
+                    {t('creditNotes.originalInvoice')}
+                  </div>
                   <Link
                     href={`/sales/invoices/${creditNote.invoice.id}`}
                     className="font-medium hover:underline"
@@ -200,18 +206,22 @@ export default function CreditNoteDetailPage() {
                 </div>
                 {creditNote.invoice.grandTotal && (
                   <div>
-                    <div className="text-sm text-muted-foreground">Invoice Total</div>
+                    <div className="text-sm text-muted-foreground">
+                      {t('creditNotes.invoiceTotal')}
+                    </div>
                     <div className="font-mono">{formatCurrency(creditNote.invoice.grandTotal)}</div>
                   </div>
                 )}
               </>
             ) : (
-              <p className="text-muted-foreground">No invoice linked</p>
+              <p className="text-muted-foreground">{t('creditNotes.noInvoiceLinked')}</p>
             )}
 
             {creditNote.type === 'APPLY_TO_INVOICE' && creditNote.appliedToInvoice && (
               <div className="pt-4 border-t">
-                <div className="text-sm text-muted-foreground">Applied To Invoice</div>
+                <div className="text-sm text-muted-foreground">
+                  {t('creditNotes.appliedToInvoice')}
+                </div>
                 <Link
                   href={`/sales/invoices/${creditNote.appliedToInvoice.id}`}
                   className="font-medium hover:underline"
@@ -228,7 +238,7 @@ export default function CreditNoteDetailPage() {
       {creditNote.reason && (
         <Card>
           <CardHeader>
-            <CardTitle>Reason</CardTitle>
+            <CardTitle>{t('creditNotes.reason')}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="whitespace-pre-wrap">{creditNote.reason}</p>

@@ -43,8 +43,10 @@ import {
   AccountType,
 } from '@/lib/hooks/use-accounts';
 import { usePermissions } from '@/lib/hooks/use-permissions';
+import { useTranslations } from 'next-intl';
 
 function AccountsPageContent() {
+  const t = useTranslations('accounting');
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'code' });
 
@@ -143,7 +145,7 @@ function AccountsPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Chart of Accounts</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('accounts.title')}</h1>
           <p className="text-muted-foreground">Manage your organization&apos;s account structure</p>
         </div>
         <div className="flex items-center gap-2">
@@ -162,7 +164,7 @@ function AccountsPageContent() {
           {canCreate && (
             <Button onClick={handleCreate}>
               <Plus className="mr-2 h-4 w-4" />
-              Add Account
+              {t('accounts.newAccount')}
             </Button>
           )}
         </div>
@@ -234,7 +236,7 @@ function AccountsPageContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Account</AlertDialogTitle>
+            <AlertDialogTitle>{t('accounts.deleteAccount')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete &quot;{accountToDelete?.name}&quot;? This action
               cannot be undone. Accounts with transactions or child accounts cannot be deleted.

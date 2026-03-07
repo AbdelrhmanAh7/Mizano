@@ -47,12 +47,14 @@ import {
   formatCurrency,
 } from '@/lib/hooks/use-bank-accounts';
 import { getStatusLabel, getStatusColor } from '@/lib/hooks/use-bank-transactions';
+import { useTranslations } from 'next-intl';
 
 interface BankAccountDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
 export default function BankAccountDetailPage({ params }: BankAccountDetailPageProps) {
+  const t = useTranslations('banking');
   const { id } = use(params);
   const router = useRouter();
   const { data: account, isLoading } = useBankAccount(id);
@@ -137,19 +139,19 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
           <Button variant="outline" asChild>
             <Link href={`/banking/accounts/${id}/edit`}>
               <Pencil className="mr-2 h-4 w-4" />
-              Edit
+              {t('accounts.editAccount')}
             </Link>
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" className="text-red-600">
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                {t('accounts.deleteAccount')}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete Bank Account</AlertDialogTitle>
+                <AlertDialogTitle>{t('accounts.deleteAccount')}</AlertDialogTitle>
                 <AlertDialogDescription>
                   Are you sure you want to delete this bank account? This action cannot be undone.
                   All associated transactions will also be deleted.
@@ -226,11 +228,11 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Account Details</CardTitle>
+            <CardTitle>{t('accounts.accountDetails')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Account Number</span>
+              <span className="text-muted-foreground">{t('accounts.form.accountNumber')}</span>
               <span className="font-mono">{account.accountNumber || '-'}</span>
             </div>
             <div className="flex justify-between">
@@ -238,7 +240,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
               <span>{account.bankName || '-'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Currency</span>
+              <span className="text-muted-foreground">{t('accounts.form.currency')}</span>
               <span>{account.currency}</span>
             </div>
             <div className="flex justify-between">
@@ -253,7 +255,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
         {account.glAccount && (
           <Card>
             <CardHeader>
-              <CardTitle>Linked GL Account</CardTitle>
+              <CardTitle>{t('accounts.form.linkedAccount')}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="font-mono">
@@ -271,7 +273,7 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
             <CardTitle>Recent Transactions</CardTitle>
             <Button variant="outline" size="sm">
               <Upload className="mr-2 h-4 w-4" />
-              Import Transactions
+              {t('transactions.import')}
             </Button>
           </div>
         </CardHeader>
@@ -284,10 +286,10 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>{t('transactions.table.date')}</TableHead>
+                  <TableHead>{t('transactions.table.description')}</TableHead>
+                  <TableHead>{t('transactions.table.status')}</TableHead>
+                  <TableHead className="text-right">{t('transactions.table.amount')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

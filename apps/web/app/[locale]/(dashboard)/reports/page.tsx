@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   ArrowRight,
@@ -15,102 +16,102 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-const reportCategories = [
-  {
-    name: 'Financial Reports',
-    description: 'Core financial statements',
-    reports: [
-      {
-        name: 'Profit & Loss',
-        description: 'Income and expenses over a period',
-        href: '/reports/profit-loss',
-        icon: TrendingUp,
-      },
-      {
-        name: 'Balance Sheet',
-        description: 'Assets, liabilities, and equity',
-        href: '/reports/balance-sheet',
-        icon: PieChart,
-      },
-      {
-        name: 'Cash Flow Statement',
-        description: 'Cash inflows and outflows',
-        href: '/reports/cash-flow',
-        icon: BarChart3,
-      },
-    ],
-  },
-  {
-    name: 'Receivables & Payables',
-    description: 'Track what you owe and are owed',
-    reports: [
-      {
-        name: 'AR Aging',
-        description: 'Outstanding customer invoices',
-        href: '/reports/ar-aging',
-        icon: Users,
-      },
-      {
-        name: 'AP Aging',
-        description: 'Outstanding vendor bills',
-        href: '/reports/ap-aging',
-        icon: Building2,
-      },
-    ],
-  },
-  {
-    name: 'Sales & Purchase Reports',
-    description: 'Analyze sales and purchasing performance',
-    reports: [
-      {
-        name: 'Sales by Customer',
-        description: 'Revenue breakdown by customer',
-        href: '/reports/sales-by-customer',
-        icon: Users,
-      },
-      {
-        name: 'Sales by Item',
-        description: 'Revenue breakdown by product/item',
-        href: '/reports/sales-by-item',
-        icon: Package,
-      },
-      {
-        name: 'Purchases by Vendor',
-        description: 'Purchase breakdown by vendor',
-        href: '/reports/purchases-by-vendor',
-        icon: ShoppingCart,
-      },
-    ],
-  },
-  {
-    name: 'Accounting Reports',
-    description: 'Detailed accounting records',
-    reports: [
-      {
-        name: 'General Ledger',
-        description: 'Account transaction history',
-        href: '/reports/general-ledger',
-        icon: FileText,
-      },
-      {
-        name: 'Trial Balance',
-        description: 'Account balances summary',
-        href: '/reports/trial-balance',
-        icon: Calculator,
-      },
-    ],
-  },
-];
-
 export default function ReportsPage() {
+  const t = useTranslations('reports');
+
+  const reportCategories = [
+    {
+      name: t('categories.financial'),
+      description: 'Core financial statements',
+      reports: [
+        {
+          name: t('profitLoss.title'),
+          description: t('profitLoss.description'),
+          href: '/reports/profit-loss',
+          icon: TrendingUp,
+        },
+        {
+          name: t('balanceSheet.title'),
+          description: t('balanceSheet.description'),
+          href: '/reports/balance-sheet',
+          icon: PieChart,
+        },
+        {
+          name: t('cashFlow.title'),
+          description: t('cashFlow.description'),
+          href: '/reports/cash-flow',
+          icon: BarChart3,
+        },
+      ],
+    },
+    {
+      name: 'Receivables & Payables',
+      description: 'Track what you owe and are owed',
+      reports: [
+        {
+          name: t('arAging.title'),
+          description: t('arAging.description'),
+          href: '/reports/ar-aging',
+          icon: Users,
+        },
+        {
+          name: t('apAging.title'),
+          description: t('apAging.description'),
+          href: '/reports/ap-aging',
+          icon: Building2,
+        },
+      ],
+    },
+    {
+      name: t('categories.sales'),
+      description: 'Analyze sales and purchasing performance',
+      reports: [
+        {
+          name: t('salesByCustomer.title'),
+          description: t('salesByCustomer.description'),
+          href: '/reports/sales-by-customer',
+          icon: Users,
+        },
+        {
+          name: t('salesByItem.title'),
+          description: t('salesByItem.description'),
+          href: '/reports/sales-by-item',
+          icon: Package,
+        },
+        {
+          name: t('purchasesByVendor.title'),
+          description: t('purchasesByVendor.description'),
+          href: '/reports/purchases-by-vendor',
+          icon: ShoppingCart,
+        },
+      ],
+    },
+    {
+      name: 'Accounting Reports',
+      description: 'Detailed accounting records',
+      reports: [
+        {
+          name: t('generalLedger.title'),
+          description: t('generalLedger.description'),
+          href: '/reports/general-ledger',
+          icon: FileText,
+        },
+        {
+          name: t('trialBalance.title'),
+          description: t('trialBalance.description'),
+          href: '/reports/trial-balance',
+          icon: Calculator,
+        },
+      ],
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-        <p className="text-muted-foreground">
-          Generate financial reports and analyze your business performance
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+        <p className="text-muted-foreground">{t('description')}</p>
       </div>
 
       {/* Report Categories */}

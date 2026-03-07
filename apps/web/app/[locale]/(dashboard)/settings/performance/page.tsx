@@ -46,6 +46,7 @@ import {
   Server,
   Zap,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 // ─── Duration Badge ────────────────────────────────────────────────────────────
@@ -77,6 +78,7 @@ function DurationBadge({ duration }: { duration: number }) {
 // ─── Health Cards ──────────────────────────────────────────────────────────────
 
 function HealthCards() {
+  const t = useTranslations('settings');
   const { data: health, isLoading } = useDatabaseHealth();
 
   if (isLoading) {
@@ -111,65 +113,75 @@ function HealthCards() {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Database Status</CardTitle>
+          <CardTitle className="text-sm font-medium">{t('performance.health.dbStatus')}</CardTitle>
           <Database className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
             {health.primaryConnected ? (
-              <span className="text-green-600">Connected</span>
+              <span className="text-green-600">{t('performance.health.connected')}</span>
             ) : (
-              <span className="text-red-600">Disconnected</span>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">Latency: {health.primaryLatencyMs}ms</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Read Replica</CardTitle>
-          <Server className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {health.replicaConfigured ? (
-              health.replicaConnected ? (
-                <span className="text-green-600">Active</span>
-              ) : (
-                <span className="text-red-600">Down</span>
-              )
-            ) : (
-              <span className="text-muted-foreground">Not configured</span>
+              <span className="text-red-600">{t('performance.health.disconnected')}</span>
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            {health.replicaConfigured && health.replicaLatencyMs != null
-              ? `Latency: ${health.replicaLatencyMs}ms`
-              : 'Using primary for reads'}
+            {t('performance.health.latency', { ms: health.primaryLatencyMs })}
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Connection Pool</CardTitle>
-          <Zap className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-sm font-medium">
+            {t('performance.health.readReplica')}
+          </CardTitle>
+          <Server className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{health.poolSize}</div>
-          <p className="text-xs text-muted-foreground mt-1">Max connections</p>
+          <div className="text-2xl font-bold">
+            {health.replicaConfigured ? (
+              health.replicaConnected ? (
+                <span className="text-green-600">{t('performance.health.active')}</span>
+              ) : (
+                <span className="text-red-600">{t('performance.health.down')}</span>
+              )
+            ) : (
+              <span className="text-muted-foreground">{t('performance.health.notConfigured')}</span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {health.replicaConfigured && health.replicaLatencyMs != null
+              ? t('performance.health.replicaLatency', { ms: health.replicaLatencyMs })
+              : t('performance.health.usingPrimary')}
+          </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Uptime</CardTitle>
+          <CardTitle className="text-sm font-medium">
+            {t('performance.health.connectionPool')}
+          </CardTitle>
+          <Zap className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{health.poolSize}</div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {t('performance.health.maxConnections')}
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">{t('performance.health.uptime')}</CardTitle>
           <Clock className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{formatUptime(health.uptimeSeconds)}</div>
-          <p className="text-xs text-muted-foreground mt-1">Since last restart</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {t('performance.health.sinceRestart')}
+          </p>
         </CardContent>
       </Card>
     </div>
@@ -179,6 +191,7 @@ function HealthCards() {
 // ─── Stats Cards ───────────────────────────────────────────────────────────────
 
 function StatsCards() {
+  const t = useTranslations('settings');
   const { data: stats, isLoading } = useQueryStats();
 
   if (isLoading) {
@@ -204,20 +217,24 @@ function StatsCards() {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Queries</CardTitle>
+          <CardTitle className="text-sm font-medium">
+            {t('performance.stats.totalQueries')}
+          </CardTitle>
           <Activity className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{stats.totalQueries.toLocaleString()}</div>
           <p className="text-xs text-muted-foreground mt-1">
-            Buffer: {stats.bufferSize.toLocaleString()} entries
+            {t('performance.stats.buffer', { count: stats.bufferSize.toLocaleString() })}
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Avg Response</CardTitle>
+          <CardTitle className="text-sm font-medium">
+            {t('performance.stats.avgResponse')}
+          </CardTitle>
           <Clock className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -228,7 +245,7 @@ function StatsCards() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">P95 Latency</CardTitle>
+          <CardTitle className="text-sm font-medium">{t('performance.stats.p95Latency')}</CardTitle>
           <AlertTriangle className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -239,7 +256,9 @@ function StatsCards() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Slow Queries</CardTitle>
+          <CardTitle className="text-sm font-medium">
+            {t('performance.stats.slowQueries')}
+          </CardTitle>
           <AlertTriangle className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -248,8 +267,10 @@ function StatsCards() {
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             {stats.totalQueries > 0
-              ? `${((stats.slowQueryCount / stats.totalQueries) * 100).toFixed(1)}% of total`
-              : 'No queries yet'}
+              ? t('performance.stats.percentOfTotal', {
+                  percent: ((stats.slowQueryCount / stats.totalQueries) * 100).toFixed(1),
+                })
+              : t('performance.stats.noQueriesYet')}
           </p>
         </CardContent>
       </Card>
@@ -260,6 +281,7 @@ function StatsCards() {
 // ─── Distribution Chart (horizontal bars) ──────────────────────────────────────
 
 function DistributionChart() {
+  const t = useTranslations('settings');
   const { data: distribution, isLoading } = useQueryDistribution();
 
   if (isLoading) {
@@ -283,13 +305,13 @@ function DistributionChart() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Query Distribution by Model</CardTitle>
-        <CardDescription>Number of queries per database model</CardDescription>
+        <CardTitle className="text-base">{t('performance.distribution.title')}</CardTitle>
+        <CardDescription>{t('performance.distribution.description')}</CardDescription>
       </CardHeader>
       <CardContent>
         {items.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
-            No query data collected yet
+            {t('performance.distribution.noData')}
           </p>
         ) : (
           <div className="space-y-3">
@@ -321,6 +343,7 @@ function DistributionChart() {
 // ─── Response Time Trend ───────────────────────────────────────────────────────
 
 function ResponseTimeTrend() {
+  const t = useTranslations('settings');
   const [interval, setInterval] = useState(5);
   const { data: trend, isLoading } = useResponseTimeTrend(interval);
 
@@ -345,8 +368,8 @@ function ResponseTimeTrend() {
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <CardTitle className="text-base">Response Time Trend</CardTitle>
-            <CardDescription>Average query duration over time</CardDescription>
+            <CardTitle className="text-base">{t('performance.trend.title')}</CardTitle>
+            <CardDescription>{t('performance.trend.description')}</CardDescription>
           </div>
           <Select value={String(interval)} onValueChange={(v) => setInterval(Number(v))}>
             <SelectTrigger className="w-[120px]">
@@ -365,7 +388,7 @@ function ResponseTimeTrend() {
       <CardContent>
         {items.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
-            No trend data available yet
+            {t('performance.trend.noData')}
           </p>
         ) : (
           <div className="flex items-end gap-1 h-48 overflow-x-auto">
@@ -407,6 +430,7 @@ function ResponseTimeTrend() {
 // ─── Slow Queries Table ────────────────────────────────────────────────────────
 
 function SlowQueriesTable() {
+  const t = useTranslations('settings');
   const [page, setPage] = useState(1);
   const [threshold, setThreshold] = useState(100);
   const { data, isLoading } = useSlowQueries({ page, limit: 10, threshold });
@@ -416,8 +440,8 @@ function SlowQueriesTable() {
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <CardTitle className="text-base">Slow Queries</CardTitle>
-            <CardDescription>Queries exceeding duration threshold</CardDescription>
+            <CardTitle className="text-base">{t('performance.slowQueries.title')}</CardTitle>
+            <CardDescription>{t('performance.slowQueries.description')}</CardDescription>
           </div>
           <Select
             value={String(threshold)}
@@ -450,10 +474,10 @@ function SlowQueriesTable() {
           <div className="text-center py-8">
             <Activity className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">
-              No queries above {threshold}ms threshold
+              {t('performance.slowQueries.noQueries', { threshold })}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Try lowering the threshold or wait for more queries
+              {t('performance.slowQueries.tryLowering')}
             </p>
           </div>
         ) : (
@@ -463,10 +487,12 @@ function SlowQueriesTable() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Timestamp</TableHead>
-                      <TableHead>Model</TableHead>
-                      <TableHead>Action</TableHead>
-                      <TableHead className="text-right">Duration</TableHead>
+                      <TableHead>{t('performance.slowQueries.timestamp')}</TableHead>
+                      <TableHead>{t('performance.slowQueries.model')}</TableHead>
+                      <TableHead>{t('performance.slowQueries.action')}</TableHead>
+                      <TableHead className="text-right">
+                        {t('performance.slowQueries.duration')}
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -526,6 +552,7 @@ function SlowQueriesTable() {
 // ─── Index Recommendations ─────────────────────────────────────────────────────
 
 function IndexRecommendations() {
+  const t = useTranslations('settings');
   const { data: recommendations, isLoading } = useIndexRecommendations();
 
   if (isLoading) {
@@ -550,17 +577,19 @@ function IndexRecommendations() {
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
           <Lightbulb className="h-5 w-5 text-yellow-500" />
-          Index Recommendations
+          {t('performance.recommendations.title')}
         </CardTitle>
-        <CardDescription>AI-powered suggestions based on query patterns</CardDescription>
+        <CardDescription>{t('performance.recommendations.description')}</CardDescription>
       </CardHeader>
       <CardContent>
         {items.length === 0 ? (
           <div className="text-center py-8">
             <Lightbulb className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">No recommendations yet</p>
+            <p className="text-sm text-muted-foreground">
+              {t('performance.recommendations.noRecommendations')}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Recommendations appear after sufficient query data is collected
+              {t('performance.recommendations.noRecommendationsHint')}
             </p>
           </div>
         ) : (
@@ -580,7 +609,7 @@ function IndexRecommendations() {
                     variant={rec.estimatedImpact > 1000 ? 'destructive' : 'secondary'}
                     className="flex-shrink-0"
                   >
-                    Impact: {rec.estimatedImpact}
+                    {t('performance.recommendations.impact', { value: rec.estimatedImpact })}
                   </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">{rec.reason}</p>
@@ -599,6 +628,7 @@ function IndexRecommendations() {
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function PerformancePage() {
+  const t = useTranslations('settings');
   const resetMetrics = useResetMetrics();
 
   return (
@@ -606,10 +636,8 @@ export default function PerformancePage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Database Performance</h1>
-          <p className="text-muted-foreground">
-            Monitor query performance, connection health, and optimization opportunities
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('performance.title')}</h1>
+          <p className="text-muted-foreground">{t('performance.description')}</p>
         </div>
         <Button
           variant="outline"
@@ -618,7 +646,7 @@ export default function PerformancePage() {
           disabled={resetMetrics.isPending}
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${resetMetrics.isPending ? 'animate-spin' : ''}`} />
-          Reset Metrics
+          {t('performance.resetMetrics')}
         </Button>
       </div>
 

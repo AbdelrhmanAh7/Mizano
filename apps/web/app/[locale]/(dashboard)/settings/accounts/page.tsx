@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslations } from 'next-intl';
 import { Save, Building, DollarSign, CreditCard, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -34,6 +35,7 @@ interface AccountSettingsFormData {
 }
 
 export default function AccountSettingsPage() {
+  const t = useTranslations('settings');
   const { data: settings, isLoading: settingsLoading } = useAccountSettings();
   const { data: accountsTree, isLoading: accountsLoading } = useAccountsTree();
   const updateSettings = useUpdateAccountSettings();
@@ -103,10 +105,8 @@ export default function AccountSettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Account Settings</h1>
-        <p className="text-muted-foreground">
-          Configure default accounts for automatic accounting entries
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('accountSettings.title')}</h1>
+        <p className="text-muted-foreground">{t('accountSettings.description')}</p>
       </div>
 
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -115,25 +115,25 @@ export default function AccountSettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <DollarSign className="h-5 w-5" />
-              Sales Accounts
+              {t('accountSettings.salesAccounts')}
             </CardTitle>
-            <CardDescription>
-              These accounts are used when creating invoices and recording customer payments
-            </CardDescription>
+            <CardDescription>{t('accountSettings.salesAccountsDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="defaultArAccountId">Accounts Receivable</Label>
+                <Label htmlFor="defaultArAccountId">
+                  {t('accountSettings.accountsReceivable')}
+                </Label>
                 <Select
                   value={form.watch('defaultArAccountId') || ''}
                   onValueChange={(value) => form.setValue('defaultArAccountId', value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
+                    <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">-- Not Set --</SelectItem>
+                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
                     {assetAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}
@@ -142,21 +142,21 @@ export default function AccountSettingsPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Debit when invoices are sent, credit when payments are received
+                  {t('accountSettings.accountsReceivableHint')}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="defaultRevenueAccountId">Sales Revenue</Label>
+                <Label htmlFor="defaultRevenueAccountId">{t('accountSettings.salesRevenue')}</Label>
                 <Select
                   value={form.watch('defaultRevenueAccountId') || ''}
                   onValueChange={(value) => form.setValue('defaultRevenueAccountId', value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
+                    <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">-- Not Set --</SelectItem>
+                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
                     {revenueAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}
@@ -164,20 +164,24 @@ export default function AccountSettingsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">Credit when invoices are sent</p>
+                <p className="text-xs text-muted-foreground">
+                  {t('accountSettings.salesRevenueHint')}
+                </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="defaultVatPayableAccountId">VAT Payable (Sales)</Label>
+                <Label htmlFor="defaultVatPayableAccountId">
+                  {t('accountSettings.vatPayable')}
+                </Label>
                 <Select
                   value={form.watch('defaultVatPayableAccountId') || ''}
                   onValueChange={(value) => form.setValue('defaultVatPayableAccountId', value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
+                    <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">-- Not Set --</SelectItem>
+                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
                     {liabilityAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}
@@ -186,21 +190,23 @@ export default function AccountSettingsPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Credit when invoices with tax are sent
+                  {t('accountSettings.vatPayableHint')}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="defaultSalesReturnsAccountId">Sales Returns / Credit Notes</Label>
+                <Label htmlFor="defaultSalesReturnsAccountId">
+                  {t('accountSettings.salesReturns')}
+                </Label>
                 <Select
                   value={form.watch('defaultSalesReturnsAccountId') || ''}
                   onValueChange={(value) => form.setValue('defaultSalesReturnsAccountId', value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
+                    <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">-- Not Set --</SelectItem>
+                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
                     {[...revenueAccounts, ...expenseAccounts].map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}
@@ -208,7 +214,9 @@ export default function AccountSettingsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">Debit when credit notes are issued</p>
+                <p className="text-xs text-muted-foreground">
+                  {t('accountSettings.salesReturnsHint')}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -219,25 +227,23 @@ export default function AccountSettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Purchases Accounts
+              {t('accountSettings.purchasesAccounts')}
             </CardTitle>
-            <CardDescription>
-              These accounts are used when creating bills and recording vendor payments
-            </CardDescription>
+            <CardDescription>{t('accountSettings.purchasesAccountsDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="defaultApAccountId">Accounts Payable</Label>
+                <Label htmlFor="defaultApAccountId">{t('accountSettings.accountsPayable')}</Label>
                 <Select
                   value={form.watch('defaultApAccountId') || ''}
                   onValueChange={(value) => form.setValue('defaultApAccountId', value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
+                    <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">-- Not Set --</SelectItem>
+                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
                     {liabilityAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}
@@ -246,21 +252,23 @@ export default function AccountSettingsPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Credit when bills are received, debit when payments are made
+                  {t('accountSettings.accountsPayableHint')}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="defaultVatReceivableAccountId">VAT Receivable (Purchases)</Label>
+                <Label htmlFor="defaultVatReceivableAccountId">
+                  {t('accountSettings.vatReceivable')}
+                </Label>
                 <Select
                   value={form.watch('defaultVatReceivableAccountId') || ''}
                   onValueChange={(value) => form.setValue('defaultVatReceivableAccountId', value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
+                    <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">-- Not Set --</SelectItem>
+                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
                     {assetAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}
@@ -269,7 +277,7 @@ export default function AccountSettingsPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Debit when bills with tax are received
+                  {t('accountSettings.vatReceivableHint')}
                 </p>
               </div>
             </div>
@@ -281,23 +289,25 @@ export default function AccountSettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Landmark className="h-5 w-5" />
-              Bank & Cash Accounts
+              {t('accountSettings.bankCashAccounts')}
             </CardTitle>
-            <CardDescription>Default accounts for deposits and withdrawals</CardDescription>
+            <CardDescription>{t('accountSettings.bankCashAccountsDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="defaultBankAccountId">Default Bank Account</Label>
+                <Label htmlFor="defaultBankAccountId">
+                  {t('accountSettings.defaultBankAccount')}
+                </Label>
                 <Select
                   value={form.watch('defaultBankAccountId') || ''}
                   onValueChange={(value) => form.setValue('defaultBankAccountId', value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
+                    <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">-- Not Set --</SelectItem>
+                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
                     {assetAccounts
                       .filter(
                         (a) => a.name.toLowerCase().includes('bank') || a.code.startsWith('1001'),
@@ -309,20 +319,24 @@ export default function AccountSettingsPage() {
                       ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">Used for bank transfer payments</p>
+                <p className="text-xs text-muted-foreground">
+                  {t('accountSettings.defaultBankAccountHint')}
+                </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="defaultCashAccountId">Default Cash Account</Label>
+                <Label htmlFor="defaultCashAccountId">
+                  {t('accountSettings.defaultCashAccount')}
+                </Label>
                 <Select
                   value={form.watch('defaultCashAccountId') || ''}
                   onValueChange={(value) => form.setValue('defaultCashAccountId', value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
+                    <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">-- Not Set --</SelectItem>
+                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
                     {assetAccounts
                       .filter(
                         (a) => a.name.toLowerCase().includes('cash') || a.code.startsWith('1000'),
@@ -334,7 +348,9 @@ export default function AccountSettingsPage() {
                       ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">Used for cash payments</p>
+                <p className="text-xs text-muted-foreground">
+                  {t('accountSettings.defaultCashAccountHint')}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -344,7 +360,7 @@ export default function AccountSettingsPage() {
         <div className="flex justify-end">
           <Button type="submit" disabled={updateSettings.isPending}>
             <Save className="mr-2 h-4 w-4" />
-            {updateSettings.isPending ? 'Saving...' : 'Save Settings'}
+            {updateSettings.isPending ? t('common.saving') : t('accountSettings.saveSettings')}
           </Button>
         </div>
       </form>

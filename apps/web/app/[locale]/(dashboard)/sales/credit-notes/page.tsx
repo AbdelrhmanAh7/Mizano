@@ -23,16 +23,19 @@ import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { Eye, Filter, Plus, RefreshCw } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
-const TYPE_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'all', label: 'All Types' },
-  { value: 'REFUND', label: 'Refund' },
-  { value: 'APPLY_TO_INVOICE', label: 'Applied to Invoice' },
-];
-
 function CreditNotesPageContent() {
+  const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
+
+  const TYPE_OPTIONS: Array<{ value: string; label: string }> = [
+    { value: 'all', label: tCommon('all') },
+    { value: 'REFUND', label: t('creditNotes.types.refund') },
+    { value: 'APPLY_TO_INVOICE', label: t('creditNotes.types.applyToInvoice') },
+  ];
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
@@ -66,7 +69,7 @@ function CreditNotesPageContent() {
       accessorKey: 'creditNoteNumber',
       header: () => (
         <SortableHeader
-          label="Credit Note #"
+          label={t('creditNotes.table.creditNoteNumber')}
           columnId="creditNoteNumber"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -84,7 +87,7 @@ function CreditNotesPageContent() {
     },
     {
       accessorKey: 'customer.name',
-      header: 'Customer',
+      header: t('creditNotes.table.customer'),
       cell: ({ row }) => {
         const creditNote = row.original;
         return creditNote.customer ? (
@@ -98,7 +101,7 @@ function CreditNotesPageContent() {
     },
     {
       accessorKey: 'invoice.invoiceNumber',
-      header: 'Original Invoice',
+      header: t('creditNotes.table.invoice'),
       cell: ({ row }) => {
         const creditNote = row.original;
         return creditNote.invoice ? (
@@ -114,7 +117,7 @@ function CreditNotesPageContent() {
       accessorKey: 'date',
       header: () => (
         <SortableHeader
-          label="Date"
+          label={t('creditNotes.table.date')}
           columnId="date"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -125,7 +128,7 @@ function CreditNotesPageContent() {
     },
     {
       accessorKey: 'type',
-      header: 'Type',
+      header: t('creditNotes.form.type'),
       cell: ({ row }) => (
         <Badge className={getCreditNoteTypeColor(row.original.type)}>
           {getCreditNoteTypeLabel(row.original.type)}
@@ -136,7 +139,7 @@ function CreditNotesPageContent() {
       accessorKey: 'amount',
       header: () => (
         <SortableHeader
-          label="Amount"
+          label={t('creditNotes.table.amount')}
           columnId="amount"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -168,15 +171,15 @@ function CreditNotesPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Credit Notes</h1>
-          <p className="text-muted-foreground">Manage customer credit notes and refunds</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('creditNotes.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
             <Button asChild>
               <Link href="/sales/credit-notes/new">
                 <Plus className="mr-2 h-4 w-4" />
-                New Credit Note
+                {t('creditNotes.newCreditNote')}
               </Link>
             </Button>
           )}
@@ -220,7 +223,7 @@ function CreditNotesPageContent() {
       {/* Credit Notes Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Credit Notes</CardTitle>
+          <CardTitle>{t('creditNotes.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -234,7 +237,7 @@ function CreditNotesPageContent() {
             onLoadMore={() => fetchNextPage()}
             enableColumnResizing
             tableId="credit-notes"
-            emptyMessage="No credit notes found"
+            emptyMessage={t('creditNotes.empty.title')}
             emptyAction={
               canCreate ? (
                 <Button asChild>

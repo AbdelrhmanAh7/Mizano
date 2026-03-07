@@ -233,13 +233,13 @@ export function DashboardClient() {
             <div className="relative">
               {cashFlowData ? <CashFlowChart data={cashFlowData} /> : <ChartSkeleton />}
               <div className="absolute top-4 end-4">
-                <ChartDrillLink href="/banking/accounts" label="View Transactions" />
+                <ChartDrillLink href="/banking/accounts" label={t('drillLinks.viewTransactions')} />
               </div>
             </div>
             <div className="relative">
               {revenueData ? <RevenueChart data={revenueData} /> : <ChartSkeleton />}
               <div className="absolute top-4 end-4">
-                <ChartDrillLink href="/sales/invoices" label="View Invoices" />
+                <ChartDrillLink href="/sales/invoices" label={t('drillLinks.viewInvoices')} />
               </div>
             </div>
           </div>
@@ -251,13 +251,16 @@ export function DashboardClient() {
             <div className="relative">
               {statsData ? <ARAPChart data={statsData.receivablesVsPayables} /> : <ChartSkeleton />}
               <div className="absolute top-4 end-4">
-                <ChartDrillLink href="/sales/invoices?status=OVERDUE" label="View Overdue" />
+                <ChartDrillLink
+                  href="/sales/invoices?status=OVERDUE"
+                  label={t('drillLinks.viewOverdue')}
+                />
               </div>
             </div>
             <div className="relative">
               {expensesData ? <ExpensesPie data={expensesData} /> : <ChartSkeleton />}
               <div className="absolute top-4 end-4">
-                <ChartDrillLink href="/purchases/expenses" label="View Expenses" />
+                <ChartDrillLink href="/purchases/expenses" label={t('drillLinks.viewExpenses')} />
               </div>
             </div>
           </div>
@@ -280,13 +283,13 @@ export function DashboardClient() {
                 <ChartSkeleton />
               )}
               <div className="absolute top-4 end-4">
-                <ChartDrillLink href="/accounting/journals" label="View P&L" />
+                <ChartDrillLink href="/accounting/journals" label={t('drillLinks.viewPL')} />
               </div>
             </div>
             <div className="relative">
               {customersData ? <TopCustomersChart data={customersData} /> : <ChartSkeleton />}
               <div className="absolute top-4 end-4">
-                <ChartDrillLink href="/sales/customers" label="View Customers" />
+                <ChartDrillLink href="/sales/customers" label={t('drillLinks.viewCustomers')} />
               </div>
             </div>
           </div>
@@ -298,13 +301,13 @@ export function DashboardClient() {
             <div className="relative">
               {bankingData ? <BankBalanceChart data={bankingData} /> : <ChartSkeleton />}
               <div className="absolute top-4 end-4">
-                <ChartDrillLink href="/banking/accounts" label="View Accounts" />
+                <ChartDrillLink href="/banking/accounts" label={t('drillLinks.viewAccounts')} />
               </div>
             </div>
             <div className="relative">
               {inventoryData ? <InventoryValueChart data={inventoryData} /> : <ChartSkeleton />}
               <div className="absolute top-4 end-4">
-                <ChartDrillLink href="/inventory/items" label="View Items" />
+                <ChartDrillLink href="/inventory/items" label={t('drillLinks.viewItems')} />
               </div>
             </div>
           </div>

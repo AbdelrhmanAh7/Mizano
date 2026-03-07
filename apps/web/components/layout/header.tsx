@@ -43,7 +43,10 @@ export function Header({ sessionUser }: HeaderProps) {
   };
 
   return (
-    <header className="bg-white dark:bg-card border-b border-gray-200 dark:border-border px-6 py-4">
+    <header
+      role="banner"
+      className="bg-white dark:bg-card border-b border-gray-200 dark:border-border px-6 py-4"
+    >
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-gray-900 dark:text-foreground">

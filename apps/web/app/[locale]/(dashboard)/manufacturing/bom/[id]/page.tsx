@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, Edit, Trash2, Package, Layers, DollarSign, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,6 +40,8 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { BOMForm } from '@/components/manufacturing/bom-form';
 
 export default function BOMDetailPage() {
+  const t = useTranslations('manufacturing');
+  const tCommon = useTranslations('common');
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -57,7 +60,7 @@ export default function BOMDetailPage() {
   const confirmDelete = async () => {
     try {
       await deleteBOM.mutateAsync(bomId);
-      toast({ title: 'BOM deleted successfully' });
+      toast({ title: t('bom.deleteBom') });
       router.push('/manufacturing/bom');
     } catch (error: unknown) {
       toast({
@@ -99,16 +102,14 @@ export default function BOMDetailPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">BOM Not Found</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('bom.empty.title')}</h1>
           </div>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              The bill of materials you&apos;re looking for doesn&apos;t exist.
-            </p>
+            <p className="text-muted-foreground">{tCommon('errors.notFound')}</p>
             <Button asChild className="mt-4">
-              <Link href="/manufacturing/bom">Back to BOMs</Link>
+              <Link href="/manufacturing/bom">{tCommon('buttons.back')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -124,7 +125,7 @@ export default function BOMDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit BOM</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('bom.editBom')}</h1>
             <p className="text-muted-foreground">{bom.name}</p>
           </div>
         </div>
@@ -161,19 +162,19 @@ export default function BOMDetailPage() {
           {canEdit && (
             <Button variant="outline" onClick={() => setIsEditing(true)}>
               <Edit className="mr-2 h-4 w-4" />
-              Edit
+              {tCommon('buttons.edit')}
             </Button>
           )}
           <Button asChild>
             <Link href={`/manufacturing/work-orders/new?bomId=${bom.id}`}>
               <Wrench className="mr-2 h-4 w-4" />
-              Create Work Order
+              {t('workOrders.newWorkOrder')}
             </Link>
           </Button>
           {canDelete && (
             <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              {tCommon('buttons.delete')}
             </Button>
           )}
         </div>
@@ -185,7 +186,7 @@ export default function BOMDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Package className="h-4 w-4" />
-              Output Item
+              {t('bom.form.outputItem')}
             </div>
             <div className="text-lg font-bold">{bom.outputItem?.name || '-'}</div>
             <div className="text-xs text-muted-foreground">{bom.outputItem?.code}</div>
@@ -196,7 +197,7 @@ export default function BOMDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Package className="h-4 w-4" />
-              Output Quantity
+              {t('bom.form.outputQuantity')}
             </div>
             <div className="text-2xl font-bold">{bom.outputQuantity}</div>
             <div className="text-xs text-muted-foreground">per production run</div>
@@ -207,7 +208,7 @@ export default function BOMDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Layers className="h-4 w-4" />
-              Components
+              {t('bom.form.items')}
             </div>
             <div className="text-2xl font-bold">{bom.components?.length || 0}</div>
             <div className="text-xs text-muted-foreground">raw materials</div>
@@ -218,7 +219,7 @@ export default function BOMDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <DollarSign className="h-4 w-4" />
-              Operations Cost
+              {t('bom.form.operationsCost')}
             </div>
             <div className="text-2xl font-bold font-mono">{formatCurrency(bom.operationsCost)}</div>
           </CardContent>
@@ -238,10 +239,10 @@ export default function BOMDetailPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Item Code</TableHead>
-                  <TableHead>Item Name</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead>Unit</TableHead>
+                  <TableHead>{t('bom.form.item')}</TableHead>
+                  <TableHead>{tCommon('name')}</TableHead>
+                  <TableHead className="text-right">{t('bom.form.quantity')}</TableHead>
+                  <TableHead>{tCommon('unit')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -265,16 +266,13 @@ export default function BOMDetailPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete BOM</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete BOM &quot;{bom.name}&quot;? This action cannot be
-              undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('bom.deleteBom')}</AlertDialogTitle>
+            <AlertDialogDescription>{tCommon('confirm.deleteMessage')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

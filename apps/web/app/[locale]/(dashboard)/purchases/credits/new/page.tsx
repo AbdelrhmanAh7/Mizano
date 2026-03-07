@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import { accountsApi, itemsApi } from '@/lib/api';
 
 export default function NewVendorCreditPage() {
   const router = useRouter();
+  const t = useTranslations('purchases');
   const searchParams = useSearchParams();
   const createCredit = useCreateVendorCredit();
 
@@ -66,14 +68,14 @@ export default function NewVendorCreditPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
           <Link href="/purchases/credits">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Vendor Credit</h1>
-          <p className="text-muted-foreground">Create a credit or refund from a vendor</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('credits.newCredit')}</h1>
+          <p className="text-muted-foreground">{t('credits.newDescription')}</p>
         </div>
       </div>
 

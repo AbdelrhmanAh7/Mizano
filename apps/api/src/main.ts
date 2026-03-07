@@ -13,7 +13,7 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
-  // Request ID middleware
+  // Assign a unique request ID to each incoming request for tracing
   app.use((req: Request, _res: Response, next: NextFunction) => {
     if (!req.headers['x-request-id']) {
       req.headers['x-request-id'] = randomUUID();
@@ -21,12 +21,12 @@ async function bootstrap() {
     next();
   });
 
-  // Compression
+  // Enable gzip/brotli response compression to reduce payload sizes
   app.use(compression());
 
   const isProduction = configService.get('NODE_ENV') === 'production';
 
-  // Security headers
+  // Set security headers (CSP, CORP, etc.) via helmet; CSP disabled in dev for Swagger
   app.use(
     helmet({
       // Enable CSP in production; disable in dev for Swagger UI inline styles/scripts
@@ -48,7 +48,7 @@ async function bootstrap() {
     }),
   );
 
-  // CORS
+  // Configure CORS; origin is required in production, defaults to localhost:5001 in dev
   const corsOrigin = configService.get<string>('CORS_ORIGIN');
   if (!corsOrigin && isProduction) {
     throw new Error('CORS_ORIGIN environment variable must be set in production');
@@ -58,7 +58,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Global validation pipe
+  // Strip unknown properties, auto-transform types, reject unexpected fields
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -70,10 +70,10 @@ async function bootstrap() {
     }),
   );
 
-  // API prefix
+  // All routes prefixed with /api (e.g., /api/invoices, /api/auth/login)
   app.setGlobalPrefix('api');
 
-  // Swagger documentation (disabled in production)
+  // Swagger/OpenAPI docs at /api/docs (disabled in production for security)
   if (!isProduction) {
     const config = new DocumentBuilder()
       .setTitle('Mizano ERP API')
@@ -85,7 +85,7 @@ async function bootstrap() {
     SwaggerModule.setup('api/docs', app, document);
   }
 
-  // Graceful shutdown
+  // Listen for SIGTERM/SIGINT to close connections cleanly before exit
   app.enableShutdownHooks();
 
   const port = configService.get('API_PORT') || configService.get('PORT', 6001);

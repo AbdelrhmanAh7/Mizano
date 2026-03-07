@@ -1,15 +1,24 @@
+/** Options for cursor-based pagination. */
 export interface CursorPaginateOptions {
+  /** Opaque cursor (record ID) to resume from. Omit for the first page. */
   cursor?: string;
+  /** Number of records per page (default 50). */
   take?: number;
+  /** Prisma `include` clause for eager-loading relations. */
   include?: Record<string, unknown>;
+  /** Prisma `select` clause for field projection. */
   select?: Record<string, unknown>;
 }
 
+/** Result shape returned by {@link cursorPaginate}. */
 export interface CursorPaginatedResult<T> {
   data: T[];
   meta: {
+    /** Total count of matching records. `-1` on subsequent pages (client caches the first-page total). */
     total: number;
+    /** Cursor for the next page, or `null` if no more pages. */
     nextCursor: string | null;
+    /** Whether additional pages exist beyond the current result set. */
     hasMore: boolean;
   };
 }
@@ -21,16 +30,16 @@ export interface CursorPaginatedResult<T> {
  * Fetches `take + 1` to determine `hasMore` without an extra query.
  * `total` count is only fetched on the first request (when cursor is absent).
  *
- * @param model - Prisma model delegate (e.g. prisma.invoice)
- * @param where - Prisma where clause
- * @param orderBy - Prisma orderBy clause
- * @param options - Cursor, take, include, select
+ * @param model - Prisma model delegate (e.g. `prisma.invoice`). Must expose `findMany` and `count`.
+ * @param where - Prisma where clause (should include `organizationId` for multi-tenancy).
+ * @param orderBy - Prisma orderBy clause (e.g. `{ createdAt: 'desc' }`).
+ * @param options - Cursor, take, include, and select options.
+ * @returns Paginated result with `data`, `meta.total`, `meta.nextCursor`, and `meta.hasMore`.
  */
 export async function cursorPaginate<T extends { id: string }>(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   model: {
-    findMany: (args: any) => Promise<T[]>;
-    count: (args: any) => Promise<number>;
+    findMany: (args: Record<string, unknown>) => Promise<T[]>;
+    count: (args: Record<string, unknown>) => Promise<number>;
   },
   where: Record<string, unknown>,
   orderBy: Record<string, string> | Record<string, string>[],

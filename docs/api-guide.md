@@ -1163,3 +1163,86 @@ Audit logs are queryable via the Audit Logs API:
 - `GET /audit-logs/:id` -- single entry
 - `GET /audit-logs/entity/:entityType/:entityId` -- history for a specific entity
 - `GET /audit-logs/stats` -- aggregated statistics
+
+---
+
+## Testing Conventions
+
+### Unit Tests
+
+Every service should have a `.spec.ts` companion file:
+
+```
+modules/sales/services/invoices.service.ts
+modules/sales/services/invoices.service.spec.ts    ← companion test
+```
+
+- Mock `PrismaService` with `jest-mock-extended`
+- Test business rules (balance enforcement, status transitions, calculations)
+- Use `Decimal` for all monetary value assertions
+- Include `organizationId` in all test scenarios
+
+### Regression Tests
+
+**Every bug fix MUST include a regression test.** Place them in `apps/api/test/regression/`:
+
+```typescript
+// test/regression/sales/invoice-overpayment.e2e-spec.ts
+describe('@critical: Invoice overpayment', () => {
+  it('should reject payment exceeding balance due', async () => {
+    // Reproduce the original bug scenario
+    // Verify the fix prevents it
+  });
+});
+```
+
+### E2E Tests
+
+E2E tests validate the full request lifecycle against a test database. Located in `apps/api/test/`:
+
+- Each suite covers a complete module flow (auth, sales, purchases, etc.)
+- Tests use `supertest` to make HTTP requests
+- Test database is provisioned fresh for each suite
+- Multi-tenancy isolation is verified in `multi-tenancy.e2e-spec.ts`
+
+See `docs/testing-strategy.md` for the full testing strategy.
+
+---
+
+## Health Endpoints
+
+The API exposes health check endpoints via the HealthModule:
+
+- `GET /health` -- Basic health check (returns `{ status: 'ok' }`)
+- `GET /health/db` -- Database connectivity check
+- `GET /health/redis` -- Redis connectivity check
+
+These are unguarded (no auth required) and used by Docker healthchecks and monitoring.
+
+---
+
+## JSDoc Conventions
+
+Key backend services and utilities include JSDoc documentation:
+
+- **Class-level**: Brief description of the service's purpose
+- **Public methods**: Description, `@param`, and `@returns`
+- **Complex logic**: Inline comments for non-obvious algorithms
+
+Example:
+
+```typescript
+/**
+ * Generates race-condition-safe sequential document numbers.
+ * Uses atomic SQL UPSERT to prevent duplicate numbers under concurrent access.
+ */
+export class DocumentNumberService {
+  /**
+   * Generate the next document number for a given prefix and organization.
+   * @param prefix - Document type prefix (e.g., 'INV', 'BILL')
+   * @param organizationId - Tenant scope
+   * @returns Formatted document number (e.g., 'INV-2026-00042')
+   */
+  async generate(prefix: string, organizationId: string): Promise<string> {}
+}
+```

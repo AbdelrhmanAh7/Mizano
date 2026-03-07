@@ -47,6 +47,7 @@ import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
+import { useTranslations } from 'next-intl';
 import {
   CheckCircle,
   DollarSign,
@@ -61,16 +62,19 @@ import {
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
-const BILL_STATUS_OPTIONS = [
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'OPEN', label: 'Open' },
-  { value: 'OVERDUE', label: 'Overdue' },
-  { value: 'PARTIAL', label: 'Partial' },
-  { value: 'PAID', label: 'Paid' },
-];
-
 function BillsPageContent() {
+  const t = useTranslations('purchases');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
+
+  const BILL_STATUS_OPTIONS = [
+    { value: 'DRAFT', label: t('bills.status.draft') },
+    { value: 'OPEN', label: t('bills.status.open') },
+    { value: 'OVERDUE', label: t('bills.status.overdue') },
+    { value: 'PARTIAL', label: t('bills.status.partiallyPaid') },
+    { value: 'PAID', label: t('bills.status.paid') },
+  ];
+
   const { hasPermission } = usePermissions();
   const { onExportAll } = useExportAll('bills', 'bills');
   const tableParams = useTableParams({
@@ -214,7 +218,7 @@ function BillsPageContent() {
       accessorKey: 'billNumber',
       header: () => (
         <SortableHeader
-          label="Bill #"
+          label={t('bills.table.billNumber')}
           columnId="billNumber"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -232,7 +236,7 @@ function BillsPageContent() {
     },
     {
       accessorKey: 'vendor.name',
-      header: 'Vendor',
+      header: t('bills.table.vendor'),
       cell: ({ row }) => {
         const bill = row.original;
         return bill.vendor ? (
@@ -248,7 +252,7 @@ function BillsPageContent() {
       accessorKey: 'date',
       header: () => (
         <SortableHeader
-          label="Date"
+          label={t('bills.table.date')}
           columnId="date"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -261,7 +265,7 @@ function BillsPageContent() {
       accessorKey: 'dueDate',
       header: () => (
         <SortableHeader
-          label="Due Date"
+          label={t('bills.table.dueDate')}
           columnId="dueDate"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -282,7 +286,7 @@ function BillsPageContent() {
     },
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: t('bills.table.status'),
       cell: ({ row }) => (
         <Badge variant={getStatusVariant(row.original.status)}>
           {getStatusText(row.original.status)}
@@ -293,7 +297,7 @@ function BillsPageContent() {
       accessorKey: 'grandTotal',
       header: () => (
         <SortableHeader
-          label="Total"
+          label={tCommon('total')}
           columnId="grandTotal"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -305,7 +309,7 @@ function BillsPageContent() {
     },
     {
       accessorKey: 'balanceDue',
-      header: 'Balance Due',
+      header: t('bills.table.balance'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => {
         const balanceDue = parseFloat(row.original.balanceDue || '0');
@@ -338,21 +342,21 @@ function BillsPageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/purchases/bills/${bill.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
-                  View
+                  {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
               {canEdit && bill.status === 'DRAFT' && (
                 <DropdownMenuItem asChild>
                   <Link href={`/purchases/bills/${bill.id}/edit`}>
                     <Edit className="mr-2 h-4 w-4" />
-                    Edit
+                    {tCommon('buttons.edit')}
                   </Link>
                 </DropdownMenuItem>
               )}
               {canDelete && bill.status === 'DRAFT' && (
                 <DropdownMenuItem onClick={() => handleDelete(bill)} className="text-red-600">
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  {tCommon('buttons.delete')}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -367,8 +371,8 @@ function BillsPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bills</h1>
-          <p className="text-muted-foreground">Manage vendor bills and track payables</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('bills.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
@@ -382,7 +386,7 @@ function BillsPageContent() {
               <Button asChild>
                 <Link href="/purchases/bills/new">
                   <Plus className="mr-2 h-4 w-4" />
-                  New Bill
+                  {t('bills.newBill')}
                 </Link>
               </Button>
             </>
@@ -400,7 +404,7 @@ function BillsPageContent() {
               placeholder="Search by bill number or vendor..."
             />
             <DataTableFacetedFilter
-              title="Status"
+              title={t('bills.table.status')}
               options={BILL_STATUS_OPTIONS}
               selected={tableParams.filters.status ? [tableParams.filters.status] : []}
               onSelectionChange={(values) =>
@@ -437,7 +441,7 @@ function BillsPageContent() {
       {/* Bills Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Bills</CardTitle>
+          <CardTitle>{t('bills.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -457,13 +461,13 @@ function BillsPageContent() {
             exportFilename="bills"
             onExportAll={onExportAll}
             bulkActions={bulkActions}
-            emptyMessage="No bills found"
+            emptyMessage={t('bills.empty.title')}
             emptyAction={
               canCreate ? (
                 <Button asChild>
                   <Link href="/purchases/bills/new">
                     <Plus className="mr-2 h-4 w-4" />
-                    Create Your First Bill
+                    {t('bills.newBill')}
                   </Link>
                 </Button>
               ) : undefined
@@ -476,16 +480,13 @@ function BillsPageContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Bill</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete bill &quot;{billToDelete?.billNumber}&quot;? This
-              action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('bills.deleteBill')}</AlertDialogTitle>
+            <AlertDialogDescription>{tCommon('confirm.deleteMessage')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

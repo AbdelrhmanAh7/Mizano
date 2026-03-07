@@ -52,6 +52,7 @@ import {
   formatCurrency,
   calculateRemainingLife,
 } from '@/lib/hooks/use-assets';
+import { useTranslations } from 'next-intl';
 
 interface AssetDetailPageProps {
   params: Promise<{ id: string }>;
@@ -59,6 +60,8 @@ interface AssetDetailPageProps {
 
 export default function AssetDetailPage({ params }: AssetDetailPageProps) {
   const { id } = use(params);
+  const t = useTranslations('assets');
+  const tc = useTranslations('common');
   const router = useRouter();
   const { data: asset, isLoading } = useAsset(id);
   const { data: scheduleData } = useDepreciationSchedule(id);
@@ -83,9 +86,9 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
   if (!asset) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Asset not found</p>
+        <p className="text-muted-foreground">{t('assetNotFound')}</p>
         <Button asChild className="mt-4">
-          <Link href="/assets">Back to Assets</Link>
+          <Link href="/assets">{t('backToAssets')}</Link>
         </Button>
       </div>
     );
@@ -137,19 +140,16 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
           {asset.status === 'ACTIVE' && (
             <Dialog open={disposeOpen} onOpenChange={setDisposeOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline">Dispose Asset</Button>
+                <Button variant="outline">{t('detail.disposeAsset')}</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Dispose Asset</DialogTitle>
-                  <DialogDescription>
-                    Record the disposal of this asset. This will create a journal entry for any gain
-                    or loss.
-                  </DialogDescription>
+                  <DialogTitle>{t('detail.disposeAsset')}</DialogTitle>
+                  <DialogDescription>{t('detail.disposeDescription')}</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Disposal Date</Label>
+                    <Label>{t('detail.disposalDate')}</Label>
                     <Input
                       type="date"
                       value={disposalDate}
@@ -157,7 +157,7 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Disposal Amount</Label>
+                    <Label>{t('detail.disposalAmount')}</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -167,16 +167,18 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
                       onChange={(e) => setDisposalAmount(e.target.value)}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Current book value: {formatCurrency(asset.currentBookValue)}
+                      {t('detail.currentBookValueLabel', {
+                        value: formatCurrency(asset.currentBookValue),
+                      })}
                     </p>
                   </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setDisposeOpen(false)}>
-                    Cancel
+                    {tc('buttons.cancel')}
                   </Button>
                   <Button onClick={handleDispose} disabled={disposeAsset.isPending}>
-                    {disposeAsset.isPending ? 'Processing...' : 'Dispose'}
+                    {disposeAsset.isPending ? t('detail.processing') : t('detail.dispose')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -187,20 +189,20 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
               <AlertDialogTrigger asChild>
                 <Button variant="outline" className="text-red-600">
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  {tc('buttons.delete')}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Asset</AlertDialogTitle>
+                  <AlertDialogTitle>{t('confirmDelete.title')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This can only be done if no depreciation entries have been posted.
+                    {t('confirmDelete.descriptionDetail')}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>{tc('buttons.cancel')}</AlertDialogCancel>
                   <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-                    Delete
+                    {tc('buttons.delete')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -212,13 +214,13 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Purchase Price</p>
+            <p className="text-sm text-muted-foreground">{t('detail.purchasePrice')}</p>
             <p className="text-2xl font-bold font-mono">{formatCurrency(asset.purchasePrice)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Current Book Value</p>
+            <p className="text-sm text-muted-foreground">{t('detail.currentBookValue')}</p>
             <p className="text-2xl font-bold font-mono text-green-600">
               {formatCurrency(asset.currentBookValue)}
             </p>
@@ -226,15 +228,15 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Depreciation</p>
+            <p className="text-sm text-muted-foreground">{t('detail.depreciation')}</p>
             <p className="text-lg font-bold">{depreciationProgress.toFixed(0)}%</p>
             <Progress value={depreciationProgress} className="h-2 mt-1" />
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Remaining Life</p>
-            <p className="text-2xl font-bold">{remainingMonths} months</p>
+            <p className="text-sm text-muted-foreground">{t('detail.remainingLife')}</p>
+            <p className="text-2xl font-bold">{t('detail.months', { count: remainingMonths })}</p>
           </CardContent>
         </Card>
       </div>
@@ -242,32 +244,32 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Asset Details</CardTitle>
+            <CardTitle>{t('assetDetails')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Purchase Date</span>
+              <span className="text-muted-foreground">{t('detail.purchaseDate')}</span>
               <span>{format(new Date(asset.purchaseDate), 'MMM d, yyyy')}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Useful Life</span>
-              <span>{asset.usefulLifeYears} years</span>
+              <span className="text-muted-foreground">{t('detail.usefulLife')}</span>
+              <span>{t('detail.years', { count: asset.usefulLifeYears })}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Depreciation Method</span>
+              <span className="text-muted-foreground">{t('detail.depreciationMethod')}</span>
               <span>{getDepreciationMethodLabel(asset.depreciationMethod)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Salvage Value</span>
+              <span className="text-muted-foreground">{t('detail.salvageValue')}</span>
               <span className="font-mono">{formatCurrency(asset.salvageValue)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Monthly Depreciation</span>
+              <span className="text-muted-foreground">{t('detail.monthlyDepreciation')}</span>
               <span className="font-mono">{formatCurrency(asset.monthlyDepreciation)}</span>
             </div>
             {asset.description && (
               <div className="pt-2 border-t">
-                <p className="text-sm text-muted-foreground mb-1">Description</p>
+                <p className="text-sm text-muted-foreground mb-1">{t('detail.description')}</p>
                 <p className="text-sm">{asset.description}</p>
               </div>
             )}
@@ -276,35 +278,35 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Financial Summary</CardTitle>
+            <CardTitle>{t('detail.financialSummary')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Purchase Price</span>
+              <span className="text-muted-foreground">{t('detail.purchasePrice')}</span>
               <span className="font-mono">{formatCurrency(asset.purchasePrice)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Accumulated Depreciation</span>
+              <span className="text-muted-foreground">{t('detail.accumulatedDepreciation')}</span>
               <span className="font-mono text-red-600">
                 ({formatCurrency(asset.accumulatedDepreciation)})
               </span>
             </div>
             <div className="flex justify-between font-bold border-t pt-2">
-              <span>Net Book Value</span>
+              <span>{t('detail.netBookValue')}</span>
               <span className="font-mono">{formatCurrency(asset.currentBookValue)}</span>
             </div>
             {asset.disposalDate && (
               <>
                 <div className="flex justify-between border-t pt-2">
-                  <span className="text-muted-foreground">Disposal Date</span>
+                  <span className="text-muted-foreground">{t('detail.disposalDate')}</span>
                   <span>{format(new Date(asset.disposalDate), 'MMM d, yyyy')}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Disposal Amount</span>
+                  <span className="text-muted-foreground">{t('detail.disposalAmount')}</span>
                   <span className="font-mono">{formatCurrency(asset.disposalAmount)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Gain/Loss</span>
+                  <span className="text-muted-foreground">{t('detail.gainLoss')}</span>
                   <span
                     className={`font-mono ${(asset.disposalGainLoss || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}
                   >
@@ -320,17 +322,17 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
       {Array.isArray(schedule) && schedule.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Depreciation Schedule</CardTitle>
+            <CardTitle>{t('schedule.title')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Period</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Accumulated</TableHead>
-                  <TableHead className="text-right">Book Value</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{t('schedule.period')}</TableHead>
+                  <TableHead className="text-right">{t('schedule.amount')}</TableHead>
+                  <TableHead className="text-right">{t('schedule.accumulated')}</TableHead>
+                  <TableHead className="text-right">{t('schedule.bookValue')}</TableHead>
+                  <TableHead>{t('schedule.status')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -366,7 +368,7 @@ export default function AssetDetailPage({ params }: AssetDetailPageProps) {
                               : 'bg-gray-100 text-gray-800'
                           }
                         >
-                          {item.executedAt ? 'Posted' : 'Pending'}
+                          {item.executedAt ? t('schedule.posted') : t('schedule.pending')}
                         </Badge>
                       </TableCell>
                     </TableRow>

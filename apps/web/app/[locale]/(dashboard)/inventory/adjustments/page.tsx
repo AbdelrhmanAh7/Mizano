@@ -31,9 +31,11 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { ArrowDown, ArrowUp, Eye, MoreHorizontal, Plus } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
 
 function AdjustmentsPageContent() {
+  const t = useTranslations('inventory');
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -88,7 +90,7 @@ function AdjustmentsPageContent() {
     },
     {
       accessorKey: 'type',
-      header: 'Type',
+      header: t('adjustments.table.type'),
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           {row.original.type === 'INCREASE' ? (
@@ -102,19 +104,21 @@ function AdjustmentsPageContent() {
               row.original.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
             )}
           >
-            {row.original.type === 'INCREASE' ? 'Increase' : 'Decrease'}
+            {row.original.type === 'INCREASE'
+              ? t('adjustments.types.increase')
+              : t('adjustments.types.decrease')}
           </span>
         </div>
       ),
     },
     {
       accessorKey: 'reason',
-      header: 'Reason',
+      header: t('adjustments.table.reason'),
       cell: ({ row }) => getReasonLabel(row.original.reason),
     },
     {
       id: 'itemCount',
-      header: 'Items',
+      header: t('adjustments.table.item'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => row.original.lines?.length || 0,
     },
@@ -162,7 +166,7 @@ function AdjustmentsPageContent() {
             <DropdownMenuItem asChild>
               <Link href={`/inventory/adjustments/${row.original.id}`}>
                 <Eye className="mr-2 h-4 w-4" />
-                View
+                {t('common.view')}
               </Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -176,13 +180,13 @@ function AdjustmentsPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Inventory Adjustments</h1>
-          <p className="text-muted-foreground">Manage stock corrections and adjustments</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('adjustments.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <Button asChild>
           <Link href="/inventory/adjustments/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Adjustment
+            {t('adjustments.newAdjustment')}
           </Link>
         </Button>
       </div>
@@ -200,8 +204,8 @@ function AdjustmentsPageContent() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="INCREASE">Increase</SelectItem>
-            <SelectItem value="DECREASE">Decrease</SelectItem>
+            <SelectItem value="INCREASE">{t('adjustments.types.increase')}</SelectItem>
+            <SelectItem value="DECREASE">{t('adjustments.types.decrease')}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -228,10 +232,10 @@ function AdjustmentsPageContent() {
         onLoadMore={() => fetchNextPage()}
         enableColumnResizing
         tableId="adjustments"
-        emptyMessage="No adjustments found"
+        emptyMessage={t('adjustments.empty.title')}
         emptyAction={
           <Button asChild>
-            <Link href="/inventory/adjustments/new">Create Adjustment</Link>
+            <Link href="/inventory/adjustments/new">{t('adjustments.newAdjustment')}</Link>
           </Button>
         }
       />

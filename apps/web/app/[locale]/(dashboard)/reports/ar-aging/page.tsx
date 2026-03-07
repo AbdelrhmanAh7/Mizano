@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +28,7 @@ import {
 } from '@/lib/hooks/use-reports';
 
 export default function ARAgingReportPage() {
+  const t = useTranslations('reports');
   const [asOfDate, setAsOfDate] = useState(new Date());
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null);
 
@@ -57,7 +59,7 @@ export default function ARAgingReportPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Accounts Receivable Aging</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('arAging.title')}</h1>
           <p className="text-muted-foreground">As of {format(asOfDate, 'MMMM d, yyyy')}</p>
         </div>
       </div>
@@ -87,7 +89,7 @@ export default function ARAgingReportPage() {
                     <Users className="h-5 w-5 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Total Outstanding</p>
+                    <p className="text-sm text-muted-foreground">{t('arAging.total')}</p>
                     <p className="text-2xl font-bold font-mono">{formatCurrency(total)}</p>
                   </div>
                 </div>

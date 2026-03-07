@@ -47,19 +47,22 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { Eye, FileCheck, Filter, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
 
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'All Statuses' },
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'FILED', label: 'Filed' },
-  { value: 'PAID', label: 'Paid' },
-];
-
 function VATReturnsPageContent() {
+  const t = useTranslations('tax');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'createdAt' });
+
+  const STATUS_OPTIONS = [
+    { value: 'all', label: t('returns.allStatuses') },
+    { value: 'DRAFT', label: tCommon('status.draft') },
+    { value: 'FILED', label: tCommon('status.filed') },
+    { value: 'PAID', label: tCommon('status.paid') },
+  ];
 
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -104,7 +107,7 @@ function VATReturnsPageContent() {
     ...(canEdit
       ? [
           {
-            label: 'File Returns',
+            label: t('returns.fileReturns'),
             icon: FileCheck,
             onClick: (rows: VATReturn[]) => {
               setBulkSelectedRows(rows);
@@ -116,7 +119,7 @@ function VATReturnsPageContent() {
     ...(canDelete
       ? [
           {
-            label: 'Delete',
+            label: tCommon('buttons.delete'),
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: (rows: VATReturn[]) => {
@@ -142,13 +145,13 @@ function VATReturnsPageContent() {
     if (selectedReturn) {
       try {
         await deleteReturn.mutateAsync(selectedReturn.id);
-        toast({ title: 'VAT return deleted' });
+        toast({ title: t('returns.deleteSuccess') });
       } catch (error: unknown) {
         toast({
-          title: 'Error',
+          title: tCommon('errors.generic'),
           description:
             (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-            'Failed to delete VAT return',
+            t('returns.deleteFail'),
           variant: 'destructive',
         });
       }
@@ -161,13 +164,13 @@ function VATReturnsPageContent() {
     if (selectedReturn) {
       try {
         await fileReturn.mutateAsync(selectedReturn.id);
-        toast({ title: 'VAT return filed successfully' });
+        toast({ title: t('returns.fileSuccess') });
       } catch (error: unknown) {
         toast({
-          title: 'Error',
+          title: tCommon('errors.generic'),
           description:
             (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-            'Failed to file VAT return',
+            t('returns.fileFail'),
           variant: 'destructive',
         });
       }
@@ -181,7 +184,7 @@ function VATReturnsPageContent() {
       id: 'period',
       header: () => (
         <SortableHeader
-          label="Period"
+          label={t('returns.table.period')}
           columnId="startDate"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -197,7 +200,7 @@ function VATReturnsPageContent() {
     },
     {
       accessorKey: 'outputVat',
-      header: 'Output VAT',
+      header: t('returns.table.outputVat'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => (
         <span className="font-mono">{formatCurrency(row.original.outputVat)}</span>
@@ -205,13 +208,13 @@ function VATReturnsPageContent() {
     },
     {
       accessorKey: 'inputVat',
-      header: 'Input VAT',
+      header: t('returns.table.inputVat'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => <span className="font-mono">{formatCurrency(row.original.inputVat)}</span>,
     },
     {
       accessorKey: 'netVat',
-      header: 'Net Payable',
+      header: t('returns.table.netPayable'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => {
         const netVat =
@@ -229,7 +232,7 @@ function VATReturnsPageContent() {
     },
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: t('returns.table.status'),
       cell: ({ row }) => (
         <Badge className={getVATReturnStatusColor(row.original.status)}>
           {getVATReturnStatusLabel(row.original.status)}
@@ -253,13 +256,13 @@ function VATReturnsPageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/tax/returns/${vatReturn.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
-                  View
+                  {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
               {canEdit && vatReturn.status === 'DRAFT' && (
                 <DropdownMenuItem onClick={() => handleFile(vatReturn)}>
                   <FileCheck className="mr-2 h-4 w-4" />
-                  File Return
+                  {t('returns.fileReturn')}
                 </DropdownMenuItem>
               )}
               {canDelete && vatReturn.status === 'DRAFT' && (
@@ -270,7 +273,7 @@ function VATReturnsPageContent() {
                     className="text-red-600"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
+                    {tCommon('buttons.delete')}
                   </DropdownMenuItem>
                 </>
               )}
@@ -286,15 +289,15 @@ function VATReturnsPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">VAT Returns</h1>
-          <p className="text-muted-foreground">Generate and manage VAT returns</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('returns.title')}</h1>
+          <p className="text-muted-foreground">{t('returns.description')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
             <Button asChild>
               <Link href="/tax/returns/generate">
                 <Plus className="mr-2 h-4 w-4" />
-                Generate Return
+                {t('returns.generateReturn')}
               </Link>
             </Button>
           )}
@@ -308,7 +311,7 @@ function VATReturnsPageContent() {
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger className="w-[180px]">
                 <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter by status" />
+                <SelectValue placeholder={t('returns.filterByStatus')} />
               </SelectTrigger>
               <SelectContent>
                 {STATUS_OPTIONS.map((option) => (
@@ -328,7 +331,7 @@ function VATReturnsPageContent() {
       {/* Returns Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All VAT Returns</CardTitle>
+          <CardTitle>{t('returns.allReturns')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -343,13 +346,13 @@ function VATReturnsPageContent() {
             isLoading={isLoading}
             enableSelection
             bulkActions={bulkActions}
-            emptyMessage="No VAT returns found"
+            emptyMessage={t('returns.noReturns')}
             emptyAction={
               canCreate ? (
                 <Button asChild>
                   <Link href="/tax/returns/generate">
                     <Plus className="mr-2 h-4 w-4" />
-                    Generate Your First Return
+                    {t('returns.generateFirst')}
                   </Link>
                 </Button>
               ) : undefined
@@ -362,15 +365,12 @@ function VATReturnsPageContent() {
       <AlertDialog open={fileDialogOpen} onOpenChange={setFileDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>File VAT Return</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to file this VAT return? This will lock the period transactions
-              and cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('returns.fileTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('returns.fileDescription')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmFile}>File Return</AlertDialogAction>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmFile}>{t('returns.fileReturn')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -379,15 +379,13 @@ function VATReturnsPageContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete VAT Return</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this VAT return? This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('returns.deleteTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('returns.deleteDescription')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -399,8 +397,8 @@ function VATReturnsPageContent() {
         onOpenChange={setBulkDeleteOpen}
         action="delete"
         count={bulkSelectedRows.length}
-        itemType="VAT returns"
-        description="Only draft VAT returns will be deleted."
+        itemType={t('returns.itemType')}
+        description={t('returns.bulkDeleteDescription')}
         destructive
         isLoading={bulkDeleteAction.isLoading}
         onConfirm={async () => {
@@ -414,8 +412,8 @@ function VATReturnsPageContent() {
         onOpenChange={setBulkSubmitOpen}
         action="file"
         count={bulkSelectedRows.length}
-        itemType="VAT returns"
-        description="Draft VAT returns will be filed. This will lock period transactions."
+        itemType={t('returns.itemType')}
+        description={t('returns.bulkFileDescription')}
         isLoading={bulkSubmitAction.isLoading}
         onConfirm={async () => {
           await bulkSubmitAction.execute(bulkSelectedRows.map((r) => r.id));

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,6 +12,7 @@ import { useItems } from '@/lib/hooks/use-items';
 import { useWarehouses } from '@/lib/hooks/use-warehouses';
 
 export default function NewAdjustmentPage() {
+  const t = useTranslations('inventory');
   const router = useRouter();
   const createAdjustment = useCreateAdjustment();
 
@@ -62,10 +64,8 @@ export default function NewAdjustmentPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Adjustment</h1>
-          <p className="text-muted-foreground">
-            Create a stock adjustment for inventory corrections
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('adjustments.newAdjustment')}</h1>
+          <p className="text-muted-foreground">{t('adjustments.empty.description')}</p>
         </div>
       </div>
 

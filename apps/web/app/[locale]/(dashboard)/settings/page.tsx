@@ -14,84 +14,98 @@ import {
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import type { LucideIcon } from 'lucide-react';
 
-const settingsGroups = [
+interface SettingsItem {
+  titleKey: string;
+  descriptionKey: string;
+  href: string;
+  icon: LucideIcon;
+}
+
+interface SettingsGroup {
+  groupKey: string;
+  items: SettingsItem[];
+}
+
+const settingsGroups: SettingsGroup[] = [
   {
-    title: 'General',
+    groupKey: 'general',
     items: [
       {
-        title: 'Organization',
-        description: 'Company name, address, contact info, and currency',
+        titleKey: 'organization',
+        descriptionKey: 'organization',
         href: '/settings/organization',
         icon: Building2,
       },
       {
-        title: 'Localization',
-        description: 'Date format, number format, and timezone',
+        titleKey: 'localization',
+        descriptionKey: 'localization',
         href: '/settings/localization',
         icon: Globe,
       },
       {
-        title: 'Branding',
-        description: 'Logo, colors, and invoice footer text',
+        titleKey: 'branding',
+        descriptionKey: 'branding',
         href: '/settings/branding',
         icon: Palette,
       },
     ],
   },
   {
-    title: 'Financial',
+    groupKey: 'financial',
     items: [
       {
-        title: 'Financial Settings',
-        description: 'Fiscal year, lock date, and payment terms',
+        titleKey: 'financial',
+        descriptionKey: 'financial',
         href: '/settings/financial',
         icon: CreditCard,
       },
       {
-        title: 'Default Accounts',
-        description: 'Default GL accounts for AR, AP, revenue, and more',
+        titleKey: 'accounts',
+        descriptionKey: 'accounts',
         href: '/settings/accounts',
         icon: Receipt,
       },
       {
-        title: 'Invoice & Document',
-        description: 'Prefixes, numbering, default notes, and terms',
+        titleKey: 'invoicing',
+        descriptionKey: 'invoicing',
         href: '/settings/invoicing',
         icon: Receipt,
       },
     ],
   },
   {
-    title: 'System',
+    groupKey: 'system',
     items: [
       {
-        title: 'AI Features',
-        description: 'Toggle AI categorization, OCR, forecasting, and anomaly detection',
+        titleKey: 'ai',
+        descriptionKey: 'ai',
         href: '/settings/ai',
         icon: Brain,
       },
       {
-        title: 'Notifications',
-        description: 'Configure notification preferences',
+        titleKey: 'notifications',
+        descriptionKey: 'notifications',
         href: '/settings/notifications',
         icon: Bell,
       },
       {
-        title: 'Team & Roles',
-        description: 'Manage team members and role permissions',
+        titleKey: 'team',
+        descriptionKey: 'team',
         href: '/settings/team',
         icon: Users,
       },
       {
-        title: 'Performance',
-        description: 'Monitor database performance and query optimization',
+        titleKey: 'performance',
+        descriptionKey: 'performance',
         href: '/settings/performance',
         icon: Activity,
       },
       {
-        title: 'Cache Management',
-        description: 'Monitor and manage API response caching',
+        titleKey: 'cache',
+        descriptionKey: 'cache',
         href: '/settings/cache',
         icon: Database,
       },
@@ -100,18 +114,20 @@ const settingsGroups = [
 ];
 
 export default function SettingsPage() {
+  const t = useTranslations('settings');
+
   return (
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">Manage your organization settings and preferences</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+        <p className="text-muted-foreground">{t('description')}</p>
       </div>
 
       {/* Settings Groups */}
       {settingsGroups.map((group) => (
-        <div key={group.title} className="space-y-4">
-          <h2 className="text-lg font-semibold">{group.title}</h2>
+        <div key={group.groupKey} className="space-y-4">
+          <h2 className="text-lg font-semibold">{t(`groups.${group.groupKey}`)}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {group.items.map((item) => {
               const Icon = item.icon;
@@ -123,11 +139,15 @@ export default function SettingsPage() {
                         <div className="rounded-lg bg-primary/10 p-2">
                           <Icon className="h-5 w-5 text-primary" />
                         </div>
-                        <CardTitle className="text-base">{item.title}</CardTitle>
+                        <CardTitle className="text-base">
+                          {t(`hub.${item.titleKey}.title`)}
+                        </CardTitle>
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <CardDescription>{item.description}</CardDescription>
+                      <CardDescription>
+                        {t(`hub.${item.descriptionKey}.description`)}
+                      </CardDescription>
                     </CardContent>
                   </Card>
                 </Link>

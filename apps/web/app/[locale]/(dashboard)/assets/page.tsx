@@ -46,8 +46,11 @@ import {
   AssetStatus,
   AssetType,
 } from '@/lib/hooks/use-assets';
+import { useTranslations } from 'next-intl';
 
 export default function AssetsPage() {
+  const t = useTranslations('assets');
+  const tc = useTranslations('common');
   const [statusFilter, setStatusFilter] = useState<AssetStatus | ''>('');
   const [typeFilter, setTypeFilter] = useState<AssetType | ''>('');
 
@@ -79,13 +82,13 @@ export default function AssetsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Fixed Assets</h1>
-          <p className="text-muted-foreground">Manage fixed assets and depreciation</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <Button asChild>
           <Link href="/assets/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Asset
+            {t('newAsset')}
           </Link>
         </Button>
       </div>
@@ -94,19 +97,21 @@ export default function AssetsPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Total Assets</p>
+              <p className="text-sm text-muted-foreground">{t('summary.totalAssets')}</p>
               <p className="text-2xl font-bold">{summary.totalAssets}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Total Value</p>
+              <p className="text-sm text-muted-foreground">{t('summary.totalValue')}</p>
               <p className="text-2xl font-bold font-mono">{formatCurrency(summary.totalValue)}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Accumulated Depreciation</p>
+              <p className="text-sm text-muted-foreground">
+                {t('summary.accumulatedDepreciation')}
+              </p>
               <p className="text-2xl font-bold font-mono">
                 {formatCurrency(summary.totalAccumulatedDepreciation)}
               </p>
@@ -114,7 +119,7 @@ export default function AssetsPage() {
           </Card>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Net Book Value</p>
+              <p className="text-sm text-muted-foreground">{t('summary.netBookValue')}</p>
               <p className="text-2xl font-bold font-mono text-green-600">
                 {formatCurrency(summary.totalBookValue)}
               </p>
@@ -126,27 +131,27 @@ export default function AssetsPage() {
       <div className="flex gap-4">
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as AssetStatus | '')}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Status" />
+            <SelectValue placeholder={t('filters.allStatus')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Status</SelectItem>
-            <SelectItem value="ACTIVE">Active</SelectItem>
-            <SelectItem value="DISPOSED">Disposed</SelectItem>
-            <SelectItem value="FULLY_DEPRECIATED">Fully Depreciated</SelectItem>
+            <SelectItem value="">{t('filters.allStatus')}</SelectItem>
+            <SelectItem value="ACTIVE">{t('status.active')}</SelectItem>
+            <SelectItem value="DISPOSED">{t('status.disposed')}</SelectItem>
+            <SelectItem value="FULLY_DEPRECIATED">{t('status.fullyDepreciated')}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as AssetType | '')}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Types" />
+            <SelectValue placeholder={t('filters.allTypes')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Types</SelectItem>
-            <SelectItem value="ELECTRONICS">Electronics</SelectItem>
-            <SelectItem value="FURNITURE">Furniture</SelectItem>
-            <SelectItem value="VEHICLES">Vehicles</SelectItem>
-            <SelectItem value="MACHINERY">Machinery</SelectItem>
-            <SelectItem value="BUILDINGS">Buildings</SelectItem>
-            <SelectItem value="OTHER">Other</SelectItem>
+            <SelectItem value="">{t('filters.allTypes')}</SelectItem>
+            <SelectItem value="ELECTRONICS">{t('types.electronics')}</SelectItem>
+            <SelectItem value="FURNITURE">{t('types.furniture')}</SelectItem>
+            <SelectItem value="VEHICLES">{t('types.vehicles')}</SelectItem>
+            <SelectItem value="MACHINERY">{t('types.machinery')}</SelectItem>
+            <SelectItem value="BUILDINGS">{t('types.buildings')}</SelectItem>
+            <SelectItem value="OTHER">{t('types.other')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -154,21 +159,19 @@ export default function AssetsPage() {
       <Card>
         <CardContent className="p-0">
           {assets.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              No assets found. Add your first fixed asset to get started.
-            </div>
+            <div className="text-center py-12 text-muted-foreground">{t('empty.noResults')}</div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Asset #</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead className="text-right">Purchase Price</TableHead>
-                  <TableHead className="text-right">Book Value</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t('table.assetNumber')}</TableHead>
+                  <TableHead>{t('table.name')}</TableHead>
+                  <TableHead>{t('table.type')}</TableHead>
+                  <TableHead>{t('table.method')}</TableHead>
+                  <TableHead className="text-right">{t('table.purchasePrice')}</TableHead>
+                  <TableHead className="text-right">{t('table.bookValue')}</TableHead>
+                  <TableHead>{t('table.status')}</TableHead>
+                  <TableHead className="text-right">{t('table.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -222,19 +225,18 @@ export default function AssetsPage() {
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Asset</AlertDialogTitle>
+                                  <AlertDialogTitle>{t('confirmDelete.title')}</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    Are you sure? This can only be done if no depreciation has been
-                                    posted.
+                                    {t('confirmDelete.description')}
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogCancel>{tc('buttons.cancel')}</AlertDialogCancel>
                                   <AlertDialogAction
                                     onClick={() => deleteAsset.mutate(asset.id)}
                                     className="bg-red-600 hover:bg-red-700"
                                   >
-                                    Delete
+                                    {tc('buttons.delete')}
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>

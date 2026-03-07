@@ -49,10 +49,13 @@ import {
 } from '@/lib/hooks/use-invoices';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { InvoiceStatusBadge } from '@/components/sales/status-badge';
+import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 export default function InvoiceDetailPage() {
+  const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -214,12 +217,12 @@ export default function InvoiceDetailPage() {
               <Button variant="outline" asChild>
                 <Link href={`/sales/invoices/${invoiceId}/edit`}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  {tCommon('buttons.edit')}
                 </Link>
               </Button>
               <Button onClick={() => setSendDialogOpen(true)}>
                 <Send className="mr-2 h-4 w-4" />
-                Send
+                {tCommon('buttons.send')}
               </Button>
             </>
           )}
@@ -227,7 +230,7 @@ export default function InvoiceDetailPage() {
             <Button asChild>
               <Link href={`/sales/payments/new?invoiceId=${invoiceId}`}>
                 <CreditCard className="mr-2 h-4 w-4" />
-                Record Payment
+                {t('invoices.recordPayment')}
               </Link>
             </Button>
           )}
@@ -238,13 +241,13 @@ export default function InvoiceDetailPage() {
               className="text-orange-600 hover:text-orange-700"
             >
               <Ban className="mr-2 h-4 w-4" />
-              Void
+              {t('invoices.voidInvoice')}
             </Button>
           )}
           {canDelete && isDraft && (
             <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              {tCommon('buttons.delete')}
             </Button>
           )}
         </div>
@@ -306,19 +309,19 @@ export default function InvoiceDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Line Items
+              {t('lineItems.title')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[40%]">Description</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right">Rate</TableHead>
-                  <TableHead className="text-right">Discount</TableHead>
-                  <TableHead className="text-right">Tax</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="w-[40%]">{t('lineItems.description')}</TableHead>
+                  <TableHead className="text-right">{t('lineItems.quantity')}</TableHead>
+                  <TableHead className="text-right">{t('lineItems.rate')}</TableHead>
+                  <TableHead className="text-right">{t('lineItems.discount')}</TableHead>
+                  <TableHead className="text-right">{t('lineItems.tax')}</TableHead>
+                  <TableHead className="text-right">{t('lineItems.amount')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -377,7 +380,7 @@ export default function InvoiceDetailPage() {
               <TableFooter>
                 <TableRow>
                   <TableCell colSpan={5} className="text-right">
-                    Subtotal
+                    {tCommon('subtotal')}
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {formatCurrency(invoice.subtotal || '0')}
@@ -386,7 +389,7 @@ export default function InvoiceDetailPage() {
                 {parseFloat(invoice.taxAmount || '0') > 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-right">
-                      Tax
+                      {tCommon('tax')}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatCurrency(invoice.taxAmount || '0')}
@@ -396,7 +399,7 @@ export default function InvoiceDetailPage() {
                 {parseFloat(invoice.shippingAmount || '0') > 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-right">
-                      Shipping
+                      {t('invoices.form.shippingAmount')}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatCurrency(invoice.shippingAmount || '0')}
@@ -405,7 +408,7 @@ export default function InvoiceDetailPage() {
                 )}
                 <TableRow className="font-bold">
                   <TableCell colSpan={5} className="text-right">
-                    Grand Total
+                    {tCommon('total')}
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {formatCurrency(invoice.grandTotal || '0')}
@@ -422,14 +425,14 @@ export default function InvoiceDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
-                Customer Details
+                {t('customers.customerDetails')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {invoice.customer ? (
                 <>
                   <div>
-                    <div className="text-sm text-muted-foreground">Name</div>
+                    <div className="text-sm text-muted-foreground">{tCommon('name')}</div>
                     <Link
                       href={`/sales/customers/${invoice.customer.id}`}
                       className="font-medium hover:underline"
@@ -439,7 +442,7 @@ export default function InvoiceDetailPage() {
                   </div>
                   {invoice.customer.email && (
                     <div>
-                      <div className="text-sm text-muted-foreground">Email</div>
+                      <div className="text-sm text-muted-foreground">{tCommon('email')}</div>
                       <a
                         href={`mailto:${invoice.customer.email}`}
                         className="text-blue-600 hover:underline"
@@ -464,11 +467,11 @@ export default function InvoiceDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <div className="text-sm text-muted-foreground">Invoice Date</div>
+                <div className="text-sm text-muted-foreground">{t('invoices.form.date')}</div>
                 <div className="font-medium">{format(new Date(invoice.date), 'MMMM d, yyyy')}</div>
               </div>
               <div>
-                <div className="text-sm text-muted-foreground">Due Date</div>
+                <div className="text-sm text-muted-foreground">{t('invoices.form.dueDate')}</div>
                 <div className={cn('font-medium', isOverdue && 'text-red-600')}>
                   {format(new Date(invoice.dueDate), 'MMMM d, yyyy')}
                   {isOverdue && ' (Overdue)'}
@@ -485,13 +488,13 @@ export default function InvoiceDetailPage() {
               <CardContent className="space-y-4">
                 {invoice.notes && (
                   <div>
-                    <div className="text-sm text-muted-foreground">Notes</div>
+                    <div className="text-sm text-muted-foreground">{tCommon('notes')}</div>
                     <p className="whitespace-pre-wrap text-sm">{invoice.notes}</p>
                   </div>
                 )}
                 {invoice.terms && (
                   <div>
-                    <div className="text-sm text-muted-foreground">Terms</div>
+                    <div className="text-sm text-muted-foreground">{t('invoices.form.terms')}</div>
                     <p className="whitespace-pre-wrap text-sm">{invoice.terms}</p>
                   </div>
                 )}
@@ -606,16 +609,16 @@ export default function InvoiceDetailPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+            <AlertDialogTitle>{t('invoices.deleteInvoice')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete invoice &quot;{invoice.invoiceNumber}&quot;? This
               action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -625,15 +628,15 @@ export default function InvoiceDetailPage() {
       <AlertDialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Send Invoice</AlertDialogTitle>
+            <AlertDialogTitle>{t('invoices.sendInvoice')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to mark invoice &quot;{invoice.invoiceNumber}&quot; as sent?
               This will create an accounting entry and you won&apos;t be able to edit it anymore.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSend}>Send Invoice</AlertDialogAction>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSend}>{t('invoices.sendInvoice')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -642,16 +645,16 @@ export default function InvoiceDetailPage() {
       <AlertDialog open={voidDialogOpen} onOpenChange={setVoidDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Void Invoice</AlertDialogTitle>
+            <AlertDialogTitle>{t('invoices.voidInvoice')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to void invoice &quot;{invoice.invoiceNumber}&quot;? This action
               cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmVoid} className="bg-orange-600 hover:bg-orange-700">
-              Void Invoice
+              {t('invoices.voidInvoice')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

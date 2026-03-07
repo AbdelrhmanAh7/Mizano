@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calculator } from 'lucide-react';
@@ -12,6 +13,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { useGenerateVATReturn } from '@/lib/hooks/use-tax';
 
 export default function GenerateVATReturnPage() {
+  const t = useTranslations('tax');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const { toast } = useToast();
   const generateReturn = useGenerateVATReturn();
@@ -26,7 +29,7 @@ export default function GenerateVATReturnPage() {
   const handleGenerate = async () => {
     try {
       const result = await generateReturn.mutateAsync({ startDate, endDate });
-      toast({ title: 'VAT return generated successfully' });
+      toast({ title: t('generate.generateSuccess') });
       const returnId = result?.id || result?.data?.id;
       if (returnId) {
         router.push(`/tax/returns/${returnId}`);
@@ -35,10 +38,10 @@ export default function GenerateVATReturnPage() {
       }
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: tCommon('errors.generic'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to generate VAT return',
+          t('generate.generateFail'),
         variant: 'destructive',
       });
     }
@@ -62,22 +65,20 @@ export default function GenerateVATReturnPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Generate VAT Return</h1>
-          <p className="text-muted-foreground">
-            Select a period to calculate VAT from invoices, bills, and expenses
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('generate.title')}</h1>
+          <p className="text-muted-foreground">{t('generate.description')}</p>
         </div>
       </div>
 
       <Card className="max-w-2xl">
         <CardHeader>
-          <CardTitle>Period Selection</CardTitle>
-          <CardDescription>Choose the period for the VAT return calculation</CardDescription>
+          <CardTitle>{t('generate.periodSelection')}</CardTitle>
+          <CardDescription>{t('generate.periodDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Quick Quarter Selection */}
           <div className="space-y-2">
-            <Label>Quick Select Quarter</Label>
+            <Label>{t('generate.quickSelectQuarter')}</Label>
             <div className="flex gap-2">
               {[1, 2, 3, 4].map((q) => (
                 <Button key={q} variant="outline" size="sm" onClick={() => setQuarter(q)}>
@@ -90,7 +91,7 @@ export default function GenerateVATReturnPage() {
           {/* Date Range */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="startDate">Start Date *</Label>
+              <Label htmlFor="startDate">{t('generate.startDate')} *</Label>
               <Input
                 id="startDate"
                 type="date"
@@ -99,7 +100,7 @@ export default function GenerateVATReturnPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="endDate">End Date *</Label>
+              <Label htmlFor="endDate">{t('generate.endDate')} *</Label>
               <Input
                 id="endDate"
                 type="date"
@@ -109,21 +110,18 @@ export default function GenerateVATReturnPage() {
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground">
-            The system will calculate Output VAT from sales invoices and credit notes, and Input VAT
-            from purchase bills and expenses within this period.
-          </p>
+          <p className="text-sm text-muted-foreground">{t('generate.calculationNote')}</p>
 
           <div className="flex justify-end gap-3">
             <Button variant="outline" asChild>
-              <Link href="/tax/returns">Cancel</Link>
+              <Link href="/tax/returns">{tCommon('buttons.cancel')}</Link>
             </Button>
             <Button
               onClick={handleGenerate}
               disabled={generateReturn.isPending || !startDate || !endDate}
             >
               <Calculator className="mr-2 h-4 w-4" />
-              {generateReturn.isPending ? 'Generating...' : 'Generate Return'}
+              {generateReturn.isPending ? t('generate.generating') : t('generate.generateButton')}
             </Button>
           </div>
         </CardContent>

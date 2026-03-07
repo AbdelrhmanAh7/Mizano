@@ -17,6 +17,7 @@ import {
 } from '@/lib/hooks/use-all-settings';
 import { ArrowLeft, Globe, Save } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 
@@ -61,6 +62,7 @@ interface FormData {
 }
 
 export default function LocalizationSettingsPage() {
+  const t = useTranslations('settings');
   const { data: settings, isLoading } = useAllOrganizationSettings();
   const updateLocalization = useUpdateLocalizationSettings();
 
@@ -104,16 +106,14 @@ export default function LocalizationSettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={t('common.goBack')}>
           <Link href="/settings">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Localization</h1>
-          <p className="text-muted-foreground text-sm">
-            Date, number, and timezone display preferences
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t('localization.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('localization.description')}</p>
         </div>
       </div>
 
@@ -122,14 +122,14 @@ export default function LocalizationSettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Globe className="h-5 w-5" />
-              Display Format
+              {t('localization.displayFormat')}
             </CardTitle>
-            <CardDescription>Configure how dates, numbers, and times are displayed</CardDescription>
+            <CardDescription>{t('localization.displayFormatDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Date Format</Label>
+                <Label>{t('localization.dateFormat')}</Label>
                 <Select
                   value={form.watch('dateFormat')}
                   onValueChange={(v) => form.setValue('dateFormat', v, { shouldDirty: true })}
@@ -148,7 +148,7 @@ export default function LocalizationSettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Number Format</Label>
+                <Label>{t('localization.numberFormat')}</Label>
                 <Select
                   value={form.watch('numberFormat')}
                   onValueChange={(v) => form.setValue('numberFormat', v, { shouldDirty: true })}
@@ -167,7 +167,7 @@ export default function LocalizationSettingsPage() {
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <Label>Timezone</Label>
+                <Label>{t('localization.timezone')}</Label>
                 <Select
                   value={form.watch('timezone')}
                   onValueChange={(v) => form.setValue('timezone', v, { shouldDirty: true })}
@@ -196,7 +196,7 @@ export default function LocalizationSettingsPage() {
             className="gap-2"
           >
             <Save className="h-4 w-4" />
-            {updateLocalization.isPending ? 'Saving...' : 'Save Changes'}
+            {updateLocalization.isPending ? t('common.saving') : t('common.saveChanges')}
           </Button>
         </div>
       </form>

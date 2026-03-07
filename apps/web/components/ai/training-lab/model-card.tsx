@@ -81,6 +81,7 @@ export function ModelCard({
   } | null>(null);
 
   const colors = COLOR_MAP[config.color] || COLOR_MAP.blue;
+  const isAlgorithmic = !config.hasDirectTrain;
   const hasModel = dashboardData?.hasActiveModel;
   const accuracy = dashboardData?.accuracy;
   const trainingCount = dashboardData?.trainingDataCount || 0;
@@ -120,12 +121,27 @@ export function ModelCard({
                 v{dashboardData?.activeVersion}
               </Badge>
             )}
-            {hasModel ? (
-              <div className="h-2 w-2 rounded-full bg-green-500" title="Active model" />
-            ) : trainingCount > 0 ? (
-              <div className="h-2 w-2 rounded-full bg-yellow-500" title="Has training data" />
+            {isAlgorithmic ? (
+              <Badge
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 border-green-500 text-green-600"
+              >
+                Active
+              </Badge>
+            ) : hasModel ? (
+              <Badge
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 border-blue-500 text-blue-600"
+              >
+                Trained
+              </Badge>
             ) : (
-              <div className="h-2 w-2 rounded-full bg-gray-300" title="No data" />
+              <Badge
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 border-yellow-500 text-yellow-600"
+              >
+                Ready
+              </Badge>
             )}
           </div>
         </div>
@@ -181,15 +197,27 @@ export function ModelCard({
             </Button>
           )}
 
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex-1 text-xs h-8"
-            onClick={onGenerateClick}
-          >
-            <Sparkles className="mr-1 h-3 w-3" />
-            Generate
-          </Button>
+          {!isAlgorithmic ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 text-xs h-8"
+              onClick={onGenerateClick}
+            >
+              <Sparkles className="mr-1 h-3 w-3" />
+              Generate
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 text-xs h-8"
+              onClick={onDetailClick}
+            >
+              <Play className="mr-1 h-3 w-3" />
+              Run Analysis
+            </Button>
+          )}
 
           <Button size="sm" variant="ghost" className="text-xs h-8 px-2" onClick={onDetailClick}>
             <Info className="h-3 w-3" />

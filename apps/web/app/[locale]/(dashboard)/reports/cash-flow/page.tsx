@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +19,7 @@ interface CashFlowItem {
 }
 
 export default function CashFlowReportPage() {
+  const t = useTranslations('reports');
   const [dateRange, setDateRange] = useState({
     startDate: startOfMonth(new Date()),
     endDate: endOfMonth(new Date()),
@@ -100,7 +102,7 @@ export default function CashFlowReportPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Cash Flow Statement</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('cashFlow.title')}</h1>
           <p className="text-muted-foreground">
             {format(dateRange.startDate, 'MMMM d')} - {format(dateRange.endDate, 'MMMM d, yyyy')}
           </p>
@@ -114,7 +116,7 @@ export default function CashFlowReportPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <TrendingUp className="h-4 w-4" />
-              Opening Balance
+              {t('cashFlow.openingBalance')}
             </div>
             <p className="text-2xl font-bold font-mono">{formatCurrency(data.openingBalance)}</p>
           </CardContent>
@@ -123,7 +125,7 @@ export default function CashFlowReportPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <DollarSign className="h-4 w-4" />
-              Net Cash Flow
+              {t('cashFlow.netCashFlow')}
             </div>
             <p
               className={cn(
@@ -140,16 +142,16 @@ export default function CashFlowReportPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <TrendingDown className="h-4 w-4" />
-              Closing Balance
+              {t('cashFlow.closingBalance')}
             </div>
             <p className="text-2xl font-bold font-mono">{formatCurrency(data.closingBalance)}</p>
           </CardContent>
         </Card>
       </div>
 
-      {renderSection('Operating Activities', data.operatingActivities)}
-      {renderSection('Investing Activities', data.investingActivities)}
-      {renderSection('Financing Activities', data.financingActivities)}
+      {renderSection(t('cashFlow.operatingActivities'), data.operatingActivities)}
+      {renderSection(t('cashFlow.investingActivities'), data.investingActivities)}
+      {renderSection(t('cashFlow.financingActivities'), data.financingActivities)}
     </div>
   );
 }

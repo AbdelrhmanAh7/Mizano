@@ -27,6 +27,7 @@ import {
   LineChart,
   Line,
 } from 'recharts';
+import { useTranslations } from 'next-intl';
 import { useRevenueForecast, formatCurrency } from '@/lib/hooks/use-ai';
 
 interface ForecastDataPoint {
@@ -38,6 +39,7 @@ interface ForecastDataPoint {
 }
 
 export default function RevenueForecastPage() {
+  const t = useTranslations('ai.insights.revenuePage');
   const [months, setMonths] = useState<number>(6);
   const { data, isLoading } = useRevenueForecast(months);
 
@@ -93,10 +95,8 @@ export default function RevenueForecastPage() {
               </Link>
             </Button>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Revenue Forecast</h1>
-              <p className="text-muted-foreground">
-                AI-powered revenue predictions based on historical data
-              </p>
+              <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+              <p className="text-muted-foreground">{t('subtitle')}</p>
             </div>
           </div>
           <Select value={months.toString()} onValueChange={(v) => setMonths(parseInt(v))}>
@@ -104,16 +104,15 @@ export default function RevenueForecastPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="3">3 Months</SelectItem>
-              <SelectItem value="6">6 Months</SelectItem>
-              <SelectItem value="12">12 Months</SelectItem>
+              <SelectItem value="3">{t('months3')}</SelectItem>
+              <SelectItem value="6">{t('months6')}</SelectItem>
+              <SelectItem value="12">{t('months12')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No revenue forecast data available yet. Add more transaction history to generate
-            predictions.
+            {t('noData')}
           </CardContent>
         </Card>
       </div>
@@ -131,10 +130,8 @@ export default function RevenueForecastPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Revenue Forecast</h1>
-            <p className="text-muted-foreground">
-              AI-powered revenue predictions based on historical data
-            </p>
+            <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+            <p className="text-muted-foreground">{t('subtitle')}</p>
           </div>
         </div>
         <Select value={months.toString()} onValueChange={(v) => setMonths(parseInt(v))}>
@@ -142,9 +139,9 @@ export default function RevenueForecastPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="3">3 Months</SelectItem>
-            <SelectItem value="6">6 Months</SelectItem>
-            <SelectItem value="12">12 Months</SelectItem>
+            <SelectItem value="3">{t('months3')}</SelectItem>
+            <SelectItem value="6">{t('months6')}</SelectItem>
+            <SelectItem value="12">{t('months12')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -158,7 +155,7 @@ export default function RevenueForecastPage() {
                 <BarChart3 className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Avg Historical</p>
+                <p className="text-sm text-muted-foreground">{t('avgHistorical')}</p>
                 <p className="text-2xl font-bold font-mono">{formatCurrency(avgHistorical)}</p>
               </div>
             </div>
@@ -171,7 +168,7 @@ export default function RevenueForecastPage() {
                 <Target className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Avg Predicted</p>
+                <p className="text-sm text-muted-foreground">{t('avgPredicted')}</p>
                 <p className="text-2xl font-bold font-mono">{formatCurrency(avgPredicted)}</p>
               </div>
             </div>
@@ -186,7 +183,7 @@ export default function RevenueForecastPage() {
                 />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Growth Rate</p>
+                <p className="text-sm text-muted-foreground">{t('growthRate')}</p>
                 <p
                   className={`text-2xl font-bold ${growthRate >= 0 ? 'text-green-600' : 'text-red-600'}`}
                 >
@@ -199,9 +196,9 @@ export default function RevenueForecastPage() {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Total Predicted</p>
+            <p className="text-sm text-muted-foreground">{t('totalPredicted')}</p>
             <p className="text-2xl font-bold font-mono">{formatCurrency(totalPredicted)}</p>
-            <p className="text-xs text-muted-foreground">Next {months} months</p>
+            <p className="text-xs text-muted-foreground">{t('nextMonths', { months })}</p>
           </CardContent>
         </Card>
       </div>
@@ -209,8 +206,8 @@ export default function RevenueForecastPage() {
       {/* Combined Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Revenue Trend</CardTitle>
-          <CardDescription>Historical revenue vs AI predictions</CardDescription>
+          <CardTitle>{t('revenueTrend')}</CardTitle>
+          <CardDescription>{t('revenueTrendDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[400px]">
@@ -227,13 +224,13 @@ export default function RevenueForecastPage() {
                 <Bar
                   dataKey="actualRevenue"
                   fill="#3b82f6"
-                  name="Actual Revenue"
+                  name={t('actualRevenue')}
                   radius={[4, 4, 0, 0]}
                 />
                 <Bar
                   dataKey="predictedRevenue"
                   fill="#8b5cf6"
-                  name="Predicted Revenue"
+                  name={t('predictedRevenue')}
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
@@ -245,8 +242,8 @@ export default function RevenueForecastPage() {
       {/* Monthly Breakdown */}
       <Card>
         <CardHeader>
-          <CardTitle>Predicted Monthly Revenue</CardTitle>
-          <CardDescription>Detailed breakdown of revenue predictions</CardDescription>
+          <CardTitle>{t('predictedMonthlyRevenue')}</CardTitle>
+          <CardDescription>{t('predictedMonthlyRevenueDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -269,7 +266,11 @@ export default function RevenueForecastPage() {
                       {formatCurrency(month.predictedRevenue)}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {index === 0 ? 'This month' : `In ${index} month${index > 1 ? 's' : ''}`}
+                      {index === 0
+                        ? t('thisMonth')
+                        : index > 1
+                          ? t('inMonthsPlural', { count: index })
+                          : t('inMonths', { count: index })}
                     </p>
                   </div>
                 </div>
@@ -284,10 +285,10 @@ export default function RevenueForecastPage() {
                   }
                 >
                   {(month.predictedRevenue ?? 0) > avgHistorical * 1.1
-                    ? 'Above Average'
+                    ? t('aboveAverage')
                     : (month.predictedRevenue ?? 0) < avgHistorical * 0.9
-                      ? 'Below Average'
-                      : 'On Track'}
+                      ? t('belowAverage')
+                      : t('onTrack')}
                 </Badge>
               </div>
             ))}
@@ -298,12 +299,12 @@ export default function RevenueForecastPage() {
       {/* Factors */}
       <Card>
         <CardHeader>
-          <CardTitle>Key Factors in Prediction</CardTitle>
+          <CardTitle>{t('keyFactors')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 bg-green-50 rounded-lg">
-              <h4 className="font-semibold text-green-800 mb-2">Positive Factors</h4>
+              <h4 className="font-semibold text-green-800 mb-2">{t('positiveFactors')}</h4>
               <ul className="space-y-1 text-sm text-green-700">
                 <li>• Increasing customer acquisition rate</li>
                 <li>• Higher average transaction value trend</li>
@@ -312,7 +313,7 @@ export default function RevenueForecastPage() {
               </ul>
             </div>
             <div className="p-4 bg-orange-50 rounded-lg">
-              <h4 className="font-semibold text-orange-800 mb-2">Risk Factors</h4>
+              <h4 className="font-semibold text-orange-800 mb-2">{t('riskFactors')}</h4>
               <ul className="space-y-1 text-sm text-orange-700">
                 <li>• Market volatility</li>
                 <li>• Competitor pricing changes</li>

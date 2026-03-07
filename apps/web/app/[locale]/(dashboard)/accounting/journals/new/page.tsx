@@ -9,8 +9,10 @@ import { useAccountsTree } from '@/lib/hooks/use-accounts';
 import { useCreateJournal } from '@/lib/hooks/use-journals';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 export default function NewJournalPage() {
+  const t = useTranslations('accounting');
   const router = useRouter();
   const { toast } = useToast();
 
@@ -62,7 +64,7 @@ export default function NewJournalPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Journal Entry</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('journals.newJournal')}</h1>
           <p className="text-muted-foreground">Create a new manual journal entry</p>
         </div>
       </div>

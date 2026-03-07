@@ -50,6 +50,16 @@
       "title": "المعاملات الأخيرة",
       "noTransactions": "لا توجد معاملات حديثة",
       "viewAll": "عرض الكل"
+    },
+    "drillLinks": {
+      "viewTransactions": "عرض المعاملات",
+      "viewInvoices": "عرض الفواتير",
+      "viewOverdue": "عرض المتأخرات",
+      "viewExpenses": "عرض المصروفات",
+      "viewPL": "عرض الأرباح والخسائر",
+      "viewCustomers": "عرض العملاء",
+      "viewAccounts": "عرض الحسابات",
+      "viewItems": "عرض الأصناف"
     }
   },
   "header": {
@@ -86,7 +96,8 @@
     "reject": "رفض",
     "reset": "إعادة تعيين",
     "apply": "تطبيق",
-    "clear": "مسح"
+    "clear": "مسح",
+    "open": "فتح"
   },
   "loading": {
     "default": "جاري التحميل...",
@@ -116,7 +127,8 @@
     "accepted": "مقبول",
     "declined": "مرفوض",
     "expired": "منتهي الصلاحية",
-    "invoiced": "تم إصدار فاتورة"
+    "invoiced": "تم إصدار فاتورة",
+    "filed": "مقدَّم"
   },
   "table": {
     "noResults": "لا توجد نتائج",

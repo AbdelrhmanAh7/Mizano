@@ -41,6 +41,7 @@ import {
   getPayrollStatusColor,
   formatCurrency,
 } from '@/lib/hooks/use-hr';
+import { useTranslations } from 'next-intl';
 
 const months = [
   'January',
@@ -59,6 +60,7 @@ const months = [
 
 export default function PayrollDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const t = useTranslations('hr');
   const router = useRouter();
   const { data: payrollRun, isLoading } = usePayrollRun(id);
   const confirmPayroll = useConfirmPayroll();
@@ -87,7 +89,7 @@ export default function PayrollDetailPage({ params }: { params: Promise<{ id: st
       <div className="text-center py-12">
         <h2 className="text-xl font-semibold">Payroll run not found</h2>
         <Button asChild className="mt-4">
-          <Link href="/hr/payroll">Back to Payroll</Link>
+          <Link href="/hr/payroll">{t('payroll.title')}</Link>
         </Button>
       </div>
     );
@@ -218,7 +220,7 @@ export default function PayrollDetailPage({ params }: { params: Promise<{ id: st
       {/* Payslips Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Payslips</CardTitle>
+          <CardTitle>{t('payroll.payslip.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>

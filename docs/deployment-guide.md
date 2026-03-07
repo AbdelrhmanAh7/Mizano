@@ -73,44 +73,43 @@ openssl rand -base64 64
 openssl rand -base64 32
 ```
 
+### Environment System
+
+Mizano uses a 4-environment configuration system. See `docs/environment-guide.md` for full details.
+
+| Environment | File         | Usage                 |
+| ----------- | ------------ | --------------------- |
+| Local       | `.env.local` | Localhost development |
+| Development | `.env.dev`   | Shared dev server     |
+| SIT         | `.env.sit`   | Integration testing   |
+| Production  | `.env.prod`  | Production            |
+
 ### Required Environment Variables
 
-Create a `.env.production` file with the following variables:
+Copy `.env.prod` and replace all `__CHANGE_ME__` placeholders:
 
 ```bash
-# ──────────────────────────────────────────────
-# Application
-# ──────────────────────────────────────────────
-NODE_ENV=production
+cp .env.prod .env
 
-# ──────────────────────────────────────────────
-# Database (PostgreSQL 16)
-# ──────────────────────────────────────────────
-DATABASE_URL="postgresql://mizano:<GENERATED_DB_PASSWORD>@db:5432/mizano_db?schema=public"
+# Generate secrets
+openssl rand -base64 64  # JWT_SECRET
+openssl rand -base64 64  # JWT_REFRESH_SECRET
+openssl rand -base64 32  # NEXTAUTH_SECRET
+openssl rand -base64 32  # POSTGRES_PASSWORD
+```
 
-# ──────────────────────────────────────────────
-# Cache / Queue (Redis)
-# ──────────────────────────────────────────────
+Key variables to configure:
+
+```bash
+APP_ENV=prod
+DATABASE_URL="postgresql://mizano:<PASSWORD>@postgres:5432/mizano_db"
 REDIS_URL="redis://redis:6379"
-
-# ──────────────────────────────────────────────
-# Authentication
-# ──────────────────────────────────────────────
-JWT_SECRET="<GENERATED_JWT_SECRET>"
-JWT_REFRESH_SECRET="<GENERATED_JWT_REFRESH_SECRET>"
-JWT_EXPIRY="15m"
-JWT_REFRESH_EXPIRY="7d"
-
-# ──────────────────────────────────────────────
-# NextAuth (Frontend)
-# ──────────────────────────────────────────────
-NEXTAUTH_SECRET="<GENERATED_NEXTAUTH_SECRET>"
-NEXTAUTH_URL="https://app.mizano.io"
-
-# ──────────────────────────────────────────────
-# API URL (Backend, as seen by the frontend)
-# ──────────────────────────────────────────────
-API_URL="https://api.mizano.io"
+JWT_SECRET="<GENERATED>"
+JWT_REFRESH_SECRET="<GENERATED>"
+NEXTAUTH_SECRET="<GENERATED>"
+NEXTAUTH_URL="https://yourdomain.com"
+NEXT_PUBLIC_API_URL="https://api.yourdomain.com"
+CORS_ORIGIN="https://yourdomain.com"
 
 # ──────────────────────────────────────────────
 # CORS
@@ -336,7 +335,7 @@ cd /opt/mizano
 git checkout v1.0.0
 
 # 3. Create the production env file
-cp .env.example .env.production
+cp .env.prod .env
 # Edit .env.production with production values
 chmod 600 .env.production
 
@@ -758,6 +757,28 @@ After stabilizing:
 3. Fix the issue on a development branch
 4. Add automated tests to prevent recurrence
 5. Re-deploy with the fix after thorough testing
+
+---
+
+## Automated Testing in CI/CD
+
+Before any production deployment, the full CI pipeline must pass:
+
+1. **On every PR**: lint + type-check + unit tests (coverage >= 70%) + API E2E tests
+2. **On merge to master**: All above + Playwright frontend E2E + security scan (Snyk)
+3. **Pre-deployment**: Regression test suite + performance baseline check
+
+```bash
+# Run the full CI suite locally before deploying
+pnpm ci:full          # lint + type-check + test + e2e
+
+# Run regression tests only
+pnpm test:regression  # Validates all previously fixed bugs remain fixed
+```
+
+**Deployment is blocked if any test fails.** This ensures regressions never reach production.
+
+See `docs/testing-strategy.md` for the full testing strategy and `docs/roadmap.md` for the product roadmap.
 
 ---
 

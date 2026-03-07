@@ -28,11 +28,13 @@ import {
 } from '@/lib/hooks/use-vendor-credits';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
+import { useTranslations } from 'next-intl';
 import { Eye, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function VendorCreditsPageContent() {
+  const t = useTranslations('purchases');
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -152,13 +154,13 @@ function VendorCreditsPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Vendor Credits</h1>
-          <p className="text-muted-foreground">Manage credits and refunds from vendors</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('credits.title')}</h1>
+          <p className="text-muted-foreground">{t('credits.pageDescription')}</p>
         </div>
         <Button asChild>
           <Link href="/purchases/credits/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Credit
+            {t('credits.newCredit')}
           </Link>
         </Button>
       </div>
@@ -170,14 +172,14 @@ function VendorCreditsPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search credits..."
+              placeholder={t('credits.searchPlaceholder')}
             />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="all">{t('credits.allStatus')}</SelectItem>
                 <SelectItem value="OPEN">Open</SelectItem>
                 <SelectItem value="APPLIED">Applied</SelectItem>
                 <SelectItem value="REFUNDED">Refunded</SelectItem>
@@ -190,7 +192,7 @@ function VendorCreditsPageContent() {
       {/* Credits Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Vendor Credits</CardTitle>
+          <CardTitle>{t('credits.allCredits')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -204,10 +206,10 @@ function VendorCreditsPageContent() {
             onLoadMore={() => fetchNextPage()}
             enableColumnResizing
             tableId="vendor-credits"
-            emptyMessage="No vendor credits found"
+            emptyMessage={t('credits.noCredits')}
             emptyAction={
               <Button asChild>
-                <Link href="/purchases/credits/new">Create your first credit</Link>
+                <Link href="/purchases/credits/new">{t('credits.createFirst')}</Link>
               </Button>
             }
           />

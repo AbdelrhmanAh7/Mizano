@@ -43,8 +43,10 @@ import { format } from 'date-fns';
 import { Eye, Pencil, Plus, Trash2, UserCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 function EmployeesPageContent() {
+  const t = useTranslations('hr');
   const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
   const { onExportAll } = useExportAll('employees', 'employees');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -195,13 +197,13 @@ function EmployeesPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Employees</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('employees.title')}</h1>
           <p className="text-muted-foreground">Manage your team members and their information</p>
         </div>
         <Button asChild>
           <Link href="/hr/employees/new">
             <Plus className="mr-2 h-4 w-4" />
-            Add Employee
+            {t('employees.newEmployee')}
           </Link>
         </Button>
       </div>
@@ -259,7 +261,7 @@ function EmployeesPageContent() {
       {/* Employees Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Employees</CardTitle>
+          <CardTitle>{t('employees.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -274,12 +276,12 @@ function EmployeesPageContent() {
             enableColumnResizing
             tableId="employees"
             onExportAll={onExportAll}
-            emptyMessage="No employees found"
+            emptyMessage={t('employees.empty.title')}
             emptyAction={
               <Button asChild>
                 <Link href="/hr/employees/new">
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Employee
+                  {t('employees.newEmployee')}
                 </Link>
               </Button>
             }
@@ -291,7 +293,7 @@ function EmployeesPageContent() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Employee</AlertDialogTitle>
+            <AlertDialogTitle>{t('employees.deleteEmployee')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete this employee? This action cannot be undone.
             </AlertDialogDescription>

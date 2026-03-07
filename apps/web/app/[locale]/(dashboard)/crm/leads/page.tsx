@@ -45,6 +45,7 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { Eye, Plus, RefreshCw, Trash2, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
@@ -84,6 +85,7 @@ function ScoreBadge({ score }: { score?: { totalScore: number; tier: string } })
 }
 
 function LeadsPageContent() {
+  const t = useTranslations('crm');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
@@ -242,7 +244,7 @@ function LeadsPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('leads.title')}</h1>
           <p className="text-muted-foreground">Track and manage your sales leads</p>
         </div>
         <div className="flex items-center gap-2">
@@ -250,7 +252,7 @@ function LeadsPageContent() {
             <Button asChild>
               <Link href="/crm/leads/new">
                 <Plus className="mr-2 h-4 w-4" />
-                New Lead
+                {t('leads.newLead')}
               </Link>
             </Button>
           )}
@@ -300,7 +302,7 @@ function LeadsPageContent() {
       {/* Leads Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Leads</CardTitle>
+          <CardTitle>{t('leads.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -314,7 +316,7 @@ function LeadsPageContent() {
             onLoadMore={() => fetchNextPage()}
             enableColumnResizing
             tableId="leads"
-            emptyMessage="No leads found"
+            emptyMessage={t('leads.empty.title')}
             emptyAction={
               canCreate ? (
                 <Button asChild>
@@ -333,7 +335,7 @@ function LeadsPageContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Lead</AlertDialogTitle>
+            <AlertDialogTitle>{t('leads.deleteLead')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete lead &quot;{selectedLead?.leadName}&quot;? This action
               cannot be undone.

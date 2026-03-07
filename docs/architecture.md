@@ -12,6 +12,7 @@ The monorepo contains the following workspaces:
 | ----------------------- | -------------------------- | ---------------------------------------------------------------------- |
 | `apps/api`              | NestJS 10 (port 6001)      | REST API backend with business logic, AI services, and database access |
 | `apps/web`              | Next.js 14 (port 5001)     | Frontend with App Router, server components, and BFF API routes        |
+| `ocr-service`           | Python FastAPI (port 7001) | PaddleOCR + Tesseract for document text extraction (no GPU needed)     |
 | `services/vlm-service`  | Python FastAPI (port 8100) | Vision-Language Model microservice for invoice data extraction         |
 | `packages/shared-types` | TypeScript                 | Shared type definitions consumed by both apps                          |
 | `packages/validators`   | Zod                        | Shared validation schemas for forms and API DTOs                       |
@@ -838,3 +839,44 @@ model Example {
 | `CustomerAiProfile`     | Customer behavior analysis for CRM                       |
 
 The `AiFeature` enum has 33 values (from `CATEGORIZATION` through `VOICE_COMMAND`) used to categorize all AI functionality and associate feedback with the correct model.
+
+---
+
+## Future Architecture Evolution
+
+### Planned Architectural Improvements
+
+| Improvement                      | Purpose                                              | Timeline |
+| -------------------------------- | ---------------------------------------------------- | -------- |
+| Event-Driven Architecture (CQRS) | Separate read/write models for reporting performance | Q1 2027  |
+| GraphQL API Layer                | Flexible data fetching alongside REST                | Q2 2027  |
+| WebSocket Real-Time Updates      | Live dashboard updates, collaborative editing        | Q3 2027  |
+| Kubernetes Deployment            | Container orchestration, auto-scaling                | Q1 2027  |
+| Multi-Region Deployment          | Data residency, latency optimization                 | Q3 2027  |
+| Database Sharding                | Scale large tenants beyond single-DB limits          | Q4 2027  |
+
+### Testing Architecture
+
+Mizano implements a comprehensive testing pyramid with automated CI/CD:
+
+- **Unit Tests (Jest)**: 60+ suites covering services, guards, utilities, and pure functions
+- **Integration Tests**: Service + database interaction with test database
+- **API E2E (supertest)**: 8+ suites validating full request lifecycle
+- **Frontend E2E (Playwright)**: 20+ critical user journeys across pages
+- **Visual Regression (Chromatic/Percy)**: UI snapshot comparison for 50+ pages
+- **Performance Tests (k6)**: Load testing targeting 100 concurrent users
+- **Security Scans (OWASP ZAP + Snyk)**: Continuous vulnerability detection
+
+All tests run in GitHub Actions CI pipeline on every PR. See `docs/testing-strategy.md` for details.
+
+### AI Architecture Evolution
+
+| Feature                   | Description                                       | Timeline |
+| ------------------------- | ------------------------------------------------- | -------- |
+| Self-Hosted LLM           | Llama/Mistral for advanced NLP (no external APIs) | Q3 2027  |
+| AI Copilot                | Natural language interface for all operations     | Q4 2026  |
+| Cross-Tenant Benchmarking | Anonymized industry comparisons                   | Q2 2027  |
+| AI Financial Advisory     | Proactive insights and recommendations            | Q3 2027  |
+| Predictive Compliance     | Auto-detect regulatory risks before filing        | Q4 2027  |
+
+See `docs/roadmap.md` for the complete product roadmap and market strategy.

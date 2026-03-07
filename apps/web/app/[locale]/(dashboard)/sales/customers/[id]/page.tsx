@@ -49,10 +49,13 @@ import { usePaymentsReceived } from '@/lib/hooks/use-payments-received';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { CustomerStatement } from '@/components/sales/customer-statement';
 import { InvoiceStatusBadge } from '@/components/sales/status-badge';
+import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 export default function CustomerDetailPage() {
+  const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -160,14 +163,14 @@ export default function CustomerDetailPage() {
             <Button variant="outline" asChild>
               <Link href={`/sales/customers/${customerId}/edit`}>
                 <Edit className="mr-2 h-4 w-4" />
-                Edit
+                {tCommon('buttons.edit')}
               </Link>
             </Button>
           )}
           {canDelete && (
             <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              {tCommon('buttons.delete')}
             </Button>
           )}
         </div>
@@ -213,7 +216,7 @@ export default function CustomerDetailPage() {
           {/* Contact Information */}
           <Card>
             <CardHeader>
-              <CardTitle>Contact Information</CardTitle>
+              <CardTitle>{t('customers.customerDetails')}</CardTitle>
             </CardHeader>
             <CardContent>
               <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Plus, MoreHorizontal, Pencil, Trash2, Eye, MapPin, Star } from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ import {
 } from '@/lib/hooks/use-warehouses';
 
 function WarehousesPageContent() {
+  const t = useTranslations('inventory');
   const tableParams = useTableParams({ defaultSortBy: 'name' });
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -53,7 +55,7 @@ function WarehousesPageContent() {
       accessorKey: 'name',
       header: () => (
         <SortableHeader
-          label="Name"
+          label={t('warehouses.table.name')}
           columnId="name"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -74,7 +76,7 @@ function WarehousesPageContent() {
     },
     {
       accessorKey: 'code',
-      header: 'Code',
+      header: t('warehouses.table.code'),
       meta: { cellClassName: 'font-mono text-sm' },
       cell: ({ row }) => row.original.code || '-',
     },
@@ -90,15 +92,15 @@ function WarehousesPageContent() {
     },
     {
       id: 'items',
-      header: 'Items',
+      header: t('warehouses.table.itemCount'),
       cell: ({ row }) => <span>{row.original._count?.stockLevels || 0} items</span>,
     },
     {
       accessorKey: 'isActive',
-      header: 'Status',
+      header: t('warehouses.table.status'),
       cell: ({ row }) => (
         <Badge variant={row.original.isActive ? 'default' : 'secondary'}>
-          {row.original.isActive ? 'Active' : 'Inactive'}
+          {row.original.isActive ? t('common.active') : t('common.inactive')}
         </Badge>
       ),
     },
@@ -119,18 +121,18 @@ function WarehousesPageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/inventory/warehouses/${warehouse.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
-                  View Stock
+                  {t('common.view')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href={`/inventory/warehouses/${warehouse.id}?edit=true`}>
                   <Pencil className="mr-2 h-4 w-4" />
-                  Edit
+                  {t('common.edit')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(warehouse.id)}>
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                {t('common.delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -144,13 +146,13 @@ function WarehousesPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Warehouses</h1>
-          <p className="text-muted-foreground">Manage your storage locations</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('warehouses.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <Button asChild>
           <Link href="/inventory/warehouses/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Warehouse
+            {t('warehouses.newWarehouse')}
           </Link>
         </Button>
       </div>
@@ -175,10 +177,10 @@ function WarehousesPageContent() {
         onPageChange={tableParams.setPage}
         onLimitChange={tableParams.setLimit}
         isLoading={isLoading}
-        emptyMessage="No warehouses found"
+        emptyMessage={t('warehouses.empty.title')}
         emptyAction={
           <Button asChild>
-            <Link href="/inventory/warehouses/new">Create your first warehouse</Link>
+            <Link href="/inventory/warehouses/new">{t('warehouses.empty.description')}</Link>
           </Button>
         }
       />
@@ -187,16 +189,13 @@ function WarehousesPageContent() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Warehouse</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this warehouse? This action cannot be undone.
-              Warehouses with stock cannot be deleted.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('warehouses.deleteWarehouse')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('common.confirmDelete')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

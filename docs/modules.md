@@ -1,6 +1,8 @@
 # Mizano ERP - Backend Modules Reference
 
-This document describes all 23 backend modules in the Mizano ERP system, located under `apps/api/src/modules/`.
+This document describes all backend modules in the Mizano ERP system, located under `apps/api/src/modules/`.
+
+> **Note:** The system has 28 modules including sub-modules. The AI module alone contains 7 sub-modules (Core, Forecasting, HR, NLP, Operations, Sales-CRM, Security). Additional supporting modules include Bulk Operations, Cache, Logger, Performance, and Search.
 
 ---
 
@@ -960,3 +962,11 @@ All modules (except Auth) share these common patterns:
 - **Auto-numbering:** Documents use format `PREFIX-YYYY-XXXXX` with per-org sequence.
 - **Pagination:** List endpoints support `page`, `limit`, `sort`, `order` query parameters.
 - **Response Format:** `{ data: T, meta?: { page, limit, total, totalPages } }` for lists; `{ data: T }` for single entities.
+
+---
+
+## Roadmap
+
+Mizano has a comprehensive 5-phase product roadmap targeting market leadership as the #1 AI-powered ERP for SMBs. The roadmap covers upcoming modules, testing & quality strategy (automation, regression, performance, security testing), integrations, mobile app, and global expansion.
+
+See `docs/roadmap.md` for the full product roadmap and `docs/testing-strategy.md` for the testing strategy.

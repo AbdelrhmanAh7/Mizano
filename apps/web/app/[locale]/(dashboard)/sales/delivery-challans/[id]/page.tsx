@@ -1,6 +1,7 @@
 'use client';
 
 import { use } from 'react';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Trash2 } from 'lucide-react';
@@ -47,6 +48,7 @@ interface ChallanDetailPageProps {
 
 export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
   const { id } = use(params);
+  const t = useTranslations('sales');
   const router = useRouter();
   const { data: challan, isLoading } = useDeliveryChallan(id);
   const deleteChallan = useDeleteDeliveryChallan();
@@ -65,9 +67,9 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
   if (!challan) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Challan not found</p>
+        <p className="text-muted-foreground">{t('deliveryChallans.challanNotFound')}</p>
         <Button asChild className="mt-4">
-          <Link href="/sales/delivery-challans">Back to Challans</Link>
+          <Link href="/sales/delivery-challans">{t('deliveryChallans.backToChallans')}</Link>
         </Button>
       </div>
     );
@@ -82,7 +84,7 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/sales/delivery-challans">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -101,11 +103,13 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
         </div>
         <div className="flex gap-2">
           {canIssueChallan(challan) && (
-            <Button onClick={() => issueChallan.mutate(challan.id)}>Issue Challan</Button>
+            <Button onClick={() => issueChallan.mutate(challan.id)}>
+              {t('deliveryChallans.issueChallan')}
+            </Button>
           )}
           {canMarkReturned(challan) && (
             <Button variant="outline" onClick={() => markReturned.mutate(challan.id)}>
-              Mark Returned
+              {t('deliveryChallans.markReturned')}
             </Button>
           )}
           {canDeleteChallan(challan) && (
@@ -118,9 +122,9 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Challan</AlertDialogTitle>
+                  <AlertDialogTitle>{t('deliveryChallans.deleteChallan')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to delete this delivery challan?
+                    {t('deliveryChallans.deleteConfirmation')}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -138,19 +142,19 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Customer</p>
+            <p className="text-sm text-muted-foreground">{t('deliveryChallans.customer')}</p>
             <p className="text-lg font-medium">{challan.customer?.name || '-'}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Date</p>
+            <p className="text-sm text-muted-foreground">{t('deliveryChallans.date')}</p>
             <p className="text-lg font-medium">{formatDate(challan.date)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Type</p>
+            <p className="text-sm text-muted-foreground">{t('deliveryChallans.type')}</p>
             <p className="text-lg font-medium">{getChallanTypeLabel(challan.challanType)}</p>
           </CardContent>
         </Card>
@@ -159,7 +163,7 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
       {challan.invoice && (
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Linked Invoice</p>
+            <p className="text-sm text-muted-foreground">{t('deliveryChallans.linkedInvoice')}</p>
             <p className="font-medium">{challan.invoice.invoiceNumber}</p>
           </CardContent>
         </Card>
@@ -167,17 +171,17 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Line Items</CardTitle>
+          <CardTitle>{t('deliveryChallans.lineItems')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead>SKU</TableHead>
-                <TableHead>Warehouse</TableHead>
-                <TableHead className="text-right">Quantity</TableHead>
-                <TableHead>Description</TableHead>
+                <TableHead>{t('deliveryChallans.table.item')}</TableHead>
+                <TableHead>{t('deliveryChallans.table.sku')}</TableHead>
+                <TableHead>{t('deliveryChallans.table.warehouse')}</TableHead>
+                <TableHead className="text-right">{t('deliveryChallans.table.quantity')}</TableHead>
+                <TableHead>{t('deliveryChallans.table.description')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -200,7 +204,7 @@ export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
       {challan.notes && (
         <Card>
           <CardHeader>
-            <CardTitle>Notes</CardTitle>
+            <CardTitle>{t('deliveryChallans.notes')}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm">{challan.notes}</p>

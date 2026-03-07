@@ -58,6 +58,7 @@ import {
   Task,
   TimesheetEntry,
 } from '@/lib/hooks/use-projects';
+import { useTranslations } from 'next-intl';
 
 interface ProjectDetailPageProps {
   params: Promise<{ id: string }>;
@@ -65,6 +66,7 @@ interface ProjectDetailPageProps {
 
 export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const { id } = use(params);
+  const t = useTranslations('projects');
   const router = useRouter();
   const { data: project, isLoading } = useProject(id);
   const { data: tasksData } = useTasks(id);
@@ -154,19 +156,19 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
           <Button variant="outline" asChild>
             <Link href={`/projects/${id}/edit`}>
               <Pencil className="mr-2 h-4 w-4" />
-              Edit
+              {t('projects.editProject')}
             </Link>
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" className="text-red-600">
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                {t('projects.deleteProject')}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete Project</AlertDialogTitle>
+                <AlertDialogTitle>{t('projects.deleteProject')}</AlertDialogTitle>
                 <AlertDialogDescription>
                   Are you sure you want to delete this project? All tasks and time entries will also
                   be deleted.
@@ -235,8 +237,8 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       {/* Tabs */}
       <Tabs defaultValue="tasks">
         <TabsList>
-          <TabsTrigger value="tasks">Tasks</TabsTrigger>
-          <TabsTrigger value="time">Time Entries</TabsTrigger>
+          <TabsTrigger value="tasks">{t('tasks.title')}</TabsTrigger>
+          <TabsTrigger value="time">{t('timesheets.title')}</TabsTrigger>
           <TabsTrigger value="details">Details</TabsTrigger>
         </TabsList>
 
@@ -244,11 +246,11 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Tasks</CardTitle>
+                <CardTitle>{t('tasks.title')}</CardTitle>
                 <Button size="sm" asChild>
                   <Link href={`/projects/${id}/tasks/new`}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Add Task
+                    {t('tasks.newTask')}
                   </Link>
                 </Button>
               </div>
@@ -256,7 +258,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
             <CardContent>
               {tasks.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No tasks yet. Add your first task to get started.
+                  {t('tasks.empty.title')}. {t('tasks.empty.description')}.
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -321,11 +323,11 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Time Entries</CardTitle>
+                <CardTitle>{t('timesheets.title')}</CardTitle>
                 <Button size="sm" asChild>
                   <Link href={`/projects/timesheets/new?projectId=${id}`}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Log Time
+                    {t('timesheets.newEntry')}
                   </Link>
                 </Button>
               </div>
@@ -333,7 +335,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
             <CardContent>
               {timeEntries.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
-                  No time entries yet. Log your first time entry.
+                  {t('timesheets.empty.title')}. {t('timesheets.empty.description')}.
                 </div>
               ) : (
                 <Table>
@@ -382,7 +384,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Project Details</CardTitle>
+                <CardTitle>{t('projects.projectDetails')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between">
@@ -390,20 +392,20 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                   <span className="font-mono">{project.projectNumber}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Customer</span>
+                  <span className="text-muted-foreground">{t('projects.form.customer')}</span>
                   <span>{project.customer?.name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Billing Method</span>
+                  <span className="text-muted-foreground">{t('projects.form.billingMethod')}</span>
                   <span>{getBillingMethodLabel(project.billingMethod)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Start Date</span>
+                  <span className="text-muted-foreground">{t('projects.form.startDate')}</span>
                   <span>{format(new Date(project.startDate), 'MMM d, yyyy')}</span>
                 </div>
                 {project.endDate && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">End Date</span>
+                    <span className="text-muted-foreground">{t('projects.form.endDate')}</span>
                     <span>{format(new Date(project.endDate), 'MMM d, yyyy')}</span>
                   </div>
                 )}
@@ -420,7 +422,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                   <span>{project.budgetType === 'COST' ? 'Cost' : 'Hours'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Budget Amount</span>
+                  <span className="text-muted-foreground">{t('projects.form.budgetAmount')}</span>
                   <span className="font-mono">
                     {project.budgetType === 'COST' ? formatCurrency(budget) : formatHours(budget)}
                   </span>
@@ -441,7 +443,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
             {project.description && (
               <Card className="md:col-span-2">
                 <CardHeader>
-                  <CardTitle>Description</CardTitle>
+                  <CardTitle>{t('projects.form.description')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm">{project.description}</p>

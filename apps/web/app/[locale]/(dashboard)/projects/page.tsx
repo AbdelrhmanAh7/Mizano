@@ -61,8 +61,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 function ProjectsPageContent() {
+  const t = useTranslations('projects');
   const tableParams = useTableParams({ defaultSortBy: 'createdAt' });
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -320,13 +322,13 @@ function ProjectsPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground">Manage projects, tasks, and time tracking</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('projects.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <Button asChild>
           <Link href="/projects/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Project
+            {t('projects.newProject')}
           </Link>
         </Button>
       </div>
@@ -404,7 +406,7 @@ function ProjectsPageContent() {
       {/* Projects Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Projects</CardTitle>
+          <CardTitle>{t('projects.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -419,12 +421,12 @@ function ProjectsPageContent() {
             isLoading={isLoading}
             enableSelection
             bulkActions={bulkActions}
-            emptyMessage="No projects found"
+            emptyMessage={t('projects.empty.title')}
             emptyAction={
               <Button asChild>
                 <Link href="/projects/new">
                   <Plus className="mr-2 h-4 w-4" />
-                  Create Project
+                  {t('projects.newProject')}
                 </Link>
               </Button>
             }
@@ -436,7 +438,7 @@ function ProjectsPageContent() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Project</AlertDialogTitle>
+            <AlertDialogTitle>{t('projects.deleteProject')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete this project? All tasks and time entries will also be
               deleted. This action cannot be undone.

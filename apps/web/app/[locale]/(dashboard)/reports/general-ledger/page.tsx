@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +28,7 @@ import { useGeneralLedgerReport, formatCurrency } from '@/lib/hooks/use-reports'
 import { useAccounts } from '@/lib/hooks/use-accounts';
 
 export default function GeneralLedgerPage() {
+  const t = useTranslations('reports');
   const [dateRange, setDateRange] = useState({
     startDate: startOfMonth(new Date()),
     endDate: endOfMonth(new Date()),
@@ -64,7 +66,7 @@ export default function GeneralLedgerPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">General Ledger</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('generalLedger.title')}</h1>
           <p className="text-muted-foreground">
             {format(dateRange.startDate, 'MMMM d')} - {format(dateRange.endDate, 'MMMM d, yyyy')}
           </p>
@@ -106,13 +108,13 @@ export default function GeneralLedgerPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Opening Balance</p>
+                <p className="text-sm text-muted-foreground">{t('cashFlow.openingBalance')}</p>
                 <p className="text-2xl font-bold font-mono">{formatCurrency(openingBalance)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Closing Balance</p>
+                <p className="text-sm text-muted-foreground">{t('cashFlow.closingBalance')}</p>
                 <p className="text-2xl font-bold font-mono">{formatCurrency(closingBalance)}</p>
               </CardContent>
             </Card>
@@ -134,8 +136,8 @@ export default function GeneralLedgerPage() {
                       <TableHead>Date</TableHead>
                       <TableHead>Journal #</TableHead>
                       <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Debit</TableHead>
-                      <TableHead className="text-right">Credit</TableHead>
+                      <TableHead className="text-right">{t('trialBalance.debit')}</TableHead>
+                      <TableHead className="text-right">{t('trialBalance.credit')}</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
                     </TableRow>
                   </TableHeader>

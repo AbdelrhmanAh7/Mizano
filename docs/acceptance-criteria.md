@@ -1684,7 +1684,7 @@ Comprehensive acceptance criteria organized by module. Each criterion includes:
 
 - **Criterion**: All secrets and configuration shall be loaded from environment variables
 - **Why**: Secrets in code get committed; environment variables support per-deployment configuration
-- **Verify**: Verify .env.example has all required variables, no hardcoded secrets in source
+- **Verify**: Verify `.env.local` has all required variables, no hardcoded secrets in source
 - **Edge Cases**: Missing required variable (fail fast with clear error), default values for optional
 
 #### AC-207: Health check endpoint

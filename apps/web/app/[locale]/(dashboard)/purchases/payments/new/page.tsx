@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import { accountsApi } from '@/lib/api';
 
 export default function NewPaymentMadePage() {
   const router = useRouter();
+  const t = useTranslations('purchases');
   const searchParams = useSearchParams();
   const createPayment = useCreatePaymentMade();
 
@@ -57,14 +59,14 @@ export default function NewPaymentMadePage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
           <Link href="/purchases/payments">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Record Payment</h1>
-          <p className="text-muted-foreground">Record a payment made to a vendor</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('payments.recordPayment')}</h1>
+          <p className="text-muted-foreground">{t('payments.recordDescription')}</p>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { accountsApi, itemsApi } from '@/lib/api';
 
 export default function NewBillPage() {
   const router = useRouter();
+  const t = useTranslations('purchases');
   const searchParams = useSearchParams();
   const defaultVendorId = searchParams.get('vendorId') || undefined;
 
@@ -66,8 +68,8 @@ export default function NewBillPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Bill</h1>
-          <p className="text-muted-foreground">Create a new vendor bill</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('bills.newBill')}</h1>
+          <p className="text-muted-foreground">{t('bills.empty.description')}</p>
         </div>
       </div>
 

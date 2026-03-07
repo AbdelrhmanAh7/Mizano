@@ -6,10 +6,20 @@ import { PrismaService } from '../../prisma/prisma.service';
  * Centralized, transaction-safe document number generation.
  *
  * Uses a `DocumentSequence` row per (organizationId, prefix) pair.
- * The row is locked via a raw `FOR UPDATE` query inside the
- * caller's Prisma transaction, eliminating race conditions.
+ * An atomic SQL `INSERT ... ON CONFLICT DO UPDATE` statement locks the row
+ * and increments the counter in a single round-trip, eliminating race conditions
+ * even under concurrent requests.
  *
  * Supported prefixes: INV, BILL, JRN, QT, CN, PMT, VPMT, ADJ, WO, DC, VC, AST
+ *
+ * @example
+ * ```ts
+ * // Inside an existing Prisma transaction:
+ * const number = await this.docNumberService.next(tx, orgId, 'INV'); // "INV-001"
+ *
+ * // Standalone (creates its own transaction):
+ * const number = await this.docNumberService.nextStandalone(orgId, 'BILL'); // "BILL-001"
+ * ```
  */
 @Injectable()
 export class DocumentNumberService {
@@ -46,7 +56,12 @@ export class DocumentNumberService {
 
   /**
    * Generate the next document number outside a transaction.
-   * Uses its own $transaction for atomicity.
+   * Creates its own `$transaction` for atomicity when no surrounding transaction exists.
+   *
+   * @param orgId  - Organization ID
+   * @param prefix - Document prefix (e.g. 'INV', 'BILL')
+   * @param padLen - Minimum digits (default 3)
+   * @returns Formatted document number (e.g. "INV-001")
    */
   async nextStandalone(orgId: string, prefix: string, padLen = 3): Promise<string> {
     return this.prisma.$transaction(async (tx) => {
@@ -56,7 +71,12 @@ export class DocumentNumberService {
 
   /**
    * Seed a sequence to start at a specific number.
-   * Useful during migration or onboarding.
+   * Useful during data migration or initial onboarding to align with existing numbering.
+   *
+   * @param orgId   - Organization ID
+   * @param prefix  - Document prefix (e.g. 'INV')
+   * @param startAt - The next number to be issued (e.g. 100 means next doc is "INV-100")
+   * @param padLen  - Minimum digits (default 3)
    */
   async seed(orgId: string, prefix: string, startAt: number, padLen = 3): Promise<void> {
     await this.prisma.documentSequence.upsert({

@@ -23,6 +23,7 @@ import {
   getPayrollStatusColor,
   formatCurrency,
 } from '@/lib/hooks/use-hr';
+import { useTranslations } from 'next-intl';
 
 const months = [
   'January',
@@ -41,6 +42,7 @@ const months = [
 
 export default function PayslipDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const t = useTranslations('hr');
   const { data: payslip, isLoading } = usePayslip(id);
 
   if (isLoading) {
@@ -55,9 +57,9 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
   if (!payslip) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold">Payslip not found</h2>
+        <h2 className="text-xl font-semibold">{t('payroll.payslip.title')} not found</h2>
         <Button asChild className="mt-4">
-          <Link href="/hr/payroll">Back to Payroll</Link>
+          <Link href="/hr/payroll">{t('payroll.title')}</Link>
         </Button>
       </div>
     );
@@ -92,7 +94,7 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">
-                Payslip - {months[payslip.month - 1]} {payslip.year}
+                {t('payroll.payslip.title')} - {months[payslip.month - 1]} {payslip.year}
               </h1>
               <Badge variant="outline" className={getPayrollStatusColor(payslip.status)}>
                 {getPayrollStatusLabel(payslip.status)}
@@ -134,7 +136,7 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
               </div>
             </div>
             <div className="text-right">
-              <h3 className="text-lg font-semibold">PAYSLIP</h3>
+              <h3 className="text-lg font-semibold">{t('payroll.payslip.title').toUpperCase()}</h3>
               <p className="text-muted-foreground">
                 {months[payslip.month - 1]} {payslip.year}
               </p>
@@ -185,7 +187,9 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
               <Table>
                 <TableBody>
                   <TableRow>
-                    <TableCell className="font-medium">Basic Salary</TableCell>
+                    <TableCell className="font-medium">
+                      {t('payroll.payslip.basicSalary')}
+                    </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatCurrency(payslip.basicSalary || 0)}
                     </TableCell>
@@ -254,7 +258,9 @@ export default function PayslipDetailPage({ params }: { params: Promise<{ id: st
           {/* Net Pay */}
           <div className="flex justify-between items-center p-6 bg-primary/5 rounded-lg">
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground">NET PAY</h4>
+              <h4 className="text-sm font-medium text-muted-foreground">
+                {t('payroll.payslip.netPay').toUpperCase()}
+              </h4>
               <p className="text-sm text-muted-foreground">Amount payable after all deductions</p>
             </div>
             <p className="text-4xl font-bold font-mono">{formatCurrency(payslip.netPay || 0)}</p>

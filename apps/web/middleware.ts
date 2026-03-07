@@ -6,7 +6,7 @@ import { routing } from './i18n/routing';
 const intlMiddleware = createMiddleware(routing);
 
 // Define public paths that don't require authentication
-const publicPaths = ['/login', '/register'];
+const publicPaths = ['/login', '/register', '/onboarding'];
 
 // Check if path is public (remove locale prefix for checking)
 function isPublicPath(pathname: string): boolean {
@@ -55,7 +55,7 @@ export async function middleware(request: NextRequest) {
     if (token) {
       return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url));
     } else {
-      return NextResponse.redirect(new URL(`/${locale}/login`, request.url));
+      return NextResponse.redirect(new URL(`/${locale}/onboarding`, request.url));
     }
   }
 

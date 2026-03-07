@@ -10,6 +10,7 @@ import { ProjectForm } from '@/components/projects/project-form';
 import { useProject, useUpdateProject } from '@/lib/hooks/use-projects';
 import { useQuery } from '@tanstack/react-query';
 import { customersApi } from '@/lib/api';
+import { useTranslations } from 'next-intl';
 
 interface EditProjectPageProps {
   params: Promise<{ id: string }>;
@@ -17,6 +18,7 @@ interface EditProjectPageProps {
 
 export default function EditProjectPage({ params }: EditProjectPageProps) {
   const { id } = use(params);
+  const t = useTranslations('projects');
   const router = useRouter();
   const { data: project, isLoading: projectLoading } = useProject(id);
   const updateProject = useUpdateProject();
@@ -69,7 +71,7 @@ export default function EditProjectPage({ params }: EditProjectPageProps) {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edit Project</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('projects.editProject')}</h1>
           <p className="text-muted-foreground">Update project details for {project.name}</p>
         </div>
       </div>

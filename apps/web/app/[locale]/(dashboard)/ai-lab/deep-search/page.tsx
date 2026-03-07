@@ -25,6 +25,7 @@ import {
   type DeepSearchSuggestion,
   type DeepSearchJob,
 } from '@/lib/hooks/use-deep-search';
+import { useTranslations } from 'next-intl';
 import { SearchProgress } from '@/components/ai/deep-search/search-progress';
 import { SuggestionCard } from '@/components/ai/deep-search/suggestion-card';
 import dynamic from 'next/dynamic';
@@ -38,6 +39,7 @@ const PromptModal = dynamic(
 type CategoryFilter = 'ALL' | 'FEATURE_GAP' | 'PERFORMANCE_UX' | 'AI_CAPABILITY';
 
 export default function DeepSearchPage() {
+  const t = useTranslations('ai.deepSearch');
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('ALL');
   const [promptSuggestion, setPromptSuggestion] = useState<DeepSearchSuggestion | null>(null);
@@ -92,11 +94,9 @@ export default function DeepSearchPage() {
         <div>
           <div className="flex items-center gap-3">
             <Search className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold tracking-tight">DeepSearch Agent</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
           </div>
-          <p className="text-muted-foreground mt-1">
-            Analyze the market and codebase to discover enhancement opportunities
-          </p>
+          <p className="text-muted-foreground mt-1">{t('subtitle')}</p>
         </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm">
@@ -106,7 +106,7 @@ export default function DeepSearchPage() {
               onChange={(e) => setSkipWeb(e.target.checked)}
               className="rounded border-gray-300"
             />
-            <span className="text-muted-foreground">Skip web scraping</span>
+            <span className="text-muted-foreground">{t('skipWebScraping')}</span>
           </label>
           <Button
             onClick={handleRunSearch}
@@ -116,12 +116,12 @@ export default function DeepSearchPage() {
             {runDeepSearch.isPending || isRunning ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Searching...
+                {t('searching')}
               </>
             ) : (
               <>
                 <Play className="h-4 w-4 mr-2" />
-                Run DeepSearch
+                {t('runDeepSearch')}
               </>
             )}
           </Button>
@@ -146,7 +146,7 @@ export default function DeepSearchPage() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{suggestions.length}</p>
-                    <p className="text-xs text-muted-foreground">Total Suggestions</p>
+                    <p className="text-xs text-muted-foreground">{t('totalSuggestions')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -159,7 +159,7 @@ export default function DeepSearchPage() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{featureGapCount}</p>
-                    <p className="text-xs text-muted-foreground">Feature Gaps</p>
+                    <p className="text-xs text-muted-foreground">{t('featureGaps')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -172,7 +172,7 @@ export default function DeepSearchPage() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{perfUxCount}</p>
-                    <p className="text-xs text-muted-foreground">Performance & UX</p>
+                    <p className="text-xs text-muted-foreground">{t('performanceUx')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -185,7 +185,7 @@ export default function DeepSearchPage() {
                   </div>
                   <div>
                     <p className="text-2xl font-bold">{aiCapCount}</p>
-                    <p className="text-xs text-muted-foreground">AI Capabilities</p>
+                    <p className="text-xs text-muted-foreground">{t('aiCapabilities')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -195,7 +195,7 @@ export default function DeepSearchPage() {
           {/* Category Filter */}
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Filter:</span>
+            <span className="text-sm text-muted-foreground">{t('filter')}</span>
             {(['ALL', 'FEATURE_GAP', 'PERFORMANCE_UX', 'AI_CAPABILITY'] as const).map((cat) => (
               <Button
                 key={cat}
@@ -204,12 +204,12 @@ export default function DeepSearchPage() {
                 onClick={() => setCategoryFilter(cat)}
               >
                 {cat === 'ALL'
-                  ? 'All'
+                  ? t('all')
                   : cat === 'FEATURE_GAP'
-                    ? 'Feature Gaps'
+                    ? t('featureGaps')
                     : cat === 'PERFORMANCE_UX'
-                      ? 'Performance & UX'
-                      : 'AI Capabilities'}
+                      ? t('performanceUx')
+                      : t('aiCapabilities')}
               </Button>
             ))}
           </div>
@@ -230,7 +230,7 @@ export default function DeepSearchPage() {
           {filteredSuggestions.length === 0 && (
             <Card>
               <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">No suggestions in this category.</p>
+                <p className="text-muted-foreground">{t('noSuggestionsInCategory')}</p>
               </CardContent>
             </Card>
           )}
@@ -244,7 +244,7 @@ export default function DeepSearchPage() {
             <div className="flex items-center gap-3 text-red-600">
               <XCircle className="h-5 w-5" />
               <div>
-                <p className="font-medium">Search Failed</p>
+                <p className="font-medium">{t('searchFailed')}</p>
                 <p className="text-sm text-muted-foreground">
                   {activeJob.error || 'An unexpected error occurred.'}
                 </p>
@@ -259,10 +259,9 @@ export default function DeepSearchPage() {
         <Card>
           <CardContent className="py-16 text-center">
             <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">No searches yet</h3>
+            <h3 className="text-lg font-medium mb-2">{t('noSearchesYet')}</h3>
             <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-              Click &ldquo;Run DeepSearch&rdquo; to analyze the ERP market and your codebase for
-              enhancement opportunities. Each suggestion includes a ready-to-use Claude Code prompt.
+              {t('noSearchesDescription')}
             </p>
           </CardContent>
         </Card>
@@ -275,7 +274,7 @@ export default function DeepSearchPage() {
           <div>
             <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <Clock className="h-5 w-5" />
-              Past Searches
+              {t('pastSearches')}
             </h2>
             <div className="space-y-2">
               {jobs.map((job: DeepSearchJob) => (
@@ -305,7 +304,9 @@ export default function DeepSearchPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <span>{job.suggestionsCount} suggestions</span>
+                        <span>
+                          {job.suggestionsCount} {t('suggestions')}
+                        </span>
                         <Badge
                           variant={
                             job.status === 'COMPLETED'

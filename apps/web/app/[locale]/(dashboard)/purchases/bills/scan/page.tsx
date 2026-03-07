@@ -62,6 +62,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { QuickTrainDialog } from '@/components/ai/ocr-training/quick-train-dialog';
 
@@ -76,6 +77,8 @@ interface EditableLineItem {
 
 export default function ScanBillPage() {
   const router = useRouter();
+  const t = useTranslations('purchases');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
 
   // State
@@ -403,7 +406,7 @@ export default function ScanBillPage() {
         <Button variant="ghost" size="sm" asChild>
           <Link href="/purchases/bills">
             <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
+            {tCommon('buttons.back')}
           </Link>
         </Button>
         <div>
@@ -641,13 +644,13 @@ export default function ScanBillPage() {
             {/* Bill details */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Bill Details</CardTitle>
+                <CardTitle className="text-lg">{t('bills.billDetails')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Vendor */}
                 <div className="space-y-2">
                   <Label>
-                    Vendor *
+                    {t('bills.form.vendor')} *
                     {intakeResult.matchedVendor && (
                       <Badge variant="secondary" className="ml-2 text-xs">
                         AI suggested: {Math.round(intakeResult.matchedVendor.similarity * 100)}%
@@ -723,7 +726,7 @@ export default function ScanBillPage() {
                   {/* Document Number */}
                   <div className="space-y-2">
                     <Label>
-                      Bill Number
+                      {t('bills.form.billNumber')}
                       <FieldConfidence confidence={intakeResult.fieldConfidence?.invoiceNumber} />
                     </Label>
                     <Input
@@ -743,7 +746,7 @@ export default function ScanBillPage() {
                   {/* Date */}
                   <div className="space-y-2">
                     <Label>
-                      Date *
+                      {t('bills.form.date')} *
                       <FieldConfidence confidence={intakeResult.fieldConfidence?.date} />
                     </Label>
                     <Input
@@ -758,7 +761,7 @@ export default function ScanBillPage() {
 
                   {/* Due Date */}
                   <div className="space-y-2">
-                    <Label>Due Date *</Label>
+                    <Label>{t('bills.form.dueDate')} *</Label>
                     <Input
                       type="date"
                       value={dueDate}
@@ -769,7 +772,7 @@ export default function ScanBillPage() {
 
                 {/* Notes */}
                 <div className="space-y-2">
-                  <Label>Notes</Label>
+                  <Label>{t('bills.form.notes')}</Label>
                   <Textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -785,12 +788,12 @@ export default function ScanBillPage() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center justify-between">
                   <span>
-                    Line Items
+                    {t('lineItems.title')}
                     <FieldConfidence confidence={intakeResult.fieldConfidence?.lineItems} />
                   </span>
                   <Button variant="outline" size="sm" onClick={addLineItem}>
                     <Plus className="h-4 w-4 mr-1" />
-                    Add Line
+                    {t('lineItems.addItem')}
                   </Button>
                 </CardTitle>
               </CardHeader>
@@ -798,11 +801,11 @@ export default function ScanBillPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[40%]">Description</TableHead>
-                      <TableHead>Qty</TableHead>
-                      <TableHead>Rate</TableHead>
-                      <TableHead>Tax %</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="w-[40%]">{t('lineItems.description')}</TableHead>
+                      <TableHead>{t('lineItems.quantity')}</TableHead>
+                      <TableHead>{t('lineItems.rate')}</TableHead>
+                      <TableHead>{t('lineItems.tax')} %</TableHead>
+                      <TableHead className="text-right">{t('lineItems.amount')}</TableHead>
                       <TableHead className="w-10" />
                     </TableRow>
                   </TableHeader>
@@ -879,16 +882,16 @@ export default function ScanBillPage() {
                 <div className="flex justify-end mt-4">
                   <div className="w-64 space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="text-muted-foreground">{tCommon('subtotal')}</span>
                       <span className="font-medium">{subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tax</span>
+                      <span className="text-muted-foreground">{tCommon('tax')}</span>
                       <span className="font-medium">{taxTotal.toFixed(2)}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between text-base">
-                      <span className="font-semibold">Total</span>
+                      <span className="font-semibold">{tCommon('total')}</span>
                       <span className="font-bold">{grandTotal.toFixed(2)}</span>
                     </div>
                     {intakeResult.extractedFields.total && (
@@ -942,12 +945,12 @@ export default function ScanBillPage() {
                   {confirmIntake.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Creating...
+                      {tCommon('loading.creating')}
                     </>
                   ) : (
                     <>
                       <Check className="h-4 w-4 mr-2" />
-                      Create Draft Bill
+                      {t('bills.newBill')}
                     </>
                   )}
                 </Button>
@@ -1003,7 +1006,7 @@ export default function ScanBillPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Vendor Name *</Label>
+              <Label>{t('vendors.form.name')} *</Label>
               <Input
                 value={newVendorName}
                 onChange={(e) => setNewVendorName(e.target.value)}
@@ -1011,7 +1014,7 @@ export default function ScanBillPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Display Name</Label>
+              <Label>{t('vendors.form.displayName')}</Label>
               <Input
                 value={newVendorDisplayName}
                 onChange={(e) => setNewVendorDisplayName(e.target.value)}
@@ -1021,14 +1024,14 @@ export default function ScanBillPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateVendor(false)}>
-              Cancel
+              {tCommon('buttons.cancel')}
             </Button>
             <Button
               onClick={handleCreateVendor}
               disabled={!newVendorName.trim() || createVendor.isPending}
             >
               {createVendor.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Create
+              {tCommon('buttons.create')}
             </Button>
           </DialogFooter>
         </DialogContent>

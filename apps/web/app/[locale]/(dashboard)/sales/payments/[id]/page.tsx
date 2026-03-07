@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { ArrowLeft, User, Calendar, CreditCard, DollarSign, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import { format } from 'date-fns';
 
 export default function PaymentReceivedDetailPage() {
   const params = useParams();
+  const t = useTranslations('sales');
   const paymentId = params.id as string;
 
   const { data: payment, isLoading } = usePaymentReceived(paymentId);
@@ -54,22 +56,20 @@ export default function PaymentReceivedDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/sales/payments">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Payment Not Found</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('payments.paymentNotFound')}</h1>
           </div>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              The payment you&apos;re looking for doesn&apos;t exist.
-            </p>
+            <p className="text-muted-foreground">{t('payments.notFoundMessage')}</p>
             <Button asChild className="mt-4">
-              <Link href="/sales/payments">Back to Payments</Link>
+              <Link href="/sales/payments">{t('payments.backToPayments')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -82,7 +82,7 @@ export default function PaymentReceivedDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/sales/payments">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -110,7 +110,7 @@ export default function PaymentReceivedDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <DollarSign className="h-4 w-4" />
-              Amount
+              {t('payments.amount')}
             </div>
             <div className="text-2xl font-bold font-mono text-green-600">
               {formatCurrency(payment.amount)}
@@ -122,7 +122,7 @@ export default function PaymentReceivedDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Calendar className="h-4 w-4" />
-              Date
+              {t('payments.date')}
             </div>
             <div className="text-2xl font-bold">
               {format(new Date(payment.date), 'MMM d, yyyy')}
@@ -134,7 +134,7 @@ export default function PaymentReceivedDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <CreditCard className="h-4 w-4" />
-              Payment Mode
+              {t('payments.paymentMode')}
             </div>
             <div className="text-xl font-bold">{getPaymentModeLabel(payment.paymentMode)}</div>
           </CardContent>
@@ -144,7 +144,7 @@ export default function PaymentReceivedDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Building className="h-4 w-4" />
-              Deposited To
+              {t('payments.depositedTo')}
             </div>
             <div className="text-lg font-bold truncate">
               {payment.depositToAccount?.name || '-'}
@@ -160,14 +160,14 @@ export default function PaymentReceivedDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
-              Customer Details
+              {t('payments.customerDetails')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {payment.customer ? (
               <>
                 <div>
-                  <div className="text-sm text-muted-foreground">Customer Name</div>
+                  <div className="text-sm text-muted-foreground">{t('payments.customerName')}</div>
                   <Link
                     href={`/sales/customers/${payment.customer.id}`}
                     className="font-medium hover:underline"
@@ -177,7 +177,7 @@ export default function PaymentReceivedDetailPage() {
                 </div>
                 {payment.customer.email && (
                   <div>
-                    <div className="text-sm text-muted-foreground">Email</div>
+                    <div className="text-sm text-muted-foreground">{t('customers.form.email')}</div>
                     <a
                       href={`mailto:${payment.customer.email}`}
                       className="text-blue-600 hover:underline"
@@ -188,7 +188,7 @@ export default function PaymentReceivedDetailPage() {
                 )}
               </>
             ) : (
-              <p className="text-muted-foreground">No customer assigned</p>
+              <p className="text-muted-foreground">{t('payments.noCustomerAssigned')}</p>
             )}
           </CardContent>
         </Card>
@@ -198,19 +198,19 @@ export default function PaymentReceivedDetailPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Payment Details
+              {t('payments.paymentDetails')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {payment.reference && (
               <div>
-                <div className="text-sm text-muted-foreground">Reference</div>
+                <div className="text-sm text-muted-foreground">{t('payments.reference')}</div>
                 <div className="font-medium">{payment.reference}</div>
               </div>
             )}
             {payment.depositToAccount && (
               <div>
-                <div className="text-sm text-muted-foreground">Deposit Account</div>
+                <div className="text-sm text-muted-foreground">{t('payments.depositAccount')}</div>
                 <div className="font-medium">
                   {payment.depositToAccount.code} - {payment.depositToAccount.name}
                 </div>
@@ -218,7 +218,7 @@ export default function PaymentReceivedDetailPage() {
             )}
             {payment.notes && (
               <div>
-                <div className="text-sm text-muted-foreground">Notes</div>
+                <div className="text-sm text-muted-foreground">{t('payments.form.notes')}</div>
                 <p className="whitespace-pre-wrap text-sm">{payment.notes}</p>
               </div>
             )}
@@ -230,16 +230,16 @@ export default function PaymentReceivedDetailPage() {
       {payment.allocations && payment.allocations.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Invoice Allocations</CardTitle>
+            <CardTitle>{t('payments.invoiceAllocations')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Invoice #</TableHead>
-                  <TableHead className="text-right">Invoice Total</TableHead>
-                  <TableHead className="text-right">Balance Before</TableHead>
-                  <TableHead className="text-right">Amount Applied</TableHead>
+                  <TableHead>{t('payments.invoiceNumber')}</TableHead>
+                  <TableHead className="text-right">{t('payments.invoiceTotal')}</TableHead>
+                  <TableHead className="text-right">{t('payments.balanceBefore')}</TableHead>
+                  <TableHead className="text-right">{t('payments.amountApplied')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -35,6 +35,7 @@ import {
   getAttendanceStatusLabel,
   AttendanceStatus,
 } from '@/lib/hooks/use-hr';
+import { useTranslations } from 'next-intl';
 
 const attendanceStatuses: AttendanceStatus[] = ['PRESENT', 'ABSENT', 'LEAVE', 'HALF_DAY'];
 
@@ -47,6 +48,7 @@ interface AttendanceEntry {
 }
 
 export default function MarkAttendancePage() {
+  const t = useTranslations('hr');
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [entries, setEntries] = useState<Map<string, AttendanceEntry>>(new Map());
@@ -134,7 +136,7 @@ export default function MarkAttendancePage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Mark Attendance</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('attendance.newAttendance')}</h1>
           <p className="text-muted-foreground">Record attendance for multiple employees</p>
         </div>
       </div>
@@ -214,11 +216,11 @@ export default function MarkAttendancePage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12"></TableHead>
-                <TableHead>Employee</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Check In</TableHead>
-                <TableHead>Check Out</TableHead>
-                <TableHead>Notes</TableHead>
+                <TableHead>{t('attendance.table.employee')}</TableHead>
+                <TableHead>{t('attendance.table.status')}</TableHead>
+                <TableHead>{t('attendance.table.checkIn')}</TableHead>
+                <TableHead>{t('attendance.table.checkOut')}</TableHead>
+                <TableHead>{t('attendance.form.notes')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

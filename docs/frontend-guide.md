@@ -1387,3 +1387,117 @@ Always place the icon before the text in buttons with `mr-2` (or `me-2` for RTL-
   View
 </DropdownMenuItem>
 ```
+
+---
+
+## Shared Components
+
+### EmptyState
+
+Use `components/shared/empty-state.tsx` for empty data states:
+
+```typescript
+import { EmptyState } from '@/components/shared/empty-state';
+import { FileText } from 'lucide-react';
+
+<EmptyState
+  icon={FileText}
+  title={t('invoices.empty.title')}
+  description={t('invoices.empty.description')}
+  action={{ label: t('invoices.newInvoice'), onClick: () => router.push('/sales/invoices/new') }}
+/>
+```
+
+### ErrorState
+
+Use `components/shared/error-state.tsx` for error boundaries:
+
+```typescript
+import { ErrorState } from '@/components/shared/error-state';
+
+<ErrorState error={error} title="Sales Error" onRetry={reset} />
+```
+
+All route groups have error boundaries using this component.
+
+---
+
+## Accessibility Conventions
+
+- Skeleton loaders: `aria-hidden="true"` and `role="presentation"`
+- Toast notifications: `role="alert"` and `aria-live="assertive"`
+- Sidebar: wrapped in `<nav aria-label="Main navigation">`
+- Header: has `role="banner"` with labeled icon buttons
+- Icon-only buttons must have `aria-label`
+- Data tables should have `aria-label` on the table element
+
+---
+
+## i18n Patterns
+
+All pages use `next-intl` with namespaced translations:
+
+```typescript
+'use client';
+import { useTranslations } from 'next-intl';
+
+export default function InvoicesPage() {
+  const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
+
+  return <h1>{t('invoices.title')}</h1>;
+}
+```
+
+Translation files are in `messages/{locale}/` (en, ar). Each module has its own file (sales.json, purchases.json, etc.)
+
+### Adding translations
+
+1. Add the key to `messages/en/{namespace}.json`
+2. Add the Arabic translation to `messages/ar/{namespace}.json`
+3. If creating a new namespace, register it in `messages/en/index.ts` and `messages/ar/index.ts`
+
+---
+
+## Dark Mode
+
+Use CSS variable-based colors from shadcn/ui (e.g., `bg-background`, `text-foreground`, `bg-muted`) instead of explicit `dark:` classes. This ensures automatic dark mode support without duplication.
+
+---
+
+## Testing
+
+### Component Tests (Jest + React Testing Library)
+
+Test interactive components in isolation. Focus on user behavior, not implementation:
+
+```typescript
+import { render, screen, fireEvent } from '@testing-library/react';
+
+it('shows validation error on empty submit', async () => {
+  render(<InvoiceForm />);
+  fireEvent.click(screen.getByText('Save'));
+  expect(await screen.findByText('Customer is required')).toBeVisible();
+});
+```
+
+### E2E Tests (Playwright)
+
+Test critical user journeys across pages:
+
+- Login -> Dashboard -> Create Invoice -> Send
+- Bank Import -> Review Transactions -> Reconcile
+- AI Insights -> View Detail -> Accept/Dismiss Suggestion
+- Settings -> Update Organization -> Verify Changes
+
+Run with: `pnpm test:playwright`
+
+### Visual Regression (Chromatic/Percy)
+
+Capture UI snapshots for key pages (dashboard, reports, forms) and compare against baselines. Covers Arabic RTL layouts and mobile breakpoints (375px, 768px).
+
+### Accessibility (axe-core)
+
+All pages must meet WCAG 2.1 AA standards. axe-core runs as part of Playwright tests to catch accessibility violations automatically.
+
+See `docs/testing-strategy.md` for the full testing strategy and `docs/roadmap.md` for the product roadmap.

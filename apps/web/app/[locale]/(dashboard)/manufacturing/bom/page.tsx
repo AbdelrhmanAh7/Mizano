@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Plus, RefreshCw, Eye, Edit, Trash2, Filter } from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,8 @@ const STATUS_OPTIONS = [
 ];
 
 function BOMListPageContent() {
+  const t = useTranslations('manufacturing');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'createdAt' });
@@ -85,7 +88,7 @@ function BOMListPageContent() {
     if (selectedBOM) {
       try {
         await deleteBOM.mutateAsync(selectedBOM.id);
-        toast({ title: 'BOM deleted successfully' });
+        toast({ title: t('bom.deleteBom') });
       } catch (error: unknown) {
         toast({
           title: 'Error',
@@ -105,7 +108,7 @@ function BOMListPageContent() {
       accessorKey: 'name',
       header: () => (
         <SortableHeader
-          label="Name"
+          label={t('bom.table.name')}
           columnId="name"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -123,7 +126,7 @@ function BOMListPageContent() {
     },
     {
       id: 'outputItem',
-      header: 'Output Item',
+      header: t('bom.table.outputItem'),
       cell: ({ row }) => {
         const bom = row.original;
         return bom.outputItem ? (
@@ -138,13 +141,13 @@ function BOMListPageContent() {
     },
     {
       id: 'components',
-      header: 'Components',
+      header: t('bom.table.itemCount'),
       meta: { headerClassName: 'text-center', cellClassName: 'text-center' },
       cell: ({ row }) => row.original.components?.length || 0,
     },
     {
       accessorKey: 'operationsCost',
-      header: 'Operations Cost',
+      header: t('bom.table.cost'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => (
         <span className="font-mono">{formatCurrency(row.original.operationsCost)}</span>
@@ -152,7 +155,7 @@ function BOMListPageContent() {
     },
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: t('workOrders.table.status'),
       cell: ({ row }) => (
         <Badge className={getBOMStatusColor(row.original.status)}>
           {getBOMStatusLabel(row.original.status)}
@@ -176,14 +179,14 @@ function BOMListPageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/manufacturing/bom/${bom.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
-                  View
+                  {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
               {canEdit && (
                 <DropdownMenuItem asChild>
                   <Link href={`/manufacturing/bom/${bom.id}`}>
                     <Edit className="mr-2 h-4 w-4" />
-                    Edit
+                    {tCommon('buttons.edit')}
                   </Link>
                 </DropdownMenuItem>
               )}
@@ -192,7 +195,7 @@ function BOMListPageContent() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => handleDelete(bom)} className="text-red-600">
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
+                    {tCommon('buttons.delete')}
                   </DropdownMenuItem>
                 </>
               )}
@@ -208,15 +211,15 @@ function BOMListPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bills of Materials</h1>
-          <p className="text-muted-foreground">Define product recipes and component requirements</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('bom.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
             <Button asChild>
               <Link href="/manufacturing/bom/new">
                 <Plus className="mr-2 h-4 w-4" />
-                New BOM
+                {t('bom.newBom')}
               </Link>
             </Button>
           )}
@@ -255,7 +258,7 @@ function BOMListPageContent() {
       {/* BOMs Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All BOMs</CardTitle>
+          <CardTitle>{t('bom.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -268,13 +271,13 @@ function BOMListPageContent() {
             onPageChange={tableParams.setPage}
             onLimitChange={tableParams.setLimit}
             isLoading={isLoading}
-            emptyMessage="No bills of materials found"
+            emptyMessage={t('bom.empty.title')}
             emptyAction={
               canCreate ? (
                 <Button asChild>
                   <Link href="/manufacturing/bom/new">
                     <Plus className="mr-2 h-4 w-4" />
-                    Create Your First BOM
+                    {t('bom.empty.description')}
                   </Link>
                 </Button>
               ) : undefined
@@ -287,16 +290,13 @@ function BOMListPageContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete BOM</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete BOM &quot;{selectedBOM?.name}&quot;? This action
-              cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('bom.deleteBom')}</AlertDialogTitle>
+            <AlertDialogDescription>{tCommon('confirm.deleteMessage')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

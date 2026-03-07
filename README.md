@@ -399,7 +399,7 @@ cd mizano
 pnpm install
 
 # 2. Configure environment
-cp .env.example .env
+cp .env.local .env
 # Edit .env with your secrets (JWT, database, etc.)
 
 # 3. Start infrastructure (PostgreSQL + Redis)

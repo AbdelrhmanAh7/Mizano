@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Progress } from '@/components/ui/progress';
 import { useEmployees, useRunPayroll, useConfirmPayroll, formatCurrency } from '@/lib/hooks/use-hr';
+import { useTranslations } from 'next-intl';
 
 const months = [
   'January',
@@ -67,6 +68,7 @@ interface PayslipPreview {
 }
 
 export default function RunPayrollPage() {
+  const t = useTranslations('hr');
   const router = useRouter();
   const today = new Date();
   const [month, setMonth] = useState(getMonth(today) + 1);
@@ -177,8 +179,8 @@ export default function RunPayrollPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Run Payroll</h1>
-          <p className="text-muted-foreground">Process employee salaries for a pay period</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('payroll.newRun')}</h1>
+          <p className="text-muted-foreground">{t('payroll.process')}</p>
         </div>
       </div>
 
@@ -244,7 +246,7 @@ export default function RunPayrollPage() {
           <CardContent className="space-y-6">
             <div className="grid grid-cols-2 gap-4 max-w-md">
               <div className="space-y-2">
-                <Label>Month</Label>
+                <Label>{t('payroll.form.month')}</Label>
                 <Select value={month.toString()} onValueChange={(v) => setMonth(parseInt(v))}>
                   <SelectTrigger>
                     <SelectValue />
@@ -259,7 +261,7 @@ export default function RunPayrollPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Year</Label>
+                <Label>{t('payroll.form.year')}</Label>
                 <Select value={year.toString()} onValueChange={(v) => setYear(parseInt(v))}>
                   <SelectTrigger>
                     <SelectValue />

@@ -48,6 +48,7 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { CheckCircle, Edit, Eye, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
 
 const JOURNAL_STATUS_OPTIONS = [
@@ -57,6 +58,7 @@ const JOURNAL_STATUS_OPTIONS = [
 ];
 
 function JournalsPageContent() {
+  const t = useTranslations('accounting');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const { onExportAll } = useExportAll('journals', 'journals');
@@ -190,7 +192,7 @@ function JournalsPageContent() {
       accessorKey: 'journalNumber',
       header: () => (
         <SortableHeader
-          label="Journal #"
+          label={t('journals.table.journalNumber')}
           columnId="journalNumber"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -203,7 +205,7 @@ function JournalsPageContent() {
       accessorKey: 'entryDate',
       header: () => (
         <SortableHeader
-          label="Date"
+          label={t('journals.table.date')}
           columnId="entryDate"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -214,19 +216,19 @@ function JournalsPageContent() {
     },
     {
       accessorKey: 'description',
-      header: 'Description',
+      header: t('journals.form.description'),
       meta: { cellClassName: 'max-w-[300px] truncate' },
       cell: ({ row }) => row.original.description || '-',
     },
     {
       id: 'amount',
-      header: 'Amount',
+      header: t('journals.table.debit'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
       cell: ({ row }) => formatJournalAmount(calculateTotal(row.original)),
     },
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: t('recurring.table.status'),
       cell: ({ row }) => (
         <Badge className={getStatusColor(row.original.status)}>{row.original.status}</Badge>
       ),
@@ -284,7 +286,7 @@ function JournalsPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Journal Entries</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('journals.title')}</h1>
           <p className="text-muted-foreground">Create and manage manual journal entries</p>
         </div>
         <div className="flex items-center gap-2">
@@ -292,7 +294,7 @@ function JournalsPageContent() {
             <Button asChild data-tour="create-journal-btn">
               <Link href="/accounting/journals/new">
                 <Plus className="mr-2 h-4 w-4" />
-                New Journal
+                {t('journals.newJournal')}
               </Link>
             </Button>
           )}
@@ -366,7 +368,7 @@ function JournalsPageContent() {
             exportFilename="journals"
             onExportAll={onExportAll}
             bulkActions={bulkActions}
-            emptyMessage="No journal entries found"
+            emptyMessage={t('journals.empty.title')}
             emptyAction={
               canCreate ? (
                 <Button asChild>
@@ -385,7 +387,7 @@ function JournalsPageContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Journal</AlertDialogTitle>
+            <AlertDialogTitle>{t('journals.deleteJournal')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete &quot;{journalToDelete?.journalNumber}&quot;? This
               action cannot be undone.

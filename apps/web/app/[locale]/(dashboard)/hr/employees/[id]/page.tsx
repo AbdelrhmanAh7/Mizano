@@ -48,9 +48,11 @@ import {
   getEmployeeStatusColor,
   formatCurrency,
 } from '@/lib/hooks/use-hr';
+import { useTranslations } from 'next-intl';
 
 export default function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const t = useTranslations('hr');
   const router = useRouter();
   const { data: employee, isLoading } = useEmployee(id);
   const { data: payslipsData } = useEmployeePayslips(id);
@@ -80,7 +82,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
       <div className="text-center py-12">
         <h2 className="text-xl font-semibold">Employee not found</h2>
         <Button asChild className="mt-4">
-          <Link href="/hr/employees">Back to Employees</Link>
+          <Link href="/hr/employees">{t('employees.title')}</Link>
         </Button>
       </div>
     );
@@ -139,19 +141,19 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
           <Button variant="outline" asChild>
             <Link href={`/hr/employees/${id}/edit`}>
               <Pencil className="mr-2 h-4 w-4" />
-              Edit
+              {t('employees.editEmployee')}
             </Link>
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive">
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                {t('employees.deleteEmployee')}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete Employee</AlertDialogTitle>
+                <AlertDialogTitle>{t('employees.deleteEmployee')}</AlertDialogTitle>
                 <AlertDialogDescription>
                   Are you sure you want to delete this employee? This action cannot be undone.
                 </AlertDialogDescription>
@@ -172,7 +174,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="salary">Salary Structure</TabsTrigger>
-          <TabsTrigger value="payslips">Payslips</TabsTrigger>
+          <TabsTrigger value="payslips">{t('payroll.payslip.title')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -262,7 +264,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
                 <Table>
                   <TableBody>
                     <TableRow>
-                      <TableCell>Basic Salary</TableCell>
+                      <TableCell>{t('payroll.payslip.basicSalary')}</TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(basicSalary)}
                       </TableCell>
@@ -276,7 +278,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
                       </TableRow>
                     ))}
                     <TableRow className="font-bold">
-                      <TableCell>Gross Salary</TableCell>
+                      <TableCell>{t('payroll.payslip.grossPay')}</TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(grossSalary)}
                       </TableCell>
@@ -289,7 +291,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
             {/* Deductions */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Deductions</CardTitle>
+                <CardTitle className="text-base">{t('payroll.payslip.deductions')}</CardTitle>
               </CardHeader>
               <CardContent>
                 {deductions.length > 0 ? (
@@ -322,7 +324,7 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
           <Card className="bg-primary/5">
             <CardContent className="pt-6">
               <div className="flex justify-between items-center">
-                <span className="text-xl font-bold">Net Salary</span>
+                <span className="text-xl font-bold">{t('payroll.payslip.netPay')}</span>
                 <span className="text-3xl font-bold font-mono">{formatCurrency(netSalary)}</span>
               </div>
             </CardContent>
@@ -336,11 +338,13 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Period</TableHead>
-                      <TableHead className="text-right">Gross</TableHead>
-                      <TableHead className="text-right">Deductions</TableHead>
-                      <TableHead className="text-right">Net Pay</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>{t('payroll.payslip.period')}</TableHead>
+                      <TableHead className="text-right">{t('payroll.payslip.grossPay')}</TableHead>
+                      <TableHead className="text-right">
+                        {t('payroll.payslip.deductions')}
+                      </TableHead>
+                      <TableHead className="text-right">{t('payroll.payslip.netPay')}</TableHead>
+                      <TableHead>{t('payroll.table.status')}</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>

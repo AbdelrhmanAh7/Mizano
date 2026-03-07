@@ -9,8 +9,10 @@ import { useToast } from '@/components/ui/use-toast';
 import { RecurringProfileForm } from '@/components/accounting/recurring-profile-form';
 import { useAccountsTree } from '@/lib/hooks/use-accounts';
 import { useCreateRecurringProfile } from '@/lib/hooks/use-recurring-profiles';
+import { useTranslations } from 'next-intl';
 
 export default function NewRecurringProfilePage() {
+  const t = useTranslations('accounting');
   const router = useRouter();
   const { toast } = useToast();
 
@@ -62,7 +64,7 @@ export default function NewRecurringProfilePage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Recurring Profile</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('recurring.newProfile')}</h1>
           <p className="text-muted-foreground">Create a new recurring journal profile</p>
         </div>
       </div>

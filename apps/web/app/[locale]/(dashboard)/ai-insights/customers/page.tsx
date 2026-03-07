@@ -21,9 +21,11 @@ import {
   YAxis,
   CartesianGrid,
 } from 'recharts';
+import { useTranslations } from 'next-intl';
 import { useCustomerAnalysis, formatCurrency } from '@/lib/hooks/use-ai';
 
 export default function CustomerAnalysisPage() {
+  const t = useTranslations('ai.insights.customersPage');
   const { data, isLoading } = useCustomerAnalysis();
 
   const analysis = data?.data;
@@ -53,14 +55,13 @@ export default function CustomerAnalysisPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Customer Analysis</h1>
-            <p className="text-muted-foreground">AI-powered customer segmentation and insights</p>
+            <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+            <p className="text-muted-foreground">{t('subtitle')}</p>
           </div>
         </div>
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No customer analysis data available yet. Add customers and transactions to generate
-            insights.
+            {t('noData')}
           </CardContent>
         </Card>
       </div>
@@ -84,8 +85,8 @@ export default function CustomerAnalysisPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Customer Analysis</h1>
-          <p className="text-muted-foreground">AI-powered customer segmentation and insights</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+          <p className="text-muted-foreground">{t('subtitle')}</p>
         </div>
       </div>
 
@@ -98,7 +99,7 @@ export default function CustomerAnalysisPage() {
                 <Users className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Customers</p>
+                <p className="text-sm text-muted-foreground">{t('totalCustomers')}</p>
                 <p className="text-2xl font-bold">{analysis.summary.totalCustomers}</p>
               </div>
             </div>
@@ -111,7 +112,7 @@ export default function CustomerAnalysisPage() {
                 <TrendingUp className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Active</p>
+                <p className="text-sm text-muted-foreground">{t('active')}</p>
                 <p className="text-2xl font-bold text-green-600">
                   {analysis.summary.activeCustomers}
                 </p>
@@ -126,7 +127,7 @@ export default function CustomerAnalysisPage() {
                 <DollarSign className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Avg Lifetime Value</p>
+                <p className="text-sm text-muted-foreground">{t('avgLifetimeValue')}</p>
                 <p className="text-2xl font-bold font-mono">
                   {formatCurrency(analysis.summary.avgLifetimeValue)}
                 </p>
@@ -136,7 +137,7 @@ export default function CustomerAnalysisPage() {
         </Card>
         <Card className={analysis.summary.churnRate > 5 ? 'bg-red-50' : 'bg-green-50'}>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Churn Rate</p>
+            <p className="text-sm text-muted-foreground">{t('churnRate')}</p>
             <p
               className={`text-2xl font-bold ${analysis.summary.churnRate > 5 ? 'text-red-600' : 'text-green-600'}`}
             >

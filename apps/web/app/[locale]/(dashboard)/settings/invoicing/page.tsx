@@ -12,6 +12,7 @@ import { useAllOrganizationSettings, useUpdateInvoiceSettings } from '@/lib/hook
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, FileText, Save } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -32,6 +33,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export default function InvoicingSettingsPage() {
+  const t = useTranslations('settings');
   const { data: settings, isLoading } = useAllOrganizationSettings();
   const updateInvoice = useUpdateInvoiceSettings();
 
@@ -93,16 +95,14 @@ export default function InvoicingSettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild aria-label="Go back">
+        <Button variant="ghost" size="icon" asChild aria-label={t('common.goBack')}>
           <Link href="/settings">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Invoice & Document Settings</h1>
-          <p className="text-muted-foreground text-sm">
-            Configure document numbering, defaults, and auto-send behavior
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t('invoicing.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('invoicing.description')}</p>
         </div>
       </div>
 
@@ -112,23 +112,21 @@ export default function InvoicingSettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Document Numbering
+              {t('invoicing.documentNumbering')}
             </CardTitle>
-            <CardDescription>
-              Set prefixes and next number for invoices, quotes, and bills
-            </CardDescription>
+            <CardDescription>{t('invoicing.documentNumberingDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Invoices */}
             <div>
-              <h4 className="text-sm font-medium mb-3">Invoices</h4>
+              <h4 className="text-sm font-medium mb-3">{t('invoicing.invoices')}</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="invoicePrefix">Prefix</Label>
+                  <Label htmlFor="invoicePrefix">{t('invoicing.prefix')}</Label>
                   <Input id="invoicePrefix" {...form.register('invoicePrefix')} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="invoiceNextNumber">Next Number</Label>
+                  <Label htmlFor="invoiceNextNumber">{t('invoicing.nextNumber')}</Label>
                   <Input
                     id="invoiceNextNumber"
                     type="number"
@@ -138,7 +136,7 @@ export default function InvoicingSettingsPage() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Preview: {form.watch('invoicePrefix')}
+                {t('invoicing.preview')} {form.watch('invoicePrefix')}
                 {String(form.watch('invoiceNextNumber')).padStart(5, '0')}
               </p>
             </div>
@@ -147,14 +145,14 @@ export default function InvoicingSettingsPage() {
 
             {/* Quotes */}
             <div>
-              <h4 className="text-sm font-medium mb-3">Quotes / Estimates</h4>
+              <h4 className="text-sm font-medium mb-3">{t('invoicing.quotesEstimates')}</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="quotePrefix">Prefix</Label>
+                  <Label htmlFor="quotePrefix">{t('invoicing.prefix')}</Label>
                   <Input id="quotePrefix" {...form.register('quotePrefix')} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="quoteNextNumber">Next Number</Label>
+                  <Label htmlFor="quoteNextNumber">{t('invoicing.nextNumber')}</Label>
                   <Input
                     id="quoteNextNumber"
                     type="number"
@@ -164,7 +162,7 @@ export default function InvoicingSettingsPage() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Preview: {form.watch('quotePrefix')}
+                {t('invoicing.preview')} {form.watch('quotePrefix')}
                 {String(form.watch('quoteNextNumber')).padStart(5, '0')}
               </p>
             </div>
@@ -173,14 +171,14 @@ export default function InvoicingSettingsPage() {
 
             {/* Bills */}
             <div>
-              <h4 className="text-sm font-medium mb-3">Bills</h4>
+              <h4 className="text-sm font-medium mb-3">{t('invoicing.bills')}</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="billPrefix">Prefix</Label>
+                  <Label htmlFor="billPrefix">{t('invoicing.prefix')}</Label>
                   <Input id="billPrefix" {...form.register('billPrefix')} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="billNextNumber">Next Number</Label>
+                  <Label htmlFor="billNextNumber">{t('invoicing.nextNumber')}</Label>
                   <Input
                     id="billNextNumber"
                     type="number"
@@ -190,7 +188,7 @@ export default function InvoicingSettingsPage() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Preview: {form.watch('billPrefix')}
+                {t('invoicing.preview')} {form.watch('billPrefix')}
                 {String(form.watch('billNextNumber')).padStart(5, '0')}
               </p>
             </div>
@@ -200,12 +198,12 @@ export default function InvoicingSettingsPage() {
         {/* Defaults */}
         <Card>
           <CardHeader>
-            <CardTitle>Invoice Defaults</CardTitle>
-            <CardDescription>Default text applied to new invoices</CardDescription>
+            <CardTitle>{t('invoicing.invoiceDefaults')}</CardTitle>
+            <CardDescription>{t('invoicing.invoiceDefaultsDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="invoiceDefaultNotes">Default Notes</Label>
+              <Label htmlFor="invoiceDefaultNotes">{t('invoicing.defaultNotes')}</Label>
               <Textarea
                 id="invoiceDefaultNotes"
                 {...form.register('invoiceDefaultNotes')}
@@ -215,7 +213,7 @@ export default function InvoicingSettingsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="invoiceDefaultTerms">Default Terms & Conditions</Label>
+              <Label htmlFor="invoiceDefaultTerms">{t('invoicing.defaultTerms')}</Label>
               <Textarea
                 id="invoiceDefaultTerms"
                 {...form.register('invoiceDefaultTerms')}
@@ -225,7 +223,7 @@ export default function InvoicingSettingsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="bankDetails">Bank Details (shown on invoices)</Label>
+              <Label htmlFor="bankDetails">{t('invoicing.bankDetails')}</Label>
               <Textarea
                 id="bankDetails"
                 {...form.register('bankDetails')}
@@ -236,9 +234,9 @@ export default function InvoicingSettingsPage() {
 
             <div className="flex items-center justify-between rounded-lg border p-4">
               <div>
-                <Label>Auto-send Invoices</Label>
+                <Label>{t('invoicing.autoSend')}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Automatically email invoices when they are marked as sent
+                  {t('invoicing.autoSendDescription')}
                 </p>
               </div>
               <Switch
@@ -257,7 +255,7 @@ export default function InvoicingSettingsPage() {
             className="gap-2"
           >
             <Save className="h-4 w-4" />
-            {updateInvoice.isPending ? 'Saving...' : 'Save Changes'}
+            {updateInvoice.isPending ? t('common.saving') : t('common.saveChanges')}
           </Button>
         </div>
       </form>

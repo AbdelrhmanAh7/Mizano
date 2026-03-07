@@ -21,8 +21,10 @@ import { format } from 'date-fns';
 import { Clock, DollarSign, LayoutGrid, List, Plus, Target, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 function DealsPageContent() {
+  const t = useTranslations('crm');
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
   const [view, setView] = useState<'kanban' | 'table'>('kanban');
@@ -113,7 +115,7 @@ function DealsPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Deals Pipeline</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('deals.pipeline.title')}</h1>
           <p className="text-muted-foreground">Manage your sales deals and track pipeline</p>
         </div>
         <div className="flex items-center gap-2">
@@ -137,7 +139,7 @@ function DealsPageContent() {
             <Button asChild>
               <Link href="/crm/deals/new">
                 <Plus className="mr-2 h-4 w-4" />
-                New Deal
+                {t('deals.newDeal')}
               </Link>
             </Button>
           )}
@@ -200,7 +202,7 @@ function DealsPageContent() {
         ) : deals.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground mb-4">No deals yet</p>
+              <p className="text-muted-foreground mb-4">{t('deals.empty.title')}</p>
               {canCreate && (
                 <Button asChild>
                   <Link href="/crm/deals/new">
@@ -228,7 +230,7 @@ function DealsPageContent() {
               onLoadMore={() => fetchNextPage()}
               enableColumnResizing
               tableId="deals"
-              emptyMessage="No deals yet"
+              emptyMessage={t('deals.empty.title')}
               emptyAction={
                 canCreate ? (
                   <Button asChild>

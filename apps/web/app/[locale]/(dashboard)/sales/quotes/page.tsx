@@ -48,10 +48,13 @@ import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { Ban, Edit, Eye, FileText, Plus, RefreshCw, Send, Trash2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function QuotesPageContent() {
+  const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
@@ -253,7 +256,7 @@ function QuotesPageContent() {
       accessorKey: 'quoteNumber',
       header: () => (
         <SortableHeader
-          label="Quote #"
+          label={t('quotes.table.quoteNumber')}
           columnId="quoteNumber"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -268,14 +271,14 @@ function QuotesPageContent() {
     },
     {
       accessorKey: 'customer.name',
-      header: 'Customer',
+      header: t('quotes.table.customer'),
       cell: ({ row }) => row.original.customer?.displayName || row.original.customer?.name || '-',
     },
     {
       accessorKey: 'date',
       header: () => (
         <SortableHeader
-          label="Date"
+          label={t('quotes.table.date')}
           columnId="date"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -288,7 +291,7 @@ function QuotesPageContent() {
       accessorKey: 'expiryDate',
       header: () => (
         <SortableHeader
-          label="Expiry"
+          label={t('quotes.table.expiryDate')}
           columnId="expiryDate"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -299,14 +302,14 @@ function QuotesPageContent() {
     },
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: t('quotes.table.status'),
       cell: ({ row }) => <QuoteStatusBadge status={row.original.status} />,
     },
     {
       accessorKey: 'grandTotal',
       header: () => (
         <SortableHeader
-          label="Amount"
+          label={t('quotes.table.amount')}
           columnId="grandTotal"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -375,7 +378,7 @@ function QuotesPageContent() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => handleConvert(quote)}>
                     <FileText className="mr-2 h-4 w-4" />
-                    Convert to Invoice
+                    {t('quotes.convertToInvoice')}
                   </DropdownMenuItem>
                 </>
               )}
@@ -401,15 +404,15 @@ function QuotesPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Quotes</h1>
-          <p className="text-muted-foreground">Create and manage estimates for your customers</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('quotes.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
             <Button asChild>
               <Link href="/sales/quotes/new">
                 <Plus className="mr-2 h-4 w-4" />
-                New Quote
+                {t('quotes.newQuote')}
               </Link>
             </Button>
           )}
@@ -430,13 +433,13 @@ function QuotesPageContent() {
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="DRAFT">Draft</SelectItem>
-                <SelectItem value="SENT">Sent</SelectItem>
-                <SelectItem value="ACCEPTED">Accepted</SelectItem>
-                <SelectItem value="INVOICED">Invoiced</SelectItem>
-                <SelectItem value="DECLINED">Declined</SelectItem>
-                <SelectItem value="EXPIRED">Expired</SelectItem>
+                <SelectItem value="all">{tCommon('all')}</SelectItem>
+                <SelectItem value="DRAFT">{t('quotes.status.draft')}</SelectItem>
+                <SelectItem value="SENT">{t('quotes.status.sent')}</SelectItem>
+                <SelectItem value="ACCEPTED">{t('quotes.status.accepted')}</SelectItem>
+                <SelectItem value="INVOICED">{t('quotes.status.invoiced')}</SelectItem>
+                <SelectItem value="DECLINED">{t('quotes.status.declined')}</SelectItem>
+                <SelectItem value="EXPIRED">{t('quotes.status.expired')}</SelectItem>
               </SelectContent>
             </Select>
             <Button
@@ -454,7 +457,7 @@ function QuotesPageContent() {
       {/* Quotes Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Quotes</CardTitle>
+          <CardTitle>{t('quotes.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -470,7 +473,7 @@ function QuotesPageContent() {
             tableId="quotes"
             enableSelection
             bulkActions={bulkActions}
-            emptyMessage="No quotes found"
+            emptyMessage={t('quotes.empty.title')}
             emptyAction={
               canCreate ? (
                 <Button asChild>
@@ -489,16 +492,16 @@ function QuotesPageContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Quote</AlertDialogTitle>
+            <AlertDialogTitle>{t('quotes.deleteQuote')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete &quot;{quoteToDelete?.quoteNumber}&quot;? This action
               cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

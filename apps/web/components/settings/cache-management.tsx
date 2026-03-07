@@ -43,6 +43,7 @@ import {
   Zap,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 // ─── Helpers ──────────────────────────────────────
@@ -95,16 +96,14 @@ function StatsSkeleton() {
 // ─── Empty State ─────────────────────────────────
 
 function EmptyKeys() {
+  const t = useTranslations('settings');
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
       <div className="rounded-full bg-muted p-4 mb-4">
         <Key className="h-8 w-8 text-muted-foreground" />
       </div>
-      <h3 className="text-lg font-semibold">No cached keys</h3>
-      <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-        There are no cache entries for your organization. Cache entries are automatically created
-        when you access dashboards, reports, and list views.
-      </p>
+      <h3 className="text-lg font-semibold">{t('cache.noKeys')}</h3>
+      <p className="text-sm text-muted-foreground mt-1 max-w-sm">{t('cache.noKeysDescription')}</p>
     </div>
   );
 }
@@ -112,6 +111,7 @@ function EmptyKeys() {
 // ─── Main Component ──────────────────────────────
 
 export function CacheManagement() {
+  const t = useTranslations('settings');
   const {
     data: stats,
     isLoading: statsLoading,
@@ -144,21 +144,19 @@ export function CacheManagement() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link href="/settings">
-            <Button variant="ghost" size="icon" aria-label="Go back">
+            <Button variant="ghost" size="icon" aria-label={t('common.goBack')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Cache Management</h1>
-            <p className="text-sm text-muted-foreground">
-              Monitor and manage the API response cache
-            </p>
+            <h1 className="text-2xl font-bold tracking-tight">{t('cache.title')}</h1>
+            <p className="text-sm text-muted-foreground">{t('cache.description')}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleRefresh}>
             <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+            {t('cache.refresh')}
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -168,24 +166,23 @@ export function CacheManagement() {
                 disabled={flushMutation.isPending || !stats?.connected}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                Flush All
+                {t('cache.flushAll')}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Flush all cache?</AlertDialogTitle>
+                <AlertDialogTitle>{t('cache.flushConfirmTitle')}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will remove all cached responses for your organization. Subsequent requests
-                  will be slower until the cache rebuilds. This action cannot be undone.
+                  {t('cache.flushConfirmDescription')}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel>{t('cache.cancel')}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => flushMutation.mutate()}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  Flush Cache
+                  {t('cache.flushCache')}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -197,11 +194,9 @@ export function CacheManagement() {
       {statsError && (
         <Card className="border-destructive">
           <CardContent className="pt-6">
-            <p className="text-destructive text-sm">
-              Failed to load cache statistics. The cache service may be unavailable.
-            </p>
+            <p className="text-destructive text-sm">{t('cache.failedToLoad')}</p>
             <Button variant="outline" size="sm" className="mt-2" onClick={() => refetchStats()}>
-              Retry
+              {t('cache.retry')}
             </Button>
           </CardContent>
         </Card>
@@ -217,18 +212,18 @@ export function CacheManagement() {
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2">
                 <Database className="h-4 w-4" />
-                Store Type
+                {t('cache.storeType')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold capitalize">{stats.storeType}</span>
                 <Badge variant={stats.connected ? 'default' : 'destructive'}>
-                  {stats.connected ? 'Connected' : 'Disconnected'}
+                  {stats.connected ? t('cache.connected') : t('cache.disconnected')}
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Uptime: {formatUptime(stats.uptime)}
+                {t('cache.uptime', { value: formatUptime(stats.uptime) })}
               </p>
             </CardContent>
           </Card>
@@ -238,12 +233,12 @@ export function CacheManagement() {
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2">
                 <Key className="h-4 w-4" />
-                Total Keys
+                {t('cache.totalKeys')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <span className="text-2xl font-bold">{stats.keyCount.toLocaleString()}</span>
-              <p className="text-xs text-muted-foreground mt-1">Across all organizations</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('cache.acrossAllOrgs')}</p>
             </CardContent>
           </Card>
 
@@ -252,12 +247,12 @@ export function CacheManagement() {
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2">
                 <HardDrive className="h-4 w-4" />
-                Memory Usage
+                {t('cache.memoryUsage')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <span className="text-2xl font-bold">{stats.memoryUsage}</span>
-              <p className="text-xs text-muted-foreground mt-1">Redis memory consumption</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('cache.redisMemory')}</p>
             </CardContent>
           </Card>
 
@@ -266,7 +261,7 @@ export function CacheManagement() {
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2">
                 <Zap className="h-4 w-4" />
-                Hit Rate
+                {t('cache.hitRate')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -274,17 +269,15 @@ export function CacheManagement() {
                 <span className="text-2xl font-bold">{stats.hitRate}%</span>
                 {stats.hitRate >= 70 ? (
                   <Badge variant="default" className="bg-green-600 text-white">
-                    Good
+                    {t('cache.good')}
                   </Badge>
                 ) : stats.hitRate >= 40 ? (
-                  <Badge variant="secondary">Fair</Badge>
+                  <Badge variant="secondary">{t('cache.fair')}</Badge>
                 ) : (
-                  <Badge variant="destructive">Low</Badge>
+                  <Badge variant="destructive">{t('cache.low')}</Badge>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Cache efficiency since server start
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">{t('cache.cacheEfficiency')}</p>
             </CardContent>
           </Card>
         </div>
@@ -295,13 +288,13 @@ export function CacheManagement() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <CardTitle className="text-lg">Cached Keys</CardTitle>
-              <CardDescription>Cache entries for your organization</CardDescription>
+              <CardTitle className="text-lg">{t('cache.cachedKeys')}</CardTitle>
+              <CardDescription>{t('cache.cachedKeysDescription')}</CardDescription>
             </div>
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Filter keys..."
+                placeholder={t('cache.filterKeys')}
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
                 className="pl-9"
@@ -318,9 +311,9 @@ export function CacheManagement() {
             </div>
           ) : keysError ? (
             <div className="text-center py-8">
-              <p className="text-sm text-destructive">Failed to load cache keys.</p>
+              <p className="text-sm text-destructive">{t('cache.failedToLoadKeys')}</p>
               <Button variant="outline" size="sm" className="mt-2" onClick={() => refetchKeys()}>
-                Retry
+                {t('cache.retry')}
               </Button>
             </div>
           ) : filteredKeys.length === 0 ? (
@@ -331,14 +324,16 @@ export function CacheManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Key</TableHead>
+                      <TableHead>{t('cache.keyColumn')}</TableHead>
                       <TableHead className="w-[120px]">
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          TTL
+                          {t('cache.ttlColumn')}
                         </div>
                       </TableHead>
-                      <TableHead className="w-[80px] text-right">Actions</TableHead>
+                      <TableHead className="w-[80px] text-right">
+                        {t('cache.actionsColumn')}
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -396,31 +391,22 @@ export function CacheManagement() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Activity className="h-5 w-5" />
-            How Caching Works
+            {t('cache.howItWorks')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
             <div>
-              <h4 className="font-semibold mb-1">Dashboard &amp; Reports</h4>
-              <p className="text-muted-foreground">
-                Cached for 5–10 minutes. Automatically invalidated when accounting entries,
-                invoices, bills, or bank transactions are modified.
-              </p>
+              <h4 className="font-semibold mb-1">{t('cache.dashboardReports')}</h4>
+              <p className="text-muted-foreground">{t('cache.dashboardReportsDescription')}</p>
             </div>
             <div>
-              <h4 className="font-semibold mb-1">Account Lists &amp; Trees</h4>
-              <p className="text-muted-foreground">
-                Cached for 10 minutes. Chart of Accounts rarely changes, so longer TTL provides
-                significant performance improvement.
-              </p>
+              <h4 className="font-semibold mb-1">{t('cache.accountLists')}</h4>
+              <p className="text-muted-foreground">{t('cache.accountListsDescription')}</p>
             </div>
             <div>
-              <h4 className="font-semibold mb-1">Sales &amp; Purchases Lists</h4>
-              <p className="text-muted-foreground">
-                Cached for 2 minutes. Short TTL ensures data freshness for frequently-changing
-                transactional data.
-              </p>
+              <h4 className="font-semibold mb-1">{t('cache.salesPurchases')}</h4>
+              <p className="text-muted-foreground">{t('cache.salesPurchasesDescription')}</p>
             </div>
           </div>
         </CardContent>

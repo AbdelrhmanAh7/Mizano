@@ -58,10 +58,13 @@ import {
   MaterialRequirement,
 } from '@/lib/hooks/use-manufacturing';
 import { usePermissions } from '@/lib/hooks/use-permissions';
+import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 export default function WorkOrderDetailPage() {
+  const t = useTranslations('manufacturing');
+  const tCommon = useTranslations('common');
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -85,7 +88,7 @@ export default function WorkOrderDetailPage() {
   const handleStart = async () => {
     try {
       await startWorkOrder.mutateAsync(workOrderId);
-      toast({ title: 'Work order started' });
+      toast({ title: t('workOrders.status.inProcess') });
     } catch (error: unknown) {
       toast({
         title: 'Error',
@@ -100,7 +103,7 @@ export default function WorkOrderDetailPage() {
   const handleComplete = async () => {
     try {
       await completeWorkOrder.mutateAsync({ id: workOrderId, producedQuantity });
-      toast({ title: 'Work order completed' });
+      toast({ title: t('workOrders.status.completed') });
       setCompleteDialogOpen(false);
     } catch (error: unknown) {
       toast({
@@ -116,7 +119,7 @@ export default function WorkOrderDetailPage() {
   const handleCancel = async () => {
     try {
       await cancelWorkOrder.mutateAsync(workOrderId);
-      toast({ title: 'Work order cancelled' });
+      toast({ title: t('workOrders.status.cancelled') });
       setCancelDialogOpen(false);
     } catch (error: unknown) {
       toast({
@@ -132,7 +135,7 @@ export default function WorkOrderDetailPage() {
   const confirmDelete = async () => {
     try {
       await deleteWorkOrder.mutateAsync(workOrderId);
-      toast({ title: 'Work order deleted' });
+      toast({ title: t('workOrders.deleteWorkOrder') });
       router.push('/manufacturing/work-orders');
     } catch (error: unknown) {
       toast({

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Users, FileText, Receipt, CreditCard, TrendingUp, Clock, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { useInvoices } from '@/lib/hooks/use-invoices';
 import { useQuotes } from '@/lib/hooks/use-quotes';
 
 export default function SalesPage() {
+  const t = useTranslations('sales');
   const { data: customersData, isLoading: customersLoading } = useCustomers({ limit: 1000 });
   const { data: invoicesData, isLoading: invoicesLoading } = useInvoices({ limit: 1000 });
   const { data: quotesData, isLoading: quotesLoading } = useQuotes({ limit: 1000 });
@@ -45,7 +47,7 @@ export default function SalesPage() {
 
   const modules = [
     {
-      title: 'Customers',
+      title: t('customers.title'),
       description: 'Manage customer accounts and view balances',
       icon: Users,
       href: '/sales/customers',
@@ -53,7 +55,7 @@ export default function SalesPage() {
       stats: `${customers.length} total`,
     },
     {
-      title: 'Quotes',
+      title: t('quotes.title'),
       description: 'Create and send estimates to customers',
       icon: FileText,
       href: '/sales/quotes',
@@ -61,7 +63,7 @@ export default function SalesPage() {
       stats: `${pendingQuotes.length} pending`,
     },
     {
-      title: 'Invoices',
+      title: t('invoices.title'),
       description: 'Create invoices and track payments',
       icon: Receipt,
       href: '/sales/invoices',
@@ -69,7 +71,7 @@ export default function SalesPage() {
       stats: `${invoices.filter((i: { status: string }) => i.status === 'SENT').length} unpaid`,
     },
     {
-      title: 'Credit Notes',
+      title: t('creditNotes.title'),
       description: 'Issue refunds and invoice adjustments',
       icon: CreditCard,
       href: '/sales/credit-notes',
@@ -77,7 +79,7 @@ export default function SalesPage() {
       stats: 'Manage refunds',
     },
     {
-      title: 'Payments Received',
+      title: t('payments.title'),
       description: 'Record and track customer payments',
       icon: TrendingUp,
       href: '/sales/payments',
@@ -90,15 +92,15 @@ export default function SalesPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Sales</h1>
-        <p className="text-muted-foreground">Manage customers, quotes, invoices, and payments</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+        <p className="text-muted-foreground">{t('description')}</p>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Outstanding</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('stats.totalOutstanding')}</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -113,7 +115,7 @@ export default function SalesPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overdue Amount</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('stats.overdueAmount')}</CardTitle>
             <AlertCircle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
@@ -132,7 +134,7 @@ export default function SalesPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Quotes</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('stats.pendingQuotes')}</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -149,7 +151,7 @@ export default function SalesPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Received This Month</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('stats.receivedThisMonth')}</CardTitle>
             <CreditCard className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>

@@ -1,0 +1,114 @@
+{
+  "title": "الأصول الثابتة",
+  "description": "إدارة الأصول الثابتة والاستهلاك",
+  "newAsset": "أصل جديد",
+  "newAssetTitle": "أصل ثابت جديد",
+  "newAssetDescription": "إضافة أصل ثابت جديد إلى السجل",
+  "editAsset": "تعديل الأصل",
+  "deleteAsset": "حذف الأصل",
+  "assetDetails": "تفاصيل الأصل",
+  "assetNotFound": "الأصل غير موجود",
+  "assetNotFoundTitle": "الأصل غير موجود",
+  "backToAssets": "العودة إلى الأصول",
+  "summary": {
+    "totalAssets": "إجمالي الأصول",
+    "totalValue": "القيمة الإجمالية",
+    "accumulatedDepreciation": "الاستهلاك المتراكم",
+    "netBookValue": "صافي القيمة الدفترية"
+  },
+  "filters": {
+    "allStatus": "جميع الحالات",
+    "allTypes": "جميع الأنواع"
+  },
+  "form": {
+    "name": "اسم الأصل",
+    "namePlaceholder": "أدخل اسم الأصل",
+    "category": "الفئة",
+    "purchaseDate": "تاريخ الشراء",
+    "purchaseCost": "تكلفة الشراء",
+    "residualValue": "القيمة المتبقية",
+    "usefulLife": "العمر الإنتاجي (بالأشهر)",
+    "depreciationMethod": "طريقة الإهلاك",
+    "account": "حساب الأصل",
+    "depreciationAccount": "حساب الإهلاك",
+    "expenseAccount": "حساب المصروفات",
+    "serialNumber": "الرقم التسلسلي",
+    "location": "الموقع",
+    "notes": "ملاحظات"
+  },
+  "table": {
+    "assetNumber": "رقم الأصل",
+    "name": "الاسم",
+    "category": "الفئة",
+    "type": "النوع",
+    "method": "الطريقة",
+    "purchaseDate": "تاريخ الشراء",
+    "purchasePrice": "سعر الشراء",
+    "purchaseCost": "التكلفة",
+    "bookValue": "القيمة الدفترية",
+    "status": "الحالة",
+    "actions": "إجراءات"
+  },
+  "status": {
+    "active": "نشط",
+    "disposed": "مُتخلص منه",
+    "fullyDepreciated": "مُستهلك بالكامل"
+  },
+  "types": {
+    "electronics": "إلكترونيات",
+    "furniture": "أثاث",
+    "vehicles": "مركبات",
+    "machinery": "آلات",
+    "buildings": "مباني",
+    "other": "أخرى"
+  },
+  "depreciation": {
+    "straightLine": "القسط الثابت",
+    "decliningBalance": "القسط المتناقص"
+  },
+  "detail": {
+    "purchasePrice": "سعر الشراء",
+    "currentBookValue": "القيمة الدفترية الحالية",
+    "depreciation": "الاستهلاك",
+    "remainingLife": "العمر المتبقي",
+    "months": "{count} شهر",
+    "years": "{count} سنة",
+    "purchaseDate": "تاريخ الشراء",
+    "usefulLife": "العمر الإنتاجي",
+    "depreciationMethod": "طريقة الاستهلاك",
+    "salvageValue": "قيمة الإنقاذ",
+    "monthlyDepreciation": "الاستهلاك الشهري",
+    "description": "الوصف",
+    "financialSummary": "الملخص المالي",
+    "accumulatedDepreciation": "الاستهلاك المتراكم",
+    "netBookValue": "صافي القيمة الدفترية",
+    "disposalDate": "تاريخ التخلص",
+    "disposalAmount": "مبلغ التخلص",
+    "gainLoss": "ربح/خسارة",
+    "disposeAsset": "التخلص من الأصل",
+    "disposeDescription": "تسجيل التخلص من هذا الأصل. سيتم إنشاء قيد يومية لأي ربح أو خسارة.",
+    "currentBookValueLabel": "القيمة الدفترية الحالية: {value}",
+    "processing": "جاري المعالجة...",
+    "dispose": "تخلص"
+  },
+  "schedule": {
+    "title": "جدول الاستهلاك",
+    "period": "الفترة",
+    "amount": "المبلغ",
+    "accumulated": "المتراكم",
+    "bookValue": "القيمة الدفترية",
+    "status": "الحالة",
+    "posted": "مُرحّل",
+    "pending": "قيد الانتظار"
+  },
+  "confirmDelete": {
+    "title": "حذف الأصل",
+    "description": "هل أنت متأكد؟ يمكن القيام بذلك فقط إذا لم يتم ترحيل أي استهلاك.",
+    "descriptionDetail": "يمكن القيام بذلك فقط إذا لم يتم ترحيل أي قيود استهلاك."
+  },
+  "empty": {
+    "title": "لا توجد أصول بعد",
+    "description": "تتبع أصولك الثابتة وجداول الإهلاك",
+    "noResults": "لا توجد أصول. أضف أول أصل ثابت للبدء."
+  }
+}

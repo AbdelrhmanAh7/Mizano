@@ -2,6 +2,7 @@
 
 import { use } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, Edit, Mail, Phone, MapPin, Building2, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +24,8 @@ interface VendorDetailPageProps {
 
 export default function VendorDetailPage({ params }: VendorDetailPageProps) {
   const { id } = use(params);
+  const t = useTranslations('purchases');
+  const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();
   const { data: vendor, isLoading } = useVendor(id);
 
@@ -44,9 +47,9 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
   if (!vendor) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Vendor not found</p>
+        <p className="text-muted-foreground">{tCommon('errors.notFound')}</p>
         <Button asChild className="mt-4">
-          <Link href="/purchases/vendors">Back to Vendors</Link>
+          <Link href="/purchases/vendors">{tCommon('buttons.back')}</Link>
         </Button>
       </div>
     );
@@ -54,14 +57,16 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
 
   const balance = parseFloat(vendor.outstandingBalance || '0');
   const paymentTermsLabel =
-    vendor.paymentTerms === 0 ? 'Due on Receipt' : `Net ${vendor.paymentTerms}`;
+    vendor.paymentTerms === 0
+      ? t('vendors.dueOnReceipt')
+      : t('vendors.netDays', { days: vendor.paymentTerms });
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/purchases/vendors">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -79,7 +84,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
           <Button asChild>
             <Link href={`/purchases/vendors/${vendor.id}/edit`}>
               <Edit className="mr-2 h-4 w-4" />
-              Edit Vendor
+              {t('vendors.editVendor')}
             </Link>
           </Button>
         )}
@@ -91,14 +96,14 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Outstanding Balance
+              {t('vendors.table.payable')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className={cn('text-2xl font-bold font-mono', getBalanceColor(balance))}>
               {formatCurrency(balance, vendor.currency)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Amount you owe to this vendor</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('vendors.amountOwed')}</p>
           </CardContent>
         </Card>
 
@@ -106,23 +111,25 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Payment Terms
+              {t('vendors.form.paymentTerms')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{paymentTermsLabel}</div>
-            <p className="text-xs text-muted-foreground mt-1">Default payment terms for bills</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('vendors.defaultPaymentTerms')}</p>
           </CardContent>
         </Card>
 
         {/* Currency */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Currency</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {tCommon('currency')}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{vendor.currency}</div>
-            <p className="text-xs text-muted-foreground mt-1">Default transaction currency</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('vendors.defaultCurrency')}</p>
           </CardContent>
         </Card>
       </div>
@@ -132,7 +139,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
         {/* Contact Information */}
         <Card>
           <CardHeader>
-            <CardTitle>Contact Information</CardTitle>
+            <CardTitle>{t('vendors.contactInformation')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {vendor.email && (
@@ -154,11 +161,13 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
             {vendor.taxId && (
               <div className="flex items-center gap-3">
                 <CreditCard className="h-4 w-4 text-muted-foreground" />
-                <span>Tax ID: {vendor.taxId}</span>
+                <span>
+                  {t('vendors.taxIdLabel')} {vendor.taxId}
+                </span>
               </div>
             )}
             {!vendor.email && !vendor.phone && !vendor.taxId && (
-              <p className="text-muted-foreground">No contact information</p>
+              <p className="text-muted-foreground">{t('vendors.noContactInfo')}</p>
             )}
           </CardContent>
         </Card>
@@ -166,14 +175,14 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
         {/* Billing Address */}
         <Card>
           <CardHeader>
-            <CardTitle>Billing Address</CardTitle>
+            <CardTitle>{t('vendors.form.billingAddress')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-start gap-3">
               <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
               <div>
                 {formatVendorAddress(vendor) === '-' ? (
-                  <p className="text-muted-foreground">No address provided</p>
+                  <p className="text-muted-foreground">{t('vendors.noAddress')}</p>
                 ) : (
                   <address className="not-italic">
                     {vendor.billingStreet && <p>{vendor.billingStreet}</p>}
@@ -196,18 +205,24 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
       {/* Quick Actions */}
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle>{t('vendors.quickActions')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
             <Button variant="outline" asChild>
-              <Link href={`/purchases/bills/new?vendorId=${vendor.id}`}>Create Bill</Link>
+              <Link href={`/purchases/bills/new?vendorId=${vendor.id}`}>
+                {t('vendors.createBill')}
+              </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href={`/purchases/expenses/new?vendorId=${vendor.id}`}>Record Expense</Link>
+              <Link href={`/purchases/expenses/new?vendorId=${vendor.id}`}>
+                {t('vendors.recordExpense')}
+              </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href={`/purchases/payments/new?vendorId=${vendor.id}`}>Record Payment</Link>
+              <Link href={`/purchases/payments/new?vendorId=${vendor.id}`}>
+                {t('vendors.recordPayment')}
+              </Link>
             </Button>
           </div>
         </CardContent>

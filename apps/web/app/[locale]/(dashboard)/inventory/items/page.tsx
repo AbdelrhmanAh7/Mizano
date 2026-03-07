@@ -43,9 +43,11 @@ import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
 import { AlertTriangle, Eye, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
 
 function ItemsPageContent() {
+  const t = useTranslations('inventory');
   const tableParams = useTableParams({ defaultSortBy: 'name', mode: 'virtual' });
   const { onExportAll } = useExportAll('items', 'items');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -80,7 +82,7 @@ function ItemsPageContent() {
       accessorKey: 'name',
       header: () => (
         <SortableHeader
-          label="Name"
+          label={t('items.table.name')}
           columnId="name"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -105,13 +107,13 @@ function ItemsPageContent() {
     },
     {
       accessorKey: 'sku',
-      header: 'SKU',
+      header: t('items.table.sku'),
       meta: { cellClassName: 'font-mono text-sm' },
       cell: ({ row }) => row.original.sku || '-',
     },
     {
       accessorKey: 'type',
-      header: 'Type',
+      header: t('items.table.type'),
       cell: ({ row }) => (
         <span
           className={cn(
@@ -125,19 +127,19 @@ function ItemsPageContent() {
     },
     {
       accessorKey: 'salesPrice',
-      header: 'Sales Price',
+      header: t('items.table.sellingPrice'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
       cell: ({ row }) => formatCurrency(row.original.salesPrice || row.original.sellingPrice),
     },
     {
       accessorKey: 'purchasePrice',
-      header: 'Purchase Price',
+      header: t('items.table.costPrice'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
       cell: ({ row }) => formatCurrency(row.original.purchasePrice),
     },
     {
       accessorKey: 'stockLevel',
-      header: 'Stock',
+      header: t('items.table.stock'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => {
         const item = row.original;
@@ -171,18 +173,18 @@ function ItemsPageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/inventory/items/${item.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
-                  View
+                  {t('common.view')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href={`/inventory/items/${item.id}/edit`}>
                   <Pencil className="mr-2 h-4 w-4" />
-                  Edit
+                  {t('common.edit')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(item.id)}>
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                {t('common.delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -197,13 +199,13 @@ function ItemsPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Items</h1>
-          <p className="text-muted-foreground">Manage products and services</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('items.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <Button asChild data-tour="create-item-btn">
           <Link href="/inventory/items/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Item
+            {t('items.newItem')}
           </Link>
         </Button>
       </div>
@@ -221,9 +223,9 @@ function ItemsPageContent() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="GOODS">Goods</SelectItem>
-            <SelectItem value="SERVICE">Service</SelectItem>
-            <SelectItem value="DIGITAL">Digital</SelectItem>
+            <SelectItem value="GOODS">{t('items.types.goods')}</SelectItem>
+            <SelectItem value="SERVICE">{t('items.types.service')}</SelectItem>
+            <SelectItem value="DIGITAL">{t('items.types.digital')}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={stockFilter} onValueChange={setStockFilter}>
@@ -254,10 +256,10 @@ function ItemsPageContent() {
           enableColumnResizing
           tableId="items"
           onExportAll={onExportAll}
-          emptyMessage="No items found"
+          emptyMessage={t('items.empty.title')}
           emptyAction={
             <Button asChild>
-              <Link href="/inventory/items/new">Create your first item</Link>
+              <Link href="/inventory/items/new">{t('items.empty.description')}</Link>
             </Button>
           }
         />
@@ -267,15 +269,13 @@ function ItemsPageContent() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Item</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this item? This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('items.deleteItem')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('common.confirmDelete')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

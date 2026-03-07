@@ -6,6 +6,9 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 });
 
+// Next.js loads env files automatically in this order:
+// .env.$(NODE_ENV).local -> .env.local -> .env.$(NODE_ENV) -> .env
+// APP_ENV (local|dev|sit|prod) is used by the API; Next.js uses NODE_ENV.
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,

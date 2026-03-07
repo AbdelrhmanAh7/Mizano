@@ -41,11 +41,14 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
+import { useTranslations } from 'next-intl';
 import { CheckCircle, Eye, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function ExpensesPageContent() {
+  const t = useTranslations('purchases');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const { onExportAll } = useExportAll('expenses', 'expenses');
@@ -138,15 +141,15 @@ function ExpensesPageContent() {
       try {
         await deleteExpense.mutateAsync(expenseToDelete.id);
         toast({
-          title: 'Expense deleted',
-          description: 'The expense has been deleted.',
+          title: t('expenses.toast.deleted'),
+          description: t('expenses.toast.deletedDescription'),
         });
       } catch (error: unknown) {
         toast({
-          title: 'Error',
+          title: tCommon('errors.generic'),
           description:
             (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-            'Failed to delete expense.',
+            t('expenses.toast.deleteError'),
           variant: 'destructive',
         });
       }
@@ -160,7 +163,7 @@ function ExpensesPageContent() {
       accessorKey: 'date',
       header: () => (
         <SortableHeader
-          label="Date"
+          label={t('expenses.table.date')}
           columnId="date"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -171,13 +174,13 @@ function ExpensesPageContent() {
     },
     {
       accessorKey: 'account.name',
-      header: 'Category',
+      header: t('expenses.table.account'),
       cell: ({ row }) =>
         row.original.account ? <Badge variant="secondary">{row.original.account.name}</Badge> : '-',
     },
     {
       accessorKey: 'vendor.name',
-      header: 'Vendor',
+      header: t('expenses.table.vendor'),
       cell: ({ row }) =>
         row.original.vendor ? (
           <Link
@@ -192,13 +195,13 @@ function ExpensesPageContent() {
     },
     {
       accessorKey: 'reference',
-      header: 'Reference',
+      header: t('expenses.table.reference'),
       meta: { cellClassName: 'font-mono text-sm' },
       cell: ({ row }) => row.original.reference || '-',
     },
     {
       accessorKey: 'description',
-      header: 'Description',
+      header: t('expenses.table.description'),
       meta: { cellClassName: 'max-w-[200px] truncate' },
       cell: ({ row }) => row.original.description || '-',
     },
@@ -206,7 +209,7 @@ function ExpensesPageContent() {
       accessorKey: 'amount',
       header: () => (
         <SortableHeader
-          label="Amount"
+          label={t('expenses.table.amount')}
           columnId="amount"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -237,13 +240,13 @@ function ExpensesPageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/purchases/expenses/${expense.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
-                  View
+                  {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
               {canDelete && (
                 <DropdownMenuItem onClick={() => handleDelete(expense)} className="text-red-600">
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  {tCommon('buttons.delete')}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -258,15 +261,15 @@ function ExpensesPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Expenses</h1>
-          <p className="text-muted-foreground">Track and manage business expenses</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('expenses.title')}</h1>
+          <p className="text-muted-foreground">{t('expenses.pageDescription')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
             <Button asChild>
               <Link href="/purchases/expenses/new">
                 <Plus className="mr-2 h-4 w-4" />
-                New Expense
+                {t('expenses.newExpense')}
               </Link>
             </Button>
           )}
@@ -280,7 +283,7 @@ function ExpensesPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search by description, reference, or vendor..."
+              placeholder={t('expenses.searchPlaceholder')}
             />
             <DataTableDateRangeFilter
               value={dateRange}
@@ -294,13 +297,13 @@ function ExpensesPageContent() {
                   tableParams.setFilters({ startDate: undefined, endDate: undefined });
                 }
               }}
-              placeholder="Date range"
+              placeholder={t('expenses.dateRange')}
             />
             <Button
               variant="outline"
               size="icon"
               onClick={() => refetch()}
-              aria-label="Refresh expenses"
+              aria-label={t('expenses.refreshExpenses')}
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -311,7 +314,7 @@ function ExpensesPageContent() {
       {/* Expenses Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Expenses</CardTitle>
+          <CardTitle>{t('expenses.allExpenses')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -331,13 +334,13 @@ function ExpensesPageContent() {
             exportFilename="expenses"
             onExportAll={onExportAll}
             bulkActions={bulkActions}
-            emptyMessage="No expenses found"
+            emptyMessage={t('expenses.noExpenses')}
             emptyAction={
               canCreate ? (
                 <Button asChild>
                   <Link href="/purchases/expenses/new">
                     <Plus className="mr-2 h-4 w-4" />
-                    Record Your First Expense
+                    {t('expenses.recordFirst')}
                   </Link>
                 </Button>
               ) : undefined
@@ -350,15 +353,13 @@ function ExpensesPageContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Expense</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this expense? This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('expenses.deleteTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('expenses.deleteConfirmation')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

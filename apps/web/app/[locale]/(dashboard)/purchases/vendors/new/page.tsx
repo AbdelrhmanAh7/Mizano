@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import { useCreateVendor } from '@/lib/hooks/use-vendors';
 
 export default function NewVendorPage() {
   const router = useRouter();
+  const t = useTranslations('purchases');
   const createVendor = useCreateVendor();
 
   const handleSubmit = async (data: Record<string, unknown>) => {
@@ -30,8 +32,8 @@ export default function NewVendorPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Vendor</h1>
-          <p className="text-muted-foreground">Add a new supplier to your organization</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('vendors.newVendor')}</h1>
+          <p className="text-muted-foreground">{t('vendors.empty.description')}</p>
         </div>
       </div>
 

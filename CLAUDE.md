@@ -46,6 +46,9 @@ pnpm test             # Run all tests
 pnpm test:api         # API unit tests
 pnpm test:cov         # API coverage report
 pnpm test:e2e         # API end-to-end tests
+pnpm test:regression  # Run regression test suite
+pnpm test:playwright  # Frontend E2E tests (Playwright)
+pnpm ci:full          # Full CI: lint + type-check + test + e2e
 
 # Infrastructure
 pnpm docker:up        # Start PostgreSQL + Redis
@@ -53,7 +56,29 @@ pnpm docker:up:ocr    # Start PostgreSQL + Redis + OCR service
 pnpm docker:up:vlm    # Start PostgreSQL + Redis + VLM
 pnpm docker:down      # Stop infrastructure
 pnpm docker:prod      # Build & start production stack
+pnpm status           # Show running containers
+
+# Environment (4-env system: local|dev|sit|prod)
+pnpm env:check        # Verify env file exists for current APP_ENV
+pnpm build:dev        # Build with APP_ENV=dev
+pnpm build:sit        # Build with APP_ENV=sit
+pnpm build:prod       # Build with APP_ENV=prod
+pnpm docker:dev       # Start infra with .env.dev
+pnpm docker:sit       # Start infra with .env.sit (production-like)
 ```
+
+## Environment System
+
+Mizano uses 4 environment configurations via `APP_ENV`:
+
+| File         | APP_ENV | NODE_ENV    | Purpose                    |
+| ------------ | ------- | ----------- | -------------------------- |
+| `.env.local` | local   | development | Localhost dev (default)    |
+| `.env.dev`   | dev     | development | Shared dev server          |
+| `.env.sit`   | sit     | production  | System Integration Testing |
+| `.env.prod`  | prod    | production  | Production                 |
+
+The API resolves: `.env.${APP_ENV}` -> `.env`. See `docs/environment-guide.md` for details.
 
 ## Project Structure
 
@@ -140,20 +165,27 @@ mizano/
 
 ## Business Domain Modules
 
-| Module        | Path                     | Key Entities                                               |
-| ------------- | ------------------------ | ---------------------------------------------------------- |
-| Accounting    | `modules/accounting/`    | Accounts, Journals, RecurringProfiles                      |
-| Sales         | `modules/sales/`         | Customers, Quotes, Invoices, CreditNotes, PaymentsReceived |
-| Purchases     | `modules/purchases/`     | Vendors, Bills, Expenses, VendorCredits, PaymentsMade      |
-| Inventory     | `modules/inventory/`     | Items, Warehouses, Movements, Adjustments, PriceLists      |
-| Banking       | `modules/banking/`       | BankAccounts, BankTransactions, BankRules                  |
-| HR            | `modules/hr/`            | Employees, Attendance, PayrollRuns, Payslips               |
-| Manufacturing | `modules/manufacturing/` | BOMs, WorkOrders                                           |
-| Projects      | `modules/projects/`      | Projects, Tasks, TimesheetEntries                          |
-| Tax           | `modules/tax/`           | TaxRates, VATReturns, VATPayments                          |
-| CRM           | `modules/crm/`           | Leads, Deals                                               |
-| Reports       | `modules/reports/`       | P&L, Balance Sheet, AR/AP Aging                            |
-| AI            | `modules/ai/`            | AIInsights, reconciliation, forecasting                    |
+| Module        | Path                       | Key Entities                                                                                 |
+| ------------- | -------------------------- | -------------------------------------------------------------------------------------------- |
+| Accounting    | `modules/accounting/`      | Accounts, Journals, RecurringProfiles                                                        |
+| Sales         | `modules/sales/`           | Customers, Quotes, Invoices, CreditNotes, PaymentsReceived                                   |
+| Purchases     | `modules/purchases/`       | Vendors, Bills, Expenses, VendorCredits, PaymentsMade                                        |
+| Inventory     | `modules/inventory/`       | Items, Warehouses, Movements, Adjustments, PriceLists                                        |
+| Banking       | `modules/banking/`         | BankAccounts, BankTransactions, BankRules                                                    |
+| HR            | `modules/hr/`              | Employees, Attendance, PayrollRuns, Payslips                                                 |
+| Manufacturing | `modules/manufacturing/`   | BOMs, WorkOrders                                                                             |
+| Projects      | `modules/projects/`        | Projects, Tasks, TimesheetEntries                                                            |
+| Tax           | `modules/tax/`             | TaxRates, VATReturns, VATPayments                                                            |
+| CRM           | `modules/crm/`             | Leads, Deals                                                                                 |
+| Reports       | `modules/reports/`         | P&L, Balance Sheet, AR/AP Aging                                                              |
+| AI            | `modules/ai/`              | 33 models across 7 sub-modules (Core, Forecasting, Sales-CRM, Security, NLP, Operations, HR) |
+| Assets        | `modules/assets/`          | FixedAssets, Depreciation                                                                    |
+| Documents     | `modules/documents/`       | OCR processing, document management                                                          |
+| Currency      | `modules/currency/`        | Exchange rates, multi-currency support                                                       |
+| Notifications | `modules/notifications/`   | In-app & email notifications                                                                 |
+| Search        | `modules/search/`          | Global search across entities                                                                |
+| Performance   | `modules/performance/`     | System performance monitoring                                                                |
+| Bulk Ops      | `modules/bulk-operations/` | Batch import/export operations                                                               |
 
 ## Common Patterns
 
@@ -215,7 +247,7 @@ if (!totalDebits.equals(totalCredits)) {
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and configure:
+Copy `.env.local` to `.env` and configure:
 
 ```bash
 DATABASE_URL="postgresql://mizano:mizano_secret@localhost:5435/mizano_db"
@@ -229,6 +261,15 @@ NEXT_PUBLIC_API_URL="http://localhost:6001"
 OCR_SERVICE_URL=http://localhost:7001
 VLM_SERVICE_URL=http://localhost:8100
 ```
+
+## Product Roadmap
+
+See `docs/roadmap.md` for the full product roadmap including:
+
+- Market vision: #1 AI-powered ERP for SMBs globally
+- 5-phase plan: Foundation Hardening -> Quality & Reliability -> Market Differentiation -> Scale & Growth -> Market Leadership
+- Comprehensive testing strategy: automation, regression, performance, security
+- Success metrics and technical debt paydown plan
 
 ## Code Quality Checklist
 

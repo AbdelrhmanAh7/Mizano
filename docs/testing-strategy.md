@@ -7,16 +7,25 @@ This document defines the testing strategy for the Mizano ERP system. The goal i
 ## Testing Pyramid
 
 ```
-         /  E2E Tests  \          ← 8 test suites (API integration)
-        / Integration    \        ← Service + database interaction
-       /  Unit Tests      \       ← ~25 test suites (pure logic + mocked deps)
-      /____________________\
+              /  Security Scans   \         ← OWASP ZAP + Snyk (weekly)
+             /  Performance Tests  \        ← k6 load testing (weekly)
+            /  Visual Regression    \       ← Chromatic/Percy snapshots
+           /  Frontend E2E (Playwright) \   ← 20+ critical user journeys
+          /  API E2E (supertest)         \  ← 8+ suites, full request lifecycle
+         /  Integration Tests             \ ← Service + database interaction
+        /  Unit Tests (Jest)               \← 60+ suites, pure logic + mocks
+       /____________________________________\
 ```
 
-| Layer      | Count      | Target                           | Tools                               |
-| ---------- | ---------- | -------------------------------- | ----------------------------------- |
-| Unit Tests | ~25 suites | Pure functions, services, guards | Jest + ts-jest + jest-mock-extended |
-| E2E Tests  | 8 suites   | API endpoints end-to-end         | Jest + supertest + test database    |
+| Layer             | Count        | Target                           | Tools                               |
+| ----------------- | ------------ | -------------------------------- | ----------------------------------- |
+| Unit Tests        | 60+ suites   | Pure functions, services, guards | Jest + ts-jest + jest-mock-extended |
+| Integration Tests | 10+ suites   | Service + database interaction   | Jest + test database                |
+| API E2E Tests     | 8+ suites    | API endpoints end-to-end         | Jest + supertest + test database    |
+| Frontend E2E      | 20+ journeys | Critical user flows              | Playwright                          |
+| Visual Regression | 50+ pages    | UI snapshot comparison           | Chromatic / Percy                   |
+| Performance Tests | 5+ scenarios | Load + stress testing            | k6 / Artillery                      |
+| Security Scans    | Continuous   | Vulnerability detection          | OWASP ZAP + Snyk                    |
 
 ## Test Infrastructure
 
@@ -232,6 +241,235 @@ test:
     - run: pnpm --filter api test:cov
     - run: pnpm --filter api test:e2e
 ```
+
+## Automation Testing
+
+### CI/CD Pipeline Integration
+
+All tests run automatically via GitHub Actions on every pull request:
+
+```yaml
+# Triggered on every PR to master/develop
+jobs:
+  lint-and-typecheck    # ESLint + TypeScript (parallel)
+  unit-tests            # Jest unit tests with coverage gates
+  e2e-tests             # API E2E against test database (postgres + redis services)
+  frontend-tests        # Component tests (Jest + RTL)
+  playwright-e2e        # Frontend E2E (master branch only)
+  security-scan         # Snyk vulnerability scanning
+```
+
+### Quality Gates
+
+| Gate                             | Threshold           | Blocks PR |
+| -------------------------------- | ------------------- | --------- |
+| Unit test coverage               | >= 70% (target 80%) | Yes       |
+| All unit tests pass              | 100%                | Yes       |
+| All E2E tests pass               | 100%                | Yes       |
+| No critical/high vulnerabilities | 0                   | Yes       |
+| Lint errors                      | 0                   | Yes       |
+| Type errors                      | 0                   | Yes       |
+
+### Test Parallelization
+
+- Unit tests and E2E tests run in parallel CI jobs
+- Jest uses `--maxWorkers=50%` for optimal CPU utilization
+- E2E test suites are independent (no shared state between suites)
+- Frontend and backend tests run in separate parallel jobs
+
+---
+
+## Regression Testing
+
+### Policy
+
+Every bug fix MUST include a regression test that:
+
+1. Reproduces the original bug (test fails without the fix)
+2. Verifies the fix works (test passes with the fix)
+3. Prevents the bug from reappearing in future releases
+
+### Directory Structure
+
+```
+apps/api/test/regression/
+  auth/                                            # Authentication regressions
+  accounting/                                      # Journal entry, balance regressions
+  sales/                                           # Invoice lifecycle regressions
+  multi-tenancy/                                   # Cross-org data leak regressions
+  ai/                                              # AI prediction regressions
+
+apps/web/__tests__/regression/
+  forms/                                           # Form input/validation regressions
+  navigation/                                      # Routing and state regressions
+  dashboard/                                       # Dashboard rendering regressions
+```
+
+### Priority Tagging
+
+Tag regression tests with priority annotations:
+
+```typescript
+// @critical - Blocks deployment if failing
+describe('@critical: Cross-org data isolation', () => { ... });
+
+// @high - Must be fixed before next release
+describe('@high: Invoice decimal rounding', () => { ... });
+
+// @medium - Should be fixed within current sprint
+describe('@medium: Sidebar collapse state', () => { ... });
+```
+
+### Monthly Review
+
+- Review the regression suite for obsolete tests (underlying code removed)
+- Identify new risk areas from recent bug reports
+- Ensure coverage of all critical business flows
+- Update priority tags based on production incident data
+
+---
+
+## Frontend Testing
+
+### Component Tests (Jest + React Testing Library)
+
+Test interactive components in isolation:
+
+```typescript
+import { render, screen, fireEvent } from '@testing-library/react';
+import { InvoiceForm } from '@/components/sales/invoice-form';
+
+describe('InvoiceForm', () => {
+  it('validates required fields before submission', async () => {
+    render(<InvoiceForm />);
+    fireEvent.click(screen.getByText('Save'));
+    expect(await screen.findByText('Customer is required')).toBeVisible();
+  });
+
+  it('calculates line totals with correct decimal precision', () => {
+    // Test Decimal precision in money fields
+  });
+});
+```
+
+### E2E Tests (Playwright)
+
+Test critical user journeys across pages:
+
+```typescript
+// e2e/invoice-lifecycle.spec.ts
+test('create, send, and pay an invoice', async ({ page }) => {
+  await page.goto('/en/sales/invoices/new');
+  await page.fill('[name="customerId"]', 'TechCorp');
+  // ... fill form
+  await page.click('button:has-text("Save")');
+  await expect(page).toHaveURL(/invoices\/[a-z0-9]+$/);
+});
+```
+
+### Visual Regression (Chromatic/Percy)
+
+Capture screenshots of key pages and compare against baselines:
+
+- Dashboard, Reports (P&L, Balance Sheet), Forms (Invoice, Bill, Journal)
+- Arabic RTL layouts
+- Mobile breakpoints (375px, 768px)
+
+### Accessibility (axe-core)
+
+Run accessibility checks on all pages:
+
+```typescript
+import { checkA11y } from '@axe-core/playwright';
+
+test('dashboard meets WCAG 2.1 AA', async ({ page }) => {
+  await page.goto('/en/dashboard');
+  await checkA11y(page);
+});
+```
+
+---
+
+## Performance Testing
+
+### Load Testing (k6)
+
+```javascript
+// k6/load-test.js
+import http from 'k6/http';
+import { check } from 'k6';
+
+export const options = {
+  stages: [
+    { duration: '2m', target: 50 }, // Ramp up
+    { duration: '5m', target: 100 }, // Sustained load
+    { duration: '2m', target: 0 }, // Ramp down
+  ],
+  thresholds: {
+    http_req_duration: ['p(95)<500'], // 95% under 500ms
+    http_req_failed: ['rate<0.01'], // <1% error rate
+  },
+};
+```
+
+### Response Time Benchmarks
+
+| Endpoint Type     | P50 Target | P95 Target | P99 Target |
+| ----------------- | ---------- | ---------- | ---------- |
+| List endpoints    | < 200ms    | < 500ms    | < 1s       |
+| Single resource   | < 100ms    | < 200ms    | < 500ms    |
+| Report generation | < 2s       | < 5s       | < 10s      |
+| AI prediction     | < 1s       | < 3s       | < 5s       |
+| Dashboard         | < 1s       | < 3s       | < 5s       |
+
+### Database Performance
+
+- Monitor via Performance module (`/performance/slow-queries`)
+- Alert threshold: queries > 100ms
+- Weekly performance regression review
+- Index advisor recommendations reviewed monthly
+
+---
+
+## Security Testing
+
+### OWASP Top 10 Verification
+
+| Risk                     | Mitigation                             | Test Method                                      |
+| ------------------------ | -------------------------------------- | ------------------------------------------------ |
+| Injection                | Prisma parameterized queries           | E2E: SQL injection payloads in all string inputs |
+| Broken Auth              | JWT + refresh rotation + rate limiting | E2E: Token expiry, reuse, brute force            |
+| Sensitive Data           | HTTPS, bcrypt, no plaintext secrets    | Security scan: check headers, storage            |
+| XXE                      | No XML processing                      | N/A                                              |
+| Broken Access            | OrganizationGuard + PermissionsGuard   | E2E: multi-tenancy isolation suite               |
+| Misconfig                | Helmet.js, CORS, env validation        | Security scan: header verification               |
+| XSS                      | React escaping + Helmet headers        | Security scan: XSS payloads                      |
+| Insecure Deserialization | class-validator DTOs                   | E2E: malformed payloads                          |
+| Vulnerable Components    | Snyk scanning                          | CI: weekly dependency scan                       |
+| Insufficient Logging     | AuditLog on all writes                 | E2E: verify audit log creation                   |
+
+### Dependency Scanning
+
+```bash
+# Run Snyk scan
+npx snyk test --all-projects
+
+# Run npm audit
+pnpm audit --audit-level=high
+```
+
+### Multi-Tenancy Isolation Tests
+
+The `multi-tenancy.e2e-spec.ts` suite verifies:
+
+- Org A data is invisible to Org B users
+- Cross-org API requests return 403/404
+- AI models are scoped per organization
+- Audit logs are scoped per organization
+
+See `docs/roadmap.md` for the full testing roadmap and quality targets.
+
+---
 
 ## Key Testing Principles
 

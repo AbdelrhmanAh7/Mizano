@@ -52,8 +52,10 @@ import {
   BankAccount,
   BankAccountType,
 } from '@/lib/hooks/use-bank-accounts';
+import { useTranslations } from 'next-intl';
 
 function BankAccountsPageContent() {
+  const t = useTranslations('banking');
   const tableParams = useTableParams({ defaultSortBy: 'accountName' });
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -87,7 +89,7 @@ function BankAccountsPageContent() {
       accessorKey: 'accountName',
       header: () => (
         <SortableHeader
-          label="Account Name"
+          label={t('accounts.table.name')}
           columnId="accountName"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -110,7 +112,7 @@ function BankAccountsPageContent() {
     },
     {
       accessorKey: 'accountType',
-      header: 'Type',
+      header: t('accounts.table.type'),
       cell: ({ row }) => (
         <Badge variant="outline" className={getAccountTypeColor(row.original.accountType)}>
           {getAccountTypeLabel(row.original.accountType)}
@@ -119,7 +121,7 @@ function BankAccountsPageContent() {
     },
     {
       accessorKey: 'accountNumber',
-      header: 'Account #',
+      header: t('accounts.table.accountNumber'),
       meta: { cellClassName: 'font-mono text-sm text-muted-foreground' },
       cell: ({ row }) =>
         row.original.accountNumber ? `.... ${row.original.accountNumber.slice(-4)}` : '-',
@@ -128,7 +130,7 @@ function BankAccountsPageContent() {
       accessorKey: 'currentBalance',
       header: () => (
         <SortableHeader
-          label="Balance"
+          label={t('accounts.table.balance')}
           columnId="currentBalance"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -201,13 +203,13 @@ function BankAccountsPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bank Accounts</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('accounts.title')}</h1>
           <p className="text-muted-foreground">Manage your bank accounts and track balances</p>
         </div>
         <Button asChild>
           <Link href="/banking/accounts/new">
             <Plus className="mr-2 h-4 w-4" />
-            Add Account
+            {t('accounts.newAccount')}
           </Link>
         </Button>
       </div>
@@ -261,10 +263,10 @@ function BankAccountsPageContent() {
         onPageChange={tableParams.setPage}
         onLimitChange={tableParams.setLimit}
         isLoading={isLoading}
-        emptyMessage="No bank accounts"
+        emptyMessage={t('accounts.empty.title')}
         emptyAction={
           <Button asChild>
-            <Link href="/banking/accounts/new">Add Bank Account</Link>
+            <Link href="/banking/accounts/new">{t('accounts.newAccount')}</Link>
           </Button>
         }
       />
@@ -273,7 +275,7 @@ function BankAccountsPageContent() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Bank Account</AlertDialogTitle>
+            <AlertDialogTitle>{t('accounts.deleteAccount')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete this bank account? This action cannot be undone. All
               associated transactions will also be deleted.

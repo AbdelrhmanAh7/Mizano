@@ -45,7 +45,7 @@ import { CommonModule } from './common/common.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: [`.env.${process.env.APP_ENV || 'local'}`, '.env'],
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
@@ -77,13 +77,20 @@ import { CommonModule } from './common/common.module';
     }),
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
+    // Infrastructure
     PrismaModule,
     CommonModule,
+
+    // Auth & Users
     AuthModule,
     UsersModule,
     OrganizationsModule,
     RolesModule,
+
+    // Audit & Logging
     AuditModule,
+
+    // Business Modules
     AccountingModule,
     SalesModule,
     PurchasesModule,
@@ -95,7 +102,11 @@ import { CommonModule } from './common/common.module';
     TaxModule,
     ReportsModule,
     CrmModule,
+
+    // AI & Intelligence
     AiModule,
+
+    // Supporting Services
     NotificationsModule,
     DocumentsModule,
     ImportExportModule,

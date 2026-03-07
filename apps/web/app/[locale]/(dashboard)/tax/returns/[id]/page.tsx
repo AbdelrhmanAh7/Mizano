@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -58,6 +59,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 export default function VATReturnDetailPage() {
+  const t = useTranslations('tax');
+  const tCommon = useTranslations('common');
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -83,14 +86,14 @@ export default function VATReturnDetailPage() {
   const confirmFile = async () => {
     try {
       await fileReturn.mutateAsync(returnId);
-      toast({ title: 'VAT return filed successfully' });
+      toast({ title: t('returns.fileSuccess') });
       setFileDialogOpen(false);
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: tCommon('errors.generic'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to file VAT return',
+          t('returns.fileFail'),
         variant: 'destructive',
       });
     }
@@ -99,14 +102,14 @@ export default function VATReturnDetailPage() {
   const confirmDelete = async () => {
     try {
       await deleteReturn.mutateAsync(returnId);
-      toast({ title: 'VAT return deleted' });
+      toast({ title: t('returns.deleteSuccess') });
       router.push('/tax/returns');
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: tCommon('errors.generic'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to delete VAT return',
+          t('returns.deleteFail'),
         variant: 'destructive',
       });
     }
@@ -122,14 +125,14 @@ export default function VATReturnDetailPage() {
         paidFromAccountId: bankAccountId,
         reference: paymentRef || undefined,
       });
-      toast({ title: 'Payment recorded successfully' });
+      toast({ title: t('payments.recordSuccess') });
       setPaymentDialogOpen(false);
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: tCommon('errors.generic'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to record payment',
+          t('payments.recordFail'),
         variant: 'destructive',
       });
     }
@@ -161,15 +164,13 @@ export default function VATReturnDetailPage() {
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <h1 className="text-3xl font-bold tracking-tight">VAT Return Not Found</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('returns.notFound')}</h1>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              The VAT return you&apos;re looking for doesn&apos;t exist.
-            </p>
+            <p className="text-muted-foreground">{t('returns.notFoundDescription')}</p>
             <Button asChild className="mt-4">
-              <Link href="/tax/returns">Back to VAT Returns</Link>
+              <Link href="/tax/returns">{t('returns.backToReturns')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -194,7 +195,7 @@ export default function VATReturnDetailPage() {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">VAT Return</h1>
+              <h1 className="text-3xl font-bold tracking-tight">{t('returns.vatReturn')}</h1>
               <Badge className={getVATReturnStatusColor(vatReturn.status)}>
                 {getVATReturnStatusLabel(vatReturn.status)}
               </Badge>
@@ -209,7 +210,7 @@ export default function VATReturnDetailPage() {
           {canEdit && isDraft && (
             <Button onClick={() => setFileDialogOpen(true)}>
               <FileCheck className="mr-2 h-4 w-4" />
-              File Return
+              {t('returns.fileReturn')}
             </Button>
           )}
           {canEdit && isFiled && (
@@ -220,13 +221,13 @@ export default function VATReturnDetailPage() {
               }}
             >
               <CreditCard className="mr-2 h-4 w-4" />
-              Record Payment
+              {t('returns.recordPayment')}
             </Button>
           )}
           {canDelete && isDraft && (
             <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              {tCommon('buttons.delete')}
             </Button>
           )}
         </div>
@@ -238,7 +239,7 @@ export default function VATReturnDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <ArrowUpRight className="h-4 w-4" />
-              Output VAT (Sales)
+              {t('returns.outputVat')}
             </div>
             <div className="text-2xl font-bold font-mono">
               {formatCurrency(vatReturn.outputVat)}
@@ -250,7 +251,7 @@ export default function VATReturnDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <ArrowDownLeft className="h-4 w-4" />
-              Input VAT (Purchases)
+              {t('returns.inputVat')}
             </div>
             <div className="text-2xl font-bold font-mono">{formatCurrency(vatReturn.inputVat)}</div>
           </CardContent>
@@ -260,7 +261,7 @@ export default function VATReturnDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <DollarSign className="h-4 w-4" />
-              {netVat >= 0 ? 'Net Payable' : 'Net Refundable'}
+              {netVat >= 0 ? t('returns.netPayable') : t('returns.netRefundable')}
             </div>
             <div
               className={cn(
@@ -277,10 +278,12 @@ export default function VATReturnDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <FileCheck className="h-4 w-4" />
-              Filed Date
+              {t('returns.filedDate')}
             </div>
             <div className="text-lg font-bold">
-              {vatReturn.filedAt ? format(new Date(vatReturn.filedAt), 'MMM d, yyyy') : 'Not filed'}
+              {vatReturn.filedAt
+                ? format(new Date(vatReturn.filedAt), 'MMM d, yyyy')
+                : t('returns.notFiled')}
             </div>
           </CardContent>
         </Card>
@@ -290,15 +293,12 @@ export default function VATReturnDetailPage() {
       <AlertDialog open={fileDialogOpen} onOpenChange={setFileDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>File VAT Return</AlertDialogTitle>
-            <AlertDialogDescription>
-              Filing this return will lock all transactions within the period. This action cannot be
-              undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('returns.fileTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('returns.fileDescriptionDetail')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmFile}>File Return</AlertDialogAction>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmFile}>{t('returns.fileReturn')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -307,12 +307,12 @@ export default function VATReturnDetailPage() {
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Record VAT Payment</DialogTitle>
-            <DialogDescription>Record the payment made for this VAT return</DialogDescription>
+            <DialogTitle>{t('payments.recordTitle')}</DialogTitle>
+            <DialogDescription>{t('payments.recordDescription')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="paymentAmount">Amount</Label>
+              <Label htmlFor="paymentAmount">{t('payments.amount')}</Label>
               <Input
                 id="paymentAmount"
                 type="number"
@@ -322,7 +322,7 @@ export default function VATReturnDetailPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="paymentDate">Payment Date</Label>
+              <Label htmlFor="paymentDate">{t('payments.paymentDate')}</Label>
               <Input
                 id="paymentDate"
                 type="date"
@@ -331,10 +331,10 @@ export default function VATReturnDetailPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="paymentRef">Reference</Label>
+              <Label htmlFor="paymentRef">{t('payments.reference')}</Label>
               <Input
                 id="paymentRef"
-                placeholder="Payment reference"
+                placeholder={t('payments.referencePlaceholder')}
                 value={paymentRef}
                 onChange={(e) => setPaymentRef(e.target.value)}
               />
@@ -342,13 +342,13 @@ export default function VATReturnDetailPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
-              Cancel
+              {tCommon('buttons.cancel')}
             </Button>
             <Button
               onClick={handleRecordPayment}
               disabled={createPayment.isPending || !paymentAmount}
             >
-              {createPayment.isPending ? 'Recording...' : 'Record Payment'}
+              {createPayment.isPending ? t('payments.recording') : t('payments.recordButton')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -358,15 +358,13 @@ export default function VATReturnDetailPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete VAT Return</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure? This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('returns.deleteTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('returns.deleteDescriptionShort')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

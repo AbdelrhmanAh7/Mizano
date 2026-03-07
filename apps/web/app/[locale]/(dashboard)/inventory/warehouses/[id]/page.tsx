@@ -3,6 +3,7 @@
 import { use, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, Pencil, Trash2, MapPin, Package, Star, ArrowRightLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,6 +49,7 @@ interface WarehouseDetailPageProps {
 }
 
 export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps) {
+  const t = useTranslations('inventory');
   const { id } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -88,9 +90,13 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
   if (!warehouse) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Warehouse not found</p>
+        <p className="text-muted-foreground">
+          {t('warehouses.title')} {t('common.notFound')}
+        </p>
         <Button asChild className="mt-4">
-          <Link href="/inventory/warehouses">Back to Warehouses</Link>
+          <Link href="/inventory/warehouses">
+            {t('common.backTo')} {t('warehouses.title')}
+          </Link>
         </Button>
       </div>
     );
@@ -119,7 +125,7 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
                 </Badge>
               )}
               <Badge variant={warehouse.isActive ? 'default' : 'secondary'}>
-                {warehouse.isActive ? 'Active' : 'Inactive'}
+                {warehouse.isActive ? t('common.active') : t('common.inactive')}
               </Badge>
             </div>
             {warehouse.code && <p className="text-muted-foreground font-mono">{warehouse.code}</p>}
@@ -135,27 +141,24 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
           </Button>
           <Button variant="outline" onClick={() => setEditDialogOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />
-            Edit
+            {t('common.edit')}
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" className="text-red-600">
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                {t('common.delete')}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete Warehouse</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete this warehouse? Warehouses with stock cannot be
-                  deleted.
-                </AlertDialogDescription>
+                <AlertDialogTitle>{t('warehouses.deleteWarehouse')}</AlertDialogTitle>
+                <AlertDialogDescription>{t('common.confirmDelete')}</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-                  Delete
+                  {t('common.delete')}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -264,7 +267,7 @@ export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Warehouse</DialogTitle>
+            <DialogTitle>{t('warehouses.editWarehouse')}</DialogTitle>
             <DialogDescription>Update warehouse details below.</DialogDescription>
           </DialogHeader>
           <WarehouseForm

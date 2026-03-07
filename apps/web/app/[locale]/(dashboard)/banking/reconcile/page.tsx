@@ -14,8 +14,10 @@ import {
   formatCurrency,
   BankAccount,
 } from '@/lib/hooks/use-bank-accounts';
+import { useTranslations } from 'next-intl';
 
 export default function ReconcilePage() {
+  const t = useTranslations('banking');
   const { data, isLoading } = useBankAccounts({ isActive: true });
   const accounts: BankAccount[] = data?.data || [];
 
@@ -36,18 +38,18 @@ export default function ReconcilePage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Bank Reconciliation</h1>
-        <p className="text-muted-foreground">Select a bank account to reconcile transactions</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('reconciliation.pageTitle')}</h1>
+        <p className="text-muted-foreground">{t('reconciliation.pageDescription')}</p>
       </div>
 
       {/* Account Selection */}
       {accounts.length === 0 ? (
         <div className="text-center py-12">
           <Landmark className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-semibold">No bank accounts</h3>
-          <p className="text-muted-foreground">Add a bank account first to start reconciliation.</p>
+          <h3 className="mt-4 text-lg font-semibold">{t('reconciliation.empty.noAccounts')}</h3>
+          <p className="text-muted-foreground">{t('reconciliation.empty.noAccountsDescription')}</p>
           <Button asChild className="mt-4">
-            <Link href="/banking/accounts/new">Add Bank Account</Link>
+            <Link href="/banking/accounts/new">{t('reconciliation.empty.addBankAccount')}</Link>
           </Button>
         </div>
       ) : (
@@ -80,7 +82,7 @@ export default function ReconcilePage() {
                     </div>
                     {needsReconciliation && (
                       <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
-                        Needs Review
+                        {t('reconciliation.needsReview')}
                       </Badge>
                     )}
                   </div>
@@ -88,11 +90,15 @@ export default function ReconcilePage() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Book Balance</span>
+                      <span className="text-muted-foreground">
+                        {t('reconciliation.bookBalance')}
+                      </span>
                       <span className="font-mono">{formatCurrency(currentBalance)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Bank Balance</span>
+                      <span className="text-muted-foreground">
+                        {t('reconciliation.bankBalance')}
+                      </span>
                       <span className="font-mono">{formatCurrency(bankBalance || 0)}</span>
                     </div>
                     <div className="border-t pt-2 flex justify-between">
@@ -102,7 +108,7 @@ export default function ReconcilePage() {
                           needsReconciliation ? 'text-yellow-600' : 'text-green-600',
                         )}
                       >
-                        Difference
+                        {t('reconciliation.summary.difference')}
                       </span>
                       <span
                         className={cn(
@@ -118,7 +124,7 @@ export default function ReconcilePage() {
                   <Button asChild className="w-full">
                     <Link href={`/banking/reconcile/${account.id}`}>
                       <RefreshCw className="mr-2 h-4 w-4" />
-                      Reconcile
+                      {t('reconciliation.reconcile')}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>

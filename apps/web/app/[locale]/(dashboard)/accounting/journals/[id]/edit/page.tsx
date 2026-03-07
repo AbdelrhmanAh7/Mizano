@@ -10,8 +10,10 @@ import { JournalForm } from '@/components/accounting/journal-form';
 import { useAccountsTree } from '@/lib/hooks/use-accounts';
 import { useJournal, useUpdateJournal } from '@/lib/hooks/use-journals';
 import { Card, CardContent } from '@/components/ui/card';
+import { useTranslations } from 'next-intl';
 
 export default function EditJournalPage() {
+  const t = useTranslations('accounting');
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -122,7 +124,9 @@ export default function EditJournalPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edit {journal.journalNumber}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t('journals.editJournal')} - {journal.journalNumber}
+          </h1>
           <p className="text-muted-foreground">Update the journal entry details</p>
         </div>
       </div>

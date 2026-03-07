@@ -60,6 +60,7 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { ActivityLog } from '@/components/crm/activity-log';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useTranslations } from 'next-intl';
 
 const STAGE_ORDER: DealStage[] = [
   'NEW',
@@ -81,6 +82,7 @@ const LOST_REASONS = [
 ];
 
 export default function DealDetailPage() {
+  const t = useTranslations('crm');
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -195,7 +197,7 @@ export default function DealDetailPage() {
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <h1 className="text-3xl font-bold tracking-tight">Deal Not Found</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('deals.dealDetails')}</h1>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
@@ -273,7 +275,7 @@ export default function DealDetailPage() {
           {canDelete && (
             <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              {t('deals.deleteDeal')}
             </Button>
           )}
         </div>
@@ -314,7 +316,7 @@ export default function DealDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <DollarSign className="h-4 w-4" />
-              Expected Amount
+              {t('deals.form.value')}
             </div>
             <div className="text-2xl font-bold font-mono">
               {formatCurrency(deal.expectedAmount)}
@@ -334,7 +336,7 @@ export default function DealDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Calendar className="h-4 w-4" />
-              Expected Close
+              {t('deals.form.expectedCloseDate')}
             </div>
             <div className="text-lg font-bold">
               {deal.expectedCloseDate
@@ -347,7 +349,7 @@ export default function DealDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <User className="h-4 w-4" />
-              Assigned To
+              {t('deals.form.assignedTo')}
             </div>
             <div className="text-lg font-bold">{deal.assignedTo?.name || 'Unassigned'}</div>
           </CardContent>
@@ -458,7 +460,7 @@ export default function DealDetailPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Deal</AlertDialogTitle>
+            <AlertDialogTitle>{t('deals.deleteDeal')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete &quot;{deal.dealName}&quot;? This cannot be undone.
             </AlertDialogDescription>

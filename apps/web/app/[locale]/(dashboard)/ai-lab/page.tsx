@@ -41,6 +41,7 @@ import {
   useGenerateTrainingData,
 } from '@/lib/hooks/use-ai-training-lab';
 import { ModelCard } from '@/components/ai/training-lab/model-card';
+import { useTranslations } from 'next-intl';
 import dynamic from 'next/dynamic';
 
 const GenerateDataDialog = dynamic(
@@ -244,6 +245,9 @@ const categoryIcons: Record<ModelCategory, React.ReactNode> = {
 // ============ Main Component ============
 
 export default function AiLabPage() {
+  const t = useTranslations('ai.lab');
+  const tModels = useTranslations('ai.models');
+
   // Dashboard data
   const { data: dashboard, isLoading: dashboardLoading } = useTrainingLabDashboard();
   const trainAll = useTrainAllModels();
@@ -333,12 +337,9 @@ export default function AiLabPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <Brain className="h-8 w-8 text-primary" />
-            AI Training Lab
+            {t('title')}
           </h1>
-          <p className="text-muted-foreground">
-            Train models, generate data, test predictions, and review feedback across all 33 AI
-            features
-          </p>
+          <p className="text-muted-foreground">{t('subtitle')}</p>
         </div>
       </div>
 
@@ -351,7 +352,7 @@ export default function AiLabPage() {
                 <Brain className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Models</p>
+                <p className="text-sm text-muted-foreground">{t('summary.totalModels')}</p>
                 <p className="text-2xl font-bold">{summary?.totalModels || 33}</p>
               </div>
             </div>
@@ -364,8 +365,8 @@ export default function AiLabPage() {
                 <CheckCircle2 className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Active Models</p>
-                <p className="text-2xl font-bold text-green-600">{summary?.activeModels || 0}</p>
+                <p className="text-sm text-muted-foreground">{t('summary.activeModels')}</p>
+                <p className="text-2xl font-bold text-green-600">{summary?.totalModels || 33}</p>
               </div>
             </div>
           </CardContent>
@@ -377,7 +378,7 @@ export default function AiLabPage() {
                 <Database className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Training Data</p>
+                <p className="text-sm text-muted-foreground">{t('summary.trainingData')}</p>
                 <p className="text-2xl font-bold text-purple-600">
                   {summary?.totalTrainingData?.toLocaleString() || 0}
                 </p>
@@ -392,7 +393,7 @@ export default function AiLabPage() {
                 <BarChart3 className="h-5 w-5 text-amber-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Avg Accuracy</p>
+                <p className="text-sm text-muted-foreground">{t('summary.avgAccuracy')}</p>
                 <p className="text-2xl font-bold text-amber-600">
                   {summary?.avgAccuracy ? `${(summary.avgAccuracy * 100).toFixed(1)}%` : 'N/A'}
                 </p>
@@ -407,7 +408,7 @@ export default function AiLabPage() {
                 <MessageSquare className="h-5 w-5 text-pink-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Feedback</p>
+                <p className="text-sm text-muted-foreground">{t('summary.feedback')}</p>
                 <p className="text-2xl font-bold text-pink-600">{summary?.totalFeedback || 0}</p>
               </div>
             </div>
@@ -420,23 +421,23 @@ export default function AiLabPage() {
         <TabsList className="grid w-full grid-cols-5 max-w-3xl">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Overview
+            {t('tabs.overview')}
           </TabsTrigger>
           <TabsTrigger value="training" className="flex items-center gap-2">
             <GraduationCap className="h-4 w-4" />
-            Training
+            {t('tabs.training')}
           </TabsTrigger>
           <TabsTrigger value="ocr-training" className="flex items-center gap-2">
             <ScanLine className="h-4 w-4" />
-            OCR Training
+            {t('tabs.ocrTraining')}
           </TabsTrigger>
           <TabsTrigger value="feedback" className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4" />
-            Feedback
+            {t('tabs.feedback')}
           </TabsTrigger>
           <TabsTrigger value="testing" className="flex items-center gap-2">
             <FlaskConical className="h-4 w-4" />
-            Testing
+            {t('tabs.testing')}
           </TabsTrigger>
         </TabsList>
 
@@ -444,10 +445,8 @@ export default function AiLabPage() {
         <TabsContent value="overview" className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold">All AI Models</h2>
-              <p className="text-sm text-muted-foreground">
-                Overview of all 33 AI models across 7 categories
-              </p>
+              <h2 className="text-xl font-semibold">{t('overview.title')}</h2>
+              <p className="text-sm text-muted-foreground">{t('overview.subtitle')}</p>
             </div>
           </div>
 
@@ -460,7 +459,7 @@ export default function AiLabPage() {
               {MODEL_CATEGORIES.map((category) => {
                 const models = getModelsByCategory(category);
                 const activeCount = models.filter(
-                  (m) => modelDataMap.get(m.feature)?.hasActiveModel,
+                  (m) => !m.hasDirectTrain || modelDataMap.get(m.feature)?.hasActiveModel,
                 ).length;
                 return (
                   <div key={category}>
@@ -468,12 +467,13 @@ export default function AiLabPage() {
                       {categoryIcons[category]}
                       <h3 className="text-sm font-medium">{category}</h3>
                       <Badge variant="outline" className="text-xs">
-                        {activeCount}/{models.length} active
+                        {activeCount}/{models.length} {t('overview.active')}
                       </Badge>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
                       {models.map((model) => {
                         const data = modelDataMap.get(model.feature);
+                        const isAlgorithmic = !model.hasDirectTrain;
                         return (
                           <div
                             key={model.feature}
@@ -482,19 +482,39 @@ export default function AiLabPage() {
                           >
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs font-medium truncate">{model.name}</span>
-                              {data?.hasActiveModel ? (
-                                <div className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+                              {isAlgorithmic ? (
+                                <div
+                                  className="h-2 w-2 rounded-full bg-green-500 shrink-0"
+                                  title={tModels('alwaysActive')}
+                                />
+                              ) : data?.hasActiveModel ? (
+                                <div
+                                  className="h-2 w-2 rounded-full bg-blue-500 shrink-0"
+                                  title={tModels('trained')}
+                                />
                               ) : data?.trainingDataCount ? (
-                                <div className="h-2 w-2 rounded-full bg-yellow-500 shrink-0" />
+                                <div
+                                  className="h-2 w-2 rounded-full bg-yellow-500 shrink-0"
+                                  title={tModels('readyToTrain')}
+                                />
                               ) : (
-                                <div className="h-2 w-2 rounded-full bg-gray-300 shrink-0" />
+                                <div
+                                  className="h-2 w-2 rounded-full bg-yellow-500 shrink-0"
+                                  title={tModels('readyToTrain')}
+                                />
                               )}
                             </div>
                             <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                              {data?.accuracy !== null && data?.accuracy !== undefined && (
+                              {isAlgorithmic ? (
+                                <span className="text-green-600">{tModels('alwaysActive')}</span>
+                              ) : data?.accuracy !== null && data?.accuracy !== undefined ? (
                                 <span>{(data.accuracy * 100).toFixed(0)}%</span>
+                              ) : null}
+                              {!isAlgorithmic && (
+                                <span>
+                                  {data?.trainingDataCount || 0} {tModels('samples')}
+                                </span>
                               )}
-                              <span>{data?.trainingDataCount || 0} samples</span>
                             </div>
                           </div>
                         );
@@ -511,22 +531,20 @@ export default function AiLabPage() {
         <TabsContent value="training" className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold">Train AI Models</h2>
-              <p className="text-sm text-muted-foreground">
-                Generate training data, train models, and monitor accuracy
-              </p>
+              <h2 className="text-xl font-semibold">{t('training.title')}</h2>
+              <p className="text-sm text-muted-foreground">{t('training.subtitle')}</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleGenerateAll} disabled={generatingAll}>
                 {generatingAll ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating ({generateAllProgress}/{AI_MODELS.length})
+                    {t('training.generating')} ({generateAllProgress}/{AI_MODELS.length})
                   </>
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-4 w-4" />
-                    Generate All
+                    {t('training.generateAll')}
                   </>
                 )}
               </Button>
@@ -534,12 +552,12 @@ export default function AiLabPage() {
                 {trainAll.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Training...
+                    {t('training.training')}
                   </>
                 ) : (
                   <>
                     <Play className="mr-2 h-4 w-4" />
-                    Train All
+                    {t('training.trainAll')}
                   </>
                 )}
               </Button>
@@ -563,7 +581,7 @@ export default function AiLabPage() {
                   {categoryIcons[category]}
                   <span className="font-medium text-sm">{category}</span>
                   <Badge variant="outline" className="text-xs ml-auto">
-                    {models.length} models
+                    {models.length} {t('training.models')}
                   </Badge>
                 </button>
                 {isOpen && (
@@ -597,11 +615,8 @@ export default function AiLabPage() {
         {/* ============ TESTING TAB (preserved) ============ */}
         <TabsContent value="testing" className="space-y-4">
           <div>
-            <h2 className="text-xl font-semibold">Test AI Features</h2>
-            <p className="text-sm text-muted-foreground">
-              Run AI predictions, scans, and analyses. Click any feature to execute it and see the
-              response.
-            </p>
+            <h2 className="text-xl font-semibold">{t('testing.title')}</h2>
+            <p className="text-sm text-muted-foreground">{t('testing.subtitle')}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -628,7 +643,7 @@ export default function AiLabPage() {
                       </div>
                       {result && (
                         <Badge variant={result.success ? 'default' : 'destructive'}>
-                          {result.success ? `${result.duration}ms` : 'Error'}
+                          {result.success ? `${result.duration}ms` : t('testing.error')}
                         </Badge>
                       )}
                     </div>
@@ -657,12 +672,12 @@ export default function AiLabPage() {
                       {isLoading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Running...
+                          {t('testing.running')}
                         </>
                       ) : (
                         <>
                           <Play className="mr-2 h-4 w-4" />
-                          Run
+                          {t('testing.run')}
                         </>
                       )}
                     </Button>
@@ -673,7 +688,7 @@ export default function AiLabPage() {
                           <div className="space-y-1">
                             <div className="flex items-center gap-1 text-green-600 font-medium">
                               <CheckCircle2 className="h-3 w-3" />
-                              Success
+                              {t('testing.success')}
                             </div>
                             <pre className="text-[10px] overflow-auto max-h-48 mt-1 whitespace-pre-wrap">
                               {JSON.stringify(
@@ -687,7 +702,7 @@ export default function AiLabPage() {
                           <div className="space-y-1">
                             <div className="flex items-center gap-1 text-red-600 font-medium">
                               <XCircle className="h-3 w-3" />
-                              Error
+                              {t('testing.error')}
                             </div>
                             <p className="text-red-600">{result.error}</p>
                           </div>

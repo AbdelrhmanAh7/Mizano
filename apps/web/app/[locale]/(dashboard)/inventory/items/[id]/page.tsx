@@ -3,6 +3,7 @@
 import { use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import {
   ArrowLeft,
   Pencil,
@@ -42,6 +43,7 @@ interface ItemDetailPageProps {
 }
 
 export default function ItemDetailPage({ params }: ItemDetailPageProps) {
+  const t = useTranslations('inventory');
   const { id } = use(params);
   const router = useRouter();
   const { data: item, isLoading } = useItem(id);
@@ -69,9 +71,13 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   if (!item) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Item not found</p>
+        <p className="text-muted-foreground">
+          {t('items.title')} {t('common.notFound')}
+        </p>
         <Button asChild className="mt-4">
-          <Link href="/inventory/items">Back to Items</Link>
+          <Link href="/inventory/items">
+            {t('common.backTo')} {t('items.title')}
+          </Link>
         </Button>
       </div>
     );
@@ -109,27 +115,25 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
           <Button variant="outline" asChild>
             <Link href={`/inventory/items/${id}/edit`}>
               <Pencil className="mr-2 h-4 w-4" />
-              Edit
+              {t('common.edit')}
             </Link>
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" className="text-red-600">
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                {t('common.delete')}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete Item</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete this item? This action cannot be undone.
-                </AlertDialogDescription>
+                <AlertDialogTitle>{t('items.deleteItem')}</AlertDialogTitle>
+                <AlertDialogDescription>{t('common.confirmDelete')}</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-                  Delete
+                  {t('common.delete')}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -146,7 +150,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 <DollarSign className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Sales Price</p>
+                <p className="text-sm text-muted-foreground">{t('items.table.sellingPrice')}</p>
                 <p className="text-2xl font-bold font-mono">
                   {formatCurrency(item.salesPrice || item.sellingPrice)}
                 </p>
@@ -162,7 +166,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 <TrendingUp className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Purchase Price</p>
+                <p className="text-sm text-muted-foreground">{t('items.table.costPrice')}</p>
                 <p className="text-2xl font-bold font-mono">{formatCurrency(item.purchasePrice)}</p>
               </div>
             </div>
@@ -176,7 +180,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 <Package className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Stock Level</p>
+                <p className="text-sm text-muted-foreground">{t('items.table.stock')}</p>
                 {item.trackInventory ? (
                   <p className={cn('text-2xl font-bold font-mono', stockStatus.color)}>
                     {item.stockLevel} {item.unit || 'units'}
@@ -214,7 +218,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 )}
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Status</p>
+                <p className="text-sm text-muted-foreground">{t('items.table.status')}</p>
                 <p className={cn('text-lg font-semibold', stockStatus.color)}>
                   {stockStatus.label}
                 </p>
@@ -228,7 +232,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Item Details</CardTitle>
+            <CardTitle>{t('items.itemDetails')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between">

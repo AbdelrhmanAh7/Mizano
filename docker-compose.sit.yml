@@ -1,0 +1,19 @@
+# SIT (System Integration Testing) override
+# Usage: docker-compose --env-file .env.sit -f docker-compose.yml -f docker-compose.sit.yml up -d
+version: '3.8'
+
+services:
+  postgres:
+    env_file: .env.sit
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  redis:
+    env_file: .env.sit
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    command: redis-server --maxmemory 400mb --maxmemory-policy allkeys-lru

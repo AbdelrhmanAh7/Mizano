@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Plus, Trash2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -28,6 +29,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { usePriceLists, useDeletePriceList } from '@/lib/hooks/use-price-lists';
 
 export default function PriceListsPage() {
+  const t = useTranslations('inventory');
   const { data, isLoading } = usePriceLists();
   const deletePriceList = useDeletePriceList();
 
@@ -46,13 +48,13 @@ export default function PriceListsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Price Lists</h1>
-          <p className="text-muted-foreground">Manage pricing tiers for items</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('priceLists.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <Button asChild>
           <Link href="/inventory/price-lists/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Price List
+            {t('priceLists.newPriceList')}
           </Link>
         </Button>
       </div>
@@ -61,17 +63,17 @@ export default function PriceListsPage() {
         <CardContent className="p-0">
           {priceLists.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              No price lists yet. Create your first price list to get started.
+              {t('priceLists.empty.title')}. {t('priceLists.empty.description')}.
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t('priceLists.table.name')}</TableHead>
+                  <TableHead>{t('priceLists.table.type')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
+                  <TableHead>{t('priceLists.table.itemCount')}</TableHead>
+                  <TableHead className="text-right">{t('common.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -99,7 +101,7 @@ export default function PriceListsPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant={pl.isActive ? 'default' : 'secondary'}>
-                          {pl.isActive ? 'Active' : 'Inactive'}
+                          {pl.isActive ? t('common.active') : t('common.inactive')}
                         </Badge>
                       </TableCell>
                       <TableCell>{pl.items?.length || 0} items</TableCell>
@@ -118,18 +120,20 @@ export default function PriceListsPage() {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Price List</AlertDialogTitle>
+                                <AlertDialogTitle>
+                                  {t('priceLists.deletePriceList')}
+                                </AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure? This will permanently delete this price list.
+                                  {t('common.confirmDelete')}
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => deletePriceList.mutate(pl.id)}
                                   className="bg-red-600 hover:bg-red-700"
                                 >
-                                  Delete
+                                  {t('common.delete')}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>

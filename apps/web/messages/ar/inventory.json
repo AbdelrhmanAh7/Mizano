@@ -139,5 +139,45 @@
       "title": "لا توجد قوائم أسعار بعد",
       "description": "أنشئ قوائم أسعار لمجموعات العملاء المختلفة"
     }
+  },
+  "transfers": {
+    "title": "تحويلات المخزون",
+    "newTransfer": "تحويل جديد",
+    "transferDetails": "تفاصيل التحويل",
+    "completeTransfer": "إتمام التحويل",
+    "cancelTransfer": "إلغاء التحويل",
+    "table": {
+      "transferNumber": "رقم التحويل",
+      "date": "التاريخ",
+      "from": "من",
+      "to": "إلى",
+      "items": "الأصناف",
+      "totalQty": "الكمية الإجمالية",
+      "status": "الحالة"
+    },
+    "empty": {
+      "title": "لا توجد تحويلات",
+      "createAction": "إنشاء تحويل"
+    }
+  },
+  "common": {
+    "open": "فتح",
+    "view": "عرض",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "cancel": "إلغاء",
+    "back": "رجوع",
+    "save": "حفظ",
+    "create": "إنشاء",
+    "search": "بحث",
+    "actions": "إجراءات",
+    "active": "نشط",
+    "inactive": "غير نشط",
+    "name": "الاسم",
+    "status": "الحالة",
+    "notFound": "غير موجود",
+    "backTo": "العودة إلى",
+    "confirmDelete": "هل أنت متأكد من حذف هذا العنصر؟ لا يمكن التراجع عن هذا الإجراء.",
+    "noData": "لا تتوفر بيانات"
   }
 }

@@ -32,11 +32,14 @@ import {
 } from '@/lib/hooks/use-vendors';
 import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
+import { useTranslations } from 'next-intl';
 import { Edit, Eye, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function VendorsPageContent() {
+  const t = useTranslations('purchases');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const { onExportAll } = useExportAll('vendors', 'vendors');
@@ -72,15 +75,15 @@ function VendorsPageContent() {
       try {
         await deleteVendor.mutateAsync(vendorToDelete.id);
         toast({
-          title: 'Vendor deleted',
-          description: `${vendorToDelete.name} has been deleted.`,
+          title: t('vendors.toast.deleted'),
+          description: t('vendors.toast.deletedDescription', { name: vendorToDelete.name }),
         });
       } catch (error: unknown) {
         toast({
-          title: 'Error',
+          title: tCommon('errors.generic'),
           description:
             (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-            'Failed to delete vendor. They may have associated transactions.',
+            t('vendors.toast.deleteError'),
           variant: 'destructive',
         });
       }
@@ -94,7 +97,7 @@ function VendorsPageContent() {
       accessorKey: 'name',
       header: () => (
         <SortableHeader
-          label="Name"
+          label={t('vendors.table.name')}
           columnId="name"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -117,23 +120,23 @@ function VendorsPageContent() {
     },
     {
       accessorKey: 'email',
-      header: 'Email',
+      header: t('vendors.table.email'),
       cell: ({ row }) => row.original.email || '-',
     },
     {
       accessorKey: 'phone',
-      header: 'Phone',
+      header: t('vendors.table.phone'),
       cell: ({ row }) => row.original.phone || '-',
     },
     {
       accessorKey: 'currency',
-      header: 'Currency',
+      header: tCommon('currency'),
     },
     {
       accessorKey: 'outstandingBalance',
       header: () => (
         <SortableHeader
-          label="Outstanding Balance"
+          label={t('vendors.table.payable')}
           columnId="outstandingBalance"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -167,21 +170,21 @@ function VendorsPageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/purchases/vendors/${vendor.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
-                  View
+                  {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
               {canEdit && (
                 <DropdownMenuItem asChild>
                   <Link href={`/purchases/vendors/${vendor.id}/edit`}>
                     <Edit className="mr-2 h-4 w-4" />
-                    Edit
+                    {tCommon('buttons.edit')}
                   </Link>
                 </DropdownMenuItem>
               )}
               {canDelete && (
                 <DropdownMenuItem onClick={() => handleDelete(vendor)} className="text-red-600">
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  {tCommon('buttons.delete')}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -196,15 +199,15 @@ function VendorsPageContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Vendors</h1>
-          <p className="text-muted-foreground">Manage your supplier accounts and track balances</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('vendors.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
           {canCreate && (
             <Button asChild>
               <Link href="/purchases/vendors/new">
                 <Plus className="mr-2 h-4 w-4" />
-                New Vendor
+                {t('vendors.newVendor')}
               </Link>
             </Button>
           )}
@@ -218,13 +221,13 @@ function VendorsPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search by name, email, or phone..."
+              placeholder={t('vendors.searchPlaceholder')}
             />
             <Button
               variant="outline"
               size="icon"
               onClick={() => refetch()}
-              aria-label="Refresh vendors"
+              aria-label={t('vendors.refreshVendors')}
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -235,7 +238,7 @@ function VendorsPageContent() {
       {/* Vendors Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Vendors</CardTitle>
+          <CardTitle>{t('vendors.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -254,13 +257,13 @@ function VendorsPageContent() {
             enableColumnVisibility
             exportFilename="vendors"
             onExportAll={onExportAll}
-            emptyMessage="No vendors found"
+            emptyMessage={t('vendors.empty.title')}
             emptyAction={
               canCreate ? (
                 <Button asChild>
                   <Link href="/purchases/vendors/new">
                     <Plus className="mr-2 h-4 w-4" />
-                    Add Your First Vendor
+                    {t('vendors.newVendor')}
                   </Link>
                 </Button>
               ) : undefined
@@ -273,16 +276,13 @@ function VendorsPageContent() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete &quot;{vendorToDelete?.name}&quot;? This action cannot
-              be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('vendors.deleteVendor')}</AlertDialogTitle>
+            <AlertDialogDescription>{tCommon('confirm.deleteMessage')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

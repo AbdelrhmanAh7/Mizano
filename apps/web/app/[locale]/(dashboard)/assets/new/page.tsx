@@ -6,9 +6,11 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCreateAsset } from '@/lib/hooks/use-assets';
 import { AssetForm } from '@/components/assets/asset-form';
+import { useTranslations } from 'next-intl';
 
 export default function NewAssetPage() {
   const router = useRouter();
+  const t = useTranslations('assets');
   const createAsset = useCreateAsset();
 
   const handleSubmit = async (data: Record<string, unknown>) => {
@@ -34,8 +36,8 @@ export default function NewAssetPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Fixed Asset</h1>
-          <p className="text-muted-foreground">Add a new fixed asset to your register</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('newAssetTitle')}</h1>
+          <p className="text-muted-foreground">{t('newAssetDescription')}</p>
         </div>
       </div>
 

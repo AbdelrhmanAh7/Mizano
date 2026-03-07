@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,6 +12,7 @@ import { useItems } from '@/lib/hooks/use-items';
 import { useWarehouses } from '@/lib/hooks/use-warehouses';
 
 export default function NewTransferPage() {
+  const t = useTranslations('inventory');
   const router = useRouter();
   const createTransfer = useCreateTransfer();
 
@@ -62,8 +64,8 @@ export default function NewTransferPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Stock Transfer</h1>
-          <p className="text-muted-foreground">Transfer inventory between warehouses</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('transfers.newTransfer')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
       </div>
 

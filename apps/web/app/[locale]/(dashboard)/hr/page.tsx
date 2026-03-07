@@ -4,37 +4,40 @@ import Link from 'next/link';
 import { Users, Clock, DollarSign, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-
-const modules = [
-  {
-    title: 'Employees',
-    description: 'Manage employee records, departments, and employment details.',
-    icon: Users,
-    href: '/hr/employees',
-    color: 'text-blue-600',
-  },
-  {
-    title: 'Attendance',
-    description: 'Track employee attendance, leave requests, and work hours.',
-    icon: Clock,
-    href: '/hr/attendance',
-    color: 'text-green-600',
-  },
-  {
-    title: 'Payroll',
-    description: 'Run payroll, generate payslips, and manage salary disbursements.',
-    icon: DollarSign,
-    href: '/hr/payroll',
-    color: 'text-purple-600',
-  },
-];
+import { useTranslations } from 'next-intl';
 
 export default function HRPage() {
+  const t = useTranslations('hr');
+
+  const modules = [
+    {
+      title: t('employees.title'),
+      description: 'Manage employee records, departments, and employment details.',
+      icon: Users,
+      href: '/hr/employees',
+      color: 'text-blue-600',
+    },
+    {
+      title: t('attendance.title'),
+      description: 'Track employee attendance, leave requests, and work hours.',
+      icon: Clock,
+      href: '/hr/attendance',
+      color: 'text-green-600',
+    },
+    {
+      title: t('payroll.title'),
+      description: 'Run payroll, generate payslips, and manage salary disbursements.',
+      icon: DollarSign,
+      href: '/hr/payroll',
+      color: 'text-purple-600',
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Human Resources</h1>
-        <p className="text-muted-foreground">Manage employees, attendance, and payroll.</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+        <p className="text-muted-foreground">{t('description')}</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
