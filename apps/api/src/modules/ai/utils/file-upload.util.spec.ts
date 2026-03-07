@@ -103,10 +103,10 @@ describe('file-upload.util', () => {
       ['image/heif', 'HEIF'],
       ['application/pdf', 'PDF'],
     ])('should accept %s (%s)', (mime: string) => {
-      let callbackErr: any = 'not-called';
+      let callbackErr: unknown = 'not-called';
       let callbackAccepted: boolean | undefined;
 
-      filter({}, createFile(mime), (err: any, accepted: boolean) => {
+      filter({}, createFile(mime), (err: unknown, accepted: boolean) => {
         callbackErr = err;
         callbackAccepted = accepted;
       });
@@ -118,16 +118,16 @@ describe('file-upload.util', () => {
     it.each(['text/plain', 'application/zip', 'video/mp4', 'application/json', 'image/svg+xml'])(
       'should reject %s',
       (mime: string) => {
-        let callbackErr: any = 'not-called';
+        let callbackErr: unknown = 'not-called';
         let callbackAccepted: boolean | undefined;
 
-        filter({}, createFile(mime), (err: any, accepted: boolean) => {
+        filter({}, createFile(mime), (err: unknown, accepted: boolean) => {
           callbackErr = err;
           callbackAccepted = accepted;
         });
 
         expect(callbackErr).toBeInstanceOf(BadRequestException);
-        expect(callbackErr.message).toBe(OCR_FILE_TYPE_ERROR);
+        expect((callbackErr as Error).message).toBe(OCR_FILE_TYPE_ERROR);
         expect(callbackAccepted).toBe(false);
       },
     );
@@ -146,10 +146,10 @@ describe('file-upload.util', () => {
         'should accept application/octet-stream with %s extension and patch mimetype to %s',
         (ext: string, expectedMime: string) => {
           const file = createFile('application/octet-stream', `upload${ext}`);
-          let callbackErr: any = 'not-called';
+          let callbackErr: unknown = 'not-called';
           let callbackAccepted: boolean | undefined;
 
-          filter({}, file, (err: any, accepted: boolean) => {
+          filter({}, file, (err: unknown, accepted: boolean) => {
             callbackErr = err;
             callbackAccepted = accepted;
           });
@@ -162,7 +162,7 @@ describe('file-upload.util', () => {
 
       it('should accept empty mimetype with .heic extension', () => {
         const file = createFile('', 'photo.heic');
-        let callbackErr: any = 'not-called';
+        let callbackErr: unknown = 'not-called';
         let callbackAccepted: boolean | undefined;
 
         filter({}, file, (err: any, accepted: boolean) => {
@@ -176,13 +176,13 @@ describe('file-upload.util', () => {
       });
 
       it('should reject application/octet-stream with unknown extension (.exe)', () => {
-        let callbackErr: any = 'not-called';
+        let callbackErr: unknown = 'not-called';
         let callbackAccepted: boolean | undefined;
 
         filter(
           {},
           createFile('application/octet-stream', 'malware.exe'),
-          (err: any, accepted: boolean) => {
+          (err: unknown, accepted: boolean) => {
             callbackErr = err;
             callbackAccepted = accepted;
           },
@@ -193,13 +193,13 @@ describe('file-upload.util', () => {
       });
 
       it('should reject application/octet-stream with no extension', () => {
-        let callbackErr: any = 'not-called';
+        let callbackErr: unknown = 'not-called';
         let callbackAccepted: boolean | undefined;
 
         filter(
           {},
           createFile('application/octet-stream', 'noext'),
-          (err: any, accepted: boolean) => {
+          (err: unknown, accepted: boolean) => {
             callbackErr = err;
             callbackAccepted = accepted;
           },
@@ -210,7 +210,7 @@ describe('file-upload.util', () => {
       });
 
       it('should NOT fall back for non-octet-stream wrong MIME (video/mp4 + .heic)', () => {
-        let callbackErr: any = 'not-called';
+        let callbackErr: unknown = 'not-called';
         let callbackAccepted: boolean | undefined;
 
         filter({}, createFile('video/mp4', 'fake.heic'), (err: any, accepted: boolean) => {
@@ -224,7 +224,7 @@ describe('file-upload.util', () => {
 
       it('should handle files with multiple dots (invoice.2024.01.heic)', () => {
         const file = createFile('application/octet-stream', 'invoice.2024.01.heic');
-        let callbackErr: any = 'not-called';
+        let callbackErr: unknown = 'not-called';
         let callbackAccepted: boolean | undefined;
 
         filter({}, file, (err: any, accepted: boolean) => {

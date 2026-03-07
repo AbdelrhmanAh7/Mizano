@@ -12,6 +12,7 @@ import { levenshteinSimilarity } from '../utils/text-similarity.util';
 import { PaddleOcrService } from './paddle-ocr.service';
 
 export interface ExtractedInvoiceData {
+  [key: string]: unknown;
   date: string | null;
   dueDate: string | null;
   paymentTerms: string | null;

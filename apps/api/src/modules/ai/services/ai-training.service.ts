@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AiFeature, AiTrainingSource } from '@prisma/client';
+import { AiFeature, AiTrainingSource, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
 export interface TrainingDataRecord {
   id: string;
   feature: AiFeature;
-  inputData: Record<string, any>;
+  inputData: Record<string, unknown>;
   label: string;
   source: AiTrainingSource;
   createdAt: Date;
@@ -62,7 +62,7 @@ export class AiTrainingService {
   async addTrainingData(
     organizationId: string,
     feature: AiFeature,
-    inputData: Record<string, any>,
+    inputData: Record<string, unknown>,
     label: string,
     source: AiTrainingSource = 'USER',
   ): Promise<{ id: string }> {
@@ -91,7 +91,7 @@ export class AiTrainingService {
   ): Promise<{ data: TrainingDataRecord[]; total: number }> {
     const { limit = 1000, offset = 0, source, startDate, endDate } = options;
 
-    const where: any = {
+    const where: Prisma.AiTrainingDataWhereInput = {
       organizationId,
       feature,
       ...(source && { source }),
@@ -187,7 +187,7 @@ export class AiTrainingService {
   /**
    * Generate a hash for input data (used for caching predictions)
    */
-  generateInputHash(inputData: Record<string, any>): string {
+  generateInputHash(inputData: Record<string, unknown>): string {
     const normalized = JSON.stringify(inputData, Object.keys(inputData).sort());
     return crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 16);
   }
@@ -198,7 +198,7 @@ export class AiTrainingService {
   async seedTrainingData(
     organizationId: string,
     feature: AiFeature,
-    records: Array<{ inputData: Record<string, any>; label: string }>,
+    records: Array<{ inputData: Record<string, unknown>; label: string }>,
   ): Promise<{ inserted: number }> {
     const data = records.map((record) => ({
       organizationId,

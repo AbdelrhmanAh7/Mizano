@@ -35,7 +35,7 @@ describe('DocumentIntakeService', () => {
     // Add applyVendorHints and learnLayout mocks not in the helper
     (ocrService as any).applyVendorHints = jest
       .fn()
-      .mockImplementation((_orgId: string, _vendorId: string, result: any) =>
+      .mockImplementation((_orgId: string, _vendorId: string, result: unknown) =>
         Promise.resolve(result),
       );
     (ocrService as any).learnLayout = jest.fn().mockResolvedValue(undefined);

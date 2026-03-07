@@ -189,20 +189,28 @@ export const TEST_ORG_ID = 'org-test-001';
 /** Standard test user ID */
 export const TEST_USER_ID = 'user-test-001';
 
+interface DecimalLike {
+  toNumber(): number;
+}
+
+type DecimalArg = DecimalLike | number;
+
 /** Helper to create a Decimal-like value for Prisma mocks */
 export function mockDecimal(value: number) {
+  const toNum = (other: DecimalArg) =>
+    typeof other === 'number' ? other : ((other as DecimalLike).toNumber?.() ?? 0);
   return {
     toNumber: () => value,
     toString: () => String(value),
-    equals: (other: any) => other?.toNumber?.() === value,
-    add: (other: any) => mockDecimal(value + (other?.toNumber?.() ?? other)),
-    sub: (other: any) => mockDecimal(value - (other?.toNumber?.() ?? other)),
-    mul: (other: any) => mockDecimal(value * (other?.toNumber?.() ?? other)),
-    div: (other: any) => mockDecimal(value / (other?.toNumber?.() ?? other)),
-    gt: (other: any) => value > (other?.toNumber?.() ?? other),
-    gte: (other: any) => value >= (other?.toNumber?.() ?? other),
-    lt: (other: any) => value < (other?.toNumber?.() ?? other),
-    lte: (other: any) => value <= (other?.toNumber?.() ?? other),
+    equals: (other: DecimalArg) => toNum(other) === value,
+    add: (other: DecimalArg) => mockDecimal(value + toNum(other)),
+    sub: (other: DecimalArg) => mockDecimal(value - toNum(other)),
+    mul: (other: DecimalArg) => mockDecimal(value * toNum(other)),
+    div: (other: DecimalArg) => mockDecimal(value / toNum(other)),
+    gt: (other: DecimalArg) => value > toNum(other),
+    gte: (other: DecimalArg) => value >= toNum(other),
+    lt: (other: DecimalArg) => value < toNum(other),
+    lte: (other: DecimalArg) => value <= toNum(other),
     isZero: () => value === 0,
     isNeg: () => value < 0,
     isPos: () => value > 0,

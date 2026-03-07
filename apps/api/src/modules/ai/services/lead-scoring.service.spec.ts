@@ -175,10 +175,12 @@ describe('LeadScoringService', () => {
       ];
       prisma.lead.findMany.mockResolvedValue(leads.map((l) => ({ id: l.id })) as any);
       // Each scoreLead call needs findFirst for the lead
-      (prisma.lead.findFirst as jest.Mock).mockImplementation(async (args: any) => {
-        const found = leads.find((l) => l.id === args?.where?.id);
-        return found || null;
-      });
+      (prisma.lead.findFirst as jest.Mock).mockImplementation(
+        async (args: { where?: { id?: string } }) => {
+          const found = leads.find((l) => l.id === args?.where?.id);
+          return found || null;
+        },
+      );
       prisma.leadScore.findFirst.mockResolvedValue(null as any);
       prisma.leadScore.upsert.mockResolvedValue({} as any);
 

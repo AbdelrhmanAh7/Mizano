@@ -2,16 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AiFeature, AiFeedbackAction } from '@prisma/client';
+import { AiFeature, AiFeedbackAction, Prisma } from '@prisma/client';
 import { AiTrainingService } from './ai-training.service';
 
 export interface FeedbackDto {
   feature: AiFeature;
   predictionId?: string;
-  aiSuggestion: Record<string, any>;
+  aiSuggestion: Record<string, unknown>;
   userAction: AiFeedbackAction;
   userAnswer?: string;
-  inputData: Record<string, any>;
+  inputData: Record<string, unknown>;
 }
 
 export interface FeedbackStats {
@@ -156,7 +156,7 @@ export class AiFeedbackService {
     feature: AiFeature,
     options?: { startDate?: Date; endDate?: Date },
   ): Promise<FeedbackStats> {
-    const where: any = {
+    const where: Prisma.AiFeedbackWhereInput = {
       organizationId,
       feature,
       ...(options?.startDate || options?.endDate
@@ -210,7 +210,7 @@ export class AiFeedbackService {
     Array<{
       id: string;
       userAction: AiFeedbackAction;
-      aiSuggestion: any;
+      aiSuggestion: Prisma.JsonValue;
       userAnswer: string | null;
       createdAt: Date;
     }>
@@ -328,8 +328,8 @@ export class AiFeedbackService {
   async storePrediction(
     organizationId: string,
     feature: AiFeature,
-    inputData: Record<string, any>,
-    prediction: Record<string, any>,
+    inputData: Record<string, unknown>,
+    prediction: Record<string, unknown>,
     confidence: number,
     modelVersion: number,
   ): Promise<{ id: string; inputHash: string }> {
@@ -375,10 +375,10 @@ export class AiFeedbackService {
   async getCachedPrediction(
     organizationId: string,
     feature: AiFeature,
-    inputData: Record<string, any>,
+    inputData: Record<string, unknown>,
     maxAgeMinutes: number = 60,
   ): Promise<{
-    prediction: any;
+    prediction: Prisma.JsonValue;
     confidence: number;
     modelVersion: number;
     predictionId: string;

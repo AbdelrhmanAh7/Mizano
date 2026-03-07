@@ -12,21 +12,21 @@ const mockToJSON = jest.fn().mockReturnValue({ type: 'logistic-regression' });
 const mockLoad = jest.fn();
 
 class MockLogisticRegression {
-  weights: any;
+  weights: number[][] | null;
   _normMeans: number[] | undefined;
   _normStds: number[] | undefined;
 
-  constructor(_opts?: any) {
+  constructor(_opts?: Record<string, unknown>) {
     this.weights = null;
   }
 
-  train(features: any, labels: any) {
+  train(features: MockMatrix, labels: MockMatrix) {
     mockTrain(features, labels);
     // Simulate trained weights
     this.weights = [[0.5], [0.5]];
   }
 
-  predict(matrix: any) {
+  predict(matrix: MockMatrix) {
     mockPredict(matrix);
     // Return based on first feature value
     const data = matrix.data || matrix;
@@ -37,7 +37,7 @@ class MockLogisticRegression {
     return mockToJSON();
   }
 
-  static load(json: any) {
+  static load(json: Record<string, unknown>) {
     mockLoad(json);
     const instance = new MockLogisticRegression();
     instance.weights = [[0.5], [0.5]];

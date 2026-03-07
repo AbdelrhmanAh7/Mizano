@@ -57,10 +57,7 @@ export class AssetsController {
   @Permissions('assets.view')
   @ApiOperation({ summary: 'Get all assets with filtering' })
   @ApiResponse({ status: 200, type: AssetListResponse })
-  async findAll(
-    @CurrentOrg() organizationId: string,
-    @Query() query: AssetQueryDto,
-  ): Promise<AssetListResponse> {
+  async findAll(@CurrentOrg() organizationId: string, @Query() query: AssetQueryDto) {
     return this.assetsService.findAll(organizationId, query);
   }
 

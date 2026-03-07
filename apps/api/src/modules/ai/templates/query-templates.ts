@@ -1,12 +1,4 @@
-import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
-
-// Type definitions for grouped results
-interface GroupByResult {
-  customerId: string;
-  accountId: string;
-  _sum: { grandTotal?: Decimal | null; amount?: Decimal | null };
-}
 
 interface InvoiceWithCustomer {
   invoiceNumber: string;
@@ -51,7 +43,7 @@ interface AccountRecord {
 export interface QueryParameter {
   name: string;
   type: 'date-range' | 'number' | 'currency' | 'string';
-  default?: any;
+  default?: unknown;
   required?: boolean;
 }
 
@@ -69,8 +61,9 @@ export interface QueryTemplate {
     | 'cash-flow';
   parameters?: QueryParameter[];
   chartType?: 'bar' | 'line' | 'pie' | 'table' | 'metric';
-  execute: (prisma: PrismaService, orgId: string, params?: Record<string, any>) => Promise<any>;
-  render: (data: any, params?: Record<string, any>) => string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  execute: (prisma: any, orgId: string, params?: Record<string, unknown>) => Promise<unknown>;
+  render: (data: unknown, params?: Record<string, unknown>) => string;
 }
 
 // Helper to format currency
@@ -131,7 +124,7 @@ export const queryTemplates: QueryTemplate[] = [
     ],
     chartType: 'bar',
     execute: async (prisma, orgId, params) => {
-      const { startDate, endDate } = getDateRange(params?.period || 'this-month');
+      const { startDate, endDate } = getDateRange((params?.period as string) || 'this-month');
       const limit = params?.limit || 5;
 
       const results = await prisma.invoice.groupBy({
@@ -161,14 +154,15 @@ export const queryTemplates: QueryTemplate[] = [
         revenue: Number(r._sum.grandTotal) || 0,
       }));
     },
-    render: (data, params) => {
-      if (data.length === 0) {
+    render: (data) => {
+      const rows = data as Array<{ customerName: string; revenue: number }>;
+      if (rows.length === 0) {
         return 'No sales data found for this period.';
       }
-      const list = data
-        .map((d: any, i: number) => `${i + 1}. ${d.customerName} (${formatCurrency(d.revenue)})`)
+      const list = rows
+        .map((d, i) => `${i + 1}. ${d.customerName} (${formatCurrency(d.revenue)})`)
         .join(', ');
-      return `Your top ${data.length} customers by revenue are: ${list}.`;
+      return `Your top ${rows.length} customers by revenue are: ${list}.`;
     },
   },
 
@@ -209,11 +203,12 @@ export const queryTemplates: QueryTemplate[] = [
       }));
     },
     render: (data) => {
-      if (data.length === 0) {
+      const rows = data as Array<{ amount: number; daysOverdue: number }>;
+      if (rows.length === 0) {
         return 'Great news! You have no overdue invoices.';
       }
-      const total = data.reduce((sum: number, d: any) => sum + d.amount, 0);
-      return `You have ${data.length} overdue invoice${data.length > 1 ? 's' : ''} totaling ${formatCurrency(total)}. The oldest is ${data[0]?.daysOverdue || 0} days overdue.`;
+      const total = rows.reduce((sum, d) => sum + d.amount, 0);
+      return `You have ${rows.length} overdue invoice${rows.length > 1 ? 's' : ''} totaling ${formatCurrency(total)}. The oldest is ${rows[0]?.daysOverdue || 0} days overdue.`;
     },
   },
 
@@ -226,7 +221,7 @@ export const queryTemplates: QueryTemplate[] = [
     parameters: [{ name: 'period', type: 'date-range', default: 'this-month' }],
     chartType: 'pie',
     execute: async (prisma, orgId, params) => {
-      const { startDate, endDate } = getDateRange(params?.period || 'this-month');
+      const { startDate, endDate } = getDateRange((params?.period as string) || 'this-month');
 
       const expenses = await prisma.expense.groupBy({
         by: ['accountId'],
@@ -265,13 +260,14 @@ export const queryTemplates: QueryTemplate[] = [
       });
     },
     render: (data) => {
-      if (data.length === 0) {
+      const rows = data as Array<{ amount: number; accountName: string; percentage: string }>;
+      if (rows.length === 0) {
         return 'No expenses recorded for this period.';
       }
-      const total = data.reduce((sum: number, d: any) => sum + d.amount, 0);
-      const top3 = data
+      const total = rows.reduce((sum, d) => sum + d.amount, 0);
+      const top3 = rows
         .slice(0, 3)
-        .map((d: any) => `${d.accountName} (${d.percentage}%)`)
+        .map((d) => `${d.accountName} (${d.percentage}%)`)
         .join(', ');
       return `Total expenses this period: ${formatCurrency(total)}. Top categories: ${top3}.`;
     },
@@ -333,8 +329,9 @@ export const queryTemplates: QueryTemplate[] = [
       };
     },
     render: (data) => {
-      const status = data.profit >= 0 ? 'profit' : 'loss';
-      return `This month: Revenue ${formatCurrency(data.revenue)}, Expenses ${formatCurrency(data.expenses)}, Net ${status} ${formatCurrency(Math.abs(data.profit))} (${data.margin}% margin).`;
+      const d = data as { profit: number; revenue: number; expenses: number; margin: string };
+      const status = d.profit >= 0 ? 'profit' : 'loss';
+      return `This month: Revenue ${formatCurrency(d.revenue)}, Expenses ${formatCurrency(d.expenses)}, Net ${status} ${formatCurrency(Math.abs(d.profit))} (${d.margin}% margin).`;
     },
   },
 
@@ -357,13 +354,13 @@ export const queryTemplates: QueryTemplate[] = [
         },
       });
 
-      const lowStockItems = items.filter((item: any) => {
+      const lowStockItems = items.filter((item: ItemWithReorder) => {
         const reorderPoint = item.reorderAnalysis?.reorderPoint || item.reorderPoint || 0;
         return (item.currentStock || 0) <= reorderPoint && reorderPoint > 0;
       });
 
       return lowStockItems
-        .map((item: any) => ({
+        .map((item: ItemWithReorder) => ({
           itemId: item.id,
           itemName: item.name,
           sku: item.sku,
@@ -379,11 +376,12 @@ export const queryTemplates: QueryTemplate[] = [
         );
     },
     render: (data) => {
-      if (data.length === 0) {
+      const rows = data as Array<{ status: string; itemName: string; currentStock: number }>;
+      if (rows.length === 0) {
         return 'All inventory items are well-stocked.';
       }
-      const critical = data.filter((d: any) => d.status === 'CRITICAL').length;
-      return `${data.length} item${data.length > 1 ? 's' : ''} below reorder point${critical > 0 ? ` (${critical} critical)` : ''}. Top concern: ${data[0]?.itemName || 'N/A'} with ${data[0]?.currentStock || 0} units.`;
+      const critical = rows.filter((d) => d.status === 'CRITICAL').length;
+      return `${rows.length} item${rows.length > 1 ? 's' : ''} below reorder point${critical > 0 ? ` (${critical} critical)` : ''}. Top concern: ${rows[0]?.itemName || 'N/A'} with ${rows[0]?.currentStock || 0} units.`;
     },
   },
 
@@ -409,7 +407,7 @@ export const queryTemplates: QueryTemplate[] = [
       });
 
       const totalBalance = bankAccounts.reduce(
-        (sum: number, acc: any) => sum + Number(acc.systemBalance || 0),
+        (sum: number, acc: BankAccountBalance) => sum + Number(acc.systemBalance || 0),
         0,
       );
 
@@ -436,7 +434,7 @@ export const queryTemplates: QueryTemplate[] = [
       return {
         totalCash: totalBalance,
         accountCount: bankAccounts.length,
-        accounts: bankAccounts.map((a: any) => ({
+        accounts: bankAccounts.map((a: BankAccountBalance) => ({
           name: a.name,
           balance: Number(a.systemBalance) || 0,
         })),
@@ -445,8 +443,14 @@ export const queryTemplates: QueryTemplate[] = [
       };
     },
     render: (data) => {
-      const netPosition = data.totalCash + data.outstandingAR - data.outstandingAP;
-      return `Current cash: ${formatCurrency(data.totalCash)} across ${data.accountCount} account${data.accountCount > 1 ? 's' : ''}. Receivables: ${formatCurrency(data.outstandingAR)}, Payables: ${formatCurrency(data.outstandingAP)}. Net position: ${formatCurrency(netPosition)}.`;
+      const d = data as {
+        totalCash: number;
+        accountCount: number;
+        outstandingAR: number;
+        outstandingAP: number;
+      };
+      const netPosition = d.totalCash + d.outstandingAR - d.outstandingAP;
+      return `Current cash: ${formatCurrency(d.totalCash)} across ${d.accountCount} account${d.accountCount > 1 ? 's' : ''}. Receivables: ${formatCurrency(d.outstandingAR)}, Payables: ${formatCurrency(d.outstandingAP)}. Net position: ${formatCurrency(netPosition)}.`;
     },
   },
 
@@ -459,7 +463,7 @@ export const queryTemplates: QueryTemplate[] = [
     parameters: [{ name: 'days', type: 'number', default: 7 }],
     chartType: 'table',
     execute: async (prisma, orgId, params) => {
-      const days = params?.days || 7;
+      const days = (params?.days as number) || 7;
       const today = new Date();
       const futureDate = new Date(today);
       futureDate.setDate(today.getDate() + days);
@@ -488,11 +492,13 @@ export const queryTemplates: QueryTemplate[] = [
       }));
     },
     render: (data, params) => {
-      if (data.length === 0) {
-        return `No bills due in the next ${params?.days || 7} days.`;
+      const rows = data as Array<{ amount: number }>;
+      const days = (params?.days as number) || 7;
+      if (rows.length === 0) {
+        return `No bills due in the next ${days} days.`;
       }
-      const total = data.reduce((sum: number, d: any) => sum + d.amount, 0);
-      return `${data.length} bill${data.length > 1 ? 's' : ''} due in the next ${params?.days || 7} days, totaling ${formatCurrency(total)}.`;
+      const total = rows.reduce((sum, d) => sum + d.amount, 0);
+      return `${rows.length} bill${rows.length > 1 ? 's' : ''} due in the next ${days} days, totaling ${formatCurrency(total)}.`;
     },
   },
 
@@ -545,13 +551,19 @@ export const queryTemplates: QueryTemplate[] = [
       };
     },
     render: (data) => {
-      const direction = data.changePercent > 0 ? 'up' : data.changePercent < 0 ? 'down' : 'flat';
+      const d = data as {
+        changePercent: number;
+        currentPeriod: number;
+        currentCount: number;
+        previousPeriod: number;
+      };
+      const direction = d.changePercent > 0 ? 'up' : d.changePercent < 0 ? 'down' : 'flat';
       const changeText =
         direction === 'flat'
           ? 'unchanged'
-          : `${direction} ${Math.abs(data.changePercent).toFixed(1)}%`;
+          : `${direction} ${Math.abs(d.changePercent).toFixed(1)}%`;
 
-      return `Sales this month: ${formatCurrency(data.currentPeriod)} (${data.currentCount} invoices), ${changeText} compared to last month (${formatCurrency(data.previousPeriod)}).`;
+      return `Sales this month: ${formatCurrency(d.currentPeriod)} (${d.currentCount} invoices), ${changeText} compared to last month (${formatCurrency(d.previousPeriod)}).`;
     },
   },
 ];

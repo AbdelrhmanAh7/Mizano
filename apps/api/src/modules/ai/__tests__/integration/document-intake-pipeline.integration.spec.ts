@@ -492,6 +492,7 @@ describe('DocumentIntakePipeline (Integration)', () => {
         status: 'DRAFT',
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       prisma.$transaction.mockImplementation(async (fn: any) => {
         if (typeof fn === 'function') {
           return fn(prisma);
@@ -554,6 +555,7 @@ describe('DocumentIntakePipeline (Integration)', () => {
         status: 'DRAFT',
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       prisma.$transaction.mockImplementation(async (fn: any) => {
         if (typeof fn === 'function') {
           return fn(prisma);
@@ -593,6 +595,7 @@ describe('DocumentIntakePipeline (Integration)', () => {
     });
 
     it('should store feedback corrections when user makes changes', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       prisma.$transaction.mockImplementation(async (fn: any) => {
         if (typeof fn === 'function') {
           return fn(prisma);

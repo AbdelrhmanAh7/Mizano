@@ -740,7 +740,7 @@ describe('OcrService', () => {
   // ─── Saudi Formal Invoices ───────────────────────────────────────
 
   describe('real OCR: IMG_2561 (Iwan Al Andalusia hotel)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_IWAN_ANDALUSIA_OCR, 78);
     });
@@ -768,7 +768,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2562 (Nakhat Al-Wafa catering)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_NAKHAT_WAFA_OCR, 81);
     });
@@ -793,7 +793,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2563 (Tasali Al-Khair faded)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_TASALI_ALKHAIR_OCR, 54);
     });
@@ -815,7 +815,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2564 (Masarat Al-Nahda poultry)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_MASARAT_NAHDA_OCR, 70);
     });
@@ -840,7 +840,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2565 (Barda Food)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_BARDA_FOOD_OCR, 77);
     });
@@ -868,7 +868,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2596 (ALMOTAMAYIZIN electrical)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_ALMOTAMAYIZIN_OCR, 90);
     });
@@ -896,7 +896,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2570 (Al-Marwani spices)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_MARWANI_SPICES_OCR, 50);
     });
@@ -920,7 +920,7 @@ describe('OcrService', () => {
   // ─── Saudi Restaurant/Retail Receipts ────────────────────────────
 
   describe('real OCR: IMG_2571 (Memaz restaurant)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_MEMAZ_RESTAURANT_OCR, 60);
     });
@@ -945,7 +945,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2573 (Rahiyyah store)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_RAHIYYAH_STORE_OCR, 83);
     });
@@ -964,7 +964,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2574 (Kaki Bakeries)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_KAKI_BAKERIES_OCR, 81);
     });
@@ -986,7 +986,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2575 (Crystal restaurant)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_CRYSTAL_RESTAURANT_OCR, 73);
     });
@@ -1011,7 +1011,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2576 (Masoub Al Sultan)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_MASOUB_SULTAN_OCR, 55);
     });
@@ -1033,7 +1033,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2577 (RATIO Coffee)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_RATIO_COFFEE_OCR, 65);
     });
@@ -1055,7 +1055,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2578 (Grand Hyper grocery)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_GRAND_HYPER_OCR, 66);
     });
@@ -1071,7 +1071,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2579 (Aswaq Ghand market)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_ASWAQ_GHAND_OCR, 46);
     });
@@ -1093,7 +1093,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2588 (RAWNAH coffee)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_RAWNAH_COFFEE_OCR, 46);
     });
@@ -1118,7 +1118,7 @@ describe('OcrService', () => {
   });
 
   describe("real OCR: IMG_2590 (Chef's Burger)", () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_CHEFS_BURGER_OCR, 63);
     });
@@ -1140,7 +1140,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2591 (ARCHI coffee)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_ARCHI_COFFEE_OCR, 63);
     });
@@ -1162,7 +1162,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2594 (Baskin Robbins)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_BASKIN_ROBBINS_OCR, 41);
     });
@@ -1192,7 +1192,7 @@ describe('OcrService', () => {
   // ─── Saudi Gas Stations ──────────────────────────────────────────
 
   describe('real OCR: IMG_2580 (Petroquel gas station)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_PETROQUEL_GAS_OCR, 95);
     });
@@ -1217,7 +1217,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2581 (Aldrees gas — 19-digit invoice)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_ALDREES_GAS_OCR, 95);
     });
@@ -1242,7 +1242,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2586 (SASCO gas station)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_SASCO_GAS_OCR, 47);
     });
@@ -1270,7 +1270,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2587 (Al Naeem gas station)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_NAEEM_GAS_OCR, 56);
     });
@@ -1297,7 +1297,7 @@ describe('OcrService', () => {
   // ─── Saudi Grocery ───────────────────────────────────────────────
 
   describe('real OCR: IMG_2567 (Panda supermarket)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_PANDA_SUPERMARKET_OCR, 68);
     });
@@ -1313,7 +1313,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2569 (Al-Hulul grocery)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_HULUL_GROCERY_OCR, 63);
     });
@@ -1335,7 +1335,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2585 (Aswaq Ghanem market)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_ASWAQ_GHANEM_OCR, 48);
     });
@@ -1362,7 +1362,7 @@ describe('OcrService', () => {
   // ─── Additional test: Layaly Restaurants ─────────────────────────
 
   describe('real OCR: IMG_2582 (Layaly Restaurants)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_LAYALY_RESTAURANTS_OCR, 95);
     });
@@ -1384,7 +1384,7 @@ describe('OcrService', () => {
   });
 
   describe('real OCR: IMG_2584 (Masoub Sultan faded)', () => {
-    let result: any;
+    let result: Record<string, unknown>;
     beforeEach(() => {
       result = service.buildExtractionResult(REAL_MASOUB_SULTAN_FADED_OCR, 44);
     });

@@ -35,7 +35,7 @@ describe('WorkforceSchedulingService', () => {
 
     it('should suggest more staff on high-attendance days', async () => {
       // Create attendance data where Monday (day 1) has higher attendance
-      const records: any[] = [];
+      const records: Record<string, unknown>[] = [];
 
       // Generate 12 Mondays with 20 present each
       for (let w = 0; w < 12; w++) {
@@ -169,7 +169,7 @@ describe('WorkforceSchedulingService', () => {
       ] as any);
 
       // 50% attendance → needs more staff
-      const records: any[] = [];
+      const records: Record<string, unknown>[] = [];
       for (let i = 0; i < 20; i++) {
         records.push({
           employeeId: `e${(i % 5) + 1}`,

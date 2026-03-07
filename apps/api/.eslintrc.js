@@ -15,11 +15,12 @@ module.exports = {
   ignorePatterns: ['.eslintrc.js', 'dist/', 'node_modules/'],
   overrides: [
     {
-      files: ['test/**/*.ts'],
+      files: ['test/**/*.ts', 'src/**/*.spec.ts', 'src/**/__tests__/**/*.ts'],
       parserOptions: {
         project: null,
       },
       rules: {
+        '@typescript-eslint/no-explicit-any': 'off',
         '@typescript-eslint/no-floating-promises': 'off',
         '@typescript-eslint/no-misused-promises': 'off',
         '@typescript-eslint/return-await': 'off',

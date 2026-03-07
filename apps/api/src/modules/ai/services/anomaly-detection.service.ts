@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AnomalyType, AnomalySeverity } from '@prisma/client';
+import { AnomalyType, AnomalySeverity, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import {
   mean,
@@ -522,7 +522,7 @@ export class AnomalyDetectionService {
   ): Promise<{ data: AnomalyRecord[]; total: number }> {
     const { type, severity, limit = 50, offset = 0 } = options || {};
 
-    const where: any = {
+    const where: Prisma.AiAnomalyWhereInput = {
       organizationId,
       isResolved: false,
       ...(type && { type }),
