@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { LeadSource, LeadStatus } from '@prisma/client';
+import { LeadSource, LeadStatus, Prisma } from '@prisma/client';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -12,7 +12,7 @@ export interface CreateLeadDto {
   source?: LeadSource;
   status?: LeadStatus;
   notes?: string;
-  customFields?: Record<string, any>;
+  customFields?: Record<string, unknown>;
   assignedToId?: string;
 }
 
@@ -41,7 +41,7 @@ export class LeadsService {
         source: dto.source || LeadSource.WEBSITE,
         status: dto.status || LeadStatus.NEW,
         notes: dto.notes,
-        customFields: dto.customFields,
+        customFields: dto.customFields as Prisma.InputJsonValue | undefined,
         assignedToId: dto.assignedToId || userId,
         organizationId,
       },
@@ -53,7 +53,7 @@ export class LeadsService {
   }
 
   async findAll(organizationId: string, query: LeadQueryDto) {
-    const where: any = { organizationId, deletedAt: null };
+    const where: Prisma.LeadWhereInput = { organizationId, deletedAt: null };
 
     if (query.status) where.status = query.status;
     if (query.source) where.source = query.source;
@@ -146,7 +146,7 @@ export class LeadsService {
         source: dto.source,
         status: dto.status,
         notes: dto.notes,
-        customFields: dto.customFields,
+        customFields: dto.customFields as Prisma.InputJsonValue | undefined,
         assignedToId: dto.assignedToId,
       },
       include: {

@@ -606,18 +606,19 @@ export class LeadScoringService {
       case 'eq':
         return value === condition.value;
       case 'gt':
-        return value > condition.value;
+        return value > (condition.value as string | number | boolean);
       case 'lt':
-        return value < condition.value;
+        return value < (condition.value as string | number | boolean);
       case 'gte':
-        return value >= condition.value;
+        return value >= (condition.value as string | number | boolean);
       case 'lte':
-        return value <= condition.value;
+        return value <= (condition.value as string | number | boolean);
       case 'in':
         return Array.isArray(condition.value) && condition.value.includes(value);
       case 'contains':
         return (
-          typeof value === 'string' && value.toLowerCase().includes(condition.value.toLowerCase())
+          typeof value === 'string' &&
+          value.toLowerCase().includes((condition.value as string).toLowerCase())
         );
       default:
         return false;
@@ -998,15 +999,15 @@ export class LeadScoringService {
   }
 
   // Inference helpers (simplified - in production would use ML or lookup tables)
-  private inferCompanySize(lead: Record<string, unknown>): string | undefined {
+  private inferCompanySize(_lead: Record<string, unknown>): string | undefined {
     return undefined;
   }
 
-  private inferIndustry(lead: Record<string, unknown>): string | undefined {
+  private inferIndustry(_lead: Record<string, unknown>): string | undefined {
     return undefined;
   }
 
-  private inferCountry(lead: Record<string, unknown>): string | undefined {
+  private inferCountry(_lead: Record<string, unknown>): string | undefined {
     return undefined;
   }
 }

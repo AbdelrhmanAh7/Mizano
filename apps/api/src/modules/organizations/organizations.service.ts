@@ -405,6 +405,7 @@ export class OrganizationsService {
     return this.formatOnboardingStatus(onboarding);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private formatOnboardingStatus(onboarding: any): OnboardingStatusResponse {
     const skippedSteps = onboarding.skippedSteps || [];
 
@@ -582,7 +583,7 @@ export class OrganizationsService {
     return this.getOnboardingStatus(orgId);
   }
 
-  async completeImportDataStep(orgId: string, dto: ImportDataStepDto) {
+  async completeImportDataStep(orgId: string, _dto: ImportDataStepDto) {
     // This step is marked complete after imports are done
     // The actual import is handled by the import-export module
 
@@ -757,7 +758,7 @@ export class OrganizationsService {
     }
   }
 
-  private getTemplateAccounts(templateId: string) {
+  private getTemplateAccounts(_templateId: string) {
     // Base accounts used by all templates
     const baseAccounts = [
       { code: '1000', name: 'Cash on Hand', type: 'ASSET', isParent: false },
@@ -809,7 +810,7 @@ export class OrganizationsService {
     return baseAccounts.map((acc) => ({
       code: acc.code,
       name: acc.name,
-      type: acc.type as any,
+      type: acc.type as import('@prisma/client').AccountType,
       isParent: acc.isParent || false,
       isActive: true,
     }));

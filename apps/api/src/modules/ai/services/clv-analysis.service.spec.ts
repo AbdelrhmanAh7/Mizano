@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ClvAnalysisService, CLVResult } from './clv-analysis.service';
+import { ClvAnalysisService } from './clv-analysis.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import {
   createMockPrisma,

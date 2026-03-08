@@ -35,7 +35,7 @@ export interface ChatResponse {
   intent: ChatIntent;
   confidence: number;
   response: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   suggestions: string[];
 }
 
@@ -120,7 +120,7 @@ export class ChatbotService {
   private readonly logger = new Logger(ChatbotService.name);
 
   /** Per-org BayesClassifier instances (bounded: max 50 orgs, 1h TTL) */
-  private classifiers = new BoundedCache<any>(50, 60 * 60 * 1000);
+  private classifiers = new BoundedCache<unknown>(50, 60 * 60 * 1000);
 
   /** In-memory chat history: key = `${orgId}:${userId}` (bounded: max 200 sessions, 30min TTL) */
   private chatHistory = new BoundedCache<ChatSession>(200, 30 * 60 * 1000);
@@ -151,7 +151,9 @@ export class ChatbotService {
     const classifier = await this.getOrTrainClassifier(organizationId);
 
     // Classify intent
-    const classifications = classifier.getClassifications(message.toLowerCase());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const typedClassifier = classifier as any;
+    const classifications = typedClassifier.getClassifications(message.toLowerCase());
     const topClassification = classifications[0];
     const intent: ChatIntent = topClassification
       ? (topClassification.label as ChatIntent)
@@ -554,7 +556,7 @@ export class ChatbotService {
     const now = new Date();
 
     // Build the where clause
-    const where: Record<string, any> = {
+    const where: Record<string, unknown> = {
       organizationId,
       status: 'OVERDUE',
       deletedAt: null,
@@ -714,7 +716,7 @@ export class ChatbotService {
   /**
    * Get an existing classifier for the org or train a new one.
    */
-  private async getOrTrainClassifier(organizationId: string): Promise<any> {
+  private async getOrTrainClassifier(organizationId: string): Promise<unknown> {
     if (this.classifiers.has(organizationId)) {
       return this.classifiers.get(organizationId)!;
     }

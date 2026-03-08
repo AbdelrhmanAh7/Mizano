@@ -6,7 +6,6 @@ import {
   Param,
   Patch,
   Post,
-  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -14,7 +13,11 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
-import { WorkOrdersService } from '../services/work-orders.service';
+import {
+  CreateWorkOrderData,
+  UpdateWorkOrderData,
+  WorkOrdersService,
+} from '../services/work-orders.service';
 
 @ApiTags('Work Orders')
 @ApiBearerAuth()
@@ -26,7 +29,7 @@ export class WorkOrdersController {
   @Post()
   @Permissions('manufacturing.create')
   @ApiOperation({ summary: 'Create a new work order' })
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateWorkOrderData) {
     return this.workOrdersService.create(orgId, dto);
   }
 
@@ -47,7 +50,7 @@ export class WorkOrdersController {
   @Patch(':id')
   @Permissions('manufacturing.edit')
   @ApiOperation({ summary: 'Update work order' })
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateWorkOrderData) {
     return this.workOrdersService.update(orgId, id, dto);
   }
 
@@ -68,7 +71,11 @@ export class WorkOrdersController {
   @Post(':id/production')
   @Permissions('manufacturing.create')
   @ApiOperation({ summary: 'Record production entry' })
-  recordProduction(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  recordProduction(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: { quantityProduced: number; notes?: string },
+  ) {
     return this.workOrdersService.recordProduction(orgId, id, dto);
   }
 

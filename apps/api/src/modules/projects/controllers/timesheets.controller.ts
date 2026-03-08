@@ -1,7 +1,12 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { TimesheetsService } from '../services/timesheets.service';
+import {
+  CreateTimesheetDto,
+  UpdateTimesheetDto,
+  TimesheetsService,
+} from '../services/timesheets.service';
 import { CurrentOrg, CurrentUser, Permissions } from '../../../common/decorators';
+import { CurrentUserData } from '../../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 
@@ -15,7 +20,11 @@ export class TimesheetsController {
   @Post()
   @Permissions('timesheets.create')
   @ApiOperation({ summary: 'Create timesheet entry' })
-  create(@CurrentOrg() orgId: string, @CurrentUser() user: any, @Body() dto: any) {
+  create(
+    @CurrentOrg() orgId: string,
+    @CurrentUser() user: CurrentUserData,
+    @Body() dto: CreateTimesheetDto,
+  ) {
     return this.timesheetsService.create(orgId, user.id, dto);
   }
 
@@ -24,7 +33,7 @@ export class TimesheetsController {
   @ApiOperation({ summary: 'Start timer' })
   startTimer(
     @CurrentOrg() orgId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserData,
     @Body() dto: { projectId: string; taskId?: string; description?: string },
   ) {
     return this.timesheetsService.startTimer(orgId, user.id, dto);
@@ -33,14 +42,18 @@ export class TimesheetsController {
   @Post('timer/stop/:id')
   @Permissions('timesheets.edit')
   @ApiOperation({ summary: 'Stop timer' })
-  stopTimer(@CurrentOrg() orgId: string, @CurrentUser() user: any, @Param('id') id: string) {
+  stopTimer(
+    @CurrentOrg() orgId: string,
+    @CurrentUser() user: CurrentUserData,
+    @Param('id') id: string,
+  ) {
     return this.timesheetsService.stopTimer(orgId, user.id, id);
   }
 
   @Get('timer/running')
   @Permissions('timesheets.view')
   @ApiOperation({ summary: 'Get running timer' })
-  getRunningTimer(@CurrentOrg() orgId: string, @CurrentUser() user: any) {
+  getRunningTimer(@CurrentOrg() orgId: string, @CurrentUser() user: CurrentUserData) {
     return this.timesheetsService.getRunningTimer(orgId, user.id);
   }
 
@@ -66,7 +79,7 @@ export class TimesheetsController {
   @ApiOperation({ summary: 'Get weekly summary' })
   getWeeklySummary(
     @CurrentOrg() orgId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: CurrentUserData,
     @Query('weekStart') weekStart: string,
   ) {
     return this.timesheetsService.getWeeklySummary(orgId, user.id, weekStart);
@@ -94,7 +107,7 @@ export class TimesheetsController {
   @Put(':id')
   @Permissions('timesheets.edit')
   @ApiOperation({ summary: 'Update timesheet entry' })
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateTimesheetDto) {
     return this.timesheetsService.update(orgId, id, dto);
   }
 

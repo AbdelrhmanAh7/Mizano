@@ -43,7 +43,7 @@ export class CreateRecurringProfileDto {
 
   @ApiProperty({ description: 'Template data for creating the entity' })
   @IsObject()
-  templateData: Record<string, any>;
+  templateData: Record<string, unknown>;
 
   @ApiProperty({ example: 'journal', description: 'Entity type: journal, invoice, bill, expense' })
   @IsString()

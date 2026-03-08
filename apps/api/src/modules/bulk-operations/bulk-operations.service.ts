@@ -67,7 +67,7 @@ export class BulkOperationsService {
         ),
       );
 
-      const successCount = results.filter((r) => r.status === 'fulfilled').length;
+      const _successCount = results.filter((r) => r.status === 'fulfilled').length;
       job.processed += chunk.length;
       this.emitProgress(job);
 

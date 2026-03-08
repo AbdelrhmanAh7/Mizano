@@ -83,7 +83,20 @@
       "Bash(ls -la /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/app/[locale]/'\\(dashboard\\)'/banking/)",
       "Bash(ls -la /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/app/[locale]/'\\(dashboard\\)'/inventory/)",
       "Bash(find /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/app/[locale]/'\\(dashboard\\)' -maxdepth 2 -name \"page.tsx\" -o -name \"error.tsx\")",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Read(//mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/**)",
+      "Bash(for f in a257830f2f7b94a3c a40a0c807fc106c10 a4089b32db666283a aa611c72ca058ccac)",
+      "Bash(do echo \"=== $f ===\")",
+      "Read(//tmp/claude-1000/-mnt-c-Users-Abdelrahman-Desktop-Personal-Project-Mizano/tasks/**)",
+      "Bash(git:*)",
+      "Bash(sed:*)",
+      "Bash(for f in adjustments composite-items items price-lists transfers)",
+      "Read(//mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/api/src/modules/inventory/services/**)",
+      "Bash(for f in bom work-orders)",
+      "Read(//mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/api/src/modules/manufacturing/services/**)",
+      "Bash(rm:*)",
+      "Bash(pnpm lint:api:*)",
+      "Bash(pnpm:*)"
     ]
   }
 }

@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -7,15 +8,15 @@ import { UserStatus } from '@prisma/client';
 export class NotificationsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: Record<string, unknown>) {
     return this.prisma.notification.create({
       data: {
-        type: dto.type,
-        title: dto.title,
-        message: dto.message,
-        entityType: dto.entityType,
-        entityId: dto.entityId,
-        userId: dto.userId,
+        type: dto.type as string,
+        title: dto.title as string,
+        message: dto.message as string,
+        entityType: (dto.entityType as string) ?? undefined,
+        entityId: (dto.entityId as string) ?? undefined,
+        userId: dto.userId as string,
         organizationId,
       },
     });
@@ -74,7 +75,7 @@ export class NotificationsService {
     userId: string,
     query: { isRead?: boolean; type?: string },
   ) {
-    const where: any = { organizationId, userId };
+    const where: Prisma.NotificationWhereInput = { organizationId, userId };
     if (query.isRead !== undefined) where.isRead = query.isRead;
     if (query.type) where.type = query.type;
 

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ActivityType } from '@prisma/client';
+import { ActivityType, Prisma } from '@prisma/client';
 
 export interface CreateActivityDto {
   type: ActivityType;
@@ -63,7 +63,7 @@ export class ActivitiesService {
   }
 
   async findAll(organizationId: string, query: ActivityQueryDto) {
-    const where: any = { organizationId };
+    const where: Prisma.ActivityLogWhereInput = { organizationId };
 
     if (query.leadId) where.leadId = query.leadId;
     if (query.dealId) where.dealId = query.dealId;

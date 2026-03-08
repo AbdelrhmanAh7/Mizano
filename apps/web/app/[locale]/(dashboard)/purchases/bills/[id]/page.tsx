@@ -4,8 +4,7 @@ import { use } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, Edit, Send, DollarSign, FileText } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { ArrowLeft, Edit, Send, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -35,7 +34,6 @@ interface BillDetailPageProps {
 
 export default function BillDetailPage({ params }: BillDetailPageProps) {
   const { id } = use(params);
-  const router = useRouter();
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();

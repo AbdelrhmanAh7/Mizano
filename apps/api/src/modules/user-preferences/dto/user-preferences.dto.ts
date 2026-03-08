@@ -13,7 +13,7 @@ export class UserPreferencesDto {
     },
     description: 'Tour progress tracking as JSON',
   })
-  tourProgress?: Record<string, any>;
+  tourProgress?: Record<string, unknown>;
 
   @ApiProperty({
     example: ['feature_x_tour', 'feature_y_tour'],

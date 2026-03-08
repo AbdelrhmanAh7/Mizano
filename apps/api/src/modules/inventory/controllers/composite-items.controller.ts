@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { CompositeItemsService } from '../services/composite-items.service';
+import { CreateCompositeItemDto, UpdateCompositeItemDto } from '../dto/composite-item.dto';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -26,7 +27,7 @@ export class CompositeItemsController {
   @Post()
   @Permissions('inventory.create')
   @ApiOperation({ summary: 'Create a composite item (bundle)' })
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateCompositeItemDto) {
     return this.compositeItemsService.create(orgId, dto);
   }
 
@@ -47,7 +48,11 @@ export class CompositeItemsController {
   @Patch(':id')
   @Permissions('inventory.edit')
   @ApiOperation({ summary: 'Update a composite item' })
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateCompositeItemDto,
+  ) {
     return this.compositeItemsService.update(orgId, id, dto);
   }
 

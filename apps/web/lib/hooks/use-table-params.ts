@@ -5,9 +5,6 @@ import type { SortOrder, TableParams, UseTableParamsOptions } from '@/lib/types/
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useTransition } from 'react';
 
-/** Keys that are part of the core table params and handled specially. */
-const CORE_KEYS = new Set(['page', 'limit', 'search', 'sortBy', 'sortOrder']);
-
 export function useTableParams(options: UseTableParamsOptions = {}) {
   const {
     defaultSortBy = 'createdAt',

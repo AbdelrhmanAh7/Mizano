@@ -20,6 +20,7 @@ export function useKeyboardShortcut(options: ShortcutOptions) {
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
 
+  const keysKey = keys.join(',');
   useEffect(() => {
     if (disabled) {
       unregister(id);
@@ -34,7 +35,8 @@ export function useKeyboardShortcut(options: ShortcutOptions) {
       handler: () => handlerRef.current(),
     });
     return () => unregister(id);
-  }, [id, keys.join(','), description, category, isSequence, disabled, register, unregister]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, keysKey, description, category, isSequence, disabled, register, unregister]);
 }
 
 function isInputElement(target: EventTarget | null): boolean {

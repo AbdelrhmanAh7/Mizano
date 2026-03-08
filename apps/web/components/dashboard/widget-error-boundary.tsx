@@ -25,7 +25,7 @@ export class WidgetErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(error: Error, _errorInfo: React.ErrorInfo) {
     console.error(
       `Widget error [${this.props.widgetId || 'unknown'}]:`,
       error.message,

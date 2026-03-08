@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
-import { LeadScoringService, LeadScoreResult } from './lead-scoring.service';
+import { LeadScoringService } from './lead-scoring.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';

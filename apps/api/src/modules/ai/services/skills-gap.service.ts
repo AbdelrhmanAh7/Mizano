@@ -177,12 +177,12 @@ export class SkillsGapService {
       create: {
         employeeId,
         organizationId,
-        skillsProfile: currentSkills as any,
-        skillsGaps: gaps as any,
+        skillsProfile: currentSkills as unknown as import('@prisma/client').Prisma.InputJsonValue,
+        skillsGaps: gaps as unknown as import('@prisma/client').Prisma.InputJsonValue,
         calculatedAt: new Date(),
       },
       update: {
-        skillsGaps: gaps as any,
+        skillsGaps: gaps as unknown as import('@prisma/client').Prisma.InputJsonValue,
         calculatedAt: new Date(),
       },
     });
@@ -457,7 +457,7 @@ export class SkillsGapService {
     organizationId: string,
     employeeId: string,
     wasCorrect: boolean,
-    adjustedGaps?: any,
+    adjustedGaps?: Record<string, unknown>,
   ): Promise<void> {
     const label = wasCorrect
       ? 'correct'

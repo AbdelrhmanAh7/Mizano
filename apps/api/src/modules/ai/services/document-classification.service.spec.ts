@@ -1,9 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  DocumentClassificationService,
-  DocumentCategory,
-  ClassificationResult,
-} from './document-classification.service';
+import { DocumentClassificationService, DocumentCategory } from './document-classification.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
 import {

@@ -1,12 +1,29 @@
+import { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
+
+export interface CreateTimesheetDto {
+  projectId: string;
+  taskId?: string;
+  date: string;
+  hours: string | number;
+  description?: string;
+  isBillable?: boolean;
+}
+
+export interface UpdateTimesheetDto {
+  hours?: string | number;
+  date?: string;
+  description?: string;
+  isBillable?: boolean;
+}
 
 @Injectable()
 export class TimesheetsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, userId: string, dto: any) {
+  async create(organizationId: string, userId: string, dto: CreateTimesheetDto) {
     // Verify project
     const project = await this.prisma.project.findFirst({
       where: { id: dto.projectId, organizationId },
@@ -124,7 +141,7 @@ export class TimesheetsService {
       isBilled?: boolean;
     },
   ) {
-    const where: any = { organizationId };
+    const where: Prisma.TimesheetEntryWhereInput = { organizationId };
     if (query.userId) where.userId = query.userId;
     if (query.projectId) where.projectId = query.projectId;
     if (query.isBilled !== undefined) where.isBilled = query.isBilled;
@@ -158,14 +175,16 @@ export class TimesheetsService {
     return entry;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateTimesheetDto) {
     const entry = await this.findOne(organizationId, id);
     if (entry.isBilled) {
       throw new BadRequestException('Cannot update billed timesheet entry');
     }
 
-    const data: any = { ...dto };
-    if (dto.hours) data.hours = new Decimal(dto.hours);
+    const data: Prisma.TimesheetEntryUpdateInput = {};
+    if (dto.description !== undefined) data.description = dto.description;
+    if (dto.isBillable !== undefined) data.isBillable = dto.isBillable;
+    if (dto.hours) data.hours = new Decimal(dto.hours as string | number);
     if (dto.date) data.date = new Date(dto.date);
 
     return this.prisma.timesheetEntry.update({
@@ -207,7 +226,7 @@ export class TimesheetsService {
     });
 
     // Group by day
-    const byDay: Record<string, any[]> = {};
+    const byDay: Record<string, unknown[]> = {};
     for (let i = 0; i < 7; i++) {
       const day = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
       byDay[day.toISOString().split('T')[0]] = [];

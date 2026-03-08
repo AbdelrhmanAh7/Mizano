@@ -303,8 +303,6 @@ export class ResourceOptimizationService {
       categoryTotals.set(category, (categoryTotals.get(category) || 0) + Number(exp.amount));
     }
 
-    const totalExpenses = Array.from(categoryTotals.values()).reduce((sum, v) => sum + v, 0);
-
     // Detect spikes using z-score
     for (const [category, monthMap] of categoryMonthly) {
       const values = Array.from(monthMap.values());

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { SentimentAnalysisService, SentimentResult } from './sentiment-analysis.service';
+import { SentimentAnalysisService } from './sentiment-analysis.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import {
   createMockPrisma,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { MessageSquare, X, Send, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,10 @@ export function ChatWidget() {
   const clearHistory = useClearChatHistory();
 
   // History is wrapped by TransformInterceptor as { data: ChatMessage[] }
-  const messages = Array.isArray(historyData?.data) ? historyData.data : [];
+  const messages = useMemo(
+    () => (Array.isArray(historyData?.data) ? historyData.data : []),
+    [historyData?.data],
+  );
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {

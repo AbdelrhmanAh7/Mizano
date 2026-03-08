@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PaymentsReceivedService } from './payments-received.service';
 import { InvoicesService } from './invoices.service';
@@ -7,7 +7,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
 import { createMockCustomer, createMockInvoice } from '../../../test/helpers/test-utils';
-import { dec, expectDecimalEqual } from '../../../test/helpers/decimal.helpers';
+import { dec } from '../../../test/helpers/decimal.helpers';
 
 describe('PaymentsReceivedService', () => {
   let service: PaymentsReceivedService;

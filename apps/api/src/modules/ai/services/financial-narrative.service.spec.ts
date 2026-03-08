@@ -380,6 +380,7 @@ describe('FinancialNarrativeService', () => {
     });
 
     it('should pass params to template execute and render', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { getQueryTemplate } = require('../templates/query-templates');
       const mockTemplate = getQueryTemplate('cash-runway');
 

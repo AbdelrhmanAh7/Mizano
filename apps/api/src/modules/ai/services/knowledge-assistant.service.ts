@@ -58,7 +58,7 @@ export class KnowledgeAssistantService {
   private readonly logger = new Logger(KnowledgeAssistantService.name);
 
   /** Per-org TF-IDF instance (bounded: max 50, 2h TTL). */
-  private tfidfInstances = new BoundedCache<any>(50, 2 * 60 * 60 * 1000);
+  private tfidfInstances = new BoundedCache<unknown>(50, 2 * 60 * 60 * 1000);
 
   /** Per-org list of indexed documents (bounded: max 50, 2h TTL). */
   private documentMaps = new BoundedCache<IndexedDocument[]>(50, 2 * 60 * 60 * 1000);
@@ -98,7 +98,8 @@ export class KnowledgeAssistantService {
 
     // Score every document with TF-IDF
     const tfidfScores: number[] = [];
-    tfidf.tfidfs(query, (_i: number, measure: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (tfidf as any).tfidfs(query, (_i: number, measure: number) => {
       tfidfScores.push(measure);
     });
 

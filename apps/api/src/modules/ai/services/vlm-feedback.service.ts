@@ -144,7 +144,7 @@ export class VlmFeedbackService {
     const fieldTotalCount: Record<string, number> = {};
 
     for (const feedback of feedbacks) {
-      const meta = feedback.inputData as Record<string, any>;
+      const meta = feedback.inputData as Record<string, unknown>;
 
       if (meta.extractionMethod === 'vlm') {
         vlmExtractions++;
@@ -156,7 +156,7 @@ export class VlmFeedbackService {
         totalAccuracy += meta.fieldAccuracy;
       }
 
-      const correctedFields: string[] = meta.correctedFields || [];
+      const correctedFields: string[] = (meta.correctedFields as string[]) || [];
       for (const field of TRACKABLE_FIELDS) {
         fieldTotalCount[field] = (fieldTotalCount[field] || 0) + 1;
         if (correctedFields.includes(field)) {

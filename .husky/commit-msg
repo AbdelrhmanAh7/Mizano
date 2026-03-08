@@ -1,1 +1,1 @@
-npx --no -- commitlint --edit "$1"
+node "$(git rev-parse --show-toplevel)/node_modules/@commitlint/cli/cli.js" --edit "$1"

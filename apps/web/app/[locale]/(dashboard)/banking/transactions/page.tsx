@@ -7,7 +7,6 @@ import { ArrowUpRight, ArrowDownLeft, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -36,7 +35,7 @@ import { useTranslations } from 'next-intl';
 export default function BankTransactionsPage() {
   const t = useTranslations('banking');
   const [statusFilter, setStatusFilter] = useState<TransactionStatus | ''>('');
-  const [bankAccountId, setBankAccountId] = useState('');
+  const [bankAccountId] = useState('');
 
   const { data, isLoading } = useBankTransactions({
     status: (statusFilter || undefined) as TransactionStatus | undefined,

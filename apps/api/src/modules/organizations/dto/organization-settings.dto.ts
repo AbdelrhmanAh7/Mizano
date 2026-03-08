@@ -7,11 +7,10 @@ import {
   Min,
   Max,
   IsIn,
-  IsUrl,
   MinLength,
   MaxLength,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 // ============================================

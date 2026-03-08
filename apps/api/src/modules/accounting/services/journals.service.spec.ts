@@ -1,12 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { Decimal } from '@prisma/client/runtime/library';
 import { JournalsService } from './journals.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { OrganizationsService } from '../../organizations/organizations.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
 import { createMockJournalEntry, createMockJournalLine } from '../../../test/helpers/test-utils';
-import { dec, expectDecimalEqual } from '../../../test/helpers/decimal.helpers';
+import { dec } from '../../../test/helpers/decimal.helpers';
 
 describe('JournalsService', () => {
   let service: JournalsService;

@@ -2,7 +2,6 @@
 
 import { use } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ArrowLeft, CheckCircle2, Download, FileText, Printer, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -61,7 +60,6 @@ const months = [
 export default function PayrollDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const t = useTranslations('hr');
-  const router = useRouter();
   const { data: payrollRun, isLoading } = usePayrollRun(id);
   const confirmPayroll = useConfirmPayroll();
 

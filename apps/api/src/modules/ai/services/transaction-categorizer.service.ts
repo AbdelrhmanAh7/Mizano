@@ -13,6 +13,7 @@ export interface CategorizationInput {
   vendorName?: string;
   amount: number;
   direction: 'expense' | 'income';
+  [key: string]: unknown;
 }
 
 export interface CategorizationPrediction {
@@ -36,6 +37,7 @@ interface CategorizationModelData {
   vocabulary: string[];
   sampleCount: number;
   lastTrainedAt: string;
+  [key: string]: unknown;
 }
 
 interface CachedClassifier {
@@ -293,7 +295,7 @@ export class TransactionCategorizerService {
     const prediction = await this.feedbackService.storePrediction(
       organizationId,
       'CATEGORIZATION',
-      input as Record<string, any>,
+      input as Record<string, unknown>,
       { accountId: topAccountId, confidence: topConfidence },
       topConfidence,
       cached.version,
@@ -596,7 +598,7 @@ export class TransactionCategorizerService {
    * Internal cross-validation
    */
   private async crossValidateInternal(
-    data: any[],
+    data: Record<string, unknown>[],
     folds: number,
   ): Promise<{ avgAccuracy: number; foldResults: number[] }> {
     // Shuffle data
@@ -617,7 +619,7 @@ export class TransactionCategorizerService {
       const classifier = new natural.BayesClassifier();
       for (const record of trainData) {
         const input = record.inputData as unknown as CategorizationInput;
-        classifier.addDocument(this.buildFeatureText(input), record.label);
+        classifier.addDocument(this.buildFeatureText(input), record.label as string);
       }
       classifier.train();
 

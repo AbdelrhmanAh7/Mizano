@@ -28,11 +28,11 @@ export class OcrTrainingSubmitDto {
 
   @ApiProperty({ description: 'Fields as originally extracted by OCR' })
   @IsObject()
-  extractedFields: Record<string, any>;
+  extractedFields: Record<string, unknown>;
 
   @ApiProperty({ description: 'User-corrected field values' })
   @IsObject()
-  correctedFields: Record<string, any>;
+  correctedFields: Record<string, unknown>;
 
   @ApiPropertyOptional({ description: 'Optional notes about the correction' })
   @IsOptional()
@@ -105,7 +105,7 @@ export class OcrTrainingExtractionResult {
   rawText: string;
 
   @ApiProperty({ description: 'Extracted fields with confidence scores' })
-  extractedFields: Record<string, any>;
+  extractedFields: Record<string, unknown>;
 
   @ApiProperty({ description: 'Field-level confidence scores (0-1)' })
   confidence: Record<string, number>;

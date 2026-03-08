@@ -25,7 +25,7 @@ import { useVendors, Vendor } from '@/lib/hooks/use-vendors';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { addDays, format } from 'date-fns';
 import { Plus, Trash2 } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -97,7 +97,7 @@ export function BillForm({
 }: BillFormProps) {
   const isEditing = !!bill;
   const { data: vendorsData } = useVendors({ limit: 100 });
-  const vendors = vendorsData?.data || [];
+  const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
   // Filter accounts
   const _expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');

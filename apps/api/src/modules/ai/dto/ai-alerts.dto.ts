@@ -129,7 +129,7 @@ export class UnifiedAlertResponse {
   sourceEntity?: SourceEntityResponse;
 
   @ApiPropertyOptional()
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 
   @ApiPropertyOptional()
   confidence?: number;

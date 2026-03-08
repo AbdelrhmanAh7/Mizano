@@ -168,7 +168,7 @@ const DATE_LABEL_KEYWORDS: Record<string, string[]> = {
 @Injectable()
 export class ContractAnalysisService {
   private readonly logger = new Logger(ContractAnalysisService.name);
-  private readonly tokenizer: any;
+  private readonly tokenizer: { tokenize(text: string): string[] };
 
   constructor(private prisma: PrismaService) {
     this.tokenizer = new natural.SentenceTokenizer();
@@ -227,7 +227,6 @@ export class ContractAnalysisService {
     const dates: ContractDate[] = [];
 
     // Extract dates via regex instead of compromise plugin (compromise core has no .dates())
-    const doc = nlp(text);
     const dateRegex =
       /\b(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s*\d{2,4}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4})\b/gi;
     const nlpDates: string[] = text.match(dateRegex) || [];

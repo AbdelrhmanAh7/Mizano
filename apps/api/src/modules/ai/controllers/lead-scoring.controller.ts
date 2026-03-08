@@ -20,7 +20,6 @@ import {
   ConversionPredictionResponse,
   ScoreHistoryEntryResponse,
   ScoreAllResultResponse,
-  UpdateScoresResultResponse,
   ScoreDistributionResponse,
 } from '../dto/lead-scoring.dto';
 

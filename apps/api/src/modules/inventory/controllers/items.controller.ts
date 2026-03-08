@@ -15,6 +15,8 @@ import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { CreateItemDto } from '../dto/create-item.dto';
+import { UpdateItemDto } from '../dto/update-item.dto';
 import { CostingService } from '../services/costing.service';
 import { ItemsService } from '../services/items.service';
 
@@ -30,7 +32,7 @@ export class ItemsController {
 
   @Post()
   @Permissions('inventory.create')
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateItemDto) {
     return this.itemsService.create(orgId, dto);
   }
 
@@ -69,7 +71,7 @@ export class ItemsController {
 
   @Patch(':id')
   @Permissions('inventory.edit')
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateItemDto) {
     return this.itemsService.update(orgId, id, dto);
   }
 

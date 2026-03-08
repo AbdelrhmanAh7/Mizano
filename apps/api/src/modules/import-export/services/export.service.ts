@@ -28,7 +28,7 @@ export class ExportService {
     let exportData = data;
     if (options.fields && options.fields.length > 0) {
       exportData = data.map((row) => {
-        const filtered: Record<string, any> = {};
+        const filtered: Record<string, unknown> = {};
         options.fields!.forEach((field) => {
           if (field in row) {
             filtered[field] = row[field];
@@ -59,7 +59,7 @@ export class ExportService {
       dateTo?: Date;
       includeDeleted?: boolean;
     },
-  ): Promise<Record<string, any>[]> {
+  ): Promise<Record<string, unknown>[]> {
     const deletedFilter = options.includeDeleted ? {} : { deletedAt: null };
     const dateFilter =
       options.dateFrom || options.dateTo
@@ -111,9 +111,9 @@ export class ExportService {
 
   private async exportCustomers(
     organizationId: string,
-    deletedFilter: any,
-    dateFilter: any,
-  ): Promise<Record<string, any>[]> {
+    deletedFilter: Record<string, unknown>,
+    dateFilter: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
     const customers = await this.prisma.customer.findMany({
       where: { organizationId, ...deletedFilter, ...dateFilter },
       orderBy: { name: 'asc' },
@@ -135,9 +135,9 @@ export class ExportService {
 
   private async exportVendors(
     organizationId: string,
-    deletedFilter: any,
-    dateFilter: any,
-  ): Promise<Record<string, any>[]> {
+    deletedFilter: Record<string, unknown>,
+    dateFilter: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
     const vendors = await this.prisma.vendor.findMany({
       where: { organizationId, ...deletedFilter, ...dateFilter },
       orderBy: { name: 'asc' },
@@ -160,9 +160,9 @@ export class ExportService {
 
   private async exportItems(
     organizationId: string,
-    deletedFilter: any,
-    dateFilter: any,
-  ): Promise<Record<string, any>[]> {
+    deletedFilter: Record<string, unknown>,
+    dateFilter: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
     const items = await this.prisma.item.findMany({
       where: { organizationId, ...deletedFilter, ...dateFilter },
       orderBy: { name: 'asc' },
@@ -183,7 +183,7 @@ export class ExportService {
     }));
   }
 
-  private async exportAccounts(organizationId: string): Promise<Record<string, any>[]> {
+  private async exportAccounts(organizationId: string): Promise<Record<string, unknown>[]> {
     const accounts = await this.prisma.account.findMany({
       where: { organizationId },
       include: { parent: { select: { code: true } } },
@@ -204,9 +204,9 @@ export class ExportService {
 
   private async exportInvoices(
     organizationId: string,
-    deletedFilter: any,
-    dateFilter: any,
-  ): Promise<Record<string, any>[]> {
+    deletedFilter: Record<string, unknown>,
+    dateFilter: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
     const invoices = await this.prisma.invoice.findMany({
       where: {
         organizationId,
@@ -221,7 +221,7 @@ export class ExportService {
     });
 
     // Flatten to line items
-    const rows: Record<string, any>[] = [];
+    const rows: Record<string, unknown>[] = [];
     for (const inv of invoices) {
       for (const line of inv.lines) {
         rows.push({
@@ -251,9 +251,9 @@ export class ExportService {
 
   private async exportBills(
     organizationId: string,
-    deletedFilter: any,
-    dateFilter: any,
-  ): Promise<Record<string, any>[]> {
+    deletedFilter: Record<string, unknown>,
+    dateFilter: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
     const bills = await this.prisma.bill.findMany({
       where: {
         organizationId,
@@ -267,7 +267,7 @@ export class ExportService {
       orderBy: { date: 'desc' },
     });
 
-    const rows: Record<string, any>[] = [];
+    const rows: Record<string, unknown>[] = [];
     for (const bill of bills) {
       for (const line of bill.lines) {
         rows.push({
@@ -297,9 +297,9 @@ export class ExportService {
 
   private async exportExpenses(
     organizationId: string,
-    deletedFilter: any,
-    dateFilter: any,
-  ): Promise<Record<string, any>[]> {
+    deletedFilter: Record<string, unknown>,
+    dateFilter: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
     const expenses = await this.prisma.expense.findMany({
       where: {
         organizationId,
@@ -329,8 +329,8 @@ export class ExportService {
 
   private async exportJournals(
     organizationId: string,
-    dateFilter: any,
-  ): Promise<Record<string, any>[]> {
+    dateFilter: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
     const journals = await this.prisma.journal.findMany({
       where: {
         organizationId,
@@ -344,7 +344,7 @@ export class ExportService {
       orderBy: { date: 'desc' },
     });
 
-    const rows: Record<string, any>[] = [];
+    const rows: Record<string, unknown>[] = [];
     for (const journal of journals) {
       for (const line of journal.lines) {
         rows.push({
@@ -366,8 +366,8 @@ export class ExportService {
 
   private async exportBankTransactions(
     organizationId: string,
-    dateFilter: any,
-  ): Promise<Record<string, any>[]> {
+    dateFilter: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
     const transactions = await this.prisma.bankTransaction.findMany({
       where: {
         organizationId,
@@ -395,9 +395,9 @@ export class ExportService {
 
   private async exportEmployees(
     organizationId: string,
-    deletedFilter: any,
-    dateFilter: any,
-  ): Promise<Record<string, any>[]> {
+    deletedFilter: Record<string, unknown>,
+    dateFilter: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
     const employees = await this.prisma.employee.findMany({
       where: { organizationId, ...dateFilter },
       orderBy: { name: 'asc' },
@@ -421,7 +421,7 @@ export class ExportService {
   // ============ Export Format Generators ============
 
   private exportToCsv(
-    data: Record<string, any>[],
+    data: Record<string, unknown>[],
     entityType: ImportEntityType,
   ): { buffer: Buffer; filename: string; contentType: string } {
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -435,7 +435,7 @@ export class ExportService {
   }
 
   private exportToExcel(
-    data: Record<string, any>[],
+    data: Record<string, unknown>[],
     entityType: ImportEntityType,
   ): { buffer: Buffer; filename: string; contentType: string } {
     const workbook = XLSX.utils.book_new();
@@ -469,7 +469,7 @@ export class ExportService {
   }
 
   private exportToJson(
-    data: Record<string, any>[],
+    data: Record<string, unknown>[],
     entityType: ImportEntityType,
   ): { buffer: Buffer; filename: string; contentType: string } {
     return {

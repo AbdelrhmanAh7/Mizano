@@ -102,20 +102,22 @@ export class AiForecastingService {
     const historicalData = await this.getMonthlyExpenses(organizationId, 12);
 
     // Group by category and forecast each
-    const categoryForecasts: Record<string, any> = {};
+    const categoryForecasts: Record<string, unknown> = {};
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const typedForecasts: Record<string, any> = categoryForecasts;
     for (const month of historicalData) {
       for (const [category, amount] of Object.entries(month.byCategory)) {
-        if (!categoryForecasts[category]) {
-          categoryForecasts[category] = { historical: [], forecast: [] };
+        if (!typedForecasts[category]) {
+          typedForecasts[category] = { historical: [], forecast: [] };
         }
-        categoryForecasts[category].historical.push(amount);
+        typedForecasts[category].historical.push(amount);
       }
     }
 
     // Forecast each category
-    for (const category in categoryForecasts) {
-      const data = categoryForecasts[category];
+    for (const category in typedForecasts) {
+      const data = typedForecasts[category];
       data.forecast = this.simpleMovingAverageForecast(
         data.historical.map((amount: number, i: number) => ({ month: i, value: amount })),
         months,
@@ -128,8 +130,8 @@ export class AiForecastingService {
     const totalForecast = [];
     for (let i = 0; i < months; i++) {
       let total = 0;
-      for (const category in categoryForecasts) {
-        total += categoryForecasts[category].forecast[i]?.value || 0;
+      for (const category in typedForecasts) {
+        total += typedForecasts[category].forecast[i]?.value || 0;
       }
       const futureMonth = new Date();
       futureMonth.setMonth(futureMonth.getMonth() + i + 1);
@@ -340,7 +342,7 @@ export class AiForecastingService {
     return parseFloat(expenses._sum.amount?.toString() || '0') / 4;
   }
 
-  private generateCashFlowWarnings(forecast: any[]) {
+  private generateCashFlowWarnings(forecast: { week: number; projectedBalance: number }[]) {
     const warnings = [];
 
     for (const week of forecast) {

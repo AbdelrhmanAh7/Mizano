@@ -85,7 +85,7 @@ export class QueryParameterDto {
   type: 'date-range' | 'number' | 'currency' | 'string';
 
   @ApiPropertyOptional({ description: 'Default value' })
-  default?: any;
+  default?: unknown;
 }
 
 export class QueryTemplateResponse {
@@ -94,6 +94,9 @@ export class QueryTemplateResponse {
 
   @ApiProperty({ description: 'Human-readable question' })
   question: string;
+
+  @ApiPropertyOptional({ description: 'Description of the query' })
+  description?: string;
 
   @ApiProperty({
     description: 'Query category',
@@ -114,6 +117,12 @@ export class QueryTemplateResponse {
     type: [QueryParameterDto],
   })
   parameters?: QueryParameterDto[];
+
+  @ApiPropertyOptional({
+    description: 'Suggested chart type for visualization',
+    enum: ['bar', 'line', 'pie', 'table'],
+  })
+  chartType?: string;
 }
 
 export class QueryResultResponse {
@@ -121,7 +130,7 @@ export class QueryResultResponse {
   answer: string;
 
   @ApiProperty({ description: 'Raw data from the query' })
-  data: any;
+  data: unknown;
 
   @ApiPropertyOptional({
     description: 'Suggested chart type for visualization',

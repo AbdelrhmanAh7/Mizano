@@ -1,9 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  DynamicPricingService,
-  ElasticityResult,
-  PriceSuggestion,
-} from './dynamic-pricing.service';
+import { DynamicPricingService } from './dynamic-pricing.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import {
   createMockPrisma,

@@ -174,6 +174,7 @@ export function InvoiceForm({
         form.setValue('dueDate', invoiceDate.toISOString().split('T')[0]);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCustomer]);
 
   const handleSubmit = (data: InvoiceFormData) => {

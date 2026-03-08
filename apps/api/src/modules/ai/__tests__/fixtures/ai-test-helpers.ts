@@ -1,7 +1,4 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { PrismaService } from '../../../../prisma/prisma.service';
 import { createMockPrisma, MockPrismaClient } from '../../../../test/mocks/prisma.mock';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 
 /**
  * Shared mock factories for AI service tests.

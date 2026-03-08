@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { FraudDetectionService, FraudScoreResult } from './fraud-detection.service';
+import { FraudDetectionService } from './fraud-detection.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import {
   createMockPrisma,

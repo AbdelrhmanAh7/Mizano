@@ -5,7 +5,7 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { TransferCursorQueryDto } from '../dto/transfer-cursor-query.dto';
-import { TransfersService } from '../services/transfers.service';
+import { CreateTransferData, TransfersService } from '../services/transfers.service';
 
 @ApiTags('Inventory Transfers')
 @ApiBearerAuth()
@@ -17,7 +17,7 @@ export class TransfersController {
   @Post()
   @Permissions('inventory.create')
   @ApiOperation({ summary: 'Create a stock transfer' })
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateTransferData) {
     return this.transfersService.create(orgId, dto);
   }
 

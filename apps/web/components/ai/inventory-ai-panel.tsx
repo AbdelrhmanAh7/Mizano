@@ -3,10 +3,8 @@
 import { Brain, Package, TrendingUp, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useReorderSummary, useForecastDashboard } from '@/lib/hooks/use-ai';
-import { ReorderStatusBadge } from './reorder-status-badge';
 
 export function InventoryAIPanel() {
   const { data: reorderData, isLoading: reorderLoading } = useReorderSummary();

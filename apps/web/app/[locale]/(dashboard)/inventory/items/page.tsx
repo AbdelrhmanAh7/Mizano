@@ -61,7 +61,6 @@ function ItemsPageContent() {
     fetchNextPage,
     isFetchingNextPage,
     isLoading,
-    refetch,
   } = useInfiniteItems({
     ...tableParams.queryParams,
     type: typeFilter !== 'all' ? (typeFilter as ItemType) : undefined,

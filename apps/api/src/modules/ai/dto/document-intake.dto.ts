@@ -140,5 +140,5 @@ export class ConfirmIntakeDto {
   })
   @IsObject()
   @IsOptional()
-  corrections?: Record<string, any>;
+  corrections?: Record<string, unknown>;
 }

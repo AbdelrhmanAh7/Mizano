@@ -251,7 +251,6 @@ export function useUpdateTask() {
 
   return useMutation({
     mutationFn: ({
-      projectId,
       taskId,
       data,
     }: {
@@ -274,8 +273,7 @@ export function useDeleteTask() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ projectId, taskId }: { projectId: string; taskId: string }) =>
-      tasksApi.delete(taskId),
+    mutationFn: ({ taskId }: { projectId: string; taskId: string }) => tasksApi.delete(taskId),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });

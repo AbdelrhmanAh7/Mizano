@@ -92,10 +92,10 @@ export class AiFeedbackService {
         organizationId,
         feature: dto.feature,
         predictionId: dto.predictionId,
-        aiSuggestion: dto.aiSuggestion,
+        aiSuggestion: dto.aiSuggestion as Prisma.InputJsonValue,
         userAction: dto.userAction,
         userAnswer: dto.userAnswer,
-        inputData: dto.inputData,
+        inputData: dto.inputData as Prisma.InputJsonValue,
       },
     });
 
@@ -360,7 +360,7 @@ export class AiFeedbackService {
         organizationId,
         feature,
         inputHash,
-        prediction,
+        prediction: prediction as Prisma.InputJsonValue,
         confidence,
         modelVersion,
       },

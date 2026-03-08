@@ -36,7 +36,6 @@ function DealsPageContent() {
     fetchNextPage,
     isFetchingNextPage,
     isLoading,
-    refetch,
   } = useInfiniteDeals({
     search: tableParams.search || undefined,
     page: tableParams.page,

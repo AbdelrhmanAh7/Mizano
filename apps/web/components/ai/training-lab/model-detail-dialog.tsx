@@ -1,15 +1,6 @@
 'use client';
 
-import {
-  CheckCircle2,
-  XCircle,
-  Clock,
-  BarChart3,
-  Database,
-  MessageSquare,
-  TrendingUp,
-  AlertTriangle,
-} from 'lucide-react';
+import { CheckCircle2, XCircle, MessageSquare, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';

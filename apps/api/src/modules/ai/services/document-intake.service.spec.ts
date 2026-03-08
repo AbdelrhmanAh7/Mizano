@@ -14,7 +14,6 @@ import {
   createMockEntityExtraction,
   createMockAiFeedback,
   TEST_ORG_ID,
-  mockDecimal,
 } from '../__tests__/fixtures/ai-test-helpers';
 
 describe('DocumentIntakeService', () => {
@@ -55,7 +54,6 @@ describe('DocumentIntakeService', () => {
   });
 
   describe('processDocument', () => {
-    const pdfBuffer = Buffer.from('fake-pdf-content');
     const imageBuffer = Buffer.from('fake-image-content');
 
     beforeEach(() => {

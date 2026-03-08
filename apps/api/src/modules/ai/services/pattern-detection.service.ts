@@ -2,17 +2,11 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import type { Prisma } from '@prisma/client';
-import {
-  PatternStatus,
-  SuggestionType,
-  SuggestionStatus,
-  RecurringFrequency,
-} from '@prisma/client';
+import { PatternStatus, SuggestionType, SuggestionStatus } from '@prisma/client';
 import {
   detectDateInDescription,
   normalizeEntityName,
   detectFrequency,
-  isAmountMatch,
   getAmountCluster,
   isPotentialDuplicate,
   generatePatternHash,
@@ -321,7 +315,6 @@ export class PatternDetectionService {
     const profileName =
       options?.name || `Recurring ${pattern.entityName} - ${pattern.amountCluster}`;
 
-    const lastOccurrence = pattern.occurrences[0];
     const nextDate = suggestion.suggestedFrequency
       ? calculateNextOccurrence(pattern.lastOccurrence, suggestion.suggestedFrequency)
       : new Date(pattern.lastOccurrence);

@@ -59,7 +59,6 @@ function EmployeesPageContent() {
     fetchNextPage,
     isFetchingNextPage,
     isLoading,
-    refetch,
   } = useInfiniteEmployees({
     ...tableParams.queryParams,
     status: statusFilter !== 'all' ? statusFilter : undefined,

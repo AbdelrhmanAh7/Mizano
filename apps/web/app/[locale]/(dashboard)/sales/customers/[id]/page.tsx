@@ -3,17 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  ArrowLeft,
-  Edit,
-  Trash2,
-  Mail,
-  Phone,
-  MapPin,
-  FileText,
-  Receipt,
-  CreditCard,
-} from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Mail, Phone, MapPin, FileText, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';

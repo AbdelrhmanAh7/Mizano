@@ -2,7 +2,6 @@
 
 import { use } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { ArrowLeft, CheckCircle, ArrowUp, ArrowDown } from 'lucide-react';
@@ -45,7 +44,6 @@ interface AdjustmentDetailPageProps {
 export default function AdjustmentDetailPage({ params }: AdjustmentDetailPageProps) {
   const t = useTranslations('inventory');
   const { id } = use(params);
-  const router = useRouter();
   const { data: adjustment, isLoading } = useAdjustment(id);
   const postAdjustment = usePostAdjustment();
 

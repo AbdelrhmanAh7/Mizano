@@ -58,7 +58,7 @@ export class PatternDetectionController {
   async getPendingSuggestions(
     @CurrentOrg() organizationId: string,
     @Query() query: SuggestionLimitDto,
-  ): Promise<any[]> {
+  ): Promise<unknown[]> {
     return this.patternService.getPendingSuggestions(organizationId, query.limit);
   }
 

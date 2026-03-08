@@ -40,7 +40,6 @@ interface ReconcileAccountPageProps {
 export default function ReconcileAccountPage({ params }: ReconcileAccountPageProps) {
   const { accountId } = use(params);
   const t = useTranslations('banking');
-  const tc = useTranslations('common');
   const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
 
   const { data: account, isLoading: accountLoading } = useBankAccount(accountId);

@@ -13,7 +13,7 @@ export interface EntityEvent {
   entityType: string;
   entityId: string;
   organizationId: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   userId?: string;
   timestamp: string;
 }
@@ -46,7 +46,7 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
 
   @SubscribeMessage('join-org')
   handleJoinOrg(client: Socket, orgId: string) {
-    client.join(`org:${orgId}`);
+    void client.join(`org:${orgId}`);
     if (!this.orgRooms.has(orgId)) {
       this.orgRooms.set(orgId, new Set());
     }
@@ -56,7 +56,7 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
 
   @SubscribeMessage('leave-org')
   handleLeaveOrg(client: Socket, orgId: string) {
-    client.leave(`org:${orgId}`);
+    void client.leave(`org:${orgId}`);
     this.orgRooms.get(orgId)?.delete(client.id);
     this.logger.log(`Client ${client.id} left org: ${orgId}`);
   }

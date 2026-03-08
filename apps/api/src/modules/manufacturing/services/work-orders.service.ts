@@ -3,14 +3,14 @@ import { Item, Prisma, WorkOrderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
 
-interface CreateWorkOrderData {
+export interface CreateWorkOrderData {
   bomId: string;
   quantity: number;
   plannedStartDate?: string;
   notes?: string;
 }
 
-interface UpdateWorkOrderData {
+export interface UpdateWorkOrderData {
   quantity?: number;
   plannedStartDate?: string;
   notes?: string;

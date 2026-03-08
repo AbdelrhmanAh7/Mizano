@@ -32,10 +32,7 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '2mb',
     },
-    optimizePackageImports: [
-      'lucide-react',
-      'date-fns',
-    ],
+    optimizePackageImports: ['lucide-react', 'date-fns'],
   },
 
   async headers() {

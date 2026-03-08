@@ -64,7 +64,6 @@ import { cn } from '@/lib/utils';
 
 export default function WorkOrderDetailPage() {
   const t = useTranslations('manufacturing');
-  const tCommon = useTranslations('common');
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();

@@ -55,31 +55,33 @@ export class CacheInvalidationInterceptor implements NestInterceptor {
     }
 
     return next.handle().pipe(
-      tap(async () => {
-        try {
-          // Delete all patterns in parallel
-          const deletePromises = patterns.map((pattern) =>
-            this.cacheService.deletePattern(pattern, organizationId),
-          );
-          const results = await Promise.all(deletePromises);
-          const totalDeleted = results.reduce((sum, n) => sum + n, 0);
+      tap(() => {
+        void (async () => {
+          try {
+            // Delete all patterns in parallel
+            const deletePromises = patterns.map((pattern) =>
+              this.cacheService.deletePattern(pattern, organizationId),
+            );
+            const results = await Promise.all(deletePromises);
+            const totalDeleted = results.reduce((sum, n) => sum + n, 0);
 
-          this.logger.debug(
-            `Cache invalidated: ${patterns.join(', ')} (${totalDeleted} keys) for org ${organizationId}`,
-          );
+            this.logger.debug(
+              `Cache invalidated: ${patterns.join(', ')} (${totalDeleted} keys) for org ${organizationId}`,
+            );
 
-          // Emit event for cross-module listeners
-          const event: CacheInvalidatedEvent = {
-            patterns,
-            organizationId,
-            method: request.method,
-            path: request.path,
-          };
-          this.eventEmitter.emit('cache.invalidated', event);
-        } catch (error) {
-          // Never fail the request due to cache invalidation errors
-          this.logger.warn(`Cache invalidation error: ${error}`);
-        }
+            // Emit event for cross-module listeners
+            const event: CacheInvalidatedEvent = {
+              patterns,
+              organizationId,
+              method: request.method,
+              path: request.path,
+            };
+            this.eventEmitter.emit('cache.invalidated', event);
+          } catch (error) {
+            // Never fail the request due to cache invalidation errors
+            this.logger.warn(`Cache invalidation error: ${error}`);
+          }
+        })();
       }),
     );
   }

@@ -151,7 +151,7 @@ export default function OnboardingPage() {
             <p className="text-muted-foreground mt-2">{t('aiShowcase.sectionSubtitle')}</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {aiCategories.map(({ key, icon: Icon, count }) => (
+            {aiCategories.map(({ key, icon: Icon }) => (
               <Card key={key} className="group hover:shadow-md transition-shadow">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3 mb-3">

@@ -3,9 +3,6 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { holtWinters, simpleExponentialSmoothing } from '../utils/holt-winters.util';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const ss = require('simple-statistics');
-
 export interface AssetHealthPrediction {
   assetId: string;
   assetName: string;
@@ -193,7 +190,7 @@ export class PredictiveMaintenanceService {
         predictedFailureDate,
         riskScore: new Decimal(riskScore),
         healthScore: new Decimal(healthScore),
-        factors: factors as any,
+        factors: factors as import('@prisma/client').Prisma.InputJsonValue,
         recommendedAction,
         calculatedAt: new Date(),
       },
@@ -203,7 +200,7 @@ export class PredictiveMaintenanceService {
         predictedFailureDate,
         riskScore: new Decimal(riskScore),
         healthScore: new Decimal(healthScore),
-        factors: factors as any,
+        factors: factors as import('@prisma/client').Prisma.InputJsonValue,
         recommendedAction,
         calculatedAt: new Date(),
       },

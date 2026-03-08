@@ -14,8 +14,11 @@ import {
   ValidationErrorDto,
   ValidationResultDto,
 } from '../dto/import-export.dto';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const ofxParser = require('ofx-js');
+// ofx-js loaded dynamically below (no ESM export)
+
+/** Loosely-typed row coming from CSV/Excel/OFX parsing. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ImportRow = Record<string, any>;
 
 @Injectable()
 export class ImportService {
@@ -41,7 +44,7 @@ export class ImportService {
 
   private async parseCsv(buffer: Buffer): Promise<ParseFileResultDto> {
     return new Promise((resolve, reject) => {
-      const rows: Record<string, any>[] = [];
+      const rows: ImportRow[] = [];
       let headers: string[] = [];
 
       const stream = Readable.from(buffer.toString());
@@ -70,7 +73,7 @@ export class ImportService {
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
-    const data = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, {
+    const data = XLSX.utils.sheet_to_json<ImportRow>(worksheet, {
       header: 1,
     });
 
@@ -79,8 +82,8 @@ export class ImportService {
     }
 
     const headers = (data[0] as string[]).map((h) => String(h || '').trim());
-    const rows = data.slice(1).map((row: any[]) => {
-      const obj: Record<string, any> = {};
+    const rows = data.slice(1).map((row: unknown[]) => {
+      const obj: ImportRow = {};
       headers.forEach((header, index) => {
         obj[header] = row[index];
       });
@@ -103,18 +106,19 @@ export class ImportService {
       headers,
       preview: rows.slice(0, 10),
       totalRows: rows.length,
-      fileType: 'ofx' as any,
+      fileType: 'csv' as const,
     };
   }
 
-  private async getOfxRows(buffer: Buffer): Promise<Record<string, any>[]> {
+  private async getOfxRows(buffer: Buffer): Promise<ImportRow[]> {
     const content = buffer.toString('utf-8');
+    const ofxParser = await import('ofx-js');
     const parsed = await ofxParser.parse(content);
 
     // Extract transactions from OFX structure
     // Bank statements: OFX.BANKMSGSRSV1.STMTTRNRS.STMTRS.BANKTRANLIST.STMTTRN
     // Credit card: OFX.CREDITCARDMSGSRSV1.CCSTMTTRNRS.CCSTMTRS.BANKTRANLIST.STMTTRN
-    let transactions: any[] = [];
+    let transactions: ImportRow[] = [];
 
     const bankTranList =
       parsed?.OFX?.BANKMSGSRSV1?.STMTTRNRS?.STMTRS?.BANKTRANLIST?.STMTTRN ||
@@ -124,7 +128,7 @@ export class ImportService {
       transactions = Array.isArray(bankTranList) ? bankTranList : [bankTranList];
     }
 
-    return transactions.map((txn: any) => {
+    return transactions.map((txn: ImportRow) => {
       // Parse OFX date format (YYYYMMDDHHMMSS or YYYYMMDD)
       const rawDate = String(txn.DTPOSTED || '');
       const year = rawDate.substring(0, 4);
@@ -132,7 +136,7 @@ export class ImportService {
       const day = rawDate.substring(6, 8);
       const dateStr = `${year}-${month}-${day}`;
 
-      const amount = parseFloat(txn.TRNAMT || '0');
+      const amount = parseFloat(String(txn.TRNAMT || '0'));
       const type = amount >= 0 ? 'DEPOSIT' : 'WITHDRAWAL';
 
       return {
@@ -153,7 +157,7 @@ export class ImportService {
     filename: string,
     config: ImportConfigDto,
   ): Promise<ValidationResultDto> {
-    const parsed = await this.parseFile(buffer, filename);
+    await this.parseFile(buffer, filename);
     const rows = await this.getAllRows(buffer, filename);
 
     const fieldDefs = ENTITY_FIELD_DEFINITIONS[config.entityType];
@@ -223,7 +227,7 @@ export class ImportService {
 
   private validateFieldType(
     fieldDef: { type: string; enumValues?: string[] },
-    value: any,
+    value: unknown,
   ): string | null {
     switch (fieldDef.type) {
       case 'number':
@@ -232,7 +236,7 @@ export class ImportService {
         }
         break;
       case 'decimal':
-        if (isNaN(parseFloat(value))) {
+        if (isNaN(parseFloat(String(value)))) {
           return 'Must be a valid decimal number';
         }
         break;
@@ -257,7 +261,7 @@ export class ImportService {
 
   private async checkDuplicates(
     organizationId: string,
-    rows: Record<string, any>[],
+    rows: ImportRow[],
     config: ImportConfigDto,
   ): Promise<ValidationErrorDto[]> {
     const warnings: ValidationErrorDto[] = [];
@@ -330,11 +334,11 @@ export class ImportService {
         if (importResult === 'created') result.created++;
         else if (importResult === 'updated') result.updated++;
         else if (importResult === 'skipped') result.skipped++;
-      } catch (error) {
+      } catch (error: unknown) {
         result.failed++;
         result.errors.push({
           row: i + 2,
-          error: error.message,
+          error: (error as Error).message,
         });
 
         if (config.stopOnError) {
@@ -350,7 +354,7 @@ export class ImportService {
   private async importSingleRow(
     organizationId: string,
     entityType: ImportEntityType,
-    data: Record<string, any>,
+    data: ImportRow,
     updateExisting: boolean = false,
     matchField?: string,
   ): Promise<'created' | 'updated' | 'skipped'> {
@@ -374,7 +378,7 @@ export class ImportService {
 
   private async importCustomer(
     organizationId: string,
-    data: Record<string, any>,
+    data: ImportRow,
     updateExisting: boolean,
     matchField?: string,
   ): Promise<'created' | 'updated' | 'skipped'> {
@@ -427,7 +431,7 @@ export class ImportService {
 
   private async importVendor(
     organizationId: string,
-    data: Record<string, any>,
+    data: ImportRow,
     updateExisting: boolean,
     matchField?: string,
   ): Promise<'created' | 'updated' | 'skipped'> {
@@ -482,7 +486,7 @@ export class ImportService {
 
   private async importItem(
     organizationId: string,
-    data: Record<string, any>,
+    data: ImportRow,
     updateExisting: boolean,
     matchField?: string,
   ): Promise<'created' | 'updated' | 'skipped'> {
@@ -537,7 +541,7 @@ export class ImportService {
 
   private async importAccount(
     organizationId: string,
-    data: Record<string, any>,
+    data: ImportRow,
     updateExisting: boolean,
     matchField?: string,
   ): Promise<'created' | 'updated' | 'skipped'> {
@@ -591,7 +595,7 @@ export class ImportService {
 
   private async importEmployee(
     organizationId: string,
-    data: Record<string, any>,
+    data: ImportRow,
     updateExisting: boolean,
     matchField?: string,
   ): Promise<'created' | 'updated' | 'skipped'> {
@@ -653,10 +657,10 @@ export class ImportService {
 
   private async importBankTransaction(
     organizationId: string,
-    data: Record<string, any>,
+    data: ImportRow,
   ): Promise<'created' | 'updated' | 'skipped'> {
     // Bank transactions are always created, not updated
-    const amount = parseFloat(data.amount);
+    const amount = parseFloat(String(data.amount));
     const type = amount >= 0 ? 'DEPOSIT' : 'WITHDRAWAL';
 
     // Get or require bankAccountId
@@ -690,8 +694,8 @@ export class ImportService {
 
   // ============ Helper Methods ============
 
-  private mapRow(row: Record<string, any>, mappings: ColumnMappingDto[]): Record<string, any> {
-    const result: Record<string, any> = {};
+  private mapRow(row: ImportRow, mappings: ColumnMappingDto[]): ImportRow {
+    const result: ImportRow = {};
 
     for (const mapping of mappings) {
       let value = row[mapping.sourceColumn];
@@ -712,7 +716,7 @@ export class ImportService {
     return result;
   }
 
-  private applyTransform(value: any, transform: string): any {
+  private applyTransform(value: unknown, transform: string): unknown {
     switch (transform) {
       case 'uppercase':
         return String(value).toUpperCase();
@@ -723,7 +727,7 @@ export class ImportService {
       case 'parseNumber':
         return Number(value);
       case 'parseDate':
-        return new Date(value);
+        return new Date(String(value));
       case 'parseBoolean':
         return ['true', '1', 'yes'].includes(String(value).toLowerCase());
       default:
@@ -731,10 +735,7 @@ export class ImportService {
     }
   }
 
-  private transformRow(
-    row: Record<string, any>,
-    entityType: ImportEntityType,
-  ): Record<string, any> {
+  private transformRow(row: ImportRow, _entityType: ImportEntityType): ImportRow {
     const transformed = { ...row };
 
     // Clean string values
@@ -750,7 +751,7 @@ export class ImportService {
     return transformed;
   }
 
-  async getAllRows(buffer: Buffer, filename: string): Promise<Record<string, any>[]> {
+  async getAllRows(buffer: Buffer, filename: string): Promise<ImportRow[]> {
     const extension = filename.toLowerCase().split('.').pop();
 
     if (extension === 'ofx' || extension === 'qfx') {
@@ -759,7 +760,7 @@ export class ImportService {
 
     if (extension === 'csv') {
       return new Promise((resolve, reject) => {
-        const rows: Record<string, any>[] = [];
+        const rows: ImportRow[] = [];
         const stream = Readable.from(buffer.toString());
         stream
           .pipe(csv())
@@ -771,13 +772,13 @@ export class ImportService {
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const data = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, {
+      const data = XLSX.utils.sheet_to_json<ImportRow>(worksheet, {
         header: 1,
       });
 
       const headers = (data[0] as string[]).map((h) => String(h || '').trim());
-      return data.slice(1).map((row: any[]) => {
-        const obj: Record<string, any> = {};
+      return data.slice(1).map((row: unknown[]) => {
+        const obj: ImportRow = {};
         headers.forEach((header, index) => {
           obj[header] = row[index];
         });

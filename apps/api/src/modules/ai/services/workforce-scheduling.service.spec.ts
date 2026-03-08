@@ -289,7 +289,7 @@ describe('WorkforceSchedulingService', () => {
       const checkOut = new Date(2024, 5, 10, 20, 0, 0); // 13 hours → 4 hours OT
 
       // 25 days of overtime for one employee
-      const records = Array.from({ length: 25 }, (_, i) => ({
+      const records = Array.from({ length: 25 }, () => ({
         employeeId: 'emp-burnout',
         checkIn: new Date(checkIn),
         checkOut: new Date(checkOut),

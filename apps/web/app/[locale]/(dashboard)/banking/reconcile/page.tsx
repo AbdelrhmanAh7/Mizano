@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 import {
   useBankAccounts,
   getAccountTypeColor,
-  getAccountTypeLabel,
   formatCurrency,
   BankAccount,
 } from '@/lib/hooks/use-bank-accounts';

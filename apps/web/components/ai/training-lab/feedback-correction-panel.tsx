@@ -69,7 +69,7 @@ const RETRAINING_THRESHOLDS: Partial<Record<AiFeature, number>> = {
 export function FeedbackCorrectionPanel() {
   const [selectedFeature, setSelectedFeature] = useState<AiFeature>('CATEGORIZATION');
 
-  const { data: feedbackStats, isLoading: loadingStats } = useAiFeedbackStats(selectedFeature);
+  const { data: feedbackStats } = useAiFeedbackStats(selectedFeature);
   const { data: recentFeedback, isLoading: loadingFeedback } = useRecentFeedback(
     selectedFeature,
     30,

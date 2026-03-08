@@ -2,17 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import {
-  Plus,
-  MoreHorizontal,
-  Eye,
-  Pencil,
-  Trash2,
-  Landmark,
-  CreditCard,
-  Wallet,
-  PiggyBank,
-} from 'lucide-react';
+import { Plus, MoreHorizontal, Eye, Pencil, Trash2 } from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import {

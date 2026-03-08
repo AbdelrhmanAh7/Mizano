@@ -7,12 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  useDeals,
   useUpdateDealStage,
   Deal,
   DealStage,
   getDealStageLabel,
-  getDealStageColor,
   formatCurrency,
 } from '@/lib/hooks/use-crm';
 import { useToast } from '@/components/ui/use-toast';

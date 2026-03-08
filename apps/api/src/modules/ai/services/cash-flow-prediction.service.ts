@@ -556,7 +556,11 @@ export class CashFlowPredictionService {
       const templateData = profile.templateData as Record<string, unknown> | null;
       const profileAmount =
         templateData && typeof templateData === 'object'
-          ? Number((templateData as any).grandTotal || (templateData as any).amount || 0)
+          ? Number(
+              (templateData as Record<string, unknown>)['grandTotal'] ||
+                (templateData as Record<string, unknown>)['amount'] ||
+                0,
+            )
           : 0;
 
       while (runDate <= endDate) {

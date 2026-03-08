@@ -4,7 +4,6 @@ import {
   IsArray,
   ValidateNested,
   IsObject,
-  IsEnum,
   IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';

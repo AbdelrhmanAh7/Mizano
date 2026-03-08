@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Post,
-  Put,
   Patch,
   Delete,
   Body,
@@ -11,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { BomService } from '../services/bom.service';
+import { BomService, CreateBomData, UpdateBomData } from '../services/bom.service';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -26,7 +25,7 @@ export class BomController {
   @Post()
   @Permissions('manufacturing.create')
   @ApiOperation({ summary: 'Create a new BOM' })
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateBomData) {
     return this.bomService.create(orgId, dto);
   }
 
@@ -47,7 +46,7 @@ export class BomController {
   @Patch(':id')
   @Permissions('manufacturing.edit')
   @ApiOperation({ summary: 'Update BOM' })
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateBomData) {
     return this.bomService.update(orgId, id, dto);
   }
 

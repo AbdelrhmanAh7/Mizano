@@ -6,7 +6,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
 import { ItemsService } from './items.service';
 
-interface CreateAdjustmentData {
+export interface CreateAdjustmentData {
   date: string;
   warehouseId: string;
   itemId: string;

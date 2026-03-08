@@ -234,7 +234,7 @@ function QuotesPageContent() {
 
   const handleConvert = async (quote: Quote) => {
     try {
-      const result = await convertToInvoice.mutateAsync(quote.id);
+      await convertToInvoice.mutateAsync(quote.id);
       toast({
         title: 'Invoice created',
         description: `Quote ${quote.quoteNumber} has been converted to invoice.`,

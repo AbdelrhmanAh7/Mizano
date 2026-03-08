@@ -6,7 +6,6 @@ import {
   IsDateString,
   IsBoolean,
   ValidateNested,
-  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -60,7 +59,7 @@ export class ParseFileResultDto {
   headers: string[];
 
   @ApiProperty({ description: 'Preview of first rows' })
-  preview: Record<string, any>[];
+  preview: Record<string, unknown>[];
 
   @ApiProperty({ description: 'Total row count' })
   totalRows: number;
@@ -108,7 +107,7 @@ export class ValidationErrorDto {
   field: string;
 
   @ApiProperty()
-  value: any;
+  value: unknown;
 
   @ApiProperty()
   error: string;

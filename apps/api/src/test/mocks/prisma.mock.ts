@@ -16,12 +16,14 @@ export function createMockPrisma(): MockPrismaClient {
   const mock = mockDeep<PrismaClient>();
 
   // Mock $transaction to execute the callback with the mock client
-  (mock.$transaction as jest.Mock).mockImplementation(async (fn: any) => {
-    if (typeof fn === 'function') {
-      return fn(mock);
-    }
-    return fn;
-  });
+  (mock.$transaction as jest.Mock).mockImplementation(
+    async (fn: (tx: typeof mock) => Promise<unknown>) => {
+      if (typeof fn === 'function') {
+        return fn(mock);
+      }
+      return fn;
+    },
+  );
 
   return mock;
 }

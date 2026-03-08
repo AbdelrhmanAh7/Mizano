@@ -12,6 +12,7 @@ const MatrixModule = require('ml-matrix');
 const { Matrix } = MatrixModule.default ? MatrixModule.default : MatrixModule;
 
 export interface LogisticRegressionModel {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   classifier: any;
   featureNames: string[];
   accuracy: number;

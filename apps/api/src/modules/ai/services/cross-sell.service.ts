@@ -48,8 +48,8 @@ export class CrossSellService {
     // Load co-occurrence matrix
     const model = await this.modelRegistry.loadActiveModel(organizationId, 'CROSS_SELL');
 
-    const coMatrix: Record<string, Record<string, number>> = model?.modelData?.coOccurrenceMatrix ||
-    {};
+    const coMatrix: Record<string, Record<string, number>> = (model?.modelData
+      ?.coOccurrenceMatrix as Record<string, Record<string, number>>) || {};
 
     // Find recommended items
     const scores = new Map<string, number>();
@@ -241,9 +241,9 @@ export class CrossSellService {
       return [];
     }
 
-    const coMatrix = model.modelData.coOccurrenceMatrix;
+    const coMatrix = model.modelData.coOccurrenceMatrix as Record<string, Record<string, number>>;
     const related = coMatrix[itemId] || {};
-    const totalTransactions = model.modelData.totalTransactions || 1;
+    const totalTransactions = (model.modelData.totalTransactions as number) || 1;
 
     const sorted = Object.entries(related)
       .sort(([, a], [, b]) => (b as number) - (a as number))

@@ -11,7 +11,6 @@ import {
   predictProbability,
   serializeModel,
   deserializeModel,
-  LogisticRegressionModel,
 } from '../utils/logistic-regression.util';
 import { zScoreWithStats, mean, standardDeviation } from '../utils/statistics.util';
 

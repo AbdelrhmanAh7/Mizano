@@ -115,7 +115,7 @@ describe('ErrorBoundary', () => {
       return <div>Recovered</div>;
     }
 
-    const { rerender } = render(
+    render(
       <ErrorBoundary>
         <ConditionalThrow />
       </ErrorBoundary>,

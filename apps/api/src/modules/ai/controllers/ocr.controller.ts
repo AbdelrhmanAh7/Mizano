@@ -120,7 +120,7 @@ export class OcrController {
     description: 'Layout learning updated',
   })
   async learnLayout(@CurrentOrg() orgId: string, @Body() dto: OcrLearnDto) {
-    const corrections: Record<string, any> = {};
+    const corrections: Record<string, unknown> = {};
 
     if (dto.date !== undefined) corrections.date = dto.date;
     if (dto.total !== undefined) corrections.total = dto.total;

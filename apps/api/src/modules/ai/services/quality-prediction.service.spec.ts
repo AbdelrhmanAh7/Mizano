@@ -14,7 +14,6 @@ import {
   createMockEventEmitter,
   MockPrismaClient,
   TEST_ORG_ID,
-  mockDecimal,
 } from '../__tests__/fixtures/ai-test-helpers';
 
 describe('QualityPredictionService', () => {

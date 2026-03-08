@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
@@ -129,7 +130,7 @@ export class CreditNotesService {
   async findAllCursor(organizationId: string, query: CursorPaginationDto) {
     const { cursor, take = 50, sortBy = 'date', sortOrder = 'desc' } = query;
 
-    const where: any = { organizationId, deletedAt: null };
+    const where: Prisma.CreditNoteWhereInput = { organizationId, deletedAt: null };
 
     return cursorPaginate(
       this.prisma.creditNote,
@@ -155,11 +156,11 @@ export class CreditNotesService {
     return creditNote;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
-    const creditNote = await this.findOne(organizationId, id);
-    const data: any = {};
-    if (dto.reason !== undefined) data.reason = dto.reason;
-    if (dto.date !== undefined) data.date = new Date(dto.date);
+  async update(organizationId: string, id: string, dto: Record<string, unknown>) {
+    await this.findOne(organizationId, id);
+    const data: Prisma.CreditNoteUpdateInput = {};
+    if (dto.reason !== undefined) data.reason = dto.reason as string;
+    if (dto.date !== undefined) data.date = new Date(dto.date as string);
 
     return this.prisma.creditNote.update({
       where: { id },

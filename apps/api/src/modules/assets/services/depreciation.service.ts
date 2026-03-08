@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
-import { AssetStatus } from '@prisma/client';
+import { AssetStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class DepreciationService {
@@ -397,7 +397,10 @@ export class DepreciationService {
     });
   }
 
-  private async generateJournalNumber(tx: any, organizationId: string): Promise<string> {
+  private async generateJournalNumber(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<string> {
     const lastJournal = await tx.journal.findFirst({
       where: { organizationId },
       orderBy: { createdAt: 'desc' },

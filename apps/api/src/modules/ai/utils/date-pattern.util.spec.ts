@@ -8,7 +8,6 @@ import {
   daysBetween,
   isPotentialDuplicate,
   generatePatternHash,
-  FREQUENCY_PATTERNS,
 } from './date-pattern.util';
 
 describe('date-pattern.util', () => {

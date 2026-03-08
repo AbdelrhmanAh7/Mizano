@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { useDropzone } from 'react-dropzone';
+import Image from 'next/image';
 import { Upload, Loader2, FileText, X, Check, Sparkles, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -337,7 +338,12 @@ export function OcrTrainingViewer({
               <div className="space-y-3">
                 {preview ? (
                   <div className="relative aspect-[3/4] bg-muted rounded-lg overflow-hidden">
-                    <img src={preview} alt="Document" className="w-full h-full object-contain" />
+                    <Image
+                      src={preview}
+                      alt="Document"
+                      className="w-full h-full object-contain"
+                      fill
+                    />
                     {!externalFile && (
                       <Button
                         variant="secondary"

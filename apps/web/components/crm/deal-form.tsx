@@ -15,17 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import {
-  useCreateDeal,
-  useLeads,
-  Deal,
-  Lead,
-  DealStage,
-  getDealStageLabel,
-} from '@/lib/hooks/use-crm';
+import { useCreateDeal, useLeads, Deal, Lead } from '@/lib/hooks/use-crm';
 import { useToast } from '@/components/ui/use-toast';
-
-const STAGES: DealStage[] = ['NEW', 'MEETING_SCHEDULED', 'PROPOSAL_SENT', 'NEGOTIATION'];
 
 const dealSchema = z.object({
   dealName: z.string().min(1, 'Deal name is required'),

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect } from 'react';
 import { useLogger } from '@/lib/hooks/use-logger';
-import { LogLevel, LogSource, LogCategory, LogStatus } from '@mizano/shared-types';
+import { LogCategory } from '@mizano/shared-types';
 
 /**
  * Global error boundary hook that captures unhandled errors and

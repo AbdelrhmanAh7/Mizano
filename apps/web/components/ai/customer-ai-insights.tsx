@@ -1,6 +1,6 @@
 'use client';
 
-import { Brain, TrendingDown, Award, Users } from 'lucide-react';
+import { Brain, Award } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

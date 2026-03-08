@@ -25,7 +25,11 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import { BankTransactionCursorQueryDto } from '../dto/bank-transaction-cursor-query.dto';
 import { BankStatementImportService } from '../services/bank-statement-import.service';
-import { BankTransactionsService } from '../services/bank-transactions.service';
+import {
+  BankTransactionsService,
+  CreateBankTransactionDto,
+  BulkImportTransactionDto,
+} from '../services/bank-transactions.service';
 
 @ApiTags('Bank Transactions')
 @ApiBearerAuth()
@@ -42,7 +46,7 @@ export class BankTransactionsController {
   @Permissions('banking.create')
   @InvalidateCache('bank-transactions:*', 'bank-accounts:*')
   @ApiOperation({ summary: 'Create/Import bank transaction' })
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateBankTransactionDto) {
     return this.bankTransactionsService.create(orgId, dto);
   }
 
@@ -52,7 +56,7 @@ export class BankTransactionsController {
   @ApiOperation({ summary: 'Bulk import transactions' })
   bulkImport(
     @CurrentOrg() orgId: string,
-    @Body() dto: { bankAccountId: string; transactions: any[] },
+    @Body() dto: { bankAccountId: string; transactions: BulkImportTransactionDto[] },
   ) {
     return this.bankTransactionsService.bulkImport(orgId, dto.bankAccountId, dto.transactions);
   }

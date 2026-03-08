@@ -242,7 +242,7 @@ export class DocumentClassificationService {
   private readonly logger = new Logger(DocumentClassificationService.name);
 
   /** In-memory cache of trained classifiers per organization (bounded: max 50, 1h TTL) */
-  private classifierCache = new BoundedCache<any>(50, 60 * 60 * 1000);
+  private classifierCache = new BoundedCache<unknown>(50, 60 * 60 * 1000);
 
   constructor(
     private prisma: PrismaService,
@@ -261,7 +261,8 @@ export class DocumentClassificationService {
       return this.classifyWithDefaults(text);
     }
 
-    return this.runClassification(classifier, text);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this.runClassification(classifier as any, text);
   }
 
   /**
@@ -346,8 +347,8 @@ export class DocumentClassificationService {
 
     // Add organization-specific training data
     for (const sample of trainingData) {
-      const inputData = sample.inputData as Record<string, any>;
-      const text = inputData.text || '';
+      const inputData = sample.inputData as Record<string, unknown>;
+      const text = (inputData.text as string) || '';
       if (text && sample.label) {
         classifier.addDocument(text, sample.label);
         sampleCount++;
@@ -383,7 +384,7 @@ export class DocumentClassificationService {
     // Evaluate accuracy using cross-validation on the training set
     const accuracy = this.evaluateAccuracy(classifier, [
       ...trainingData.map((d) => ({
-        text: (d.inputData as Record<string, any>).text || '',
+        text: ((d.inputData as Record<string, unknown>).text as string) || '',
         label: d.label,
       })),
       ...(needsSeeding
@@ -443,7 +444,7 @@ export class DocumentClassificationService {
   /**
    * Load a classifier from cache or model registry.
    */
-  private async getOrLoadClassifier(organizationId: string): Promise<any | null> {
+  private async getOrLoadClassifier(organizationId: string): Promise<unknown | null> {
     // Check in-memory cache first
     if (this.classifierCache.has(organizationId)) {
       return this.classifierCache.get(organizationId);
@@ -473,7 +474,15 @@ export class DocumentClassificationService {
    * Run classification using a trained Bayes classifier.
    * Returns the top category and confidence scores for all categories.
    */
-  private runClassification(classifier: any, text: string): ClassificationResult {
+  private runClassification(
+    classifier: {
+      classify(text: string): string;
+      getClassifications(text: string): Array<{ label: string; value: number }>;
+      addDocument(text: string, label: string): void;
+      train(): void;
+    },
+    text: string,
+  ): ClassificationResult {
     const preprocessedText = this.preprocessText(text);
     const topCategory = classifier.classify(preprocessedText) as DocumentCategory;
     const classifications = classifier.getClassifications(preprocessedText) as Array<{
@@ -611,7 +620,7 @@ export class DocumentClassificationService {
    * Uses simple hold-one-out evaluation for small datasets.
    */
   private evaluateAccuracy(
-    classifier: any,
+    classifier: { classify(text: string): string },
     samples: Array<{ text: string; label: string }>,
   ): number {
     if (samples.length === 0) return 0;

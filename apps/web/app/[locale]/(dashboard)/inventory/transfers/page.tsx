@@ -43,7 +43,6 @@ function TransfersPageContent() {
     fetchNextPage,
     isFetchingNextPage,
     isLoading,
-    refetch,
   } = useInfiniteTransfers({
     ...tableParams.queryParams,
     status: statusFilter !== 'all' ? (statusFilter as TransferStatus) : undefined,

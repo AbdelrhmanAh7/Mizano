@@ -99,16 +99,16 @@ export class OcrTrainingController {
         inputData: {
           rawText: dto.rawText.slice(0, 2000), // bounded
           extractedFields: dto.extractedFields,
-        },
+        } as import('@prisma/client').Prisma.InputJsonValue,
         label: JSON.stringify(dto.correctedFields),
       },
     });
 
     // 3. Log feedback
     await this.feedbackService.processFeedback(orgId, {
-      feature: 'OCR_LAYOUT' as any,
+      feature: 'OCR_LAYOUT' as import('@prisma/client').AiFeature,
       aiSuggestion: dto.extractedFields,
-      userAction: 'CORRECTED' as any,
+      userAction: 'CORRECTED' as import('@prisma/client').AiFeedbackAction,
       userAnswer: JSON.stringify(dto.correctedFields),
       inputData: { vendorId: dto.vendorId },
     });
@@ -182,11 +182,11 @@ export class OcrTrainingController {
           extraction,
           error: null,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         results.push({
           filename: file.originalname,
           extraction: null,
-          error: error.message || 'Extraction failed',
+          error: (error as Error).message || 'Extraction failed',
         });
       }
     }

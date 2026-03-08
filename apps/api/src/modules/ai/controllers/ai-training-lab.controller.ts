@@ -192,7 +192,7 @@ export class AiTrainingLabController {
   async trainAll(@CurrentOrg() orgId: string) {
     const trainable: Array<{
       feature: AiFeature;
-      train: () => Promise<any>;
+      train: () => Promise<unknown>;
     }> = [
       { feature: 'CATEGORIZATION', train: () => this.categorizerService.train(orgId) },
       { feature: 'CHURN_PREDICTION', train: () => this.churnService.trainModel(orgId) },
@@ -227,11 +227,13 @@ export class AiTrainingLabController {
         }
 
         const result = await train();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const resultObj = result as any;
         results.push({
           feature,
           trained: true,
           message: 'Training completed',
-          accuracy: result?.accuracy ?? result?.testAccuracy ?? undefined,
+          accuracy: resultObj?.accuracy ?? resultObj?.testAccuracy ?? undefined,
         });
       } catch (error) {
         results.push({

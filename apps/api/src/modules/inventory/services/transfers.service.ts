@@ -11,7 +11,7 @@ interface TransferLineData {
   quantity: number | string;
 }
 
-interface CreateTransferData {
+export interface CreateTransferData {
   fromWarehouseId: string;
   toWarehouseId: string;
   date: string;

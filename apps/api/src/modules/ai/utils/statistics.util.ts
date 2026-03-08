@@ -263,7 +263,6 @@ export function linearRegression(
   const sumY = sum(y);
   const sumXY = x.reduce((acc, xi, i) => acc + xi * y[i], 0);
   const sumXX = x.reduce((acc, xi) => acc + xi * xi, 0);
-  const sumYY = y.reduce((acc, yi) => acc + yi * yi, 0);
 
   const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
   const intercept = (sumY - slope * sumX) / n;

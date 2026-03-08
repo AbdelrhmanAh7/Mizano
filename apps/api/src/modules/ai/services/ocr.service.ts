@@ -1106,10 +1106,9 @@ export class OcrService {
     // Try DD/MM/YYYY format
     match = dateStr.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
     if (match) {
-      let [, day, month, year] = match;
-      if (year.length === 2) {
-        year = (parseInt(year, 10) > 50 ? '19' : '20') + year;
-      }
+      const [, day, month, rawYear] = match;
+      const year =
+        rawYear.length === 2 ? (parseInt(rawYear, 10) > 50 ? '19' : '20') + rawYear : rawYear;
       return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     }
 
@@ -1851,10 +1850,10 @@ export class OcrService {
     const headerLine = lines[headerIndex];
 
     // Detect column positions from header keywords
-    const descCol = this.findColumnPosition(headerLine, /description|item|particular/i);
-    const qtyCol = this.findColumnPosition(headerLine, /qty|quantity/i);
-    const priceCol = this.findColumnPosition(headerLine, /unit\s*price|rate|price/i);
-    const totalCol = this.findColumnPosition(headerLine, /total|amount/i);
+    const _descCol = this.findColumnPosition(headerLine, /description|item|particular/i);
+    const _qtyCol = this.findColumnPosition(headerLine, /qty|quantity/i);
+    const _priceCol = this.findColumnPosition(headerLine, /unit\s*price|rate|price/i);
+    const _totalCol = this.findColumnPosition(headerLine, /total|amount/i);
 
     // Stop keywords that indicate end of line items
     const stopKeywords =

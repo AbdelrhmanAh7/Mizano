@@ -2,7 +2,6 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AlertCategory, AlertPriority, AlertSource, AIInsight, Prisma } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
 
 export interface UnifiedAlert {
   id: string;
@@ -349,7 +348,7 @@ export class AiAlertsService {
     organizationId: string,
     alertId: string,
     userId: string,
-    reason?: string,
+    _reason?: string,
   ): Promise<void> {
     const alert = await this.prisma.aIInsight.findFirst({
       where: { id: alertId, organizationId },
@@ -517,7 +516,7 @@ export class AiAlertsService {
                 accuracy,
                 threshold: accuracyThreshold,
                 modelVersion: model.version,
-              } as any,
+              } as import('@prisma/client').Prisma.InputJsonValue,
               organizationId,
             },
           });
@@ -553,7 +552,7 @@ export class AiAlertsService {
                 correctionRate,
                 totalFeedback: fb.total,
                 corrections: fb.corrections,
-              } as any,
+              } as import('@prisma/client').Prisma.InputJsonValue,
               organizationId,
             },
           });
@@ -588,7 +587,7 @@ export class AiAlertsService {
                 feature,
                 daysSinceRetrain,
                 lastTrainedAt: model.trainedAt?.toISOString(),
-              } as any,
+              } as import('@prisma/client').Prisma.InputJsonValue,
               organizationId,
             },
           });

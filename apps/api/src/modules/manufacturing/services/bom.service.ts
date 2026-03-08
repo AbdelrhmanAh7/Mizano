@@ -8,7 +8,7 @@ interface BomComponentData {
   quantity: string | number;
 }
 
-interface CreateBomData {
+export interface CreateBomData {
   name: string;
   outputItemId: string;
   outputQuantity?: number;
@@ -17,7 +17,7 @@ interface CreateBomData {
   components?: BomComponentData[];
 }
 
-interface UpdateBomData {
+export interface UpdateBomData {
   name?: string;
   outputQuantity?: number;
   operationsCost?: string | number;

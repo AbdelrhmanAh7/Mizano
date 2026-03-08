@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import {
@@ -95,7 +96,7 @@ export class CurrencyService {
   }
 
   async getExchangeRates(organizationId: string, query: ExchangeRateQueryDto) {
-    const where: any = { organizationId };
+    const where: Prisma.ExchangeRateWhereInput = { organizationId };
 
     if (query.fromCurrency) {
       where.fromCurrency = query.fromCurrency.toUpperCase();
@@ -222,7 +223,7 @@ export class CurrencyService {
     const base = baseCurrency?.toUpperCase() || org?.baseCurrency || 'SAR';
 
     // Get latest rates from base currency
-    const rates = await this.prisma.$queryRaw<Array<any>>`
+    const rates = await this.prisma.$queryRaw<Array<Record<string, unknown>>>`
       SELECT DISTINCT ON (to_currency) *
       FROM exchange_rates
       WHERE organization_id = ${organizationId}
@@ -233,7 +234,7 @@ export class CurrencyService {
     return rates.map((r) => ({
       fromCurrency: r.from_currency,
       toCurrency: r.to_currency,
-      rate: parseFloat(r.rate),
+      rate: parseFloat(String(r.rate)),
       date: r.date,
       source: r.source,
     }));
@@ -337,7 +338,16 @@ export class CurrencyService {
     });
 
     const baseCurrency = org?.baseCurrency || 'SAR';
-    const details: Array<any> = [];
+    const details: Array<{
+      type: 'receivable' | 'payable';
+      entityType: string;
+      entityId: string;
+      currency: string;
+      originalAmount: number;
+      originalRate: number;
+      currentRate: number;
+      gainLoss: number;
+    }> = [];
     let receivablesGainLoss = 0;
     let payablesGainLoss = 0;
 

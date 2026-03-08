@@ -532,7 +532,7 @@ export class ReorderPointsService {
    * In-memory reorder calculation using pre-fetched data (no DB calls).
    */
   private calculateForItemInMemory(
-    item: { currentStock: number; costPrice: any; type: string },
+    item: { currentStock: number; costPrice: { toNumber(): number } | number; type: string },
     dailySales: number[],
     leadTimeDays: number = this.DEFAULT_LEAD_TIME_DAYS,
     serviceLevel: number = this.DEFAULT_SERVICE_LEVEL,

@@ -18,7 +18,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
 import {
   Table,
   TableBody,
@@ -44,8 +43,6 @@ import {
   useDeleteInvoice,
   useSendInvoice,
   useVoidInvoice,
-  getInvoiceStatusColor,
-  getInvoiceStatusLabel,
 } from '@/lib/hooks/use-invoices';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { InvoiceStatusBadge } from '@/components/sales/status-badge';

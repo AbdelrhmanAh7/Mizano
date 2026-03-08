@@ -14,7 +14,6 @@ import {
   RefreshCw,
   Eye,
   X,
-  CheckCircle2,
   Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -28,7 +27,6 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Progress } from '@/components/ui/progress';
 import { useTranslations } from 'next-intl';
 import {
   useAIInsights,
@@ -79,7 +77,6 @@ export default function AIInsightsPage() {
   // Summary counts
   const anomalyCount = insights.filter((i) => i.type === 'ANOMALY').length;
   const recommendationCount = insights.filter((i) => i.type === 'RECOMMENDATION').length;
-  const alertCount = insights.filter((i) => i.type === 'ALERT').length;
   const highPriorityCount = insights.filter(
     (i) => i.priority === 'HIGH' || i.priority === 'CRITICAL',
   ).length;

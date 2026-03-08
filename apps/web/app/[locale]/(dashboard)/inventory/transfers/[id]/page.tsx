@@ -2,7 +2,6 @@
 
 import { use } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { ArrowLeft, CheckCircle, XCircle, Truck, ArrowRight } from 'lucide-react';
@@ -29,7 +28,6 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 import {
   useTransfer,
   useCompleteTransfer,
@@ -45,7 +43,6 @@ interface TransferDetailPageProps {
 export default function TransferDetailPage({ params }: TransferDetailPageProps) {
   const t = useTranslations('inventory');
   const { id } = use(params);
-  const router = useRouter();
   const { data: transfer, isLoading } = useTransfer(id);
   const completeTransfer = useCompleteTransfer();
   const cancelTransfer = useCancelTransfer();

@@ -6,7 +6,7 @@ import { Decimal } from '@prisma/client/runtime/library';
  * Override any field by passing a partial.
  */
 
-export function createMockOrganization(overrides: Record<string, any> = {}) {
+export function createMockOrganization(overrides: Record<string, unknown> = {}) {
   return {
     id: 'org-test-001',
     name: 'Test Organization',
@@ -19,7 +19,7 @@ export function createMockOrganization(overrides: Record<string, any> = {}) {
   };
 }
 
-export function createMockUser(overrides: Record<string, any> = {}) {
+export function createMockUser(overrides: Record<string, unknown> = {}) {
   return {
     id: 'user-test-001',
     email: 'test@mizano.com',
@@ -33,7 +33,7 @@ export function createMockUser(overrides: Record<string, any> = {}) {
   };
 }
 
-export function createMockInvoice(overrides: Record<string, any> = {}) {
+export function createMockInvoice(overrides: Record<string, unknown> = {}) {
   return {
     id: 'inv-test-001',
     number: 'INV-2024-00001',
@@ -53,7 +53,7 @@ export function createMockInvoice(overrides: Record<string, any> = {}) {
   };
 }
 
-export function createMockBill(overrides: Record<string, any> = {}) {
+export function createMockBill(overrides: Record<string, unknown> = {}) {
   return {
     id: 'bill-test-001',
     number: 'BILL-2024-00001',
@@ -74,7 +74,7 @@ export function createMockBill(overrides: Record<string, any> = {}) {
   };
 }
 
-export function createMockJournalEntry(overrides: Record<string, any> = {}) {
+export function createMockJournalEntry(overrides: Record<string, unknown> = {}) {
   return {
     id: 'jrn-test-001',
     number: 'JRN-2024-00001',
@@ -90,7 +90,7 @@ export function createMockJournalEntry(overrides: Record<string, any> = {}) {
   };
 }
 
-export function createMockJournalLine(overrides: Record<string, any> = {}) {
+export function createMockJournalLine(overrides: Record<string, unknown> = {}) {
   return {
     id: 'line-test-001',
     journalId: 'jrn-test-001',
@@ -102,7 +102,7 @@ export function createMockJournalLine(overrides: Record<string, any> = {}) {
   };
 }
 
-export function createMockCustomer(overrides: Record<string, any> = {}) {
+export function createMockCustomer(overrides: Record<string, unknown> = {}) {
   return {
     id: 'cust-test-001',
     organizationId: 'org-test-001',
@@ -115,7 +115,7 @@ export function createMockCustomer(overrides: Record<string, any> = {}) {
   };
 }
 
-export function createMockVendor(overrides: Record<string, any> = {}) {
+export function createMockVendor(overrides: Record<string, unknown> = {}) {
   return {
     id: 'vendor-test-001',
     organizationId: 'org-test-001',
@@ -127,7 +127,7 @@ export function createMockVendor(overrides: Record<string, any> = {}) {
   };
 }
 
-export function createMockItem(overrides: Record<string, any> = {}) {
+export function createMockItem(overrides: Record<string, unknown> = {}) {
   return {
     id: 'item-test-001',
     organizationId: 'org-test-001',
@@ -145,7 +145,7 @@ export function createMockItem(overrides: Record<string, any> = {}) {
   };
 }
 
-export function createMockEmployee(overrides: Record<string, any> = {}) {
+export function createMockEmployee(overrides: Record<string, unknown> = {}) {
   return {
     id: 'emp-test-001',
     organizationId: 'org-test-001',
@@ -164,7 +164,7 @@ export function createMockEmployee(overrides: Record<string, any> = {}) {
   };
 }
 
-export function createMockBankAccount(overrides: Record<string, any> = {}) {
+export function createMockBankAccount(overrides: Record<string, unknown> = {}) {
   return {
     id: 'bank-test-001',
     organizationId: 'org-test-001',

@@ -1,7 +1,7 @@
 'use client';
 
 import { format } from 'date-fns';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import {
   FileText,
   CreditCard,
@@ -57,7 +57,6 @@ function getTransactionColors(type: RecentTransaction['type']) {
 
 export function RecentTransactions({ transactions }: RecentTransactionsProps) {
   const t = useTranslations('common.dashboard.recentTransactions');
-  const locale = useLocale();
 
   return (
     <Card>

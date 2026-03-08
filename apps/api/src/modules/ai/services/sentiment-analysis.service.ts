@@ -65,7 +65,15 @@ const MAX_DETAILS = 50;
 @Injectable()
 export class SentimentAnalysisService {
   private readonly logger = new Logger(SentimentAnalysisService.name);
-  private readonly analyzer: any;
+  private readonly analyzer: {
+    analyze(text: string): {
+      score: number;
+      comparative: number;
+      words: string[];
+      positive: string[];
+      negative: string[];
+    };
+  };
 
   constructor(private prisma: PrismaService) {
     this.analyzer = new Sentiment();

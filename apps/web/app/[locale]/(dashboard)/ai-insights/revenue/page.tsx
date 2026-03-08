@@ -24,8 +24,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-  LineChart,
-  Line,
 } from 'recharts';
 import { useTranslations } from 'next-intl';
 import { useRevenueForecast, formatCurrency } from '@/lib/hooks/use-ai';

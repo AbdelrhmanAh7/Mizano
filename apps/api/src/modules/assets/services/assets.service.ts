@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { AssetStatus, DepreciationMethod } from '@prisma/client';
+import { AssetStatus, DepreciationMethod, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
@@ -15,7 +15,7 @@ export class AssetsService {
   /**
    * Create a new asset with depreciation schedule
    */
-  async create(organizationId: string, dto: CreateAssetDto): Promise<any> {
+  async create(organizationId: string, dto: CreateAssetDto): Promise<unknown> {
     // Generate asset number
     const assetNumber = await this.generateAssetNumber(organizationId);
 
@@ -80,8 +80,8 @@ export class AssetsService {
   async findAll(
     organizationId: string,
     query: AssetQueryDto,
-  ): Promise<{ data: any[]; total: number }> {
-    const where: any = {
+  ): Promise<{ data: Record<string, unknown>[]; total: number }> {
+    const where: Prisma.AssetWhereInput = {
       organizationId,
       deletedAt: null,
     };
@@ -146,7 +146,7 @@ export class AssetsService {
   /**
    * Get asset by ID with depreciation schedule
    */
-  async findOne(organizationId: string, assetId: string): Promise<any> {
+  async findOne(organizationId: string, assetId: string): Promise<unknown> {
     const asset = await this.prisma.asset.findFirst({
       where: {
         id: assetId,
@@ -173,7 +173,7 @@ export class AssetsService {
   /**
    * Update an asset
    */
-  async update(organizationId: string, assetId: string, dto: UpdateAssetDto): Promise<any> {
+  async update(organizationId: string, assetId: string, dto: UpdateAssetDto): Promise<unknown> {
     const asset = await this.prisma.asset.findFirst({
       where: { id: assetId, organizationId, deletedAt: null },
     });
@@ -227,7 +227,7 @@ export class AssetsService {
   /**
    * Dispose an asset (sell or write off)
    */
-  async dispose(organizationId: string, assetId: string, dto: DisposeAssetDto): Promise<any> {
+  async dispose(organizationId: string, assetId: string, dto: DisposeAssetDto): Promise<unknown> {
     const asset = await this.prisma.asset.findFirst({
       where: { id: assetId, organizationId, deletedAt: null },
       include: {
@@ -290,7 +290,7 @@ export class AssetsService {
   /**
    * Get depreciation schedule for an asset
    */
-  async getDepreciationSchedule(organizationId: string, assetId: string): Promise<any[]> {
+  async getDepreciationSchedule(organizationId: string, assetId: string): Promise<unknown[]> {
     const asset = await this.prisma.asset.findFirst({
       where: { id: assetId, organizationId, deletedAt: null },
     });
@@ -323,7 +323,7 @@ export class AssetsService {
   /**
    * Get asset summary/statistics
    */
-  async getSummary(organizationId: string): Promise<any> {
+  async getSummary(organizationId: string): Promise<unknown> {
     const assets = await this.prisma.asset.findMany({
       where: { organizationId, deletedAt: null },
     });
@@ -402,7 +402,7 @@ export class AssetsService {
   }
 
   private async generateDepreciationSchedule(
-    tx: any,
+    tx: Prisma.TransactionClient,
     assetId: string,
     organizationId: string,
     purchaseDate: Date,
@@ -413,14 +413,12 @@ export class AssetsService {
   ): Promise<void> {
     const depreciableAmount = purchasePrice - salvageValue;
     const totalMonths = usefulLifeYears * 12;
-    const schedules: any[] = [];
+    const schedules: Prisma.DepreciationScheduleCreateManyInput[] = [];
 
     let currentMonth = purchaseDate.getMonth() + 1;
     let currentYear = purchaseDate.getFullYear();
     let accumulatedTotal = 0;
     let bookValue = purchasePrice;
-    let remainingValue = depreciableAmount;
-
     for (let period = 1; period <= totalMonths; period++) {
       let monthlyAmount: number;
 
@@ -439,7 +437,6 @@ export class AssetsService {
 
       accumulatedTotal += monthlyAmount;
       bookValue -= monthlyAmount;
-      remainingValue -= monthlyAmount;
 
       schedules.push({
         assetId,
@@ -463,8 +460,15 @@ export class AssetsService {
   }
 
   private async regenerateScheduleFromCurrent(
-    tx: any,
-    asset: any,
+    tx: Prisma.TransactionClient,
+    asset: {
+      id: string;
+      salvageValue: Decimal;
+      usefulLifeYears: number;
+      purchasePrice: Decimal;
+      purchaseDate: Date;
+      depreciationMethod: DepreciationMethod;
+    },
     organizationId: string,
   ): Promise<void> {
     // Get last executed schedule
@@ -506,7 +510,7 @@ export class AssetsService {
     if (remainingMonths <= 0 || depreciableAmount <= 0) return;
 
     const monthlyAmount = depreciableAmount / remainingMonths;
-    const schedules: any[] = [];
+    const schedules: Prisma.DepreciationScheduleCreateManyInput[] = [];
 
     let month = startMonth;
     let year = startYear;
@@ -549,13 +553,23 @@ export class AssetsService {
   }
 
   private async createDisposalJournal(
-    tx: any,
+    tx: Prisma.TransactionClient,
     organizationId: string,
-    asset: any,
+    asset: {
+      id: string;
+      assetNumber: string;
+      name: string;
+      depreciationAccountId: string;
+      accumulatedDeprAccountId: string;
+      assetAccountId: string;
+      salvageValue: Decimal;
+      accumulatedDepreciation: Decimal;
+      purchasePrice: Decimal;
+    },
     disposalDate: Date,
     disposalAmount: Decimal,
     gainLoss: Decimal,
-  ): Promise<any> {
+  ): Promise<{ id: string }> {
     // Get or create gain/loss account
     let gainLossAccount = await tx.account.findFirst({
       where: {
@@ -578,7 +592,7 @@ export class AssetsService {
     const journalNumber = await this.generateJournalNumber(tx, organizationId);
 
     // Build journal lines
-    const lines: any[] = [];
+    const lines: Prisma.JournalLineUncheckedCreateWithoutJournalInput[] = [];
 
     // Debit: Cash/Bank (disposal amount received)
     if (disposalAmount.greaterThan(0)) {
@@ -638,9 +652,8 @@ export class AssetsService {
         journalNumber,
         date: disposalDate,
         reference: `DISPOSAL-${asset.assetNumber}`,
-        description: `Asset disposal: ${asset.name}`,
-        isAdjusting: false,
-        status: 'POSTED',
+        notes: `Asset disposal: ${asset.name}`,
+        isPosted: true,
         organizationId,
         lines: {
           create: lines,
@@ -651,7 +664,10 @@ export class AssetsService {
     return journal;
   }
 
-  private async generateJournalNumber(tx: any, organizationId: string): Promise<string> {
+  private async generateJournalNumber(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<string> {
     const lastJournal = await tx.journal.findFirst({
       where: { organizationId },
       orderBy: { createdAt: 'desc' },
@@ -666,7 +682,13 @@ export class AssetsService {
     return `JRN-${String(lastNumber + 1).padStart(3, '0')}`;
   }
 
-  private formatAssetResponse(asset: any): any {
+  private toNum(val: unknown): number | undefined {
+    if (val === null || val === undefined) return undefined;
+    if (val instanceof Decimal) return val.toNumber();
+    return Number(val);
+  }
+
+  private formatAssetResponse(asset: Record<string, unknown>): Record<string, unknown> {
     return {
       id: asset.id,
       assetNumber: asset.assetNumber,
@@ -674,32 +696,34 @@ export class AssetsService {
       description: asset.description,
       assetType: asset.assetType,
       purchaseDate: asset.purchaseDate,
-      purchasePrice: asset.purchasePrice.toNumber(),
-      salvageValue: asset.salvageValue.toNumber(),
+      purchasePrice: this.toNum(asset.purchasePrice),
+      salvageValue: this.toNum(asset.salvageValue),
       usefulLifeYears: asset.usefulLifeYears,
       depreciationMethod: asset.depreciationMethod,
-      monthlyDepreciation: asset.monthlyDepreciation.toNumber(),
-      accumulatedDepreciation: asset.accumulatedDepreciation.toNumber(),
-      currentBookValue: asset.currentBookValue.toNumber(),
+      monthlyDepreciation: this.toNum(asset.monthlyDepreciation),
+      accumulatedDepreciation: this.toNum(asset.accumulatedDepreciation),
+      currentBookValue: this.toNum(asset.currentBookValue),
       status: asset.status,
       disposalDate: asset.disposalDate,
-      disposalAmount: asset.disposalAmount?.toNumber(),
-      disposalGainLoss: asset.disposalGainLoss?.toNumber(),
+      disposalAmount: this.toNum(asset.disposalAmount),
+      disposalGainLoss: this.toNum(asset.disposalGainLoss),
       createdAt: asset.createdAt,
       updatedAt: asset.updatedAt,
     };
   }
 
-  private formatAssetDetailResponse(asset: any): any {
+  private formatAssetDetailResponse(asset: Record<string, unknown>): Record<string, unknown> {
     return {
       ...this.formatAssetResponse(asset),
-      depreciationSchedule: asset.depreciationSchedule?.map((s: any) => ({
+      depreciationSchedule: (
+        asset.depreciationSchedule as Record<string, unknown>[] | undefined
+      )?.map((s) => ({
         id: s.id,
         month: s.month,
         year: s.year,
-        amount: s.amount.toNumber(),
-        accumulatedTotal: s.accumulatedTotal.toNumber(),
-        bookValue: s.bookValue.toNumber(),
+        amount: this.toNum(s.amount),
+        accumulatedTotal: this.toNum(s.accumulatedTotal),
+        bookValue: this.toNum(s.bookValue),
         journalId: s.journalId,
         executedAt: s.executedAt,
       })),

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -24,7 +25,7 @@ export type VoiceEntityType =
 export interface ParsedCommand {
   action: VoiceAction;
   entityType: VoiceEntityType | null;
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
   confidence: number;
   originalText: string;
 }
@@ -32,7 +33,7 @@ export interface ParsedCommand {
 export interface CommandExecutionResult {
   success: boolean;
   action: VoiceAction;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   message: string;
   requiresConfirmation?: boolean;
 }
@@ -305,11 +306,17 @@ export class VoiceCommandService {
    * Extract structured parameters from the voice text using compromise + regex.
    */
   private extractParameters(
-    doc: any,
+    doc: {
+      verbs(): { toInfinitive(): { out(format: string): string[] } };
+      nouns(): { out(format: string): string[] };
+      people(): { out(format: string): string[] };
+      organizations(): { out(format: string): string[] };
+      money(): { out(format: string): string[] };
+    },
     text: string,
     entityType: VoiceEntityType | null,
-  ): Record<string, any> {
-    const params: Record<string, any> = {};
+  ): Record<string, unknown> {
+    const params: Record<string, unknown> = {};
 
     // Invoice number: INV-XXX pattern
     const invoicePattern = /\bINV[-\s]?(\d{1,6})\b/gi;
@@ -399,7 +406,7 @@ export class VoiceCommandService {
   private async executeRead(
     organizationId: string,
     entityType: VoiceEntityType,
-    parameters: Record<string, any>,
+    parameters: Record<string, unknown>,
   ): Promise<CommandExecutionResult> {
     switch (entityType) {
       case 'invoice':
@@ -427,14 +434,14 @@ export class VoiceCommandService {
 
   private async readInvoice(
     organizationId: string,
-    parameters: Record<string, any>,
+    parameters: Record<string, unknown>,
   ): Promise<CommandExecutionResult> {
     // Single invoice lookup by number
     if (parameters.invoiceNumber) {
       const invoice = await this.prisma.invoice.findFirst({
         where: {
           organizationId,
-          invoiceNumber: parameters.invoiceNumber,
+          invoiceNumber: parameters.invoiceNumber as string,
           deletedAt: null,
         },
         include: { customer: { select: { name: true } } },
@@ -464,7 +471,7 @@ export class VoiceCommandService {
     }
 
     // Filtered list (e.g. overdue invoices)
-    const where: Record<string, any> = {
+    const where: Prisma.InvoiceWhereInput = {
       organizationId,
       deletedAt: null,
     };
@@ -506,12 +513,12 @@ export class VoiceCommandService {
 
   private async readCustomer(
     organizationId: string,
-    parameters: Record<string, any>,
+    parameters: Record<string, unknown>,
   ): Promise<CommandExecutionResult> {
-    const where: Record<string, any> = { organizationId };
+    const where: Prisma.CustomerWhereInput = { organizationId };
 
     if (parameters.name || parameters.customerName) {
-      const searchName = parameters.name || parameters.customerName;
+      const searchName = (parameters.name || parameters.customerName) as string;
       where.name = { contains: searchName, mode: 'insensitive' };
     }
 
@@ -549,16 +556,17 @@ export class VoiceCommandService {
 
   private async readAccount(
     organizationId: string,
-    parameters: Record<string, any>,
+    parameters: Record<string, unknown>,
   ): Promise<CommandExecutionResult> {
     if (parameters.accountName) {
+      const accountName = parameters.accountName as string;
       const account = await this.prisma.account.findFirst({
         where: {
           organizationId,
           isActive: true,
           OR: [
-            { name: { contains: parameters.accountName, mode: 'insensitive' } },
-            { code: { equals: parameters.accountName, mode: 'insensitive' } },
+            { name: { contains: accountName, mode: 'insensitive' } },
+            { code: { equals: accountName, mode: 'insensitive' } },
           ],
         },
       });
@@ -567,7 +575,7 @@ export class VoiceCommandService {
         return {
           success: false,
           action: 'READ',
-          message: `No account found matching "${parameters.accountName}".`,
+          message: `No account found matching "${accountName}".`,
         };
       }
 
@@ -611,12 +619,12 @@ export class VoiceCommandService {
 
   private async readVendor(
     organizationId: string,
-    parameters: Record<string, any>,
+    parameters: Record<string, unknown>,
   ): Promise<CommandExecutionResult> {
-    const where: Record<string, any> = { organizationId };
+    const where: Prisma.VendorWhereInput = { organizationId };
 
     if (parameters.name || parameters.vendorName) {
-      const searchName = parameters.name || parameters.vendorName;
+      const searchName = (parameters.name || parameters.vendorName) as string;
       where.name = { contains: searchName, mode: 'insensitive' };
     }
 
@@ -631,7 +639,7 @@ export class VoiceCommandService {
         success: false,
         action: 'READ',
         message: parameters.name
-          ? `No vendor found matching "${parameters.name}".`
+          ? `No vendor found matching "${parameters.name as string}".`
           : 'No vendors found.',
       };
     }
@@ -643,7 +651,7 @@ export class VoiceCommandService {
         vendors: vendors.map((v) => ({
           id: v.id,
           name: v.name,
-          email: (v as any).email ?? null,
+          email: (v as { email?: string | null }).email ?? null,
         })),
         count: vendors.length,
       },
@@ -651,8 +659,8 @@ export class VoiceCommandService {
     };
   }
 
-  private readReport(parameters: Record<string, any>): CommandExecutionResult {
-    const reportType = parameters.reportType ?? 'unknown';
+  private readReport(parameters: Record<string, unknown>): CommandExecutionResult {
+    const reportType = (parameters.reportType as string) ?? 'unknown';
     const reportNames: Record<string, string> = {
       pl: 'Profit & Loss',
       balance_sheet: 'Balance Sheet',
@@ -689,9 +697,9 @@ export class VoiceCommandService {
 
   private async readBill(
     organizationId: string,
-    parameters: Record<string, any>,
+    parameters: Record<string, unknown>,
   ): Promise<CommandExecutionResult> {
-    const where: Record<string, any> = {
+    const where: Prisma.BillWhereInput = {
       organizationId,
       deletedAt: null,
     };
@@ -732,7 +740,7 @@ export class VoiceCommandService {
 
   private async readPayment(
     organizationId: string,
-    _parameters: Record<string, any>,
+    _parameters: Record<string, unknown>,
   ): Promise<CommandExecutionResult> {
     const payments = await this.prisma.paymentReceived.findMany({
       where: {
@@ -767,7 +775,7 @@ export class VoiceCommandService {
    */
   private executeCreate(
     entityType: VoiceEntityType,
-    parameters: Record<string, any>,
+    parameters: Record<string, unknown>,
   ): CommandExecutionResult {
     switch (entityType) {
       case 'invoice':

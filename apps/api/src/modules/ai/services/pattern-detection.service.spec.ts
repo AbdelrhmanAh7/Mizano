@@ -214,7 +214,7 @@ describe('PatternDetectionService', () => {
       ] as any);
       prisma.transactionPattern.count.mockResolvedValue(1 as any);
 
-      const patterns = await service.getPatterns(TEST_ORG_ID, { limit: 1 });
+      await service.getPatterns(TEST_ORG_ID, { limit: 1 });
 
       expect(prisma.transactionPattern.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ take: 1 }),

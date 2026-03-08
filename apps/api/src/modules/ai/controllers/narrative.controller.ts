@@ -135,7 +135,7 @@ export class NarrativeController {
   })
   async getAvailableQueries(): Promise<{ data: QueryTemplateResponse[] }> {
     const queries = this.narrativeService.getAvailableQueries();
-    return { data: queries };
+    return { data: queries as unknown as QueryTemplateResponse[] };
   }
 
   @Get('query/:id')
@@ -169,7 +169,7 @@ export class NarrativeController {
     @Query('limit') limit?: string,
     @Query('minAmount') minAmount?: string,
   ): Promise<{ data: QueryAnswer }> {
-    const params: Record<string, any> = {};
+    const params: Record<string, unknown> = {};
     if (period) params.period = period;
     if (limit) params.limit = parseInt(limit, 10);
     if (minAmount) params.minAmount = parseFloat(minAmount);

@@ -181,7 +181,7 @@ export class ComplianceMonitoringService {
 
     // Check for same user performing both CREATE and UPDATE/APPROVE
     for (const [key, userActions] of entityActions) {
-      for (const [userId, actions] of userActions) {
+      for (const [_userId, actions] of userActions) {
         if (actions.has('CREATE') && (actions.has('UPDATE') || actions.has('APPROVE'))) {
           const [entityType, entityId] = key.split(':');
           violations.push({

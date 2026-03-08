@@ -2,15 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import {
-  LogEntry,
-  LogLevel,
-  LogSource,
-  LogCategory,
-  LogStatus,
-  LogFilter,
-  LogStats,
-} from '@mizano/shared-types';
+import { LogEntry, LogStatus, LogFilter, LogStats } from '@mizano/shared-types';
 
 interface LoggerState {
   logs: LogEntry[];
@@ -40,7 +32,7 @@ const DEFAULT_FILTER: LogFilter = {};
 
 export const useLoggerStore = create<LoggerState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       logs: [],
       stats: null,
       filter: DEFAULT_FILTER,

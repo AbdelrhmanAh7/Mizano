@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { DeepSearchStatus, SuggestionCategory } from '@prisma/client';
+import { SuggestionCategory } from '@prisma/client';
 import * as puppeteer from 'puppeteer';
 import * as natural from 'natural';
 import * as fs from 'fs/promises';
@@ -644,7 +644,7 @@ export class DeepSearchService {
     }
   }
 
-  private async updateJob(jobId: string, data: Record<string, any>) {
+  private async updateJob(jobId: string, data: Record<string, unknown>) {
     await this.prisma.deepSearchJob.update({ where: { id: jobId }, data });
   }
 

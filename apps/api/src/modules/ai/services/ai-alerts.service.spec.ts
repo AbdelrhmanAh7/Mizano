@@ -8,7 +8,6 @@ import {
   MockPrismaClient,
   createMockEventEmitter,
   TEST_ORG_ID,
-  mockDecimal,
 } from '../__tests__/fixtures/ai-test-helpers';
 
 describe('AiAlertsService', () => {

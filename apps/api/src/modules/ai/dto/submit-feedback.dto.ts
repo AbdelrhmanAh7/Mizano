@@ -31,7 +31,7 @@ export class SubmitFeedbackDto {
   })
   @IsObject()
   @IsNotEmpty()
-  aiSuggestion: Record<string, any>;
+  aiSuggestion: Record<string, unknown>;
 
   @ApiProperty({
     enum: ['ACCEPTED', 'REJECTED', 'CORRECTED'],
@@ -55,5 +55,5 @@ export class SubmitFeedbackDto {
   })
   @IsObject()
   @IsNotEmpty()
-  inputData: Record<string, any>;
+  inputData: Record<string, unknown>;
 }

@@ -91,10 +91,10 @@ export function TransferForm({
   const watchSourceWarehouse = form.watch('sourceWarehouseId');
 
   // Calculate total items being transferred
+  const watchedLines = form.watch('lines');
   const totalQuantity = useMemo(() => {
-    const lines = form.watch('lines');
-    return lines.reduce((sum, line) => sum + (line.quantity || 0), 0);
-  }, [form.watch('lines')]);
+    return watchedLines.reduce((sum, line) => sum + (line.quantity || 0), 0);
+  }, [watchedLines]);
 
   const handleSubmit = (data: TransferFormData) => {
     onSubmit({

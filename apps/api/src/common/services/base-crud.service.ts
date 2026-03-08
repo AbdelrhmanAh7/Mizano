@@ -75,10 +75,27 @@ export abstract class BaseCrudService {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected get model(): any {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (this.prisma as any)[this.config.modelName];
+  protected get model(): {
+    findMany: (...args: unknown[]) => Promise<unknown[]>;
+    count: (...args: unknown[]) => Promise<number>;
+    findFirst: (...args: unknown[]) => Promise<unknown>;
+    create: (...args: unknown[]) => Promise<unknown>;
+    update: (...args: unknown[]) => Promise<unknown>;
+    delete: (...args: unknown[]) => Promise<unknown>;
+  } {
+    return (
+      this.prisma as unknown as Record<
+        string,
+        {
+          findMany: (...args: unknown[]) => Promise<unknown[]>;
+          count: (...args: unknown[]) => Promise<number>;
+          findFirst: (...args: unknown[]) => Promise<unknown>;
+          create: (...args: unknown[]) => Promise<unknown>;
+          update: (...args: unknown[]) => Promise<unknown>;
+          delete: (...args: unknown[]) => Promise<unknown>;
+        }
+      >
+    )[this.config.modelName];
   }
 
   /**
@@ -153,11 +170,19 @@ export abstract class BaseCrudService {
     const where = wb.build();
     const orderBy = this.buildOrderBy(query.sortBy, query.sortOrder);
 
-    return cursorPaginate(this.model, where, orderBy, {
-      cursor: query.cursor,
-      take: query.take ?? 50,
-      include: this.config.defaultInclude,
-    });
+    return cursorPaginate(
+      this.model as unknown as {
+        findMany: (args: Record<string, unknown>) => Promise<{ id: string }[]>;
+        count: (args: Record<string, unknown>) => Promise<number>;
+      },
+      where,
+      orderBy,
+      {
+        cursor: query.cursor,
+        take: query.take ?? 50,
+        include: this.config.defaultInclude,
+      },
+    );
   }
 
   /**

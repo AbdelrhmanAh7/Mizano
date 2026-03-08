@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AnomalyDetectionService } from '../services/anomaly-detection.service';
@@ -403,7 +403,7 @@ export class AiRetrainingScheduler {
                   .map((s) => s.content)
                   .join(' ')
                   .slice(0, 500),
-              data: narrative as any,
+              data: narrative as unknown as import('@prisma/client').Prisma.InputJsonValue,
             },
           });
 

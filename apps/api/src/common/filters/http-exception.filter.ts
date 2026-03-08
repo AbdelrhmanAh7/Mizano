@@ -19,7 +19,7 @@ interface ErrorResponse {
   code?: string;
   message: string;
   error: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   timestamp: string;
   path: string;
   requestId?: string;
@@ -56,7 +56,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         code: exception.code,
         message: exception.message,
         error: 'Business Rule Violation',
-        details: exception.details,
+        details: exception.details as Record<string, unknown>,
         timestamp,
         path,
         requestId,
@@ -201,15 +201,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     let message: string = exception.message;
     let error: string = 'Error';
-    let details: Record<string, any> | undefined;
+    let details: Record<string, unknown> | undefined;
     let code: string | undefined;
 
     if (typeof exceptionResponse === 'object') {
-      const responseObj = exceptionResponse as Record<string, any>;
-      message = responseObj.message || exception.message;
-      error = responseObj.error || 'Error';
-      code = responseObj.code;
-      details = responseObj.details;
+      const responseObj = exceptionResponse as Record<string, unknown>;
+      message = (responseObj.message as string) || exception.message;
+      error = (responseObj.error as string) || 'Error';
+      code = responseObj.code as string | undefined;
+      details = responseObj.details as Record<string, unknown> | undefined;
 
       // Handle validation errors from class-validator
       if (Array.isArray(responseObj.message)) {
@@ -257,8 +257,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       path: response.path,
       method: request.method,
       requestId: response.requestId,
-      userId: (request as any).user?.id,
-      organizationId: (request as any).user?.organizationId,
+      userId: (request as { user?: { id?: string; organizationId?: string } }).user?.id,
+      organizationId: (request as { user?: { id?: string; organizationId?: string } }).user
+        ?.organizationId,
     };
 
     if (response.statusCode >= 500) {
@@ -278,8 +279,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
         method: request.method,
         statusCode: response.statusCode,
         userAgent: request.headers['user-agent'],
-        userId: (request as any).user?.id,
-        organizationId: (request as any).user?.organizationId,
+        userId: (request as { user?: { id?: string; organizationId?: string } }).user?.id,
+        organizationId: (request as { user?: { id?: string; organizationId?: string } }).user
+          ?.organizationId,
       });
     } else if (response.statusCode >= 400) {
       this.logger.warn(`${response.code || 'ERROR'}: ${response.message}`, logContext);
@@ -293,8 +295,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
         method: request.method,
         statusCode: response.statusCode,
         userAgent: request.headers['user-agent'],
-        userId: (request as any).user?.id,
-        organizationId: (request as any).user?.organizationId,
+        userId: (request as { user?: { id?: string; organizationId?: string } }).user?.id,
+        organizationId: (request as { user?: { id?: string; organizationId?: string } }).user
+          ?.organizationId,
       });
     }
   }

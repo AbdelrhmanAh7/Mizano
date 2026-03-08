@@ -99,9 +99,6 @@ export class ClvAnalysisService {
 
     // Simplified BG/NBD: expected transactions in next 12 months
     const T = customerAge;
-    const recency = Math.floor(
-      (Date.now() - invoices[invoices.length - 1].date.getTime()) / (30 * 86400000),
-    );
     const frequency = invoices.length;
 
     // Retention probability based on recency vs average interval

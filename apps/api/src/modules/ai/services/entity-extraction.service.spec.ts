@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { EntityExtractionService, ExtractionResult } from './entity-extraction.service';
+import { EntityExtractionService } from './entity-extraction.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import {
   createMockPrisma,

@@ -39,7 +39,7 @@ export class FraudAlertDto {
   @ApiProperty() entityType: string;
   @ApiProperty() entityId: string;
   @ApiProperty() fraudScore: number;
-  @ApiProperty() signals: any[];
+  @ApiProperty() signals: unknown[];
   @ApiProperty() isResolved: boolean;
   @ApiPropertyOptional() resolvedAt?: Date;
   @ApiProperty() createdAt: Date;

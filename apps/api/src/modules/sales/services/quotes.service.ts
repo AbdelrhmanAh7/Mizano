@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { QuoteStatus } from '@prisma/client';
+import { Prisma, QuoteStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
@@ -65,7 +65,7 @@ export class QuotesService {
 
   async findAll(organizationId: string, query: PaginationDto) {
     const { page = 1, limit = 20, search, sortBy = 'date', sortOrder = 'desc' } = query;
-    const where: any = { organizationId, deletedAt: null };
+    const where: Prisma.QuoteWhereInput = { organizationId, deletedAt: null };
     if (search) {
       where.OR = [
         { quoteNumber: { contains: search, mode: 'insensitive' } },
@@ -90,7 +90,7 @@ export class QuotesService {
   async findAllCursor(organizationId: string, query: CursorPaginationDto) {
     const { cursor, take = 50, search, sortBy = 'date', sortOrder = 'desc' } = query;
 
-    const where: any = { organizationId, deletedAt: null };
+    const where: Prisma.QuoteWhereInput = { organizationId, deletedAt: null };
 
     if (search) {
       where.OR = [
@@ -130,7 +130,7 @@ export class QuotesService {
     if (quote.status !== QuoteStatus.DRAFT)
       throw new BadRequestException('Only draft quotes can be updated');
 
-    const { customerId, lines, date, expiryDate, ...restData } = updateQuoteDto;
+    const { customerId, lines: _lines, date, expiryDate, ...restData } = updateQuoteDto;
     return this.prisma.quote.update({
       where: { id },
       data: {

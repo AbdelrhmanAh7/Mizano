@@ -47,7 +47,6 @@ function AdjustmentsPageContent() {
     fetchNextPage,
     isFetchingNextPage,
     isLoading,
-    refetch,
   } = useInfiniteAdjustments({
     ...tableParams.queryParams,
     status: statusFilter !== 'all' ? (statusFilter as AdjustmentStatus) : undefined,

@@ -57,7 +57,7 @@ export class JournalsService {
     });
 
     return {
-      ...journal,
+      ...(journal as Record<string, unknown>),
       totalDebit: totalDebit.toFixed(4),
       totalCredit: totalCredit.toFixed(4),
     };
@@ -74,7 +74,7 @@ export class JournalsService {
       dateTo,
     } = query;
 
-    const where: any = {
+    const where: Prisma.JournalWhereInput = {
       organizationId,
       deletedAt: null,
     };
@@ -143,7 +143,7 @@ export class JournalsService {
 
   async findAllCursor(organizationId: string, query: JournalCursorQueryDto) {
     const { cursor, take, search, sortBy = 'date', sortOrder = 'desc', dateFrom, dateTo } = query;
-    const where: any = { organizationId, deletedAt: null };
+    const where: Prisma.JournalWhereInput = { organizationId, deletedAt: null };
     if (search) {
       where.OR = [
         { journalNumber: { contains: search, mode: 'insensitive' } },
@@ -343,17 +343,21 @@ export class JournalsService {
       },
     });
 
-    const totalDebit = reversalJournal.lines.reduce(
-      (sum: number, line: any) => sum + parseFloat(line.debit.toString()),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const reversalData = reversalJournal as any;
+    const totalDebit = reversalData.lines.reduce(
+      (sum: number, line: { debit: { toString(): string }; credit: { toString(): string } }) =>
+        sum + parseFloat(line.debit.toString()),
       0,
     );
-    const totalCredit = reversalJournal.lines.reduce(
-      (sum: number, line: any) => sum + parseFloat(line.credit.toString()),
+    const totalCredit = reversalData.lines.reduce(
+      (sum: number, line: { debit: { toString(): string }; credit: { toString(): string } }) =>
+        sum + parseFloat(line.credit.toString()),
       0,
     );
 
     return {
-      ...reversalJournal,
+      ...reversalData,
       totalDebit: totalDebit.toFixed(4),
       totalCredit: totalCredit.toFixed(4),
     };
@@ -382,15 +386,17 @@ export class JournalsService {
    */
   private async createJournalWithRetry(
     organizationId: string,
-    data: Record<string, any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data: any,
     maxRetries: number = 3,
-  ): Promise<any> {
+  ): Promise<unknown> {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         return await this.prisma.$transaction(async (tx) => {
           const journalNumber = await this.generateJournalNumberTx(tx, organizationId);
           return tx.journal.create({
-            data: { ...data, journalNumber } as any,
+            data: { ...data, journalNumber },
+
             include: {
               lines: {
                 include: {

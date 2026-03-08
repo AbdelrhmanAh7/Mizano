@@ -70,7 +70,7 @@ export class AiTrainingService {
       data: {
         organizationId,
         feature,
-        inputData,
+        inputData: inputData as Prisma.InputJsonValue,
         label,
         source,
       },
@@ -203,7 +203,7 @@ export class AiTrainingService {
     const data = records.map((record) => ({
       organizationId,
       feature,
-      inputData: record.inputData,
+      inputData: record.inputData as Prisma.InputJsonValue,
       label: record.label,
       source: 'SEED' as AiTrainingSource,
     }));

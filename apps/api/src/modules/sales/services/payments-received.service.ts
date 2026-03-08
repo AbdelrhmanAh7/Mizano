@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
@@ -162,7 +163,7 @@ export class PaymentsReceivedService {
   async findAllCursor(organizationId: string, query: CursorPaginationDto) {
     const { cursor, take = 50, sortBy = 'date', sortOrder = 'desc' } = query;
 
-    const where: any = { organizationId, deletedAt: null };
+    const where: Prisma.PaymentReceivedWhereInput = { organizationId, deletedAt: null };
 
     return cursorPaginate(
       this.prisma.paymentReceived,

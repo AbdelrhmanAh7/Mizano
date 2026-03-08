@@ -342,7 +342,7 @@ export class PaddleOcrService implements OnModuleInit {
   private async recognizeTextBoxes(
     originalImage: Buffer,
     boxes: DetectionBox[],
-    language: string,
+    _language: string,
   ): Promise<Array<{ text: string; confidence: number; bbox: number[][] }>> {
     if (!this.recognitionSession) {
       throw new Error('Recognition model not loaded');

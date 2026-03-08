@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DocumentIntakeService } from '../../services/document-intake.service';
 import { OcrService } from '../../services/ocr.service';
 import { DocumentClassificationService } from '../../services/document-classification.service';
@@ -21,7 +20,6 @@ import {
   ARABIC_INVOICE_TEXT,
   RECEIPT_TEXT,
   EUROPEAN_FORMAT_INVOICE,
-  PURCHASE_ORDER_TEXT,
   MINIMAL_INVOICE_TEXT,
 } from '../fixtures/sample-invoice-text';
 

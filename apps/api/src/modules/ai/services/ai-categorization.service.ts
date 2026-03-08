@@ -212,7 +212,7 @@ export class AiCategorizationService {
 
     let bestMatch = null;
     let bestScore = 0;
-    const alternatives: any[] = [];
+    const alternatives: { accountId: string; accountName: string; confidence: number }[] = [];
 
     for (const data of historicalData) {
       const patternWords = data.pattern.split(/\s+/);

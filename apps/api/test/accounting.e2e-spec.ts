@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { ApiHelper } from './helpers/api.helper';
-import { generateTestToken } from './helpers/auth.helper';
 
 describe('Accounting (e2e)', () => {
   let app: INestApplication;

@@ -388,7 +388,6 @@ export function detectTrend(data: number[]): {
   const sumY = data.reduce((a, b) => a + b, 0);
   const sumXY = x.reduce((sum, xi, i) => sum + xi * data[i], 0);
   const sumXX = x.reduce((sum, xi) => sum + xi * xi, 0);
-  const sumYY = data.reduce((sum, yi) => sum + yi * yi, 0);
 
   const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
   const intercept = (sumY - slope * sumX) / n;

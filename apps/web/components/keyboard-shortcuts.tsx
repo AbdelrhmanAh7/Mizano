@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useGlobalShortcutListener, useKeyboardShortcut } from '@/lib/hooks/use-keyboard-shortcut';
-import { modifierSymbol, useShortcutRegistry } from '@/lib/stores/use-shortcut-registry';
+import { modifierSymbol } from '@/lib/stores/use-shortcut-registry';
 import { useLocale } from 'next-intl';
 import { usePathname, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -202,9 +202,6 @@ export function KeyboardShortcuts() {
     isSequence: true,
     handler: () => nav('/accounting/journals'),
   });
-
-  // Build display list from registry
-  const allShortcuts = useShortcutRegistry((s) => s.getAll());
 
   const displayShortcuts = useMemo(() => {
     // Static display list for help dialog — ordered logically

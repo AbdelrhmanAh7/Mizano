@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
+import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { ChevronRight, Home } from 'lucide-react';
 

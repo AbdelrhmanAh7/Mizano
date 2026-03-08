@@ -50,7 +50,12 @@ export function resolveMimeFromExtension(originalname: string): string | undefin
  * `file.mimetype` is patched so downstream consumers receive the correct value.
  */
 export function createOcrFileFilter() {
-  return (req: any, file: Express.Multer.File, cb: any) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (
+    req: Record<string, unknown>,
+    file: Express.Multer.File,
+    cb: (error: Error | null, acceptFile: boolean) => void,
+  ) => {
     if (OCR_ALLOWED_MIMES.includes(file.mimetype)) {
       cb(null, true);
       return;

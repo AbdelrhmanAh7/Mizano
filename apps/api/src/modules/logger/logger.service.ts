@@ -38,7 +38,7 @@ export class LoggerService {
   /**
    * Categorize an error based on its message and context
    */
-  private categorize(message: string, context?: Record<string, any>): LogCategory {
+  private categorize(message: string, context?: Record<string, unknown>): LogCategory {
     const msg = message.toLowerCase();
     if (context?.category) return context.category as LogCategory;
     if (msg.includes('prisma') || msg.includes('database') || msg.includes('sql'))
@@ -77,7 +77,7 @@ export class LoggerService {
     source: LogSource;
     message: string;
     stack?: string;
-    context?: Record<string, any>;
+    context?: Record<string, unknown>;
     url?: string;
     method?: string;
     statusCode?: number;
@@ -150,7 +150,7 @@ export class LoggerService {
   /**
    * Capture error from exception filter
    */
-  captureException(error: Error, source: LogSource, context?: Record<string, any>): LogEntry {
+  captureException(error: Error, source: LogSource, context?: Record<string, unknown>): LogEntry {
     return this.capture({
       level: LogLevel.ERROR,
       source,
@@ -163,7 +163,7 @@ export class LoggerService {
   /**
    * Capture warning
    */
-  captureWarning(message: string, source: LogSource, context?: Record<string, any>): LogEntry {
+  captureWarning(message: string, source: LogSource, context?: Record<string, unknown>): LogEntry {
     return this.capture({
       level: LogLevel.WARN,
       source,

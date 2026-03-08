@@ -3,9 +3,9 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 export interface BusinessRuleErrorDetails {
   field?: string;
   constraint?: string;
-  value?: any;
-  expected?: any;
-  metadata?: Record<string, any>;
+  value?: unknown;
+  expected?: unknown;
+  metadata?: Record<string, unknown>;
 }
 
 /**

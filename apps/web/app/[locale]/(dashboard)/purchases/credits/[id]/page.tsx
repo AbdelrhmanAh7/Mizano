@@ -3,7 +3,6 @@
 import { use, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ArrowLeft, Building2, CreditCard, Calendar, Receipt, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -54,7 +53,6 @@ interface VendorCreditDetailPageProps {
 export default function VendorCreditDetailPage({ params }: VendorCreditDetailPageProps) {
   const { id } = use(params);
   const t = useTranslations('purchases');
-  const router = useRouter();
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState<string>('');

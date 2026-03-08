@@ -1,13 +1,13 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AiFeature, AiModelStatus } from '@prisma/client';
+import { AiFeature, AiModelStatus, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 export interface SavedModel {
   id: string;
   version: number;
-  modelData: any;
+  modelData: Record<string, unknown>;
   accuracy: number;
   sampleCount: number;
   status: AiModelStatus;
@@ -53,7 +53,7 @@ export class ModelRegistryService {
   async saveModel(
     organizationId: string,
     feature: AiFeature,
-    modelData: Record<string, any>,
+    modelData: Record<string, unknown>,
     accuracy: number,
     sampleCount: number,
   ): Promise<{ id: string; version: number }> {
@@ -84,7 +84,7 @@ export class ModelRegistryService {
           organizationId,
           feature,
           version: nextVersion,
-          modelData,
+          modelData: modelData as Prisma.InputJsonValue,
           accuracy: new Decimal(accuracy),
           sampleCount,
           status: 'ACTIVE',
@@ -128,7 +128,7 @@ export class ModelRegistryService {
     return {
       id: model.id,
       version: model.version,
-      modelData: model.modelData,
+      modelData: model.modelData as Record<string, unknown>,
       accuracy: Number(model.accuracy),
       sampleCount: model.sampleCount,
       status: model.status,
@@ -161,7 +161,7 @@ export class ModelRegistryService {
     return {
       id: model.id,
       version: model.version,
-      modelData: model.modelData,
+      modelData: model.modelData as Record<string, unknown>,
       accuracy: Number(model.accuracy),
       sampleCount: model.sampleCount,
       status: model.status,
@@ -336,7 +336,7 @@ export class ModelRegistryService {
     organizationId: string,
     feature: AiFeature,
     version: number,
-    modelData: Record<string, any>,
+    modelData: Record<string, unknown>,
     accuracy: number,
     sampleCount: number,
   ): Promise<void> {
@@ -363,7 +363,7 @@ export class ModelRegistryService {
           },
         },
         data: {
-          modelData,
+          modelData: modelData as Prisma.InputJsonValue,
           accuracy: new Decimal(accuracy),
           sampleCount,
           status: 'ACTIVE',
@@ -433,7 +433,7 @@ export class ModelRegistryService {
   async saveModelWithValidation(
     organizationId: string,
     feature: AiFeature,
-    modelData: Record<string, any>,
+    modelData: Record<string, unknown>,
     accuracy: number,
     sampleCount: number,
     options?: { accuracyTolerance?: number; forceActivate?: boolean },
@@ -460,7 +460,7 @@ export class ModelRegistryService {
               organizationId,
               feature,
               version: nextVersion,
-              modelData,
+              modelData: modelData as Prisma.InputJsonValue,
               accuracy: new Decimal(accuracy),
               sampleCount,
               status: 'RETIRED',

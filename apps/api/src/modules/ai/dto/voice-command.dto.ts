@@ -29,7 +29,7 @@ export class ParsedCommandDto {
     description: 'Extracted parameters from the voice command',
     example: { customer: 'Acme Corp', amount: 5000, currency: 'USD' },
   })
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
 
   @ApiProperty({
     description: 'Confidence score of the command parsing (0-1)',
@@ -61,7 +61,7 @@ export class CommandExecutionDto {
     description: 'Result data from the command execution',
     example: { invoiceId: 'clx123abc', invoiceNumber: 'INV-001' },
   })
-  data?: any;
+  data?: unknown;
 
   @ApiProperty({
     description: 'Human-readable message about the execution result',

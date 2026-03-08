@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ChallanStatus } from '@prisma/client';
@@ -90,7 +91,7 @@ export class DeliveryChallansService {
       dateTo,
     } = query;
 
-    const where: any = { organizationId, deletedAt: null };
+    const where: Prisma.DeliveryChallanWhereInput = { organizationId, deletedAt: null };
 
     if (status) where.status = status;
     if (challanType) where.challanType = challanType;
@@ -399,7 +400,7 @@ export class DeliveryChallansService {
   }
 
   private async getItemStock(itemId: string, warehouseId?: string | null): Promise<number> {
-    const where: any = { itemId };
+    const where: Prisma.InventoryLevelWhereInput = { itemId };
     if (warehouseId) {
       where.warehouseId = warehouseId;
     }
@@ -420,7 +421,7 @@ export class DeliveryChallansService {
     reference: string,
   ) {
     // Find or create inventory level
-    const where: any = { itemId, organizationId };
+    const where: Prisma.InventoryLevelWhereInput = { itemId, organizationId };
     if (warehouseId) {
       where.warehouseId = warehouseId;
     }
@@ -474,7 +475,7 @@ export class DeliveryChallansService {
     warehouseId: string | null | undefined,
     reference: string,
   ) {
-    const where: any = { itemId, organizationId };
+    const where: Prisma.InventoryLevelWhereInput = { itemId, organizationId };
     if (warehouseId) {
       where.warehouseId = warehouseId;
     }

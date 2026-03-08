@@ -170,7 +170,10 @@ export class ChurnPredictionService {
     };
   }
 
-  async getHighRiskCustomers(organizationId: string, limit: number = 20): Promise<any[]> {
+  async getHighRiskCustomers(
+    organizationId: string,
+    limit: number = 20,
+  ): Promise<Record<string, unknown>[]> {
     const profiles = await this.prisma.customerAiProfile.findMany({
       where: { organizationId, churnRisk: { gte: 0.5 } },
       orderBy: { churnRisk: 'desc' },
@@ -392,7 +395,10 @@ export class ChurnPredictionService {
     };
   }
 
-  private calculateChurnScore(rfm: RFMFeatures): { score: number; factors: any[] } {
+  private calculateChurnScore(rfm: RFMFeatures): {
+    score: number;
+    factors: { factor: string; impact: number; description: string }[];
+  } {
     const factors: { factor: string; impact: number; description: string }[] = [];
     let score = 0;
 
@@ -485,7 +491,10 @@ export class ChurnPredictionService {
     ];
   }
 
-  private getRecommendation(riskLevel: string, factors: any[]): string {
+  private getRecommendation(
+    riskLevel: string,
+    _factors: { factor: string; impact: number; description: string }[],
+  ): string {
     switch (riskLevel) {
       case 'CRITICAL':
         return 'Immediate outreach required. Schedule a personal call or meeting.';

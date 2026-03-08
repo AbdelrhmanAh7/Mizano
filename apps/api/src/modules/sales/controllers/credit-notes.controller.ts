@@ -69,7 +69,11 @@ export class CreditNotesController {
   @Permissions('sales.edit')
   @InvalidateCache('credit-notes:*')
   @ApiOperation({ summary: 'Update credit note' })
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: Record<string, unknown>,
+  ) {
     return this.creditNotesService.update(orgId, id, dto);
   }
 

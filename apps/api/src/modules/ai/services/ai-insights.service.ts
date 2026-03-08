@@ -51,7 +51,7 @@ const TYPE_MAP: Record<string, InsightType> = {
   PROJECT_OVER_BUDGET: 'ALERT',
 };
 
-const MODULE_MAP: Record<string, string> = {
+const _MODULE_MAP: Record<string, string> = {
   CASH_FLOW_WARNING: 'banking',
   CASH_FLOW_NEGATIVE: 'banking',
   REVENUE_GROWTH: 'sales',

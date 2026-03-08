@@ -11,6 +11,7 @@ import {
   Image as ImageIcon,
   FileText,
 } from 'lucide-react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -190,10 +191,11 @@ export function OcrScanner({ vendorId, onExtract, onApply, className }: OcrScann
             <div className="space-y-4">
               <div className="relative aspect-[4/3] bg-muted rounded-lg overflow-hidden">
                 {preview && (
-                  <img
+                  <Image
                     src={preview}
                     alt="Invoice preview"
                     className="w-full h-full object-contain"
+                    fill
                   />
                 )}
                 <Button

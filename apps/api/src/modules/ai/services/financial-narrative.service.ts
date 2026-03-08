@@ -30,7 +30,7 @@ export interface QueryAnswer {
   queryId: string;
   question: string;
   answer: string;
-  data: any;
+  data: unknown;
   chartType?: 'bar' | 'line' | 'pie' | 'table' | 'metric';
 }
 
@@ -533,7 +533,7 @@ export class FinancialNarrativeService {
   async answerQuery(
     organizationId: string,
     queryId: string,
-    params?: Record<string, any>,
+    params?: Record<string, unknown>,
   ): Promise<QueryAnswer> {
     const template = getQueryTemplate(queryId);
 
@@ -541,7 +541,12 @@ export class FinancialNarrativeService {
       throw new NotFoundException(`Query template '${queryId}' not found`);
     }
 
-    const data = await template.execute(this.prisma, organizationId, params);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await template.execute(
+      this.prisma as unknown as Record<string, unknown>,
+      organizationId,
+      params,
+    );
     const answer = template.render(data, params);
 
     return {
@@ -561,7 +566,7 @@ export class FinancialNarrativeService {
     question: string;
     description: string;
     category: string;
-    parameters?: any[];
+    parameters?: { name: string; type: string; required?: boolean }[];
     chartType?: string;
   }> {
     return queryTemplates.map((t) => ({

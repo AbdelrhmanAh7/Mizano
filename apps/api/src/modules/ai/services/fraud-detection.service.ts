@@ -4,7 +4,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import type { Prisma } from '@prisma/client';
 import { getRiskLevel } from '../utils/risk-level.util';
 import { buildIsolationForest1D, isolationForestScore1D } from '../utils/isolation-forest.util';
-import { zScore, mean, standardDeviation } from '../utils/statistics.util';
+import { zScore } from '../utils/statistics.util';
 
 export interface FraudScoreResult {
   entityType: string;
@@ -415,9 +415,7 @@ export class FraudDetectionService {
     entityType: string,
     entityId: string,
   ): Promise<FraudSignal> {
-    const amount = await this.getEntityAmount(organizationId, entityType, entityId);
-    const leadingDigit = parseInt(Math.abs(amount).toString()[0]);
-
+    await this.getEntityAmount(organizationId, entityType, entityId);
     // Benford's expected distribution
     const expected: Record<number, number> = {
       1: 0.301,

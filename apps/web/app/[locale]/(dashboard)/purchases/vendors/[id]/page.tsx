@@ -3,12 +3,10 @@
 import { use } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, Edit, Mail, Phone, MapPin, Building2, CreditCard } from 'lucide-react';
+import { ArrowLeft, Edit, Mail, Phone, MapPin, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import {
   useVendor,
   formatVendorAddress,

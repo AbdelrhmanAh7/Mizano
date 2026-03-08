@@ -89,10 +89,10 @@ export function AdjustmentForm({
   const watchType = form.watch('type');
 
   // Calculate total adjustment
+  const watchedLines = form.watch('lines');
   const totalAdjustment = useMemo(() => {
-    const lines = form.watch('lines');
-    return lines.reduce((sum, line) => sum + (line.quantityAdjusted || 0), 0);
-  }, [form.watch('lines')]);
+    return watchedLines.reduce((sum, line) => sum + (line.quantityAdjusted || 0), 0);
+  }, [watchedLines]);
 
   const handleSubmit = (data: AdjustmentFormData) => {
     onSubmit({

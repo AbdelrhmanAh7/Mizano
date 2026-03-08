@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  LineChart,
   Line,
   XAxis,
   YAxis,

@@ -1,9 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  VoiceCommandService,
-  ParsedCommand,
-  CommandExecutionResult,
-} from './voice-command.service';
+import { VoiceCommandService, ParsedCommand } from './voice-command.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import {
   createMockPrisma,
@@ -260,7 +256,9 @@ describe('VoiceCommandService', () => {
       const result = await service.executeCommand(orgId, command);
 
       expect(result.success).toBe(true);
-      expect(result.data?.customers[0].name).toBe('Acme Corp');
+      expect((result.data as { customers: Array<{ name: string }> })?.customers[0].name).toBe(
+        'Acme Corp',
+      );
     });
 
     it('should return account balance for READ account command', async () => {
@@ -349,7 +347,7 @@ describe('VoiceCommandService', () => {
       const result = await service.executeCommand(orgId, command);
 
       expect(result.success).toBe(true);
-      expect(result.data?.vendors.length).toBe(1);
+      expect((result.data as { vendors: unknown[] })?.vendors.length).toBe(1);
     });
   });
 

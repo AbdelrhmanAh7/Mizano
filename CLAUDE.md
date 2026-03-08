@@ -271,6 +271,64 @@ See `docs/roadmap.md` for the full product roadmap including:
 - Comprehensive testing strategy: automation, regression, performance, security
 - Success metrics and technical debt paydown plan
 
+## CI Zero-Tolerance Policy
+
+**`pnpm ci:full` MUST pass with ZERO warnings and ZERO errors.** This is a hard requirement for all code changes.
+
+### What `ci:full` runs
+
+1. **Lint** (`pnpm lint`) — ESLint across all packages
+2. **Type-check** (`pnpm type-check`) — TypeScript strict compilation
+3. **Unit tests** (`pnpm test`) — Jest test suites
+4. **E2E tests** (`pnpm test:e2e`) — End-to-end integration tests
+
+### Rules to follow
+
+#### Lint (zero warnings, zero errors)
+
+- No `// eslint-disable` or `/* eslint-disable */` comments unless absolutely unavoidable (and justified in PR)
+- No unused imports or variables — remove them. Prefix with `_` ONLY for required parameters that must exist but aren't used (e.g., `(_req, res)`)
+- No `any` type — use proper types, `unknown`, or generics
+- No `console.log` in committed code — use the Logger service (`@nestjs/common` Logger) in backend, remove debug logs in frontend
+- Follow existing ESLint config; do not modify `.eslintrc` to suppress warnings
+- Ensure consistent import ordering (built-in → external → internal → relative)
+- **Unused imports**: NEVER import types/classes/functions you don't use. Before adding an import, verify it's needed. After refactoring, clean up orphaned imports.
+- **Unused variables**: If you destructure or assign a value, USE it. If a destructured field is only needed for exclusion (rest pattern), prefix the unused field with `_` (e.g., `const { passwordHash: _ph, ...rest } = user`).
+- **Unused function parameters**: If a parameter is required by an interface/override but not used in the implementation, prefix with `_` (e.g., `_dto`, `_entityType`). Do NOT leave parameters unprefix unprefixed.
+- **Floating promises**: All promises must be awaited, `.catch()`ed, `.then()`ed, or explicitly voided with `void` operator. Never fire-and-forget.
+- **prefer-const**: Always use `const` for variables that are never reassigned. Only use `let` when reassignment is needed.
+- **no-var-requires**: Use ES module `import` syntax. For dynamic requires, use `await import()` or add inline eslint-disable with justification.
+
+#### Type-check (zero errors)
+
+- All functions must have explicit return types on exported functions
+- No implicit `any` — enable and respect `strict: true` in tsconfig
+- Use `Decimal` (from Prisma) for all monetary values, never `number`
+- Ensure all Prisma model changes are followed by `pnpm db:generate` to keep the client in sync
+- When adding new fields/models, update related DTOs and types across `shared-types` and `validators` packages
+- No `@ts-ignore` or `@ts-expect-error` unless with a comment explaining why and a TODO to fix
+
+#### Tests (zero failures)
+
+- All existing tests must continue to pass after your changes
+- When modifying business logic, update or add corresponding unit tests
+- When adding new endpoints, add at least basic integration tests
+- Mock external dependencies (Redis, external APIs) properly — do not rely on running infrastructure for unit tests
+- Ensure test data doesn't conflict with other tests (use unique identifiers)
+
+#### General
+
+- After making changes, mentally verify the full CI pipeline would pass before considering the task done
+- If a change touches Prisma schema, run `pnpm db:generate` and ensure generated types propagate
+- If a change touches shared packages (`shared-types`, `validators`), rebuild them (`pnpm build`) to ensure downstream consumers compile
+- Never leave TODO/FIXME comments that would cause lint warnings — track them in issues instead
+- Ensure imports reference actual exports — no broken import paths after refactoring
+
+## Git Hooks
+
+- **pre-commit**: Runs lint-staged (ESLint --fix + Prettier on staged files only)
+- **pre-push**: Runs `pnpm ci:full` (lint + type-check + test + format + e2e) — ALL checks must pass before push
+
 ## Code Quality Checklist
 
 When writing code, ensure:
@@ -282,3 +340,4 @@ When writing code, ensure:
 - [ ] Prisma transactions for multi-table writes
 - [ ] Mobile-responsive UI (test at 375px)
 - [ ] Proper error messages for business rules
+- [ ] `pnpm ci:full` passes with zero warnings and zero errors

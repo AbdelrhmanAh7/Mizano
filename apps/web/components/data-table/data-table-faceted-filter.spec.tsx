@@ -92,7 +92,7 @@ jest.mock('@/components/ui/command', () => ({
     onSelect?: () => void;
     className?: string;
   }) => (
-    <div data-testid="command-item" onClick={onSelect} role="option">
+    <div data-testid="command-item" onClick={onSelect} role="option" aria-selected={false}>
       {children}
     </div>
   ),

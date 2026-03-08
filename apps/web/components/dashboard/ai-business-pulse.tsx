@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Brain, TrendingUp, AlertTriangle, Sparkles, ArrowRight } from 'lucide-react';
+import { Brain, TrendingUp, AlertTriangle, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';

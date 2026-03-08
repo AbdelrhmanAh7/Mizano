@@ -30,7 +30,7 @@ class CaptureLogDto {
 
   @IsOptional()
   @IsObject()
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 
   @IsOptional()
   @IsString()

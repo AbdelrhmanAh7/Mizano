@@ -3,7 +3,7 @@ import { AiFeature } from '@prisma/client';
 import { AiTrainingService } from './ai-training.service';
 
 interface TrainingRecord {
-  inputData: Record<string, any>;
+  inputData: Record<string, unknown>;
   label: string;
 }
 

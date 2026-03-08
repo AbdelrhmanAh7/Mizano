@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { CreatePriceListDto, UpdatePriceListDto } from '../dto/price-list.dto';
 import { PriceListsService } from '../services/price-lists.service';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -14,7 +15,7 @@ export class PriceListsController {
 
   @Post()
   @Permissions('inventory.create')
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreatePriceListDto) {
     return this.priceListsService.create(orgId, dto);
   }
 
@@ -32,7 +33,7 @@ export class PriceListsController {
 
   @Patch(':id')
   @Permissions('inventory.edit')
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdatePriceListDto) {
     return this.priceListsService.update(orgId, id, dto);
   }
 

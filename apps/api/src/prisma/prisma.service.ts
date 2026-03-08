@@ -51,8 +51,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       (key) => typeof key === 'string' && !key.startsWith('_'),
     );
     for (const model of models) {
-      if (typeof (this as any)[model]?.deleteMany === 'function') {
-        await (this as any)[model].deleteMany();
+      if (typeof model === 'string') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const delegate = (
+          this as unknown as Record<string, { deleteMany?: () => Promise<unknown> }>
+        )[model];
+        if (typeof delegate?.deleteMany === 'function') {
+          await delegate.deleteMany();
+        }
       }
     }
   }

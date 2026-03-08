@@ -7,7 +7,7 @@ import { LeadTier } from '@prisma/client';
 
 export interface ScoringCondition {
   operator: 'eq' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'contains';
-  value: any;
+  value: unknown;
   score: number;
 }
 

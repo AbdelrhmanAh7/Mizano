@@ -125,12 +125,12 @@ export class EmployeeAttritionService {
         employeeId,
         organizationId,
         attritionRisk: new Decimal(finalScore),
-        attritionFactors: factors as any,
+        attritionFactors: factors as unknown as import('@prisma/client').Prisma.InputJsonValue,
         calculatedAt: new Date(),
       },
       update: {
         attritionRisk: new Decimal(finalScore),
-        attritionFactors: factors as any,
+        attritionFactors: factors as unknown as import('@prisma/client').Prisma.InputJsonValue,
         calculatedAt: new Date(),
       },
     });

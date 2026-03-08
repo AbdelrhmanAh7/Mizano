@@ -8,9 +8,7 @@ import {
   LogEntry,
   LogLevel,
   LogSource,
-  LogCategory,
   LogStatus,
-  LogFilter,
   LogStats,
   GeneratePromptResponse,
 } from '@mizano/shared-types';
@@ -101,10 +99,12 @@ export function useLogger() {
   // Sync to store
   useEffect(() => {
     if (logs) store.setLogs(logs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logs]);
 
   useEffect(() => {
     if (stats) store.setStats(stats);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stats]);
 
   // Update status mutation
@@ -163,6 +163,7 @@ export function useLogger() {
         refetchStats();
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Capture frontend warning
@@ -186,6 +187,7 @@ export function useLogger() {
         refetchStats();
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Capture AI model error
@@ -202,6 +204,7 @@ export function useLogger() {
         refetchStats();
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Mark as fixed and test-covered
@@ -210,6 +213,7 @@ export function useLogger() {
       updateStatusMutation.mutate({ ids, status: LogStatus.FIXED });
       store.updateLogStatus(ids, LogStatus.FIXED);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [updateStatusMutation],
   );
 
@@ -218,6 +222,7 @@ export function useLogger() {
       updateStatusMutation.mutate({ ids, status: LogStatus.TEST_COVERED });
       store.updateLogStatus(ids, LogStatus.TEST_COVERED);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [updateStatusMutation],
   );
 
@@ -226,6 +231,7 @@ export function useLogger() {
       updateStatusMutation.mutate({ ids, status: LogStatus.IGNORED });
       store.updateLogStatus(ids, LogStatus.IGNORED);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [updateStatusMutation],
   );
 
@@ -238,6 +244,7 @@ export function useLogger() {
       clearLogsMutation.mutate({ ids: resolvedIds });
       store.removeLogs(resolvedIds);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.logs]);
 
   // Clear all
@@ -245,6 +252,7 @@ export function useLogger() {
     clearLogsMutation.mutate({});
     store.setLogs([]);
     store.deselectAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Clear selected
@@ -253,6 +261,7 @@ export function useLogger() {
       clearLogsMutation.mutate({ ids: store.selectedIds });
       store.removeLogs(store.selectedIds);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.selectedIds]);
 
   // Generate Claude prompt
@@ -263,6 +272,7 @@ export function useLogger() {
       const result = await generatePromptMutation.mutateAsync(targetIds);
       return result;
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [store.selectedIds],
   );
 

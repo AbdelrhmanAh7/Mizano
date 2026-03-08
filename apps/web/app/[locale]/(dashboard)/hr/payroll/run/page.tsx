@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { format, getMonth, getYear } from 'date-fns';
+import { getMonth, getYear } from 'date-fns';
 import { ArrowLeft, Play, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -35,7 +35,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Progress } from '@/components/ui/progress';
 import { useEmployees, useRunPayroll, useConfirmPayroll, formatCurrency } from '@/lib/hooks/use-hr';
 import { useTranslations } from 'next-intl';
 

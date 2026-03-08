@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateTourProgressDto } from './dto/update-tour-progress.dto';
 import { UserPreferencesDto } from './dto/user-preferences.dto';
@@ -65,12 +66,12 @@ export class UserPreferencesService {
   ): Promise<DashboardLayoutConfig> {
     await this.prisma.userPreferences.upsert({
       where: { userId },
-      update: { dashboardLayout: layout as any },
+      update: { dashboardLayout: layout as unknown as Prisma.InputJsonValue },
       create: {
         userId,
         tourProgress: {},
         tourDismissed: [],
-        dashboardLayout: layout as any,
+        dashboardLayout: layout as unknown as Prisma.InputJsonValue,
       },
     });
     return layout;
@@ -97,7 +98,7 @@ export class UserPreferencesService {
     }
 
     // Update tour progress
-    const tourProgress = (preferences.tourProgress as Record<string, any>) || {};
+    const tourProgress = (preferences.tourProgress as Record<string, unknown>) || {};
 
     tourProgress[tourId] = {
       completed: updateDto.completed,
@@ -108,7 +109,7 @@ export class UserPreferencesService {
     const updated = await this.prisma.userPreferences.update({
       where: { userId },
       data: {
-        tourProgress,
+        tourProgress: tourProgress as Prisma.InputJsonValue,
         lastTourSeenAt: new Date(),
       },
     });
@@ -149,17 +150,17 @@ export class UserPreferencesService {
     return this.formatPreferences(preferences);
   }
 
-  private formatPreferences(preferences: any): UserPreferencesDto {
+  private formatPreferences(preferences: Record<string, unknown>): UserPreferencesDto {
     return {
-      id: preferences.id,
-      userId: preferences.userId,
-      tourProgress: (preferences.tourProgress as Record<string, any>) || undefined,
-      tourDismissed: preferences.tourDismissed || [],
-      lastTourSeenAt: preferences.lastTourSeenAt,
-      theme: preferences.theme,
-      sidebarCollapsed: preferences.sidebarCollapsed,
-      createdAt: preferences.createdAt,
-      updatedAt: preferences.updatedAt,
+      id: preferences.id as string,
+      userId: preferences.userId as string,
+      tourProgress: (preferences.tourProgress as Record<string, unknown>) || undefined,
+      tourDismissed: (preferences.tourDismissed as string[]) || [],
+      lastTourSeenAt: preferences.lastTourSeenAt as Date | undefined,
+      theme: preferences.theme as string | undefined,
+      sidebarCollapsed: preferences.sidebarCollapsed as boolean,
+      createdAt: preferences.createdAt as Date,
+      updatedAt: preferences.updatedAt as Date,
     };
   }
 }

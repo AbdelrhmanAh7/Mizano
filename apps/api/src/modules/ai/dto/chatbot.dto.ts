@@ -34,7 +34,7 @@ export class ChatResponseDto {
     description: 'Additional data relevant to the response',
     example: { totalRevenue: 45230.0, currency: 'USD' },
   })
-  data?: any;
+  data?: unknown;
 
   @ApiProperty({
     description: 'Suggested follow-up questions or actions',

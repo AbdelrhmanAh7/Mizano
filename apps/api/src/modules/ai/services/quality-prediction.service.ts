@@ -4,7 +4,6 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { ModelRegistryService } from './model-registry.service';
 import { AiFeedbackService } from './ai-feedback.service';
 import { AiTrainingService } from './ai-training.service';
-import { Decimal } from '@prisma/client/runtime/library';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { DecisionTreeClassifier } = require('ml-cart');
@@ -638,7 +637,7 @@ export class QualityPredictionService {
   private generateRecommendations(
     riskLevel: 'HIGH' | 'MEDIUM' | 'LOW',
     features: QualityFeatureVector,
-    factors: Array<{ name: string; impact: number; description: string }>,
+    _factors: Array<{ name: string; impact: number; description: string }>,
   ): string[] {
     const recommendations: string[] = [];
 

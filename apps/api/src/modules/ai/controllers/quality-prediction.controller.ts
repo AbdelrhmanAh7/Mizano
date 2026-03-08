@@ -72,7 +72,7 @@ export class QualityPredictionController {
     status: 200,
     description: 'Returns training results',
   })
-  async trainModel(@CurrentOrg() orgId: string): Promise<{ data: any }> {
+  async trainModel(@CurrentOrg() orgId: string): Promise<{ data: unknown }> {
     const result = await this.qualityPredictionService.trainModel(orgId);
     return { data: result };
   }

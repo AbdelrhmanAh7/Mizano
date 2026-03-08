@@ -14,18 +14,11 @@ import {
   ArrowDownLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -73,7 +66,7 @@ export default function VATReturnDetailPage() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentRef, setPaymentRef] = useState('');
-  const [bankAccountId, setBankAccountId] = useState('');
+  const [bankAccountId, _setBankAccountId] = useState('');
 
   const { data: vatReturn, isLoading } = useVATReturn(returnId);
   const fileReturn = useFileVATReturn();

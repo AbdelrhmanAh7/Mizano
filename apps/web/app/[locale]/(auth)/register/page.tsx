@@ -34,7 +34,6 @@ export default function RegisterPage() {
   const router = useRouter();
   const locale = useLocale();
   const t = useTranslations('auth.register');
-  const tCommon = useTranslations('common');
   const tErrors = useTranslations('auth.errors');
   const tValidation = useTranslations('validation');
   const { toast } = useToast();

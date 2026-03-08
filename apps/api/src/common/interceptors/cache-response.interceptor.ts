@@ -64,16 +64,18 @@ export class CacheResponseInterceptor implements NestInterceptor {
       DEFAULT_TTL_SECONDS;
 
     return next.handle().pipe(
-      tap(async (response) => {
-        try {
-          await this.cacheService.set(cacheKey, response, {
-            ttl,
-            organizationId,
-          });
-          this.logger.debug(`Cache SET: ${cacheKey} (TTL ${ttl}s)`);
-        } catch (error) {
-          this.logger.warn(`Cache write error for ${cacheKey}: ${error}`);
-        }
+      tap((response) => {
+        void (async () => {
+          try {
+            await this.cacheService.set(cacheKey, response, {
+              ttl,
+              organizationId,
+            });
+            this.logger.debug(`Cache SET: ${cacheKey} (TTL ${ttl}s)`);
+          } catch (error) {
+            this.logger.warn(`Cache write error for ${cacheKey}: ${error}`);
+          }
+        })();
       }),
     );
   }

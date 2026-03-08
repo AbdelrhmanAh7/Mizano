@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslations } from 'next-intl';
-import { Save, Building, DollarSign, CreditCard, Landmark } from 'lucide-react';
+import { Save, DollarSign, CreditCard, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -15,12 +15,10 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
-import { useAccountsTree, flattenAccountsTree, Account } from '@/lib/hooks/use-accounts';
+import { useAccountsTree, flattenAccountsTree } from '@/lib/hooks/use-accounts';
 import {
   useAccountSettings,
   useUpdateAccountSettings,
-  AccountSettings,
 } from '@/lib/hooks/use-organization-settings';
 
 interface AccountSettingsFormData {

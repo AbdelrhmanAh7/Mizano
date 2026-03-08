@@ -5,7 +5,7 @@ import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
-import { AdjustmentsService } from '../services/adjustments.service';
+import { AdjustmentsService, CreateAdjustmentData } from '../services/adjustments.service';
 
 @ApiTags('Inventory Adjustments')
 @ApiBearerAuth()
@@ -16,7 +16,7 @@ export class AdjustmentsController {
 
   @Post()
   @Permissions('inventory.create')
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateAdjustmentData) {
     return this.adjustmentsService.create(orgId, dto);
   }
 

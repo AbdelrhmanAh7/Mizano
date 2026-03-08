@@ -99,7 +99,7 @@ export class RecurringProfilesService {
         nextRunDate,
         autoPost: autoPost || false,
         autoSend: autoSend || false,
-        templateData,
+        templateData: templateData as Prisma.InputJsonValue,
         entityType,
         organizationId,
       },
@@ -209,20 +209,28 @@ export class RecurringProfilesService {
         ? this.mapEntityTypeToRecurringType(entityType)
         : undefined;
 
+    // Build update payload, converting templateData to Prisma-compatible type
+    const updateData: Prisma.RecurringProfileUpdateInput = {
+      ...(restDto.name !== undefined && { name: restDto.name }),
+      ...(restDto.frequency !== undefined && { frequency: restDto.frequency }),
+      ...(restDto.autoPost !== undefined && { autoPost: restDto.autoPost }),
+      ...(restDto.autoSend !== undefined && { autoSend: restDto.autoSend }),
+      ...(restDto.templateData !== undefined && {
+        templateData: restDto.templateData as Prisma.InputJsonValue,
+      }),
+      ...(mappedType !== undefined && { type: mappedType }),
+      ...(entityType !== undefined && { entityType }),
+      nextRunDate,
+      startDate: updateRecurringProfileDto.startDate
+        ? new Date(updateRecurringProfileDto.startDate)
+        : undefined,
+      endDate: updateRecurringProfileDto.endDate
+        ? new Date(updateRecurringProfileDto.endDate)
+        : undefined,
+    };
     const updatedProfile = await this.prisma.recurringProfile.update({
       where: { id },
-      data: {
-        ...restDto,
-        ...(mappedType !== undefined && { type: mappedType }),
-        ...(entityType !== undefined && { entityType }),
-        nextRunDate,
-        startDate: updateRecurringProfileDto.startDate
-          ? new Date(updateRecurringProfileDto.startDate)
-          : undefined,
-        endDate: updateRecurringProfileDto.endDate
-          ? new Date(updateRecurringProfileDto.endDate)
-          : undefined,
-      },
+      data: updateData,
     });
 
     return updatedProfile;

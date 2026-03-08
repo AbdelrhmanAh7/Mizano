@@ -50,7 +50,7 @@ export class AssetsController {
     @CurrentOrg() organizationId: string,
     @Body() dto: CreateAssetDto,
   ): Promise<AssetResponse> {
-    return this.assetsService.create(organizationId, dto);
+    return this.assetsService.create(organizationId, dto) as Promise<AssetResponse>;
   }
 
   @Get()
@@ -73,7 +73,7 @@ export class AssetsController {
   @ApiOperation({ summary: 'Get asset summary/statistics' })
   @ApiResponse({ status: 200, type: AssetSummaryResponse })
   async getSummary(@CurrentOrg() organizationId: string): Promise<AssetSummaryResponse> {
-    return this.assetsService.getSummary(organizationId);
+    return this.assetsService.getSummary(organizationId) as Promise<AssetSummaryResponse>;
   }
 
   @Get('depreciation/forecast')
@@ -95,7 +95,7 @@ export class AssetsController {
     @CurrentOrg() organizationId: string,
     @Param('id') assetId: string,
   ): Promise<AssetDetailResponse> {
-    return this.assetsService.findOne(organizationId, assetId);
+    return this.assetsService.findOne(organizationId, assetId) as Promise<AssetDetailResponse>;
   }
 
   @Put(':id')
@@ -108,7 +108,7 @@ export class AssetsController {
     @Param('id') assetId: string,
     @Body() dto: UpdateAssetDto,
   ): Promise<AssetResponse> {
-    return this.assetsService.update(organizationId, assetId, dto);
+    return this.assetsService.update(organizationId, assetId, dto) as Promise<AssetResponse>;
   }
 
   @Post(':id/dispose')
@@ -122,7 +122,7 @@ export class AssetsController {
     @Param('id') assetId: string,
     @Body() dto: DisposeAssetDto,
   ): Promise<AssetResponse> {
-    return this.assetsService.dispose(organizationId, assetId, dto);
+    return this.assetsService.dispose(organizationId, assetId, dto) as Promise<AssetResponse>;
   }
 
   @Get(':id/schedule')
@@ -134,7 +134,9 @@ export class AssetsController {
     @CurrentOrg() organizationId: string,
     @Param('id') assetId: string,
   ): Promise<DepreciationScheduleResponse[]> {
-    return this.assetsService.getDepreciationSchedule(organizationId, assetId);
+    return this.assetsService.getDepreciationSchedule(organizationId, assetId) as Promise<
+      DepreciationScheduleResponse[]
+    >;
   }
 
   @Post(':id/depreciate')
