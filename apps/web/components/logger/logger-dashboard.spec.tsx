@@ -111,12 +111,24 @@ jest.mock('@/components/ui/sheet', () => ({
   SheetHeader: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   SheetTitle: ({ children }: { children?: React.ReactNode }) => <h2>{children}</h2>,
   SheetTrigger: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  SheetDescription: ({ children }: { children?: React.ReactNode }) => <p>{children}</p>,
 }));
 
 jest.mock('@/components/ui/scroll-area', () => ({
   ScrollArea: ({ children }: { children?: React.ReactNode }) => (
     <div data-testid="scroll-area">{children}</div>
   ),
+}));
+
+jest.mock('@/components/ui/dialog', () => ({
+  Dialog: ({ children, open }: { children?: React.ReactNode; open?: boolean }) =>
+    open ? <div data-testid="dialog">{children}</div> : null,
+  DialogContent: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="dialog-content">{children}</div>
+  ),
+  DialogHeader: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children?: React.ReactNode }) => <h2>{children}</h2>,
+  DialogDescription: ({ children }: { children?: React.ReactNode }) => <p>{children}</p>,
 }));
 
 jest.mock('@/components/ui/checkbox', () => ({

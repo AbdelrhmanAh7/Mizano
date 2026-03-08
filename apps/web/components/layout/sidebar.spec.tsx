@@ -112,6 +112,17 @@ jest.mock('@/components/ui/sheet', () => ({
   SheetTrigger: React.forwardRef<HTMLElement, { children: React.ReactNode; asChild?: boolean }>(
     ({ children }, ref) => <div ref={ref as React.Ref<HTMLDivElement>}>{children}</div>,
   ),
+  SheetDescription: ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <div data-testid="sheet-description" className={className}>
+      {children}
+    </div>
+  ),
 }));
 
 // Mock lucide-react icons - return simple spans for all icons

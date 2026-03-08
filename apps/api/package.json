@@ -123,6 +123,13 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(.+/node_modules/)?(afinn-165|uuid)/)"
+    ],
+    "moduleNameMapper": {
+      "^@mizano/shared-types$": "<rootDir>/../../../packages/shared-types/src/index.ts",
+      "^@mizano/validators$": "<rootDir>/../../../packages/validators/src/index.ts"
+    },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],

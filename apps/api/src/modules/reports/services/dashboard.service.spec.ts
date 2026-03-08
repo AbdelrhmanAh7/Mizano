@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Decimal } from '@prisma/client/runtime/library';
 import { DashboardService } from './dashboard.service';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { ReadReplicaService } from '../../../prisma/read-replica.service';
+import { CacheService } from '../../../cache/cache.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
 import { dec } from '../../../test/helpers/decimal.helpers';
 
@@ -15,7 +16,16 @@ describe('DashboardService', () => {
     prisma = createMockPrisma();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [DashboardService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        DashboardService,
+        { provide: ReadReplicaService, useValue: prisma },
+        {
+          provide: CacheService,
+          useValue: {
+            getOrSet: jest.fn((_key: string, fn: () => Promise<unknown>) => fn()),
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<DashboardService>(DashboardService);
@@ -59,15 +69,15 @@ describe('DashboardService', () => {
     // invoice.aggregate is called multiple times: receivables, revenueInRange (current, prev, yearly)
     prisma.invoice.aggregate
       .mockResolvedValueOnce({ _sum: { balanceDue: new Decimal(receivables) } } as any) // receivables
-      .mockResolvedValueOnce({ _sum: { total: new Decimal(currentRevenue) } } as any) // current revenue
-      .mockResolvedValueOnce({ _sum: { total: new Decimal(prevRevenue) } } as any) // prev revenue
-      .mockResolvedValueOnce({ _sum: { total: new Decimal(yearlyRevenue) } } as any); // yearly revenue
+      .mockResolvedValueOnce({ _sum: { grandTotal: new Decimal(currentRevenue) } } as any) // current revenue
+      .mockResolvedValueOnce({ _sum: { grandTotal: new Decimal(prevRevenue) } } as any) // prev revenue
+      .mockResolvedValueOnce({ _sum: { grandTotal: new Decimal(yearlyRevenue) } } as any); // yearly revenue
 
     // bill.aggregate: payables, current expenses from bills, prev expenses from bills
     prisma.bill.aggregate
       .mockResolvedValueOnce({ _sum: { balanceDue: new Decimal(payables) } } as any) // payables
-      .mockResolvedValueOnce({ _sum: { total: new Decimal(currentBillExpenses) } } as any) // current bill expenses
-      .mockResolvedValueOnce({ _sum: { total: new Decimal(prevBillExpenses) } } as any); // prev bill expenses
+      .mockResolvedValueOnce({ _sum: { grandTotal: new Decimal(currentBillExpenses) } } as any) // current bill expenses
+      .mockResolvedValueOnce({ _sum: { grandTotal: new Decimal(prevBillExpenses) } } as any); // prev bill expenses
 
     // expense.aggregate: current expenses, prev expenses
     prisma.expense.aggregate
@@ -266,17 +276,17 @@ describe('DashboardService', () => {
         {
           id: 'c1',
           name: 'Small Customer',
-          invoices: [{ total: dec('500') }],
+          invoices: [{ grandTotal: dec('500') }],
         },
         {
           id: 'c2',
           name: 'Big Customer',
-          invoices: [{ total: dec('5000') }, { total: dec('3000') }],
+          invoices: [{ grandTotal: dec('5000') }, { grandTotal: dec('3000') }],
         },
         {
           id: 'c3',
           name: 'Medium Customer',
-          invoices: [{ total: dec('2000') }],
+          invoices: [{ grandTotal: dec('2000') }],
         },
       ] as any);
 
@@ -294,9 +304,9 @@ describe('DashboardService', () => {
 
     it('should limit results to specified count', async () => {
       prisma.customer.findMany.mockResolvedValue([
-        { id: 'c1', name: 'A', invoices: [{ total: dec('100') }] },
-        { id: 'c2', name: 'B', invoices: [{ total: dec('200') }] },
-        { id: 'c3', name: 'C', invoices: [{ total: dec('300') }] },
+        { id: 'c1', name: 'A', invoices: [{ grandTotal: dec('100') }] },
+        { id: 'c2', name: 'B', invoices: [{ grandTotal: dec('200') }] },
+        { id: 'c3', name: 'C', invoices: [{ grandTotal: dec('300') }] },
       ] as any);
 
       const result = await service.getTopCustomers(ORG_ID, 2);
@@ -427,13 +437,13 @@ describe('DashboardService', () => {
       const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
       prisma.invoice.groupBy.mockResolvedValue([
-        { issueDate: currentMonth, _sum: { total: dec('10000') } },
+        { date: currentMonth, _sum: { grandTotal: dec('10000') } },
       ] as any);
       prisma.expense.groupBy.mockResolvedValue([
         { date: currentMonth, _sum: { amount: dec('3000') } },
       ] as any);
       prisma.bill.groupBy.mockResolvedValue([
-        { billDate: currentMonth, _sum: { total: dec('2000') } },
+        { date: currentMonth, _sum: { grandTotal: dec('2000') } },
       ] as any);
 
       const result = await service.getRevenueChart(ORG_ID, 12);

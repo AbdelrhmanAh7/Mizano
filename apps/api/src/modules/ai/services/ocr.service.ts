@@ -3,7 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import type { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import * as Tesseract from 'tesseract.js';
-import sharp from 'sharp';
+import * as sharp from 'sharp';
 import { execFile } from 'child_process';
 import { promises as fsPromises } from 'fs';
 import { tmpdir } from 'os';

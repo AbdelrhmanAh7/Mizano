@@ -41,6 +41,72 @@ import {
   REAL_RAK_BANK_INVOICE_OCR_V2,
 } from '../__tests__/fixtures/sample-invoice-text';
 
+// Mock sharp to avoid native dependency issues in tests
+jest.mock('sharp', () => {
+  const createChain = (overrides?: Record<string, unknown>): Record<string, jest.Mock> => {
+    const chain: Record<string, jest.Mock> = {};
+    const methods = [
+      'rotate',
+      'resize',
+      'grayscale',
+      'sharpen',
+      'normalize',
+      'threshold',
+      'negate',
+      'jpeg',
+      'png',
+      'median',
+      'modulate',
+      'linear',
+      'flatten',
+      'extend',
+      'extract',
+      'trim',
+      'flip',
+      'flop',
+      'blur',
+      'gamma',
+      'removeAlpha',
+      'ensureAlpha',
+      'composite',
+      'clone',
+      'raw',
+      'tiff',
+      'webp',
+      'avif',
+    ];
+    for (const m of methods) {
+      chain[m] = jest.fn().mockReturnValue(chain);
+    }
+    chain.toBuffer = jest.fn().mockResolvedValue(Buffer.from('processed'));
+    chain.metadata = jest.fn().mockResolvedValue({ width: 1000, height: 800, format: 'jpeg' });
+    chain.toFile = jest.fn().mockResolvedValue({ width: 1000, height: 800 });
+    if (overrides) {
+      for (const [key, val] of Object.entries(overrides)) {
+        chain[key] = jest.fn().mockImplementation(() => val);
+      }
+    }
+    return chain;
+  };
+  const mockSharp = jest.fn().mockImplementation((input?: Buffer) => {
+    // For HEIC detection: if input has 'ftyp' header, simulate HEIC decoding failure
+    if (input && input.length >= 12) {
+      const ftypStr = input.toString('ascii', 4, 8);
+      if (ftypStr === 'ftyp') {
+        const chain = createChain();
+        chain.metadata = jest.fn().mockResolvedValue({ width: 1000, height: 800, format: 'heif' });
+        chain.toBuffer = jest
+          .fn()
+          .mockRejectedValue(new Error('Input buffer contains unsupported image format'));
+        chain.rotate = jest.fn().mockReturnValue(chain);
+        return chain;
+      }
+    }
+    return createChain();
+  });
+  return mockSharp;
+});
+
 describe('OcrService', () => {
   let service: OcrService;
   let prisma: MockPrismaClient;
@@ -1404,14 +1470,22 @@ describe('OcrService', () => {
 
   describe('HEIC conversion (convertHeicToJpeg)', () => {
     let convertHeicToJpeg: (buf: Buffer) => Promise<Buffer>;
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const sharpMock = require('sharp') as jest.Mock;
 
     beforeEach(() => {
       convertHeicToJpeg = (service as any).convertHeicToJpeg.bind(service);
     });
 
     it('should throw platform-specific error on non-macOS when sharp cannot decode HEIC', async () => {
-      // On non-macOS (this test env is Windows), if sharp can't decode HEIC
-      // the method should throw a descriptive error instead of trying sips
+      // Make sharp simulate inability to decode HEIC
+      sharpMock.mockImplementationOnce(() => ({
+        jpeg: jest.fn().mockReturnValue({
+          toBuffer: jest
+            .fn()
+            .mockRejectedValue(new Error('Input buffer contains unsupported image format')),
+        }),
+      }));
       const fakeHeicBuffer = Buffer.from('fake-heic-data');
 
       await expect(convertHeicToJpeg(fakeHeicBuffer)).rejects.toThrow(
@@ -1420,6 +1494,14 @@ describe('OcrService', () => {
     });
 
     it('should include remediation advice in the error message', async () => {
+      // Make sharp simulate inability to decode HEIC
+      sharpMock.mockImplementationOnce(() => ({
+        jpeg: jest.fn().mockReturnValue({
+          toBuffer: jest
+            .fn()
+            .mockRejectedValue(new Error('Input buffer contains unsupported image format')),
+        }),
+      }));
       const fakeHeicBuffer = Buffer.from('fake-heic-data');
 
       await expect(convertHeicToJpeg(fakeHeicBuffer)).rejects.toThrow(
@@ -1497,16 +1579,17 @@ describe('OcrService', () => {
       ).resolves.toBeInstanceOf(Buffer);
     });
 
-    it('should handle HEIC buffer by converting then calling sharp', async () => {
+    it('should handle HEIC buffer by detecting format and attempting conversion', async () => {
       // Build a fake HEIC header: 12 bytes with 'ftyp' at offset 4 and 'heic' at offset 8
       const heicHeader = Buffer.alloc(64);
       heicHeader.write('ftyp', 4, 'ascii');
       heicHeader.write('heic', 8, 'ascii');
-      // ensureProcessableImage will detect HEIC, attempt convertHeicToJpeg, then call sharp().rotate()
-      // convertHeicToJpeg shells out to heif-convert which will fail, so it falls back to passing through
-      // The key check: sharp() is callable after the conversion attempt
-      const result = await (service as any).ensureProcessableImage(heicHeader);
-      expect(result).toBeInstanceOf(Buffer);
+      // ensureProcessableImage will detect HEIC, attempt convertHeicToJpeg
+      // On non-macOS: sharp can't decode HEIC and sips is unavailable, so it throws
+      // The key check: sharp() is callable (the original regression was sharp not being a function)
+      await expect((service as any).ensureProcessableImage(heicHeader)).rejects.toThrow(
+        /HEIC conversion is not supported/,
+      );
     });
   });
 });

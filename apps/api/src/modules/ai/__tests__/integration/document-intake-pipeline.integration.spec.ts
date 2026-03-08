@@ -4,6 +4,10 @@ import { OcrService } from '../../services/ocr.service';
 import { DocumentClassificationService } from '../../services/document-classification.service';
 import { EntityExtractionService } from '../../services/entity-extraction.service';
 import { AiFeedbackService } from '../../services/ai-feedback.service';
+import { OcrMicroserviceClient } from '../../services/ocr-microservice-client.service';
+import { VlmService } from '../../services/vlm.service';
+import { VlmFeedbackService } from '../../services/vlm-feedback.service';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import {
   createMockPrisma,
@@ -49,9 +53,28 @@ describe('DocumentIntakePipeline (Integration)', () => {
         DocumentIntakeService,
         { provide: PrismaService, useValue: prisma },
         { provide: OcrService, useValue: ocrService },
+        {
+          provide: OcrMicroserviceClient,
+          useValue: {
+            extract: jest.fn().mockResolvedValue(null),
+            isAvailable: jest.fn().mockReturnValue(false),
+          },
+        },
         { provide: DocumentClassificationService, useValue: classificationService },
         { provide: EntityExtractionService, useValue: entityExtractionService },
         { provide: AiFeedbackService, useValue: feedbackService },
+        {
+          provide: VlmService,
+          useValue: {
+            extractFromImage: jest.fn().mockResolvedValue(null),
+            isHealthy: jest.fn().mockResolvedValue(false),
+          },
+        },
+        {
+          provide: VlmFeedbackService,
+          useValue: { recordFeedback: jest.fn(), applyCorrections: jest.fn() },
+        },
+        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue(null) } },
       ],
     }).compile();
 
