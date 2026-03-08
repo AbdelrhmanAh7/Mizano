@@ -6,8 +6,11 @@
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
+  "transformIgnorePatterns": ["node_modules/(?!(.+/node_modules/)?(afinn-165|uuid)/)"],
   "moduleNameMapper": {
-    "^@/(.*)$": "<rootDir>/../src/$1"
+    "^@/(.*)$": "<rootDir>/../src/$1",
+    "^@mizano/shared-types$": "<rootDir>/../../packages/shared-types/src/index.ts",
+    "^@mizano/validators$": "<rootDir>/../../packages/validators/src/index.ts"
   },
   "setupFilesAfterSetup": ["./setup-e2e.ts"]
 }
