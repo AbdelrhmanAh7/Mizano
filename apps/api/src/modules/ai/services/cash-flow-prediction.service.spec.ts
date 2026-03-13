@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CashFlowPredictionService } from './cash-flow-prediction.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PaymentPredictionService } from './payment-prediction.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -23,6 +24,14 @@ describe('CashFlowPredictionService', () => {
         CashFlowPredictionService,
         { provide: PrismaService, useValue: prisma },
         { provide: PaymentPredictionService, useValue: paymentPredictionService },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            generateCompletion: jest.fn().mockResolvedValue(''),
+            generateStructuredOutput: jest.fn().mockResolvedValue({}),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
       ],
     }).compile();
 

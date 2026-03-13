@@ -120,7 +120,7 @@ const assetsApi = {
     return response.data;
   },
   getDepreciationSchedule: async (id: string) => {
-    const response = await api.get(`/assets/${id}/depreciation-schedule`);
+    const response = await api.get(`/assets/${id}/schedule`);
     return response.data;
   },
   runMonthlyDepreciation: async () => {

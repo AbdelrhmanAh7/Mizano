@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import {
@@ -34,11 +34,11 @@ import {
 import { useTranslations } from 'next-intl';
 
 interface ReconcileAccountPageProps {
-  params: Promise<{ accountId: string }>;
+  params: { accountId: string };
 }
 
 export default function ReconcileAccountPage({ params }: ReconcileAccountPageProps) {
-  const { accountId } = use(params);
+  const { accountId } = params;
   const t = useTranslations('banking');
   const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
 

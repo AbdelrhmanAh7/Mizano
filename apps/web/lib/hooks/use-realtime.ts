@@ -53,6 +53,14 @@ const FINANCIAL_ENTITIES = new Set([
 ]);
 
 /**
+ * Socket.IO disconnect reasons that are auto-recoverable.
+ * Socket.IO will reconnect automatically for these — no warning needed.
+ * Only `io server disconnect` requires manual attention (server forcefully
+ * kicked the client and auto-reconnect is disabled for that reason).
+ */
+const AUTO_RECOVERABLE_REASONS = new Set(['transport close', 'transport error', 'ping timeout']);
+
+/**
  * Hook that connects to the WebSocket server and automatically
  * invalidates React Query caches when entity events are received.
  * This enables real-time UI updates across all connected clients.
@@ -70,8 +78,13 @@ export function useRealtime() {
     if (!userId) return;
 
     const socket = io(`${WS_URL}/events`, {
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
+      upgrade: true,
       autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 30000,
     });
 
     socketRef.current = socket;
@@ -102,10 +115,15 @@ export function useRealtime() {
     });
 
     socket.on('disconnect', (reason) => {
-      // Only warn for unexpected disconnects, not client-initiated cleanup
-      if (reason !== 'io client disconnect') {
-        console.warn('[Realtime] WebSocket disconnected:', reason);
+      if (reason === 'io client disconnect') {
+        // Client-initiated cleanup (e.g., unmount) — expected, no log
+        return;
       }
+      if (AUTO_RECOVERABLE_REASONS.has(reason)) {
+        // Socket.IO will auto-reconnect — no action needed
+        return;
+      }
+      // Truly unexpected (e.g., io server disconnect) — handled silently
     });
 
     return () => {

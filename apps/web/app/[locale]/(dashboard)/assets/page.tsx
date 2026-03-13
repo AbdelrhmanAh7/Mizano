@@ -51,12 +51,12 @@ import { useTranslations } from 'next-intl';
 export default function AssetsPage() {
   const t = useTranslations('assets');
   const tc = useTranslations('common');
-  const [statusFilter, setStatusFilter] = useState<AssetStatus | ''>('');
-  const [typeFilter, setTypeFilter] = useState<AssetType | ''>('');
+  const [statusFilter, setStatusFilter] = useState<AssetStatus | 'all'>('all');
+  const [typeFilter, setTypeFilter] = useState<AssetType | 'all'>('all');
 
   const { data, isLoading } = useAssets({
-    status: statusFilter || undefined,
-    assetType: typeFilter || undefined,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    assetType: typeFilter !== 'all' ? typeFilter : undefined,
   });
   const { data: summary } = useAssetSummary();
   const deleteAsset = useDeleteAsset();
@@ -129,23 +129,26 @@ export default function AssetsPage() {
       )}
 
       <div className="flex gap-4">
-        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as AssetStatus | '')}>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as AssetStatus | 'all')}
+        >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder={t('filters.allStatus')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">{t('filters.allStatus')}</SelectItem>
+            <SelectItem value="all">{t('filters.allStatus')}</SelectItem>
             <SelectItem value="ACTIVE">{t('status.active')}</SelectItem>
             <SelectItem value="DISPOSED">{t('status.disposed')}</SelectItem>
             <SelectItem value="FULLY_DEPRECIATED">{t('status.fullyDepreciated')}</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as AssetType | '')}>
+        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as AssetType | 'all')}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder={t('filters.allTypes')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">{t('filters.allTypes')}</SelectItem>
+            <SelectItem value="all">{t('filters.allTypes')}</SelectItem>
             <SelectItem value="ELECTRONICS">{t('types.electronics')}</SelectItem>
             <SelectItem value="FURNITURE">{t('types.furniture')}</SelectItem>
             <SelectItem value="VEHICLES">{t('types.vehicles')}</SelectItem>

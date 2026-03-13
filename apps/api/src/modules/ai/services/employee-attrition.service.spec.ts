@@ -2,15 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { EmployeeAttritionService } from './employee-attrition.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { AiTrainingService } from './ai-training.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   createMockPrisma,
-  createMockModelRegistry,
   createMockAiFeedback,
-  createMockAiTraining,
   createMockEventEmitter,
   MockPrismaClient,
   TEST_ORG_ID,
@@ -20,20 +17,24 @@ import {
 describe('EmployeeAttritionService', () => {
   let service: EmployeeAttritionService;
   let prisma: MockPrismaClient;
-  let modelRegistry: ReturnType<typeof createMockModelRegistry>;
 
   beforeEach(async () => {
     prisma = createMockPrisma();
-    modelRegistry = createMockModelRegistry();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EmployeeAttritionService,
         { provide: PrismaService, useValue: prisma },
-        { provide: ModelRegistryService, useValue: modelRegistry },
         { provide: AiFeedbackService, useValue: createMockAiFeedback() },
-        { provide: AiTrainingService, useValue: createMockAiTraining() },
         { provide: EventEmitter2, useValue: createMockEventEmitter() },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            infer: jest.fn().mockResolvedValue(null),
+            isHealthy: jest.fn().mockResolvedValue(false),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
       ],
     }).compile();
 
@@ -83,9 +84,6 @@ describe('EmployeeAttritionService', () => {
 
       // Upsert profile
       prisma.employeeAiProfile.upsert.mockResolvedValue({} as any);
-
-      // No ML model available
-      modelRegistry.loadActiveModel.mockResolvedValue(null as any);
     });
 
     it('should return LOW risk for long-tenure employee with good attendance', async () => {
@@ -147,33 +145,6 @@ describe('EmployeeAttritionService', () => {
       await expect(service.predictAttrition(TEST_ORG_ID, 'nonexistent')).rejects.toThrow(
         NotFoundException,
       );
-    });
-
-    it('should use RULE_BASED method when no ML model is available', async () => {
-      modelRegistry.loadActiveModel.mockResolvedValue(null as any);
-
-      const result = await service.predictAttrition(TEST_ORG_ID, 'emp-001');
-
-      expect(result.predictionMethod).toBe('RULE_BASED');
-      expect(result.confidence).toBe(0.7);
-    });
-
-    it('should use HYBRID method when ML model is available', async () => {
-      modelRegistry.loadActiveModel.mockResolvedValue({
-        modelData: {
-          trees: [],
-          predict: jest.fn().mockReturnValue([0]),
-          toJSON: jest.fn(),
-        },
-        accuracy: 0.8,
-      } as any);
-
-      // The service tries to use RandomForestClassifier.load which will fail
-      // with mock data, so it falls back to rule-based
-      const result = await service.predictAttrition(TEST_ORG_ID, 'emp-001');
-
-      // Should fall back gracefully
-      expect(['RULE_BASED', 'HYBRID']).toContain(result.predictionMethod);
     });
 
     it('should include factor descriptions in result', async () => {
@@ -308,60 +279,6 @@ describe('EmployeeAttritionService', () => {
       expect(result.highRisk).toBe(0);
       expect(result.mediumRisk).toBe(0);
       expect(result.lowRisk).toBe(0);
-    });
-  });
-
-  describe('trainModel', () => {
-    it('should return insufficient data message when < 30 samples', async () => {
-      prisma.employee.findMany
-        .mockResolvedValueOnce([{ id: 'term-1' }] as any) // terminated
-        .mockResolvedValueOnce([{ id: 'act-1' }] as any); // active
-
-      const result = await service.trainModel(TEST_ORG_ID);
-
-      expect(result.version).toBe(0);
-      expect(result.accuracy).toBe(0);
-      expect(result.sampleCount).toBe(2);
-      expect(result.message).toContain('Insufficient');
-    });
-
-    it('should train model and return accuracy when sufficient data', async () => {
-      const terminated = Array.from({ length: 20 }, (_, i) => ({ id: `term-${i}` }));
-      const active = Array.from({ length: 20 }, (_, i) => ({ id: `act-${i}` }));
-
-      prisma.employee.findMany
-        .mockResolvedValueOnce(terminated as any) // terminated
-        .mockResolvedValueOnce(active as any); // active with 1+ year tenure
-
-      // For each employee, extractAttritionFeatures needs data
-      prisma.employee.findFirst.mockResolvedValue({
-        hireDate: new Date('2020-01-01'),
-        dateOfJoining: new Date('2020-01-01'),
-        basicSalary: mockDecimal(5000),
-        department: 'Engineering',
-        status: 'ACTIVE',
-      } as any);
-
-      prisma.employee.findMany.mockResolvedValue([
-        { basicSalary: mockDecimal(5000) },
-        { basicSalary: mockDecimal(5500) },
-      ] as any);
-
-      prisma.attendance.findMany.mockResolvedValue([
-        { status: 'PRESENT' },
-        { status: 'PRESENT' },
-      ] as any);
-
-      prisma.employee.count.mockResolvedValue(10 as any);
-
-      modelRegistry.saveModel.mockResolvedValue({ version: 1 } as any);
-
-      const result = await service.trainModel(TEST_ORG_ID);
-
-      expect(result.sampleCount).toBeGreaterThanOrEqual(30);
-      expect(result.version).toBe(1);
-      expect(result.accuracy).toBeGreaterThanOrEqual(0);
-      expect(result.message).toContain('trained');
     });
   });
 });

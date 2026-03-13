@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { holtWinters, simpleExponentialSmoothing } from '../utils/holt-winters.util';
-
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildResourcePrompt } from '../prompts/hr.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ss = require('simple-statistics');
 
@@ -37,6 +39,7 @@ export interface OptimizationOpportunity {
 
 export interface OptimizationOpportunities {
   opportunities: OptimizationOpportunity[];
+  predictionMethod: PredictionMethod;
 }
 
 export interface CategoryEfficiency {
@@ -56,7 +59,10 @@ export interface EfficiencyMetrics {
 export class ResourceOptimizationService {
   private readonly logger = new Logger(ResourceOptimizationService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {}
 
   /**
    * Analyze expense trends by category over time
@@ -375,7 +381,44 @@ export class ResourceOptimizationService {
     // Sort by potential savings descending
     opportunities.sort((a, b) => b.potentialSavings - a.potentialSavings);
 
-    return { opportunities };
+    let predictionMethod: PredictionMethod = 'RULE_BASED';
+
+    // --- Ollama enhancement ---
+    try {
+      const resourceData = {
+        categories: Array.from(categoryTotals.entries()).map(([cat, total]) => ({
+          category: cat,
+          totalSpend: total,
+        })),
+      };
+      const demandData = { totalRevenue };
+      const prompt = buildResourcePrompt(resourceData, demandData);
+      const ollamaResult = await this.gateway.infer<{
+        allocation: Array<{ resource: string; utilization: number; recommendation: string }>;
+        utilization_score: number;
+        recommendations: string[];
+      }>(prompt);
+
+      if (ollamaResult && ollamaResult.data.recommendations?.length > 0) {
+        // Add Ollama-identified opportunities
+        for (const rec of ollamaResult.data.recommendations) {
+          opportunities.push({
+            type: 'high_ratio',
+            category: 'AI Insight',
+            description: rec,
+            potentialSavings: 0,
+            priority: 'MEDIUM',
+          });
+        }
+        predictionMethod = 'HYBRID';
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama resource optimization failed, using rule-based: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    return { opportunities, predictionMethod };
   }
 
   /**

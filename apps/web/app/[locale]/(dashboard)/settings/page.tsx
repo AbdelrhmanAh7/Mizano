@@ -11,6 +11,7 @@ import {
   Globe,
   Palette,
   Receipt,
+  ScrollText,
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -108,6 +109,12 @@ const settingsGroups: SettingsGroup[] = [
         descriptionKey: 'cache',
         href: '/settings/cache',
         icon: Database,
+      },
+      {
+        titleKey: 'auditLogs',
+        descriptionKey: 'auditLogs',
+        href: '/settings/audit-logs',
+        icon: ScrollText,
       },
     ],
   },

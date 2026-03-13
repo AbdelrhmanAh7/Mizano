@@ -10,6 +10,12 @@ import {
   applyWhatIfScenario,
   identifyCriticalDates,
 } from '../utils/monte-carlo.util';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import {
+  buildCashFlowExplanationPrompt,
+  CashFlowExplanationResponse,
+} from '../prompts/forecasting.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface CashFlowForecast {
   date: Date;
@@ -30,7 +36,12 @@ export interface CashFlowPrediction {
     totalExpectedOutflows: number;
   };
   confidence: 'high' | 'medium' | 'low';
-  predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID';
+  predictionMethod: PredictionMethod;
+  riskNarrative?: {
+    summary: string;
+    risks: { description: string; probability: number; impact: number }[];
+    mitigationActions: string[];
+  };
 }
 
 export interface QuickForecast {
@@ -84,6 +95,7 @@ export class CashFlowPredictionService {
   constructor(
     private prisma: PrismaService,
     private paymentPredictionService: PaymentPredictionService,
+    private ollamaGateway: OllamaInferenceGateway,
   ) {}
 
   /**
@@ -151,6 +163,83 @@ export class CashFlowPredictionService {
     // 8. Calculate confidence
     const confidence = this.calculateConfidence(events.length, currentCash);
 
+    // 9. Try Ollama for risk narratives and mitigation suggestions
+    let riskNarrative: CashFlowPrediction['riskNarrative'];
+    let predictionMethod: PredictionMethod = 'ML';
+
+    try {
+      const promptData = buildCashFlowExplanationPrompt(
+        {
+          period: `${horizonDays} days`,
+          predicted_inflows: totals.expectedInflows,
+          predicted_outflows: totals.expectedOutflows,
+          net_cash_flow: totals.expectedInflows - totals.expectedOutflows,
+          ending_balance: simulation.minBalance,
+          breakdown: [
+            {
+              category: 'Accounts Receivable',
+              amount: totals.inflowsBySource.ar || 0,
+              direction: 'IN' as const,
+            },
+            {
+              category: 'Accounts Payable',
+              amount: totals.outflowsBySource.ap || 0,
+              direction: 'OUT' as const,
+            },
+            {
+              category: 'Payroll',
+              amount: totals.outflowsBySource.payroll || 0,
+              direction: 'OUT' as const,
+            },
+            {
+              category: 'Recurring',
+              amount: totals.outflowsBySource.recurring || 0,
+              direction: 'OUT' as const,
+            },
+          ],
+        },
+        [
+          {
+            name: 'Pessimistic',
+            resulting_balance: forecasts[forecasts.length - 1]?.closingBalance.p10 ?? currentCash,
+            adjustments: [],
+          },
+          {
+            name: 'Expected',
+            resulting_balance: forecasts[forecasts.length - 1]?.closingBalance.p50 ?? currentCash,
+            adjustments: [],
+          },
+          {
+            name: 'Optimistic',
+            resulting_balance: forecasts[forecasts.length - 1]?.closingBalance.p90 ?? currentCash,
+            adjustments: [],
+          },
+        ],
+      );
+
+      const ollamaResult = await this.ollamaGateway.infer<CashFlowExplanationResponse>(
+        promptData.user,
+        { systemPrompt: promptData.system },
+      );
+
+      if (ollamaResult?.data) {
+        riskNarrative = {
+          summary: ollamaResult.data.summary || '',
+          risks: (ollamaResult.data.risks || []).map((r) => ({
+            description: r.description,
+            probability: r.probability,
+            impact: r.impact,
+          })),
+          mitigationActions: ollamaResult.data.mitigation_actions || [],
+        };
+        predictionMethod = 'HYBRID';
+      }
+    } catch (error) {
+      this.logger.debug(
+        `Ollama risk narrative unavailable for cash flow prediction: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
     return {
       forecasts,
       summary: {
@@ -164,7 +253,8 @@ export class CashFlowPredictionService {
         totalExpectedOutflows: totals.expectedOutflows,
       },
       confidence,
-      predictionMethod: 'ML',
+      predictionMethod,
+      riskNarrative,
     };
   }
 

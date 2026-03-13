@@ -5,6 +5,9 @@ import type { Prisma } from '@prisma/client';
 import { getRiskLevel } from '../utils/risk-level.util';
 import { buildIsolationForest1D, isolationForestScore1D } from '../utils/isolation-forest.util';
 import { zScore } from '../utils/statistics.util';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildFraudAnalysisPrompt, FraudAnalysisResponse } from '../prompts/security.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface FraudScoreResult {
   entityType: string;
@@ -13,6 +16,8 @@ export interface FraudScoreResult {
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   signals: FraudSignal[];
   isAnomaly: boolean;
+  explanation?: string;
+  predictionMethod: PredictionMethod;
 }
 
 export interface FraudSignal {
@@ -26,7 +31,10 @@ export interface FraudSignal {
 export class FraudDetectionService {
   private readonly logger = new Logger(FraudDetectionService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private ollamaGateway: OllamaInferenceGateway,
+  ) {}
 
   async scoreTransaction(
     organizationId: string,
@@ -67,7 +75,84 @@ export class FraudDetectionService {
     totalScore += benfordResult.score * 0.1;
     weightSum += 0.1;
 
-    const fraudScore = weightSum > 0 ? totalScore / weightSum : 0;
+    let fraudScore = weightSum > 0 ? totalScore / weightSum : 0;
+    let explanation: string | undefined;
+    let predictionMethod: PredictionMethod = 'ML';
+
+    // Try Ollama for explanation and blended fraud score
+    try {
+      const amount = await this.getEntityAmount(organizationId, entityType, entityId);
+      const createdAt = await this.getEntityCreatedAt(organizationId, entityType, entityId);
+      const historicalAmounts = await this.getHistoricalAmounts(organizationId, entityType);
+      const avgAmount =
+        historicalAmounts.length > 0
+          ? historicalAmounts.reduce((a, b) => a + b, 0) / historicalAmounts.length
+          : 0;
+      const maxAmount = historicalAmounts.length > 0 ? Math.max(...historicalAmounts) : 0;
+
+      const promptData = buildFraudAnalysisPrompt(
+        {
+          transaction_id: entityId,
+          type: entityType,
+          amount,
+          date: createdAt?.toISOString() || new Date().toISOString(),
+        },
+        {
+          avg_transaction_amount: avgAmount,
+          max_transaction_amount: maxAmount,
+          transaction_frequency_per_month:
+            historicalAmounts.length > 0 ? historicalAmounts.length / 6 : 0,
+          recent_transactions: historicalAmounts.slice(0, 5).map((amt, i) => ({
+            date: new Date(Date.now() - i * 86400000).toISOString().split('T')[0],
+            amount: amt,
+            type: entityType,
+          })),
+        },
+      );
+
+      const ollamaResult = await this.ollamaGateway.infer<FraudAnalysisResponse>(promptData.user, {
+        systemPrompt: promptData.system,
+      });
+
+      if (ollamaResult?.data) {
+        const ollamaData = ollamaResult.data;
+
+        // Blend Ollama fraud score with signal-weighted score (60% signals, 40% Ollama)
+        const ollamaFraudScore =
+          typeof ollamaData.fraud_score === 'number'
+            ? Math.max(0, Math.min(1, ollamaData.fraud_score))
+            : fraudScore;
+        fraudScore = fraudScore * 0.6 + ollamaFraudScore * 0.4;
+        predictionMethod = 'HYBRID';
+
+        // Add Ollama signals to the signal list
+        if (ollamaData.signals && Array.isArray(ollamaData.signals)) {
+          for (const ollamaSignal of ollamaData.signals) {
+            const existingSignalNames = signals.map((s) => s.signal);
+            if (!existingSignalNames.includes(ollamaSignal.signal)) {
+              signals.push({
+                signal: ollamaSignal.signal,
+                score: ollamaSignal.severity || 0,
+                description: ollamaSignal.description || '',
+                triggered: (ollamaSignal.severity || 0) > 0.3,
+              });
+            }
+          }
+        }
+
+        // Build explanation from Ollama's analysis
+        const triggeredSignals = signals.filter((s) => s.triggered);
+        explanation =
+          triggeredSignals.length > 0
+            ? `Fraud analysis detected ${triggeredSignals.length} risk signal(s): ${triggeredSignals.map((s) => s.description).join('; ')}.`
+            : 'No significant fraud signals detected.';
+      }
+    } catch (error) {
+      this.logger.debug(
+        `Ollama fraud explanation unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
     const riskLevel = getRiskLevel(fraudScore);
 
     return {
@@ -77,6 +162,8 @@ export class FraudDetectionService {
       riskLevel,
       signals,
       isAnomaly: fraudScore > 0.5,
+      explanation,
+      predictionMethod,
     };
   }
 

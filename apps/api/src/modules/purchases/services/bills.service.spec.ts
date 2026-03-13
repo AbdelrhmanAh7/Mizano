@@ -3,6 +3,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BillsService } from './bills.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { JournalsService } from '../../accounting/services/journals.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
 import { createMockBill, createMockVendor } from '../../../test/helpers/test-utils';
 import { dec, expectDecimalEqual } from '../../../test/helpers/decimal.helpers';
@@ -17,7 +18,11 @@ describe('BillsService', () => {
     prisma = createMockPrisma();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [BillsService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        BillsService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: JournalsService, useValue: { create: jest.fn() } },
+      ],
     }).compile();
 
     service = module.get<BillsService>(BillsService);
@@ -202,8 +207,19 @@ describe('BillsService', () => {
 
   describe('approve (status transition DRAFT -> OPEN)', () => {
     it('should transition a DRAFT bill to OPEN', async () => {
-      const draftBill = createMockBill({ id: 'bill-1', status: 'DRAFT' });
+      const draftBill = createMockBill({
+        id: 'bill-1',
+        status: 'DRAFT',
+        billNumber: 'BILL-001',
+        grandTotal: dec('575'),
+        taxAmount: dec('75'),
+        lines: [{ accountId: 'acc-1', amount: dec('500'), description: 'Office supplies' }],
+      });
       prisma.bill.findFirst.mockResolvedValue(draftBill as any);
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultApAccountId: 'ap-acc-1',
+        defaultVatReceivableAccountId: 'vat-acc-1',
+      } as any);
       prisma.bill.update.mockResolvedValue({ ...draftBill, status: 'OPEN' } as any);
 
       const result = await service.approve(ORG_ID, 'bill-1');
@@ -261,12 +277,10 @@ describe('BillsService', () => {
       expectDecimalEqual(updateCall.data.balanceDue as any, '375');
     });
 
-    it('should not update when bill not found', async () => {
+    it('should throw NotFoundException when bill not found', async () => {
       prisma.bill.findUnique.mockResolvedValue(null);
 
-      await service.updateBalanceDue('nonexistent');
-
-      expect(prisma.bill.update).not.toHaveBeenCalled();
+      await expect(service.updateBalanceDue('nonexistent')).rejects.toThrow(NotFoundException);
     });
 
     it('should handle overpayment by capping balance at zero', async () => {

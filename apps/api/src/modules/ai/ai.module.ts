@@ -17,7 +17,6 @@ import { DeepSearchService } from './services/deep-search.service';
 import { TransactionCategorizerService } from './services/transaction-categorizer.service';
 
 // Cross-cutting controllers
-import { AiTrainingLabController } from './controllers/ai-training-lab.controller';
 import { AiController } from './controllers/ai.controller';
 import { CategorizationController } from './controllers/categorization.controller';
 import { DeepSearchController } from './controllers/deep-search.controller';
@@ -26,8 +25,8 @@ import { NarrativeController } from './controllers/narrative.controller';
 // Financial narrative
 import { FinancialNarrativeService } from './services/financial-narrative.service';
 
-// Cross-cutting scheduler (depends on services from many sub-modules)
-import { AiRetrainingScheduler } from './schedulers/ai-retraining.scheduler';
+// Cross-cutting operations scheduler
+import { AiOperationsScheduler } from './schedulers/ai-operations.scheduler';
 
 @Module({
   imports: [
@@ -40,13 +39,7 @@ import { AiRetrainingScheduler } from './schedulers/ai-retraining.scheduler';
     AiOperationsModule,
     AiHrModule,
   ],
-  controllers: [
-    AiController,
-    AiTrainingLabController,
-    CategorizationController,
-    DeepSearchController,
-    NarrativeController,
-  ],
+  controllers: [AiController, CategorizationController, DeepSearchController, NarrativeController],
   providers: [
     // Legacy orchestration services
     AiCategorizationService,
@@ -57,8 +50,8 @@ import { AiRetrainingScheduler } from './schedulers/ai-retraining.scheduler';
     DeepSearchService,
     // Financial narrative
     FinancialNarrativeService,
-    // Cross-cutting scheduler (uses services from core, operations, forecasting, sales-crm)
-    AiRetrainingScheduler,
+    // Cross-cutting operations scheduler (uses services from core, operations, forecasting, sales-crm)
+    AiOperationsScheduler,
   ],
   exports: [
     // Re-export all sub-modules

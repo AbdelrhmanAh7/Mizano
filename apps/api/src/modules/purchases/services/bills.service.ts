@@ -223,6 +223,23 @@ export class BillsService {
     };
   }
 
+  async open(organizationId: string, id: string) {
+    const bill = await this.prisma.bill.findFirst({
+      where: { id, organizationId, deletedAt: null },
+    });
+    if (!bill) throw new NotFoundException('Bill not found');
+    if (bill.status !== BillStatus.DRAFT) {
+      throw new BadRequestException('Only draft bills can be opened');
+    }
+
+    const updated = await this.prisma.bill.update({
+      where: { id },
+      data: { status: BillStatus.OPEN },
+    });
+
+    return { data: updated };
+  }
+
   async approve(organizationId: string, id: string) {
     const bill = await this.prisma.bill.findFirst({
       where: { id, organizationId, deletedAt: null },

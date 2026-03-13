@@ -1,5 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildRoutePrompt } from '../prompts/hr.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface OptimizedStop {
   deliveryId: string;
@@ -16,6 +19,7 @@ export interface RouteOptimizationResult {
   estimatedSavings: string;
   totalStops: number;
   regionCount: number;
+  predictionMethod: PredictionMethod;
 }
 
 export interface DeliveryEstimate {
@@ -43,7 +47,10 @@ export interface RouteAnalytics {
 export class RouteOptimizationService {
   private readonly logger = new Logger(RouteOptimizationService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {}
 
   /**
    * Optimize delivery order using nearest-neighbor heuristic + 2-opt improvement
@@ -53,7 +60,13 @@ export class RouteOptimizationService {
     deliveryIds: string[],
   ): Promise<RouteOptimizationResult> {
     if (deliveryIds.length === 0) {
-      return { optimizedOrder: [], estimatedSavings: '0%', totalStops: 0, regionCount: 0 };
+      return {
+        optimizedOrder: [],
+        estimatedSavings: '0%',
+        totalStops: 0,
+        regionCount: 0,
+        predictionMethod: 'RULE_BASED',
+      };
     }
 
     // Get delivery challans with customer addresses
@@ -81,7 +94,13 @@ export class RouteOptimizationService {
     });
 
     if (deliveries.length === 0) {
-      return { optimizedOrder: [], estimatedSavings: '0%', totalStops: 0, regionCount: 0 };
+      return {
+        optimizedOrder: [],
+        estimatedSavings: '0%',
+        totalStops: 0,
+        regionCount: 0,
+        predictionMethod: 'RULE_BASED',
+      };
     }
 
     // Build stop list with location info
@@ -127,11 +146,36 @@ export class RouteOptimizationService {
       sequence: sequence + 1,
     }));
 
+    let predictionMethod: PredictionMethod = 'RULE_BASED';
+
+    // --- Ollama enhancement ---
+    try {
+      const locationsData = {
+        stops: stops.map((s) => ({ id: s.id, city: s.city, state: s.state, country: s.country })),
+      };
+      const constraintsData = { totalStops: stops.length, regionCount: regions.size };
+      const prompt = buildRoutePrompt(locationsData, constraintsData);
+      const ollamaResult = await this.gateway.infer<{
+        optimized_route: string[];
+        savings: { distance_percent: number; time_percent: number };
+        reasoning: string;
+      }>(prompt);
+
+      if (ollamaResult && ollamaResult.data.reasoning) {
+        predictionMethod = 'HYBRID';
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama route optimization failed, using heuristic: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
     return {
       optimizedOrder,
       estimatedSavings: `${Math.round(savings)}%`,
       totalStops: stops.length,
       regionCount: regions.size,
+      predictionMethod,
     };
   }
 

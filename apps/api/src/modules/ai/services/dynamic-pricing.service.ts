@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildDynamicPricingPrompt, DynamicPricingResponse } from '../prompts/sales-crm.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ss = require('simple-statistics');
@@ -27,6 +30,7 @@ export interface PriceSuggestion {
   expectedRevenueChange: number;
   confidence: number;
   reason: string;
+  predictionMethod: PredictionMethod;
 }
 
 export interface PricingInsight {
@@ -43,7 +47,10 @@ export interface PricingInsight {
 export class DynamicPricingService {
   private readonly logger = new Logger(DynamicPricingService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {}
 
   async estimateElasticity(organizationId: string, itemId: string): Promise<ElasticityResult> {
     const item = await this.prisma.item.findFirst({
@@ -162,6 +169,48 @@ export class DynamicPricingService {
       }
     }
 
+    // Try Ollama inference for pricing suggestion
+    let ollamaPrice: number | null = null;
+    let predictionMethod: PredictionMethod = 'RULE_BASED';
+    try {
+      const prompt = buildDynamicPricingPrompt(
+        {
+          item_id: itemId,
+          item_name: item.name,
+          current_price: currentPrice,
+          cost: costPrice,
+          sales_velocity: elasticity.dataPoints,
+        },
+        {
+          market_trend: 'STABLE',
+        },
+        {
+          recent_sales_count: elasticity.dataPoints,
+          trend_direction:
+            elasticity.elasticity < -0.5 ? 'DOWN' : elasticity.elasticity > 0.5 ? 'UP' : 'FLAT',
+        },
+      );
+      const ollamaResult = await this.gateway.infer<DynamicPricingResponse>(prompt.user, {
+        systemPrompt: prompt.system,
+      });
+      if (ollamaResult?.data?.suggested_price != null && ollamaResult.data.suggested_price > 0) {
+        ollamaPrice = ollamaResult.data.suggested_price;
+        if (ollamaResult.data.reasoning) {
+          reason = ollamaResult.data.reasoning;
+        }
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama pricing failed for item ${itemId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // Blend: Ollama + rule-based
+    if (ollamaPrice !== null) {
+      suggestedPrice = ollamaPrice * 0.5 + suggestedPrice * 0.5;
+      predictionMethod = 'HYBRID';
+    }
+
     // Apply margin constraint
     const minPrice = costPrice > 0 ? costPrice / (1 - target) : 0;
     suggestedPrice = Math.max(suggestedPrice, minPrice);
@@ -178,8 +227,10 @@ export class DynamicPricingService {
       currentMargin,
       suggestedMargin,
       expectedRevenueChange,
-      confidence: elasticity.confidence,
+      confidence:
+        ollamaPrice !== null ? Math.min(0.95, elasticity.confidence + 0.1) : elasticity.confidence,
       reason,
+      predictionMethod,
     };
   }
 

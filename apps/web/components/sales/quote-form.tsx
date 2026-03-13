@@ -61,7 +61,7 @@ export function QuoteForm({
   isSubmitting,
 }: QuoteFormProps) {
   const isEditing = !!quote;
-  const { data: customersData } = useCustomers({ limit: 1000 });
+  const { data: customersData } = useCustomers({ limit: 100 });
   const customers = customersData?.data || [];
 
   // Default dates

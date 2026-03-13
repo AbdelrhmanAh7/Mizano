@@ -263,7 +263,7 @@ enum AiFeature {
   // Core Financial AI (10)
   CATEGORIZATION
   RECONCILIATION
-  OCR_LAYOUT
+
   DEMAND_FORECAST
   LEAD_SCORING
   ANOMALY
@@ -307,18 +307,6 @@ enum LeadTier {
   WARM
   COOL
   COLD
-}
-
-enum AiTrainingSource {
-  USER
-  SEED
-  CORRECTION
-}
-
-enum AiModelStatus {
-  ACTIVE
-  TRAINING
-  RETIRED
 }
 
 enum AiFeedbackAction {
@@ -532,14 +520,12 @@ model Organization {
   reconciliations       Reconciliation[]
 
   // AI Infrastructure Relations
-  aiTrainingData         AiTrainingData[]
-  aiModels               AiModel[]
   aiFeedback             AiFeedback[]
   aiPredictions          AiPrediction[]
   aiAnomalies            AiAnomaly[]
   itemReorderAnalysis    ItemReorderAnalysis[]
   reconciliationPatterns ReconciliationPattern[]
-  vendorOcrLayouts       VendorOcrLayout[]
+
   itemDemandForecasts    ItemDemandForecast[]
   cashFlowForecasts      CashFlowForecast[]
   leadScores             LeadScore[]
@@ -602,11 +588,10 @@ model Organization {
   // AI Settings
   aiCategorizationEnabled Boolean @default(true)
   aiReconciliationEnabled Boolean @default(true)
-  aiOcrEnabled            Boolean @default(true)
+
   aiForecastingEnabled    Boolean @default(true)
   aiAnomalyEnabled        Boolean @default(true)
   aiLeadScoringEnabled    Boolean @default(true)
-  aiRetrainingFrequency   String  @default("weekly") // daily, weekly, monthly
   anomalySensitivity      Int     @default(3) // Z-score threshold (2-4)
 
   // Localization Settings
@@ -1122,7 +1107,6 @@ model Vendor {
   bills         Bill[]
   vendorCredits VendorCredit[]
   paymentsMade  PaymentMade[]
-  ocrLayouts    VendorOcrLayout[]
 
   @@index([organizationId])
   @@index([name])
@@ -2214,45 +2198,6 @@ model Notification {
 // AI FOUNDATION INFRASTRUCTURE
 // ============================================
 
-model AiTrainingData {
-  id             String           @id @default(cuid())
-  feature        AiFeature
-  inputData      Json
-  label          String
-  source         AiTrainingSource
-  organizationId String
-  createdAt      DateTime         @default(now())
-
-  // Relations
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@index([organizationId])
-  @@index([feature])
-  @@index([organizationId, feature])
-  @@map("ai_training_data")
-}
-
-model AiModel {
-  id             String        @id @default(cuid())
-  feature        AiFeature
-  version        Int
-  accuracy       Decimal       @default(0) @db.Decimal(5, 4)
-  sampleCount    Int           @default(0)
-  modelData      Json
-  status         AiModelStatus @default(TRAINING)
-  trainedAt      DateTime?
-  organizationId String
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
-  // Relations
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@unique([organizationId, feature, version])
-  @@index([organizationId])
-  @@index([organizationId, feature, status])
-  @@map("ai_models")
-}
 
 model AiFeedback {
   id             String           @id @default(cuid())
@@ -2382,28 +2327,6 @@ model ReconciliationPattern {
   @@map("reconciliation_patterns")
 }
 
-// ============================================
-// OCR VENDOR LAYOUTS
-// ============================================
-
-model VendorOcrLayout {
-  id             String   @id @default(cuid())
-  vendorId       String
-  fieldPositions Json
-  sampleCount    Int      @default(1)
-  lastUsedAt     DateTime @default(now())
-  organizationId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  // Relations
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  vendor       Vendor       @relation(fields: [vendorId], references: [id])
-
-  @@unique([organizationId, vendorId])
-  @@index([organizationId])
-  @@map("vendor_ocr_layouts")
-}
 
 // ============================================
 // DEMAND FORECASTING

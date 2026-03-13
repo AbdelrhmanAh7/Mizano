@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ComplianceMonitoringService } from './compliance-monitoring.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import {
   createMockPrisma,
   MockPrismaClient,
@@ -18,7 +19,18 @@ describe('ComplianceMonitoringService', () => {
     prisma = createMockPrisma();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [ComplianceMonitoringService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        ComplianceMonitoringService,
+        { provide: PrismaService, useValue: prisma },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            infer: jest.fn().mockResolvedValue(null),
+            isHealthy: jest.fn().mockResolvedValue(false),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<ComplianceMonitoringService>(ComplianceMonitoringService);

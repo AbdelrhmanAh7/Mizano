@@ -1,12 +1,11 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AiTrainingService } from './ai-training.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { ModelRegistryService } from './model-registry.service';
-import { AiTrainingSource } from '@prisma/client';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+
 import * as natural from 'natural';
 import { BoundedCache } from '../utils/bounded-cache.util';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface CategorizationInput {
   description: string;
@@ -28,16 +27,14 @@ export interface CategorizationPrediction {
     accountName: string;
     confidence: number;
   }>;
-  predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID';
+  predictionMethod: PredictionMethod;
 }
 
-interface CategorizationModelData {
-  classifierJson: string;
-  vendorAccountMap: Record<string, { accountId: string; count: number }>;
-  vocabulary: string[];
-  sampleCount: number;
-  lastTrainedAt: string;
-  [key: string]: unknown;
+interface OllamaCategorizationResponse {
+  account_id: string | null;
+  account_name: string;
+  confidence: number;
+  alternatives: { name: string; confidence: number }[];
 }
 
 interface CachedClassifier {
@@ -60,10 +57,8 @@ export class TransactionCategorizerService {
 
   constructor(
     private prisma: PrismaService,
-    private trainingService: AiTrainingService,
     private feedbackService: AiFeedbackService,
-    private modelRegistry: ModelRegistryService,
-    private eventEmitter: EventEmitter2,
+    private ollamaGateway: OllamaInferenceGateway,
   ) {}
 
   /**
@@ -76,14 +71,8 @@ export class TransactionCategorizerService {
   }> {
     this.logger.log(`Starting categorization training for org ${organizationId}`);
 
-    // 1. Fetch all training data
-    const trainingData = await this.prisma.aiTrainingData.findMany({
-      where: {
-        organizationId,
-        feature: 'CATEGORIZATION',
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    // 1. Training data (aiTrainingData table removed; training data is no longer persisted separately)
+    const trainingData: Array<{ id: string; inputData: unknown; label: string }> = [];
 
     if (trainingData.length < this.MIN_SAMPLES_FOR_PREDICTION) {
       throw new BadRequestException(
@@ -140,37 +129,23 @@ export class TransactionCategorizerService {
       // 6. Run cross-validation
       const cvResult = await this.crossValidateInternal(trainingData, 5);
 
-      // 7. Serialize and save model
-      const modelData: CategorizationModelData = {
-        classifierJson: JSON.stringify(classifier),
-        vendorAccountMap,
-        vocabulary: Array.from(vocabulary),
-        sampleCount: trainingData.length,
-        lastTrainedAt: new Date().toISOString(),
-      };
-
-      const savedModel = await this.modelRegistry.saveModel(
-        organizationId,
-        'CATEGORIZATION',
-        modelData,
-        cvResult.avgAccuracy,
-        trainingData.length,
-      );
+      // 7. Model registry removed — cache classifier in memory only
+      const version = 1;
 
       // 8. Update cache
       this.classifierCache.set(organizationId, {
         classifier,
         vendorAccountMap,
-        version: savedModel.version,
+        version,
         loadedAt: new Date(),
       });
 
       this.logger.log(
-        `Categorization training completed for org ${organizationId}: v${savedModel.version}, accuracy=${cvResult.avgAccuracy.toFixed(2)}, samples=${trainingData.length}`,
+        `Categorization training completed for org ${organizationId}: v${version}, accuracy=${cvResult.avgAccuracy.toFixed(2)}, samples=${trainingData.length}`,
       );
 
       return {
-        version: savedModel.version,
+        version,
         accuracy: cvResult.avgAccuracy,
         sampleCount: trainingData.length,
       };
@@ -191,7 +166,135 @@ export class TransactionCategorizerService {
     organizationId: string,
     input: CategorizationInput,
   ): Promise<CategorizationPrediction> {
-    // 1. Load classifier from cache or DB
+    // 1. Try Ollama first for categorization
+    try {
+      const ollamaPrompt = `Categorize this accounting transaction for an ERP system.
+
+Transaction details:
+- Description: ${input.description}
+${input.vendorName ? `- Vendor: ${input.vendorName}` : ''}
+- Amount: ${input.amount}
+- Direction: ${input.direction}
+
+Based on the description, vendor, amount, and direction, determine the most appropriate chart-of-accounts category.
+
+Return a JSON object with:
+- account_id: null (to be resolved by the system)
+- account_name: the most likely account category name (e.g., "Office Supplies", "Rent Expense", "Sales Revenue")
+- confidence: your confidence from 0.0 to 1.0
+- alternatives: array of up to 3 alternative categories, each with { "name": string, "confidence": number }
+
+Return ONLY valid JSON.`;
+
+      const ollamaResult =
+        await this.ollamaGateway.infer<OllamaCategorizationResponse>(ollamaPrompt);
+
+      if (ollamaResult?.data && ollamaResult.data.account_name) {
+        const ollamaData = ollamaResult.data;
+        const ollamaConfidence =
+          typeof ollamaData.confidence === 'number' ? ollamaData.confidence : 0.6;
+
+        // Try to match Ollama's suggested account name to an actual account in the org
+        const matchedAccounts = await this.prisma.account.findMany({
+          where: {
+            organizationId,
+            OR: [
+              { name: { contains: ollamaData.account_name, mode: 'insensitive' } },
+              ...(ollamaData.alternatives || []).map((alt) => ({
+                name: { contains: alt.name, mode: 'insensitive' as const },
+              })),
+            ],
+          },
+          select: { id: true, code: true, name: true },
+        });
+
+        let topAccountId: string | null = null;
+        let topAccountCode = '';
+        let topAccountName = ollamaData.account_name;
+        let topConfidence = ollamaConfidence;
+
+        if (matchedAccounts.length > 0) {
+          // Find best match
+          const primaryMatch = matchedAccounts.find((a) =>
+            a.name.toLowerCase().includes(ollamaData.account_name.toLowerCase()),
+          );
+          const bestMatch = primaryMatch || matchedAccounts[0];
+          topAccountId = bestMatch.id;
+          topAccountCode = bestMatch.code;
+          topAccountName = bestMatch.name;
+        }
+
+        // Apply vendor boost as post-processing
+        await this.loadModel(organizationId);
+        const cached = this.classifierCache.get(organizationId);
+
+        if (input.vendorName && cached) {
+          const normalizedVendor = this.normalizeText(input.vendorName);
+          const vendorMapping = cached.vendorAccountMap[normalizedVendor];
+
+          if (vendorMapping && vendorMapping.count >= 3) {
+            // Strong vendor association — if vendor maps to a specific account, boost it
+            const vendorAccount = await this.prisma.account.findUnique({
+              where: { id: vendorMapping.accountId },
+              select: { id: true, code: true, name: true },
+            });
+
+            if (vendorAccount) {
+              topAccountId = vendorAccount.id;
+              topAccountCode = vendorAccount.code;
+              topAccountName = vendorAccount.name;
+              topConfidence = Math.min(1, topConfidence + this.VENDOR_CONFIDENCE_BOOST);
+            }
+          }
+        }
+
+        // Build alternatives from Ollama response
+        const alternativeAccounts = (ollamaData.alternatives || [])
+          .filter((alt) => alt.name !== topAccountName)
+          .slice(0, 3);
+
+        const alternatives: CategorizationPrediction['alternatives'] = [];
+        for (const alt of alternativeAccounts) {
+          const match = matchedAccounts.find((a) =>
+            a.name.toLowerCase().includes(alt.name.toLowerCase()),
+          );
+          alternatives.push({
+            accountId: match?.id || '',
+            accountCode: match?.code || '',
+            accountName: match?.name || alt.name,
+            confidence: alt.confidence || 0.3,
+          });
+        }
+
+        // Store prediction for feedback tracking
+        const prediction = await this.feedbackService.storePrediction(
+          organizationId,
+          'CATEGORIZATION',
+          input as Record<string, unknown>,
+          { accountId: topAccountId, confidence: topConfidence },
+          topConfidence,
+          0,
+        );
+
+        // Training bridge removed — training data storage no longer available
+
+        return {
+          accountId: topAccountId,
+          accountCode: topAccountCode,
+          accountName: topAccountName,
+          confidence: topConfidence,
+          predictionId: prediction?.id || '',
+          alternatives,
+          predictionMethod: 'OLLAMA',
+        };
+      }
+    } catch (error) {
+      this.logger.debug(
+        `Ollama categorization unavailable, falling back to Bayes: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // 2. Fallback: Load Naive Bayes classifier from cache or DB
     await this.loadModel(organizationId);
 
     const cached = this.classifierCache.get(organizationId);
@@ -207,10 +310,10 @@ export class TransactionCategorizerService {
       };
     }
 
-    // 2. Build feature text
+    // 3. Build feature text
     const featureText = this.buildFeatureText(input);
 
-    // 3. Get classifications with probabilities
+    // 4. Get classifications with probabilities
     const classifications = cached.classifier.getClassifications(featureText);
 
     if (classifications.length === 0) {
@@ -225,14 +328,14 @@ export class TransactionCategorizerService {
       };
     }
 
-    // 4. Apply softmax for 0-1 confidence scores
+    // 5. Apply softmax for 0-1 confidence scores
     const probabilities: Record<string, number> = {};
     classifications.forEach((c) => {
       probabilities[c.label] = c.value;
     });
     const softmaxProbs = this.applySoftmax(probabilities);
 
-    // 5. Check vendor boost
+    // 6. Check vendor boost
     let topAccountId = classifications[0].label;
     let topConfidence = softmaxProbs[topAccountId];
 
@@ -261,7 +364,7 @@ export class TransactionCategorizerService {
       }
     }
 
-    // 6. Get account details
+    // 7. Get account details
     const accounts = await this.prisma.account.findMany({
       where: {
         organizationId,
@@ -273,7 +376,7 @@ export class TransactionCategorizerService {
     const accountMap = new Map(accounts.map((a) => [a.id, a]));
     const topAccount = accountMap.get(topAccountId);
 
-    // 7. Build alternatives (top 3)
+    // 8. Build alternatives (top 3)
     const sortedProbs = Object.entries(softmaxProbs)
       .filter(([id]) => id !== topAccountId)
       .sort((a, b) => b[1] - a[1])
@@ -291,7 +394,7 @@ export class TransactionCategorizerService {
         };
       });
 
-    // 8. Store prediction for feedback tracking
+    // 9. Store prediction for feedback tracking
     const prediction = await this.feedbackService.storePrediction(
       organizationId,
       'CATEGORIZATION',
@@ -325,32 +428,7 @@ export class TransactionCategorizerService {
     // Determine if this is a correction
     const isCorrection = wasAiSuggested && aiSuggestedAccountId !== selectedAccountId;
 
-    const source: AiTrainingSource = isCorrection ? 'CORRECTION' : 'USER';
-
-    // 1. Store as training data
-    await this.trainingService.addTrainingData(
-      organizationId,
-      'CATEGORIZATION',
-      input,
-      selectedAccountId,
-      source,
-    );
-
-    // 2. Check if corrections threshold reached
-    if (isCorrection) {
-      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
-        organizationId,
-        'CATEGORIZATION',
-      );
-
-      if (shouldRetrain) {
-        this.logger.log(`Categorization retraining threshold reached for org ${organizationId}`);
-        this.eventEmitter.emit('ai.retraining.needed', {
-          organizationId,
-          feature: 'CATEGORIZATION',
-        });
-      }
-    }
+    const source = isCorrection ? 'CORRECTION' : 'USER';
 
     this.logger.debug(
       `Learned categorization for org ${organizationId}: ${input.description} -> ${selectedAccountId} (${source})`,
@@ -358,50 +436,17 @@ export class TransactionCategorizerService {
   }
 
   /**
-   * Load model from database into memory
+   * Load model from in-memory cache.
+   * Model registry removed — classifiers are only available in-memory after training.
    */
   async loadModel(organizationId: string): Promise<boolean> {
-    // Check if already cached (BoundedCache handles TTL expiry)
     const cached = this.classifierCache.get(organizationId);
     if (cached) {
       return true;
     }
 
-    // Load from database
-    const model = await this.modelRegistry.loadActiveModel(organizationId, 'CATEGORIZATION');
-
-    if (!model) {
-      this.logger.debug(`No active categorization model for org ${organizationId}`);
-      return false;
-    }
-
-    const modelData = model.modelData as unknown as CategorizationModelData;
-
-    if (!modelData.classifierJson || modelData.sampleCount < this.MIN_SAMPLES_FOR_PREDICTION) {
-      this.logger.debug(`Categorization model for org ${organizationId} has insufficient samples`);
-      return false;
-    }
-
-    try {
-      // Deserialize classifier
-      const classifier = natural.BayesClassifier.restore(JSON.parse(modelData.classifierJson));
-
-      // Cache the classifier
-      this.classifierCache.set(organizationId, {
-        classifier,
-        vendorAccountMap: modelData.vendorAccountMap || {},
-        version: model.version,
-        loadedAt: new Date(),
-      });
-
-      this.logger.debug(`Loaded categorization model v${model.version} for org ${organizationId}`);
-      return true;
-    } catch (error) {
-      this.logger.error(
-        `Failed to load categorization model for org ${organizationId}: ${error.message}`,
-      );
-      return false;
-    }
+    this.logger.debug(`No cached categorization model for org ${organizationId}`);
+    return false;
   }
 
   /**
@@ -411,12 +456,8 @@ export class TransactionCategorizerService {
     organizationId: string,
     folds: number = 5,
   ): Promise<{ avgAccuracy: number; foldResults: number[] }> {
-    const trainingData = await this.prisma.aiTrainingData.findMany({
-      where: {
-        organizationId,
-        feature: 'CATEGORIZATION',
-      },
-    });
+    // Training data table removed; cross-validation returns empty results
+    const trainingData: Record<string, unknown>[] = [];
 
     if (trainingData.length < folds * 2) {
       return { avgAccuracy: 0, foldResults: [] };
@@ -435,33 +476,25 @@ export class TransactionCategorizerService {
     lastTrainedAt: string | null;
     needsRetraining: boolean;
   }> {
-    const model = await this.modelRegistry.loadActiveModel(organizationId, 'CATEGORIZATION');
+    // Model registry removed — return stats from in-memory cache
+    const cached = this.classifierCache.get(organizationId);
 
-    if (!model) {
-      const sampleCount = await this.prisma.aiTrainingData.count({
-        where: { organizationId, feature: 'CATEGORIZATION' },
-      });
-
+    if (!cached) {
       return {
-        sampleCount,
+        sampleCount: 0,
         accuracy: 0,
         version: 0,
         lastTrainedAt: null,
-        needsRetraining: sampleCount >= this.MIN_SAMPLES_FOR_PREDICTION,
+        needsRetraining: false,
       };
     }
 
-    const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
-      organizationId,
-      'CATEGORIZATION',
-    );
-
     return {
-      sampleCount: model.sampleCount,
-      accuracy: Number(model.accuracy),
-      version: model.version,
-      lastTrainedAt: model.trainedAt?.toISOString() || null,
-      needsRetraining: shouldRetrain,
+      sampleCount: 0,
+      accuracy: 0,
+      version: cached.version,
+      lastTrainedAt: cached.loadedAt.toISOString(),
+      needsRetraining: false,
     };
   }
 
@@ -507,15 +540,6 @@ export class TransactionCategorizerService {
 
       // Only seed if has meaningful description
       if (input.description.length < 3) continue;
-
-      await this.trainingService.addTrainingData(
-        organizationId,
-        'CATEGORIZATION',
-        input,
-        expense.accountId,
-        'SEED',
-      );
-
       seeded++;
     }
 

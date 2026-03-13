@@ -38,7 +38,7 @@ export type {
   CashFlowForecast,
 } from './use-ai-insights';
 
-// AI Infrastructure — feedback, anomalies, reorder, reconciliation, OCR (use-ai-infrastructure)
+// AI Infrastructure — feedback, anomalies, reorder, reconciliation (use-ai-infrastructure)
 export {
   useSubmitAiFeedback,
   useAiFeedbackStats,
@@ -57,10 +57,6 @@ export {
   useCreateBankRule,
   useBankRules,
   useBulkAutoMatch,
-  useOcrExtract,
-  useOcrExtractBase64,
-  useOcrLearn,
-  useOcrCheckDuplicate,
 } from './use-ai-infrastructure';
 export type {
   AiFeature,
@@ -68,7 +64,6 @@ export type {
   AiAnomaly,
   ItemReorderAnalysis,
   ReconciliationMatch,
-  OcrExtractResult,
 } from './use-ai-infrastructure';
 
 // Categorization (use-ai-categorization)
@@ -292,46 +287,3 @@ export {
   useDismissAlert,
 } from './use-ai-alerts';
 export type { UnifiedAlert, AlertSummary, AlertAggregationResult } from './use-ai-alerts';
-
-// Training Lab (use-ai-training-lab)
-export {
-  useTrainingLabDashboard,
-  useTrainingStats,
-  useTrainingReadiness,
-  useGenerateTrainingData,
-  useTrainAllModels,
-  useTrainModel,
-  useModelStatus,
-  useModelHistory,
-  useTriggerRetraining,
-  useRecentFeedback,
-  useFeedbackTrends,
-} from './use-ai-training-lab';
-export type {
-  TrainingLabDashboard,
-  TrainingLabModelItem,
-  TrainingStats,
-  TrainingReadiness,
-  ModelStatus,
-  ModelHistoryEntry,
-  FeedbackStats,
-  FeedbackEntry,
-  FeedbackTrendEntry,
-} from './use-ai-training-lab';
-
-// OCR Training (use-ocr-training)
-export {
-  useOcrTrainingExtract,
-  useOcrTrainingSubmit,
-  useOcrBatchExtract,
-  useVendorOcrHistory,
-  useOcrTrainingStats,
-} from './use-ocr-training';
-export type {
-  OcrTrainingExtractResult,
-  OcrTrainingSubmitData,
-  OcrTrainingSubmitResult,
-  BatchExtractionResult,
-  VendorOcrHistory,
-  OcrTrainingStats,
-} from './use-ocr-training';

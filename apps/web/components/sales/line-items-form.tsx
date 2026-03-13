@@ -141,6 +141,10 @@ export function LineItemsForm({
   const totals = calculateLineTotals(lines, taxRates);
 
   const handleItemSelect = (index: number, itemId: string) => {
+    if (itemId === '__custom__') {
+      setValue(`${name}.${index}.itemId`, '');
+      return;
+    }
     const item = items.find((i: Item) => i.id === itemId);
     if (item) {
       setValue(`${name}.${index}.itemId`, itemId);
@@ -245,14 +249,14 @@ export function LineItemsForm({
               {/* Item/Description */}
               <div className="space-y-1">
                 <Select
-                  value={watch(`${name}.${index}.itemId`) || ''}
+                  value={watch(`${name}.${index}.itemId`) || '__custom__'}
                   onValueChange={(value) => handleItemSelect(index, value)}
                 >
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="Select item (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Custom item</SelectItem>
+                    <SelectItem value="__custom__">Custom item</SelectItem>
                     {items.map((item: Item) => (
                       <SelectItem key={item.id} value={item.id}>
                         {item.name} - {formatAmount(parseFloat(item.sellingPrice), currency)}
@@ -307,14 +311,16 @@ export function LineItemsForm({
               {/* Tax */}
               {showTax && (
                 <Select
-                  value={watch(`${name}.${index}.taxRateId`) || ''}
-                  onValueChange={(value) => setValue(`${name}.${index}.taxRateId`, value)}
+                  value={watch(`${name}.${index}.taxRateId`) || '__none__'}
+                  onValueChange={(value) =>
+                    setValue(`${name}.${index}.taxRateId`, value === '__none__' ? '' : value)
+                  }
                 >
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="No tax" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No tax</SelectItem>
+                    <SelectItem value="__none__">No tax</SelectItem>
                     {taxRates.map((tax) => (
                       <SelectItem key={tax.id} value={tax.id}>
                         {tax.name} ({tax.rate}%)

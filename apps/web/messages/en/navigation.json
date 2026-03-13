@@ -33,6 +33,12 @@
     },
     "adjustments": {
       "title": "Adjustments"
+    },
+    "transfers": {
+      "title": "Transfers"
+    },
+    "priceLists": {
+      "title": "Price Lists"
     }
   },
   "banking": {
@@ -84,10 +90,10 @@
     "leads": "Leads",
     "deals": "Deals"
   },
+  "assets": "Fixed Assets",
   "reports": "Reports",
   "aiInsights": "AI Insights",
-  "aiLab": "AI Lab",
-  "deepSearch": "DeepSearch",
+  "deepSearch": "Deep Search",
   "performance": "Performance",
   "settings": "Settings",
   "expandSidebar": "Expand sidebar",

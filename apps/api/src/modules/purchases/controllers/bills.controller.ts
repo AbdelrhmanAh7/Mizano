@@ -84,6 +84,14 @@ export class BillsController {
     return this.billsService.update(orgId, id, dto);
   }
 
+  @Patch(':id/open')
+  @Permissions('purchases.edit')
+  @InvalidateCache('bills:*')
+  @ApiOperation({ summary: 'Open a draft bill (change status DRAFT → OPEN)' })
+  open(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.billsService.open(orgId, id);
+  }
+
   @Post(':id/approve')
   @Permissions('purchases.edit')
   @InvalidateCache('bills:*')

@@ -3,13 +3,6 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -23,18 +16,17 @@ import { useForm } from 'react-hook-form';
 interface FormData {
   aiCategorizationEnabled: boolean;
   aiReconciliationEnabled: boolean;
-  aiOcrEnabled: boolean;
+
   aiForecastingEnabled: boolean;
   aiAnomalyEnabled: boolean;
   aiLeadScoringEnabled: boolean;
-  aiRetrainingFrequency: string;
   anomalySensitivity: number;
 }
 
 const AI_FEATURES = [
   { key: 'aiCategorizationEnabled' as const, labelKey: 'categorization' },
   { key: 'aiReconciliationEnabled' as const, labelKey: 'reconciliation' },
-  { key: 'aiOcrEnabled' as const, labelKey: 'ocr' },
+
   { key: 'aiForecastingEnabled' as const, labelKey: 'forecasting' },
   { key: 'aiAnomalyEnabled' as const, labelKey: 'anomaly' },
   { key: 'aiLeadScoringEnabled' as const, labelKey: 'leadScoring' },
@@ -49,11 +41,10 @@ export default function AISettingsPage() {
     defaultValues: {
       aiCategorizationEnabled: true,
       aiReconciliationEnabled: true,
-      aiOcrEnabled: true,
+
       aiForecastingEnabled: true,
       aiAnomalyEnabled: true,
       aiLeadScoringEnabled: true,
-      aiRetrainingFrequency: 'weekly',
       anomalySensitivity: 50,
     },
   });
@@ -63,11 +54,10 @@ export default function AISettingsPage() {
       form.reset({
         aiCategorizationEnabled: settings.ai.aiCategorizationEnabled ?? true,
         aiReconciliationEnabled: settings.ai.aiReconciliationEnabled ?? true,
-        aiOcrEnabled: settings.ai.aiOcrEnabled ?? true,
+
         aiForecastingEnabled: settings.ai.aiForecastingEnabled ?? true,
         aiAnomalyEnabled: settings.ai.aiAnomalyEnabled ?? true,
         aiLeadScoringEnabled: settings.ai.aiLeadScoringEnabled ?? true,
-        aiRetrainingFrequency: settings.ai.aiRetrainingFrequency || 'weekly',
         anomalySensitivity: settings.ai.anomalySensitivity ?? 50,
       });
     }
@@ -145,27 +135,6 @@ export default function AISettingsPage() {
             <CardDescription>{t('ai.modelParametersDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label>{t('ai.retrainingFrequency')}</Label>
-              <Select
-                value={form.watch('aiRetrainingFrequency')}
-                onValueChange={(v) =>
-                  form.setValue('aiRetrainingFrequency', v, { shouldDirty: true })
-                }
-              >
-                <SelectTrigger className="max-w-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">{t('ai.retrainingOptions.daily')}</SelectItem>
-                  <SelectItem value="weekly">{t('ai.retrainingOptions.weekly')}</SelectItem>
-                  <SelectItem value="biweekly">{t('ai.retrainingOptions.biweekly')}</SelectItem>
-                  <SelectItem value="monthly">{t('ai.retrainingOptions.monthly')}</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">{t('ai.retrainingFrequencyHint')}</p>
-            </div>
-
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>{t('ai.anomalySensitivity')}</Label>

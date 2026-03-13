@@ -1,12 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AiTrainingService } from './ai-training.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { ModelRegistryService } from './model-registry.service';
-import { AiFeature } from '@prisma/client';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { findBestMatch } from '../utils/text-similarity.util';
 import { BoundedCache } from '../utils/bounded-cache.util';
+import { buildKnowledgeAssistantPrompt } from '../prompts/nlp.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const natural = require('natural');
@@ -26,6 +25,7 @@ export interface KnowledgeSearchResult {
 export interface KnowledgeSearchResponse {
   results: KnowledgeSearchResult[];
   totalResults: number;
+  predictionMethod?: PredictionMethod;
 }
 
 export interface IndexResult {
@@ -65,10 +65,8 @@ export class KnowledgeAssistantService {
 
   constructor(
     private prisma: PrismaService,
-    private modelRegistry: ModelRegistryService,
-    private trainingService: AiTrainingService,
     private feedbackService: AiFeedbackService,
-    private eventEmitter: EventEmitter2,
+    private gateway: OllamaInferenceGateway,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -85,6 +83,73 @@ export class KnowledgeAssistantService {
     limit: number = 10,
   ): Promise<KnowledgeSearchResponse> {
     this.logger.log(`Searching knowledge base in org ${organizationId}: "${query}"`);
+
+    // --- Ollama-first inference path ---
+    {
+      try {
+        // Build context from indexed documents
+        await this.ensureIndex(organizationId);
+        const documents = this.documentMaps.get(organizationId) ?? [];
+        const contextText = documents
+          .slice(0, 20)
+          .map((d) => `[${d.title}]: ${d.text.slice(0, 300)}`)
+          .join('\n');
+
+        if (contextText.length > 0) {
+          const prompt = buildKnowledgeAssistantPrompt(query, contextText);
+          const ollamaResult = await this.gateway.infer<{
+            answer: string;
+            sources: string[];
+            confidence: number;
+          }>(prompt);
+
+          if (ollamaResult) {
+            const d = ollamaResult.data;
+            const confidence = d.confidence ?? 0.8;
+
+            // Map sources back to documents for structured results
+            const results: KnowledgeSearchResult[] = (d.sources || [])
+              .slice(0, limit)
+              .map((source, idx) => {
+                const matchedDoc = documents.find((doc) =>
+                  source.toLowerCase().includes(doc.title.toLowerCase()),
+                );
+                return {
+                  id: matchedDoc?.id ?? `ollama-${idx}`,
+                  title: matchedDoc?.title ?? source,
+                  description: matchedDoc ? matchedDoc.text.slice(0, 300) : d.answer.slice(0, 300),
+                  relevanceScore: Math.max(confidence - idx * 0.1, 0.1),
+                  source: matchedDoc?.source ?? 'ollama',
+                  createdAt: matchedDoc?.createdAt ?? new Date(),
+                };
+              });
+
+            // If no source matching, return the answer as a single result
+            if (results.length === 0 && d.answer) {
+              results.push({
+                id: 'ollama-answer',
+                title: 'AI Answer',
+                description: d.answer.slice(0, 300),
+                relevanceScore: confidence,
+                source: 'ollama',
+                createdAt: new Date(),
+              });
+            }
+            return {
+              results,
+              totalResults: results.length,
+              predictionMethod: 'OLLAMA',
+            };
+          }
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Ollama knowledge search failed, falling back to TF-IDF: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    // --- Existing TF-IDF fallback ---
 
     // Ensure the index is loaded
     await this.ensureIndex(organizationId);
@@ -141,7 +206,11 @@ export class KnowledgeAssistantService {
       .sort((a, b) => b.relevanceScore - a.relevanceScore)
       .slice(0, limit);
 
-    const searchResponse = { results: sorted, totalResults: sorted.length };
+    const searchResponse: KnowledgeSearchResponse = {
+      results: sorted,
+      totalResults: sorted.length,
+      predictionMethod: 'ML' as const,
+    };
 
     // Store prediction for feedback tracking
     if (sorted.length > 0) {
@@ -205,31 +274,7 @@ export class KnowledgeAssistantService {
     this.tfidfInstances.set(organizationId, tfidf);
     this.documentMaps.set(organizationId, documents);
 
-    // Persist index metadata via ModelRegistryService
-    try {
-      const indexMetadata = {
-        type: 'TfIdf',
-        documentCount: documents.length,
-        indexedAt: new Date().toISOString(),
-        documents: documents.map((d) => ({
-          id: d.id,
-          title: d.title,
-          text: d.text,
-          source: d.source,
-          createdAt: d.createdAt,
-        })),
-      };
-
-      await this.modelRegistry.saveModel(
-        organizationId,
-        AiFeature.KNOWLEDGE_ASSISTANT,
-        indexMetadata,
-        1.0, // Index completeness (not accuracy per se)
-        documents.length,
-      );
-    } catch (error) {
-      this.logger.warn(`Failed to persist knowledge index metadata: ${error}`);
-    }
+    // Model registry removed — index is kept in memory only
 
     this.logger.log(`Indexed ${documents.length} documents for org ${organizationId}`);
 
@@ -308,37 +353,12 @@ export class KnowledgeAssistantService {
    * correction and may trigger index retraining when the threshold is reached.
    */
   async recordSearchFeedback(
-    organizationId: string,
-    query: string,
-    resultId: string,
-    wasHelpful: boolean,
+    _organizationId: string,
+    _query: string,
+    _resultId: string,
+    _wasHelpful: boolean,
   ): Promise<void> {
-    const label = wasHelpful ? 'helpful' : 'not_helpful';
-
-    await this.trainingService.addTrainingData(
-      organizationId,
-      'KNOWLEDGE_ASSISTANT',
-      { query, resultId },
-      label,
-      wasHelpful ? 'USER' : 'CORRECTION',
-    );
-
-    if (!wasHelpful) {
-      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
-        organizationId,
-        'KNOWLEDGE_ASSISTANT',
-      );
-
-      if (shouldRetrain) {
-        this.logger.log(
-          `Knowledge assistant retraining threshold reached for org ${organizationId}`,
-        );
-        this.eventEmitter.emit('ai.retraining.needed', {
-          organizationId,
-          feature: 'KNOWLEDGE_ASSISTANT',
-        });
-      }
-    }
+    // Feedback is recorded via AiFeedbackService.processFeedback
   }
 
   // ---------------------------------------------------------------------------
@@ -356,47 +376,7 @@ export class KnowledgeAssistantService {
       return;
     }
 
-    // Try to restore from persisted model
-    const savedModel = await this.modelRegistry.loadActiveModel(
-      organizationId,
-      AiFeature.KNOWLEDGE_ASSISTANT,
-    );
-
-    if (savedModel?.modelData?.documents) {
-      const storedDocs = savedModel.modelData.documents as Array<{
-        id: string;
-        title: string;
-        text: string;
-        source: string;
-        createdAt: string;
-      }>;
-
-      if (storedDocs.length > 0) {
-        const tfidf = new natural.TfIdf();
-        const documents: IndexedDocument[] = [];
-
-        for (const doc of storedDocs) {
-          tfidf.addDocument(`${doc.title} ${doc.text}`);
-          documents.push({
-            id: doc.id,
-            title: doc.title,
-            text: doc.text,
-            source: doc.source,
-            createdAt: new Date(doc.createdAt),
-          });
-        }
-
-        this.tfidfInstances.set(organizationId, tfidf);
-        this.documentMaps.set(organizationId, documents);
-
-        this.logger.log(
-          `Restored knowledge index from registry for org ${organizationId} (${documents.length} docs)`,
-        );
-        return;
-      }
-    }
-
-    // Fall back to fresh index build
+    // Model registry removed — build fresh index
     await this.indexDocuments(organizationId);
   }
 }

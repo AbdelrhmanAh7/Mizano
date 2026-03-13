@@ -14,10 +14,12 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
 import {
   Activity,
+  ArrowRightLeft,
   Banknote,
   BarChart3,
   Brain,
   Briefcase,
+  Building,
   Building2,
   Calculator,
   ChevronLeft,
@@ -28,7 +30,6 @@ import {
   DollarSign,
   Factory,
   FileText,
-  FlaskConical,
   Landmark,
   Layers,
   LayoutDashboard,
@@ -110,6 +111,16 @@ const navigationConfig: NavItem[] = [
         href: '/inventory/adjustments',
         icon: ClipboardList,
       },
+      {
+        nameKey: 'inventory.transfers.title',
+        href: '/inventory/transfers',
+        icon: ArrowRightLeft,
+      },
+      {
+        nameKey: 'inventory.priceLists.title',
+        href: '/inventory/price-lists',
+        icon: DollarSign,
+      },
     ],
   },
   {
@@ -166,6 +177,12 @@ const navigationConfig: NavItem[] = [
     ],
   },
   {
+    nameKey: 'assets',
+    href: '/assets',
+    icon: Building,
+    permission: 'assets.view',
+  },
+  {
     nameKey: 'crm.title',
     href: '/crm',
     icon: Target,
@@ -177,8 +194,7 @@ const navigationConfig: NavItem[] = [
   },
   { nameKey: 'reports', href: '/reports', icon: BarChart3, permission: 'reports.view' },
   { nameKey: 'aiInsights', href: '/ai-insights', icon: Brain },
-  { nameKey: 'aiLab', href: '/ai-lab', icon: FlaskConical },
-  { nameKey: 'deepSearch', href: '/ai-lab/deep-search', icon: Search },
+  { nameKey: 'deepSearch', href: '/deep-search', icon: Search },
   {
     nameKey: 'performance',
     href: '/settings/performance',

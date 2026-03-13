@@ -93,16 +93,21 @@ function VendorCreditsPageContent() {
     {
       accessorKey: 'type',
       header: 'Type',
-      cell: ({ row }) => <Badge variant="outline">{getTypeText(row.original.type)}</Badge>,
+      cell: ({ row }) => (
+        <Badge variant="outline">{row.original.type ? getTypeText(row.original.type) : '-'}</Badge>
+      ),
     },
     {
       accessorKey: 'status',
       header: 'Status',
-      cell: ({ row }) => (
-        <Badge variant={getStatusVariant(row.original.status)}>
-          {getStatusText(row.original.status)}
-        </Badge>
-      ),
+      cell: ({ row }) =>
+        row.original.status ? (
+          <Badge variant={getStatusVariant(row.original.status)}>
+            {getStatusText(row.original.status)}
+          </Badge>
+        ) : (
+          <Badge variant="outline">-</Badge>
+        ),
     },
     {
       accessorKey: 'total',

@@ -1,9 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { AiTrainingService } from './ai-training.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildQualityPrompt } from '../prompts/hr.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { DecisionTreeClassifier } = require('ml-cart');
@@ -15,6 +15,7 @@ export interface QualityPrediction {
   factors: Array<{ name: string; impact: number; description: string }>;
   confidence: number;
   recommendations: string[];
+  predictionMethod: PredictionMethod;
 }
 
 export interface BomQualityMetrics {
@@ -50,10 +51,8 @@ export class QualityPredictionService {
 
   constructor(
     private prisma: PrismaService,
-    private modelRegistry: ModelRegistryService,
     private feedbackService: AiFeedbackService,
-    private trainingService: AiTrainingService,
-    private eventEmitter: EventEmitter2,
+    private gateway: OllamaInferenceGateway,
   ) {}
 
   /**
@@ -76,45 +75,61 @@ export class QualityPredictionService {
     }
 
     const features = await this.extractQualityFeatures(organizationId, workOrderId);
-    let defectRisk: number;
-    let confidence: number;
 
-    // Try ML prediction first
-    const model = await this.modelRegistry.loadActiveModel(organizationId, 'QUALITY_PREDICTION');
-
-    if (model) {
-      try {
-        const classifier = new DecisionTreeClassifier();
-        classifier.fromJSON(model.modelData.tree);
-        const featureArray = [
-          features.batchSize,
-          features.bomComplexity,
-          features.historicalDefectRate,
-          features.dayOfWeek,
-          features.productionRateVariance,
-        ];
-        const prediction = classifier.predict([featureArray]);
-        const mlRisk = prediction[0] === 1 ? 0.8 : 0.2;
-
-        // Blend ML with rule-based: 60% ML, 40% rule-based
-        const ruleBasedRisk = this.calculateRuleBasedRisk(features);
-        defectRisk = mlRisk * 0.6 + ruleBasedRisk * 0.4;
-        confidence = Math.min(0.95, model.accuracy * 0.8 + 0.15);
-      } catch (error) {
-        this.logger.warn(`ML prediction failed, falling back to rule-based: ${error}`);
-        defectRisk = this.calculateRuleBasedRisk(features);
-        confidence = 0.5;
-      }
-    } else {
-      defectRisk = this.calculateRuleBasedRisk(features);
-      confidence = 0.5;
-    }
+    // Rule-based prediction (ML model registry removed)
+    let defectRisk: number = this.calculateRuleBasedRisk(features);
+    const confidence = 0.5;
 
     defectRisk = Math.max(0, Math.min(1, defectRisk));
     const riskLevel = defectRisk >= 0.7 ? 'HIGH' : defectRisk >= 0.4 ? 'MEDIUM' : 'LOW';
 
     const factors = this.identifyRiskFactors(features);
-    const recommendations = this.generateRecommendations(riskLevel, features, factors);
+    let recommendations = this.generateRecommendations(riskLevel, features, factors);
+    let predictionMethod: PredictionMethod = 'RULE_BASED';
+
+    // --- Ollama enhancement ---
+    {
+      try {
+        const prompt = buildQualityPrompt(
+          {
+            defectRisk,
+            riskLevel,
+            batchSize: features.batchSize,
+            bomComplexity: features.bomComplexity,
+          },
+          {
+            historicalDefectRate: features.historicalDefectRate,
+            productionRateVariance: features.productionRateVariance,
+          },
+        );
+        const ollamaResult = await this.gateway.infer<{
+          prediction: number;
+          factors: Array<{ factor: string; impact: number }>;
+          improvements: string[];
+        }>(prompt);
+
+        if (ollamaResult) {
+          // Blend defect risk: 50% existing + 50% Ollama
+          if (typeof ollamaResult.data.prediction === 'number') {
+            const ollamaRisk = ollamaResult.data.prediction / 100; // Ollama returns 0-100
+            defectRisk = defectRisk * 0.5 + ollamaRisk * 0.5;
+            defectRisk = Math.max(0, Math.min(1, defectRisk));
+          }
+
+          // Prefer Ollama recommendations if available
+          if (ollamaResult.data.improvements?.length > 0) {
+            recommendations = ollamaResult.data.improvements;
+          }
+          predictionMethod = 'HYBRID';
+
+          // Store as training data
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Ollama quality prediction failed, using existing: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
 
     const result: QualityPrediction = {
       workOrderId,
@@ -123,6 +138,7 @@ export class QualityPredictionService {
       factors,
       confidence: Math.round(confidence * 100) / 100,
       recommendations,
+      predictionMethod,
     };
 
     // Store prediction for feedback tracking
@@ -379,32 +395,15 @@ export class QualityPredictionService {
     }
     const accuracy = testFeatures.length > 0 ? correct / testFeatures.length : 0.5;
 
-    // Save model
-    const { version } = await this.modelRegistry.saveModel(
-      organizationId,
-      'QUALITY_PREDICTION',
-      {
-        tree: classifier.toJSON(),
-        featureNames: [
-          'batchSize',
-          'bomComplexity',
-          'historicalDefectRate',
-          'dayOfWeek',
-          'productionRateVariance',
-        ],
-      },
-      accuracy,
-      features.length,
-    );
-
+    // Model registry removed — log result only
     this.logger.log(
-      `Quality prediction model trained: v${version}, accuracy=${accuracy.toFixed(3)}, samples=${features.length}`,
+      `Quality prediction model trained: accuracy=${accuracy.toFixed(3)}, samples=${features.length}`,
     );
 
     return {
       accuracy: Math.round(accuracy * 1000) / 1000,
       sampleCount: features.length,
-      version,
+      version: 1,
     };
   }
 
@@ -412,42 +411,12 @@ export class QualityPredictionService {
    * Record user feedback on a quality prediction.
    */
   async recordQualityFeedback(
-    organizationId: string,
-    workOrderId: string,
-    wasCorrect: boolean,
-    actualDefects?: number,
+    _organizationId: string,
+    _workOrderId: string,
+    _wasCorrect: boolean,
+    _actualDefects?: number,
   ): Promise<void> {
-    const label =
-      actualDefects !== undefined
-        ? `DEFECTS_${actualDefects}`
-        : wasCorrect
-          ? 'CORRECT'
-          : 'INCORRECT';
-
-    await this.trainingService.addTrainingData(
-      organizationId,
-      'QUALITY_PREDICTION',
-      { workOrderId },
-      label,
-      wasCorrect ? 'USER' : 'CORRECTION',
-    );
-
-    if (!wasCorrect) {
-      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
-        organizationId,
-        'QUALITY_PREDICTION',
-      );
-
-      if (shouldRetrain) {
-        this.logger.log(
-          `Quality prediction retraining threshold reached for org ${organizationId}`,
-        );
-        this.eventEmitter.emit('ai.retraining.needed', {
-          organizationId,
-          feature: 'QUALITY_PREDICTION',
-        });
-      }
-    }
+    // Feedback is recorded via AiFeedbackService.processFeedback
   }
 
   // ── Private helpers ──────────────────────────────────────────────

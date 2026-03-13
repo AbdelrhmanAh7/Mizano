@@ -7,7 +7,7 @@ export class SubmitFeedbackDto {
     enum: [
       'CATEGORIZATION',
       'RECONCILIATION',
-      'OCR_LAYOUT',
+
       'DEMAND_FORECAST',
       'LEAD_SCORING',
       'ANOMALY',

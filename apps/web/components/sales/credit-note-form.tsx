@@ -48,7 +48,7 @@ export function CreditNoteForm({
   onCancel,
   isSubmitting,
 }: CreditNoteFormProps) {
-  const { data: customersData } = useCustomers({ limit: 1000 });
+  const { data: customersData } = useCustomers({ limit: 100 });
   const customers = customersData?.data || [];
 
   const form = useForm<CreditNoteFormData>({
@@ -71,7 +71,7 @@ export function CreditNoteForm({
   // Fetch invoices for selected customer
   const { data: invoicesData } = useInvoices({
     customerId: selectedCustomerId || undefined,
-    limit: 1000,
+    limit: 100,
   });
   const invoices = invoicesData?.data || [];
 

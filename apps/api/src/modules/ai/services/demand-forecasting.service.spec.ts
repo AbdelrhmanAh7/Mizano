@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { DemandForecastingService } from './demand-forecasting.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import {
   createMockPrisma,
   MockPrismaClient,
@@ -57,7 +58,18 @@ describe('DemandForecastingService', () => {
     prisma = createMockPrisma();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [DemandForecastingService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        DemandForecastingService,
+        { provide: PrismaService, useValue: prisma },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            generateCompletion: jest.fn().mockResolvedValue(''),
+            generateStructuredOutput: jest.fn().mockResolvedValue({}),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<DemandForecastingService>(DemandForecastingService);

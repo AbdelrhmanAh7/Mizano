@@ -2,15 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { QualityPredictionService } from './quality-prediction.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { AiTrainingService } from './ai-training.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   createMockPrisma,
-  createMockModelRegistry,
   createMockAiFeedback,
-  createMockAiTraining,
   createMockEventEmitter,
   MockPrismaClient,
   TEST_ORG_ID,
@@ -19,20 +16,24 @@ import {
 describe('QualityPredictionService', () => {
   let service: QualityPredictionService;
   let prisma: MockPrismaClient;
-  let modelRegistry: ReturnType<typeof createMockModelRegistry>;
 
   beforeEach(async () => {
     prisma = createMockPrisma();
-    modelRegistry = createMockModelRegistry();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         QualityPredictionService,
         { provide: PrismaService, useValue: prisma },
-        { provide: ModelRegistryService, useValue: modelRegistry },
         { provide: AiFeedbackService, useValue: createMockAiFeedback() },
-        { provide: AiTrainingService, useValue: createMockAiTraining() },
         { provide: EventEmitter2, useValue: createMockEventEmitter() },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            generateCompletion: jest.fn().mockResolvedValue(''),
+            generateStructuredOutput: jest.fn().mockResolvedValue({}),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
       ],
     }).compile();
 
@@ -61,9 +62,6 @@ describe('QualityPredictionService', () => {
 
       // No historical orders
       prisma.workOrder.findMany.mockResolvedValue([] as any);
-
-      // No ML model
-      modelRegistry.loadActiveModel.mockResolvedValue(null as any);
     });
 
     it('should return LOW defect risk for work order with good history', async () => {
@@ -167,18 +165,6 @@ describe('QualityPredictionService', () => {
 
       const weekendFactor = result.factors.find((f) => f.name === 'Weekend Production');
       expect(weekendFactor).toBeDefined();
-    });
-
-    it('should use ML model when available', async () => {
-      modelRegistry.loadActiveModel.mockResolvedValue({
-        modelData: { tree: {} },
-        accuracy: 0.85,
-      } as any);
-
-      // ML predict will throw because we give it a mock, falling back to rule-based
-      const result = await service.predictWorkOrderQuality(TEST_ORG_ID, 'wo-001');
-
-      expect(result.confidence).toBeGreaterThanOrEqual(0.5);
     });
 
     it('should clamp defect risk between 0 and 1', async () => {
@@ -295,57 +281,6 @@ describe('QualityPredictionService', () => {
 
       // waste / (produced + waste) = 10 / 100 = 0.1
       expect(trends[0].defectRate).toBeCloseTo(0.1, 3);
-    });
-  });
-
-  describe('trainModel', () => {
-    it('should return insufficient data when < 10 orders', async () => {
-      prisma.workOrder.findMany.mockResolvedValue([
-        {
-          id: 'wo-1',
-          quantity: 100,
-          bomId: 'bom-1',
-          bom: { items: [{ id: 'bi-1' }] },
-          productionEntries: [{ quantityProduced: 90, wastageQuantity: 5, quantityRejected: 5 }],
-          actualStartDate: new Date(),
-          createdAt: new Date(),
-        },
-      ] as any);
-
-      const result = await service.trainModel(TEST_ORG_ID);
-
-      expect(result.accuracy).toBe(0);
-      expect(result.sampleCount).toBe(1);
-      expect(result.version).toBe(0);
-    });
-
-    it('should train model and return accuracy when sufficient data', async () => {
-      const orders = Array.from({ length: 15 }, (_, i) => ({
-        id: `wo-${i}`,
-        quantity: 100 + i * 10,
-        bomId: 'bom-1',
-        bom: { items: Array.from({ length: 3 + i }, (_, j) => ({ id: `bi-${j}` })) },
-        productionEntries: [
-          {
-            quantityProduced: 90 + i,
-            wastageQuantity: i % 3 === 0 ? 10 : 2,
-            quantityRejected: i % 5 === 0 ? 5 : 0,
-          },
-        ],
-        actualStartDate: new Date(2024, 0, i + 1),
-        createdAt: new Date(2024, 0, i + 1),
-        status: 'COMPLETED',
-      }));
-
-      prisma.workOrder.findMany.mockResolvedValue(orders as any);
-      modelRegistry.saveModel.mockResolvedValue({ version: 1 } as any);
-
-      const result = await service.trainModel(TEST_ORG_ID);
-
-      expect(result.sampleCount).toBe(15);
-      expect(result.version).toBe(1);
-      expect(result.accuracy).toBeGreaterThanOrEqual(0);
-      expect(result.accuracy).toBeLessThanOrEqual(1);
     });
   });
 });

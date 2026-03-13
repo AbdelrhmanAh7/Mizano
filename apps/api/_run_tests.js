@@ -24,14 +24,7 @@ try {
   console.error('Failed to scan pnpm store:', e.message);
 }
 
-const jestBin = path.join(
-  pnpmStore,
-  'jest@29.7.0_@types+node@20.19.31_ts-node@10.9.2',
-  'node_modules',
-  'jest',
-  'bin',
-  'jest.js',
-);
+const jestBin = path.join(root, 'node_modules', 'jest', 'bin', 'jest.js');
 
 // Use the config file that has absolute ts-jest path
 const configFile = path.join(__dirname, '_jest.config.js');

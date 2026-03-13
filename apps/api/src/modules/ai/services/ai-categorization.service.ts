@@ -1,10 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 @Injectable()
 export class AiCategorizationService {
   private readonly logger = new Logger(AiCategorizationService.name);
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {}
 
   async categorizeTransaction(
     organizationId: string,
@@ -12,6 +17,44 @@ export class AiCategorizationService {
     amount: number,
     type: 'expense' | 'income',
   ) {
+    // --- Ollama-first path ---
+    try {
+      const ollamaPrompt = [
+        'Categorize the following financial transaction and return JSON:',
+        `Description: "${description}"`,
+        `Amount: ${amount}`,
+        `Type: ${type}`,
+        '',
+        'Return JSON with: { "account_name": "string", "account_code": "string", "confidence": 0-100, "reason": "string" }',
+      ].join('\n');
+
+      const ollamaResult = await this.gateway.infer<{
+        account_name: string;
+        account_code: string;
+        confidence: number;
+        reason: string;
+      }>(ollamaPrompt);
+
+      if (ollamaResult && ollamaResult.data.account_name) {
+        const ollamaConfidence = ollamaResult.data.confidence ?? 75;
+
+        return {
+          suggestedAccountId: null as string | null,
+          suggestedAccountName: ollamaResult.data.account_name,
+          confidence: ollamaConfidence,
+          reason: ollamaResult.data.reason || 'Categorized by AI',
+          alternatives: [],
+          predictionMethod: 'OLLAMA' as PredictionMethod,
+        };
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama categorization failed, falling back to rule-based: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // --- Existing rule-based fallback ---
+
     // Get historical categorizations for learning
     const historicalData = await this.getHistoricalCategorizations(organizationId, type);
 
@@ -25,6 +68,7 @@ export class AiCategorizationService {
         confidence: match.confidence,
         reason: match.reason,
         alternatives: match.alternatives,
+        predictionMethod: 'RULE_BASED' as PredictionMethod,
       };
     }
 
@@ -37,6 +81,7 @@ export class AiCategorizationService {
       confidence: keywordMatch.confidence,
       reason: keywordMatch.reason,
       alternatives: [],
+      predictionMethod: 'RULE_BASED' as PredictionMethod,
     };
   }
 

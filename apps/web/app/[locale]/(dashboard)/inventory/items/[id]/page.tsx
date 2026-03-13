@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -38,12 +37,12 @@ import {
 } from '@/lib/hooks/use-items';
 
 interface ItemDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const t = useTranslations('inventory');
-  const { id } = use(params);
+  const { id } = params;
   const router = useRouter();
   const { data: item, isLoading } = useItem(id);
   const deleteItem = useDeleteItem();

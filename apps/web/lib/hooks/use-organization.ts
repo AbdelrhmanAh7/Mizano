@@ -44,7 +44,7 @@ export interface InventorySettings {
 export interface AiSettings {
   aiCategorizationEnabled: boolean;
   aiReconciliationEnabled: boolean;
-  aiOcrEnabled: boolean;
+
   aiForecastingEnabled: boolean;
   aiAnomalyEnabled: boolean;
   aiLeadScoringEnabled: boolean;
@@ -252,7 +252,7 @@ const organizationApi = {
   completeAiFeatures: async (data: {
     categorizationEnabled?: boolean;
     reconciliationEnabled?: boolean;
-    ocrEnabled?: boolean;
+
     forecastingEnabled?: boolean;
     anomalyEnabled?: boolean;
     leadScoringEnabled?: boolean;

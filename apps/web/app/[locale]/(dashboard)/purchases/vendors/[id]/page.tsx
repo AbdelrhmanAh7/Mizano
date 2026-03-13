@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft, Edit, Mail, Phone, MapPin, CreditCard } from 'lucide-react';
@@ -17,11 +16,11 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
 
 interface VendorDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function VendorDetailPage({ params }: VendorDetailPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();

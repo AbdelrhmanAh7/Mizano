@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
@@ -38,12 +37,12 @@ import {
 } from '@/lib/hooks/use-adjustments';
 
 interface AdjustmentDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function AdjustmentDetailPage({ params }: AdjustmentDetailPageProps) {
   const t = useTranslations('inventory');
-  const { id } = use(params);
+  const { id } = params;
   const { data: adjustment, isLoading } = useAdjustment(id);
   const postAdjustment = usePostAdjustment();
 

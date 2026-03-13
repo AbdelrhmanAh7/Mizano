@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -47,11 +47,11 @@ import { useQuery } from '@tanstack/react-query';
 import { billsApi, accountsApi } from '@/lib/api';
 
 interface VendorCreditDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function VendorCreditDetailPage({ params }: VendorCreditDetailPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const t = useTranslations('purchases');
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);

@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -55,11 +55,11 @@ import {
 import { useTranslations } from 'next-intl';
 
 interface AssetDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function AssetDetailPage({ params }: AssetDetailPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const t = useTranslations('assets');
   const tc = useTranslations('common');
   const router = useRouter();

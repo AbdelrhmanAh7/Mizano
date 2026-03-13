@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { PredictiveMaintenanceService } from './predictive-maintenance.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import {
   createMockPrisma,
   MockPrismaClient,
@@ -17,7 +18,18 @@ describe('PredictiveMaintenanceService', () => {
     prisma = createMockPrisma();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PredictiveMaintenanceService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        PredictiveMaintenanceService,
+        { provide: PrismaService, useValue: prisma },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            generateCompletion: jest.fn().mockResolvedValue(''),
+            generateStructuredOutput: jest.fn().mockResolvedValue({}),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<PredictiveMaintenanceService>(PredictiveMaintenanceService);

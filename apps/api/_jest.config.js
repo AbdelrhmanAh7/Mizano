@@ -1,14 +1,8 @@
 const path = require('path');
 
 const root = path.resolve(__dirname, '..', '..');
-const pnpmStore = path.join(root, 'node_modules', '.pnpm');
 
-const tsJestPath = path.join(
-  pnpmStore,
-  'ts-jest@29.4.6_@babel+core@7.29.0_jest@29.7.0_typescript@5.9.3',
-  'node_modules',
-  'ts-jest',
-);
+const tsJestPath = path.join(root, 'node_modules', 'ts-jest');
 
 module.exports = {
   moduleFileExtensions: ['js', 'json', 'ts'],

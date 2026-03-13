@@ -9,12 +9,16 @@ export const OCR_ALLOWED_MIMES = [
   'image/tiff',
   'image/heic',
   'image/heif',
+  'image/bmp',
+  'image/x-bmp',
+  'image/avif',
+  'image/jxl',
   'application/pdf',
 ];
 
 /** Human-readable error shown when an unsupported file type is uploaded. */
 export const OCR_FILE_TYPE_ERROR =
-  'Invalid file type. Allowed: JPEG, PNG, GIF, WebP, TIFF, HEIC, PDF';
+  'Invalid file type. Allowed: JPEG, PNG, BMP, WebP, TIFF, HEIC, AVIF, PDF';
 
 /** Maps common file extensions to their canonical MIME types. */
 export const EXTENSION_TO_MIME: Record<string, string> = {
@@ -27,6 +31,9 @@ export const EXTENSION_TO_MIME: Record<string, string> = {
   '.tif': 'image/tiff',
   '.heic': 'image/heic',
   '.heif': 'image/heif',
+  '.bmp': 'image/bmp',
+  '.avif': 'image/avif',
+  '.jxl': 'image/jxl',
   '.pdf': 'application/pdf',
 };
 

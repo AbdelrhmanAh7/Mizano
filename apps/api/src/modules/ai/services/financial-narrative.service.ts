@@ -2,6 +2,12 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { queryTemplates, getQueryTemplate } from '../templates/query-templates';
 import { Decimal } from '@prisma/client/runtime/library';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import {
+  buildFinancialNarrativePrompt,
+  FinancialNarrativeResponse,
+} from '../prompts/forecasting.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface NarrativeSection {
   id: string;
@@ -24,6 +30,7 @@ export interface GeneratedNarrative {
   alerts: NarrativeAlert[];
   recommendations: string[];
   summary: string;
+  predictionMethod?: PredictionMethod;
 }
 
 export interface QueryAnswer {
@@ -56,7 +63,10 @@ interface MonthlyFinancials {
 export class FinancialNarrativeService {
   private readonly logger = new Logger(FinancialNarrativeService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private ollamaGateway: OllamaInferenceGateway,
+  ) {}
 
   /**
    * Generate monthly financial narrative
@@ -80,7 +90,102 @@ export class FinancialNarrativeService {
       prevNetIncome: prevData.netIncome,
     };
 
-    // Generate sections
+    const monthName = new Date(year, month - 1).toLocaleString('default', {
+      month: 'long',
+    });
+
+    // Try Ollama FIRST for rich narrative generation
+    try {
+      const margin = data.revenue > 0 ? data.netIncome / data.revenue : 0;
+      const revenueGrowth =
+        data.prevRevenue > 0 ? (data.revenue - data.prevRevenue) / data.prevRevenue : 0;
+      const expenseGrowth =
+        data.prevExpenses > 0 ? (data.expenses - data.prevExpenses) / data.prevExpenses : 0;
+
+      const promptData = buildFinancialNarrativePrompt({
+        period: `${monthName} ${year}`,
+        currency: 'USD',
+        revenue: data.revenue,
+        expenses: data.expenses,
+        net_income: data.netIncome,
+        operating_margin: margin,
+        cash_balance: data.cashBalance,
+        accounts_receivable: data.overdueAR,
+        accounts_payable: data.overdueAP,
+        revenue_growth: revenueGrowth,
+        expense_growth: expenseGrowth,
+        top_customers: data.topRevenueDrivers.map((d) => ({
+          name: d.name,
+          revenue: d.amount,
+        })),
+        prior_period: {
+          revenue: data.prevRevenue,
+          expenses: data.prevExpenses,
+          net_income: data.prevNetIncome,
+          cash_balance: undefined,
+        },
+      });
+
+      const ollamaResult = await this.ollamaGateway.infer<FinancialNarrativeResponse>(
+        promptData.user,
+        { systemPrompt: promptData.system },
+      );
+
+      if (ollamaResult?.data) {
+        const ollamaData = ollamaResult.data;
+
+        // Map Ollama sections to NarrativeSection format
+        const sections: NarrativeSection[] = (ollamaData.sections || []).map((s, index) => ({
+          id: `ollama-section-${index}`,
+          title: s.title || '',
+          content: s.content || '',
+          metrics: s.metrics
+            ? Object.entries(s.metrics).map(([label, value]) => ({
+                label,
+                value: String(value),
+              }))
+            : undefined,
+        }));
+
+        // Map Ollama alerts
+        const alerts: NarrativeAlert[] = (ollamaData.alerts || []).map((a) => ({
+          type: (a.type === 'critical' || a.type === 'warning'
+            ? a.type
+            : a.type === 'positive'
+              ? 'info'
+              : 'info') as 'warning' | 'info' | 'opportunity',
+          message: a.message || '',
+          severity: (a.severity as 'low' | 'medium' | 'high') || 'medium',
+        }));
+
+        // Build recommendations from KPIs and alerts
+        const recommendations: string[] = [];
+        for (const alert of ollamaData.alerts || []) {
+          if (alert.type === 'warning' || alert.type === 'critical') {
+            recommendations.push(alert.message);
+          }
+        }
+
+        const result: GeneratedNarrative = {
+          title: `Financial Summary - ${monthName} ${year}`,
+          period: `${monthName} ${year}`,
+          generatedAt: new Date(),
+          sections,
+          alerts,
+          recommendations,
+          summary: ollamaData.executive_summary || this.generateSummary(data),
+          predictionMethod: 'OLLAMA',
+        };
+
+        return result;
+      }
+    } catch (error) {
+      this.logger.debug(
+        `Ollama narrative generation unavailable, falling back to templates: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // Fallback: existing template-based generation
     const sections: NarrativeSection[] = [];
     const alerts: NarrativeAlert[] = [];
     const recommendations: string[] = [];
@@ -108,10 +213,6 @@ export class FinancialNarrativeService {
     // Generate summary
     const summary = this.generateSummary(data);
 
-    const monthName = new Date(year, month - 1).toLocaleString('default', {
-      month: 'long',
-    });
-
     return {
       title: `Financial Summary - ${monthName} ${year}`,
       period: `${monthName} ${year}`,
@@ -120,6 +221,7 @@ export class FinancialNarrativeService {
       alerts,
       recommendations,
       summary,
+      predictionMethod: 'RULE_BASED',
     };
   }
 

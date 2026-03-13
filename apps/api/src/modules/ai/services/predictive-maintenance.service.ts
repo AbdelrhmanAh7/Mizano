@@ -2,6 +2,9 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { holtWinters, simpleExponentialSmoothing } from '../utils/holt-winters.util';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildMaintenancePrompt } from '../prompts/hr.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface AssetHealthPrediction {
   assetId: string;
@@ -11,6 +14,7 @@ export interface AssetHealthPrediction {
   predictedFailureDate: Date | null;
   factors: Array<{ name: string; value: number; description: string }>;
   recommendedAction: string;
+  predictionMethod: PredictionMethod;
 }
 
 export interface MaintenanceScheduleEntry {
@@ -45,7 +49,10 @@ export interface BatchPredictionResult {
 export class PredictiveMaintenanceService {
   private readonly logger = new Logger(PredictiveMaintenanceService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {}
 
   /**
    * Predict maintenance needs for a single asset
@@ -175,11 +182,58 @@ export class PredictiveMaintenanceService {
     }
 
     // Determine recommended action
-    const recommendedAction = this.determineRecommendedAction(
+    let recommendedAction = this.determineRecommendedAction(
       healthScore,
       ageRatio,
       predictedFailureDate,
     );
+    let predictionMethod: PredictionMethod = 'RULE_BASED';
+
+    // --- Ollama enhancement ---
+    try {
+      const prompt = buildMaintenancePrompt(
+        {
+          name: asset.name,
+          ageMonths,
+          usefulLifeMonths,
+          healthScore,
+          purchasePrice,
+          currentBookValue,
+          status: asset.status,
+        },
+        {
+          depreciationRatio,
+          ageRatio,
+          maintenanceFlag,
+        },
+      );
+      const ollamaResult = await this.gateway.infer<{
+        prediction: { failure_probability: number; estimated_date: string | null };
+        urgency: string;
+        schedule: string[];
+      }>(prompt);
+
+      if (ollamaResult) {
+        // Use Ollama's recommended schedule as the action
+        if (ollamaResult.data.schedule?.length > 0) {
+          recommendedAction = ollamaResult.data.schedule.join('. ');
+        }
+
+        // Use Ollama's predicted failure date if we don't have one
+        if (!predictedFailureDate && ollamaResult.data.prediction?.estimated_date) {
+          const ollamaDate = new Date(ollamaResult.data.prediction.estimated_date);
+          if (!isNaN(ollamaDate.getTime())) {
+            predictedFailureDate = ollamaDate;
+          }
+        }
+
+        predictionMethod = 'HYBRID';
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama maintenance prediction failed, using rule-based: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
 
     // Store prediction in database
     await this.prisma.assetMaintenancePrediction.upsert({
@@ -214,6 +268,7 @@ export class PredictiveMaintenanceService {
       predictedFailureDate,
       factors,
       recommendedAction,
+      predictionMethod,
     };
   }
 

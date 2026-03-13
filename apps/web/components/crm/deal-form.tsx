@@ -15,8 +15,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
 import { useCreateDeal, useLeads, Deal, Lead } from '@/lib/hooks/use-crm';
 import { useToast } from '@/components/ui/use-toast';
+
+const DEAL_STAGES = [
+  { value: 'NEW', label: 'New' },
+  { value: 'MEETING_SCHEDULED', label: 'Meeting Scheduled' },
+  { value: 'PROPOSAL_SENT', label: 'Proposal Sent' },
+  { value: 'NEGOTIATION', label: 'Negotiation' },
+] as const;
 
 const dealSchema = z.object({
   dealName: z.string().min(1, 'Deal name is required'),
@@ -24,6 +32,8 @@ const dealSchema = z.object({
   expectedAmount: z.number().min(0, 'Amount must be 0 or higher'),
   probability: z.number().min(0).max(100).default(50),
   expectedCloseDate: z.string().optional(),
+  stage: z.string().optional().default('NEW'),
+  notes: z.string().optional(),
 });
 
 type DealFormData = z.infer<typeof dealSchema>;
@@ -51,6 +61,8 @@ export function DealForm({ deal }: DealFormProps) {
           expectedAmount: deal.expectedAmount,
           probability: deal.probability,
           expectedCloseDate: deal.expectedCloseDate?.split('T')[0] || '',
+          stage: deal.stage || 'NEW',
+          notes: deal.notes || '',
         }
       : {
           dealName: '',
@@ -58,6 +70,8 @@ export function DealForm({ deal }: DealFormProps) {
           expectedAmount: 0,
           probability: 50,
           expectedCloseDate: '',
+          stage: 'NEW',
+          notes: '',
         },
   });
 
@@ -69,6 +83,8 @@ export function DealForm({ deal }: DealFormProps) {
         expectedAmount: data.expectedAmount,
         probability: data.probability,
         expectedCloseDate: data.expectedCloseDate || undefined,
+        stage: data.stage || 'NEW',
+        notes: data.notes || undefined,
       });
       toast({ title: 'Deal created successfully' });
       router.push(`/crm/deals/${result?.id || result?.data?.id}`);
@@ -156,6 +172,37 @@ export function DealForm({ deal }: DealFormProps) {
               <Label htmlFor="expectedCloseDate">Expected Close Date</Label>
               <Input id="expectedCloseDate" type="date" {...form.register('expectedCloseDate')} />
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Stage</Label>
+              <Select
+                value={form.watch('stage') || 'NEW'}
+                onValueChange={(value) => form.setValue('stage', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select stage" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEAL_STAGES.map((stage) => (
+                    <SelectItem key={stage.value} value={stage.value}>
+                      {stage.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea
+              id="notes"
+              placeholder="Add any notes about this deal..."
+              rows={3}
+              {...form.register('notes')}
+            />
           </div>
         </CardContent>
       </Card>

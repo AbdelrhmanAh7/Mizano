@@ -52,7 +52,7 @@ export interface DocumentIntakeResult {
   } | null;
   rawText: string;
 
-  /** Accounting entry suggestion from VLM */
+  /** Accounting entry suggestion from Ollama */
   accountingEntry?: {
     debitAccount: string | null;
     creditAccount: string | null;
@@ -60,24 +60,7 @@ export interface DocumentIntakeResult {
   } | null;
 
   /** Which AI engine was used */
-  extractionMethod?: 'vlm' | 'ocr' | 'paddleocr+tesseract';
-
-  /** Per-field confidence breakdown from Python OCR service (0-100 scale) */
-  detailedConfidence?: {
-    overall: number;
-    invoice_number: number;
-    dates: number;
-    vendor: number;
-    line_items: number;
-    totals: number;
-  } | null;
-
-  /** Mathematical validation results from Python OCR service */
-  validationResults?: {
-    all_passed: boolean;
-    checks: Array<{ name: string; passed: boolean; detail: string }>;
-    corrections_applied: string[];
-  } | null;
+  extractionMethod?: 'ollama-vision' | 'ollama-text';
 }
 
 export interface ConfirmIntakeLineData {
@@ -114,7 +97,7 @@ const documentIntakeApi = {
   processDocument: async (formData: FormData) => {
     const response = await api.post('/ai/document-intake/process', formData, {
       headers: { 'Content-Type': undefined },
-      timeout: 120000,
+      timeout: 330000, // 5.5 min — must exceed backend Ollama vision timeout (300s)
     });
     return response.data;
   },

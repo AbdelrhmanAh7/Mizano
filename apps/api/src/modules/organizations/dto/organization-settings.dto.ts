@@ -216,11 +216,6 @@ export class AiSettingsDto {
   @IsBoolean()
   aiReconciliationEnabled?: boolean;
 
-  @ApiPropertyOptional({ description: 'Enable invoice OCR' })
-  @IsOptional()
-  @IsBoolean()
-  aiOcrEnabled?: boolean;
-
   @ApiPropertyOptional({ description: 'Enable demand forecasting' })
   @IsOptional()
   @IsBoolean()
@@ -235,12 +230,6 @@ export class AiSettingsDto {
   @IsOptional()
   @IsBoolean()
   aiLeadScoringEnabled?: boolean;
-
-  @ApiPropertyOptional({ description: 'AI model retraining frequency' })
-  @IsOptional()
-  @IsString()
-  @IsIn(['daily', 'weekly', 'monthly'])
-  aiRetrainingFrequency?: string;
 
   @ApiPropertyOptional({ description: 'Anomaly detection sensitivity (Z-score threshold)' })
   @IsOptional()
@@ -416,11 +405,10 @@ export interface AllSettingsResponse {
   ai: {
     aiCategorizationEnabled: boolean;
     aiReconciliationEnabled: boolean;
-    aiOcrEnabled: boolean;
+
     aiForecastingEnabled: boolean;
     aiAnomalyEnabled: boolean;
     aiLeadScoringEnabled: boolean;
-    aiRetrainingFrequency: string;
     anomalySensitivity: number;
   };
   email: {

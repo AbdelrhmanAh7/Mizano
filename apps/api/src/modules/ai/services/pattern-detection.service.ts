@@ -3,6 +3,9 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import type { Prisma } from '@prisma/client';
 import { PatternStatus, SuggestionType, SuggestionStatus } from '@prisma/client';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildPatternDetectionPrompt } from '../prompts/operations.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 import {
   detectDateInDescription,
   normalizeEntityName,
@@ -38,6 +41,7 @@ interface AnalysisResult {
   patternsUpdated: number;
   suggestionsCreated: number;
   duplicatesFound: number;
+  predictionMethod: PredictionMethod;
 }
 
 interface DuplicateCheckResult {
@@ -64,7 +68,10 @@ export class PatternDetectionService {
   private readonly DUPLICATE_WINDOW_DAYS = 3;
   private readonly LOOKBACK_MONTHS = 6;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {}
 
   /**
    * Main entry point: Analyze all transactions for patterns
@@ -77,6 +84,7 @@ export class PatternDetectionService {
       patternsUpdated: 0,
       suggestionsCreated: 0,
       duplicatesFound: 0,
+      predictionMethod: 'RULE_BASED',
     };
 
     try {
@@ -110,6 +118,31 @@ export class PatternDetectionService {
 
       // Step 5: Mark stale patterns
       await this.markStalePatterns(organizationId);
+
+      // Step 6: Ollama enhancement — ask LLM for pattern insights
+      if (transactions.length > 0) {
+        try {
+          const sampleTx = transactions.slice(0, 50).map((t) => ({
+            entityName: t.entityName,
+            amount: t.amount,
+            date: t.date.toISOString().split('T')[0],
+            description: t.description,
+          }));
+          const prompt = buildPatternDetectionPrompt({ transactions: sampleTx });
+          const ollamaResult = await this.gateway.infer<{
+            patterns: Array<{ description: string; frequency: string; amount_range: string }>;
+            significance: string[];
+          }>(prompt);
+
+          if (ollamaResult) {
+            result.predictionMethod = 'HYBRID';
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Ollama pattern detection failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
 
       this.logger.log(
         `Pattern analysis completed: ${result.patternsDetected} new, ${result.patternsUpdated} updated, ${result.suggestionsCreated} suggestions`,

@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildContractAnalysisPrompt } from '../prompts/nlp.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const nlp = require('compromise');
@@ -49,6 +52,7 @@ export interface ContractAnalysisResult {
     totalClauses: number;
     clauseBreakdown: Record<ClauseType, number>;
   };
+  predictionMethod?: PredictionMethod;
 }
 
 export interface ObligationResult {
@@ -170,7 +174,10 @@ export class ContractAnalysisService {
   private readonly logger = new Logger(ContractAnalysisService.name);
   private readonly tokenizer: { tokenize(text: string): string[] };
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {
     this.tokenizer = new natural.SentenceTokenizer();
   }
 
@@ -185,6 +192,73 @@ export class ContractAnalysisService {
   async analyzeContract(organizationId: string, text: string): Promise<ContractAnalysisResult> {
     this.logger.log(`Analyzing contract for org ${organizationId} (${text.length} chars)`);
 
+    // --- Ollama-first inference path ---
+    try {
+      const prompt = buildContractAnalysisPrompt(text);
+      const ollamaResult = await this.gateway.infer<{
+        parties: Array<{ name: string; role?: string }>;
+        dates: Array<{ label: string; value: string }>;
+        clauses: Array<{ type: string; text: string; risk_level?: string }>;
+        risks: Array<{ description: string; severity: string; recommendation: string }>;
+        summary: string;
+      }>(prompt);
+
+      if (ollamaResult) {
+        const d = ollamaResult.data;
+
+        const parties: ContractParty[] = (d.parties || []).map((p) => ({
+          name: p.name,
+          role: p.role,
+        }));
+
+        const dates: ContractDate[] = (d.dates || []).map((dt) => ({
+          label: dt.label,
+          text: dt.value,
+          parsed: this.tryParseDate(dt.value),
+        }));
+
+        const ollamaClauses: ContractClause[] = (d.clauses || []).map((c) => ({
+          text: c.text,
+          type: (c.type as ClauseType) || 'general',
+          confidence: 0.8,
+        }));
+
+        const clauseBreakdown: Record<ClauseType, number> = {
+          payment_terms: 0,
+          penalty: 0,
+          termination: 0,
+          renewal: 0,
+          liability: 0,
+          confidentiality: 0,
+          general: 0,
+        };
+        for (const clause of ollamaClauses) {
+          if (clause.type in clauseBreakdown) {
+            clauseBreakdown[clause.type]++;
+          }
+        }
+
+        const result: ContractAnalysisResult = {
+          parties,
+          dates,
+          keyTerms: this.extractKeyTerms(text),
+          clauses: ollamaClauses,
+          summary: {
+            totalClauses: ollamaClauses.length,
+            clauseBreakdown,
+          },
+          predictionMethod: 'OLLAMA',
+        };
+
+        return result;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama contract analysis failed, falling back to NLP/regex: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // --- Existing NLP/regex fallback ---
     const [parties, dates, keyTerms, clauses] = await Promise.all([
       Promise.resolve(this.extractParties(text)),
       Promise.resolve(this.extractDates(text)),
@@ -216,6 +290,7 @@ export class ContractAnalysisService {
         totalClauses: clauses.clauses.length,
         clauseBreakdown,
       },
+      predictionMethod: 'RULE_BASED',
     };
   }
 

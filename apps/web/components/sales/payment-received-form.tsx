@@ -78,7 +78,7 @@ export function PaymentReceivedForm({
   onCancel,
   isSubmitting,
 }: PaymentReceivedFormProps) {
-  const { data: customersData } = useCustomers({ limit: 1000 });
+  const { data: customersData } = useCustomers({ limit: 100 });
   const customers = customersData?.data || [];
 
   const { data: assetAccounts } = useAccountsByType('ASSET');
@@ -123,7 +123,7 @@ export function PaymentReceivedForm({
   // Fetch invoices for selected customer
   const { data: invoicesData } = useInvoices({
     customerId: selectedCustomerId || undefined,
-    limit: 1000,
+    limit: 100,
   });
 
   // Filter for open invoices (not paid, not void, not draft, with balance due)

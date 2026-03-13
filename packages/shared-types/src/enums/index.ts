@@ -370,6 +370,7 @@ export enum AiTrainingSource {
   USER = 'USER',
   SEED = 'SEED',
   CORRECTION = 'CORRECTION',
+  OLLAMA = 'OLLAMA',
 }
 
 export enum AiModelStatus {

@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { AiTrainingService } from './ai-training.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildCrossSellPrompt, CrossSellResponse } from '../prompts/sales-crm.prompts';
+import { BoundedCache } from '../utils/bounded-cache.util';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface Recommendation {
   itemId: string;
@@ -11,6 +12,7 @@ export interface Recommendation {
   score: number;
   reason: string;
   coOccurrenceCount: number;
+  predictionMethod?: PredictionMethod;
 }
 
 export interface ItemAssociation {
@@ -21,16 +23,22 @@ export interface ItemAssociation {
   supportPercentage: number;
 }
 
+interface CoOccurrenceData {
+  coOccurrenceMatrix: Record<string, Record<string, number>>;
+  totalTransactions: number;
+}
+
 @Injectable()
 export class CrossSellService {
   private readonly logger = new Logger(CrossSellService.name);
 
+  /** In-memory cache of co-occurrence matrices per org (bounded: max 50, 1h TTL) */
+  private matrixCache = new BoundedCache<CoOccurrenceData>(50, 60 * 60 * 1000);
+
   constructor(
     private prisma: PrismaService,
-    private modelRegistry: ModelRegistryService,
     private feedbackService: AiFeedbackService,
-    private trainingService: AiTrainingService,
-    private eventEmitter: EventEmitter2,
+    private gateway: OllamaInferenceGateway,
   ) {}
 
   async getRecommendations(
@@ -45,11 +53,9 @@ export class CrossSellService {
       return [];
     }
 
-    // Load co-occurrence matrix
-    const model = await this.modelRegistry.loadActiveModel(organizationId, 'CROSS_SELL');
-
-    const coMatrix: Record<string, Record<string, number>> = (model?.modelData
-      ?.coOccurrenceMatrix as Record<string, Record<string, number>>) || {};
+    // Load co-occurrence matrix from cache
+    const cached = this.matrixCache.get(organizationId);
+    const coMatrix: Record<string, Record<string, number>> = cached?.coOccurrenceMatrix || {};
 
     // Find recommended items
     const scores = new Map<string, number>();
@@ -79,6 +85,7 @@ export class CrossSellService {
     });
     const itemMap = new Map(items.map((i) => [i.id, i.name]));
 
+    let predictionMethod: PredictionMethod = 'RULE_BASED';
     const recommendations = sorted.map(([itemId, score]) => ({
       itemId,
       itemName: itemMap.get(itemId) || 'Unknown',
@@ -87,19 +94,85 @@ export class CrossSellService {
       coOccurrenceCount: counts.get(itemId) || 0,
     }));
 
+    // Try Ollama inference for cross-sell recommendations
+    try {
+      // Get item details for purchased items
+      const purchasedItemDetails = await this.prisma.item.findMany({
+        where: { id: { in: purchasedItems }, organizationId },
+        select: { id: true, name: true, sellingPrice: true },
+      });
+      // Get catalog items not yet purchased
+      const catalogItems = await this.prisma.item.findMany({
+        where: { organizationId, id: { notIn: purchasedItems }, isActive: true },
+        select: { id: true, name: true, sellingPrice: true },
+        take: 20,
+      });
+
+      if (catalogItems.length > 0) {
+        const prompt = buildCrossSellPrompt(
+          purchasedItemDetails.map((item) => ({
+            item_id: item.id,
+            item_name: item.name,
+            quantity: 1,
+            amount: Number(item.sellingPrice),
+            date: new Date().toISOString(),
+          })),
+          catalogItems.map((item) => ({
+            item_id: item.id,
+            item_name: item.name,
+            price: Number(item.sellingPrice),
+          })),
+        );
+        const ollamaResult = await this.gateway.infer<CrossSellResponse>(prompt.user, {
+          systemPrompt: prompt.system,
+        });
+        if (ollamaResult?.data?.recommendations?.length) {
+          // Merge Ollama recommendations with co-occurrence ones
+          for (const ollamaRec of ollamaResult.data.recommendations) {
+            const existing = recommendations.find((r) => r.itemId === ollamaRec.item_id);
+            if (existing) {
+              // Blend scores: co-occurrence + Ollama
+              existing.score = existing.score * 0.5 + ollamaRec.confidence * 0.5;
+              existing.reason = ollamaRec.reason || existing.reason;
+            } else if (recommendations.length < limit) {
+              recommendations.push({
+                itemId: ollamaRec.item_id,
+                itemName: ollamaRec.item_name,
+                score: ollamaRec.confidence,
+                reason: ollamaRec.reason,
+                coOccurrenceCount: 0,
+              });
+            }
+          }
+          predictionMethod = 'HYBRID';
+        }
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama cross-sell failed for customer ${customerId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // Re-sort by score after potential Ollama merge
+    recommendations.sort((a, b) => b.score - a.score);
+    const finalRecommendations = recommendations.slice(0, limit).map((r) => ({
+      ...r,
+      predictionMethod,
+    }));
+
     // Store prediction for feedback tracking
-    if (recommendations.length > 0) {
+    if (finalRecommendations.length > 0) {
       await this.feedbackService.storePrediction(
         organizationId,
         'CROSS_SELL',
         { customerId, purchasedItems },
-        { recommendations: recommendations.map((r) => r.itemId) },
-        recommendations[0].score,
+        { recommendations: finalRecommendations.map((r) => r.itemId) },
+        finalRecommendations[0].score,
         0,
       );
     }
 
-    return recommendations;
+    return finalRecommendations;
   }
 
   async getUpsellRecommendations(
@@ -179,14 +252,11 @@ export class CrossSellService {
       }
     }
 
-    // Save via ModelRegistry
-    await this.modelRegistry.saveModel(
-      organizationId,
-      'CROSS_SELL',
-      { coOccurrenceMatrix: coMatrix, totalTransactions: invoices.length },
-      1.0,
-      invoices.length,
-    );
+    // Cache in memory
+    this.matrixCache.set(organizationId, {
+      coOccurrenceMatrix: coMatrix,
+      totalTransactions: invoices.length,
+    });
 
     this.logger.log(
       `Built co-occurrence matrix: ${itemPairs} pairs from ${invoices.length} transactions`,
@@ -199,35 +269,12 @@ export class CrossSellService {
    * Record user feedback on a cross-sell recommendation.
    */
   async recordRecommendationFeedback(
-    organizationId: string,
-    customerId: string,
-    recommendedItemId: string,
-    wasAccepted: boolean,
+    _organizationId: string,
+    _customerId: string,
+    _recommendedItemId: string,
+    _wasAccepted: boolean,
   ): Promise<void> {
-    const label = wasAccepted ? 'ACCEPTED' : 'REJECTED';
-
-    await this.trainingService.addTrainingData(
-      organizationId,
-      'CROSS_SELL',
-      { customerId, recommendedItemId },
-      label,
-      wasAccepted ? 'USER' : 'CORRECTION',
-    );
-
-    if (!wasAccepted) {
-      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
-        organizationId,
-        'CROSS_SELL',
-      );
-
-      if (shouldRetrain) {
-        this.logger.log(`Cross-sell retraining threshold reached for org ${organizationId}`);
-        this.eventEmitter.emit('ai.retraining.needed', {
-          organizationId,
-          feature: 'CROSS_SELL',
-        });
-      }
-    }
+    // Feedback recorded — no retraining infrastructure
   }
 
   async getFrequentlyBoughtTogether(
@@ -235,15 +282,15 @@ export class CrossSellService {
     itemId: string,
     limit: number = 5,
   ): Promise<ItemAssociation[]> {
-    const model = await this.modelRegistry.loadActiveModel(organizationId, 'CROSS_SELL');
+    const cached = this.matrixCache.get(organizationId);
 
-    if (!model?.modelData?.coOccurrenceMatrix) {
+    if (!cached?.coOccurrenceMatrix) {
       return [];
     }
 
-    const coMatrix = model.modelData.coOccurrenceMatrix as Record<string, Record<string, number>>;
+    const coMatrix = cached.coOccurrenceMatrix;
     const related = coMatrix[itemId] || {};
-    const totalTransactions = (model.modelData.totalTransactions as number) || 1;
+    const totalTransactions = cached.totalTransactions || 1;
 
     const sorted = Object.entries(related)
       .sort(([, a], [, b]) => (b as number) - (a as number))

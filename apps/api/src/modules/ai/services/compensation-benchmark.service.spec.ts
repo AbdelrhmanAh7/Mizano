@@ -2,16 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { CompensationBenchmarkService } from './compensation-benchmark.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { AiTrainingService } from './ai-training.service';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import {
   createMockPrisma,
-  createMockModelRegistry,
   createMockAiFeedback,
-  createMockAiTraining,
-  createMockEventEmitter,
   MockPrismaClient,
   TEST_ORG_ID,
   mockDecimal,
@@ -20,20 +15,23 @@ import {
 describe('CompensationBenchmarkService', () => {
   let service: CompensationBenchmarkService;
   let prisma: MockPrismaClient;
-  let modelRegistry: ReturnType<typeof createMockModelRegistry>;
 
   beforeEach(async () => {
     prisma = createMockPrisma();
-    modelRegistry = createMockModelRegistry();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CompensationBenchmarkService,
         { provide: PrismaService, useValue: prisma },
-        { provide: ModelRegistryService, useValue: modelRegistry },
         { provide: AiFeedbackService, useValue: createMockAiFeedback() },
-        { provide: AiTrainingService, useValue: createMockAiTraining() },
-        { provide: EventEmitter2, useValue: createMockEventEmitter() },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            generateCompletion: jest.fn().mockResolvedValue(''),
+            generateStructuredOutput: jest.fn().mockResolvedValue({}),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
       ],
     }).compile();
 

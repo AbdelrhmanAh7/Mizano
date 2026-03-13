@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -61,11 +60,11 @@ import {
 import { useTranslations } from 'next-intl';
 
 interface ProjectDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const t = useTranslations('projects');
   const router = useRouter();
   const { data: project, isLoading } = useProject(id);

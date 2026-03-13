@@ -181,11 +181,6 @@ export class AiFeaturesStepDto {
   @IsBoolean()
   reconciliationEnabled?: boolean;
 
-  @ApiPropertyOptional({ description: 'Enable invoice OCR' })
-  @IsOptional()
-  @IsBoolean()
-  ocrEnabled?: boolean;
-
   @ApiPropertyOptional({ description: 'Enable demand forecasting' })
   @IsOptional()
   @IsBoolean()

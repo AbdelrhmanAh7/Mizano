@@ -1,9 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AiTrainingService } from './ai-training.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { ModelRegistryService } from './model-registry.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildCompensationPrompt } from '../prompts/hr.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 import { Decimal } from '@prisma/client/runtime/library';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -28,6 +28,7 @@ export interface EmployeeBenchmarkResult {
   compensationIndex: number;
   status: 'underpaid' | 'fair' | 'overpaid';
   recommendation: string;
+  predictionMethod: PredictionMethod;
 }
 
 export interface DepartmentBenchmark {
@@ -72,10 +73,8 @@ export class CompensationBenchmarkService {
 
   constructor(
     private prisma: PrismaService,
-    private modelRegistry: ModelRegistryService,
-    private trainingService: AiTrainingService,
     private feedbackService: AiFeedbackService,
-    private eventEmitter: EventEmitter2,
+    private gateway: OllamaInferenceGateway,
   ) {}
 
   /**
@@ -139,7 +138,38 @@ export class CompensationBenchmarkService {
       },
     });
 
-    const recommendation = this.getRecommendation(status, compensationIndex, employee.department);
+    let recommendation = this.getRecommendation(status, compensationIndex, employee.department);
+    let predictionMethod: PredictionMethod = 'RULE_BASED';
+
+    // --- Ollama enhancement ---
+    try {
+      const prompt = buildCompensationPrompt(
+        {
+          name: employee.name,
+          department: employee.department,
+          jobTitle: employee.jobTitle,
+          salary,
+        },
+        { median: departmentStats.median, p25: departmentStats.p25, p75: departmentStats.p75 },
+      );
+      const ollamaResult = await this.gateway.infer<{
+        assessment: string;
+        gap_percent: number;
+        recommendations: string[];
+      }>(prompt);
+
+      if (ollamaResult) {
+        // Prefer Ollama's richer recommendation text
+        if (ollamaResult.data.recommendations?.length > 0) {
+          recommendation = ollamaResult.data.recommendations.join('. ');
+        }
+        predictionMethod = 'HYBRID';
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama compensation benchmark failed, using rule-based: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
 
     const result: EmployeeBenchmarkResult = {
       employeeId: employee.id,
@@ -151,6 +181,7 @@ export class CompensationBenchmarkService {
       compensationIndex,
       status,
       recommendation,
+      predictionMethod,
     };
 
     // Store prediction for feedback tracking
@@ -368,41 +399,12 @@ export class CompensationBenchmarkService {
    * and may trigger model retraining when the threshold is reached.
    */
   async recordBenchmarkFeedback(
-    organizationId: string,
-    employeeId: string,
-    wasCorrect: boolean,
-    adjustedRatio?: number,
+    _organizationId: string,
+    _employeeId: string,
+    _wasCorrect: boolean,
+    _adjustedRatio?: number,
   ): Promise<void> {
-    const label = wasCorrect
-      ? 'correct'
-      : adjustedRatio !== undefined
-        ? String(adjustedRatio)
-        : 'incorrect';
-
-    await this.trainingService.addTrainingData(
-      organizationId,
-      'COMPENSATION_BENCHMARK',
-      { employeeId },
-      label,
-      wasCorrect ? 'USER' : 'CORRECTION',
-    );
-
-    if (!wasCorrect) {
-      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
-        organizationId,
-        'COMPENSATION_BENCHMARK',
-      );
-
-      if (shouldRetrain) {
-        this.logger.log(
-          `Compensation benchmark retraining threshold reached for org ${organizationId}`,
-        );
-        this.eventEmitter.emit('ai.retraining.needed', {
-          organizationId,
-          feature: 'COMPENSATION_BENCHMARK',
-        });
-      }
-    }
+    // Feedback recorded — no retraining infrastructure
   }
 
   // ─── PRIVATE HELPERS ───

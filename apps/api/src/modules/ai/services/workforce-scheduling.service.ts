@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildSchedulingPrompt } from '../prompts/hr.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ss = require('simple-statistics');
 
@@ -17,6 +19,7 @@ export interface ScheduleSuggestion {
   weekStart: string;
   dailySuggestions: DailySuggestion[];
   notes: string[];
+  predictionMethod: PredictionMethod;
 }
 
 export interface DepartmentStaffingNeed {
@@ -89,7 +92,10 @@ const STANDARD_WORK_HOURS = 9;
 export class WorkforceSchedulingService {
   private readonly logger = new Logger(WorkforceSchedulingService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {}
 
   /**
    * Suggest optimal schedule for the next week based on attendance patterns
@@ -215,10 +221,44 @@ export class WorkforceSchedulingService {
       notes.push(`Total active employees: ${activeEmployees}`);
     }
 
+    let predictionMethod: PredictionMethod = 'RULE_BASED';
+
+    // --- Ollama enhancement ---
+    try {
+      const attendanceData = {
+        dailySuggestions: dailySuggestions.map((d) => ({
+          day: d.dayName,
+          avgPresent: d.historicalAvgPresent,
+          avgAbsent: d.historicalAvgAbsent,
+        })),
+      };
+      const staffingData = { activeEmployees };
+      const prompt = buildSchedulingPrompt(attendanceData, staffingData);
+      const ollamaResult = await this.gateway.infer<{
+        suggestions: Array<{ day: string; action: string; reason: string }>;
+        overtime_analysis: Array<{ employee: string; hours: number; recommendation: string }>;
+      }>(prompt);
+
+      if (ollamaResult) {
+        // Add Ollama's scheduling notes
+        if (ollamaResult.data.suggestions?.length > 0) {
+          for (const suggestion of ollamaResult.data.suggestions) {
+            notes.push(`${suggestion.day}: ${suggestion.action} - ${suggestion.reason}`);
+          }
+        }
+        predictionMethod = 'HYBRID';
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama scheduling failed, using rule-based: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
     return {
       weekStart: weekStart.toISOString().split('T')[0],
       dailySuggestions,
       notes,
+      predictionMethod,
     };
   }
 

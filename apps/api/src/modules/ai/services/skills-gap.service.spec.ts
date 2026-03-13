@@ -2,15 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { SkillsGapService } from './skills-gap.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { AiTrainingService } from './ai-training.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   createMockPrisma,
-  createMockModelRegistry,
   createMockAiFeedback,
-  createMockAiTraining,
   createMockEventEmitter,
   MockPrismaClient,
   TEST_ORG_ID,
@@ -19,20 +16,24 @@ import {
 describe('SkillsGapService', () => {
   let service: SkillsGapService;
   let prisma: MockPrismaClient;
-  let modelRegistry: ReturnType<typeof createMockModelRegistry>;
 
   beforeEach(async () => {
     prisma = createMockPrisma();
-    modelRegistry = createMockModelRegistry();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SkillsGapService,
         { provide: PrismaService, useValue: prisma },
-        { provide: ModelRegistryService, useValue: modelRegistry },
         { provide: AiFeedbackService, useValue: createMockAiFeedback() },
-        { provide: AiTrainingService, useValue: createMockAiTraining() },
         { provide: EventEmitter2, useValue: createMockEventEmitter() },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            infer: jest.fn().mockResolvedValue(null),
+            isHealthy: jest.fn().mockResolvedValue(false),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
       ],
     }).compile();
 
@@ -271,6 +272,7 @@ describe('SkillsGapService', () => {
         gaps: [{ skill: 'typescript', required: 4, current: 1, gap: 3 }],
         matchScore: 0.25,
         recommendations: [],
+        predictionMethod: 'RULE_BASED',
       });
       spy.mockResolvedValueOnce({
         employeeId: 'emp-b',
@@ -281,6 +283,7 @@ describe('SkillsGapService', () => {
         gaps: [{ skill: 'typescript', required: 4, current: 2, gap: 2 }],
         matchScore: 0.5,
         recommendations: [],
+        predictionMethod: 'RULE_BASED',
       });
 
       const result = await service.analyzeDepartmentGap(TEST_ORG_ID, 'Engineering');

@@ -684,19 +684,8 @@ export class AiInsightsService {
       totalFeedback: number;
     };
   }> {
-    // Get all models (latest version per feature)
-    const allModels = await this.prisma.aiModel.findMany({
-      where: { organizationId },
-      orderBy: [{ feature: 'asc' }, { version: 'desc' }],
-    });
-
-    // Deduplicate to latest version per feature
-    const latestModels = new Map<string, (typeof allModels)[0]>();
-    for (const model of allModels) {
-      if (!latestModels.has(model.feature)) {
-        latestModels.set(model.feature, model);
-      }
-    }
+    // AiModel and AiTrainingData tables have been removed.
+    // Build performance report from aiFeedback and aiPrediction data only.
 
     // Get feedback counts grouped by feature and action
     const feedbackCounts = await this.prisma.aiFeedback.groupBy({
@@ -711,13 +700,6 @@ export class AiInsightsService {
       where: { organizationId },
       _count: { id: true },
       _avg: { confidence: true },
-    });
-
-    // Get training data counts
-    const trainingCounts = await this.prisma.aiTrainingData.groupBy({
-      by: ['feature'],
-      where: { organizationId },
-      _count: { id: true },
     });
 
     // Build per-feature feedback map
@@ -744,12 +726,6 @@ export class AiInsightsService {
       });
     }
 
-    // Build per-feature training data map
-    const trainMap = new Map<string, number>();
-    for (const tc of trainingCounts) {
-      trainMap.set(tc.feature, tc._count.id);
-    }
-
     // Get confidence distribution per feature
     const confidenceDistributions = new Map<
       string,
@@ -771,24 +747,24 @@ export class AiInsightsService {
       else dist.high++;
     }
 
-    const now = Date.now();
-    const models = Array.from(latestModels.entries()).map(([feature, model]) => {
+    // Collect all known features from feedback and predictions
+    const allFeatures = new Set<string>();
+    for (const key of feedbackMap.keys()) allFeatures.add(key);
+    for (const key of predMap.keys()) allFeatures.add(key);
+
+    const models = Array.from(allFeatures).map((feature) => {
       const fb = feedbackMap.get(feature) || { accepted: 0, rejected: 0, corrected: 0 };
       const pred = predMap.get(feature) || { count: 0, avgConfidence: 0 };
       const totalFeedback = fb.accepted + fb.rejected + fb.corrected;
       const correctionRate = totalFeedback > 0 ? (fb.corrected + fb.rejected) / totalFeedback : 0;
-      const trainedAt = model.trainedAt ? model.trainedAt.toISOString() : null;
-      const daysSinceRetrain = model.trainedAt
-        ? Math.floor((now - model.trainedAt.getTime()) / (1000 * 60 * 60 * 24))
-        : null;
 
       return {
         feature,
-        latestVersion: model.version,
-        accuracy: parseFloat(model.accuracy.toString()),
-        sampleCount: model.sampleCount,
-        status: model.status,
-        trainedAt,
+        latestVersion: 0,
+        accuracy: 0,
+        sampleCount: 0,
+        status: 'ACTIVE',
+        trainedAt: null,
         correctionRate: Math.round(correctionRate * 1000) / 1000,
         totalPredictions: pred.count,
         totalFeedback,
@@ -801,31 +777,23 @@ export class AiInsightsService {
           medium: 0,
           high: 0,
         },
-        trainingDataCount: trainMap.get(feature) || 0,
-        lastRetrainedAt: trainedAt,
-        daysSinceRetrain,
+        trainingDataCount: 0,
+        lastRetrainedAt: null,
+        daysSinceRetrain: null,
       };
     });
 
-    const activeModels = models.filter((m) => m.status === 'ACTIVE');
-    const avgAccuracy =
-      activeModels.length > 0
-        ? activeModels.reduce((sum, m) => sum + m.accuracy, 0) / activeModels.length
-        : 0;
     const avgCorrectionRate =
       models.length > 0 ? models.reduce((sum, m) => sum + m.correctionRate, 0) / models.length : 0;
-    const modelsNeedingRetrain = models.filter(
-      (m) => m.daysSinceRetrain !== null && m.daysSinceRetrain > 30,
-    ).length;
 
     return {
       models,
       summary: {
         totalModels: models.length,
-        activeModels: activeModels.length,
-        avgAccuracy: Math.round(avgAccuracy * 10000) / 10000,
+        activeModels: models.length,
+        avgAccuracy: 0,
         avgCorrectionRate: Math.round(avgCorrectionRate * 1000) / 1000,
-        modelsNeedingRetrain,
+        modelsNeedingRetrain: 0,
         totalPredictions: models.reduce((sum, m) => sum + m.totalPredictions, 0),
         totalFeedback: models.reduce((sum, m) => sum + m.totalFeedback, 0),
       },

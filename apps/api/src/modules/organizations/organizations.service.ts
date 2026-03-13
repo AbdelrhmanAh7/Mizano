@@ -216,11 +216,10 @@ export class OrganizationsService {
       ai: {
         aiCategorizationEnabled: org.aiCategorizationEnabled,
         aiReconciliationEnabled: org.aiReconciliationEnabled,
-        aiOcrEnabled: org.aiOcrEnabled,
+
         aiForecastingEnabled: org.aiForecastingEnabled,
         aiAnomalyEnabled: org.aiAnomalyEnabled,
         aiLeadScoringEnabled: org.aiLeadScoringEnabled,
-        aiRetrainingFrequency: org.aiRetrainingFrequency,
         anomalySensitivity: org.anomalySensitivity,
       },
       email: {
@@ -322,11 +321,10 @@ export class OrganizationsService {
       data: {
         aiCategorizationEnabled: dto.aiCategorizationEnabled,
         aiReconciliationEnabled: dto.aiReconciliationEnabled,
-        aiOcrEnabled: dto.aiOcrEnabled,
+
         aiForecastingEnabled: dto.aiForecastingEnabled,
         aiAnomalyEnabled: dto.aiAnomalyEnabled,
         aiLeadScoringEnabled: dto.aiLeadScoringEnabled,
-        aiRetrainingFrequency: dto.aiRetrainingFrequency,
         anomalySensitivity: dto.anomalySensitivity,
       },
       select: { id: true, updatedAt: true },
@@ -602,7 +600,7 @@ export class OrganizationsService {
       data: {
         aiCategorizationEnabled: dto.categorizationEnabled ?? true,
         aiReconciliationEnabled: dto.reconciliationEnabled ?? true,
-        aiOcrEnabled: dto.ocrEnabled ?? true,
+
         aiForecastingEnabled: dto.forecastingEnabled ?? true,
         aiAnomalyEnabled: dto.anomalyEnabled ?? true,
         aiLeadScoringEnabled: dto.leadScoringEnabled ?? true,

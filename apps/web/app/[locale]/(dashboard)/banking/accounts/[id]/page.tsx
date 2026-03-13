@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -54,12 +53,12 @@ import {
 import { useTranslations } from 'next-intl';
 
 interface BankAccountDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function BankAccountDetailPage({ params }: BankAccountDetailPageProps) {
   const t = useTranslations('banking');
-  const { id } = use(params);
+  const { id } = params;
   const router = useRouter();
   const { data: account, isLoading } = useBankAccount(id);
   const { data: transactionsData } = useBankAccountTransactions(id);

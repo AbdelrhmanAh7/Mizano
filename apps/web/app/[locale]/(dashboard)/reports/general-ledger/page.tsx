@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfYear, endOfMonth } from 'date-fns';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft, BookOpen } from 'lucide-react';
@@ -30,7 +30,7 @@ import { useAccounts } from '@/lib/hooks/use-accounts';
 export default function GeneralLedgerPage() {
   const t = useTranslations('reports');
   const [dateRange, setDateRange] = useState({
-    startDate: startOfMonth(new Date()),
+    startDate: startOfYear(new Date()),
     endDate: endOfMonth(new Date()),
   });
   const [accountId, setAccountId] = useState('');

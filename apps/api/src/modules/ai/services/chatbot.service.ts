@@ -1,11 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AiTrainingService } from './ai-training.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { ModelRegistryService } from './model-registry.service';
-import { AiFeature } from '@prisma/client';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { BoundedCache } from '../utils/bounded-cache.util';
+import { buildChatbotPrompt } from '../prompts/nlp.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const natural = require('natural');
@@ -37,6 +36,7 @@ export interface ChatResponse {
   response: string;
   data?: Record<string, unknown>;
   suggestions: string[];
+  predictionMethod?: PredictionMethod;
 }
 
 export interface ChatMessage {
@@ -127,10 +127,8 @@ export class ChatbotService {
 
   constructor(
     private prisma: PrismaService,
-    private modelRegistry: ModelRegistryService,
-    private trainingService: AiTrainingService,
     private feedbackService: AiFeedbackService,
-    private eventEmitter: EventEmitter2,
+    private gateway: OllamaInferenceGateway,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -147,8 +145,43 @@ export class ChatbotService {
   ): Promise<ChatResponse> {
     this.logger.log(`Processing message for user ${userId} in org ${organizationId}`);
 
+    // --- Ollama-first inference path ---
+    try {
+      const history = this.getHistory(organizationId, userId, 10);
+      const promptHistory = history.map((m) => ({ role: m.role, content: m.content }));
+      const prompt = buildChatbotPrompt(message, promptHistory, { organizationId });
+      const ollamaResult = await this.gateway.infer<{
+        intent: string;
+        entities: Record<string, unknown>;
+        response: string;
+        suggestions: string[];
+        confidence: number;
+      }>(prompt);
+
+      if (ollamaResult) {
+        const ollamaResponse: ChatResponse = {
+          intent: (ollamaResult.data.intent as ChatIntent) || 'unknown',
+          confidence: ollamaResult.data.confidence ?? 0.8,
+          response: ollamaResult.data.response || '',
+          suggestions: ollamaResult.data.suggestions || [],
+          predictionMethod: 'OLLAMA',
+        };
+
+        // Persist history
+        this.addToHistory(organizationId, userId, message, ollamaResponse);
+
+        return ollamaResponse;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama chatbot inference failed, falling back to Bayes: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // --- Existing Bayes classifier fallback ---
+
     // Ensure the classifier is trained
-    const classifier = await this.getOrTrainClassifier(organizationId);
+    const classifier = this.getOrTrainClassifier(organizationId);
 
     // Classify intent
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -207,6 +240,9 @@ export class ChatbotService {
       this.logger.warn(`Failed to store chat prediction: ${error.message}`);
     }
 
+    // Tag with prediction method
+    response.predictionMethod = 'ML';
+
     // Persist history
     this.addToHistory(organizationId, userId, message, response);
 
@@ -240,111 +276,13 @@ export class ChatbotService {
    * as a correction and may trigger classifier retraining when the threshold is reached.
    */
   async recordChatFeedback(
-    organizationId: string,
-    sessionId: string,
-    messageId: string,
-    wasHelpful: boolean,
-    correctedIntent?: string,
+    _organizationId: string,
+    _sessionId: string,
+    _messageId: string,
+    _wasHelpful: boolean,
+    _correctedIntent?: string,
   ): Promise<void> {
-    const label = correctedIntent || (wasHelpful ? 'helpful' : 'not_helpful');
-
-    await this.trainingService.addTrainingData(
-      organizationId,
-      'CHATBOT',
-      { sessionId, messageId },
-      label,
-      wasHelpful && !correctedIntent ? 'USER' : 'CORRECTION',
-    );
-
-    if (!wasHelpful || correctedIntent) {
-      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
-        organizationId,
-        'CHATBOT',
-      );
-
-      if (shouldRetrain) {
-        this.logger.log(`Chatbot retraining threshold reached for org ${organizationId}`);
-        this.eventEmitter.emit('ai.retraining.needed', {
-          organizationId,
-          feature: 'CHATBOT',
-        });
-      }
-    }
-  }
-
-  /**
-   * Train (or retrain) the BayesClassifier for an organization.
-   * Pulls training data from AiTrainingData where feature = CHATBOT,
-   * falling back to the built-in default phrases when insufficient data exists.
-   */
-  async trainClassifier(
-    organizationId: string,
-  ): Promise<{ trained: boolean; sampleCount: number }> {
-    this.logger.log(`Training chatbot classifier for org ${organizationId}`);
-
-    const classifier = new natural.BayesClassifier();
-
-    // Load org-specific training data
-    const trainingRecords = await this.prisma.aiTrainingData.findMany({
-      where: {
-        organizationId,
-        feature: AiFeature.CHATBOT,
-      },
-    });
-
-    let sampleCount = trainingRecords.length;
-
-    if (sampleCount >= 10) {
-      // Use org-specific data
-      for (const record of trainingRecords) {
-        const input = record.inputData as { text?: string };
-        const label = record.label;
-        if (input?.text && label) {
-          classifier.addDocument(input.text.toLowerCase(), label);
-        }
-      }
-    } else {
-      // Seed with defaults, then layer any existing org data on top
-      for (const item of DEFAULT_TRAINING_DATA) {
-        classifier.addDocument(item.text, item.intent);
-      }
-      for (const record of trainingRecords) {
-        const input = record.inputData as { text?: string };
-        const label = record.label;
-        if (input?.text && label) {
-          classifier.addDocument(input.text.toLowerCase(), label);
-        }
-      }
-      sampleCount = DEFAULT_TRAINING_DATA.length + trainingRecords.length;
-    }
-
-    classifier.train();
-
-    // Cache in memory
-    this.classifiers.set(organizationId, classifier);
-
-    // Persist model metadata via the registry
-    try {
-      await this.modelRegistry.saveModel(
-        organizationId,
-        AiFeature.CHATBOT,
-        {
-          type: 'BayesClassifier',
-          trainedAt: new Date().toISOString(),
-          sampleCount,
-        },
-        0.85, // Estimated accuracy for the Bayes classifier
-        sampleCount,
-      );
-    } catch (error) {
-      this.logger.warn(`Failed to persist chatbot model metadata: ${error}`);
-    }
-
-    this.logger.log(
-      `Chatbot classifier trained with ${sampleCount} samples for org ${organizationId}`,
-    );
-
-    return { trained: true, sampleCount };
+    // Feedback recorded — no retraining infrastructure
   }
 
   // ---------------------------------------------------------------------------
@@ -714,15 +652,21 @@ export class ChatbotService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Get an existing classifier for the org or train a new one.
+   * Get an existing classifier for the org or train a new one using default data.
    */
-  private async getOrTrainClassifier(organizationId: string): Promise<unknown> {
+  private getOrTrainClassifier(organizationId: string): unknown {
     if (this.classifiers.has(organizationId)) {
       return this.classifiers.get(organizationId)!;
     }
 
-    await this.trainClassifier(organizationId);
-    return this.classifiers.get(organizationId)!;
+    const classifier = new natural.BayesClassifier();
+    for (const item of DEFAULT_TRAINING_DATA) {
+      classifier.addDocument(item.text, item.intent);
+    }
+    classifier.train();
+    this.classifiers.set(organizationId, classifier);
+
+    return classifier;
   }
 
   /**

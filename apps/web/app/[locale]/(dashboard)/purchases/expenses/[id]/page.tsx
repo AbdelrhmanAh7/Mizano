@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -26,11 +25,11 @@ import { useExpense, useDeleteExpense, formatCurrency } from '@/lib/hooks/use-ex
 import { usePermissions } from '@/lib/hooks/use-permissions';
 
 interface ExpenseDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');
   const router = useRouter();

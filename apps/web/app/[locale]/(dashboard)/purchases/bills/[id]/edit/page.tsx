@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -13,11 +12,11 @@ import { useQuery } from '@tanstack/react-query';
 import { accountsApi, itemsApi } from '@/lib/api';
 
 interface EditBillPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function EditBillPage({ params }: EditBillPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const router = useRouter();
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');

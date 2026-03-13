@@ -70,7 +70,7 @@ export function InvoiceForm({
   isSubmitting,
 }: InvoiceFormProps) {
   const isEditing = !!invoice;
-  const { data: customersData } = useCustomers({ limit: 1000 });
+  const { data: customersData } = useCustomers({ limit: 100 });
   const customers = customersData?.data || [];
 
   // Default dates

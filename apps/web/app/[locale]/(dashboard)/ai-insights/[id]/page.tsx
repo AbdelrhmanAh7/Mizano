@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -43,10 +42,10 @@ const insightIcons: Record<InsightType, React.ReactNode> = {
   OPPORTUNITY: <Target className="h-6 w-6" />,
 };
 
-export default function InsightDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function InsightDetailPage({ params }: { params: { id: string } }) {
   const t = useTranslations('ai.insights.detail');
   const tInsights = useTranslations('ai.insights');
-  const { id } = use(params);
+  const { id } = params;
   const router = useRouter();
   const { data: insight, isLoading } = useAIInsight(id);
   const dismissInsight = useDismissInsight();

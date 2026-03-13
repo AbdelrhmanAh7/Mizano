@@ -63,9 +63,9 @@ export class LeadScoreResponse {
 
   @ApiProperty({
     description: 'Prediction method used',
-    enum: ['ML', 'RULE_BASED', 'HYBRID'],
+    enum: ['OLLAMA', 'ML', 'RULE_BASED', 'HYBRID'],
   })
-  predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID';
+  predictionMethod: 'OLLAMA' | 'ML' | 'RULE_BASED' | 'HYBRID';
 }
 
 export class HotLeadResponse {

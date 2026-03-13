@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WorkforceSchedulingService } from './workforce-scheduling.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import {
   createMockPrisma,
   MockPrismaClient,
@@ -15,7 +16,18 @@ describe('WorkforceSchedulingService', () => {
     prisma = createMockPrisma();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [WorkforceSchedulingService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        WorkforceSchedulingService,
+        { provide: PrismaService, useValue: prisma },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            generateCompletion: jest.fn().mockResolvedValue(''),
+            generateStructuredOutput: jest.fn().mockResolvedValue({}),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<WorkforceSchedulingService>(WorkforceSchedulingService);

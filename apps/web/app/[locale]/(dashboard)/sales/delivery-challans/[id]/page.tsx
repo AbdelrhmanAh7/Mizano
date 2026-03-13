@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -43,11 +42,11 @@ import {
 } from '@/lib/hooks/use-delivery-challans';
 
 interface ChallanDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function ChallanDetailPage({ params }: ChallanDetailPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const t = useTranslations('sales');
   const router = useRouter();
   const { data: challan, isLoading } = useDeliveryChallan(id);

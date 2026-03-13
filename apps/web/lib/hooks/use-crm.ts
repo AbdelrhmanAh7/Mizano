@@ -64,6 +64,7 @@ export interface Deal {
   wonQuoteId?: string;
   createdAt: string;
   updatedAt: string;
+  notes?: string;
   activities?: ActivityLog[];
 }
 
@@ -110,6 +111,8 @@ export interface CreateDealDto {
   probability?: number;
   expectedCloseDate?: string;
   assignedToId?: string;
+  stage?: string;
+  notes?: string;
 }
 
 export interface UpdateDealDto {

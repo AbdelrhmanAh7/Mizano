@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildVoiceCommandPrompt } from '../prompts/nlp.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const nlp = require('compromise');
@@ -28,6 +31,7 @@ export interface ParsedCommand {
   parameters: Record<string, unknown>;
   confidence: number;
   originalText: string;
+  predictionMethod?: PredictionMethod;
 }
 
 export interface CommandExecutionResult {
@@ -85,11 +89,57 @@ const NOUN_ENTITY_MAP: Record<VoiceEntityType, string[]> = {
 export class VoiceCommandService {
   private readonly logger = new Logger(VoiceCommandService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {}
 
   // ---------------------------------------------------------------------------
   // Public API
   // ---------------------------------------------------------------------------
+
+  /**
+   * Parse a voice command with Ollama-first inference, falling back to NLP/regex.
+   * Use this method when async is acceptable (e.g., API handlers).
+   */
+  async parseCommandAsync(text: string): Promise<ParsedCommand> {
+    this.logger.log(`Parsing voice command (async): "${text}"`);
+
+    // --- Ollama-first inference path ---
+    try {
+      const prompt = buildVoiceCommandPrompt(text);
+      const ollamaResult = await this.gateway.infer<{
+        action: string;
+        entity: string;
+        parameters: Record<string, unknown>;
+        confidence: number;
+      }>(prompt);
+
+      if (ollamaResult) {
+        const d = ollamaResult.data;
+        const action = (d.action as VoiceAction) || 'READ';
+        const entity = d.entity as VoiceEntityType | null;
+        const confidence = d.confidence ?? 0.8;
+
+        const result: ParsedCommand = {
+          action,
+          entityType: entity,
+          parameters: d.parameters || {},
+          confidence,
+          originalText: text,
+          predictionMethod: 'OLLAMA',
+        };
+        return result;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama voice command parsing failed, falling back to NLP/regex: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // --- Existing NLP/regex fallback ---
+    return { ...this.parseCommand(text), predictionMethod: 'RULE_BASED' };
+  }
 
   /**
    * Parse a natural-language voice command into a structured command object.

@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -50,8 +49,8 @@ import {
 } from '@/lib/hooks/use-hr';
 import { useTranslations } from 'next-intl';
 
-export default function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function EmployeeDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const t = useTranslations('hr');
   const router = useRouter();
   const { data: employee, isLoading } = useEmployee(id);

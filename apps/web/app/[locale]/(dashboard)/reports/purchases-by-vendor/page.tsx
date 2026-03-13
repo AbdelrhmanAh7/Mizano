@@ -10,7 +10,7 @@ import {
   type PurchasesByVendorEntry,
 } from '@/lib/hooks/use-reports';
 import type { ColumnDef } from '@tanstack/react-table';
-import { endOfMonth, format, startOfMonth } from 'date-fns';
+import { endOfMonth, format, startOfYear } from 'date-fns';
 import { Building2, DollarSign, Receipt, Wallet } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Suspense, useMemo, useState } from 'react';
@@ -19,7 +19,7 @@ function PurchasesByVendorContent() {
   const t = useTranslations('reports');
   const today = new Date();
   const [dateRange, setDateRange] = useState({
-    startDate: startOfMonth(today),
+    startDate: startOfYear(today),
     endDate: endOfMonth(today),
   });
 

@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
@@ -29,11 +28,11 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
 
 interface BillDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function BillDetailPage({ params }: BillDetailPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();

@@ -1,14 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditRiskService } from './audit-risk.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { AiTrainingService } from './ai-training.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   createMockPrisma,
   createMockAiFeedback,
-  createMockAiTraining,
   createMockEventEmitter,
   MockPrismaClient,
   TEST_ORG_ID,
@@ -18,11 +16,6 @@ import {
 describe('AuditRiskService', () => {
   let service: AuditRiskService;
   let prisma: MockPrismaClient;
-  let modelRegistry: {
-    loadActiveModel: jest.Mock;
-    saveModel: jest.Mock;
-    getModelStatus: jest.Mock;
-  };
 
   const orgId = TEST_ORG_ID;
 
@@ -61,26 +54,21 @@ describe('AuditRiskService', () => {
 
   beforeEach(async () => {
     prisma = createMockPrisma();
-    modelRegistry = {
-      loadActiveModel: jest.fn().mockResolvedValue(null),
-      saveModel: jest.fn().mockResolvedValue({ id: 'model-001', version: 1 }),
-      getModelStatus: jest.fn().mockResolvedValue({
-        hasActiveModel: false,
-        activeVersion: null,
-        isTraining: false,
-        trainingVersion: null,
-        lastTrainedAt: null,
-      }),
-    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuditRiskService,
         { provide: PrismaService, useValue: prisma },
-        { provide: ModelRegistryService, useValue: modelRegistry },
         { provide: AiFeedbackService, useValue: createMockAiFeedback() },
-        { provide: AiTrainingService, useValue: createMockAiTraining() },
         { provide: EventEmitter2, useValue: createMockEventEmitter() },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            infer: jest.fn().mockResolvedValue(null),
+            isHealthy: jest.fn().mockResolvedValue(false),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
       ],
     }).compile();
 
@@ -214,39 +202,6 @@ describe('AuditRiskService', () => {
       const result = await service.scoreEntity(orgId, 'expense', 'exp-001');
 
       expect(result.entityType).toBe('expense');
-    });
-
-    it('should fall back to rule-based confidence when ML model data format is invalid', async () => {
-      // The modelData does not contain a valid serialized LogisticRegression classifier,
-      // so deserializeModel will throw and the service falls back to rule-based scoring.
-      modelRegistry.loadActiveModel.mockResolvedValue({
-        modelData: {
-          weights: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
-          bias: 0,
-          featureNames: [
-            'amount_normalized',
-            'corrections_count',
-            'weekend_flag',
-            'round_number_flag',
-            'deviation_from_avg',
-            'amount_anomaly',
-          ],
-        },
-      } as any);
-
-      const journal = createMockJournal();
-      prisma.journal.findFirst.mockResolvedValue(journal as any);
-      prisma.journal.findMany.mockResolvedValue(
-        Array.from({ length: 5 }, () => ({
-          lines: [{ debit: mockDecimal(500) }],
-        })) as any,
-      );
-      prisma.auditLog.count.mockResolvedValue(0 as any);
-
-      const result = await service.scoreEntity(orgId, 'journal', 'jrn-001');
-
-      // ML model deserialization fails -> falls back to rule-based with confidence 0.65
-      expect(result.confidence).toBe(0.65);
     });
   });
 

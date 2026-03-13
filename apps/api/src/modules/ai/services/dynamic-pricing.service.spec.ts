@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DynamicPricingService } from './dynamic-pricing.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import {
   createMockPrisma,
   MockPrismaClient,
@@ -38,7 +39,18 @@ describe('DynamicPricingService', () => {
     prisma = createMockPrisma();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [DynamicPricingService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        DynamicPricingService,
+        { provide: PrismaService, useValue: prisma },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            infer: jest.fn().mockResolvedValue(null),
+            isHealthy: jest.fn().mockResolvedValue(false),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<DynamicPricingService>(DynamicPricingService);

@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import {
   PrismaClient,
   UserStatus,
@@ -38,10 +39,6 @@ import {
   BankTransactionType,
   ReconciliationStatus,
   ActivityType,
-  AiFeature,
-  AiTrainingSource,
-  AiModelStatus,
-  AiFeedbackAction,
   AnomalyType,
   AnomalySeverity,
   ReorderStatus,
@@ -57,7 +54,6 @@ import {
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { Decimal } from '@prisma/client/runtime/library';
-import { seedAiTrainingData } from './seed-ai-training';
 
 const prisma = new PrismaClient();
 const DEFAULT_PASSWORD = 'password123';
@@ -278,7 +274,7 @@ async function main() {
       organizationId: orgId,
     },
   });
-  const taxRate5 = await prisma.taxRate.upsert({
+  await prisma.taxRate.upsert({
     where: { id: 'tax-vat-5' },
     update: {},
     create: {
@@ -892,26 +888,6 @@ async function main() {
     },
   });
   console.log('  ✓ 1 reconciliation, 1 pattern');
-
-  // ─────────────────────────────────────────────────────────
-  // 21. VENDOR OCR LAYOUT
-  // ─────────────────────────────────────────────────────────
-  console.log('\n21. Vendor OCR layouts...');
-  await prisma.vendorOcrLayout.upsert({
-    where: { organizationId_vendorId: { organizationId: orgId, vendorId: vendMap['vend-001'] } },
-    update: {},
-    create: {
-      vendorId: vendMap['vend-001'],
-      fieldPositions: {
-        invoiceNumber: { x: 450, y: 80, width: 150, height: 20 },
-        date: { x: 450, y: 110, width: 120, height: 20 },
-        total: { x: 450, y: 400, width: 150, height: 25 },
-      },
-      sampleCount: 3,
-      organizationId: orgId,
-    },
-  });
-  console.log('  ✓ 1 vendor OCR layout');
 
   // ─────────────────────────────────────────────────────────
   // 22. QUOTES
@@ -1929,7 +1905,7 @@ async function main() {
       organizationId: orgId,
     },
   });
-  const task3 = await prisma.task.upsert({
+  await prisma.task.upsert({
     where: { id: 'task-003' },
     update: {},
     create: {
@@ -2055,7 +2031,7 @@ async function main() {
       organizationId: orgId,
     },
   });
-  const asset2 = await prisma.asset.upsert({
+  await prisma.asset.upsert({
     where: { organizationId_assetNumber: { organizationId: orgId, assetNumber: 'FA-002' } },
     update: {},
     create: {
@@ -2955,11 +2931,6 @@ async function main() {
   console.log('  ✓ 3 audit logs');
 
   // ─────────────────────────────────────────────────────────
-  // 57. AI TRAINING DATA (existing seed-ai-training)
-  // ─────────────────────────────────────────────────────────
-  await seedAiTrainingData(prisma, orgId, accountMap, custMap, vendMap, itemMap, whMap, bankMap);
-
-  // ─────────────────────────────────────────────────────────
   // DONE
   // ─────────────────────────────────────────────────────────
   console.log('\n' + '='.repeat(60));
@@ -2977,6 +2948,6 @@ main()
     console.error(e);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
+  .finally(() => {
+    void prisma.$disconnect();
   });

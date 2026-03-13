@@ -12,9 +12,9 @@ import { useQuotes } from '@/lib/hooks/use-quotes';
 
 export default function SalesPage() {
   const t = useTranslations('sales');
-  const { data: customersData, isLoading: customersLoading } = useCustomers({ limit: 1000 });
-  const { data: invoicesData, isLoading: invoicesLoading } = useInvoices({ limit: 1000 });
-  const { data: quotesData, isLoading: quotesLoading } = useQuotes({ limit: 1000 });
+  const { data: customersData, isLoading: customersLoading } = useCustomers({ limit: 100 });
+  const { data: invoicesData, isLoading: invoicesLoading } = useInvoices({ limit: 100 });
+  const { data: quotesData, isLoading: quotesLoading } = useQuotes({ limit: 100 });
 
   const customers = customersData?.data || [];
   const invoices = invoicesData?.data || [];

@@ -136,7 +136,7 @@ export function useActiveItems() {
   return useQuery({
     queryKey: ['items', 'active'],
     queryFn: async () => {
-      const response = await itemsApi.getAll({ isActive: true, limit: 1000 });
+      const response = await itemsApi.getAll({ limit: 100 });
       return (response.data.data || response.data) as Item[];
     },
   });

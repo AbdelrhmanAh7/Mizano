@@ -10,7 +10,9 @@ import {
   Ban,
   Trash2,
   CreditCard,
+  Download,
   FileText,
+  Mail,
   User,
   Calendar,
   DollarSign,
@@ -234,11 +236,25 @@ export default function InvoiceDetailPage() {
           )}
           {canEdit && !isVoid && !isDraft && !isPaid && (
             <Button asChild>
-              <Link href={`/sales/payments/new?invoiceId=${invoiceId}`}>
+              <Link
+                href={`/sales/payments/new?invoiceId=${invoice.id}&customerId=${invoice.customerId}`}
+              >
                 <CreditCard className="mr-2 h-4 w-4" />
                 {t('invoices.recordPayment')}
               </Link>
             </Button>
+          )}
+          {!isDraft && (
+            <>
+              <Button variant="outline" disabled title="Coming soon">
+                <Download className="mr-2 h-4 w-4" />
+                Export PDF
+              </Button>
+              <Button variant="outline" disabled title="Coming soon">
+                <Mail className="mr-2 h-4 w-4" />
+                Email
+              </Button>
+            </>
           )}
           {canEdit && !isVoid && !isDraft && (
             <Button
@@ -319,109 +335,111 @@ export default function InvoiceDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[40%]">{t('lineItems.description')}</TableHead>
-                  <TableHead className="text-right">{t('lineItems.quantity')}</TableHead>
-                  <TableHead className="text-right">{t('lineItems.rate')}</TableHead>
-                  <TableHead className="text-right">{t('lineItems.discount')}</TableHead>
-                  <TableHead className="text-right">{t('lineItems.tax')}</TableHead>
-                  <TableHead className="text-right">{t('lineItems.amount')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoice.lines && invoice.lines.length > 0 ? (
-                  invoice.lines.map(
-                    (
-                      line: {
-                        id?: string;
-                        item?: { sku?: string };
-                        description?: string;
-                        quantity?: string;
-                        rate?: string;
-                        discount?: string;
-                        taxRate?: string;
-                        amount?: string;
-                      },
-                      index: number,
-                    ) => (
-                      <TableRow key={line.id || index}>
-                        <TableCell>
-                          <div>
-                            {line.item && (
-                              <span className="text-xs text-muted-foreground block">
-                                {line.item.sku}
-                              </span>
-                            )}
-                            {line.description}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {parseFloat(line.quantity || '0').toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(line.rate || '0')}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {parseFloat(line.discount || '0').toFixed(0)}%
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {parseFloat(line.taxRate || '0').toFixed(0)}%
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
-                          {formatCurrency(line.amount || '0')}
-                        </TableCell>
-                      </TableRow>
-                    ),
-                  )
-                ) : (
+            <div className="overflow-x-auto">
+              <Table className="min-w-[600px]">
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      No line items
-                    </TableCell>
+                    <TableHead className="w-[40%]">{t('lineItems.description')}</TableHead>
+                    <TableHead className="text-right">{t('lineItems.quantity')}</TableHead>
+                    <TableHead className="text-right">{t('lineItems.rate')}</TableHead>
+                    <TableHead className="text-right">{t('lineItems.discount')}</TableHead>
+                    <TableHead className="text-right">{t('lineItems.tax')}</TableHead>
+                    <TableHead className="text-right">{t('lineItems.amount')}</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-              <TableFooter>
-                <TableRow>
-                  <TableCell colSpan={5} className="text-right">
-                    {tCommon('subtotal')}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatCurrency(invoice.subtotal || '0')}
-                  </TableCell>
-                </TableRow>
-                {parseFloat(invoice.taxAmount || '0') > 0 && (
+                </TableHeader>
+                <TableBody>
+                  {invoice.lines && invoice.lines.length > 0 ? (
+                    invoice.lines.map(
+                      (
+                        line: {
+                          id?: string;
+                          item?: { sku?: string };
+                          description?: string;
+                          quantity?: string;
+                          rate?: string;
+                          discount?: string;
+                          taxRate?: string;
+                          amount?: string;
+                        },
+                        index: number,
+                      ) => (
+                        <TableRow key={line.id || index}>
+                          <TableCell>
+                            <div>
+                              {line.item && (
+                                <span className="text-xs text-muted-foreground block">
+                                  {line.item.sku}
+                                </span>
+                              )}
+                              {line.description}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {parseFloat(line.quantity || '0').toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatCurrency(line.rate || '0')}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {parseFloat(line.discount || '0').toFixed(0)}%
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {parseFloat(line.taxRate || '0').toFixed(0)}%
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium whitespace-nowrap">
+                            {formatCurrency(line.amount || '0')}
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                        No line items
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+                <TableFooter>
                   <TableRow>
                     <TableCell colSpan={5} className="text-right">
-                      {tCommon('tax')}
+                      {tCommon('subtotal')}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(invoice.taxAmount || '0')}
+                      {formatCurrency(invoice.subtotal || '0')}
                     </TableCell>
                   </TableRow>
-                )}
-                {parseFloat(invoice.shippingAmount || '0') > 0 && (
-                  <TableRow>
+                  {parseFloat(invoice.taxAmount || '0') > 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-right">
+                        {tCommon('tax')}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(invoice.taxAmount || '0')}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {parseFloat(invoice.shippingAmount || '0') > 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-right">
+                        {t('invoices.form.shippingAmount')}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(invoice.shippingAmount || '0')}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  <TableRow className="font-bold">
                     <TableCell colSpan={5} className="text-right">
-                      {t('invoices.form.shippingAmount')}
+                      {tCommon('total')}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(invoice.shippingAmount || '0')}
+                      {formatCurrency(invoice.grandTotal || '0')}
                     </TableCell>
                   </TableRow>
-                )}
-                <TableRow className="font-bold">
-                  <TableCell colSpan={5} className="text-right">
-                    {tCommon('total')}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatCurrency(invoice.grandTotal || '0')}
-                  </TableCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
+                </TableFooter>
+              </Table>
+            </div>
           </CardContent>
         </Card>
 

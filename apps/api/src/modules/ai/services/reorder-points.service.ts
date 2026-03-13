@@ -3,6 +3,9 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { ReorderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { mean, standardDeviation, getZValueForServiceLevel } from '../utils/statistics.util';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildReorderPrompt } from '../prompts/operations.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface ReorderCalculation {
   avgDailyDemand: number;
@@ -13,6 +16,7 @@ export interface ReorderCalculation {
   daysOfStockRemaining: number | null;
   status: ReorderStatus;
   needsReorder: boolean;
+  predictionMethod: PredictionMethod;
 }
 
 export interface ReorderAlert {
@@ -69,7 +73,10 @@ export class ReorderPointsService {
   private readonly DEAD_STOCK_DAYS = 90;
   private readonly ABC_SERVICE_LEVELS = { A: 0.98, B: 0.95, C: 0.9 };
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {}
 
   /**
    * Calculate reorder point for daily sales history
@@ -153,6 +160,7 @@ export class ReorderPointsService {
         daysOfStockRemaining: null,
         status: 'OK',
         needsReorder: false,
+        predictionMethod: 'RULE_BASED',
       };
     }
 
@@ -160,7 +168,8 @@ export class ReorderPointsService {
     const dailySales = await this.getDemandHistory(organizationId, itemId, 90);
 
     // Calculate reorder point
-    const { avgDailyDemand, demandStdDev, safetyStock, reorderPoint } = this.calculateReorderPoint(
+    // eslint-disable-next-line prefer-const -- safetyStock & reorderPoint are reassigned by Ollama blending below
+    let { avgDailyDemand, demandStdDev, safetyStock, reorderPoint } = this.calculateReorderPoint(
       dailySales,
       leadTimeDays,
       serviceLevel,
@@ -178,6 +187,46 @@ export class ReorderPointsService {
     // Calculate days of stock remaining
     const daysOfStockRemaining =
       avgDailyDemand > 0 ? Math.floor(item.currentStock / avgDailyDemand) : null;
+
+    let predictionMethod: PredictionMethod = 'RULE_BASED';
+
+    // --- Ollama enhancement ---
+    try {
+      const itemData = {
+        id: itemId,
+        currentStock: item.currentStock,
+        costPrice: Number(item.costPrice),
+      };
+      const salesData = { avgDailyDemand, demandStdDev, leadTimeDays };
+      const stockData = { currentStock: item.currentStock, daysOfStockRemaining };
+      const prompt = buildReorderPrompt(itemData, salesData, stockData);
+      const ollamaResult = await this.gateway.infer<{
+        reorder_point: number;
+        safety_stock: number;
+        reasoning: string;
+      }>(prompt);
+
+      if (ollamaResult) {
+        // Blend reorder point: 50% existing + 50% Ollama
+        if (
+          typeof ollamaResult.data.reorder_point === 'number' &&
+          ollamaResult.data.reorder_point > 0
+        ) {
+          reorderPoint = Math.ceil(reorderPoint * 0.5 + ollamaResult.data.reorder_point * 0.5);
+        }
+        if (
+          typeof ollamaResult.data.safety_stock === 'number' &&
+          ollamaResult.data.safety_stock > 0
+        ) {
+          safetyStock = Math.ceil(safetyStock * 0.5 + ollamaResult.data.safety_stock * 0.5);
+        }
+        predictionMethod = 'HYBRID';
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama reorder calculation failed, using rule-based: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
 
     // Determine status
     const status = this.determineStatus(
@@ -198,6 +247,7 @@ export class ReorderPointsService {
       daysOfStockRemaining,
       status,
       needsReorder,
+      predictionMethod,
     };
   }
 
@@ -547,6 +597,7 @@ export class ReorderPointsService {
         daysOfStockRemaining: null,
         status: 'OK',
         needsReorder: false,
+        predictionMethod: 'RULE_BASED',
       };
     }
 
@@ -583,6 +634,7 @@ export class ReorderPointsService {
       daysOfStockRemaining,
       status,
       needsReorder: item.currentStock <= reorderPoint,
+      predictionMethod: 'RULE_BASED',
     };
   }
 

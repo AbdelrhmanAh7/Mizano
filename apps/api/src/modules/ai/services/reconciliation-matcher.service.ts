@@ -2,6 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { Prisma } from '@prisma/client';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildReconciliationPrompt } from '../prompts/operations.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 import {
   levenshteinSimilarity,
   normalizeText,
@@ -40,6 +43,7 @@ export interface MatchScore {
   };
   confidence: 'high' | 'medium' | 'low';
   matchReasons: string[];
+  predictionMethod: PredictionMethod;
 }
 
 export interface BankRuleCondition {
@@ -74,7 +78,10 @@ export class ReconciliationMatcherService {
   // Minimum matches before a pattern is auto-suggested with high confidence
   private readonly PATTERN_LEARNING_THRESHOLD = 3;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {}
 
   /**
    * Match a bank transaction against potential candidates
@@ -130,6 +137,53 @@ export class ReconciliationMatcherService {
 
     // Sort by score descending
     scores.sort((a, b) => b.totalScore - a.totalScore);
+
+    // --- Ollama enhancement ---
+    if (scores.length > 0) {
+      try {
+        const bankTxData = {
+          amount: Number(transaction.amount),
+          description: transaction.description,
+          reference: transaction.reference,
+          payee: transaction.payee,
+          date: transaction.date.toISOString().split('T')[0],
+        };
+        const bookTxData = {
+          candidates: scores.slice(0, 5).map((s) => ({
+            entityType: s.entityType,
+            entityId: s.entityId,
+            amount: this.getCandidateAmount({ entityType: s.entityType, entity: s.entity }),
+            reference: this.getCandidateReference({ entityType: s.entityType, entity: s.entity }),
+          })),
+        };
+        const prompt = buildReconciliationPrompt(bankTxData, bookTxData);
+        const ollamaResult = await this.gateway.infer<{
+          matches: Array<{ bank_id: string; book_id: string; confidence: number; reason: string }>;
+          unmatched_explanation: string[];
+        }>(prompt);
+
+        if (ollamaResult && ollamaResult.data.matches?.length > 0) {
+          // Boost scores for Ollama-confirmed matches
+          for (const ollamaMatch of ollamaResult.data.matches) {
+            const existingScore = scores.find((s) => s.entityId === ollamaMatch.book_id);
+            if (existingScore) {
+              // Blend: 50% existing + 50% Ollama confidence
+              existingScore.totalScore =
+                existingScore.totalScore * 0.5 + ollamaMatch.confidence * 0.5;
+              existingScore.matchReasons.push(`Ollama: ${ollamaMatch.reason}`);
+              existingScore.predictionMethod = 'HYBRID';
+            }
+          }
+
+          // Re-sort after blending
+          scores.sort((a, b) => b.totalScore - a.totalScore);
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Ollama reconciliation failed, using rule-based: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
 
     // Return top 5 matches
     return scores.slice(0, 5);
@@ -199,6 +253,7 @@ export class ReconciliationMatcherService {
       },
       confidence,
       matchReasons,
+      predictionMethod: 'RULE_BASED',
     };
   }
 

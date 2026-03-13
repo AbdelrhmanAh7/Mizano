@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfYear, endOfMonth } from 'date-fns';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
@@ -21,7 +21,7 @@ interface CashFlowItem {
 export default function CashFlowReportPage() {
   const t = useTranslations('reports');
   const [dateRange, setDateRange] = useState({
-    startDate: startOfMonth(new Date()),
+    startDate: startOfYear(new Date()),
     endDate: endOfMonth(new Date()),
   });
 

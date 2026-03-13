@@ -50,6 +50,10 @@
     "cache": {
       "title": "Cache Management",
       "description": "Monitor and manage API response caching"
+    },
+    "auditLogs": {
+      "title": "Audit Logs",
+      "description": "Track all user actions and changes across the system"
     }
   },
   "organization": {
@@ -195,14 +199,6 @@
     },
     "modelParameters": "Model Parameters",
     "modelParametersDescription": "Configure how AI models learn and detect anomalies",
-    "retrainingFrequency": "Retraining Frequency",
-    "retrainingFrequencyHint": "How often AI models retrain on your latest data",
-    "retrainingOptions": {
-      "daily": "Daily",
-      "weekly": "Weekly",
-      "biweekly": "Every 2 Weeks",
-      "monthly": "Monthly"
-    },
     "anomalySensitivity": "Anomaly Detection Sensitivity",
     "anomalySensitivityHint": "Higher values flag more transactions. Lower values only flag the most unusual ones."
   },
@@ -362,6 +358,47 @@
     "accountListsDescription": "Cached for 10 minutes. Chart of Accounts rarely changes, so longer TTL provides significant performance improvement.",
     "salesPurchases": "Sales & Purchases Lists",
     "salesPurchasesDescription": "Cached for 2 minutes. Short TTL ensures data freshness for frequently-changing transactional data."
+  },
+  "auditLogs": {
+    "title": "Audit Logs",
+    "description": "Track all user actions and changes across the system",
+    "stats": {
+      "totalActions": "Total Actions",
+      "creates": "Creates",
+      "updates": "Updates",
+      "deletes": "Deletes"
+    },
+    "filters": {
+      "searchPlaceholder": "Search by entity or user...",
+      "entityType": "Entity Type",
+      "allEntities": "All Entities",
+      "action": "Action",
+      "allActions": "All Actions"
+    },
+    "actions": {
+      "create": "Create",
+      "update": "Update",
+      "delete": "Delete"
+    },
+    "table": {
+      "title": "Activity Log",
+      "description": "All recorded actions in the last 30 days"
+    },
+    "columns": {
+      "timestamp": "Timestamp",
+      "user": "User",
+      "action": "Action",
+      "entityType": "Entity Type",
+      "entityId": "Entity ID",
+      "ip": "IP Address"
+    },
+    "pagination": {
+      "page": "Page"
+    },
+    "empty": {
+      "title": "No audit logs found",
+      "description": "Actions will appear here as users make changes"
+    }
   },
   "common": {
     "saveChanges": "Save Changes",

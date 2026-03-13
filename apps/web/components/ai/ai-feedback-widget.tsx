@@ -20,7 +20,6 @@ import { cn } from '@/lib/utils';
 export type AiFeature =
   | 'CATEGORIZATION'
   | 'RECONCILIATION'
-  | 'OCR_LAYOUT'
   | 'DEMAND_FORECAST'
   | 'LEAD_SCORING'
   | 'ANOMALY'

@@ -1,14 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { KnowledgeAssistantService } from './knowledge-assistant.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { AiTrainingService } from './ai-training.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   createMockPrisma,
   createMockAiFeedback,
-  createMockAiTraining,
   createMockEventEmitter,
   MockPrismaClient,
   TEST_ORG_ID,
@@ -17,10 +15,6 @@ import {
 describe('KnowledgeAssistantService', () => {
   let service: KnowledgeAssistantService;
   let prisma: MockPrismaClient;
-  let modelRegistry: {
-    loadActiveModel: jest.Mock;
-    saveModel: jest.Mock;
-  };
 
   const orgId = TEST_ORG_ID;
 
@@ -39,19 +33,21 @@ describe('KnowledgeAssistantService', () => {
 
   beforeEach(async () => {
     prisma = createMockPrisma();
-    modelRegistry = {
-      loadActiveModel: jest.fn().mockResolvedValue(null),
-      saveModel: jest.fn().mockResolvedValue({ id: 'model-001', version: 1 }),
-    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         KnowledgeAssistantService,
         { provide: PrismaService, useValue: prisma },
-        { provide: ModelRegistryService, useValue: modelRegistry },
         { provide: AiFeedbackService, useValue: createMockAiFeedback() },
-        { provide: AiTrainingService, useValue: createMockAiTraining() },
         { provide: EventEmitter2, useValue: createMockEventEmitter() },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            generateCompletion: jest.fn().mockResolvedValue(''),
+            generateStructuredOutput: jest.fn().mockResolvedValue({}),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
       ],
     }).compile();
 
@@ -205,23 +201,6 @@ describe('KnowledgeAssistantService', () => {
 
       expect(result.indexed).toBe(3);
       expect(result.totalDocuments).toBe(3);
-    });
-
-    it('should persist index metadata via ModelRegistryService', async () => {
-      prisma.aIInsight.findMany.mockResolvedValue([createMockInsight()] as any);
-
-      await service.indexDocuments(orgId);
-
-      expect(modelRegistry.saveModel).toHaveBeenCalledWith(
-        orgId,
-        expect.anything(), // AiFeature.KNOWLEDGE_ASSISTANT
-        expect.objectContaining({
-          type: 'TfIdf',
-          documentCount: 1,
-        }),
-        expect.any(Number),
-        expect.any(Number),
-      );
     });
   });
 

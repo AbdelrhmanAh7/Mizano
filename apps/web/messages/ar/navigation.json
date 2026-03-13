@@ -33,6 +33,12 @@
     },
     "adjustments": {
       "title": "التسويات"
+    },
+    "transfers": {
+      "title": "التحويلات"
+    },
+    "priceLists": {
+      "title": "قوائم الأسعار"
     }
   },
   "banking": {
@@ -84,9 +90,9 @@
     "leads": "العملاء المحتملون",
     "deals": "الصفقات"
   },
+  "assets": "الأصول الثابتة",
   "reports": "التقارير",
   "aiInsights": "رؤى الذكاء الاصطناعي",
-  "aiLab": "مختبر الذكاء الاصطناعي",
   "deepSearch": "بحث عميق",
   "performance": "الأداء",
   "settings": "الإعدادات",

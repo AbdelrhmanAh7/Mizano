@@ -3,7 +3,7 @@ export * from './anomaly-badge';
 export * from './reorder-status-badge';
 export * from './confidence-badge';
 export * from './reconciliation-match-card';
-export * from './ocr-scanner';
+
 export * from './inventory-ai-panel';
 export * from './collection-priority-card';
 export * from './customer-ai-insights';

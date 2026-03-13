@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -13,11 +12,11 @@ import { customersApi } from '@/lib/api';
 import { useTranslations } from 'next-intl';
 
 interface EditProjectPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function EditProjectPage({ params }: EditProjectPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const t = useTranslations('projects');
   const router = useRouter();
   const { data: project, isLoading: projectLoading } = useProject(id);

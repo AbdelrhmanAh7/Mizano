@@ -2,17 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { LeadScoringService } from './lead-scoring.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
 
 describe('LeadScoringService', () => {
   let service: LeadScoringService;
   let prisma: MockPrismaClient;
-  let modelRegistry: {
-    loadActiveModel: jest.Mock;
-    saveModel: jest.Mock;
-    getModelStatus: jest.Mock;
-  };
 
   const orgId = 'org-test-001';
 
@@ -35,23 +30,19 @@ describe('LeadScoringService', () => {
 
   beforeEach(async () => {
     prisma = createMockPrisma();
-    modelRegistry = {
-      loadActiveModel: jest.fn().mockResolvedValue(null),
-      saveModel: jest.fn().mockResolvedValue({ id: 'model-001', version: 1 }),
-      getModelStatus: jest.fn().mockResolvedValue({
-        hasActiveModel: false,
-        activeVersion: null,
-        isTraining: false,
-        trainingVersion: null,
-        lastTrainedAt: null,
-      }),
-    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LeadScoringService,
         { provide: PrismaService, useValue: prisma },
-        { provide: ModelRegistryService, useValue: modelRegistry },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            infer: jest.fn().mockResolvedValue(null),
+            isHealthy: jest.fn().mockResolvedValue(false),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
       ],
     }).compile();
 
@@ -86,7 +77,6 @@ describe('LeadScoringService', () => {
       prisma.lead.findFirst.mockResolvedValue(lead as any);
       prisma.leadScore.findFirst.mockResolvedValue(null as any);
       prisma.leadScore.upsert.mockResolvedValue({} as any);
-      modelRegistry.loadActiveModel.mockResolvedValue(null);
 
       const result = await service.scoreLead(orgId, lead.id);
 
@@ -228,38 +218,6 @@ describe('LeadScoringService', () => {
       const hotTier = result.byTier.find((t) => t.tier === 'HOT');
       expect(hotTier?.count).toBe(1);
       expect(hotTier?.percentage).toBe(25);
-    });
-  });
-
-  describe('getMLModelStatus', () => {
-    it('should return no model status when no model exists', async () => {
-      modelRegistry.getModelStatus.mockResolvedValue({
-        hasActiveModel: false,
-        activeVersion: null,
-        isTraining: false,
-        trainingVersion: null,
-        lastTrainedAt: null,
-      });
-
-      const result = await service.getMLModelStatus(orgId);
-
-      expect(result.hasModel).toBe(false);
-      expect(result.version).toBeNull();
-      expect(result.accuracy).toBeNull();
-      expect(result.blendWeight).toBe(0.3);
-    });
-  });
-
-  describe('trainMLModel', () => {
-    it('should return insufficient data message when not enough leads', async () => {
-      prisma.lead.findMany.mockResolvedValue([] as any);
-
-      const result = await service.trainMLModel(orgId);
-
-      expect(result.version).toBe(0);
-      expect(result.accuracy).toBe(0);
-      expect(result.sampleCount).toBe(0);
-      expect(result.message).toContain('Insufficient data');
     });
   });
 

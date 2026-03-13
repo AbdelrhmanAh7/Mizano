@@ -1,18 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { AiTrainingService } from './ai-training.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { getRiskLevel } from '../utils/risk-level.util';
 import { buildIsolationForest1D, isolationForestScore1D } from '../utils/isolation-forest.util';
-import {
-  trainLogisticRegression,
-  predictProbability,
-  serializeModel,
-  deserializeModel,
-} from '../utils/logistic-regression.util';
 import { zScoreWithStats, mean, standardDeviation } from '../utils/statistics.util';
+import { buildAuditRiskPrompt, AuditRiskResponse } from '../prompts/security.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface AuditRiskResult {
   entityType: string;
@@ -21,6 +15,7 @@ export interface AuditRiskResult {
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   factors: { factor: string; weight: number; description: string }[];
   confidence: number;
+  predictionMethod: PredictionMethod;
 }
 
 export interface AuditRiskBatchResult {
@@ -37,10 +32,8 @@ export class AuditRiskService {
 
   constructor(
     private prisma: PrismaService,
-    private modelRegistry: ModelRegistryService,
     private feedbackService: AiFeedbackService,
-    private trainingService: AiTrainingService,
-    private eventEmitter: EventEmitter2,
+    private gateway: OllamaInferenceGateway,
   ) {}
 
   async scoreEntity(
@@ -57,25 +50,49 @@ export class AuditRiskService {
         riskLevel: 'LOW',
         factors: [],
         confidence: 0,
+        predictionMethod: 'RULE_BASED' as PredictionMethod,
       };
     }
 
-    // Try ML prediction first
-    let mlScore: number | null = null;
+    const { score, factors } = this.ruleBasedScore(features);
+
+    // Try Ollama inference
+    let ollamaScore: number | null = null;
     try {
-      const model = await this.modelRegistry.loadActiveModel(organizationId, 'AUDIT_RISK');
-      if (model?.modelData) {
-        const deserialized = deserializeModel(JSON.stringify(model.modelData));
-        mlScore = predictProbability(deserialized, features.vector);
+      const prompt = buildAuditRiskPrompt(
+        {
+          entity_type: entityType,
+          entity_id: entityId,
+          data: features.raw,
+        },
+        [], // patterns not readily available at this point
+      );
+      const ollamaResult = await this.gateway.infer<AuditRiskResponse>(prompt.user, {
+        systemPrompt: prompt.system,
+      });
+      if (ollamaResult?.data?.risk_score != null) {
+        ollamaScore = Math.max(0, Math.min(1, ollamaResult.data.risk_score));
       }
-    } catch {
-      // ML not available, use rule-based
+    } catch (error) {
+      this.logger.warn(
+        `Ollama audit risk failed for ${entityType}/${entityId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
-    const { score, factors } = this.ruleBasedScore(features);
-    const finalScore = mlScore !== null ? score * 0.6 + mlScore * 0.4 : score;
+    // Blend scores: Ollama + rule-based
+    let finalScore: number;
+    let predictionMethod: PredictionMethod;
+    if (ollamaScore !== null) {
+      finalScore = ollamaScore * 0.5 + score * 0.5;
+      predictionMethod = 'HYBRID';
+    } else {
+      finalScore = score;
+      predictionMethod = 'RULE_BASED';
+    }
 
     const riskLevel = getRiskLevel(finalScore);
+
+    const confidence = ollamaScore !== null ? 0.85 : 0.65;
 
     const result: AuditRiskResult = {
       entityType,
@@ -83,7 +100,8 @@ export class AuditRiskService {
       riskScore: Math.round(finalScore * 1000) / 1000,
       riskLevel,
       factors,
-      confidence: mlScore !== null ? 0.85 : 0.65,
+      confidence,
+      predictionMethod,
     };
 
     // Store prediction for feedback tracking
@@ -165,115 +183,13 @@ export class AuditRiskService {
    * Record user feedback on an audit risk score.
    */
   async recordAuditFeedback(
-    organizationId: string,
-    entityType: string,
-    entityId: string,
-    wasCorrect: boolean,
-    actualRisk?: string,
+    _organizationId: string,
+    _entityType: string,
+    _entityId: string,
+    _wasCorrect: boolean,
+    _actualRisk?: string,
   ): Promise<void> {
-    const label = actualRisk || (wasCorrect ? 'CORRECT' : 'INCORRECT');
-
-    await this.trainingService.addTrainingData(
-      organizationId,
-      'AUDIT_RISK',
-      { entityType, entityId },
-      label,
-      wasCorrect ? 'USER' : 'CORRECTION',
-    );
-
-    if (!wasCorrect) {
-      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
-        organizationId,
-        'AUDIT_RISK',
-      );
-
-      if (shouldRetrain) {
-        this.logger.log(`Audit risk retraining threshold reached for org ${organizationId}`);
-        this.eventEmitter.emit('ai.retraining.needed', {
-          organizationId,
-          feature: 'AUDIT_RISK',
-        });
-      }
-    }
-  }
-
-  async trainModel(organizationId: string): Promise<{
-    version: number;
-    accuracy: number;
-    sampleCount: number;
-    message: string;
-  }> {
-    // Gather training data from audit logs and feedback
-    const feedback = await this.prisma.aiFeedback.findMany({
-      where: {
-        organizationId,
-        feature: 'AUDIT_RISK',
-      },
-      select: {
-        inputData: true,
-        userAction: true,
-      },
-    });
-
-    if (feedback.length < 30) {
-      return {
-        version: 0,
-        accuracy: 0,
-        sampleCount: feedback.length,
-        message: `Insufficient feedback data: ${feedback.length} samples, need 30`,
-      };
-    }
-
-    const features: number[][] = [];
-    const labels: number[] = [];
-
-    for (const fb of feedback) {
-      const input = fb.inputData as Record<string, string> | null;
-      if (!input?.entityType || !input?.entityId) continue;
-      const featureData = await this.extractFeatures(
-        organizationId,
-        input.entityType,
-        input.entityId,
-      );
-      if (featureData) {
-        features.push(featureData.vector);
-        labels.push(fb.userAction === 'ACCEPTED' ? 1 : 0); // accepted = confirmed risky
-      }
-    }
-
-    if (features.length < 30) {
-      return {
-        version: 0,
-        accuracy: 0,
-        sampleCount: features.length,
-        message: `Insufficient valid features: ${features.length} samples, need 30`,
-      };
-    }
-
-    const result = trainLogisticRegression(features, labels, [
-      'amount_normalized',
-      'corrections_count',
-      'weekend_flag',
-      'round_number_flag',
-      'deviation_from_avg',
-      'amount_anomaly',
-    ]);
-
-    const serialized = serializeModel(result.model);
-    const saved = await this.modelRegistry.saveModel(
-      organizationId,
-      'AUDIT_RISK',
-      JSON.parse(serialized),
-      result.accuracy,
-      features.length,
-    );
-
-    return {
-      version: saved.version,
-      accuracy: result.accuracy,
-      sampleCount: features.length,
-      message: `Model trained with ${features.length} samples, accuracy: ${(result.accuracy * 100).toFixed(1)}%`,
-    };
+    // Feedback recorded — no retraining infrastructure
   }
 
   private async extractFeatures(

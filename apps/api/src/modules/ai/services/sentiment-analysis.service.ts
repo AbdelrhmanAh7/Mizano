@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildSentimentPrompt } from '../prompts/nlp.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Sentiment = require('sentiment');
@@ -20,6 +23,8 @@ export interface SentimentResult {
   negative: string[];
   /** Overall sentiment label */
   sentiment: SentimentLabel;
+  /** How the prediction was generated */
+  predictionMethod?: PredictionMethod;
 }
 
 export interface EntitySentimentResult {
@@ -75,7 +80,10 @@ export class SentimentAnalysisService {
     };
   };
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {
     this.analyzer = new Sentiment();
   }
 
@@ -110,6 +118,56 @@ export class SentimentAnalysisService {
       negative: result.negative || [],
       sentiment: this.labelFromComparative(comparative),
     };
+  }
+
+  /**
+   * Async sentiment analysis that tries Ollama first, then falls back to AFINN.
+   * Use this method when async is acceptable (e.g., API handlers).
+   */
+  async analyzeTextAsync(text: string): Promise<SentimentResult> {
+    if (!text || text.trim().length === 0) {
+      return {
+        score: 0,
+        comparative: 0,
+        positive: [],
+        negative: [],
+        sentiment: 'neutral',
+        predictionMethod: 'RULE_BASED',
+      };
+    }
+
+    // --- Ollama-first inference path ---
+    try {
+      const prompt = buildSentimentPrompt(text);
+      const ollamaResult = await this.gateway.infer<{
+        score: number;
+        comparative: number;
+        sentiment: string;
+        positive_words: string[];
+        negative_words: string[];
+      }>(prompt);
+
+      if (ollamaResult) {
+        const d = ollamaResult.data;
+        const comparative = this.clamp(d.comparative ?? 0, -1, 1);
+        const result: SentimentResult = {
+          score: d.score ?? 0,
+          comparative,
+          positive: d.positive_words || [],
+          negative: d.negative_words || [],
+          sentiment: (d.sentiment as SentimentLabel) || this.labelFromComparative(comparative),
+          predictionMethod: 'OLLAMA',
+        };
+        return result;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama sentiment analysis failed, falling back to AFINN: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // --- Existing AFINN fallback ---
+    return { ...this.analyzeText(text), predictionMethod: 'RULE_BASED' };
   }
 
   /**

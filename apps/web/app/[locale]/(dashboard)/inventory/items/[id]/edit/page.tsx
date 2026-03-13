@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
@@ -13,12 +12,12 @@ import { useQuery } from '@tanstack/react-query';
 import { accountsApi, taxRatesApi } from '@/lib/api';
 
 interface EditItemPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function EditItemPage({ params }: EditItemPageProps) {
   const t = useTranslations('inventory');
-  const { id } = use(params);
+  const { id } = params;
   const router = useRouter();
   const { data: item, isLoading: itemLoading } = useItem(id);
   const updateItem = useUpdateItem();

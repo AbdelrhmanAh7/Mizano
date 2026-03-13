@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -11,11 +10,11 @@ import { VendorForm } from '@/components/purchases/vendor-form';
 import { useVendor, useUpdateVendor } from '@/lib/hooks/use-vendors';
 
 interface EditVendorPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function EditVendorPage({ params }: EditVendorPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const router = useRouter();
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');

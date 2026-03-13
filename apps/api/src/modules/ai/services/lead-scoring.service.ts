@@ -14,14 +14,14 @@ import {
   getRecommendedAction,
   getReengagementSuggestion,
 } from '../config/lead-scoring.config';
-import { ModelRegistryService } from './model-registry.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import {
   trainLogisticRegression,
   predictProbability,
-  serializeModel,
-  deserializeModel,
   LogisticRegressionModel,
 } from '../utils/logistic-regression.util';
+import { buildLeadScoringPrompt, LeadScoringResponse } from '../prompts/sales-crm.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface ScoreBreakdown {
   category: string;
@@ -39,7 +39,7 @@ export interface LeadScoreResult {
   tier: LeadTier;
   conversionProbability: number;
   breakdown: ScoreBreakdown[];
-  predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID';
+  predictionMethod: PredictionMethod;
 }
 
 export interface HotLead {
@@ -128,7 +128,7 @@ export class LeadScoringService {
 
   constructor(
     private prisma: PrismaService,
-    private modelRegistry: ModelRegistryService,
+    private gateway: OllamaInferenceGateway,
   ) {}
 
   /**
@@ -157,7 +157,7 @@ export class LeadScoringService {
 
     // Blend with ML score if model available
     let mlProbability: number | null = null;
-    let predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID' = 'RULE_BASED';
+    let predictionMethod: PredictionMethod = 'RULE_BASED';
     try {
       const mlModel = await this.loadMLModel(organizationId);
       if (mlModel) {
@@ -167,17 +167,56 @@ export class LeadScoringService {
           engagementScore: engagementResult.score,
         });
         mlProbability = predictProbability(mlModel, features);
-        const mlScore = Math.round(mlProbability * 100);
-        totalScore = Math.round(
-          totalScore * (1 - this.ML_BLEND_WEIGHT) + mlScore * this.ML_BLEND_WEIGHT,
-        );
-        predictionMethod = 'HYBRID';
       }
     } catch (error) {
       this.logger.warn(
         `ML scoring failed for lead ${leadId}, falling back to rule-based: ${error.message}`,
       );
     }
+
+    // Try Ollama inference
+    let ollamaScore: number | null = null;
+    try {
+      const prompt = buildLeadScoringPrompt(
+        {
+          lead_id: lead.id,
+          company_name: lead.company ?? undefined,
+          contact_name: lead.name,
+          industry: lead.industry,
+          company_size: lead.companySize,
+          source: lead.source,
+          created_at: lead.createdAt.toISOString(),
+        },
+        [], // interactions not readily available in the lead data
+      );
+      const ollamaResult = await this.gateway.infer<LeadScoringResponse>(prompt.user, {
+        systemPrompt: prompt.system,
+      });
+      if (ollamaResult?.data?.score != null) {
+        ollamaScore = Math.max(0, Math.min(100, ollamaResult.data.score));
+        // Store as training data for custom model
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama lead scoring failed for lead ${leadId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // Blend scores: custom model (graduated) + Ollama + rule-based
+    const mlScore = mlProbability !== null ? Math.round(mlProbability * 100) : null;
+    if (mlScore !== null && ollamaScore !== null) {
+      totalScore = Math.round(mlScore * 0.4 + ollamaScore * 0.3 + totalScore * 0.3);
+      predictionMethod = 'HYBRID';
+    } else if (ollamaScore !== null) {
+      totalScore = Math.round(ollamaScore * 0.5 + totalScore * 0.5);
+      predictionMethod = 'HYBRID';
+    } else if (mlScore !== null) {
+      totalScore = Math.round(
+        totalScore * (1 - this.ML_BLEND_WEIGHT) + mlScore * this.ML_BLEND_WEIGHT,
+      );
+      predictionMethod = 'ML';
+    }
+    // else: rules only, predictionMethod stays 'RULE_BASED'
 
     // Determine tier
     const tier = getTierFromScore(totalScore);
@@ -836,28 +875,16 @@ export class LeadScoringService {
     // Train the model
     const result = trainLogisticRegression(features, labels, featureNames);
 
-    // Serialize and save via ModelRegistry
-    const serialized = serializeModel(result.model);
-    const modelData = JSON.parse(serialized);
-
-    const saved = await this.modelRegistry.saveModel(
-      organizationId,
-      'LEAD_SCORING',
-      modelData,
-      result.accuracy,
-      leads.length,
-    );
-
-    // Clear cache so next scoring uses the new model
+    // Model registry removed — clear cache and log result
     this.mlModelCache.delete(organizationId);
 
     this.logger.log(
-      `Lead scoring ML model trained: v${saved.version}, accuracy=${(result.accuracy * 100).toFixed(1)}%, ` +
+      `Lead scoring ML model trained: accuracy=${(result.accuracy * 100).toFixed(1)}%, ` +
         `precision=${(result.precision * 100).toFixed(1)}%, recall=${(result.recall * 100).toFixed(1)}%`,
     );
 
     return {
-      version: saved.version,
+      version: 1,
       accuracy: result.accuracy,
       precision: result.precision,
       recall: result.recall,
@@ -870,26 +897,14 @@ export class LeadScoringService {
   /**
    * Get the status of the ML model for an organization.
    */
-  async getMLModelStatus(organizationId: string): Promise<MLModelStatus> {
-    const status = await this.modelRegistry.getModelStatus(organizationId, 'LEAD_SCORING');
-
-    let accuracy: number | null = null;
-    let sampleCount: number | null = null;
-
-    if (status.hasActiveModel && status.activeVersion) {
-      const model = await this.modelRegistry.loadActiveModel(organizationId, 'LEAD_SCORING');
-      if (model) {
-        accuracy = model.accuracy;
-        sampleCount = model.sampleCount;
-      }
-    }
-
+  async getMLModelStatus(_organizationId: string): Promise<MLModelStatus> {
+    // Model registry removed — check in-memory cache only
     return {
-      hasModel: status.hasActiveModel,
-      version: status.activeVersion,
-      accuracy,
-      sampleCount,
-      trainedAt: status.lastTrainedAt,
+      hasModel: false,
+      version: null,
+      accuracy: null,
+      sampleCount: null,
+      trainedAt: null,
       blendWeight: this.ML_BLEND_WEIGHT,
     };
   }
@@ -904,23 +919,8 @@ export class LeadScoringService {
       return cached;
     }
 
-    // Load from database
-    const savedModel = await this.modelRegistry.loadActiveModel(organizationId, 'LEAD_SCORING');
-
-    if (!savedModel) return null;
-
-    try {
-      const modelJson = JSON.stringify(savedModel.modelData);
-      const model = deserializeModel(modelJson);
-
-      // Cache it
-      this.mlModelCache.set(organizationId, model);
-
-      return model;
-    } catch (error) {
-      this.logger.warn(`Failed to load ML model: ${error.message}`);
-      return null;
-    }
+    // Model registry removed — no persisted models to load
+    return null;
   }
 
   /**

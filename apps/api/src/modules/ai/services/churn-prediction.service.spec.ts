@@ -1,20 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ChurnPredictionService } from './churn-prediction.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
-import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
 import { AiFeedbackService } from './ai-feedback.service';
-import { AiTrainingService } from './ai-training.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
 import { Decimal } from '@prisma/client/runtime/library';
 
 describe('ChurnPredictionService', () => {
   let service: ChurnPredictionService;
   let prisma: MockPrismaClient;
-  let modelRegistry: {
-    loadActiveModel: jest.Mock;
-    saveModel: jest.Mock;
-  };
 
   const orgId = 'org-test-001';
 
@@ -44,28 +39,26 @@ describe('ChurnPredictionService', () => {
 
   beforeEach(async () => {
     prisma = createMockPrisma();
-    modelRegistry = {
-      loadActiveModel: jest.fn().mockResolvedValue(null),
-      saveModel: jest.fn().mockResolvedValue({ id: 'model-001', version: 1 }),
-    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ChurnPredictionService,
         { provide: PrismaService, useValue: prisma },
-        { provide: ModelRegistryService, useValue: modelRegistry },
         {
           provide: AiFeedbackService,
           useValue: {
             storePrediction: jest.fn().mockResolvedValue({}),
-            checkRetrainingThreshold: jest.fn().mockResolvedValue({ shouldRetrain: false }),
           },
         },
-        {
-          provide: AiTrainingService,
-          useValue: { addTrainingData: jest.fn().mockResolvedValue({}) },
-        },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            infer: jest.fn().mockResolvedValue(null),
+            isHealthy: jest.fn().mockResolvedValue(false),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
       ],
     }).compile();
 
@@ -132,7 +125,6 @@ describe('ChurnPredictionService', () => {
       const customer = createMockCustomer();
       prisma.customer.findFirst.mockResolvedValue(customer as any);
       prisma.invoice.findMany.mockResolvedValue([] as any);
-      modelRegistry.loadActiveModel.mockResolvedValue(null);
 
       const result = await service.predictChurnRisk(orgId, customer.id);
 
@@ -295,7 +287,8 @@ describe('ChurnPredictionService', () => {
 
       expect(result).toBeInstanceOf(Array);
       expect(result.length).toBe(1);
-      expect(result[0].customerName).toBe('At Risk Customer');
+      expect(result[0].name).toBe('At Risk Customer');
+      expect(result[0].id).toBe('cust-001');
       expect(result[0].churnRisk).toBe(0.75);
       expect(result[0].riskLevel).toBeDefined();
     });
@@ -306,33 +299,6 @@ describe('ChurnPredictionService', () => {
       const result = await service.getHighRiskCustomers(orgId);
 
       expect(result).toEqual([]);
-    });
-  });
-
-  describe('trainModel', () => {
-    it('should return insufficient data when not enough customers', async () => {
-      prisma.customer.findMany.mockResolvedValue([] as any);
-
-      const result = await service.trainModel(orgId);
-
-      expect(result.version).toBe(0);
-      expect(result.accuracy).toBe(0);
-      expect(result.message).toContain('Insufficient data');
-    });
-
-    it('should return insufficient data with less than 30 customers', async () => {
-      const customers = Array.from({ length: 10 }, (_, i) => ({
-        id: `cust-${i}`,
-      }));
-      prisma.customer.findMany.mockResolvedValue(customers as any);
-      // Each customer has no invoices -> extractRFMFeatures returns default
-      prisma.invoice.findMany.mockResolvedValue([] as any);
-
-      const result = await service.trainModel(orgId);
-
-      // 10 customers < 30 required
-      expect(result.version).toBe(0);
-      expect(result.message).toContain('Insufficient data');
     });
   });
 

@@ -1,9 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiFeature, AiFeedbackAction, Prisma } from '@prisma/client';
-import { AiTrainingService } from './ai-training.service';
+import * as crypto from 'crypto';
 
 export interface FeedbackDto {
   feature: AiFeature;
@@ -24,68 +22,16 @@ export interface FeedbackStats {
   correctionRate: number;
 }
 
-// Retraining thresholds per feature (0 = retraining disabled)
-const RETRAINING_THRESHOLDS: Record<AiFeature, number> = {
-  // Core financial
-  CATEGORIZATION: 50,
-  RECONCILIATION: 30,
-  OCR_LAYOUT: 20,
-  DEMAND_FORECAST: 100,
-  LEAD_SCORING: 20,
-  ANOMALY: 50,
-  REORDER: 50,
-  PAYMENT_PREDICTION: 30,
-  CASH_FLOW: 50,
-  PATTERN_DETECTION: 30,
-  // Sales & CRM
-  CHURN_PREDICTION: 30,
-  CLV_ANALYSIS: 50,
-  CROSS_SELL: 40,
-  DYNAMIC_PRICING: 50,
-  PIPELINE_FORECAST: 30,
-  // Security
-  FRAUD_DETECTION: 20,
-  COMPLIANCE_MONITORING: 30,
-  AUDIT_RISK: 30,
-  // NLP & Documents
-  DOCUMENT_CLASSIFICATION: 30,
-  SENTIMENT_ANALYSIS: 50,
-  ENTITY_EXTRACTION: 30,
-  CONTRACT_ANALYSIS: 50,
-  // HR
-  EMPLOYEE_ATTRITION: 30,
-  COMPENSATION_BENCHMARK: 50,
-  SKILLS_GAP: 50,
-  QUALITY_PREDICTION: 40,
-  PREDICTIVE_MAINTENANCE: 40,
-  WORKFORCE_SCHEDULING: 50,
-  // Operations
-  ROUTE_OPTIMIZATION: 100,
-  RESOURCE_OPTIMIZATION: 100,
-  // Chat
-  CHATBOT: 50,
-  KNOWLEDGE_ASSISTANT: 50,
-  // Not implemented
-  VOICE_COMMAND: 0,
-};
-
 @Injectable()
 export class AiFeedbackService {
   private readonly logger = new Logger(AiFeedbackService.name);
 
-  constructor(
-    private prisma: PrismaService,
-    private eventEmitter: EventEmitter2,
-    private trainingService: AiTrainingService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   /**
    * Process user feedback (accept/reject/correct)
    */
-  async processFeedback(
-    organizationId: string,
-    dto: FeedbackDto,
-  ): Promise<{ id: string; shouldRetrain: boolean }> {
+  async processFeedback(organizationId: string, dto: FeedbackDto): Promise<{ id: string }> {
     // Store the feedback
     const feedback = await this.prisma.aiFeedback.create({
       data: {
@@ -103,49 +49,7 @@ export class AiFeedbackService {
       `Received ${dto.userAction} feedback for ${dto.feature} in org ${organizationId}`,
     );
 
-    // If corrected, add to training data
-    if (dto.userAction === 'CORRECTED' && dto.userAnswer) {
-      await this.trainingService.addTrainingData(
-        organizationId,
-        dto.feature,
-        dto.inputData,
-        dto.userAnswer,
-        'CORRECTION',
-      );
-    }
-
-    // Check if retraining is needed
-    const { shouldRetrain } = await this.checkRetrainingThreshold(organizationId, dto.feature);
-
-    if (shouldRetrain) {
-      this.triggerRetraining(organizationId, dto.feature);
-    }
-
-    return { id: feedback.id, shouldRetrain };
-  }
-
-  /**
-   * Check if retraining threshold is met
-   */
-  async checkRetrainingThreshold(
-    organizationId: string,
-    feature: AiFeature,
-  ): Promise<{ shouldRetrain: boolean; correctionCount: number; threshold: number }> {
-    const threshold = RETRAINING_THRESHOLDS[feature];
-
-    // Features with threshold 0 have retraining disabled
-    if (threshold === 0) {
-      return { shouldRetrain: false, correctionCount: 0, threshold: 0 };
-    }
-
-    const correctionCount = await this.trainingService.countCorrectionsSinceLastTraining(
-      organizationId,
-      feature,
-    );
-
-    const shouldRetrain = correctionCount >= threshold;
-
-    return { shouldRetrain, correctionCount, threshold };
+    return { id: feedback.id };
   }
 
   /**
@@ -310,19 +214,6 @@ export class AiFeedbackService {
   }
 
   /**
-   * Trigger retraining event
-   */
-  private triggerRetraining(organizationId: string, feature: AiFeature): void {
-    this.logger.log(`Triggering retraining for ${feature} in org ${organizationId}`);
-
-    this.eventEmitter.emit('ai.retraining.needed', {
-      organizationId,
-      feature,
-      triggeredAt: new Date(),
-    });
-  }
-
-  /**
    * Store a prediction for tracking
    */
   async storePrediction(
@@ -333,7 +224,7 @@ export class AiFeedbackService {
     confidence: number,
     modelVersion: number,
   ): Promise<{ id: string; inputHash: string }> {
-    const inputHash = this.trainingService.generateInputHash(inputData);
+    const inputHash = this.generateInputHash(inputData);
 
     // Check if same prediction exists (cache)
     const existing = await this.prisma.aiPrediction.findFirst({
@@ -383,7 +274,7 @@ export class AiFeedbackService {
     modelVersion: number;
     predictionId: string;
   } | null> {
-    const inputHash = this.trainingService.generateInputHash(inputData);
+    const inputHash = this.generateInputHash(inputData);
     const minDate = new Date();
     minDate.setMinutes(minDate.getMinutes() - maxAgeMinutes);
 
@@ -408,17 +299,6 @@ export class AiFeedbackService {
   }
 
   /**
-   * Invalidate cached predictions when a new model is activated
-   */
-  @OnEvent('ai.model.activated')
-  async onModelActivated(payload: { organizationId: string; feature: AiFeature; version: number }) {
-    this.logger.log(
-      `Model v${payload.version} activated for ${payload.feature} — invalidating prediction cache`,
-    );
-    await this.invalidatePredictionCache(payload.organizationId, payload.feature);
-  }
-
-  /**
    * Clear all cached predictions for an org+feature
    */
   async invalidatePredictionCache(
@@ -439,13 +319,6 @@ export class AiFeedbackService {
   }
 
   /**
-   * Get retraining threshold for a feature
-   */
-  getRetrainingThreshold(feature: AiFeature): number {
-    return RETRAINING_THRESHOLDS[feature];
-  }
-
-  /**
    * Delete old predictions (for data retention)
    */
   async deleteOldPredictions(
@@ -460,5 +333,14 @@ export class AiFeedbackService {
     });
 
     return { deleted: result.count };
+  }
+
+  /**
+   * Generate a deterministic hash from input data for deduplication.
+   * Replaces the removed AiTrainingService.generateInputHash.
+   */
+  private generateInputHash(inputData: Record<string, unknown>): string {
+    const normalized = JSON.stringify(inputData, Object.keys(inputData).sort());
+    return crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 16);
   }
 }

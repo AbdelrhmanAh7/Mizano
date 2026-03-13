@@ -113,7 +113,7 @@ export class AssetsService {
     ]);
 
     return {
-      data: data.map(this.formatAssetResponse),
+      data: data.map((asset) => this.formatAssetResponse(asset as Record<string, unknown>)),
       total,
     };
   }

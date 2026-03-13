@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DocumentClassificationService, DocumentCategory } from './document-classification.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import {
   createMockPrisma,
   MockPrismaClient,
@@ -11,33 +11,24 @@ import {
 describe('DocumentClassificationService', () => {
   let service: DocumentClassificationService;
   let prisma: MockPrismaClient;
-  let modelRegistry: {
-    loadActiveModel: jest.Mock;
-    saveModel: jest.Mock;
-    getModelStatus: jest.Mock;
-  };
 
   const orgId = TEST_ORG_ID;
 
   beforeEach(async () => {
     prisma = createMockPrisma();
-    modelRegistry = {
-      loadActiveModel: jest.fn().mockResolvedValue(null),
-      saveModel: jest.fn().mockResolvedValue({ id: 'model-001', version: 1 }),
-      getModelStatus: jest.fn().mockResolvedValue({
-        hasActiveModel: false,
-        activeVersion: null,
-        isTraining: false,
-        trainingVersion: null,
-        lastTrainedAt: null,
-      }),
-    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DocumentClassificationService,
         { provide: PrismaService, useValue: prisma },
-        { provide: ModelRegistryService, useValue: modelRegistry },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            generateCompletion: jest.fn().mockResolvedValue(''),
+            generateStructuredOutput: jest.fn().mockResolvedValue({}),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
       ],
     }).compile();
 
@@ -127,16 +118,6 @@ describe('DocumentClassificationService', () => {
       expect(result.confidence).toBeGreaterThanOrEqual(0);
       expect(result.confidence).toBeLessThanOrEqual(1);
     });
-
-    it('should use default classifier when no trained model exists', async () => {
-      modelRegistry.loadActiveModel.mockResolvedValue(null as any);
-
-      const result = await service.classifyText(orgId, 'tax return filing income');
-
-      // Should still classify using defaults
-      expect(result.category).toBeDefined();
-      expect(result.scores.length).toBeGreaterThan(0);
-    });
   });
 
   // ---------------------------------------------------------------------------
@@ -214,70 +195,4 @@ describe('DocumentClassificationService', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // trainModel
-  // ---------------------------------------------------------------------------
-  describe('trainModel', () => {
-    it('should train with default data when no org data exists', async () => {
-      prisma.aiTrainingData.findMany.mockResolvedValue([] as any);
-
-      const result = await service.trainModel(orgId);
-
-      expect(result.version).toBe(1);
-      expect(result.sampleCount).toBeGreaterThan(0);
-      expect(result.accuracy).toBeGreaterThanOrEqual(0);
-      expect(modelRegistry.saveModel).toHaveBeenCalled();
-    });
-
-    it('should train with org-specific data when available', async () => {
-      const orgData = Array.from({ length: 30 }, (_, i) => ({
-        inputData: { text: `invoice document number ${i} total amount` },
-        label: DocumentCategory.INVOICE,
-      }));
-      prisma.aiTrainingData.findMany.mockResolvedValue(orgData as any);
-
-      const result = await service.trainModel(orgId);
-
-      expect(result.sampleCount).toBeGreaterThanOrEqual(30);
-    });
-
-    it('should return accuracy between 0 and 1', async () => {
-      prisma.aiTrainingData.findMany.mockResolvedValue([] as any);
-
-      const result = await service.trainModel(orgId);
-
-      expect(result.accuracy).toBeGreaterThanOrEqual(0);
-      expect(result.accuracy).toBeLessThanOrEqual(1);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // getModelStatus
-  // ---------------------------------------------------------------------------
-  describe('getModelStatus', () => {
-    it('should return model status with training data count', async () => {
-      prisma.aiTrainingData.count.mockResolvedValue(42 as any);
-      modelRegistry.getModelStatus.mockResolvedValue({
-        hasActiveModel: true,
-        activeVersion: 3,
-        isTraining: false,
-        trainingVersion: null,
-        lastTrainedAt: new Date('2025-01-01'),
-      } as any);
-
-      const status = await service.getModelStatus(orgId);
-
-      expect(status.hasActiveModel).toBe(true);
-      expect(status.activeVersion).toBe(3);
-      expect(status.trainingDataCount).toBe(42);
-    });
-
-    it('should return no model when none is trained', async () => {
-      prisma.aiTrainingData.count.mockResolvedValue(0 as any);
-
-      const status = await service.getModelStatus(orgId);
-
-      expect(status.hasActiveModel).toBe(false);
-      expect(status.trainingDataCount).toBe(0);
-    });
-  });
 });

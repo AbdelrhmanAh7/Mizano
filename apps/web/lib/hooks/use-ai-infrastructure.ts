@@ -6,7 +6,6 @@ import api from '@/lib/api';
 export type AiFeature =
   | 'CATEGORIZATION'
   | 'RECONCILIATION'
-  | 'OCR_LAYOUT'
   | 'DEMAND_FORECAST'
   | 'LEAD_SCORING'
   | 'ANOMALY'
@@ -111,23 +110,6 @@ export interface ReconciliationMatch {
   };
   confidence: 'high' | 'medium' | 'low';
   matchReasons: string[];
-}
-
-export interface OcrExtractResult {
-  date: string | null;
-  total: number | null;
-  subtotal: number | null;
-  tax: number | null;
-  invoiceNumber: string | null;
-  vendorName: string | null;
-  lineItems: Array<{
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
-  }>;
-  ocrConfidence: number;
-  rawText: string;
 }
 
 // ============ API Functions ============
@@ -238,38 +220,6 @@ const newAiApi = {
       },
       { params: { minConfidence } },
     );
-    return response.data;
-  },
-
-  // OCR
-  extractFromImage: async (formData: FormData) => {
-    const response = await api.post('/ai/ocr/extract', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data;
-  },
-  extractFromBase64: async (imageData: string, vendorId?: string, language?: string) => {
-    const response = await api.post('/ai/ocr/extract-base64', {
-      imageData,
-      vendorId,
-      language,
-    });
-    return response.data;
-  },
-  learnOcrLayout: async (data: {
-    vendorId: string;
-    date?: string;
-    total?: number;
-    subtotal?: number;
-    tax?: number;
-    invoiceNumber?: string;
-    vendorName?: string;
-  }) => {
-    const response = await api.post('/ai/ocr/learn', data);
-    return response.data;
-  },
-  checkDuplicate: async (data: { vendorId?: string; invoiceNumber?: string; amount?: number }) => {
-    const response = await api.post('/ai/ocr/check-duplicate', data);
     return response.data;
   },
 };
@@ -450,40 +400,6 @@ export function useBulkAutoMatch() {
       queryClient.invalidateQueries({ queryKey: ['ai-reconciliation-matches'] });
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
     },
-  });
-}
-
-// ============ Hooks - OCR ============
-
-export function useOcrExtract() {
-  return useMutation({
-    mutationFn: newAiApi.extractFromImage,
-  });
-}
-
-export function useOcrExtractBase64() {
-  return useMutation({
-    mutationFn: ({
-      imageData,
-      vendorId,
-      language,
-    }: {
-      imageData: string;
-      vendorId?: string;
-      language?: string;
-    }) => newAiApi.extractFromBase64(imageData, vendorId, language),
-  });
-}
-
-export function useOcrLearn() {
-  return useMutation({
-    mutationFn: newAiApi.learnOcrLayout,
-  });
-}
-
-export function useOcrCheckDuplicate() {
-  return useMutation({
-    mutationFn: newAiApi.checkDuplicate,
   });
 }
 

@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -11,11 +10,11 @@ import { useProject, useCreateTask } from '@/lib/hooks/use-projects';
 import { useTranslations } from 'next-intl';
 
 interface NewTaskPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function NewTaskPage({ params }: NewTaskPageProps) {
-  const { id } = use(params);
+  const { id } = params;
   const t = useTranslations('projects');
   const router = useRouter();
   const { data: project, isLoading } = useProject(id);

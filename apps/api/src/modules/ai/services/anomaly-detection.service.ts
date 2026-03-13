@@ -9,6 +9,9 @@ import {
   interquartileRange,
 } from '../utils/statistics.util';
 import { buildIsolationForest1D, isolationForestScore1D } from '../utils/isolation-forest.util';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildAnomalyExplanationPrompt } from '../prompts/operations.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface AnomalyResult {
   isAnomaly: boolean;
@@ -20,6 +23,8 @@ export interface AnomalyResult {
   severity: AnomalySeverity | null;
   method: 'zscore' | 'iqr' | 'isolation_forest' | 'ensemble';
   reason: string;
+  explanation?: string;
+  predictionMethod: PredictionMethod;
 }
 
 export interface AnomalyRecord {
@@ -43,7 +48,10 @@ export class AnomalyDetectionService {
   private readonly Z_SCORE_THRESHOLD = 2.5;
   private readonly IQR_MULTIPLIER = 1.5;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {}
 
   /**
    * Core anomaly detection method using Z-Score + IQR + Isolation Forest ensemble
@@ -61,6 +69,7 @@ export class AnomalyDetectionService {
         severity: null,
         method: 'ensemble',
         reason: 'insufficient_data',
+        predictionMethod: 'RULE_BASED',
       };
     }
 
@@ -117,7 +126,49 @@ export class AnomalyDetectionService {
       severity: isAnomaly ? severity : null,
       method: 'ensemble',
       reason,
+      predictionMethod: 'RULE_BASED',
     };
+  }
+
+  /**
+   * Enhance an anomaly result with an Ollama-generated explanation.
+   * Falls back gracefully if Ollama is unavailable.
+   */
+  async enhanceWithOllamaExplanation(
+    organizationId: string,
+    result: AnomalyResult,
+    context?: Record<string, unknown>,
+  ): Promise<AnomalyResult> {
+    if (!result.isAnomaly) return result;
+
+    try {
+      const anomalyData = {
+        value: result.value,
+        mean: result.mean,
+        stdDev: result.stdDev,
+        zScore: result.zScore,
+        severity: result.severity,
+        reason: result.reason,
+      };
+      const historyData = { ...context };
+      const prompt = buildAnomalyExplanationPrompt(anomalyData, historyData);
+      const ollamaResult = await this.gateway.infer<{
+        explanation: string;
+        severity_rationale: string;
+        recommended_action: string;
+      }>(prompt);
+
+      if (ollamaResult) {
+        result.explanation = ollamaResult.data.explanation || undefined;
+        result.predictionMethod = 'HYBRID';
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama anomaly explanation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    return result;
   }
 
   /**
@@ -181,9 +232,15 @@ export class AnomalyDetectionService {
     const historicalValues = expenses.map((e) => Number(e.amount));
     const result = this.detectAnomaly(amount, historicalValues);
 
+    // Enhance with Ollama explanation if anomaly detected
+    const enhanced = await this.enhanceWithOllamaExplanation(organizationId, result, {
+      accountId,
+      historicalCount: historicalValues.length,
+    });
+
     return {
-      ...result,
-      historicalAvg: result.mean,
+      ...enhanced,
+      historicalAvg: enhanced.mean,
     };
   }
 
@@ -293,6 +350,7 @@ export class AnomalyDetectionService {
         severity: null,
         method: 'ensemble',
         reason: 'payroll_run_not_found',
+        predictionMethod: 'RULE_BASED',
       };
     }
 

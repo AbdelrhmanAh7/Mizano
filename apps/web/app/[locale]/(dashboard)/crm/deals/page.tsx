@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Deal,
+  DealStage,
   formatCurrency,
   getDealStageColor,
   getDealStageLabel,
@@ -189,6 +190,30 @@ function DealsPageContent() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Pipeline Stage Breakdown */}
+      {metrics?.byStage && Object.keys(metrics.byStage).length > 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">Pipeline by Stage</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {Object.entries(
+                metrics.byStage as Record<string, { count: number; value: number }>,
+              ).map(([stage, data]) => (
+                <div key={stage} className="flex flex-col gap-1 p-3 rounded-lg border">
+                  <Badge className={getDealStageColor(stage as DealStage)}>
+                    {getDealStageLabel(stage as DealStage)}
+                  </Badge>
+                  <span className="text-lg font-bold">{data.count} deals</span>
+                  <span className="text-sm text-muted-foreground font-mono">
+                    {formatCurrency(data.value)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* AI Pipeline Forecast */}

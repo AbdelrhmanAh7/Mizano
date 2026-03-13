@@ -3,6 +3,12 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { mean, standardDeviation } from '../utils/statistics.util';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BoundedCache } from '../utils/bounded-cache.util';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import {
+  buildPaymentPredictionPrompt,
+  PaymentPredictionResponse,
+} from '../prompts/forecasting.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 interface InvoiceWithCustomer {
   id: string;
@@ -46,6 +52,8 @@ export interface PaymentPrediction {
     dayOfWeek: number;
     monthEnd: number;
   };
+  collectionPriority?: 'HIGH' | 'MEDIUM' | 'LOW';
+  predictionMethod: PredictionMethod;
 }
 
 export interface CollectionPriorityItem {
@@ -82,7 +90,10 @@ export class PaymentPredictionService {
   // Minimum history for statistical prediction
   private readonly MIN_HISTORY_FOR_STATISTICAL = 3;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private ollamaGateway: OllamaInferenceGateway,
+  ) {}
 
   /**
    * Predict payment date for a specific invoice
@@ -106,8 +117,62 @@ export class PaymentPredictionService {
     // Get payment history for this customer
     const history = await this.getPaymentHistory(organizationId, invoice.customerId);
 
-    // Calculate prediction
-    return this.calculatePrediction(invoice, history);
+    // Calculate statistical prediction
+    const prediction = this.calculatePrediction(invoice, history);
+
+    // Try Ollama for collection priority recommendation
+    try {
+      const daysToPayArray = history.map((h) => h.daysToPayment);
+      const avgDays = daysToPayArray.length > 0 ? mean(daysToPayArray) : 30;
+      const onTimeCount = history.filter((h) => h.daysAfterDue <= 0).length;
+      const onTimeRate = history.length > 0 ? onTimeCount / history.length : 0;
+
+      const today = new Date();
+      const daysOutstanding = Math.floor(
+        (today.getTime() - new Date(invoice.date).getTime()) / (1000 * 60 * 60 * 24),
+      );
+
+      const promptData = buildPaymentPredictionPrompt(
+        {
+          invoice_id: invoice.id,
+          invoice_number: invoice.invoiceNumber,
+          customer_id: invoice.customerId,
+          customer_name: invoice.customer?.name || 'Unknown',
+          amount: Number(invoice.grandTotal),
+          issue_date: new Date(invoice.date).toISOString().split('T')[0],
+          due_date: new Date(invoice.dueDate).toISOString().split('T')[0],
+          days_outstanding: daysOutstanding,
+        },
+        {
+          avg_days_to_pay: avgDays,
+          on_time_payment_rate: onTimeRate,
+          total_invoices: history.length,
+          total_paid: history.length,
+          total_outstanding: Number(invoice.grandTotal),
+          recent_payments: history.slice(0, 5).map((h) => ({
+            invoice_amount: h.amount,
+            days_to_pay: h.daysToPayment,
+            date: h.paidDate.toISOString().split('T')[0],
+          })),
+        },
+      );
+
+      const ollamaResult = await this.ollamaGateway.infer<PaymentPredictionResponse>(
+        promptData.user,
+        { systemPrompt: promptData.system },
+      );
+
+      if (ollamaResult?.data) {
+        prediction.collectionPriority = ollamaResult.data.collection_priority || undefined;
+        prediction.predictionMethod = 'HYBRID';
+      }
+    } catch (error) {
+      this.logger.debug(
+        `Ollama collection priority unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    return prediction;
   }
 
   /**
@@ -573,6 +638,7 @@ export class PaymentPredictionService {
       confidence,
       method,
       factors,
+      predictionMethod: method === 'statistical' ? 'ML' : 'RULE_BASED',
     };
   }
 }

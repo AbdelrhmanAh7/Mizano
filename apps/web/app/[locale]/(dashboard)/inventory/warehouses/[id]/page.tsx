@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -45,12 +45,12 @@ import {
 } from '@/lib/hooks/use-warehouses';
 
 interface WarehouseDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function WarehouseDetailPage({ params }: WarehouseDetailPageProps) {
   const t = useTranslations('inventory');
-  const { id } = use(params);
+  const { id } = params;
   const router = useRouter();
   const searchParams = useSearchParams();
   const isEditing = searchParams.get('edit') === 'true';

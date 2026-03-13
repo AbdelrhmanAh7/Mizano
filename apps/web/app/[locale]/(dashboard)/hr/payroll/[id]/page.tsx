@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ArrowLeft, CheckCircle2, Download, FileText, Printer, Mail } from 'lucide-react';
@@ -57,8 +56,8 @@ const months = [
   'December',
 ];
 
-export default function PayrollDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function PayrollDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const t = useTranslations('hr');
   const { data: payrollRun, isLoading } = usePayrollRun(id);
   const confirmPayroll = useConfirmPayroll();

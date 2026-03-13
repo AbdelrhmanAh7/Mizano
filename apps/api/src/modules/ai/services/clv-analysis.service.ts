@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildClvPrompt, ClvResponse } from '../prompts/sales-crm.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ss = require('simple-statistics');
@@ -16,6 +19,7 @@ export interface CLVResult {
   predictedNextPurchase: number; // days
   retentionProbability: number;
   confidence: number;
+  predictionMethod: PredictionMethod;
 }
 
 export interface CLVSegment {
@@ -43,7 +47,10 @@ export interface CLVDistribution {
 export class ClvAnalysisService {
   private readonly logger = new Logger(ClvAnalysisService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {}
 
   async calculateCLV(organizationId: string, customerId: string): Promise<CLVResult> {
     const customer = await this.prisma.customer.findFirst({
@@ -82,6 +89,7 @@ export class ClvAnalysisService {
         predictedNextPurchase: 0,
         retentionProbability: 0.1,
         confidence: 0.3,
+        predictionMethod: 'RULE_BASED',
       };
     }
 
@@ -124,19 +132,53 @@ export class ClvAnalysisService {
     // Confidence based on data points
     const confidence = Math.min(0.95, 0.3 + invoices.length * 0.05 + (T > 6 ? 0.2 : 0));
 
+    // Try Ollama inference for CLV estimate
+    let ollamaClv: number | null = null;
+    let predictionMethod: PredictionMethod = 'RULE_BASED';
+    try {
+      const prompt = buildClvPrompt(
+        {
+          customer_id: customerId,
+          customer_name: customer.name,
+          acquisition_date: customer.createdAt.toISOString(),
+        },
+        invoices.map((inv) => ({
+          date: inv.date.toISOString(),
+          amount: Number(inv.grandTotal),
+        })),
+      );
+      const ollamaResult = await this.gateway.infer<ClvResponse>(prompt.user, {
+        systemPrompt: prompt.system,
+      });
+      if (ollamaResult?.data?.clv_estimate != null && ollamaResult.data.clv_estimate > 0) {
+        ollamaClv = ollamaResult.data.clv_estimate;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama CLV failed for customer ${customerId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // Blend: Ollama + rule-based (CLV has no separate ML model)
+    let finalLifetimeValue = lifetimeValue;
+    if (ollamaClv !== null) {
+      finalLifetimeValue = ollamaClv * 0.5 + lifetimeValue * 0.5;
+      predictionMethod = 'HYBRID';
+    }
+
     // Store in profile
     await this.prisma.customerAiProfile.upsert({
       where: { customerId },
       create: {
         customerId,
         organizationId,
-        lifetimeValue: new Decimal(lifetimeValue),
+        lifetimeValue: new Decimal(finalLifetimeValue),
         clvSegment: 'MEDIUM', // will be set by batch
         rfmFrequency: frequency,
         rfmMonetary: new Decimal(historicalValue),
       },
       update: {
-        lifetimeValue: new Decimal(lifetimeValue),
+        lifetimeValue: new Decimal(finalLifetimeValue),
         calculatedAt: new Date(),
       },
     });
@@ -144,14 +186,15 @@ export class ClvAnalysisService {
     return {
       customerId,
       customerName: customer.name,
-      lifetimeValue,
+      lifetimeValue: finalLifetimeValue,
       segment: 'MEDIUM', // determined by batch segmentation
       avgOrderValue,
       purchaseFrequency,
       customerAge,
       predictedNextPurchase: Math.round(predictedNextPurchase),
       retentionProbability,
-      confidence,
+      confidence: ollamaClv !== null ? Math.min(0.95, confidence + 0.1) : confidence,
+      predictionMethod,
     };
   }
 

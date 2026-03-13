@@ -51,12 +51,4 @@ export class AuditRiskController {
   batchScore(@CurrentOrg() orgId: string, @Param('entityType') entityType: string) {
     return this.auditRiskService.batchScore(orgId, entityType);
   }
-
-  @Post('train')
-  @Permissions('accounting.manage')
-  @ApiOperation({ summary: 'Train the audit risk ML model from feedback data' })
-  @ApiResponse({ status: 200, description: 'Training completed' })
-  trainModel(@CurrentOrg() orgId: string) {
-    return this.auditRiskService.trainModel(orgId);
-  }
 }

@@ -441,23 +441,11 @@ export class AiAlertsService {
       staleDays?: number; // default 30
     },
   ): Promise<{ alertsCreated: number; modelsChecked: number }> {
-    const accuracyThreshold = options?.accuracyThreshold ?? 0.7;
     const correctionRateThreshold = options?.correctionRateThreshold ?? 0.3;
-    const staleDays = options?.staleDays ?? 30;
     let alertsCreated = 0;
 
-    // Get latest model per feature
-    const allModels = await this.prisma.aiModel.findMany({
-      where: { organizationId, status: 'ACTIVE' },
-      orderBy: [{ feature: 'asc' }, { version: 'desc' }],
-    });
-
-    const latestModels = new Map<string, (typeof allModels)[0]>();
-    for (const model of allModels) {
-      if (!latestModels.has(model.feature)) {
-        latestModels.set(model.feature, model);
-      }
-    }
+    // AiModel table has been removed — model accuracy checks are now based
+    // solely on feedback correction rates from aiFeedback.
 
     // Get correction rates from feedback
     const feedbackCounts = await this.prisma.aiFeedback.groupBy({
@@ -478,54 +466,11 @@ export class AiAlertsService {
       }
     }
 
-    const now = Date.now();
+    for (const [feature, fb] of feedbackMap) {
+      const correctionRate = fb.total > 0 ? fb.corrections / fb.total : 0;
 
-    for (const [feature, model] of latestModels) {
-      const accuracy = parseFloat(model.accuracy.toString());
-      const fb = feedbackMap.get(feature);
-      const correctionRate = fb && fb.total > 0 ? fb.corrections / fb.total : 0;
-      const daysSinceRetrain = model.trainedAt
-        ? Math.floor((now - model.trainedAt.getTime()) / (1000 * 60 * 60 * 24))
-        : null;
-
-      // Alert 1: Low accuracy
-      if (accuracy > 0 && accuracy < accuracyThreshold) {
-        const existingAlert = await this.findExistingAlert(
-          organizationId,
-          AlertSource.ANOMALY,
-          `ai-accuracy-${feature}`,
-        );
-        if (!existingAlert) {
-          await this.prisma.aIInsight.create({
-            data: {
-              type: 'ALERT',
-              title: `AI Model Accuracy Below Threshold: ${feature}`,
-              description: `The ${feature} model accuracy is ${(accuracy * 100).toFixed(1)}%, below the ${(accuracyThreshold * 100).toFixed(0)}% threshold. Consider retraining with more data.`,
-              severity: accuracy < 0.5 ? 'critical' : 'warning',
-              category: AlertCategory.FINANCIAL,
-              priority: accuracy < 0.5 ? AlertPriority.CRITICAL : AlertPriority.HIGH,
-              aiSource: AlertSource.ANOMALY,
-              sourceEntityType: 'ai_model',
-              sourceEntityId: `ai-accuracy-${feature}`,
-              impact: `${feature} predictions may be unreliable`,
-              suggestedAction: 'Retrain the model with corrected data or review training samples',
-              actionUrl: '/settings/ai',
-              actionLabel: 'AI Settings',
-              data: {
-                feature,
-                accuracy,
-                threshold: accuracyThreshold,
-                modelVersion: model.version,
-              } as import('@prisma/client').Prisma.InputJsonValue,
-              organizationId,
-            },
-          });
-          alertsCreated++;
-        }
-      }
-
-      // Alert 2: High correction rate
-      if (fb && fb.total >= 10 && correctionRate > correctionRateThreshold) {
+      // Alert: High correction rate
+      if (fb.total >= 10 && correctionRate > correctionRateThreshold) {
         const existingAlert = await this.findExistingAlert(
           organizationId,
           AlertSource.ANOMALY,
@@ -559,44 +504,9 @@ export class AiAlertsService {
           alertsCreated++;
         }
       }
-
-      // Alert 3: Stale training data
-      if (daysSinceRetrain !== null && daysSinceRetrain > staleDays) {
-        const existingAlert = await this.findExistingAlert(
-          organizationId,
-          AlertSource.ANOMALY,
-          `ai-stale-${feature}`,
-        );
-        if (!existingAlert) {
-          await this.prisma.aIInsight.create({
-            data: {
-              type: 'ALERT',
-              title: `Stale Model: ${feature}`,
-              description: `The ${feature} model hasn't been retrained in ${daysSinceRetrain} days. Newer data may improve accuracy.`,
-              severity: 'info',
-              category: AlertCategory.FINANCIAL,
-              priority: daysSinceRetrain > 60 ? AlertPriority.MEDIUM : AlertPriority.LOW,
-              aiSource: AlertSource.ANOMALY,
-              sourceEntityType: 'ai_model',
-              sourceEntityId: `ai-stale-${feature}`,
-              impact: 'Model may not reflect recent patterns',
-              suggestedAction: 'Trigger a model retrain from AI Settings',
-              actionUrl: '/settings/ai',
-              actionLabel: 'AI Settings',
-              data: {
-                feature,
-                daysSinceRetrain,
-                lastTrainedAt: model.trainedAt?.toISOString(),
-              } as import('@prisma/client').Prisma.InputJsonValue,
-              organizationId,
-            },
-          });
-          alertsCreated++;
-        }
-      }
     }
 
-    return { alertsCreated, modelsChecked: latestModels.size };
+    return { alertsCreated, modelsChecked: feedbackMap.size };
   }
 
   // ============ Private Alert Collection Methods ============

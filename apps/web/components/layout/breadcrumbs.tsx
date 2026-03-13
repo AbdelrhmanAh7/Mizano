@@ -21,7 +21,6 @@ const segmentLabels: Record<string, string> = {
   reports: 'Reports',
   settings: 'Settings',
   'ai-insights': 'AI Insights',
-  'ai-lab': 'AI Lab',
   // Sub-pages
   customers: 'Customers',
   invoices: 'Invoices',
@@ -52,6 +51,11 @@ const segmentLabels: Record<string, string> = {
   rates: 'Tax Rates',
   returns: 'VAT Returns',
   scan: 'Scan Document',
+  performance: 'Performance',
+  'audit-logs': 'Audit Logs',
+  'price-lists': 'Price Lists',
+  assets: 'Fixed Assets',
+  'deep-search': 'Deep Search',
 };
 
 export function Breadcrumbs() {
@@ -68,10 +72,18 @@ export function Breadcrumbs() {
     const crumbs = segments.map((segment, index) => {
       const href = '/' + segments.slice(0, index + 1).join('/');
       const isId = /^[a-z0-9]{20,}$/i.test(segment) || /^[0-9a-f-]{36}$/i.test(segment);
-      const label = isId
-        ? 'Details'
-        : segmentLabels[segment] ||
+      let label: string;
+      if (isId) {
+        const preceding = index > 0 ? segments[index - 1] : '';
+        const parentLabel =
+          segmentLabels[preceding] ||
+          preceding.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        label = parentLabel ? `${parentLabel} Details` : 'Details';
+      } else {
+        label =
+          segmentLabels[segment] ||
           segment.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      }
       return { label, href, isLast: index === segments.length - 1 };
     });
 

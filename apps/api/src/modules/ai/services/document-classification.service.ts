@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
-import { AiFeature } from '@prisma/client';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { BoundedCache } from '../utils/bounded-cache.util';
+import { buildDocumentClassificationPrompt } from '../prompts/nlp.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const natural = require('natural');
@@ -30,15 +31,7 @@ export interface ClassificationResult {
   category: DocumentCategory;
   confidence: number;
   scores: ClassificationScore[];
-}
-
-export interface ModelStatus {
-  hasActiveModel: boolean;
-  activeVersion: number | null;
-  isTraining: boolean;
-  trainingVersion: number | null;
-  lastTrainedAt: Date | null;
-  trainingDataCount: number;
+  predictionMethod?: PredictionMethod;
 }
 
 /**
@@ -246,7 +239,7 @@ export class DocumentClassificationService {
 
   constructor(
     private prisma: PrismaService,
-    private modelRegistry: ModelRegistryService,
+    private gateway: OllamaInferenceGateway,
   ) {}
 
   /**
@@ -275,6 +268,39 @@ export class DocumentClassificationService {
     text: string,
     filename?: string,
   ): Promise<ClassificationResult> {
+    // --- Ollama-first inference path ---
+    try {
+      const prompt = buildDocumentClassificationPrompt(text, filename);
+      const ollamaResult = await this.gateway.infer<{
+        category: string;
+        confidence: number;
+        scores: Record<string, number>;
+      }>(prompt);
+
+      if (ollamaResult) {
+        const d = ollamaResult.data;
+        const category = (d.category as DocumentCategory) || DocumentCategory.OTHER;
+        const confidence = d.confidence ?? 0.8;
+        const scores: ClassificationScore[] = Object.values(DocumentCategory).map((cat) => ({
+          category: cat,
+          score: d.scores?.[cat] ?? (cat === category ? confidence : 0),
+        }));
+
+        const result: ClassificationResult = {
+          category,
+          confidence,
+          scores,
+          predictionMethod: 'OLLAMA',
+        };
+        return result;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama document classification failed, falling back to Bayes: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // --- Existing Bayes classifier fallback ---
     const textResult = await this.classifyText(organizationId, text);
 
     if (!filename) {
@@ -333,78 +359,30 @@ export class DocumentClassificationService {
   ): Promise<{ version: number; accuracy: number; sampleCount: number }> {
     this.logger.log(`Training document classifier for org ${organizationId}`);
 
-    // Fetch organization-specific training data
-    const trainingData = await this.prisma.aiTrainingData.findMany({
-      where: {
-        organizationId,
-        feature: AiFeature.DOCUMENT_CLASSIFICATION,
-      },
-    });
-
+    // aiTrainingData table removed; always train with default seed data
     const classifier = new natural.BayesClassifier();
 
     let sampleCount = 0;
 
-    // Add organization-specific training data
-    for (const sample of trainingData) {
-      const inputData = sample.inputData as Record<string, unknown>;
-      const text = (inputData.text as string) || '';
-      if (text && sample.label) {
-        classifier.addDocument(text, sample.label);
-        sampleCount++;
-      }
-    }
-
-    // If insufficient data, seed with defaults
-    const MIN_SAMPLES_PER_CATEGORY = 3;
-    const categoryCounts = new Map<string, number>();
-    for (const sample of trainingData) {
-      const count = categoryCounts.get(sample.label) || 0;
-      categoryCounts.set(sample.label, count + 1);
-    }
-
-    const allCategories = Object.values(DocumentCategory);
-    const needsSeeding = allCategories.some(
-      (cat) => (categoryCounts.get(cat) || 0) < MIN_SAMPLES_PER_CATEGORY,
-    );
-
-    if (needsSeeding) {
-      this.logger.log(
-        `Seeding default training data for org ${organizationId} (insufficient samples)`,
-      );
-      for (const seed of DEFAULT_TRAINING_DATA) {
-        classifier.addDocument(seed.text, seed.category);
-        sampleCount++;
-      }
+    for (const seed of DEFAULT_TRAINING_DATA) {
+      classifier.addDocument(seed.text, seed.category);
+      sampleCount++;
     }
 
     // Train the classifier
     classifier.train();
 
     // Evaluate accuracy using cross-validation on the training set
-    const accuracy = this.evaluateAccuracy(classifier, [
-      ...trainingData.map((d) => ({
-        text: ((d.inputData as Record<string, unknown>).text as string) || '',
-        label: d.label,
+    const accuracy = this.evaluateAccuracy(
+      classifier,
+      DEFAULT_TRAINING_DATA.map((d) => ({
+        text: d.text,
+        label: d.category,
       })),
-      ...(needsSeeding
-        ? DEFAULT_TRAINING_DATA.map((d) => ({
-            text: d.text,
-            label: d.category,
-          }))
-        : []),
-    ]);
-
-    // Serialize and save the model
-    const serializedModel = JSON.parse(JSON.stringify(classifier));
-
-    const { version } = await this.modelRegistry.saveModel(
-      organizationId,
-      AiFeature.DOCUMENT_CLASSIFICATION,
-      serializedModel,
-      accuracy,
-      sampleCount,
     );
+
+    // Model registry removed — just cache in memory
+    const version = 1;
 
     // Update in-memory cache
     this.classifierCache.set(organizationId, classifier);
@@ -419,21 +397,17 @@ export class DocumentClassificationService {
 
   /**
    * Get the current model status for document classification.
+   * Model registry removed — returns status based on in-memory cache.
    */
-  async getModelStatus(organizationId: string): Promise<ModelStatus> {
-    const [registryStatus, trainingDataCount] = await Promise.all([
-      this.modelRegistry.getModelStatus(organizationId, AiFeature.DOCUMENT_CLASSIFICATION),
-      this.prisma.aiTrainingData.count({
-        where: {
-          organizationId,
-          feature: AiFeature.DOCUMENT_CLASSIFICATION,
-        },
-      }),
-    ]);
+  async getModelStatus(organizationId: string): Promise<{
+    isActive: boolean;
+    trainingDataCount: number;
+  }> {
+    const hasCachedModel = this.classifierCache.has(organizationId);
 
     return {
-      ...registryStatus,
-      trainingDataCount,
+      isActive: hasCachedModel,
+      trainingDataCount: 0,
     };
   }
 
@@ -442,32 +416,15 @@ export class DocumentClassificationService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Load a classifier from cache or model registry.
+   * Load a classifier from cache.
+   * Model registry removed — classifiers are only available in-memory after training.
    */
   private async getOrLoadClassifier(organizationId: string): Promise<unknown | null> {
-    // Check in-memory cache first
     if (this.classifierCache.has(organizationId)) {
       return this.classifierCache.get(organizationId);
     }
 
-    // Load from model registry
-    const savedModel = await this.modelRegistry.loadActiveModel(
-      organizationId,
-      AiFeature.DOCUMENT_CLASSIFICATION,
-    );
-
-    if (!savedModel || !savedModel.modelData) {
-      return null;
-    }
-
-    try {
-      const classifier = natural.BayesClassifier.restore(savedModel.modelData);
-      this.classifierCache.set(organizationId, classifier);
-      return classifier;
-    } catch (error) {
-      this.logger.error(`Failed to restore classifier for org ${organizationId}: ${error.message}`);
-      return null;
-    }
+    return null;
   }
 
   /**

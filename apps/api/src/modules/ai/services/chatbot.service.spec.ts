@@ -1,14 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ChatbotService, ChatIntent } from './chatbot.service';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { AiTrainingService } from './ai-training.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   createMockPrisma,
   createMockAiFeedback,
-  createMockAiTraining,
   createMockEventEmitter,
   MockPrismaClient,
   TEST_ORG_ID,
@@ -19,36 +17,31 @@ import {
 describe('ChatbotService', () => {
   let service: ChatbotService;
   let prisma: MockPrismaClient;
-  let modelRegistry: {
-    loadActiveModel: jest.Mock;
-    saveModel: jest.Mock;
-  };
 
   const orgId = TEST_ORG_ID;
   const userId = TEST_USER_ID;
 
   beforeEach(async () => {
     prisma = createMockPrisma();
-    modelRegistry = {
-      loadActiveModel: jest.fn().mockResolvedValue(null),
-      saveModel: jest.fn().mockResolvedValue({ id: 'model-001', version: 1 }),
-    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ChatbotService,
         { provide: PrismaService, useValue: prisma },
-        { provide: ModelRegistryService, useValue: modelRegistry },
         { provide: AiFeedbackService, useValue: createMockAiFeedback() },
-        { provide: AiTrainingService, useValue: createMockAiTraining() },
         { provide: EventEmitter2, useValue: createMockEventEmitter() },
+        {
+          provide: OllamaInferenceGateway,
+          useValue: {
+            generateCompletion: jest.fn().mockResolvedValue(''),
+            generateStructuredOutput: jest.fn().mockResolvedValue({}),
+            isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<ChatbotService>(ChatbotService);
-
-    // Default: no org-specific training data, use defaults
-    prisma.aiTrainingData.findMany.mockResolvedValue([] as any);
   });
 
   // ---------------------------------------------------------------------------
@@ -232,33 +225,6 @@ describe('ChatbotService', () => {
 
       expect(service.getHistory(orgId, userId)).toHaveLength(0);
       expect(service.getHistory(orgId, 'other-user').length).toBeGreaterThan(0);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // trainClassifier
-  // ---------------------------------------------------------------------------
-  describe('trainClassifier', () => {
-    it('should train with default data when no org-specific data', async () => {
-      prisma.aiTrainingData.findMany.mockResolvedValue([] as any);
-
-      const result = await service.trainClassifier(orgId);
-
-      expect(result.trained).toBe(true);
-      expect(result.sampleCount).toBeGreaterThan(0);
-    });
-
-    it('should train with org-specific data when sufficient', async () => {
-      const trainingData = Array.from({ length: 15 }, (_, i) => ({
-        inputData: { text: `test phrase ${i}` },
-        label: 'greeting',
-      }));
-      prisma.aiTrainingData.findMany.mockResolvedValue(trainingData as any);
-
-      const result = await service.trainClassifier(orgId);
-
-      expect(result.trained).toBe(true);
-      expect(result.sampleCount).toBeGreaterThanOrEqual(15);
     });
   });
 });

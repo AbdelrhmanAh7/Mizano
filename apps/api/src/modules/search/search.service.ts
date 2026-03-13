@@ -140,7 +140,7 @@ export class SearchService {
 
         const results: SearchResult[] = rows.map((row) => {
           const trgmScore = Number(row.similarity);
-          const jwScore = JaroWinklerDistance(query.toLowerCase(), row.title.toLowerCase());
+          const jwScore = JaroWinklerDistance(query.toLowerCase(), row.title.toLowerCase(), {});
           // Weighted combination: 60% trigram, 40% JaroWinkler
           const combinedScore = trgmScore * 0.6 + jwScore * 0.4;
 
@@ -308,7 +308,7 @@ export class SearchService {
       // Apply JaroWinkler scoring to fallback results
       const scored = results.map((r) => ({
         ...r,
-        score: JaroWinklerDistance(query.toLowerCase(), r.title.toLowerCase()),
+        score: JaroWinklerDistance(query.toLowerCase(), r.title.toLowerCase(), {}),
       }));
       scored.sort((a, b) => b.score - a.score);
 

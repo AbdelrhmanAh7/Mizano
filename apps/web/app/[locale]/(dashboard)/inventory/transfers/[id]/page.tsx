@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
@@ -37,12 +36,12 @@ import {
 } from '@/lib/hooks/use-transfers';
 
 interface TransferDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function TransferDetailPage({ params }: TransferDetailPageProps) {
   const t = useTranslations('inventory');
-  const { id } = use(params);
+  const { id } = params;
   const { data: transfer, isLoading } = useTransfer(id);
   const completeTransfer = useCompleteTransfer();
   const cancelTransfer = useCancelTransfer();

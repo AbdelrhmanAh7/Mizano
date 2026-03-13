@@ -8,6 +8,7 @@ import { AcceptLanguageResolver, HeaderResolver, I18nModule, QueryResolver } fro
 import path from 'path';
 import { CacheModule } from './cache/cache.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { CacheResponseInterceptor } from './common/interceptors/cache-response.interceptor';
 import { HttpCacheInterceptor } from './common/interceptors/http-cache.interceptor';
 import { HealthModule } from './health/health.module';
@@ -45,7 +46,13 @@ import { CommonModule } from './common/common.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [`.env.${process.env.APP_ENV || 'local'}`, '.env'],
+      envFilePath: [
+        `.env.${process.env.APP_ENV || 'local'}`,
+        '.env',
+        // Also load from monorepo root (CWD is apps/api/ when run via turborepo)
+        `../../.env.${process.env.APP_ENV || 'local'}`,
+        '../../.env',
+      ],
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
@@ -136,6 +143,10 @@ import { CommonModule } from './common/common.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: HttpCacheInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
     },
   ],
 })

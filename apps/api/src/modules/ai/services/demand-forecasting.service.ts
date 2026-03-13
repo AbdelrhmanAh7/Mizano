@@ -13,6 +13,12 @@ import {
   HoltWintersParams,
 } from '../utils/holt-winters.util';
 import { mean, standardDeviation } from '../utils/statistics.util';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import {
+  buildForecastInterpretationPrompt,
+  ForecastInterpretationResponse,
+} from '../prompts/forecasting.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface DemandForecast {
   forecasts: Array<{
@@ -31,6 +37,12 @@ export interface DemandForecast {
   dataPoints: number;
   confidence: 'high' | 'medium' | 'low';
   method: 'holt-winters' | 'double-exponential' | 'simple-exponential';
+  interpretation?: {
+    narrative: string;
+    alerts: string[];
+    recommendations: string[];
+  };
+  predictionMethod: PredictionMethod;
 }
 
 export interface SeasonalityAnalysis {
@@ -72,7 +84,10 @@ export class DemandForecastingService {
   private readonly DEFAULT_SEASON_LENGTH = 12;
   private readonly MIN_DATA_POINTS = 6;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private ollamaGateway: OllamaInferenceGateway,
+  ) {}
 
   /**
    * Forecast demand for a single item
@@ -167,12 +182,63 @@ export class DemandForecastingService {
     // Store forecasts in database
     await this.storeForecast(organizationId, itemId, forecastsWithDates, modelData);
 
+    // Try Ollama for natural-language interpretation of the forecast
+    let interpretation: DemandForecast['interpretation'];
+    let predictionMethod: PredictionMethod = 'ML';
+
+    try {
+      const trendDirection =
+        modelData.trend > 0.5 ? 'UP' : modelData.trend < -0.5 ? 'DOWN' : 'FLAT';
+
+      const promptData = buildForecastInterpretationPrompt(
+        {
+          metric: `Demand for item ${itemId}`,
+          period: `${horizonMonths} months`,
+          forecast_values: forecastsWithDates.map((f) => ({
+            date: f.date.toISOString().split('T')[0],
+            value: f.predicted,
+            lower_bound: f.lowerBound,
+            upper_bound: f.upperBound,
+          })),
+          model_used: method,
+          confidence_interval: 95,
+          trend: trendDirection,
+        },
+        {
+          values: historicalData.map((d) => ({
+            date: d.month.toISOString().split('T')[0],
+            value: d.value,
+          })),
+        },
+      );
+
+      const ollamaResult = await this.ollamaGateway.infer<ForecastInterpretationResponse>(
+        promptData.user,
+        { systemPrompt: promptData.system },
+      );
+
+      if (ollamaResult?.data) {
+        interpretation = {
+          narrative: ollamaResult.data.narrative || '',
+          alerts: ollamaResult.data.alerts || [],
+          recommendations: ollamaResult.data.recommendations || [],
+        };
+        predictionMethod = 'HYBRID';
+      }
+    } catch (error) {
+      this.logger.debug(
+        `Ollama interpretation unavailable for demand forecast: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
     return {
       forecasts: forecastsWithDates,
       model: modelData,
       dataPoints: values.length,
       confidence,
       method,
+      interpretation,
+      predictionMethod,
     };
   }
 
@@ -212,6 +278,7 @@ export class DemandForecastingService {
       dataPoints: values.length,
       confidence: 'low',
       method: 'simple-exponential',
+      predictionMethod: 'ML',
     };
   }
 
@@ -248,6 +315,7 @@ export class DemandForecastingService {
       dataPoints: 0,
       confidence: 'low',
       method: 'simple-exponential',
+      predictionMethod: 'RULE_BASED',
     };
   }
 

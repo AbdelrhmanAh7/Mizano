@@ -290,8 +290,16 @@ describe('LoggerService', () => {
 
   describe('clearLogs', () => {
     it('should clear all logs when no params', () => {
-      service.capture({ level: LogLevel.ERROR, source: LogSource.BACKEND, message: 'Error 1' });
-      service.capture({ level: LogLevel.ERROR, source: LogSource.BACKEND, message: 'Error 2' });
+      service.capture({
+        level: LogLevel.ERROR,
+        source: LogSource.BACKEND,
+        message: 'Database failed',
+      });
+      service.capture({
+        level: LogLevel.ERROR,
+        source: LogSource.BACKEND,
+        message: 'Network timeout',
+      });
 
       const removed = service.clearLogs();
       expect(removed).toBe(2);
@@ -302,9 +310,13 @@ describe('LoggerService', () => {
       const e1 = service.capture({
         level: LogLevel.ERROR,
         source: LogSource.BACKEND,
-        message: 'Error 1',
+        message: 'Database failed',
       });
-      service.capture({ level: LogLevel.ERROR, source: LogSource.BACKEND, message: 'Error 2' });
+      service.capture({
+        level: LogLevel.ERROR,
+        source: LogSource.BACKEND,
+        message: 'Network timeout',
+      });
 
       const removed = service.clearLogs({ ids: [e1.id] });
       expect(removed).toBe(1);
@@ -315,9 +327,13 @@ describe('LoggerService', () => {
       const e1 = service.capture({
         level: LogLevel.ERROR,
         source: LogSource.BACKEND,
-        message: 'Error 1',
+        message: 'Database failed',
       });
-      service.capture({ level: LogLevel.ERROR, source: LogSource.BACKEND, message: 'Error 2' });
+      service.capture({
+        level: LogLevel.ERROR,
+        source: LogSource.BACKEND,
+        message: 'Network timeout',
+      });
       service.updateStatus([e1.id], LogStatus.FIXED);
 
       const removed = service.clearLogs({ status: LogStatus.FIXED });

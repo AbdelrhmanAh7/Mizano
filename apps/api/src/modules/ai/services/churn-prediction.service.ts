@@ -1,14 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { ModelRegistryService } from './model-registry.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { AiTrainingService } from './ai-training.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { getRiskLevel } from '../utils/risk-level.util';
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { RandomForestClassifier } = require('ml-random-forest');
+import { buildChurnPredictionPrompt, ChurnPredictionResponse } from '../prompts/sales-crm.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface RFMFeatures {
   recency: number; // days since last purchase
@@ -28,7 +25,7 @@ export interface ChurnPredictionResult {
   rfm: RFMFeatures;
   confidence: number;
   recommendation: string;
-  predictionMethod: 'ML' | 'RULE_BASED' | 'HYBRID';
+  predictionMethod: PredictionMethod;
 }
 
 export interface ChurnBatchResult {
@@ -44,10 +41,8 @@ export class ChurnPredictionService {
 
   constructor(
     private prisma: PrismaService,
-    private modelRegistry: ModelRegistryService,
     private feedbackService: AiFeedbackService,
-    private trainingService: AiTrainingService,
-    private eventEmitter: EventEmitter2,
+    private gateway: OllamaInferenceGateway,
   ) {}
 
   async predictChurnRisk(
@@ -65,23 +60,46 @@ export class ChurnPredictionService {
     const rfm = await this.extractRFMFeatures(organizationId, customerId);
     const { score, factors } = this.calculateChurnScore(rfm);
 
-    // Try ML prediction
-    let mlScore: number | null = null;
+    // Try Ollama inference
+    let ollamaScore: number | null = null;
     try {
-      const model = await this.modelRegistry.loadActiveModel(organizationId, 'CHURN_PREDICTION');
-      if (model?.modelData) {
-        const classifier = RandomForestClassifier.load(model.modelData);
-        const features = this.rfmToFeatureVector(rfm);
-        const prediction = classifier.predict([features]);
-        mlScore = prediction[0] === 1 ? 0.8 : 0.2;
+      const prompt = buildChurnPredictionPrompt(
+        {
+          recency_days: rfm.recency,
+          frequency: rfm.frequency,
+          monetary_value: rfm.monetary,
+          avg_order_value: rfm.avgOrderValue,
+          days_since_last_purchase: rfm.recency,
+        },
+        {
+          customer_id: customerId,
+          customer_name: customer.name,
+          total_orders: rfm.frequency,
+          total_revenue: rfm.monetary,
+        },
+      );
+      const ollamaResult = await this.gateway.infer<ChurnPredictionResponse>(prompt.user, {
+        systemPrompt: prompt.system,
+      });
+      if (ollamaResult?.data?.churn_risk != null) {
+        ollamaScore = Math.max(0, Math.min(1, ollamaResult.data.churn_risk));
       }
     } catch (error) {
       this.logger.warn(
-        `ML churn prediction failed for customer ${customerId}, falling back to rule-based: ${error.message}`,
+        `Ollama churn prediction failed for customer ${customerId}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
 
-    const finalScore = mlScore !== null ? score * 0.7 + mlScore * 0.3 : score;
+    // Blend scores: Ollama + rule-based
+    let finalScore: number;
+    let predictionMethod: PredictionMethod;
+    if (ollamaScore !== null) {
+      finalScore = ollamaScore * 0.5 + score * 0.5;
+      predictionMethod = 'HYBRID';
+    } else {
+      finalScore = score;
+      predictionMethod = 'RULE_BASED';
+    }
 
     const riskLevel = getRiskLevel(finalScore);
 
@@ -109,6 +127,8 @@ export class ChurnPredictionService {
       },
     });
 
+    const confidence = ollamaScore !== null ? 0.85 : 0.7;
+
     const result: ChurnPredictionResult = {
       customerId,
       customerName: customer.name,
@@ -116,9 +136,9 @@ export class ChurnPredictionService {
       riskLevel,
       factors,
       rfm,
-      confidence: mlScore !== null ? 0.85 : 0.7,
+      confidence,
       recommendation: this.getRecommendation(riskLevel, factors),
-      predictionMethod: mlScore !== null ? 'ML' : 'RULE_BASED',
+      predictionMethod,
     };
 
     // Store prediction for feedback tracking
@@ -182,8 +202,8 @@ export class ChurnPredictionService {
     });
 
     return profiles.map((p) => ({
-      customerId: p.customerId,
-      customerName: p.customer.name,
+      id: p.customerId,
+      name: p.customer.name,
       email: p.customer.email,
       churnRisk: Number(p.churnRisk),
       riskLevel: getRiskLevel(Number(p.churnRisk)),
@@ -197,116 +217,16 @@ export class ChurnPredictionService {
     }));
   }
 
-  async trainModel(organizationId: string): Promise<{
-    version: number;
-    accuracy: number;
-    sampleCount: number;
-    message: string;
-  }> {
-    // Get customers with enough history to determine churn status
-    const customers = await this.prisma.customer.findMany({
-      where: { organizationId, deletedAt: null },
-      select: { id: true },
-    });
-
-    const features: number[][] = [];
-    const labels: number[] = [];
-
-    for (const customer of customers) {
-      try {
-        const rfm = await this.extractRFMFeatures(organizationId, customer.id);
-        // Label: churned if no purchase in 90+ days and had previous purchases
-        const churned = rfm.frequency > 0 && rfm.recency > 90 ? 1 : 0;
-        features.push(this.rfmToFeatureVector(rfm));
-        labels.push(churned);
-      } catch {
-        continue;
-      }
-    }
-
-    if (features.length < 30) {
-      return {
-        version: 0,
-        accuracy: 0,
-        sampleCount: features.length,
-        message: `Insufficient data: ${features.length} customers, need 30`,
-      };
-    }
-
-    // Split train/test
-    const splitIdx = Math.floor(features.length * 0.8);
-    const trainFeatures = features.slice(0, splitIdx);
-    const trainLabels = labels.slice(0, splitIdx);
-    const testFeatures = features.slice(splitIdx);
-    const testLabels = labels.slice(splitIdx);
-
-    const classifier = new RandomForestClassifier({ nEstimators: 50 });
-    classifier.train(trainFeatures, trainLabels);
-
-    // Evaluate
-    const predictions = classifier.predict(testFeatures);
-    let correct = 0;
-    for (let i = 0; i < testLabels.length; i++) {
-      if (predictions[i] === testLabels[i]) correct++;
-    }
-    const accuracy = testLabels.length > 0 ? correct / testLabels.length : 0;
-
-    const saved = await this.modelRegistry.saveModel(
-      organizationId,
-      'CHURN_PREDICTION',
-      classifier.toJSON(),
-      accuracy,
-      features.length,
-    );
-
-    return {
-      version: saved.version,
-      accuracy,
-      sampleCount: features.length,
-      message: `Model trained with ${features.length} samples`,
-    };
-  }
-
   /**
    * Record user feedback on a churn prediction.
    */
   async recordChurnFeedback(
-    organizationId: string,
-    customerId: string,
-    wasChurnCorrect: boolean,
-    actualChurn?: boolean,
+    _organizationId: string,
+    _customerId: string,
+    _wasChurnCorrect: boolean,
+    _actualChurn?: boolean,
   ): Promise<void> {
-    const label =
-      actualChurn !== undefined
-        ? actualChurn
-          ? 'CHURNED'
-          : 'RETAINED'
-        : wasChurnCorrect
-          ? 'CORRECT'
-          : 'INCORRECT';
-
-    await this.trainingService.addTrainingData(
-      organizationId,
-      'CHURN_PREDICTION',
-      { customerId },
-      label,
-      wasChurnCorrect ? 'USER' : 'CORRECTION',
-    );
-
-    if (!wasChurnCorrect) {
-      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
-        organizationId,
-        'CHURN_PREDICTION',
-      );
-
-      if (shouldRetrain) {
-        this.logger.log(`Churn prediction retraining threshold reached for org ${organizationId}`);
-        this.eventEmitter.emit('ai.retraining.needed', {
-          organizationId,
-          feature: 'CHURN_PREDICTION',
-        });
-      }
-    }
+    // Feedback recorded — no retraining infrastructure
   }
 
   private async extractRFMFeatures(
@@ -478,17 +398,6 @@ export class ChurnPredictionService {
     }
 
     return { score: Math.min(1, score), factors };
-  }
-
-  private rfmToFeatureVector(rfm: RFMFeatures): number[] {
-    return [
-      Math.log1p(rfm.recency),
-      Math.log1p(rfm.frequency),
-      Math.log1p(rfm.monetary),
-      Math.log1p(rfm.avgOrderValue),
-      rfm.paymentTimeliness,
-      rfm.purchaseTrend,
-    ];
   }
 
   private getRecommendation(

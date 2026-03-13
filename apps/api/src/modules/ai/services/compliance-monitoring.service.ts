@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildComplianceCheckPrompt, ComplianceCheckResponse } from '../prompts/security.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface ComplianceViolation {
   type: string;
@@ -16,6 +19,8 @@ export interface ComplianceReport {
   passed: number;
   violations: ComplianceViolation[];
   checkedAt: Date;
+  predictionMethod: PredictionMethod;
+  recommendations?: string[];
 }
 
 export interface ComplianceScoreResult {
@@ -32,7 +37,10 @@ export interface ComplianceScoreResult {
 export class ComplianceMonitoringService {
   private readonly logger = new Logger(ComplianceMonitoringService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {}
 
   async runComplianceCheck(organizationId: string): Promise<ComplianceReport> {
     const violations: ComplianceViolation[] = [];
@@ -68,14 +76,88 @@ export class ComplianceMonitoringService {
       backdateViolations,
     ].filter((v) => v.length === 0).length;
 
-    const score = totalChecks > 0 ? (passed / totalChecks) * 100 : 100;
+    const ruleScore = totalChecks > 0 ? (passed / totalChecks) * 100 : 100;
+
+    // Try Ollama for interpretation and recommendations
+    let finalScore = ruleScore;
+    let predictionMethod: PredictionMethod = 'RULE_BASED';
+    let ollamaRecommendations: string[] | undefined;
+    try {
+      const prompt = buildComplianceCheckPrompt(
+        {
+          entity_type: 'organization',
+          entity_id: organizationId,
+          data: {
+            total_checks: totalChecks,
+            passed,
+            violation_count: violations.length,
+            violations_summary: violations.slice(0, 10).map((v) => ({
+              type: v.type,
+              severity: v.severity,
+              description: v.description,
+            })),
+          },
+        },
+        [
+          {
+            rule_id: 'journal_balance',
+            name: 'Journal Balance',
+            description: 'All journal entries must have balanced debits and credits',
+            severity: 'CRITICAL',
+          },
+          {
+            rule_id: 'payment_references',
+            name: 'Payment References',
+            description: 'Paid invoices must have payment records',
+            severity: 'HIGH',
+          },
+          {
+            rule_id: 'segregation_of_duties',
+            name: 'Segregation of Duties',
+            description: 'Different users for creation and approval',
+            severity: 'MEDIUM',
+          },
+          {
+            rule_id: 'regulatory_filings',
+            name: 'Regulatory Filings',
+            description: 'VAT returns filed on time',
+            severity: 'HIGH',
+          },
+          {
+            rule_id: 'backdated_transactions',
+            name: 'Backdated Transactions',
+            description: 'Transactions should not be significantly backdated',
+            severity: 'MEDIUM',
+          },
+        ],
+      );
+      const ollamaResult = await this.gateway.infer<ComplianceCheckResponse>(prompt.user, {
+        systemPrompt: prompt.system,
+      });
+      if (ollamaResult?.data?.compliance_score != null) {
+        const ollamaScoreNormalized = Math.max(
+          0,
+          Math.min(100, ollamaResult.data.compliance_score * 100),
+        );
+        // Blend Ollama score with rule-based score
+        finalScore = ollamaScoreNormalized * 0.5 + ruleScore * 0.5;
+        predictionMethod = 'HYBRID';
+        ollamaRecommendations = ollamaResult.data.recommendations;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama compliance check failed for org ${organizationId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
 
     return {
-      score,
+      score: finalScore,
       totalChecks,
       passed,
       violations,
       checkedAt: new Date(),
+      predictionMethod,
+      recommendations: ollamaRecommendations,
     };
   }
 

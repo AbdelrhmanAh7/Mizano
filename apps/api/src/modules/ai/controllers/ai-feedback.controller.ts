@@ -14,7 +14,6 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { AiFeedbackService } from '../services/ai-feedback.service';
-import { ModelRegistryService } from '../services/model-registry.service';
 import { SubmitFeedbackDto } from '../dto/submit-feedback.dto';
 import { AiFeature } from '@prisma/client';
 
@@ -23,10 +22,7 @@ import { AiFeature } from '@prisma/client';
 @Controller('ai/feedback')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class AiFeedbackController {
-  constructor(
-    private feedbackService: AiFeedbackService,
-    private modelRegistry: ModelRegistryService,
-  ) {}
+  constructor(private feedbackService: AiFeedbackService) {}
 
   @Post()
   @Permissions('ai.feedback')
@@ -74,39 +70,5 @@ export class AiFeedbackController {
     @Query('limit') limit?: number,
   ) {
     return this.feedbackService.getRecentFeedback(orgId, feature, limit || 50);
-  }
-
-  @Get('models/:feature/status')
-  @Permissions('ai.view')
-  @ApiOperation({ summary: 'Get model status for a feature' })
-  getModelStatus(@CurrentOrg() orgId: string, @Param('feature') feature: AiFeature) {
-    return this.modelRegistry.getModelStatus(orgId, feature);
-  }
-
-  @Get('models/:feature/history')
-  @Permissions('ai.view')
-  @ApiOperation({ summary: 'Get model version history' })
-  getModelHistory(
-    @CurrentOrg() orgId: string,
-    @Param('feature') feature: AiFeature,
-    @Query('limit') limit?: number,
-  ) {
-    return this.modelRegistry.getModelHistory(orgId, feature, limit);
-  }
-
-  @Post('models/:feature/retrain')
-  @Permissions('ai.manage')
-  @ApiOperation({ summary: 'Trigger retraining for a feature' })
-  async triggerRetraining(@CurrentOrg() orgId: string, @Param('feature') feature: AiFeature) {
-    const { shouldRetrain, correctionCount, threshold } =
-      await this.feedbackService.checkRetrainingThreshold(orgId, feature);
-
-    return {
-      triggered: true,
-      correctionCount,
-      threshold,
-      shouldRetrain,
-      message: shouldRetrain ? 'Retraining queued' : 'Retraining not needed yet',
-    };
   }
 }

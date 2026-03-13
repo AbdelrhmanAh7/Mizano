@@ -1,9 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AiTrainingService } from './ai-training.service';
 import { AiFeedbackService } from './ai-feedback.service';
-import { ModelRegistryService } from './model-registry.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { buildSkillsGapPrompt } from '../prompts/hr.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const KNN = require('ml-knn');
@@ -30,6 +30,7 @@ export interface EmployeeGapResult {
   gaps: SkillGap[];
   matchScore: number;
   recommendations: SkillRecommendation[];
+  predictionMethod: PredictionMethod;
 }
 
 export interface DepartmentGapResult {
@@ -104,10 +105,8 @@ export class SkillsGapService {
 
   constructor(
     private prisma: PrismaService,
-    private modelRegistry: ModelRegistryService,
-    private trainingService: AiTrainingService,
     private feedbackService: AiFeedbackService,
-    private eventEmitter: EventEmitter2,
+    private gateway: OllamaInferenceGateway,
   ) {}
 
   /**
@@ -166,10 +165,49 @@ export class SkillsGapService {
     gaps.sort((a, b) => b.gap - a.gap);
 
     // Match score: percentage of required skills met
-    const matchScore = totalRequired > 0 ? totalMatched / totalRequired : 1.0;
+    let matchScore = totalRequired > 0 ? totalMatched / totalRequired : 1.0;
 
     // Generate recommendations
-    const recommendations = this.generateRecommendations(gaps);
+    let recommendations = this.generateRecommendations(gaps);
+    let predictionMethod: PredictionMethod = 'RULE_BASED';
+
+    // --- Ollama enhancement ---
+    {
+      try {
+        const prompt = buildSkillsGapPrompt(
+          { name: employee.name, department: employee.department, skills: currentSkills },
+          requiredSkills as Record<string, unknown>,
+        );
+        const ollamaResult = await this.gateway.infer<{
+          gaps: Array<{ skill: string; current_level: number; required_level: number }>;
+          match_score: number;
+          training_recommendations: string[];
+        }>(prompt);
+
+        if (ollamaResult) {
+          // Blend match scores: 50% existing + 50% Ollama
+          const ollamaMatchScore = ollamaResult.data.match_score ?? matchScore;
+          matchScore = matchScore * 0.5 + ollamaMatchScore * 0.5;
+
+          // Prefer Ollama's richer training recommendations if available
+          if (ollamaResult.data.training_recommendations?.length > 0) {
+            recommendations = ollamaResult.data.training_recommendations.map((rec, idx) => ({
+              skill: gaps[idx]?.skill || 'general',
+              priority:
+                idx < 2 ? ('high' as const) : idx < 4 ? ('medium' as const) : ('low' as const),
+              suggestion: rec,
+            }));
+          }
+          predictionMethod = 'HYBRID';
+
+          // Store as training data
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Ollama skills gap analysis failed, using rule-based: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
 
     // Store skills gaps in EmployeeAiProfile
     await this.prisma.employeeAiProfile.upsert({
@@ -196,6 +234,7 @@ export class SkillsGapService {
       gaps,
       matchScore,
       recommendations,
+      predictionMethod,
     };
 
     // Store prediction for feedback tracking
@@ -454,39 +493,12 @@ export class SkillsGapService {
    * and may trigger model retraining when the threshold is reached.
    */
   async recordSkillsGapFeedback(
-    organizationId: string,
-    employeeId: string,
-    wasCorrect: boolean,
-    adjustedGaps?: Record<string, unknown>,
+    _organizationId: string,
+    _employeeId: string,
+    _wasCorrect: boolean,
+    _adjustedGaps?: Record<string, unknown>,
   ): Promise<void> {
-    const label = wasCorrect
-      ? 'correct'
-      : adjustedGaps
-        ? JSON.stringify(adjustedGaps)
-        : 'incorrect';
-
-    await this.trainingService.addTrainingData(
-      organizationId,
-      'SKILLS_GAP',
-      { employeeId },
-      label,
-      wasCorrect ? 'USER' : 'CORRECTION',
-    );
-
-    if (!wasCorrect) {
-      const { shouldRetrain } = await this.feedbackService.checkRetrainingThreshold(
-        organizationId,
-        'SKILLS_GAP',
-      );
-
-      if (shouldRetrain) {
-        this.logger.log(`Skills gap retraining threshold reached for org ${organizationId}`);
-        this.eventEmitter.emit('ai.retraining.needed', {
-          organizationId,
-          feature: 'SKILLS_GAP',
-        });
-      }
-    }
+    // Feedback is recorded via AiFeedbackService.processFeedback
   }
 
   // ─── PRIVATE HELPERS ───

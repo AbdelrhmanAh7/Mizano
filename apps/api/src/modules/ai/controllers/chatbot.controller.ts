@@ -56,17 +56,6 @@ export class ChatbotController {
     return this.chatbotService.getHistory(orgId, userId, limit || 50);
   }
 
-  @Post('train')
-  @Permissions('accounting.manage')
-  @ApiOperation({ summary: 'Train the chatbot intent classifier' })
-  @ApiResponse({
-    status: 200,
-    description: 'Classifier training completed',
-  })
-  trainClassifier(@CurrentOrg() orgId: string) {
-    return this.chatbotService.trainClassifier(orgId);
-  }
-
   @Delete('history')
   @Permissions('accounting.view')
   @ApiOperation({ summary: 'Clear chat history for the current user' })

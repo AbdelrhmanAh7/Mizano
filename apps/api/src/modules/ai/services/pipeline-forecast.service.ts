@@ -1,6 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { holtWinters } from '../utils/holt-winters.util';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import {
+  buildPipelineNarrativePrompt,
+  PipelineNarrativeResponse,
+} from '../prompts/forecasting.prompts';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 export interface PipelineForecast {
   totalWeighted: number;
@@ -9,6 +15,12 @@ export interface PipelineForecast {
   activeDeals: number;
   avgDealSize: number;
   avgDaysToClose: number;
+  narrative?: {
+    insights: string[];
+    riskDeals: { dealName: string; risk: string; recommendation: string }[];
+    adjustedForecast?: number;
+  };
+  predictionMethod: PredictionMethod;
 }
 
 export interface WeightedPipelineStage {
@@ -53,7 +65,10 @@ export class PipelineForecastService {
     LOST: 0,
   };
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private ollamaGateway: OllamaInferenceGateway,
+  ) {}
 
   async forecastPipeline(organizationId: string, months: number = 6): Promise<PipelineForecast> {
     const activeDeals = await this.prisma.deal.findMany({
@@ -134,6 +149,83 @@ export class PipelineForecastService {
       }
     }
 
+    // Try Ollama for deal-level risk assessment and insights
+    let narrative: PipelineForecast['narrative'];
+    let predictionMethod: PredictionMethod = 'ML';
+
+    try {
+      // Get stage data for the prompt
+      const stageBreakdown = new Map<
+        string,
+        {
+          count: number;
+          value: number;
+          deals: { name: string; value: number; daysInStage: number }[];
+        }
+      >();
+      for (const deal of activeDeals) {
+        const existing = stageBreakdown.get(deal.stage) || { count: 0, value: 0, deals: [] };
+        existing.count++;
+        existing.value += Number(deal.expectedAmount);
+        const daysInStage = Math.floor((Date.now() - deal.createdAt.getTime()) / 86400000);
+        existing.deals.push({
+          name: `Deal-${deal.stage}-${existing.count}`,
+          value: Number(deal.expectedAmount),
+          daysInStage,
+        });
+        stageBreakdown.set(deal.stage, existing);
+      }
+
+      const stages = Array.from(stageBreakdown.entries()).map(([name, data]) => ({
+        name,
+        deals_count: data.count,
+        total_value: data.value,
+        avg_days_in_stage:
+          data.deals.length > 0
+            ? data.deals.reduce((s, d) => s + d.daysInStage, 0) / data.deals.length
+            : 0,
+        conversion_rate: this.STAGE_WEIGHTS[name] || 0,
+        deals: data.deals.map((d) => ({
+          deal_name: d.name,
+          value: d.value,
+          days_in_stage: d.daysInStage,
+        })),
+      }));
+
+      const promptData = buildPipelineNarrativePrompt(
+        {
+          total_value: totalUnweighted,
+          total_deals: activeDeals.length,
+          weighted_value: totalWeighted,
+          avg_deal_size: avgDealSize,
+          avg_cycle_days: Math.round(avgDaysToClose),
+        },
+        stages,
+      );
+
+      const ollamaResult = await this.ollamaGateway.infer<PipelineNarrativeResponse>(
+        promptData.user,
+        { systemPrompt: promptData.system },
+      );
+
+      if (ollamaResult?.data) {
+        narrative = {
+          insights: ollamaResult.data.insights || [],
+          riskDeals: (ollamaResult.data.risk_deals || []).map((d) => ({
+            dealName: d.deal_name,
+            risk: d.risk,
+            recommendation: d.recommendation,
+          })),
+          adjustedForecast: ollamaResult.data.forecast || undefined,
+        };
+        predictionMethod = 'HYBRID';
+      }
+    } catch (error) {
+      this.logger.debug(
+        `Ollama pipeline narrative unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
     return {
       totalWeighted,
       totalUnweighted,
@@ -141,6 +233,8 @@ export class PipelineForecastService {
       activeDeals: activeDeals.length,
       avgDealSize,
       avgDaysToClose: Math.round(avgDaysToClose),
+      narrative,
+      predictionMethod,
     };
   }
 

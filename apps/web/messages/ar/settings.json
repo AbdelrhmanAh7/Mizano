@@ -50,6 +50,10 @@
     "cache": {
       "title": "إدارة الذاكرة المؤقتة",
       "description": "مراقبة وإدارة التخزين المؤقت لاستجابات API"
+    },
+    "auditLogs": {
+      "title": "سجل التدقيق",
+      "description": "تتبع جميع إجراءات المستخدمين والتغييرات عبر النظام"
     }
   },
   "organization": {
@@ -195,14 +199,6 @@
     },
     "modelParameters": "معلمات النموذج",
     "modelParametersDescription": "تكوين كيفية تعلم نماذج الذكاء الاصطناعي واكتشاف الشذوذ",
-    "retrainingFrequency": "تكرار إعادة التدريب",
-    "retrainingFrequencyHint": "عدد مرات إعادة تدريب نماذج الذكاء الاصطناعي على أحدث بياناتك",
-    "retrainingOptions": {
-      "daily": "يومياً",
-      "weekly": "أسبوعياً",
-      "biweekly": "كل أسبوعين",
-      "monthly": "شهرياً"
-    },
     "anomalySensitivity": "حساسية اكتشاف الشذوذ",
     "anomalySensitivityHint": "القيم الأعلى تُشير إلى مزيد من المعاملات. القيم المنخفضة تُشير فقط إلى الأكثر غرابة."
   },
@@ -362,6 +358,47 @@
     "accountListsDescription": "يتم التخزين المؤقت لمدة 10 دقائق. نادرًا ما يتغير دليل الحسابات، لذا يوفر TTL الأطول تحسينًا كبيرًا في الأداء.",
     "salesPurchases": "قوائم المبيعات والمشتريات",
     "salesPurchasesDescription": "يتم التخزين المؤقت لمدة دقيقتين. يضمن TTL القصير حداثة البيانات للبيانات المعاملاتية المتغيرة بشكل متكرر."
+  },
+  "auditLogs": {
+    "title": "سجل التدقيق",
+    "description": "تتبع جميع إجراءات المستخدمين والتغييرات عبر النظام",
+    "stats": {
+      "totalActions": "إجمالي الإجراءات",
+      "creates": "إنشاء",
+      "updates": "تحديث",
+      "deletes": "حذف"
+    },
+    "filters": {
+      "searchPlaceholder": "البحث حسب الكيان أو المستخدم...",
+      "entityType": "نوع الكيان",
+      "allEntities": "جميع الكيانات",
+      "action": "الإجراء",
+      "allActions": "جميع الإجراءات"
+    },
+    "actions": {
+      "create": "إنشاء",
+      "update": "تحديث",
+      "delete": "حذف"
+    },
+    "table": {
+      "title": "سجل النشاط",
+      "description": "جميع الإجراءات المسجلة في آخر 30 يوماً"
+    },
+    "columns": {
+      "timestamp": "التوقيت",
+      "user": "المستخدم",
+      "action": "الإجراء",
+      "entityType": "نوع الكيان",
+      "entityId": "معرف الكيان",
+      "ip": "عنوان IP"
+    },
+    "pagination": {
+      "page": "صفحة"
+    },
+    "empty": {
+      "title": "لا توجد سجلات تدقيق",
+      "description": "ستظهر الإجراءات هنا عندما يقوم المستخدمون بإجراء تغييرات"
+    }
   },
   "common": {
     "saveChanges": "حفظ التغييرات",

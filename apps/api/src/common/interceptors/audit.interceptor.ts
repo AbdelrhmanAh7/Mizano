@@ -1,4 +1,4 @@
-import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
+import { Injectable, Logger, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -6,6 +6,8 @@ import { AuditAction } from '@prisma/client';
 
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(AuditInterceptor.name);
+
   constructor(private prisma: PrismaService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -45,7 +47,7 @@ export class AuditInterceptor implements NestInterceptor {
             }
           } catch (error) {
             // Don't fail the request if audit logging fails
-            console.error('Audit logging failed:', error);
+            this.logger.error('Audit logging failed:', error);
           }
         })();
       }),

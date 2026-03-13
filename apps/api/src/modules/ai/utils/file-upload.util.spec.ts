@@ -9,8 +9,8 @@ import {
 
 describe('file-upload.util', () => {
   describe('OCR_ALLOWED_MIMES', () => {
-    it('should contain 8 MIME types', () => {
-      expect(OCR_ALLOWED_MIMES).toHaveLength(8);
+    it('should contain 12 MIME types', () => {
+      expect(OCR_ALLOWED_MIMES).toHaveLength(12);
     });
 
     it.each([
@@ -41,8 +41,8 @@ describe('file-upload.util', () => {
   });
 
   describe('EXTENSION_TO_MIME', () => {
-    it('should have 10 entries', () => {
-      expect(Object.keys(EXTENSION_TO_MIME)).toHaveLength(10);
+    it('should have 13 entries', () => {
+      expect(Object.keys(EXTENSION_TO_MIME)).toHaveLength(13);
     });
 
     it.each([
@@ -55,6 +55,9 @@ describe('file-upload.util', () => {
       ['.tif', 'image/tiff'],
       ['.heic', 'image/heic'],
       ['.heif', 'image/heif'],
+      ['.bmp', 'image/bmp'],
+      ['.avif', 'image/avif'],
+      ['.jxl', 'image/jxl'],
       ['.pdf', 'application/pdf'],
     ])('should map %s to %s', (ext, mime) => {
       expect(EXTENSION_TO_MIME[ext]).toBe(mime);

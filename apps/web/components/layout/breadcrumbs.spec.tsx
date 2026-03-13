@@ -123,10 +123,10 @@ describe('Breadcrumbs', () => {
     expect(screen.getByText('Journal Entries')).toBeInTheDocument();
   });
 
-  it('renders "Details" for ID-like segments (cuid)', () => {
+  it('renders context-aware "Details" for ID-like segments (cuid)', () => {
     mockPathname = '/en/sales/invoices/clz1234567890abcdefgh';
     render(<Breadcrumbs />);
-    expect(screen.getByText('Details')).toBeInTheDocument();
+    expect(screen.getByText('Invoices Details')).toBeInTheDocument();
   });
 
   it('capitalizes unknown segments with hyphen-to-space conversion', () => {

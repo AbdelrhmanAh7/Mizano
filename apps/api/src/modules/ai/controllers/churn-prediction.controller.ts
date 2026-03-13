@@ -38,12 +38,4 @@ export class ChurnPredictionController {
     const result = await this.churnService.predictAllCustomers(orgId);
     return { data: result };
   }
-
-  @Post('train')
-  @Permissions('sales.manage')
-  @ApiOperation({ summary: 'Train churn prediction ML model' })
-  async train(@CurrentOrg() orgId: string) {
-    const result = await this.churnService.trainModel(orgId);
-    return { data: result };
-  }
 }

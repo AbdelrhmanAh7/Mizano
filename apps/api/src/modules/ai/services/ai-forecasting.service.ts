@@ -10,15 +10,31 @@ export class AiForecastingService {
     const historicalData = await this.getMonthlyRevenue(organizationId, 12);
 
     // Simple moving average forecast
-    const forecast = this.simpleMovingAverageForecast(historicalData, months);
+    const forecastData = this.simpleMovingAverageForecast(historicalData, months);
 
     // Calculate confidence based on variance
     const variance = this.calculateVariance(historicalData);
     const confidence = this.calculateConfidence(variance);
 
+    // Combine historical + forecast into the shape the frontend expects:
+    // { date: ISO string, actualRevenue?: number, predictedRevenue: number, variance?: number }
+    const combined = [
+      ...historicalData.map((h) => ({
+        date: h.isoDate,
+        actualRevenue: h.value,
+        predictedRevenue: h.value,
+        variance: 0,
+      })),
+      ...forecastData.map((f) => ({
+        date: f.isoDate,
+        predictedRevenue: f.value,
+        actualRevenue: undefined,
+        variance: undefined,
+      })),
+    ];
+
     return {
-      historical: historicalData,
-      forecast,
+      data: combined,
       confidence,
       methodology: 'Simple Moving Average (3-month)',
       generatedAt: new Date(),
@@ -33,7 +49,8 @@ export class AiForecastingService {
     });
     let currentBalance = parseFloat(bankAccounts._sum.systemBalance?.toString() || '0');
 
-    const forecast = [];
+    const weeklyRecurring = await this.estimateWeeklyRecurring(organizationId);
+    const rawForecast = [];
     const today = new Date();
 
     for (let i = 1; i <= weeks; i++) {
@@ -70,29 +87,34 @@ export class AiForecastingService {
         0,
       );
 
-      // Estimated recurring expenses (payroll, rent, etc.) - simplified
-      const weeklyRecurring = await this.estimateWeeklyRecurring(organizationId);
-
-      const netCashFlow = inflowAmount - outflowAmount - weeklyRecurring;
+      const totalOutflow = outflowAmount + weeklyRecurring;
+      const netCashFlow = inflowAmount - totalOutflow;
       currentBalance += netCashFlow;
 
-      forecast.push({
+      rawForecast.push({
         week: i,
         startDate: weekStart.toISOString().split('T')[0],
-        endDate: weekEnd.toISOString().split('T')[0],
-        expectedInflows: inflowAmount,
-        expectedOutflows: outflowAmount + weeklyRecurring,
-        netCashFlow,
         projectedBalance: currentBalance,
-        invoicesDue: expectedInflows.length,
-        billsDue: expectedOutflows.length,
+        expectedInflows: inflowAmount,
+        expectedOutflows: totalOutflow,
       });
     }
 
+    // Map to the shape the frontend expects:
+    // { date, predictedInflow, predictedOutflow, predictedBalance, lowerBound, upperBound }
+    const data = rawForecast.map((w) => ({
+      date: w.startDate,
+      predictedInflow: w.expectedInflows,
+      predictedOutflow: w.expectedOutflows,
+      predictedBalance: w.projectedBalance,
+      lowerBound: Math.round(w.projectedBalance * 0.85 * 100) / 100,
+      upperBound: Math.round(w.projectedBalance * 1.15 * 100) / 100,
+    }));
+
     return {
+      data,
       currentBalance: parseFloat(bankAccounts._sum.systemBalance?.toString() || '0'),
-      forecast,
-      warnings: this.generateCashFlowWarnings(forecast),
+      warnings: this.generateCashFlowWarnings(rawForecast),
       generatedAt: new Date(),
     };
   }
@@ -254,6 +276,7 @@ export class AiForecastingService {
 
       data.push({
         month: start.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        isoDate: start.toISOString().split('T')[0],
         value: parseFloat(invoices._sum.grandTotal?.toString() || '0'),
       });
     }
@@ -304,9 +327,11 @@ export class AiForecastingService {
 
       const futureMonth = new Date();
       futureMonth.setMonth(futureMonth.getMonth() + i + 1);
+      futureMonth.setDate(1);
 
       forecast.push({
         month: futureMonth.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        isoDate: futureMonth.toISOString().split('T')[0],
         value: Math.round(avg * 100) / 100,
       });
 

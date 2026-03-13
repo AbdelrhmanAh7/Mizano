@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ArrowLeft, Download, Printer, Mail, Building2 } from 'lucide-react';
@@ -33,8 +32,8 @@ const months = [
   'December',
 ];
 
-export default function PayslipDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function PayslipDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const t = useTranslations('hr');
   const { data: payslip, isLoading } = usePayslip(id);
 

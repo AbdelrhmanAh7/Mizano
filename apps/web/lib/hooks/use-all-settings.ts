@@ -47,7 +47,7 @@ export interface InventorySettings {
 export interface AISettings {
   aiCategorizationEnabled: boolean;
   aiReconciliationEnabled: boolean;
-  aiOcrEnabled: boolean;
+
   aiForecastingEnabled: boolean;
   aiAnomalyEnabled: boolean;
   aiLeadScoringEnabled: boolean;

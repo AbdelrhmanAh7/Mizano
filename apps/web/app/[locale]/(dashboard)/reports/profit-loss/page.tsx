@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfYear, endOfMonth } from 'date-fns';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
@@ -16,7 +16,7 @@ export default function ProfitLossReportPage() {
   const t = useTranslations('reports');
   const today = new Date();
   const [dateRange, setDateRange] = useState({
-    startDate: startOfMonth(today),
+    startDate: startOfYear(today),
     endDate: endOfMonth(today),
   });
 
