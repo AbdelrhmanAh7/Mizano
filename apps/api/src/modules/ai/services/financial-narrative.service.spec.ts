@@ -3,6 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 import { FinancialNarrativeService } from './financial-narrative.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { AiCacheService } from './ai-cache.service';
 import {
   createMockPrisma,
   MockPrismaClient,
@@ -122,6 +123,17 @@ describe('FinancialNarrativeService', () => {
             generateCompletion: jest.fn().mockResolvedValue(''),
             generateStructuredOutput: jest.fn().mockResolvedValue({}),
             isAvailable: jest.fn().mockResolvedValue(false),
+          },
+        },
+        {
+          provide: AiCacheService,
+          useValue: {
+            getOrSet: jest
+              .fn()
+              .mockImplementation(
+                (_f: string, _o: string, _i: unknown, factory: () => Promise<unknown>) => factory(),
+              ),
+            invalidateFeature: jest.fn().mockResolvedValue(0),
           },
         },
       ],

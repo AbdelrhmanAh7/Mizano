@@ -1,3 +1,4 @@
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 
@@ -135,6 +136,182 @@ export function useTrainChatbot() {
   return useMutation({
     mutationFn: chatbotApi.trainChatbot,
   });
+}
+
+/**
+ * Streaming chatbot hook — sends a message and progressively builds the response
+ * as tokens arrive via SSE. Falls back to useSendChatMessage if SSE fails.
+ */
+export function useSendChatMessageStream() {
+  const queryClient = useQueryClient();
+  const [streamingText, setStreamingText] = useState('');
+  const [intent, setIntent] = useState<string | null>(null);
+  const [confidence, setConfidence] = useState<number>(0);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
+
+  const sendMessage = useCallback(
+    async (message: string) => {
+      setStreamingText('');
+      setIntent(null);
+      setConfidence(0);
+      setError(null);
+      setIsStreaming(true);
+
+      // Optimistically add user message to history
+      queryClient.setQueriesData(
+        { queryKey: ['ai-chatbot-history'] },
+        (old: { data?: ChatMessage[] } | undefined) => {
+          const existing = Array.isArray(old?.data) ? old.data : [];
+          return {
+            ...old,
+            data: [
+              ...existing,
+              { role: 'user', content: message, timestamp: new Date().toISOString() },
+            ],
+          };
+        },
+      );
+
+      try {
+        // POST to stream endpoint — the response body is an SSE stream
+        const baseUrl = api.defaults.baseURL || '';
+        const response = await fetch(`${baseUrl}/ai/chatbot/message/stream`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...((api.defaults.headers?.common as Record<string, string>) || {}),
+          },
+          body: JSON.stringify({ message }),
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error(`Stream request failed: ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulated = '';
+        let buffer = '';
+
+        const processLine = (line: string) => {
+          if (line.startsWith('data:')) {
+            const data = line.slice(5).trim();
+            if (!data) return;
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.token) {
+                accumulated += parsed.token;
+                setStreamingText(accumulated);
+              }
+              if (parsed.intent) {
+                setIntent(parsed.intent);
+                setConfidence(parsed.confidence || 0);
+              }
+              if (parsed.error) {
+                setError(parsed.error);
+              }
+            } catch {
+              // ignore
+            }
+          }
+        };
+
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            processLine(line.trim());
+          }
+        }
+
+        // Process remaining buffer
+        if (buffer.trim()) {
+          processLine(buffer.trim());
+        }
+
+        // Add assistant response to history
+        if (accumulated) {
+          queryClient.setQueriesData(
+            { queryKey: ['ai-chatbot-history'] },
+            (old: { data?: ChatMessage[] } | undefined) => {
+              const existing = Array.isArray(old?.data) ? old.data : [];
+              return {
+                ...old,
+                data: [
+                  ...existing,
+                  {
+                    role: 'assistant',
+                    content: accumulated,
+                    timestamp: new Date().toISOString(),
+                  },
+                ],
+              };
+            },
+          );
+        }
+
+        queryClient.invalidateQueries({ queryKey: ['ai-chatbot-history'] });
+      } catch (err) {
+        // Fall back to non-streaming
+        try {
+          const response = await chatbotApi.sendMessage(message);
+          const chatResponse = response?.data || response;
+          setStreamingText(chatResponse.response || '');
+          setIntent(chatResponse.intent);
+          setConfidence(chatResponse.confidence || 0);
+
+          queryClient.setQueriesData(
+            { queryKey: ['ai-chatbot-history'] },
+            (old: { data?: ChatMessage[] } | undefined) => {
+              const existing = Array.isArray(old?.data) ? old.data : [];
+              return {
+                ...old,
+                data: [
+                  ...existing,
+                  {
+                    role: 'assistant',
+                    content: chatResponse.response,
+                    timestamp: new Date().toISOString(),
+                  },
+                ],
+              };
+            },
+          );
+          queryClient.invalidateQueries({ queryKey: ['ai-chatbot-history'] });
+        } catch (fallbackErr) {
+          setError(fallbackErr instanceof Error ? fallbackErr.message : 'Failed to send message');
+        }
+      } finally {
+        setIsStreaming(false);
+      }
+    },
+    [queryClient],
+  );
+
+  return {
+    sendMessage,
+    streamingText,
+    intent,
+    confidence,
+    isStreaming,
+    error,
+  };
 }
 
 export function useClearChatHistory() {

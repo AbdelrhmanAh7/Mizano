@@ -74,6 +74,10 @@ describe('ChatbotService', () => {
         openingBalance: mockDecimal(25000),
       } as any);
 
+      prisma.journalLine.aggregate.mockResolvedValue({
+        _sum: { debit: mockDecimal(10000), credit: mockDecimal(3000) },
+      } as any);
+
       const result = await service.processMessage(
         orgId,
         userId,

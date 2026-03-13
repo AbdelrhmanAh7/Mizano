@@ -1,18 +1,28 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
-import { lastValueFrom } from 'rxjs';
-import { OllamaInferenceOptions, OllamaInferenceResult } from '../types/ollama-inference.types';
+import { lastValueFrom, Observable, Subject } from 'rxjs';
+import {
+  OllamaInferenceOptions,
+  OllamaInferenceResult,
+  OllamaInferencePriority,
+  OllamaStreamChunk,
+} from '../types/ollama-inference.types';
+
+interface PriorityWaiter {
+  priority: OllamaInferencePriority;
+  resolve: () => void;
+}
 
 /**
  * Generic Ollama inference gateway.
  *
  * Provides text and vision inference that any AI service can consume.
- * Handles health caching, model availability, JSON parsing, and
- * concurrency limiting so callers only deal with typed results.
+ * Handles health caching, model availability, JSON parsing, priority-based
+ * concurrency limiting, and streaming so callers only deal with typed results.
  */
 @Injectable()
-export class OllamaInferenceGateway {
+export class OllamaInferenceGateway implements OnModuleInit {
   private readonly logger = new Logger(OllamaInferenceGateway.name);
 
   private readonly baseUrl: string;
@@ -22,17 +32,17 @@ export class OllamaInferenceGateway {
   private readonly enabled: boolean;
   private readonly maxConcurrent: number;
 
-  // Health cache (30s TTL)
+  // Health cache (60s TTL)
   private lastHealthCheck: { available: boolean; timestamp: number } | null = null;
-  private readonly HEALTH_CACHE_TTL = 30_000;
+  private readonly HEALTH_CACHE_TTL = 60_000;
 
-  // Model availability cache (60s TTL per model)
+  // Model availability cache (300s TTL — models rarely change at runtime)
   private modelAvailability = new Map<string, { available: boolean; timestamp: number }>();
-  private readonly MODEL_CACHE_TTL = 60_000;
+  private readonly MODEL_CACHE_TTL = 300_000;
 
-  // Concurrency semaphore
+  // Priority-based concurrency semaphore
   private activeCalls = 0;
-  private readonly waitQueue: Array<() => void> = [];
+  private readonly waitQueue: PriorityWaiter[] = [];
 
   constructor(
     private configService: ConfigService,
@@ -44,6 +54,63 @@ export class OllamaInferenceGateway {
     this.defaultTimeoutMs = parseInt(this.configService.get('OLLAMA_TIMEOUT_MS', '120000'), 10);
     this.enabled = this.configService.get('OLLAMA_ENABLED', 'true') !== 'false';
     this.maxConcurrent = parseInt(this.configService.get('OLLAMA_MAX_CONCURRENT', '3'), 10);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle — warm up model on startup
+  // ---------------------------------------------------------------------------
+
+  async onModuleInit(): Promise<void> {
+    if (!this.enabled) return;
+
+    // Fire-and-forget warmup — don't block app startup
+    this.warmUpModel().catch((err) => {
+      this.logger.warn(
+        `Model warmup failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    });
+  }
+
+  /**
+   * Send a tiny inference to preload the default text model into Ollama's GPU memory.
+   * This eliminates the "first request is slow" problem.
+   */
+  private async warmUpModel(): Promise<void> {
+    const healthy = await this.isHealthy();
+    if (!healthy) {
+      this.logger.debug('Skipping model warmup — Ollama not reachable');
+      return;
+    }
+
+    const model = this.defaultTextModel;
+    const modelAvail = await this.isModelAvailable(model);
+    if (!modelAvail) {
+      this.logger.debug(`Skipping model warmup — model ${model} not available`);
+      return;
+    }
+
+    this.logger.log(`Warming up Ollama model "${model}"...`);
+    const start = Date.now();
+
+    try {
+      await lastValueFrom(
+        this.httpService.post(
+          `${this.baseUrl}/api/chat`,
+          {
+            model,
+            messages: [{ role: 'user', content: 'Hi' }],
+            stream: false,
+            options: { num_predict: 1 },
+          },
+          { timeout: 60_000 },
+        ),
+      );
+      this.logger.log(`Model "${model}" warmed up in ${Date.now() - start}ms`);
+    } catch (err) {
+      this.logger.warn(
+        `Model warmup request failed after ${Date.now() - start}ms: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -79,11 +146,28 @@ export class OllamaInferenceGateway {
     return this.doInfer<T>(prompt, images, model, options);
   }
 
+  /**
+   * Run a streaming text inference. Returns an Observable that emits
+   * OllamaStreamChunk for each token. The semaphore is held for the
+   * duration of the stream and released in finalize().
+   */
+  inferStream(prompt: string, options?: OllamaInferenceOptions): Observable<OllamaStreamChunk> {
+    const model = options?.model ?? this.defaultTextModel;
+    const subject = new Subject<OllamaStreamChunk>();
+
+    // Run async pipeline in background
+    this.doInferStream(prompt, model, options, subject).catch((err) => {
+      subject.error(err);
+    });
+
+    return subject.asObservable();
+  }
+
   // ---------------------------------------------------------------------------
   // Health & availability
   // ---------------------------------------------------------------------------
 
-  /** Check if Ollama server is reachable (30s cache). */
+  /** Check if Ollama server is reachable (60s cache). */
   async isHealthy(): Promise<boolean> {
     if (!this.enabled) {
       this.logger.debug('isHealthy: OLLAMA_ENABLED=false');
@@ -119,7 +203,7 @@ export class OllamaInferenceGateway {
     }
   }
 
-  /** Check if a specific model is pulled and available (60s cache). */
+  /** Check if a specific model is pulled and available (300s cache). */
   async isModelAvailable(modelName: string): Promise<boolean> {
     if (!this.enabled) return false;
 
@@ -185,7 +269,7 @@ export class OllamaInferenceGateway {
   }
 
   // ---------------------------------------------------------------------------
-  // Private helpers
+  // Private helpers — batch inference
   // ---------------------------------------------------------------------------
 
   private async doInfer<T>(
@@ -194,7 +278,32 @@ export class OllamaInferenceGateway {
     model: string,
     options?: OllamaInferenceOptions,
   ): Promise<OllamaInferenceResult<T> | null> {
-    await this.acquireSemaphore();
+    // Try up to 2 attempts — first attempt may fail on thinking-mode models
+    const maxAttempts = 2;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const result = await this.doInferOnce<T>(prompt, images, model, options, attempt);
+      if (result) return result;
+
+      if (attempt < maxAttempts) {
+        this.logger.warn(
+          `Retrying inference (attempt ${attempt + 1}/${maxAttempts}, model=${model})`,
+        );
+      }
+    }
+
+    return null;
+  }
+
+  private async doInferOnce<T>(
+    prompt: string,
+    images: string[],
+    model: string,
+    options: OllamaInferenceOptions | undefined,
+    attempt: number,
+  ): Promise<OllamaInferenceResult<T> | null> {
+    const priority = options?.priority ?? OllamaInferencePriority.NORMAL;
+    await this.acquireSemaphore(priority);
 
     try {
       const startTime = Date.now();
@@ -215,27 +324,36 @@ export class OllamaInferenceGateway {
       }
       messages.push(userMessage);
 
+      // On retry, increase token budget and lower temperature
+      const maxTokens =
+        attempt > 1
+          ? Math.max((options?.maxTokens ?? 4096) * 2, 8192)
+          : (options?.maxTokens ?? 4096);
+      const temperature = attempt > 1 ? 0 : (options?.temperature ?? 0.1);
+
+      const body: Record<string, unknown> = {
+        model,
+        messages,
+        stream: false,
+        think: false,
+        options: {
+          temperature,
+          num_predict: maxTokens,
+        },
+      };
+
+      // Only enforce JSON format when not in rawText mode
+      if (!options?.rawText) {
+        body.format = 'json';
+      }
+
       const response = await lastValueFrom(
-        this.httpService.post(
-          `${this.baseUrl}/api/chat`,
-          {
-            model,
-            messages,
-            stream: false,
-            options: {
-              temperature: options?.temperature ?? 0.1,
-              num_predict: options?.maxTokens ?? 4096,
-            },
-          },
-          { timeout: timeoutMs },
-        ),
+        this.httpService.post(`${this.baseUrl}/api/chat`, body, { timeout: timeoutMs }),
       );
 
       const processingTimeMs = Date.now() - startTime;
 
-      // Successful HTTP call proves Ollama is healthy — refresh cache so
-      // subsequent requests within the 30s window aren't blocked by a stale
-      // false cached from a prior failure (e.g., VRAM overflow from another model).
+      // Successful HTTP call proves Ollama is healthy — refresh cache
       this.lastHealthCheck = { available: true, timestamp: Date.now() };
 
       const rawContent: string = response.data?.message?.content ?? '';
@@ -245,27 +363,26 @@ export class OllamaInferenceGateway {
       // Qwen3 models may put reasoning in a separate `thinking` field,
       // leaving `content` empty.  Fall back to extracting JSON from thinking.
       if (!content) {
-        const thinkingField: string = response.data?.message?.thinking ?? '';
-        if (thinkingField) {
-          const salvaged = this.stripThinkTags(thinkingField);
-          const salvagedJson = salvaged ? this.parseJsonResponse(salvaged) : null;
-          if (salvagedJson) {
-            this.logger.warn(
-              `Ollama content was empty — salvaged JSON from thinking field (model=${model})`,
-            );
-            content = salvaged;
-          }
-        }
+        content = this.salvageFromThinking(response.data?.message?.thinking, model) ?? '';
       }
 
       if (!content) {
         const thinkLen = (response.data?.message?.thinking ?? '').length;
         const doneReason = response.data?.done_reason ?? 'unknown';
         this.logger.warn(
-          `Ollama returned empty content (model=${model}, rawLen=${rawContent.length}, ` +
+          `Ollama returned empty content (model=${model}, attempt=${attempt}, rawLen=${rawContent.length}, ` +
             `thinkingLen=${thinkLen}, done_reason=${doneReason}, time=${processingTimeMs}ms)`,
         );
         return null;
+      }
+
+      // For rawText mode, return the content as-is (no JSON parsing)
+      if (options?.rawText) {
+        return {
+          data: content as unknown as T,
+          processingTimeMs,
+          model,
+        };
       }
 
       const parsed = this.parseJsonResponse(content);
@@ -282,16 +399,177 @@ export class OllamaInferenceGateway {
         model,
       };
     } catch (error) {
-      // If the inference call itself fails, Ollama might be crashing/restarting.
-      // Invalidate health cache so the next check does a fresh probe.
       this.lastHealthCheck = null;
       this.logger.warn(
-        `Ollama inference failed (model=${model}): ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama inference failed (model=${model}, attempt=${attempt}): ${error instanceof Error ? error.message : String(error)}`,
       );
       return null;
     } finally {
       this.releaseSemaphore();
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private helpers — streaming inference
+  // ---------------------------------------------------------------------------
+
+  private async doInferStream(
+    prompt: string,
+    model: string,
+    options: OllamaInferenceOptions | undefined,
+    subject: Subject<OllamaStreamChunk>,
+  ): Promise<void> {
+    if (!(await this.isAvailable(model))) {
+      subject.error(new Error('Ollama is not available'));
+      return;
+    }
+
+    const priority = options?.priority ?? OllamaInferencePriority.CRITICAL;
+    await this.acquireSemaphore(priority);
+
+    try {
+      const timeoutMs = options?.timeoutMs ?? this.defaultTimeoutMs;
+      const messages: Array<Record<string, unknown>> = [];
+
+      if (options?.systemPrompt) {
+        messages.push({ role: 'system', content: options.systemPrompt });
+      }
+      messages.push({ role: 'user', content: prompt });
+
+      const response = await lastValueFrom(
+        this.httpService.post(
+          `${this.baseUrl}/api/chat`,
+          {
+            model,
+            messages,
+            stream: true,
+            think: false,
+            options: {
+              temperature: options?.temperature ?? 0.3,
+              num_predict: options?.maxTokens ?? 4096,
+            },
+          },
+          { timeout: timeoutMs, responseType: 'stream' },
+        ),
+      );
+
+      this.lastHealthCheck = { available: true, timestamp: Date.now() };
+
+      const stream = response.data as NodeJS.ReadableStream;
+      let fullContent = '';
+      let buffer = '';
+      let insideThink = false;
+
+      stream.on('data', (chunk: Buffer) => {
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
+        // Keep last partial line in buffer
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line) as {
+              message?: { content?: string };
+              done?: boolean;
+            };
+            const token = parsed.message?.content ?? '';
+
+            // Strip <think>...</think> blocks from streaming tokens
+            if (token.includes('<think>')) insideThink = true;
+            if (insideThink) {
+              if (token.includes('</think>')) {
+                insideThink = false;
+                // Emit anything after the closing tag
+                const afterClose = token.split('</think>').pop() ?? '';
+                if (afterClose) {
+                  fullContent += afterClose;
+                  subject.next({ token: afterClose, done: false });
+                }
+              }
+              continue;
+            }
+
+            fullContent += token;
+            const done = parsed.done === true;
+
+            subject.next({
+              token,
+              done,
+              fullContent: done ? fullContent : undefined,
+            });
+
+            if (done) {
+              subject.complete();
+            }
+          } catch {
+            // Skip malformed NDJSON lines
+          }
+        }
+      });
+
+      stream.on('end', () => {
+        if (!subject.closed) {
+          subject.next({ token: '', done: true, fullContent });
+          subject.complete();
+        }
+      });
+
+      stream.on('error', (err: Error) => {
+        if (!subject.closed) {
+          subject.error(err);
+        }
+      });
+
+      // Wait for subject to complete before releasing semaphore
+      await new Promise<void>((resolve) => {
+        subject.subscribe({
+          complete: () => resolve(),
+          error: () => resolve(),
+        });
+      });
+    } catch (error) {
+      this.lastHealthCheck = null;
+      if (!subject.closed) {
+        subject.error(error);
+      }
+    } finally {
+      this.releaseSemaphore();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Text processing helpers
+  // ---------------------------------------------------------------------------
+
+  /** Try to extract JSON from the thinking field when content is empty. */
+  private salvageFromThinking(
+    thinkingRaw: string | undefined | null,
+    model: string,
+  ): string | null {
+    const thinkingField = thinkingRaw ?? '';
+    if (!thinkingField) return null;
+
+    // Try stripped thinking first
+    const salvaged = this.stripThinkTags(thinkingField);
+    if (salvaged) {
+      const json = this.parseJsonResponse(salvaged);
+      if (json) {
+        this.logger.warn(
+          `Ollama content empty — salvaged JSON from thinking field (model=${model})`,
+        );
+        return JSON.stringify(json);
+      }
+    }
+
+    // Try raw thinking text for embedded JSON
+    const rawJson = this.parseJsonResponse(thinkingField);
+    if (rawJson) {
+      this.logger.warn(`Ollama content empty — salvaged JSON from raw thinking (model=${model})`);
+      return JSON.stringify(rawJson);
+    }
+
+    return null;
   }
 
   /**
@@ -355,23 +633,28 @@ export class OllamaInferenceGateway {
   }
 
   // ---------------------------------------------------------------------------
-  // Semaphore for concurrency limiting
+  // Priority-based semaphore for concurrency limiting
   // ---------------------------------------------------------------------------
 
-  private acquireSemaphore(): Promise<void> {
+  private acquireSemaphore(
+    priority: OllamaInferencePriority = OllamaInferencePriority.NORMAL,
+  ): Promise<void> {
     if (this.activeCalls < this.maxConcurrent) {
       this.activeCalls++;
       return Promise.resolve();
     }
     return new Promise<void>((resolve) => {
-      this.waitQueue.push(resolve);
+      this.waitQueue.push({ priority, resolve });
+      // Keep sorted by priority (lower number = higher priority)
+      this.waitQueue.sort((a, b) => a.priority - b.priority);
     });
   }
 
   private releaseSemaphore(): void {
     if (this.waitQueue.length > 0) {
+      // Queue is sorted by priority — take the highest priority waiter
       const next = this.waitQueue.shift()!;
-      next();
+      next.resolve();
     } else {
       this.activeCalls--;
     }

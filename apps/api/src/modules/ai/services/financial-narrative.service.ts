@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { queryTemplates, getQueryTemplate } from '../templates/query-templates';
 import { Decimal } from '@prisma/client/runtime/library';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { AiCacheService } from './ai-cache.service';
 import {
   buildFinancialNarrativePrompt,
   FinancialNarrativeResponse,
@@ -66,12 +67,23 @@ export class FinancialNarrativeService {
   constructor(
     private prisma: PrismaService,
     private ollamaGateway: OllamaInferenceGateway,
+    private aiCache: AiCacheService,
   ) {}
 
   /**
-   * Generate monthly financial narrative
+   * Generate monthly financial narrative (cached for 1 hour)
    */
   async generateMonthlyNarrative(
+    organizationId: string,
+    month: number,
+    year: number,
+  ): Promise<GeneratedNarrative> {
+    return this.aiCache.getOrSet('narrative-monthly', organizationId, { month, year }, () =>
+      this.doGenerateMonthlyNarrative(organizationId, month, year),
+    );
+  }
+
+  private async doGenerateMonthlyNarrative(
     organizationId: string,
     month: number,
     year: number,

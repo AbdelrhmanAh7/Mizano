@@ -17,26 +17,62 @@ const CROSS_MODULE_INVALIDATION_MAP: Record<string, string[]> = {
   'accounts:*': ['dashboard:*', 'reports:*'],
   'journals:*': ['dashboard:*', 'reports:*'],
 
-  // Sales writes → invalidate dashboard + revenue/profit reports
-  'invoices:*': ['dashboard:*', 'reports:pnl:*', 'reports:sales-*', 'reports:receivables-*'],
+  // Sales writes → invalidate dashboard + revenue/profit reports + AI caches
+  'invoices:*': [
+    'dashboard:*',
+    'reports:pnl:*',
+    'reports:sales-*',
+    'reports:receivables-*',
+    'ai:narrative-monthly:*',
+    'ai:narrative-weekly:*',
+    'ai:cash-flow:*',
+  ],
   'customers:*': ['dashboard:*', 'reports:sales-*'],
   'credit-notes:*': ['dashboard:*', 'reports:*'],
-  'payments-received:*': ['dashboard:*', 'reports:cash-flow:*', 'reports:receivables-*'],
+  'payments-received:*': [
+    'dashboard:*',
+    'reports:cash-flow:*',
+    'reports:receivables-*',
+    'ai:narrative-monthly:*',
+    'ai:narrative-weekly:*',
+    'ai:cash-flow:*',
+  ],
 
-  // Purchases writes → invalidate dashboard + expense/payables reports
-  'bills:*': ['dashboard:*', 'reports:pnl:*', 'reports:purchases-*', 'reports:payables-*'],
+  // Purchases writes → invalidate dashboard + expense/payables reports + AI caches
+  'bills:*': [
+    'dashboard:*',
+    'reports:pnl:*',
+    'reports:purchases-*',
+    'reports:payables-*',
+    'ai:narrative-monthly:*',
+    'ai:narrative-weekly:*',
+    'ai:cash-flow:*',
+  ],
   'vendors:*': ['dashboard:*', 'reports:purchases-*'],
-  'expenses:*': ['dashboard:*', 'reports:pnl:*', 'reports:expenses-*'],
-  'payments-made:*': ['dashboard:*', 'reports:cash-flow:*', 'reports:payables-*'],
+  'expenses:*': [
+    'dashboard:*',
+    'reports:pnl:*',
+    'reports:expenses-*',
+    'ai:narrative-monthly:*',
+    'ai:narrative-weekly:*',
+  ],
+  'payments-made:*': [
+    'dashboard:*',
+    'reports:cash-flow:*',
+    'reports:payables-*',
+    'ai:narrative-monthly:*',
+    'ai:narrative-weekly:*',
+    'ai:cash-flow:*',
+  ],
   'vendor-credits:*': ['dashboard:*', 'reports:*'],
 
   // Banking writes → invalidate dashboard + cash flow
   'bank-accounts:*': ['dashboard:*', 'reports:cash-flow:*'],
-  'bank-transactions:*': ['dashboard:*', 'reports:cash-flow:*'],
+  'bank-transactions:*': ['dashboard:*', 'reports:cash-flow:*', 'ai:categorization:*'],
   'reconciliation:*': ['dashboard:*', 'reports:*', 'bank-transactions:*'],
 
-  // Inventory writes → invalidate dashboard inventory widget
-  'inventory:*': ['dashboard:*'],
+  // Inventory writes → invalidate dashboard + AI demand forecast
+  'inventory:*': ['dashboard:*', 'ai:demand-forecast:*'],
 };
 
 @Injectable()

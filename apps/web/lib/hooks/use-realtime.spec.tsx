@@ -84,7 +84,8 @@ describe('useRealtime', () => {
     renderHook(() => useRealtime(), { wrapper: Wrapper });
 
     expect(io).toHaveBeenCalledWith(expect.stringContaining('/events'), {
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
+      upgrade: true,
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
@@ -149,7 +150,7 @@ describe('useRealtime', () => {
   });
 
   it.each(['transport close', 'transport error', 'ping timeout'])(
-    'logs debug (not warn) for auto-recoverable reason: %s',
+    'silently handles auto-recoverable disconnect reason: %s',
     (reason) => {
       mockUseSession.mockReturnValue({
         data: { user: { id: 'user-1', organizationId: 'org-1' } },
@@ -163,16 +164,13 @@ describe('useRealtime', () => {
       getHandler('disconnect')!(reason);
 
       expect(warnSpy).not.toHaveBeenCalled();
-      expect(debugSpy).toHaveBeenCalledWith(
-        '[Realtime] WebSocket disconnected (will reconnect):',
-        reason,
-      );
+      expect(debugSpy).not.toHaveBeenCalled();
       warnSpy.mockRestore();
       debugSpy.mockRestore();
     },
   );
 
-  it('warns for truly unexpected disconnect reasons (e.g. io server disconnect)', () => {
+  it('silently handles unexpected disconnect reasons (e.g. io server disconnect)', () => {
     mockUseSession.mockReturnValue({
       data: { user: { id: 'user-1', organizationId: 'org-1' } },
     });
@@ -184,10 +182,8 @@ describe('useRealtime', () => {
 
     getHandler('disconnect')!('io server disconnect');
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      '[Realtime] WebSocket disconnected:',
-      'io server disconnect',
-    );
+    // Hook handles silently — no console output
+    expect(warnSpy).not.toHaveBeenCalled();
     expect(debugSpy).not.toHaveBeenCalled();
     warnSpy.mockRestore();
     debugSpy.mockRestore();

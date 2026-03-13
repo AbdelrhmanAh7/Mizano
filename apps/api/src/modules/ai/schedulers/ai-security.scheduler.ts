@@ -5,6 +5,8 @@ import { FraudDetectionService } from '../services/fraud-detection.service';
 import { ComplianceMonitoringService } from '../services/compliance-monitoring.service';
 import { AuditRiskService } from '../services/audit-risk.service';
 
+const BATCH_SIZE = 5;
+
 @Injectable()
 export class AiSecurityScheduler {
   private readonly logger = new Logger(AiSecurityScheduler.name);
@@ -29,16 +31,27 @@ export class AiSecurityScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const result = await this.fraudService.dailyFraudScan(org.id);
-          if (result.alertsCreated > 0) {
-            this.logger.log(
-              `Org ${org.name}: Fraud scan - ${result.scanned} scanned, ${result.alertsCreated} alerts created`,
-            );
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const result = await this.fraudService.dailyFraudScan(org.id);
+              if (result.alertsCreated > 0) {
+                this.logger.log(
+                  `Org ${org.name}: Fraud scan - ${result.scanned} scanned, ${result.alertsCreated} alerts created`,
+                );
+              }
+            } catch (error) {
+              this.logger.error(`Error running fraud scan for org ${org.id}: ${error.message}`);
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
           }
-        } catch (error) {
-          this.logger.error(`Error running fraud scan for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -61,14 +74,25 @@ export class AiSecurityScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const report = await this.complianceService.runComplianceCheck(org.id);
-          this.logger.log(
-            `Org ${org.name}: Compliance score ${report.score.toFixed(0)}% - ${report.violations.length} violations found`,
-          );
-        } catch (error) {
-          this.logger.error(`Error checking compliance for org ${org.id}: ${error.message}`);
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const report = await this.complianceService.runComplianceCheck(org.id);
+              this.logger.log(
+                `Org ${org.name}: Compliance score ${report.score.toFixed(0)}% - ${report.violations.length} violations found`,
+              );
+            } catch (error) {
+              this.logger.error(`Error checking compliance for org ${org.id}: ${error.message}`);
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+          }
         }
       }
 
@@ -91,19 +115,30 @@ export class AiSecurityScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        for (const entityType of ['journal', 'invoice', 'bill', 'expense']) {
-          try {
-            const result = await this.auditRiskService.batchScore(org.id, entityType);
-            if (result.highRisk > 0) {
-              this.logger.log(
-                `Org ${org.name}: Audit risk ${entityType} - ${result.processed} scored (high: ${result.highRisk}, medium: ${result.mediumRisk})`,
-              );
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            for (const entityType of ['journal', 'invoice', 'bill', 'expense']) {
+              try {
+                const result = await this.auditRiskService.batchScore(org.id, entityType);
+                if (result.highRisk > 0) {
+                  this.logger.log(
+                    `Org ${org.name}: Audit risk ${entityType} - ${result.processed} scored (high: ${result.highRisk}, medium: ${result.mediumRisk})`,
+                  );
+                }
+              } catch (error) {
+                this.logger.error(
+                  `Error scoring ${entityType} audit risk for org ${org.id}: ${error.message}`,
+                );
+              }
             }
-          } catch (error) {
-            this.logger.error(
-              `Error scoring ${entityType} audit risk for org ${org.id}: ${error.message}`,
-            );
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
           }
         }
       }

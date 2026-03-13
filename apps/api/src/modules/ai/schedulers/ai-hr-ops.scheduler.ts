@@ -7,6 +7,8 @@ import { QualityPredictionService } from '../services/quality-prediction.service
 import { PredictiveMaintenanceService } from '../services/predictive-maintenance.service';
 import { ResourceOptimizationService } from '../services/resource-optimization.service';
 
+const BATCH_SIZE = 5;
+
 @Injectable()
 export class AiHrOpsScheduler {
   private readonly logger = new Logger(AiHrOpsScheduler.name);
@@ -33,14 +35,25 @@ export class AiHrOpsScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const result = await this.attritionService.predictAll(org.id);
-          this.logger.log(
-            `Org ${org.name}: Attrition prediction - ${result.processed} employees (high: ${result.highRisk}, medium: ${result.mediumRisk}, low: ${result.lowRisk})`,
-          );
-        } catch (error) {
-          this.logger.error(`Error predicting attrition for org ${org.id}: ${error.message}`);
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const result = await this.attritionService.predictAll(org.id);
+              this.logger.log(
+                `Org ${org.name}: Attrition prediction - ${result.processed} employees (high: ${result.highRisk}, medium: ${result.mediumRisk}, low: ${result.lowRisk})`,
+              );
+            } catch (error) {
+              this.logger.error(`Error predicting attrition for org ${org.id}: ${error.message}`);
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+          }
         }
       }
 
@@ -63,14 +76,27 @@ export class AiHrOpsScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const departments = await this.compensationService.getDepartmentBenchmarks(org.id);
-          this.logger.log(
-            `Org ${org.name}: Compensation benchmark - ${departments.length} departments analyzed`,
-          );
-        } catch (error) {
-          this.logger.error(`Error benchmarking compensation for org ${org.id}: ${error.message}`);
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const departments = await this.compensationService.getDepartmentBenchmarks(org.id);
+              this.logger.log(
+                `Org ${org.name}: Compensation benchmark - ${departments.length} departments analyzed`,
+              );
+            } catch (error) {
+              this.logger.error(
+                `Error benchmarking compensation for org ${org.id}: ${error.message}`,
+              );
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+          }
         }
       }
 
@@ -93,12 +119,23 @@ export class AiHrOpsScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const trends = await this.qualityService.getQualityTrends(org.id);
-          this.logger.log(`Org ${org.name}: Quality trends - ${trends.length} months analyzed`);
-        } catch (error) {
-          this.logger.error(`Error analyzing quality for org ${org.id}: ${error.message}`);
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const trends = await this.qualityService.getQualityTrends(org.id);
+              this.logger.log(`Org ${org.name}: Quality trends - ${trends.length} months analyzed`);
+            } catch (error) {
+              this.logger.error(`Error analyzing quality for org ${org.id}: ${error.message}`);
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+          }
         }
       }
 
@@ -121,14 +158,25 @@ export class AiHrOpsScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const result = await this.maintenanceService.predictAll(org.id);
-          this.logger.log(
-            `Org ${org.name}: Maintenance prediction - ${result.processed} assets (critical: ${result.critical}, warning: ${result.warning}, healthy: ${result.healthy})`,
-          );
-        } catch (error) {
-          this.logger.error(`Error predicting maintenance for org ${org.id}: ${error.message}`);
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const result = await this.maintenanceService.predictAll(org.id);
+              this.logger.log(
+                `Org ${org.name}: Maintenance prediction - ${result.processed} assets (critical: ${result.critical}, warning: ${result.warning}, healthy: ${result.healthy})`,
+              );
+            } catch (error) {
+              this.logger.error(`Error predicting maintenance for org ${org.id}: ${error.message}`);
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+          }
         }
       }
 
@@ -151,14 +199,25 @@ export class AiHrOpsScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const opportunities = await this.resourceService.getOptimizationOpportunities(org.id);
-          this.logger.log(
-            `Org ${org.name}: Resource optimization - ${opportunities.opportunities.length} opportunities found`,
-          );
-        } catch (error) {
-          this.logger.error(`Error optimizing resources for org ${org.id}: ${error.message}`);
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const opportunities = await this.resourceService.getOptimizationOpportunities(org.id);
+              this.logger.log(
+                `Org ${org.name}: Resource optimization - ${opportunities.opportunities.length} opportunities found`,
+              );
+            } catch (error) {
+              this.logger.error(`Error optimizing resources for org ${org.id}: ${error.message}`);
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+          }
         }
       }
 

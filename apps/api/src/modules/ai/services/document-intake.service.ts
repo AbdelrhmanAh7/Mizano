@@ -1,5 +1,6 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiFeature, AiFeedbackAction } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -9,6 +10,7 @@ import { EntityExtractionService } from './entity-extraction.service';
 import { AiFeedbackService } from './ai-feedback.service';
 import { extractTextFromPdf } from '../utils/pdf-extractor.util';
 import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.util';
+import { BoundedCache } from '../utils/bounded-cache.util';
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -91,6 +93,15 @@ export interface DocumentIntakeResult {
     taxAccount: string | null;
   } | null;
 
+  /** Suggested new vendor when no existing vendor matched */
+  suggestCreateVendor: {
+    name: string;
+    address: string | null;
+    phone: string | null;
+    email: string | null;
+    taxId: string | null;
+  } | null;
+
   /** Which AI engine extracted the data */
   extractionMethod: 'ollama-vision' | 'ollama-text';
 }
@@ -119,12 +130,44 @@ export interface ConfirmIntakeDto {
 }
 
 // ---------------------------------------------------------------------------
+// Async intake types
+// ---------------------------------------------------------------------------
+
+export type IntakeStage =
+  | 'received'
+  | 'extracting'
+  | 'classifying'
+  | 'matching'
+  | 'complete'
+  | 'error';
+
+export interface IntakeProgressEvent {
+  stage: IntakeStage;
+  progress: number;
+  message?: string;
+  result?: DocumentIntakeResult;
+  error?: string;
+}
+
+export interface IntakeJob {
+  jobId: string;
+  status: IntakeStage;
+  progress: number;
+  result: DocumentIntakeResult | null;
+  error: string | null;
+  createdAt: number;
+}
+
+// ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
 
 @Injectable()
 export class DocumentIntakeService {
   private readonly logger = new Logger(DocumentIntakeService.name);
+
+  /** In-memory job store with bounded size and TTL */
+  private readonly jobs = new BoundedCache<IntakeJob>(200, 30 * 60 * 1000);
 
   constructor(
     private prisma: PrismaService,
@@ -133,7 +176,103 @@ export class DocumentIntakeService {
     private entityExtractionService: EntityExtractionService,
     private feedbackService: AiFeedbackService,
     private configService: ConfigService,
+    private eventEmitter: EventEmitter2,
   ) {}
+
+  // ---------------------------------------------------------------------------
+  // Async job management
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Start document processing as a background job.
+   * Returns a jobId immediately so the caller can stream progress via SSE.
+   */
+  processDocumentAsync(
+    organizationId: string,
+    fileBuffer: Buffer,
+    mimeType: string,
+    filename?: string,
+    language: string = 'eng+ara',
+  ): string {
+    const jobId = `intake_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+    const job: IntakeJob = {
+      jobId,
+      status: 'received',
+      progress: 5,
+      result: null,
+      error: null,
+      createdAt: Date.now(),
+    };
+    this.jobs.set(jobId, job);
+
+    // Emit initial received event
+    this.emitProgress(jobId, { stage: 'received', progress: 5, message: 'File accepted' });
+
+    // Fire off the pipeline in the background (non-blocking)
+    void this.runAsyncPipeline(jobId, organizationId, fileBuffer, mimeType, filename, language);
+
+    return jobId;
+  }
+
+  /** Retrieve a job by ID. */
+  getJob(jobId: string): IntakeJob | undefined {
+    return this.jobs.get(jobId);
+  }
+
+  private emitProgress(jobId: string, event: IntakeProgressEvent): void {
+    // Update in-memory job
+    const job = this.jobs.get(jobId);
+    if (job) {
+      job.status = event.stage;
+      job.progress = event.progress;
+      if (event.result) job.result = event.result;
+      if (event.error) job.error = event.error;
+      this.jobs.set(jobId, job);
+    }
+    this.eventEmitter.emit(`document-intake.progress.${jobId}`, event);
+  }
+
+  private async runAsyncPipeline(
+    jobId: string,
+    organizationId: string,
+    fileBuffer: Buffer,
+    mimeType: string,
+    filename?: string,
+    language?: string,
+  ): Promise<void> {
+    try {
+      this.emitProgress(jobId, {
+        stage: 'extracting',
+        progress: 20,
+        message: 'AI is reading your document...',
+      });
+
+      const result = await this.processDocument(
+        organizationId,
+        fileBuffer,
+        mimeType,
+        filename,
+        language,
+        (stage, progress, message) => this.emitProgress(jobId, { stage, progress, message }),
+      );
+
+      this.emitProgress(jobId, {
+        stage: 'complete',
+        progress: 100,
+        message: 'Processing complete',
+        result,
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Async intake pipeline failed for job ${jobId}: ${msg}`);
+      this.emitProgress(jobId, {
+        stage: 'error',
+        progress: 0,
+        error: msg,
+      });
+    }
+  }
 
   /**
    * Process a document through the AI intake pipeline (powered by Ollama).
@@ -150,6 +289,7 @@ export class DocumentIntakeService {
     mimeType: string,
     filename?: string,
     _language: string = 'eng+ara',
+    onProgress?: (stage: IntakeStage, progress: number, message: string) => void,
   ): Promise<DocumentIntakeResult> {
     this.logger.log(
       `Processing document intake: mime=${mimeType}, size=${fileBuffer.length}, file=${filename || 'unknown'}`,
@@ -161,6 +301,7 @@ export class DocumentIntakeService {
     const isPdf = mimeType === 'application/pdf';
 
     // Step 1a: For images, use Ollama vision model
+    onProgress?.('extracting', 20, 'AI is reading your document...');
     if (!isPdf) {
       extraction = await this.ollamaService.extractFromImageVision(fileBuffer, mimeType);
       if (extraction) {
@@ -205,6 +346,7 @@ export class DocumentIntakeService {
     }
 
     // Step 2: Classify document
+    onProgress?.('classifying', 60, 'Classifying document type...');
     const classification = await this.classificationService.classifyDocument(
       organizationId,
       rawText,
@@ -217,6 +359,7 @@ export class DocumentIntakeService {
     );
 
     // Step 3: Extract entities and match against vendors/customers
+    onProgress?.('matching', 80, 'Matching vendors and customers...');
     const entityResult = await this.entityExtractionService.extractAndMatch(
       organizationId,
       rawText,
@@ -265,6 +408,18 @@ export class DocumentIntakeService {
         .filter((m) => m.matchType === 'customer')
         .sort((a, b) => b.similarity - a.similarity)[0]?.matchedName || null;
 
+    // Build vendor creation suggestion when no vendor matched
+    const suggestCreateVendor =
+      !matchedVendor && extraction.vendorName
+        ? {
+            name: extraction.vendorName,
+            address: extraction.vendorAddress,
+            phone: extraction.vendorPhone,
+            email: extraction.vendorEmail,
+            taxId: extraction.vendorTaxId,
+          }
+        : null;
+
     return {
       documentType,
       classificationConfidence: classification.confidence,
@@ -296,6 +451,7 @@ export class DocumentIntakeService {
       duplicateWarning,
       rawText,
       accountingEntry: extraction.accountingEntry,
+      suggestCreateVendor,
       extractionMethod,
     };
   }

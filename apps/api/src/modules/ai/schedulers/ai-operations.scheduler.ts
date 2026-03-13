@@ -11,6 +11,8 @@ import { LeadScoringService } from '../services/lead-scoring.service';
 import { PatternDetectionService } from '../services/pattern-detection.service';
 import { AiAlertsService } from '../services/ai-alerts.service';
 
+const BATCH_SIZE = 5;
+
 @Injectable()
 export class AiOperationsScheduler {
   private readonly logger = new Logger(AiOperationsScheduler.name);
@@ -45,16 +47,27 @@ export class AiOperationsScheduler {
 
       let totalAnomalies = 0;
 
-      for (const org of organizations) {
-        try {
-          const result = await this.anomalyService.dailyAnomalyScan(org.id);
-          totalAnomalies += result.newAnomaliesCreated;
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const result = await this.anomalyService.dailyAnomalyScan(org.id);
+              totalAnomalies += result.newAnomaliesCreated;
 
-          if (result.newAnomaliesCreated > 0) {
-            this.logger.log(`Org ${org.name}: Found ${result.newAnomaliesCreated} anomalies`);
+              if (result.newAnomaliesCreated > 0) {
+                this.logger.log(`Org ${org.name}: Found ${result.newAnomaliesCreated} anomalies`);
+              }
+            } catch (error) {
+              this.logger.error(`Error scanning anomalies for org ${org.id}: ${error.message}`);
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
           }
-        } catch (error) {
-          this.logger.error(`Error scanning anomalies for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -78,12 +91,25 @@ export class AiOperationsScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const result = await this.reorderService.updateItemReorderPoints(org.id);
-          this.logger.log(`Org ${org.name}: Updated ${result.updated} item reorder points`);
-        } catch (error) {
-          this.logger.error(`Error updating reorder points for org ${org.id}: ${error.message}`);
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const result = await this.reorderService.updateItemReorderPoints(org.id);
+              this.logger.log(`Org ${org.name}: Updated ${result.updated} item reorder points`);
+            } catch (error) {
+              this.logger.error(
+                `Error updating reorder points for org ${org.id}: ${error.message}`,
+              );
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+          }
         }
       }
 
@@ -107,19 +133,34 @@ export class AiOperationsScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const result = await this.demandForecastingService.forecastAllItems(org.id);
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const result = await this.demandForecastingService.forecastAllItems(org.id);
 
-          this.logger.log(
-            `Org ${org.name}: Processed ${result.processed} items, skipped ${result.skipped} (insufficient data)`,
-          );
+              this.logger.log(
+                `Org ${org.name}: Processed ${result.processed} items, skipped ${result.skipped} (insufficient data)`,
+              );
 
-          if (result.errors.length > 0) {
-            this.logger.warn(`Org ${org.name}: ${result.errors.length} errors during forecasting`);
+              if (result.errors.length > 0) {
+                this.logger.warn(
+                  `Org ${org.name}: ${result.errors.length} errors during forecasting`,
+                );
+              }
+            } catch (error) {
+              this.logger.error(
+                `Error updating demand forecasts for org ${org.id}: ${error.message}`,
+              );
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
           }
-        } catch (error) {
-          this.logger.error(`Error updating demand forecasts for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -143,13 +184,26 @@ export class AiOperationsScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const result = await this.cashFlowPredictionService.dailyRecalculate(org.id);
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const result = await this.cashFlowPredictionService.dailyRecalculate(org.id);
 
-          this.logger.log(`Org ${org.name}: Updated ${result.updated} days of cash flow forecasts`);
-        } catch (error) {
-          this.logger.error(`Error updating cash flow for org ${org.id}: ${error.message}`);
+              this.logger.log(
+                `Org ${org.name}: Updated ${result.updated} days of cash flow forecasts`,
+              );
+            } catch (error) {
+              this.logger.error(`Error updating cash flow for org ${org.id}: ${error.message}`);
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+          }
         }
       }
 
@@ -173,15 +227,26 @@ export class AiOperationsScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const result = await this.leadScoringService.updateScores(org.id);
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const result = await this.leadScoringService.updateScores(org.id);
 
-          this.logger.log(
-            `Org ${org.name}: Updated ${result.updated} lead scores, ${result.decayed} leads had decay applied`,
-          );
-        } catch (error) {
-          this.logger.error(`Error updating lead scores for org ${org.id}: ${error.message}`);
+              this.logger.log(
+                `Org ${org.name}: Updated ${result.updated} lead scores, ${result.decayed} leads had decay applied`,
+              );
+            } catch (error) {
+              this.logger.error(`Error updating lead scores for org ${org.id}: ${error.message}`);
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+          }
         }
       }
 
@@ -205,14 +270,25 @@ export class AiOperationsScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const result = await this.paymentPredictionService.updatePredictions(org.id);
-          this.logger.log(`Org ${org.name}: Updated ${result.updated} payment predictions`);
-        } catch (error) {
-          this.logger.error(
-            `Error updating payment predictions for org ${org.id}: ${error.message}`,
-          );
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const result = await this.paymentPredictionService.updatePredictions(org.id);
+              this.logger.log(`Org ${org.name}: Updated ${result.updated} payment predictions`);
+            } catch (error) {
+              this.logger.error(
+                `Error updating payment predictions for org ${org.id}: ${error.message}`,
+              );
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+          }
         }
       }
 
@@ -242,35 +318,46 @@ export class AiOperationsScheduler {
       const month = prevMonth.getMonth() + 1;
       const year = prevMonth.getFullYear();
 
-      for (const org of organizations) {
-        try {
-          const narrative = await this.narrativeService.generateMonthlyNarrative(
-            org.id,
-            month,
-            year,
-          );
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const narrative = await this.narrativeService.generateMonthlyNarrative(
+                org.id,
+                month,
+                year,
+              );
 
-          // Store as AI Insight for historical reference
-          await this.prisma.aIInsight.create({
-            data: {
-              organizationId: org.id,
-              type: 'NARRATIVE',
-              severity: 'info',
-              priority: 'MEDIUM',
-              title: `Monthly Summary - ${prevMonth.toLocaleString('default', { month: 'long' })} ${year}`,
-              description:
-                narrative.summary ||
-                narrative.sections
-                  .map((s) => s.content)
-                  .join(' ')
-                  .slice(0, 500),
-              data: narrative as unknown as import('@prisma/client').Prisma.InputJsonValue,
-            },
-          });
+              // Store as AI Insight for historical reference
+              await this.prisma.aIInsight.create({
+                data: {
+                  organizationId: org.id,
+                  type: 'NARRATIVE',
+                  severity: 'info',
+                  priority: 'MEDIUM',
+                  title: `Monthly Summary - ${prevMonth.toLocaleString('default', { month: 'long' })} ${year}`,
+                  description:
+                    narrative.summary ||
+                    narrative.sections
+                      .map((s) => s.content)
+                      .join(' ')
+                      .slice(0, 500),
+                  data: narrative as unknown as import('@prisma/client').Prisma.InputJsonValue,
+                },
+              });
 
-          this.logger.log(`Org ${org.name}: Monthly narrative generated for ${month}/${year}`);
-        } catch (error) {
-          this.logger.error(`Error generating narrative for org ${org.id}: ${error.message}`);
+              this.logger.log(`Org ${org.name}: Monthly narrative generated for ${month}/${year}`);
+            } catch (error) {
+              this.logger.error(`Error generating narrative for org ${org.id}: ${error.message}`);
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+          }
         }
       }
 
@@ -294,15 +381,26 @@ export class AiOperationsScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const result = await this.patternDetectionService.analyzePatterns(org.id);
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const result = await this.patternDetectionService.analyzePatterns(org.id);
 
-          this.logger.log(
-            `Org ${org.name}: Detected ${result.patternsDetected} patterns, created ${result.suggestionsCreated} suggestions, found ${result.duplicatesFound} potential duplicates`,
-          );
-        } catch (error) {
-          this.logger.error(`Error analyzing patterns for org ${org.id}: ${error.message}`);
+              this.logger.log(
+                `Org ${org.name}: Detected ${result.patternsDetected} patterns, created ${result.suggestionsCreated} suggestions, found ${result.duplicatesFound} potential duplicates`,
+              );
+            } catch (error) {
+              this.logger.error(`Error analyzing patterns for org ${org.id}: ${error.message}`);
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+          }
         }
       }
 
@@ -326,17 +424,28 @@ export class AiOperationsScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const result = await this.aiAlertsService.aggregateAlerts(org.id);
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const result = await this.aiAlertsService.aggregateAlerts(org.id);
 
-          if (result.created > 0 || result.updated > 0) {
-            this.logger.log(
-              `Org ${org.name}: Created ${result.created} new alerts, updated ${result.updated}, expired ${result.expired}`,
-            );
+              if (result.created > 0 || result.updated > 0) {
+                this.logger.log(
+                  `Org ${org.name}: Created ${result.created} new alerts, updated ${result.updated}, expired ${result.expired}`,
+                );
+              }
+            } catch (error) {
+              this.logger.error(`Error aggregating alerts for org ${org.id}: ${error.message}`);
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
           }
-        } catch (error) {
-          this.logger.error(`Error aggregating alerts for org ${org.id}: ${error.message}`);
         }
       }
 
@@ -362,12 +471,23 @@ export class AiOperationsScheduler {
 
       let totalCleaned = 0;
 
-      for (const org of organizations) {
-        try {
-          const cleaned = await this.aiAlertsService.cleanupExpiredAlerts(org.id);
-          totalCleaned += cleaned;
-        } catch (error) {
-          this.logger.error(`Error cleaning up alerts for org ${org.id}: ${error.message}`);
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const cleaned = await this.aiAlertsService.cleanupExpiredAlerts(org.id);
+              totalCleaned += cleaned;
+            } catch (error) {
+              this.logger.error(`Error cleaning up alerts for org ${org.id}: ${error.message}`);
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+          }
         }
       }
 
@@ -459,16 +579,27 @@ export class AiOperationsScheduler {
         select: { id: true, name: true },
       });
 
-      for (const org of organizations) {
-        try {
-          const result = await this.reorderService.recalculateWithAbcServiceLevels(org.id);
+      for (let i = 0; i < organizations.length; i += BATCH_SIZE) {
+        const batch = organizations.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (org) => {
+            try {
+              const result = await this.reorderService.recalculateWithAbcServiceLevels(org.id);
 
-          this.logger.log(
-            `Org ${org.name}: ABC analysis updated ${result.updated} items ` +
-              `(A:${result.byCategory.A}, B:${result.byCategory.B}, C:${result.byCategory.C})`,
-          );
-        } catch (error) {
-          this.logger.error(`Error running ABC analysis for org ${org.id}: ${error.message}`);
+              this.logger.log(
+                `Org ${org.name}: ABC analysis updated ${result.updated} items ` +
+                  `(A:${result.byCategory.A}, B:${result.byCategory.B}, C:${result.byCategory.C})`,
+              );
+            } catch (error) {
+              this.logger.error(`Error running ABC analysis for org ${org.id}: ${error.message}`);
+            }
+          }),
+        );
+        // Log any unexpected rejections
+        for (const r of results) {
+          if (r.status === 'rejected') {
+            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+          }
         }
       }
 

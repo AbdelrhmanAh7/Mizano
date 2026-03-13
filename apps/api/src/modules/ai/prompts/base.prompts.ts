@@ -37,8 +37,6 @@ export function wrapJsonPrompt(
       contextOrSchema,
       '',
       'Respond with ONLY the JSON object, nothing else.',
-      '',
-      '/no_think',
     ].join('\n');
   }
   // 3-arg form: task + context + schema
@@ -55,8 +53,6 @@ export function wrapJsonPrompt(
     jsonSchema,
     '',
     'Respond with ONLY the JSON object, nothing else.',
-    '',
-    '/no_think',
   ].join('\n');
 }
 

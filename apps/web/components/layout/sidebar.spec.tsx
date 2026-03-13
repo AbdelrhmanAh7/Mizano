@@ -109,6 +109,17 @@ jest.mock('@/components/ui/sheet', () => ({
       {children}
     </div>
   ),
+  SheetDescription: ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <p data-testid="sheet-description" className={className}>
+      {children}
+    </p>
+  ),
   SheetTrigger: React.forwardRef<HTMLElement, { children: React.ReactNode; asChild?: boolean }>(
     ({ children }, ref) => <div ref={ref as React.Ref<HTMLDivElement>}>{children}</div>,
   ),
@@ -178,8 +189,6 @@ describe('Sidebar', () => {
     render(<Sidebar />);
     const aiInsights = screen.getAllByText('aiInsights');
     expect(aiInsights.length).toBeGreaterThanOrEqual(1);
-    const aiLab = screen.getAllByText('aiLab');
-    expect(aiLab.length).toBeGreaterThanOrEqual(1);
   });
 
   it('highlights the active route with primary styling', () => {

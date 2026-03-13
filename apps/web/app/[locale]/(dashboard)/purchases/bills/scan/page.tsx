@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -15,6 +15,7 @@ import {
   X,
   Plus,
   Trash2,
+  UserPlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -40,12 +41,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  useDocumentIntakeProcess,
+  useDocumentIntakeStream,
   useDocumentIntakeConfirm,
   type DocumentIntakeResult,
   type IntakeLineItem,
 } from '@/lib/hooks/use-ai-document-intake';
-import { useVendors } from '@/lib/hooks/use-vendors';
+import { useVendors, useCreateVendor } from '@/lib/hooks/use-vendors';
 import { cn } from '@/lib/utils';
 
 type Step = 'upload' | 'processing' | 'review' | 'confirmed';
@@ -56,14 +57,12 @@ export default function ScanBillPage() {
   const tCommon = useTranslations('common');
 
   const [step, setStep] = useState<Step>('upload');
-  const [progress, setProgress] = useState(0);
-  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [converting, setConverting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [result, setResult] = useState<DocumentIntakeResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [localResult, setLocalResult] = useState<DocumentIntakeResult | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   // Editable extracted fields
   const [vendorName, setVendorName] = useState('');
@@ -74,25 +73,54 @@ export default function ScanBillPage() {
   const [lineItems, setLineItems] = useState<IntakeLineItem[]>([]);
   const [notes, setNotes] = useState('');
 
-  const processDoc = useDocumentIntakeProcess();
+  // SSE-based document intake
+  const intake = useDocumentIntakeStream();
   const confirmIntake = useDocumentIntakeConfirm();
-
-  useEffect(() => {
-    return () => {
-      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-    };
-  }, []);
+  const createVendor = useCreateVendor();
 
   const { data: vendorsData } = useVendors({ limit: 100 });
   const vendors: Array<{ id: string; name: string }> = vendorsData?.data || [];
 
+  // Transition to review when SSE completes
+  useEffect(() => {
+    if (intake.result && step === 'processing') {
+      const result = intake.result;
+      setLocalResult(result);
+
+      // Populate editable fields
+      setVendorName(result.extractedFields.vendorName || '');
+      setDocumentNumber(result.extractedFields.documentNumber || '');
+      setDate(result.extractedFields.date || new Date().toISOString().slice(0, 10));
+      setDueDate(result.extractedFields.dueDate || '');
+      setLineItems(
+        result.extractedFields.lineItems.length > 0
+          ? result.extractedFields.lineItems
+          : [{ description: '', quantity: 1, unitPrice: 0, total: 0 }],
+      );
+
+      if (result.matchedVendor) {
+        setSelectedVendorId(result.matchedVendor.id);
+      }
+
+      setStep('review');
+    }
+  }, [intake.result, step]);
+
+  // Handle errors
+  useEffect(() => {
+    if (intake.error && step === 'processing') {
+      setLocalError(intake.error);
+      setStep('upload');
+    }
+  }, [intake.error, step]);
+
   const handleFileSelect = useCallback(async (file: File) => {
     if (file.size > 15 * 1024 * 1024) {
-      setError('File too large. Maximum size is 15MB.');
+      setLocalError('File too large. Maximum size is 15MB.');
       return;
     }
 
-    setError(null);
+    setLocalError(null);
 
     const isHeic =
       file.type === 'image/heic' ||
@@ -111,8 +139,8 @@ export default function ScanBillPage() {
         });
         setSelectedFile(jpegFile);
         setPreviewUrl(URL.createObjectURL(jpegFile));
-      } catch (err) {
-        setError('Failed to convert HEIC image. Please convert it manually to JPEG or PNG.');
+      } catch {
+        setLocalError('Failed to convert HEIC image. Please convert it manually to JPEG or PNG.');
         setSelectedFile(null);
         setPreviewUrl(null);
       } finally {
@@ -140,87 +168,30 @@ export default function ScanBillPage() {
     [handleFileSelect],
   );
 
-  const startProgressSimulation = () => {
-    setProgress(0);
-    // Slowly advance — first call can take 2+ min while Ollama loads the model
-    progressIntervalRef.current = setInterval(() => {
-      setProgress((prev) => {
-        if (prev < 40) return prev + 1.5;
-        if (prev < 70) return prev + 0.4;
-        if (prev < 90) return prev + 0.1;
-        return prev; // hold at 90 until done
-      });
-    }, 500);
-  };
-
-  const stopProgressSimulation = (finished: boolean) => {
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-      progressIntervalRef.current = null;
-    }
-    if (finished) setProgress(100);
-  };
-
   const handleProcess = async () => {
     if (!selectedFile) return;
 
     setStep('processing');
-    setError(null);
-    startProgressSimulation();
+    setLocalError(null);
 
-    try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('forceType', 'BILL');
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('forceType', 'BILL');
 
-      const response = await processDoc.mutateAsync(formData);
-      const intake: DocumentIntakeResult = response.data;
-      stopProgressSimulation(true);
-      setResult(intake);
-
-      // Populate editable fields
-      setVendorName(intake.extractedFields.vendorName || '');
-      setDocumentNumber(intake.extractedFields.documentNumber || '');
-      setDate(intake.extractedFields.date || new Date().toISOString().slice(0, 10));
-      setDueDate(intake.extractedFields.dueDate || '');
-      setLineItems(
-        intake.extractedFields.lineItems.length > 0
-          ? intake.extractedFields.lineItems
-          : [{ description: '', quantity: 1, unitPrice: 0, total: 0 }],
-      );
-
-      // Auto-select matched vendor
-      if (intake.matchedVendor) {
-        setSelectedVendorId(intake.matchedVendor.id);
-      }
-
-      setStep('review');
-    } catch (err) {
-      stopProgressSimulation(false);
-      setProgress(0);
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('timeout')) {
-        setError(
-          'Processing timed out. This can happen on first use while the AI model loads. Please try again — subsequent scans are much faster.',
-        );
-      } else {
-        setError(msg || 'Failed to process document. Please try again.');
-      }
-      setStep('upload');
-    }
+    await intake.processDocument(formData);
   };
 
   const handleConfirm = async () => {
     if (!selectedVendorId) {
-      setError('Please select a vendor.');
+      setLocalError('Please select a vendor.');
       return;
     }
     if (lineItems.length === 0) {
-      setError('Please add at least one line item.');
+      setLocalError('Please add at least one line item.');
       return;
     }
 
-    setError(null);
+    setLocalError(null);
 
     try {
       const response = await confirmIntake.mutateAsync({
@@ -235,7 +206,7 @@ export default function ScanBillPage() {
           rate: item.unitPrice,
         })),
         notes: notes || undefined,
-        corrections: result
+        corrections: localResult
           ? {
               vendorName,
               documentNumber,
@@ -248,12 +219,13 @@ export default function ScanBillPage() {
       const created = response.data;
       setStep('confirmed');
 
-      // Navigate to the new bill after a short delay
       setTimeout(() => {
         router.push(`/purchases/bills/${created.id}`);
       }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create bill. Please try again.');
+      setLocalError(
+        err instanceof Error ? err.message : 'Failed to create bill. Please try again.',
+      );
     }
   };
 
@@ -261,7 +233,6 @@ export default function ScanBillPage() {
     setLineItems((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
-      // Auto-calculate total
       if (field === 'quantity' || field === 'unitPrice') {
         updated[index].total = updated[index].quantity * updated[index].unitPrice;
       }
@@ -284,6 +255,22 @@ export default function ScanBillPage() {
     if (confidence >= 0.5) return <Badge variant="secondary">Medium</Badge>;
     return <Badge variant="destructive">Low</Badge>;
   };
+
+  // Stage-specific messages for the processing UI
+  const stageMessage =
+    intake.message ||
+    (intake.stage === 'received'
+      ? 'Uploading document...'
+      : intake.stage === 'extracting'
+        ? 'AI is reading your document...'
+        : intake.stage === 'classifying'
+          ? 'Classifying document type...'
+          : intake.stage === 'matching'
+            ? 'Matching vendors and customers...'
+            : 'Processing...');
+
+  const result = localResult;
+  const error = localError;
 
   return (
     <div className="space-y-6">
@@ -329,7 +316,7 @@ export default function ScanBillPage() {
                 variant="ghost"
                 size="icon"
                 className="ml-auto h-6 w-6"
-                onClick={() => setError(null)}
+                onClick={() => setLocalError(null)}
               >
                 <X className="h-3 w-3" />
               </Button>
@@ -439,36 +426,25 @@ export default function ScanBillPage() {
         </Card>
       )}
 
-      {/* Step 2: Processing */}
+      {/* Step 2: Processing — real-time progress from SSE */}
       {step === 'processing' && (
         <Card>
           <CardContent className="py-16">
             <div className="max-w-md mx-auto space-y-6">
               <div className="text-center space-y-2">
                 <Loader2 className="h-12 w-12 mx-auto animate-spin text-primary" />
-                <p className="text-lg font-medium">Processing your document...</p>
+                <p className="text-lg font-medium">{stageMessage}</p>
                 <p className="text-sm text-muted-foreground">
-                  Ollama AI is analysing your document. First scan may take 1-3 minutes while the
-                  model loads.
+                  AI is processing your document. You&apos;ll see live progress below.
                 </p>
               </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>
-                    {progress < 30
-                      ? 'Uploading document...'
-                      : progress < 60
-                        ? 'Extracting text & fields...'
-                        : progress < 85
-                          ? 'Classifying & matching vendors...'
-                          : progress < 100
-                            ? 'Finalising results...'
-                            : 'Done!'}
-                  </span>
-                  <span>{Math.round(progress)}%</span>
+                  <span>{stageMessage}</span>
+                  <span>{Math.round(intake.progress)}%</span>
                 </div>
-                <Progress value={progress} className="h-2" />
+                <Progress value={intake.progress} className="h-2" />
               </div>
             </div>
           </CardContent>
@@ -559,6 +535,33 @@ export default function ScanBillPage() {
                         .map((c) => c.name)
                         .join(', ')}
                     </div>
+                  )}
+                  {!selectedVendorId && result.suggestCreateVendor && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-1"
+                      disabled={createVendor.isPending}
+                      onClick={async () => {
+                        const suggestion = result.suggestCreateVendor!;
+                        const created = await createVendor.mutateAsync({
+                          name: suggestion.name,
+                          email: suggestion.email,
+                          phone: suggestion.phone,
+                          taxId: suggestion.taxId,
+                        });
+                        if (created?.data?.id) {
+                          setSelectedVendorId(created.data.id);
+                        }
+                      }}
+                    >
+                      {createVendor.isPending ? (
+                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                      ) : (
+                        <UserPlus className="mr-2 h-3 w-3" />
+                      )}
+                      Create &quot;{result.suggestCreateVendor.name}&quot; as new vendor
+                    </Button>
                   )}
                 </div>
 
@@ -727,8 +730,9 @@ export default function ScanBillPage() {
               variant="outline"
               onClick={() => {
                 setStep('upload');
-                setResult(null);
-                setError(null);
+                setLocalResult(null);
+                setLocalError(null);
+                intake.reset();
               }}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />

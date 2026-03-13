@@ -96,7 +96,11 @@
       "Read(//mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/api/src/modules/manufacturing/services/**)",
       "Bash(rm:*)",
       "Bash(pnpm lint:api:*)",
-      "Bash(pnpm:*)"
+      "Bash(pnpm:*)",
+      "Bash(ls -la \"/mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/app/[locale]/\\(dashboard\\)/purchases/bills/scan\")",
+      "Bash(npx turbo:*)",
+      "Bash(docker-compose --profile ocr up -d ocr-service 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\Abdelrahman\\\\Desktop\\\\Personal_Project\\\\Mizano\" && docker compose --profile vlm build vlm-service 2>&1)"
     ]
   }
 }

@@ -5,6 +5,7 @@ import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { BoundedCache } from '../utils/bounded-cache.util';
 import { buildChatbotPrompt } from '../prompts/nlp.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { OllamaInferencePriority } from '../types/ollama-inference.types';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const natural = require('natural');
@@ -25,7 +26,7 @@ export type ChatIntent =
   | 'unknown';
 
 export interface ChatEntity {
-  type: 'customer' | 'invoice_number' | 'amount' | 'account' | 'date';
+  type: 'customer' | 'invoice_number' | 'amount' | 'account' | 'date' | 'report_type';
   value: string;
   raw: string;
 }
@@ -145,7 +146,13 @@ export class ChatbotService {
   ): Promise<ChatResponse> {
     this.logger.log(`Processing message for user ${userId} in org ${organizationId}`);
 
-    // --- Ollama-first inference path ---
+    // --- Step 1: Detect intent + extract entities ---
+    // Try Ollama first for better NLU, fall back to Bayes classifier.
+    let intent: ChatIntent = 'unknown';
+    let confidence = 0;
+    let entities: ChatEntity[] = [];
+    let predictionMethod: PredictionMethod = 'ML';
+
     try {
       const history = this.getHistory(organizationId, userId, 10);
       const promptHistory = history.map((m) => ({ role: m.role, content: m.content }));
@@ -159,18 +166,48 @@ export class ChatbotService {
       }>(prompt);
 
       if (ollamaResult) {
-        const ollamaResponse: ChatResponse = {
-          intent: (ollamaResult.data.intent as ChatIntent) || 'unknown',
-          confidence: ollamaResult.data.confidence ?? 0.8,
-          response: ollamaResult.data.response || '',
-          suggestions: ollamaResult.data.suggestions || [],
-          predictionMethod: 'OLLAMA',
-        };
+        intent = (ollamaResult.data.intent as ChatIntent) || 'unknown';
+        confidence = ollamaResult.data.confidence ?? 0.8;
+        predictionMethod = 'OLLAMA';
 
-        // Persist history
-        this.addToHistory(organizationId, userId, message, ollamaResponse);
-
-        return ollamaResponse;
+        // Merge Ollama-extracted entities with regex entities for best coverage
+        entities = this.extractEntities(message);
+        const ollamaEntities = ollamaResult.data.entities || {};
+        if (ollamaEntities.invoice_number && !entities.some((e) => e.type === 'invoice_number')) {
+          entities.push({
+            type: 'invoice_number',
+            value: String(ollamaEntities.invoice_number),
+            raw: String(ollamaEntities.invoice_number),
+          });
+        }
+        if (ollamaEntities.customer_name && !entities.some((e) => e.type === 'customer')) {
+          entities.push({
+            type: 'customer',
+            value: String(ollamaEntities.customer_name),
+            raw: String(ollamaEntities.customer_name),
+          });
+        }
+        if (ollamaEntities.amount && !entities.some((e) => e.type === 'amount')) {
+          entities.push({
+            type: 'amount',
+            value: String(ollamaEntities.amount),
+            raw: String(ollamaEntities.amount),
+          });
+        }
+        if (ollamaEntities.date && !entities.some((e) => e.type === 'date')) {
+          entities.push({
+            type: 'date',
+            value: String(ollamaEntities.date),
+            raw: String(ollamaEntities.date),
+          });
+        }
+        if (ollamaEntities.report_type && !entities.some((e) => e.type === 'report_type')) {
+          entities.push({
+            type: 'report_type',
+            value: String(ollamaEntities.report_type),
+            raw: String(ollamaEntities.report_type),
+          });
+        }
       }
     } catch (error) {
       this.logger.warn(
@@ -178,25 +215,24 @@ export class ChatbotService {
       );
     }
 
-    // --- Existing Bayes classifier fallback ---
+    // Fall back to Bayes classifier if Ollama didn't produce an intent
+    if (intent === 'unknown' && predictionMethod !== 'OLLAMA') {
+      const classifier = this.getOrTrainClassifier(organizationId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const typedClassifier = classifier as any;
+      const classifications = typedClassifier.getClassifications(message.toLowerCase());
+      const topClassification = classifications[0];
+      intent = topClassification ? (topClassification.label as ChatIntent) : 'unknown';
+      confidence = topClassification ? topClassification.value : 0;
+      predictionMethod = 'ML';
+    }
 
-    // Ensure the classifier is trained
-    const classifier = this.getOrTrainClassifier(organizationId);
+    // Ensure we always have regex entities
+    if (entities.length === 0) {
+      entities = this.extractEntities(message);
+    }
 
-    // Classify intent
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const typedClassifier = classifier as any;
-    const classifications = typedClassifier.getClassifications(message.toLowerCase());
-    const topClassification = classifications[0];
-    const intent: ChatIntent = topClassification
-      ? (topClassification.label as ChatIntent)
-      : 'unknown';
-    const confidence: number = topClassification ? topClassification.value : 0;
-
-    // Extract entities from the user message
-    const entities = this.extractEntities(message);
-
-    // Execute the appropriate intent handler
+    // --- Step 2: Execute the data-backed handler for the detected intent ---
     let response: ChatResponse;
 
     switch (intent) {
@@ -213,7 +249,7 @@ export class ChatbotService {
         response = this.handleCreateInvoice(entities, confidence);
         break;
       case 'report_request':
-        response = this.handleReportRequest(confidence);
+        response = await this.handleReportRequest(organizationId, entities, confidence);
         break;
       case 'greeting':
         response = this.handleGreeting(confidence);
@@ -237,16 +273,111 @@ export class ChatbotService {
         1,
       );
     } catch (error) {
-      this.logger.warn(`Failed to store chat prediction: ${error.message}`);
+      this.logger.warn(
+        `Failed to store chat prediction: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     // Tag with prediction method
-    response.predictionMethod = 'ML';
+    response.predictionMethod = predictionMethod;
 
     // Persist history
     this.addToHistory(organizationId, userId, message, response);
 
     return response;
+  }
+
+  /**
+   * Stream a chatbot response token-by-token via callbacks.
+   * Uses Bayes for instant intent detection, then streams the Ollama response.
+   */
+  async processMessageStream(
+    organizationId: string,
+    userId: string,
+    message: string,
+    callbacks: {
+      onIntent: (intent: ChatIntent, confidence: number) => void;
+      onToken: (token: string) => void;
+      onComplete: (response: ChatResponse) => void;
+      onError: (error: string) => void;
+    },
+  ): Promise<void> {
+    this.logger.log(`Streaming message for user ${userId} in org ${organizationId}`);
+
+    // Fast intent detection via Bayes (no Ollama wait)
+    const classifier = this.getOrTrainClassifier(organizationId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const typedClassifier = classifier as any;
+    const classifications = typedClassifier.getClassifications(message.toLowerCase());
+    const topClassification = classifications[0];
+    const intent: ChatIntent = topClassification
+      ? (topClassification.label as ChatIntent)
+      : 'unknown';
+    const confidence: number = topClassification ? topClassification.value : 0;
+
+    callbacks.onIntent(intent, confidence);
+
+    // Build prompt for streaming
+    const history = this.getHistory(organizationId, userId, 10);
+    const promptHistory = history.map((m) => ({ role: m.role, content: m.content }));
+    const prompt = buildChatbotPrompt(message, promptHistory, { organizationId });
+
+    try {
+      // Stream the response via Ollama
+      const stream$ = this.gateway.inferStream(prompt, {
+        priority: OllamaInferencePriority.CRITICAL,
+        rawText: true,
+        temperature: 0.3,
+      });
+
+      let fullContent = '';
+
+      await new Promise<void>((resolve, reject) => {
+        stream$.subscribe({
+          next: (chunk) => {
+            if (chunk.token) {
+              callbacks.onToken(chunk.token);
+              fullContent += chunk.token;
+            }
+          },
+          error: (err) => {
+            // Fall back to non-streaming response
+            this.logger.warn(
+              `Streaming failed, falling back: ${err instanceof Error ? err.message : String(err)}`,
+            );
+            void this.processMessage(organizationId, userId, message)
+              .then((response) => {
+                callbacks.onComplete(response);
+                resolve();
+              })
+              .catch((fallbackErr) => {
+                callbacks.onError(
+                  fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr),
+                );
+                reject(fallbackErr);
+              });
+          },
+          complete: () => {
+            const response: ChatResponse = {
+              intent,
+              confidence,
+              response: fullContent,
+              suggestions: [],
+              predictionMethod: 'OLLAMA',
+            };
+
+            this.addToHistory(organizationId, userId, message, response);
+            callbacks.onComplete(response);
+            resolve();
+          },
+        });
+      });
+    } catch (error) {
+      // Final fallback
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Stream processing failed: ${msg}`);
+      callbacks.onError(msg);
+    }
   }
 
   /**
@@ -357,6 +488,26 @@ export class ChatbotService {
       }
     }
 
+    // Report type heuristic: detect common report names
+    const lower = message.toLowerCase();
+    const reportKeywords: Array<{ keywords: string[]; type: string }> = [
+      { keywords: ['profit and loss', 'profit & loss', 'p&l', 'income statement'], type: 'pl' },
+      { keywords: ['balance sheet'], type: 'balance_sheet' },
+      {
+        keywords: ['cash flow', 'cash inflow', 'cash outflow'],
+        type: 'cash_flow',
+      },
+      { keywords: ['ar aging', 'accounts receivable', 'receivable aging'], type: 'ar_aging' },
+      { keywords: ['ap aging', 'accounts payable', 'payable aging'], type: 'ap_aging' },
+      { keywords: ['general ledger', 'ledger'], type: 'general_ledger' },
+    ];
+    for (const rk of reportKeywords) {
+      if (rk.keywords.some((kw) => lower.includes(kw))) {
+        entities.push({ type: 'report_type', value: rk.type, raw: rk.keywords[0] });
+        break;
+      }
+    }
+
     return entities;
   }
 
@@ -427,18 +578,36 @@ export class ChatbotService {
     confidence: number,
   ): Promise<ChatResponse> {
     const accountEntity = entities.find((e) => e.type === 'account');
+    const dateEntity = entities.find((e) => e.type === 'date');
 
     if (!accountEntity) {
+      // No specific account — show a summary of all top-level accounts
+      const accounts = await this.prisma.account.findMany({
+        where: { organizationId, isActive: true, parentId: null },
+        select: { id: true, code: true, name: true, type: true },
+        orderBy: { code: 'asc' },
+        take: 10,
+      });
+
+      if (accounts.length === 0) {
+        return {
+          intent: 'account_balance',
+          confidence,
+          response: 'No accounts found. Please set up your Chart of Accounts first.',
+          suggestions: ['Go to Chart of Accounts', 'Help'],
+        };
+      }
+
+      const accountList = accounts.map((a) => `- **${a.name}** (${a.code}) — ${a.type}`).join('\n');
+
       return {
         intent: 'account_balance',
         confidence,
         response:
-          'Which account would you like to check? You can say something like "What is the balance of account Cash?"',
-        suggestions: [
-          'Balance of Cash account',
-          'Balance of Accounts Receivable',
-          'Show all accounts',
-        ],
+          'Which account would you like to check? Here are your top-level accounts:\n\n' +
+          accountList +
+          '\n\nTry: "Balance of Cash" or "Balance of Accounts Receivable"',
+        suggestions: accounts.slice(0, 3).map((a) => `Balance of ${a.name}`),
       };
     }
 
@@ -465,16 +634,60 @@ export class ChatbotService {
       };
     }
 
+    // Parse the optional date filter
+    let asOfDate: Date | null = null;
+    if (dateEntity) {
+      const parsed = new Date(dateEntity.value);
+      if (!isNaN(parsed.getTime())) {
+        asOfDate = parsed;
+      }
+    }
+
+    // Calculate actual balance from journal entries
+    const journalFilter: Record<string, unknown> = {
+      accountId: account.id,
+      journal: {
+        organizationId,
+        isPosted: true,
+        deletedAt: null,
+        ...(asOfDate ? { date: { lte: asOfDate } } : {}),
+      },
+    };
+
+    const aggregation = await this.prisma.journalLine.aggregate({
+      where: journalFilter,
+      _sum: { debit: true, credit: true },
+    });
+
+    const totalDebits = Number(aggregation._sum.debit ?? 0);
+    const totalCredits = Number(aggregation._sum.credit ?? 0);
+    const openingBalance = Number(account.openingBalance ?? 0);
+
+    // Balance depends on account type (debit-normal vs credit-normal)
+    const debitNormalTypes = ['ASSET', 'EXPENSE'];
+    const isDebitNormal = debitNormalTypes.includes(account.type);
+    const balance = isDebitNormal
+      ? openingBalance + totalDebits - totalCredits
+      : openingBalance + totalCredits - totalDebits;
+
+    const dateLabel = asOfDate ? ` as of **${asOfDate.toISOString().split('T')[0]}**` : '';
+
     return {
       intent: 'account_balance',
       confidence,
-      response: `The balance of **${account.name}** (${account.code}) is $${Number(account.openingBalance).toLocaleString()}. Account type: ${account.type}.`,
+      response:
+        `The balance of **${account.name}** (${account.code})${dateLabel} is **$${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}**.\n\n` +
+        `Account type: ${account.type} | Debits: $${totalDebits.toLocaleString()} | Credits: $${totalCredits.toLocaleString()}`,
       data: {
         accountId: account.id,
         accountName: account.name,
         accountCode: account.code,
-        balance: Number(account.openingBalance),
+        balance,
+        totalDebits,
+        totalCredits,
+        openingBalance,
         type: account.type,
+        asOfDate: asOfDate?.toISOString().split('T')[0] ?? null,
       },
       suggestions: [
         'Show journal entries for this account',
@@ -583,19 +796,365 @@ export class ChatbotService {
     };
   }
 
-  private handleReportRequest(confidence: number): ChatResponse {
+  private async handleReportRequest(
+    organizationId: string,
+    entities: ChatEntity[],
+    confidence: number,
+  ): Promise<ChatResponse> {
+    const reportEntity = entities.find((e) => e.type === 'report_type');
+
+    if (!reportEntity) {
+      return {
+        intent: 'report_request',
+        confidence,
+        response:
+          'Which report would you like to see?\n\n' +
+          '- **Profit & Loss** — summary of revenue and expenses\n' +
+          '- **Balance Sheet** — assets, liabilities, and equity\n' +
+          '- **AR Aging** — outstanding customer receivables\n' +
+          '- **AP Aging** — outstanding vendor payables\n' +
+          '- **Cash Flow** — cash inflows and outflows\n' +
+          '- **General Ledger** — detailed journal entries',
+        suggestions: [
+          'Show Profit & Loss',
+          'Show Balance Sheet',
+          'Show AR Aging',
+          'Show Cash Flow',
+        ],
+      };
+    }
+
+    const reportType = reportEntity.value.toLowerCase();
+
+    switch (reportType) {
+      case 'pl':
+      case 'profit_loss':
+      case 'income_statement':
+        return this.generatePLSummary(organizationId, confidence);
+      case 'balance_sheet':
+        return this.generateBalanceSheetSummary(organizationId, confidence);
+      case 'cash_flow':
+        return this.generateCashFlowSummary(organizationId, confidence);
+      case 'ar_aging':
+        return this.generateARAging(organizationId, confidence);
+      case 'ap_aging':
+        return this.generateAPAging(organizationId, confidence);
+      case 'general_ledger':
+        return this.generateGLSummary(organizationId, confidence);
+      default:
+        return {
+          intent: 'report_request',
+          confidence,
+          response: `I don't recognize the report type "${reportEntity.raw}". Try: Profit & Loss, Balance Sheet, Cash Flow, AR Aging, AP Aging, or General Ledger.`,
+          suggestions: ['Show Profit & Loss', 'Show Balance Sheet', 'Show Cash Flow'],
+        };
+    }
+  }
+
+  private async generatePLSummary(
+    organizationId: string,
+    confidence: number,
+  ): Promise<ChatResponse> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const revenueAccounts = await this.prisma.journalLine.aggregate({
+      where: {
+        account: { organizationId, type: 'REVENUE' },
+        journal: { organizationId, isPosted: true, deletedAt: null, date: { gte: startOfMonth } },
+      },
+      _sum: { credit: true, debit: true },
+    });
+
+    const expenseAccounts = await this.prisma.journalLine.aggregate({
+      where: {
+        account: { organizationId, type: 'EXPENSE' },
+        journal: { organizationId, isPosted: true, deletedAt: null, date: { gte: startOfMonth } },
+      },
+      _sum: { debit: true, credit: true },
+    });
+
+    const revenue =
+      Number(revenueAccounts._sum.credit ?? 0) - Number(revenueAccounts._sum.debit ?? 0);
+    const expenses =
+      Number(expenseAccounts._sum.debit ?? 0) - Number(expenseAccounts._sum.credit ?? 0);
+    const netIncome = revenue - expenses;
+    const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
     return {
       intent: 'report_request',
       confidence,
       response:
-        'I can help you access reports. Which report would you like to see?\n\n' +
-        '- **Profit & Loss** — summary of revenue and expenses\n' +
-        '- **Balance Sheet** — assets, liabilities, and equity\n' +
-        '- **AR Aging** — outstanding customer receivables\n' +
-        '- **AP Aging** — outstanding vendor payables\n' +
-        '- **Cash Flow** — cash inflows and outflows\n' +
-        '- **General Ledger** — detailed journal entries',
-      suggestions: ['Show Profit & Loss', 'Show Balance Sheet', 'Show AR Aging', 'Show Cash Flow'],
+        `**Profit & Loss Summary — ${monthName}**\n\n` +
+        `| | Amount |\n|---|---|\n` +
+        `| Revenue | $${revenue.toLocaleString(undefined, { minimumFractionDigits: 2 })} |\n` +
+        `| Expenses | $${expenses.toLocaleString(undefined, { minimumFractionDigits: 2 })} |\n` +
+        `| **Net Income** | **$${netIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}** |`,
+      data: { revenue, expenses, netIncome, period: monthName },
+      suggestions: ['Show Balance Sheet', 'Show Cash Flow', 'Show full P&L report page'],
+    };
+  }
+
+  private async generateBalanceSheetSummary(
+    organizationId: string,
+    confidence: number,
+  ): Promise<ChatResponse> {
+    const accountTypes = ['ASSET', 'LIABILITY', 'EQUITY'] as const;
+    const totals: Record<string, number> = {};
+
+    for (const type of accountTypes) {
+      const agg = await this.prisma.journalLine.aggregate({
+        where: {
+          account: { organizationId, type },
+          journal: { organizationId, isPosted: true, deletedAt: null },
+        },
+        _sum: { debit: true, credit: true },
+      });
+
+      const openingAgg = await this.prisma.account.aggregate({
+        where: { organizationId, type, isActive: true },
+        _sum: { openingBalance: true },
+      });
+
+      const opening = Number(openingAgg._sum.openingBalance ?? 0);
+      const debits = Number(agg._sum.debit ?? 0);
+      const credits = Number(agg._sum.credit ?? 0);
+
+      if (type === 'ASSET') {
+        totals[type] = opening + debits - credits;
+      } else {
+        totals[type] = opening + credits - debits;
+      }
+    }
+
+    const fmt = (n: number): string =>
+      `$${n.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+
+    return {
+      intent: 'report_request',
+      confidence,
+      response:
+        `**Balance Sheet Summary**\n\n` +
+        `| | Amount |\n|---|---|\n` +
+        `| Total Assets | ${fmt(totals.ASSET)} |\n` +
+        `| Total Liabilities | ${fmt(totals.LIABILITY)} |\n` +
+        `| Total Equity | ${fmt(totals.EQUITY)} |\n` +
+        `| **Assets − (Liabilities + Equity)** | **${fmt(totals.ASSET - totals.LIABILITY - totals.EQUITY)}** |`,
+      data: totals,
+      suggestions: ['Show Profit & Loss', 'Show Cash Flow', 'Show full Balance Sheet page'],
+    };
+  }
+
+  private async generateCashFlowSummary(
+    organizationId: string,
+    confidence: number,
+  ): Promise<ChatResponse> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Cash & bank type accounts
+    const cashAccounts = await this.prisma.account.findMany({
+      where: {
+        organizationId,
+        isActive: true,
+        type: 'ASSET',
+        OR: [
+          { name: { contains: 'cash', mode: 'insensitive' } },
+          { name: { contains: 'bank', mode: 'insensitive' } },
+          { subType: { in: ['cash', 'bank'] } },
+        ],
+      },
+      select: { id: true, name: true },
+    });
+
+    if (cashAccounts.length === 0) {
+      return {
+        intent: 'report_request',
+        confidence,
+        response:
+          'No cash or bank accounts found. Please set up cash/bank accounts in your Chart of Accounts.',
+        suggestions: ['Go to Chart of Accounts', 'Show Balance Sheet'],
+      };
+    }
+
+    const cashIds = cashAccounts.map((a) => a.id);
+
+    const thisMonth = await this.prisma.journalLine.aggregate({
+      where: {
+        accountId: { in: cashIds },
+        journal: { organizationId, isPosted: true, deletedAt: null, date: { gte: startOfMonth } },
+      },
+      _sum: { debit: true, credit: true },
+    });
+
+    const inflows = Number(thisMonth._sum.debit ?? 0);
+    const outflows = Number(thisMonth._sum.credit ?? 0);
+    const netCashFlow = inflows - outflows;
+    const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    const fmt = (n: number): string =>
+      `$${n.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+
+    return {
+      intent: 'report_request',
+      confidence,
+      response:
+        `**Cash Flow Summary — ${monthName}**\n\n` +
+        `| | Amount |\n|---|---|\n` +
+        `| Cash Inflows | ${fmt(inflows)} |\n` +
+        `| Cash Outflows | ${fmt(outflows)} |\n` +
+        `| **Net Cash Flow** | **${fmt(netCashFlow)}** |\n\n` +
+        `Accounts tracked: ${cashAccounts.map((a) => a.name).join(', ')}`,
+      data: { inflows, outflows, netCashFlow, period: monthName },
+      suggestions: ['Show Profit & Loss', 'Show Balance Sheet', 'Check account balance'],
+    };
+  }
+
+  private async generateARAging(organizationId: string, confidence: number): Promise<ChatResponse> {
+    const now = new Date();
+    const openInvoices = await this.prisma.invoice.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+        status: { in: ['SENT', 'OVERDUE', 'PARTIALLY_PAID'] },
+      },
+      select: { balanceDue: true, dueDate: true, invoiceNumber: true },
+      orderBy: { dueDate: 'asc' },
+    });
+
+    const buckets = { current: 0, days30: 0, days60: 0, days90: 0, over90: 0 };
+    for (const inv of openInvoices) {
+      const daysOverdue = Math.floor(
+        (now.getTime() - inv.dueDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      const amount = Number(inv.balanceDue);
+      if (daysOverdue <= 0) buckets.current += amount;
+      else if (daysOverdue <= 30) buckets.days30 += amount;
+      else if (daysOverdue <= 60) buckets.days60 += amount;
+      else if (daysOverdue <= 90) buckets.days90 += amount;
+      else buckets.over90 += amount;
+    }
+
+    const total = Object.values(buckets).reduce((s, v) => s + v, 0);
+    const fmt = (n: number): string =>
+      `$${n.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+
+    return {
+      intent: 'report_request',
+      confidence,
+      response:
+        `**AR Aging Summary** (${openInvoices.length} open invoices)\n\n` +
+        `| Aging Bucket | Amount |\n|---|---|\n` +
+        `| Current | ${fmt(buckets.current)} |\n` +
+        `| 1–30 days | ${fmt(buckets.days30)} |\n` +
+        `| 31–60 days | ${fmt(buckets.days60)} |\n` +
+        `| 61–90 days | ${fmt(buckets.days90)} |\n` +
+        `| Over 90 days | ${fmt(buckets.over90)} |\n` +
+        `| **Total** | **${fmt(total)}** |`,
+      data: { ...buckets, total, invoiceCount: openInvoices.length },
+      suggestions: ['Show overdue invoices', 'Show AP Aging', 'Show Balance Sheet'],
+    };
+  }
+
+  private async generateAPAging(organizationId: string, confidence: number): Promise<ChatResponse> {
+    const now = new Date();
+    const openBills = await this.prisma.bill.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+        status: { in: ['PENDING', 'OPEN', 'OVERDUE', 'PARTIALLY_PAID'] },
+      },
+      select: { balanceDue: true, dueDate: true },
+      orderBy: { dueDate: 'asc' },
+    });
+
+    const buckets = { current: 0, days30: 0, days60: 0, days90: 0, over90: 0 };
+    for (const bill of openBills) {
+      const daysOverdue = Math.floor(
+        (now.getTime() - bill.dueDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      const amount = Number(bill.balanceDue);
+      if (daysOverdue <= 0) buckets.current += amount;
+      else if (daysOverdue <= 30) buckets.days30 += amount;
+      else if (daysOverdue <= 60) buckets.days60 += amount;
+      else if (daysOverdue <= 90) buckets.days90 += amount;
+      else buckets.over90 += amount;
+    }
+
+    const total = Object.values(buckets).reduce((s, v) => s + v, 0);
+    const fmt = (n: number): string =>
+      `$${n.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+
+    return {
+      intent: 'report_request',
+      confidence,
+      response:
+        `**AP Aging Summary** (${openBills.length} open bills)\n\n` +
+        `| Aging Bucket | Amount |\n|---|---|\n` +
+        `| Current | ${fmt(buckets.current)} |\n` +
+        `| 1–30 days | ${fmt(buckets.days30)} |\n` +
+        `| 31–60 days | ${fmt(buckets.days60)} |\n` +
+        `| 61–90 days | ${fmt(buckets.days90)} |\n` +
+        `| Over 90 days | ${fmt(buckets.over90)} |\n` +
+        `| **Total** | **${fmt(total)}** |`,
+      data: { ...buckets, total, billCount: openBills.length },
+      suggestions: ['Show AR Aging', 'Show overdue invoices', 'Show Balance Sheet'],
+    };
+  }
+
+  private async generateGLSummary(
+    organizationId: string,
+    confidence: number,
+  ): Promise<ChatResponse> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const recentJournals = await this.prisma.journal.findMany({
+      where: {
+        organizationId,
+        isPosted: true,
+        deletedAt: null,
+        date: { gte: startOfMonth },
+      },
+      select: { journalNumber: true, date: true, notes: true },
+      orderBy: { date: 'desc' },
+      take: 10,
+    });
+
+    const totalCount = await this.prisma.journal.count({
+      where: {
+        organizationId,
+        isPosted: true,
+        deletedAt: null,
+        date: { gte: startOfMonth },
+      },
+    });
+
+    const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    if (recentJournals.length === 0) {
+      return {
+        intent: 'report_request',
+        confidence,
+        response: `No journal entries found for ${monthName}.`,
+        suggestions: ['Show Profit & Loss', 'Show Balance Sheet', 'Create journal entry'],
+      };
+    }
+
+    const lines = recentJournals.map(
+      (j) =>
+        `- **${j.journalNumber}** (${j.date.toLocaleDateString()})${j.notes ? ` — ${j.notes}` : ''}`,
+    );
+
+    return {
+      intent: 'report_request',
+      confidence,
+      response:
+        `**General Ledger — ${monthName}** (${totalCount} entries)\n\n` +
+        `Recent entries:\n${lines.join('\n')}` +
+        (totalCount > 10 ? `\n\n...and ${totalCount - 10} more entries.` : ''),
+      data: { totalCount, period: monthName },
+      suggestions: ['Show Profit & Loss', 'Show Balance Sheet', 'Check account balance'],
     };
   }
 

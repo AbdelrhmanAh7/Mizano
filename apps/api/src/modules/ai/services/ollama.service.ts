@@ -114,7 +114,13 @@ export class OllamaService {
     fileBuffer: Buffer,
     mimeType: string,
   ): Promise<DocumentExtractionResult | null> {
-    const processed = await this.preprocessImage(fileBuffer, mimeType);
+    let processed: Buffer;
+    try {
+      processed = await this.preprocessImage(fileBuffer, mimeType);
+    } catch (err) {
+      this.logger.error(`Image preprocessing failed: ${err instanceof Error ? err.message : err}`);
+      return null;
+    }
     const base64 = processed.toString('base64');
 
     this.logger.log(
@@ -149,61 +155,65 @@ export class OllamaService {
    * Falls back to the original buffer if preprocessing fails.
    */
   private async preprocessImage(buffer: Buffer, mimeType: string): Promise<Buffer> {
-    let imageBuffer = buffer;
+    const isHeic = mimeType === 'image/heic' || mimeType === 'image/heif';
 
-    // Step 1: HEIC/HEIF → JPEG
-    if (mimeType === 'image/heic' || mimeType === 'image/heif') {
+    // Step 1: Try sharp first — it handles HEIC natively (via libvips) + resize + JPEG encode
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires -- dynamic require for optional dep
+      const sharp = require('sharp');
+      const meta = await sharp(buffer).metadata();
+      const maxDim = Math.max(meta.width ?? 0, meta.height ?? 0);
+
+      const needsResize = maxDim > OllamaService.MAX_IMAGE_DIM;
+      const needsConvert = mimeType !== 'image/jpeg' && mimeType !== 'image/jpg';
+
+      if (needsResize || needsConvert) {
+        let pipeline = sharp(buffer);
+        if (needsResize) {
+          pipeline = pipeline.resize(OllamaService.MAX_IMAGE_DIM, OllamaService.MAX_IMAGE_DIM, {
+            fit: 'inside',
+            withoutEnlargement: true,
+          });
+        }
+        const result = await pipeline.jpeg({ quality: OllamaService.JPEG_QUALITY }).toBuffer();
+
+        this.logger.log(
+          `Preprocessed: ${meta.width}x${meta.height} (${mimeType}) → JPEG ` +
+            `${needsResize ? `max ${OllamaService.MAX_IMAGE_DIM}px ` : ''}` +
+            `(${buffer.length} → ${result.length} bytes)`,
+        );
+        return result;
+      }
+
+      return buffer;
+    } catch (err) {
+      this.logger.warn(`sharp preprocessing failed: ${err instanceof Error ? err.message : err}`);
+    }
+
+    // Step 2: For HEIC — fall back to heic-convert (pure JS) if sharp can't handle it
+    if (isHeic) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-var-requires -- heic-convert is CJS-only
         const convert = require('heic-convert');
         const result = await convert({
-          buffer: imageBuffer,
+          buffer,
           format: 'JPEG',
           quality: OllamaService.JPEG_QUALITY / 100,
         });
-        imageBuffer = Buffer.from(result);
-        this.logger.log(`HEIC → JPEG: ${buffer.length} → ${imageBuffer.length} bytes`);
+        const converted = Buffer.from(result);
+        this.logger.log(`HEIC → JPEG (heic-convert): ${buffer.length} → ${converted.length} bytes`);
+        return converted;
       } catch (err) {
-        this.logger.warn(`HEIC conversion failed: ${err instanceof Error ? err.message : err}`);
-        return buffer;
-      }
-    }
-
-    // Step 2: Resize with sharp (caps at 1536px longest side)
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires -- dynamic require for optional dep
-      const sharp = require('sharp');
-      const meta = await sharp(imageBuffer).metadata();
-      const maxDim = Math.max(meta.width ?? 0, meta.height ?? 0);
-
-      if (maxDim > OllamaService.MAX_IMAGE_DIM) {
-        const resized = await sharp(imageBuffer)
-          .resize(OllamaService.MAX_IMAGE_DIM, OllamaService.MAX_IMAGE_DIM, {
-            fit: 'inside',
-            withoutEnlargement: true,
-          })
-          .jpeg({ quality: OllamaService.JPEG_QUALITY })
-          .toBuffer();
-
-        this.logger.log(
-          `Resized: ${meta.width}x${meta.height} → max ${OllamaService.MAX_IMAGE_DIM}px ` +
-            `(${imageBuffer.length} → ${resized.length} bytes)`,
+        this.logger.error(
+          `HEIC conversion failed — cannot process this image: ${err instanceof Error ? err.message : err}`,
         );
-        return resized;
+        // Return empty buffer to signal failure — never send raw HEIC to Ollama
+        throw new Error('HEIC image conversion failed. Please convert to JPEG before uploading.');
       }
-
-      // Small enough — just ensure JPEG format
-      if (mimeType !== 'image/jpeg' && mimeType !== 'image/jpg') {
-        return sharp(imageBuffer).jpeg({ quality: OllamaService.JPEG_QUALITY }).toBuffer();
-      }
-
-      return imageBuffer;
-    } catch (err) {
-      this.logger.warn(
-        `sharp preprocessing failed (sending original): ${err instanceof Error ? err.message : err}`,
-      );
-      return imageBuffer;
     }
+
+    // Non-HEIC image that sharp couldn't process — send as-is (JPEG/PNG are natively supported)
+    return buffer;
   }
 
   /**

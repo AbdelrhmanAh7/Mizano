@@ -47,9 +47,7 @@ Rules:
 - Dates must be YYYY-MM-DD format
 - Confidence values should be between 0.0 and 1.0
 - Extract ALL line items visible in the document
-- Support both English and Arabic documents
-
-/no_think`;
+- Support both English and Arabic documents`;
 
 /**
  * Build a prompt for extracting data from raw text (PDF text extraction).
@@ -99,7 +97,5 @@ Rules:
 - Confidence values should be between 0.0 and 1.0
 
 --- DOCUMENT TEXT ---
-${rawText}
-
-/no_think`;
+${rawText}`;
 }
