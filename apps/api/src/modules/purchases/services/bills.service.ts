@@ -2,8 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { BillStatus, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { BillCursorQueryDto } from '../dto/bill-cursor-query.dto';
+import { BillQueryDto } from '../dto/bill-query.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
@@ -31,7 +31,7 @@ export class BillsService {
       const tax = parseFloat(line.taxRate || '0');
       const lineTotal = qty * rate;
       subtotal += lineTotal;
-      taxAmount += lineTotal * (tax / 100);
+      taxAmount += (lineTotal * tax) / 100;
       return { ...line, amount: lineTotal.toFixed(4) };
     });
 
@@ -45,6 +45,8 @@ export class BillsService {
         taxAmount: new Decimal(taxAmount),
         grandTotal: new Decimal(subtotal + taxAmount),
         balanceDue: new Decimal(subtotal + taxAmount),
+        reference: dto.reference,
+        currencyCode: dto.currencyCode,
         notes: dto.notes,
         projectId: dto.projectId,
         organizationId,
@@ -64,9 +66,23 @@ export class BillsService {
     });
   }
 
-  async findAll(organizationId: string, query: PaginationDto) {
+  async findAll(organizationId: string, query: BillQueryDto) {
     const { page = 1, limit = 20, sortBy = 'date', sortOrder = 'desc' } = query;
-    const where = { organizationId, deletedAt: null };
+    const where: Prisma.BillWhereInput = { organizationId, deletedAt: null };
+
+    if (query.vendorId) {
+      where.vendorId = query.vendorId;
+    }
+
+    if (query.status) {
+      const statuses = query.status.split(',').map((s) => s.trim()) as BillStatus[];
+      where.status = { in: statuses };
+    }
+
+    if (query.hasBalance) {
+      where.balanceDue = { gt: new Decimal(0) };
+    }
+
     const [bills, total] = await Promise.all([
       this.prisma.bill.findMany({
         where,
@@ -80,9 +96,30 @@ export class BillsService {
     return { data: bills, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
-  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+  async findAllCursor(organizationId: string, query: BillCursorQueryDto) {
     const { cursor, take = 50, sortBy = 'date', sortOrder = 'desc' } = query;
-    const where = { organizationId, deletedAt: null };
+    const where: Prisma.BillWhereInput = { organizationId, deletedAt: null };
+
+    if (query.vendorId) {
+      where.vendorId = query.vendorId;
+    }
+
+    if (query.status) {
+      const statuses = query.status.split(',').map((s) => s.trim()) as BillStatus[];
+      where.status = { in: statuses };
+    }
+
+    if (query.hasBalance) {
+      where.balanceDue = { gt: new Decimal(0) };
+    }
+
+    if (query.startDate || query.endDate) {
+      where.date = {
+        ...(query.startDate && { gte: new Date(query.startDate) }),
+        ...(query.endDate && { lte: new Date(query.endDate) }),
+      };
+    }
+
     return cursorPaginate(
       this.prisma.bill,
       where,
@@ -326,6 +363,59 @@ export class BillsService {
         vendor: { select: { id: true, name: true } },
         lines: true,
       },
+    });
+  }
+
+  async clone(organizationId: string, id: string) {
+    const original = await this.prisma.bill.findFirst({
+      where: { id, organizationId, deletedAt: null },
+      include: { lines: true },
+    });
+    if (!original) throw new NotFoundException('Bill not found');
+
+    // Generate new bill number
+    const last = await this.prisma.bill.findFirst({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      select: { billNumber: true },
+    });
+    let billNumber = 'BILL-001';
+    if (last?.billNumber) {
+      const parts = last.billNumber.split('-');
+      const seq = parseInt(parts[parts.length - 1], 10);
+      billNumber = `BILL-${String(seq + 1).padStart(3, '0')}`;
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const bill = await tx.bill.create({
+        data: {
+          billNumber,
+          vendorId: original.vendorId,
+          date: new Date(),
+          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          status: 'DRAFT',
+          subtotal: original.subtotal,
+          taxAmount: original.taxAmount,
+          grandTotal: original.grandTotal,
+          balanceDue: original.grandTotal,
+          notes: original.notes,
+          projectId: original.projectId,
+          organizationId,
+          lines: {
+            create: original.lines.map((line) => ({
+              itemId: line.itemId,
+              accountId: line.accountId,
+              description: line.description,
+              quantity: line.quantity,
+              rate: line.rate,
+              taxRate: line.taxRate,
+              amount: line.amount,
+            })),
+          },
+        },
+        include: { vendor: { select: { id: true, name: true } }, lines: true },
+      });
+      return bill;
     });
   }
 

@@ -176,9 +176,15 @@ if (!totalDebits.equals(totalCredits)) throw new BadRequestException('Journal en
 
 ### Test rules
 
+- **After ANY code change, run affected tests and verify they pass before considering the task complete**
 - All existing tests must pass after changes
 - Mock Redis, external APIs — no infra dependency in unit tests
 - When modifying business logic, update/add corresponding tests
+- When modifying a service/controller/component, run its spec file and fix any broken assertions
+- When adding new features, add corresponding unit tests
+- API tests: `node apps/api/_run_tests.js [--testPathPattern="<pattern>"]` (required for Windows/WSL compatibility)
+- Web tests: `cd apps/web && npx jest [--testPathPattern="<pattern>"]`
+- Always run the full suite (`node apps/api/_run_tests.js` + `cd apps/web && npx jest`) before finalizing changes
 
 ## Git Hooks
 
@@ -193,6 +199,7 @@ if (!totalDebits.equals(totalCredits)) throw new BadRequestException('Journal en
 - [ ] Journal entries balance before saving
 - [ ] Prisma transactions for multi-table writes
 - [ ] Mobile responsive (test at 375px)
+- [ ] All affected tests pass after changes (run targeted spec + full suite)
 - [ ] `pnpm ci:full` passes with zero warnings/errors
 
 ## Agent Workflows (Slash Commands)
