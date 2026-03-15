@@ -14,6 +14,7 @@ export interface ExtractedLineItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  taxAmount: number;
   total: number;
 }
 
@@ -37,6 +38,7 @@ export interface DocumentExtractionResult {
   rawText: string;
   ocrConfidence: number;
   fieldConfidence: Record<string, number>;
+  documentCategory: string | null;
   accountingEntry: {
     debitAccount: string | null;
     creditAccount: string | null;
@@ -66,12 +68,14 @@ interface OllamaExtractionRaw {
     description?: string;
     quantity?: number;
     unitPrice?: number;
+    taxAmount?: number;
     total?: number;
   }>;
   confidence?: {
     overall?: number;
     [field: string]: number | undefined;
   };
+  documentCategory?: string | null;
   accountingEntry?: {
     debitAccount?: string | null;
     creditAccount?: string | null;
@@ -95,18 +99,20 @@ export class OllamaService {
 
   constructor(private readonly gateway: OllamaInferenceGateway) {}
 
-  /** Max pixels on the longest side before we resize for Ollama vision. */
-  private static readonly MAX_IMAGE_DIM = 1536;
-  /** JPEG quality for preprocessed images (0-100). */
-  private static readonly JPEG_QUALITY = 85;
+  /** Max file size in bytes for processed images sent to Ollama (100KB). */
+  private static readonly MAX_IMAGE_BYTES = 100 * 1024;
+  /** Starting max dimension — will be reduced if image exceeds MAX_IMAGE_BYTES. */
+  private static readonly INITIAL_MAX_DIM = 1536;
+  /** Starting JPEG quality — will be reduced if image exceeds MAX_IMAGE_BYTES. */
+  private static readonly INITIAL_JPEG_QUALITY = 85;
 
   /**
    * Extract document data from an image using Ollama's vision model.
    *
    * Preprocessing pipeline:
-   *  1. HEIC/HEIF → JPEG (via heic-convert, pure JS)
-   *  2. Resize to max 1536px on longest side (via sharp)
-   *  3. Re-encode as JPEG @ quality 85
+   *  1. HEIC/HEIF → JPEG (via sharp or heic-convert fallback)
+   *  2. Progressively resize + reduce quality until ≤ 100KB
+   *  3. Sharpen + normalize contrast for text readability
    *
    * Returns null if Ollama is unavailable or extraction fails.
    */
@@ -134,7 +140,7 @@ export class OllamaService {
       {
         systemPrompt: OLLAMA_EXTRACTION_SYSTEM_PROMPT,
         timeoutMs: 300_000,
-        maxTokens: 8192,
+        maxTokens: 16384,
       },
     );
 
@@ -148,72 +154,128 @@ export class OllamaService {
 
   /**
    * Preprocess an image for Ollama Vision:
-   *  1. Convert HEIC/HEIF → JPEG (pure JS, works on all platforms)
-   *  2. Resize large images to fit within MAX_IMAGE_DIM
-   *  3. Re-encode as JPEG
-   *
-   * Falls back to the original buffer if preprocessing fails.
+   *  1. Convert HEIC/HEIF → JPEG (via sharp or heic-convert fallback)
+   *  2. Progressively resize + reduce quality until ≤ 100KB
+   *  3. Apply sharpening + contrast normalization for text readability
    */
   private async preprocessImage(buffer: Buffer, mimeType: string): Promise<Buffer> {
     const isHeic = mimeType === 'image/heic' || mimeType === 'image/heif';
 
-    // Step 1: Try sharp first — it handles HEIC natively (via libvips) + resize + JPEG encode
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires -- dynamic require for optional dep
-      const sharp = require('sharp');
-      const meta = await sharp(buffer).metadata();
-      const maxDim = Math.max(meta.width ?? 0, meta.height ?? 0);
-
-      const needsResize = maxDim > OllamaService.MAX_IMAGE_DIM;
-      const needsConvert = mimeType !== 'image/jpeg' && mimeType !== 'image/jpg';
-
-      if (needsResize || needsConvert) {
-        let pipeline = sharp(buffer);
-        if (needsResize) {
-          pipeline = pipeline.resize(OllamaService.MAX_IMAGE_DIM, OllamaService.MAX_IMAGE_DIM, {
-            fit: 'inside',
-            withoutEnlargement: true,
-          });
-        }
-        const result = await pipeline.jpeg({ quality: OllamaService.JPEG_QUALITY }).toBuffer();
-
-        this.logger.log(
-          `Preprocessed: ${meta.width}x${meta.height} (${mimeType}) → JPEG ` +
-            `${needsResize ? `max ${OllamaService.MAX_IMAGE_DIM}px ` : ''}` +
-            `(${buffer.length} → ${result.length} bytes)`,
-        );
-        return result;
-      }
-
-      return buffer;
-    } catch (err) {
-      this.logger.warn(`sharp preprocessing failed: ${err instanceof Error ? err.message : err}`);
-    }
-
-    // Step 2: For HEIC — fall back to heic-convert (pure JS) if sharp can't handle it
+    // Step 1: Convert HEIC → JPEG first (if needed) so all later steps work on JPEG
+    let jpegBuffer = buffer;
     if (isHeic) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires -- heic-convert is CJS-only
-        const convert = require('heic-convert');
-        const result = await convert({
-          buffer,
-          format: 'JPEG',
-          quality: OllamaService.JPEG_QUALITY / 100,
-        });
-        const converted = Buffer.from(result);
-        this.logger.log(`HEIC → JPEG (heic-convert): ${buffer.length} → ${converted.length} bytes`);
-        return converted;
-      } catch (err) {
-        this.logger.error(
-          `HEIC conversion failed — cannot process this image: ${err instanceof Error ? err.message : err}`,
-        );
-        // Return empty buffer to signal failure — never send raw HEIC to Ollama
-        throw new Error('HEIC image conversion failed. Please convert to JPEG before uploading.');
-      }
+      jpegBuffer = await this.convertHeicToJpeg(buffer);
     }
 
-    // Non-HEIC image that sharp couldn't process — send as-is (JPEG/PNG are natively supported)
-    return buffer;
+    // Step 2: Resize + compress to fit under MAX_IMAGE_BYTES using sharp
+    const compressed = await this.compressToTarget(jpegBuffer, mimeType);
+    if (compressed) return compressed;
+
+    // Step 3: If sharp unavailable, return the JPEG as-is (heic-convert result or original)
+    return jpegBuffer;
+  }
+
+  /** Convert HEIC buffer to JPEG. Tries sharp first, falls back to heic-convert. */
+  private async convertHeicToJpeg(buffer: Buffer): Promise<Buffer> {
+    // Try sharp HEIC decode
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const sharp = require('sharp');
+      const result = await sharp(buffer).jpeg({ quality: 90 }).toBuffer();
+      this.logger.log(
+        `HEIC → JPEG (sharp): ${(buffer.length / 1024).toFixed(0)}KB → ${(result.length / 1024).toFixed(0)}KB`,
+      );
+      return result;
+    } catch {
+      // sharp unavailable or can't decode HEIC
+    }
+
+    // Fall back to heic-convert (pure JS)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const convert = require('heic-convert');
+      const result = await convert({ buffer, format: 'JPEG', quality: 0.9 });
+      const converted = Buffer.from(result);
+      this.logger.log(
+        `HEIC → JPEG (heic-convert): ${(buffer.length / 1024).toFixed(0)}KB → ${(converted.length / 1024).toFixed(0)}KB`,
+      );
+      return converted;
+    } catch (err) {
+      throw new Error(
+        `HEIC conversion failed: ${err instanceof Error ? err.message : err}. Please convert to JPEG before uploading.`,
+      );
+    }
+  }
+
+  /**
+   * Progressively resize and reduce JPEG quality until the image is ≤ MAX_IMAGE_BYTES.
+   * Returns null if sharp is unavailable.
+   */
+  private async compressToTarget(buffer: Buffer, originalMimeType: string): Promise<Buffer | null> {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    let sharp: ReturnType<typeof require>;
+    try {
+      sharp = require('sharp');
+    } catch {
+      this.logger.warn('sharp not available for compression');
+      return null;
+    }
+
+    try {
+      const meta = await sharp(buffer).metadata();
+      const origW = meta.width ?? 0;
+      const origH = meta.height ?? 0;
+      const origDim = Math.max(origW, origH);
+
+      this.logger.log(
+        `compressToTarget: input ${origW}x${origH} (${(buffer.length / 1024).toFixed(0)}KB), target ≤${(OllamaService.MAX_IMAGE_BYTES / 1024).toFixed(0)}KB`,
+      );
+
+      // If already under target, return as-is
+      if (buffer.length <= OllamaService.MAX_IMAGE_BYTES) {
+        this.logger.log('compressToTarget: already under target, skipping');
+        return buffer;
+      }
+
+      let maxDim = Math.min(origDim, OllamaService.INITIAL_MAX_DIM);
+      let quality = OllamaService.INITIAL_JPEG_QUALITY;
+      let result: Buffer;
+      let iteration = 0;
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        iteration++;
+        result = await sharp(buffer)
+          .resize(maxDim, maxDim, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality })
+          .toBuffer();
+
+        this.logger.debug(
+          `compressToTarget iteration ${iteration}: ${maxDim}px q${quality} → ${(result.length / 1024).toFixed(0)}KB`,
+        );
+
+        if (result.length <= OllamaService.MAX_IMAGE_BYTES) break;
+
+        // Reduce quality first, then shrink dimensions
+        if (quality > 30) {
+          quality -= 10;
+        } else if (maxDim > 400) {
+          maxDim = Math.round(maxDim * 0.7);
+          quality = OllamaService.INITIAL_JPEG_QUALITY;
+        } else {
+          break; // smallest possible
+        }
+      }
+
+      this.logger.log(
+        `Compressed: ${origW}x${origH} (${originalMimeType}) → JPEG ${maxDim}px q${quality} ` +
+          `(${(buffer.length / 1024).toFixed(0)}KB → ${(result.length / 1024).toFixed(0)}KB)`,
+      );
+      return result;
+    } catch (err) {
+      this.logger.warn(`sharp compression failed: ${err instanceof Error ? err.message : err}`);
+      return null;
+    }
   }
 
   /**
@@ -261,6 +323,7 @@ export class OllamaService {
       rawText,
       ocrConfidence: 0,
       fieldConfidence: {},
+      documentCategory: null,
       accountingEntry: null,
       processingTimeMs: 0,
     };
@@ -279,6 +342,7 @@ export class OllamaService {
       description: item.description || '',
       quantity: item.quantity || 0,
       unitPrice: item.unitPrice || 0,
+      taxAmount: item.taxAmount || 0,
       total: item.total || 0,
     }));
 
@@ -310,6 +374,7 @@ export class OllamaService {
       rawText,
       ocrConfidence: confidence.overall ?? 0,
       fieldConfidence,
+      documentCategory: raw.documentCategory ?? null,
       accountingEntry: raw.accountingEntry
         ? {
             debitAccount: raw.accountingEntry.debitAccount ?? null,

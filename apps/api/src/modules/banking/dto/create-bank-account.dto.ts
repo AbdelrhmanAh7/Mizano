@@ -1,4 +1,12 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, Length, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEnum,
+  IsBoolean,
+  Length,
+  MaxLength,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { BankAccountType } from '@prisma/client';
 
@@ -9,11 +17,11 @@ export class CreateBankAccountDto {
   @MaxLength(100)
   name: string;
 
-  @ApiProperty({ example: '1234567890' })
+  @ApiProperty({ required: false, example: '1234567890' })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MaxLength(50)
-  accountNumber: string;
+  accountNumber?: string;
 
   @ApiProperty({ required: false, default: 'USD', example: 'USD' })
   @IsString()
@@ -34,4 +42,9 @@ export class CreateBankAccountDto {
   @IsString()
   @IsNotEmpty()
   linkedAccountId: string;
+
+  @ApiProperty({ required: false, default: true })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 }

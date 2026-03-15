@@ -191,6 +191,23 @@ export class PaymentsReceivedService {
     return payment;
   }
 
+  // === Bulk Operations ===
+
+  async bulkDelete(
+    organizationId: string,
+    ids: string[],
+  ): Promise<{ deleted: number; total: number }> {
+    const result = await this.prisma.paymentReceived.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
   private async generatePaymentNumber(organizationId: string): Promise<string> {
     const last = await this.prisma.paymentReceived.findFirst({
       where: { organizationId },

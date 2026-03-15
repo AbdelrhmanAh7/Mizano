@@ -351,5 +351,23 @@
     "discount": "Discount",
     "tax": "Tax",
     "amount": "Amount"
+  },
+  "overview": {
+    "quickActions": "Quick Actions",
+    "recentActivity": "Recent Activity",
+    "overdueInvoices": "Overdue Invoices",
+    "daysOverdue": "{days} days overdue",
+    "noOverdue": "No overdue invoices",
+    "noRecentActivity": "No recent activity",
+    "viewAll": "View All"
+  },
+  "customer360": {
+    "quotesTab": "Quotes",
+    "creditNotesTab": "Credit Notes",
+    "createInvoice": "Create Invoice",
+    "createQuote": "Create Quote",
+    "recordPayment": "Record Payment",
+    "totalQuotes": "Total Quotes",
+    "totalCreditNotes": "Total Credit Notes"
   }
 }

@@ -21,7 +21,9 @@
     "title": "Accounting",
     "chartOfAccounts": "Chart of Accounts",
     "journalEntries": "Journal Entries",
-    "recurring": "Recurring"
+    "recurring": "Recurring",
+    "trialBalance": "Trial Balance",
+    "generalLedger": "General Ledger"
   },
   "inventory": {
     "title": "Inventory",
@@ -39,12 +41,21 @@
     },
     "priceLists": {
       "title": "Price Lists"
+    },
+    "compositeItems": {
+      "title": "Composite Items"
+    },
+    "movements": {
+      "title": "Movements"
     }
   },
   "banking": {
     "title": "Banking",
     "accounts": {
       "title": "Bank Accounts"
+    },
+    "transactions": {
+      "title": "Transactions"
     },
     "reconciliation": {
       "title": "Reconciliation"
@@ -58,6 +69,7 @@
     "projects": {
       "title": "All Projects"
     },
+    "myTasks": "My Tasks",
     "timesheets": {
       "title": "Timesheets"
     }

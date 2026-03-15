@@ -101,12 +101,17 @@ export class CashFlowPredictionService {
   /**
    * Generate cash flow prediction with Monte Carlo simulation
    */
-  async predict(organizationId: string, horizonDays: number = 90): Promise<CashFlowPrediction> {
+  async predict(
+    organizationId: string,
+    horizonDays: number = 90,
+    options?: { skipNarrative?: boolean; preloadedEvents?: CashFlowEvent[] },
+  ): Promise<CashFlowPrediction> {
     // 1. Get current cash balance
     const currentCash = await this.getCurrentCashBalance(organizationId);
 
-    // 2. Gather all cash flow events
-    const events = await this.gatherCashFlowEvents(organizationId, horizonDays);
+    // 2. Gather all cash flow events (reuse if preloaded)
+    const events =
+      options?.preloadedEvents ?? (await this.gatherCashFlowEvents(organizationId, horizonDays));
 
     // 3. Run Monte Carlo simulation
     const simulation = runCashFlowMonteCarlo({
@@ -163,81 +168,83 @@ export class CashFlowPredictionService {
     // 8. Calculate confidence
     const confidence = this.calculateConfidence(events.length, currentCash);
 
-    // 9. Try Ollama for risk narratives and mitigation suggestions
+    // 9. Try Ollama for risk narratives and mitigation suggestions (skip for quick forecasts)
     let riskNarrative: CashFlowPrediction['riskNarrative'];
     let predictionMethod: PredictionMethod = 'ML';
 
-    try {
-      const promptData = buildCashFlowExplanationPrompt(
-        {
-          period: `${horizonDays} days`,
-          predicted_inflows: totals.expectedInflows,
-          predicted_outflows: totals.expectedOutflows,
-          net_cash_flow: totals.expectedInflows - totals.expectedOutflows,
-          ending_balance: simulation.minBalance,
-          breakdown: [
+    if (!options?.skipNarrative) {
+      try {
+        const promptData = buildCashFlowExplanationPrompt(
+          {
+            period: `${horizonDays} days`,
+            predicted_inflows: totals.expectedInflows,
+            predicted_outflows: totals.expectedOutflows,
+            net_cash_flow: totals.expectedInflows - totals.expectedOutflows,
+            ending_balance: simulation.minBalance,
+            breakdown: [
+              {
+                category: 'Accounts Receivable',
+                amount: totals.inflowsBySource.ar || 0,
+                direction: 'IN' as const,
+              },
+              {
+                category: 'Accounts Payable',
+                amount: totals.outflowsBySource.ap || 0,
+                direction: 'OUT' as const,
+              },
+              {
+                category: 'Payroll',
+                amount: totals.outflowsBySource.payroll || 0,
+                direction: 'OUT' as const,
+              },
+              {
+                category: 'Recurring',
+                amount: totals.outflowsBySource.recurring || 0,
+                direction: 'OUT' as const,
+              },
+            ],
+          },
+          [
             {
-              category: 'Accounts Receivable',
-              amount: totals.inflowsBySource.ar || 0,
-              direction: 'IN' as const,
+              name: 'Pessimistic',
+              resulting_balance: forecasts[forecasts.length - 1]?.closingBalance.p10 ?? currentCash,
+              adjustments: [],
             },
             {
-              category: 'Accounts Payable',
-              amount: totals.outflowsBySource.ap || 0,
-              direction: 'OUT' as const,
+              name: 'Expected',
+              resulting_balance: forecasts[forecasts.length - 1]?.closingBalance.p50 ?? currentCash,
+              adjustments: [],
             },
             {
-              category: 'Payroll',
-              amount: totals.outflowsBySource.payroll || 0,
-              direction: 'OUT' as const,
-            },
-            {
-              category: 'Recurring',
-              amount: totals.outflowsBySource.recurring || 0,
-              direction: 'OUT' as const,
+              name: 'Optimistic',
+              resulting_balance: forecasts[forecasts.length - 1]?.closingBalance.p90 ?? currentCash,
+              adjustments: [],
             },
           ],
-        },
-        [
-          {
-            name: 'Pessimistic',
-            resulting_balance: forecasts[forecasts.length - 1]?.closingBalance.p10 ?? currentCash,
-            adjustments: [],
-          },
-          {
-            name: 'Expected',
-            resulting_balance: forecasts[forecasts.length - 1]?.closingBalance.p50 ?? currentCash,
-            adjustments: [],
-          },
-          {
-            name: 'Optimistic',
-            resulting_balance: forecasts[forecasts.length - 1]?.closingBalance.p90 ?? currentCash,
-            adjustments: [],
-          },
-        ],
-      );
+        );
 
-      const ollamaResult = await this.ollamaGateway.infer<CashFlowExplanationResponse>(
-        promptData.user,
-        { systemPrompt: promptData.system },
-      );
+        const ollamaResult = await this.ollamaGateway.infer<CashFlowExplanationResponse>(
+          promptData.user,
+          { systemPrompt: promptData.system },
+        );
 
-      if (ollamaResult?.data) {
-        riskNarrative = {
-          summary: ollamaResult.data.summary || '',
-          risks: (ollamaResult.data.risks || []).map((r) => ({
-            description: r.description,
-            probability: r.probability,
-            impact: r.impact,
-          })),
-          mitigationActions: ollamaResult.data.mitigation_actions || [],
-        };
-        predictionMethod = 'HYBRID';
+        if (ollamaResult?.data) {
+          riskNarrative = {
+            summary: ollamaResult.data.summary || '',
+            risks: (ollamaResult.data.risks || []).map((r) => ({
+              description: r.description,
+              probability: r.probability,
+              impact: r.impact,
+            })),
+            mitigationActions: ollamaResult.data.mitigation_actions || [],
+          };
+          predictionMethod = 'HYBRID';
+        }
+      } catch (error) {
+        this.logger.debug(
+          `Ollama risk narrative unavailable for cash flow prediction: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
-    } catch (error) {
-      this.logger.debug(
-        `Ollama risk narrative unavailable for cash flow prediction: ${error instanceof Error ? error.message : String(error)}`,
-      );
     }
 
     return {
@@ -262,7 +269,12 @@ export class CashFlowPredictionService {
    * Get quick forecast summary
    */
   async getQuickForecast(organizationId: string): Promise<QuickForecast> {
-    const prediction = await this.predict(organizationId, 90);
+    // Gather events once and reuse for both predict and critical dates
+    const events = await this.gatherCashFlowEvents(organizationId, 90);
+    const prediction = await this.predict(organizationId, 90, {
+      skipNarrative: true,
+      preloadedEvents: events,
+    });
     const forecasts = prediction.forecasts;
 
     // Get balances at key points
@@ -270,8 +282,7 @@ export class CashFlowPredictionService {
     const day30 = forecasts[29] || forecasts[forecasts.length - 1];
     const day90 = forecasts[89] || forecasts[forecasts.length - 1];
 
-    // Get critical dates
-    const events = await this.gatherCashFlowEvents(organizationId, 90);
+    // Get critical dates (reuse events already gathered)
     const simplifiedForecasts = forecasts.map((f) => ({
       date: f.date,
       p10: f.closingBalance.p10,
@@ -312,7 +323,7 @@ export class CashFlowPredictionService {
     expected: CashFlowScenario;
     pessimistic: CashFlowScenario;
   }> {
-    const prediction = await this.predict(organizationId, 90);
+    const prediction = await this.predict(organizationId, 90, { skipNarrative: true });
 
     const buildScenario = (name: string, percentile: 'p10' | 'p50' | 'p90'): CashFlowScenario => {
       const forecasts = prediction.forecasts.map((f) => ({
@@ -351,7 +362,7 @@ export class CashFlowPredictionService {
    * Get alerts for cash flow issues
    */
   async getAlerts(organizationId: string): Promise<CashFlowAlert[]> {
-    const prediction = await this.predict(organizationId, 90);
+    const prediction = await this.predict(organizationId, 90, { skipNarrative: true });
     const alerts: CashFlowAlert[] = [];
     const avgDailyExpense = prediction.summary.totalExpectedOutflows / 90 || 1000;
 
@@ -532,6 +543,7 @@ export class CashFlowPredictionService {
         const prediction = await this.paymentPredictionService.predictPaymentDate(
           organizationId,
           invoice.id,
+          { skipAiEnrichment: true },
         );
         if (prediction) {
           predictedDate = prediction.predictedDate;

@@ -220,6 +220,79 @@ export function useDeleteRecurringProfile() {
 }
 
 /**
+ * Hook to execute a recurring profile immediately
+ */
+export function useExecuteRecurringProfile() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await recurringProfilesApi.execute(id);
+      return response.data;
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['recurring-profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['recurring-profiles', id] });
+      toast({
+        title: 'Profile executed',
+        description: 'The recurring profile has been executed successfully.',
+      });
+    },
+    onError: (error: ApiError) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error executing profile',
+        description: error.response?.data?.message || 'An error occurred',
+      });
+    },
+  });
+}
+
+/**
+ * Hook to fetch recurring profile statistics
+ */
+export function useRecurringProfileStatistics() {
+  return useQuery({
+    queryKey: ['recurring-profiles', 'statistics'],
+    queryFn: async () => {
+      const response = await recurringProfilesApi.getStatistics();
+      return response.data;
+    },
+  });
+}
+
+/**
+ * Hook to fetch execution history for a recurring profile
+ */
+export function useRecurringProfileExecutions(id: string | undefined, limit?: number) {
+  return useQuery({
+    queryKey: ['recurring-profiles', id, 'executions', limit],
+    queryFn: async () => {
+      if (!id) throw new Error('Profile ID is required');
+      const response = await recurringProfilesApi.getExecutionHistory(
+        id,
+        limit ? { limit } : undefined,
+      );
+      return response.data;
+    },
+    enabled: !!id,
+  });
+}
+
+/**
+ * Hook to fetch upcoming recurring profiles
+ */
+export function useUpcomingProfiles(days?: number) {
+  return useQuery({
+    queryKey: ['recurring-profiles', 'upcoming', days],
+    queryFn: async () => {
+      const response = await recurringProfilesApi.getUpcoming(days);
+      return response.data;
+    },
+  });
+}
+
+/**
  * Get frequency display label
  */
 export function getFrequencyLabel(frequency: RecurringFrequency): string {

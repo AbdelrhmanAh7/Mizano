@@ -26,6 +26,7 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
+import { Public } from '../../../common/decorators/public.decorator';
 import { DocumentIntakeService, IntakeProgressEvent } from '../services/document-intake.service';
 import { ProcessDocumentDto, ConfirmIntakeDto } from '../dto/document-intake.dto';
 import { createOcrFileFilter } from '../utils/file-upload.util';
@@ -121,6 +122,7 @@ export class DocumentIntakeController {
   }
 
   @Sse(':jobId/progress')
+  @Public()
   @ApiOperation({ summary: 'Stream document intake progress via SSE' })
   streamProgress(@Param('jobId') jobId: string): Observable<MessageEvent> {
     const job = this.intakeService.getJob(jobId);

@@ -104,6 +104,328 @@ export class ReportsController {
     return this.dashboardService.getInventoryValueTrend(orgId, months ? parseInt(months) : 6);
   }
 
+  // ============ Financial (Tab 2) ============
+
+  @Get('dashboard/gross-margin-trend')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:gross-margin-trend')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get gross margin trend' })
+  getGrossMarginTrend(@CurrentOrg() orgId: string, @Query('months') months?: string) {
+    return this.dashboardService.getGrossMarginTrend(orgId, months ? parseInt(months) : 6);
+  }
+
+  @Get('dashboard/revenue-yoy')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:revenue-yoy')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get year-over-year revenue comparison' })
+  getRevenueYoY(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getRevenueYoY(orgId);
+  }
+
+  @Get('dashboard/account-balances')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:account-balances')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get account balances by type' })
+  getAccountBalances(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getAccountBalances(orgId);
+  }
+
+  @Get('dashboard/vat-summary')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:vat-summary')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get VAT returns summary' })
+  getVATSummary(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getVATSummary(orgId);
+  }
+
+  // ============ Sales (Tab 3) ============
+
+  @Get('dashboard/invoice-status')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:invoice-status')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get invoice count by status' })
+  getInvoiceStatus(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getInvoiceStatus(orgId);
+  }
+
+  @Get('dashboard/quote-conversion')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:quote-conversion')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get quote conversion funnel' })
+  getQuoteConversion(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getQuoteConversion(orgId);
+  }
+
+  @Get('dashboard/invoice-volume')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:invoice-volume')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get monthly invoice volume and amount' })
+  getInvoiceVolume(@CurrentOrg() orgId: string, @Query('months') months?: string) {
+    return this.dashboardService.getInvoiceVolume(orgId, months ? parseInt(months) : 6);
+  }
+
+  @Get('dashboard/payment-collection')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:payment-collection')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get monthly payment collection amounts' })
+  getPaymentCollection(@CurrentOrg() orgId: string, @Query('months') months?: string) {
+    return this.dashboardService.getPaymentCollection(orgId, months ? parseInt(months) : 6);
+  }
+
+  @Get('dashboard/churn-risk')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:churn-risk')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get customer churn risk distribution' })
+  getChurnRisk(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getChurnRisk(orgId);
+  }
+
+  @Get('dashboard/clv-segments')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:clv-segments')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get customer lifetime value segments' })
+  getCLVSegments(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getCLVSegments(orgId);
+  }
+
+  // ============ Purchases (Tab 4) ============
+
+  @Get('dashboard/bill-status')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:bill-status')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get bill count by status' })
+  getBillStatus(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getBillStatus(orgId);
+  }
+
+  @Get('dashboard/top-vendors')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:top-vendors')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get top vendors by spend' })
+  getTopVendors(@CurrentOrg() orgId: string, @Query('limit') limit?: string) {
+    return this.dashboardService.getTopVendors(orgId, limit ? parseInt(limit) : 5);
+  }
+
+  @Get('dashboard/purchase-trend')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:purchase-trend')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get monthly purchase trend' })
+  getPurchaseTrend(@CurrentOrg() orgId: string, @Query('months') months?: string) {
+    return this.dashboardService.getPurchaseTrend(orgId, months ? parseInt(months) : 6);
+  }
+
+  @Get('dashboard/expense-trend')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:expense-trend')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get monthly expense trend with categories' })
+  getExpenseTrend(@CurrentOrg() orgId: string, @Query('months') months?: string) {
+    return this.dashboardService.getExpenseTrend(orgId, months ? parseInt(months) : 6);
+  }
+
+  @Get('dashboard/vendor-payment-time')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:vendor-payment-time')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get average vendor payment time' })
+  getVendorPaymentTime(@CurrentOrg() orgId: string, @Query('limit') limit?: string) {
+    return this.dashboardService.getVendorPaymentTime(orgId, limit ? parseInt(limit) : 10);
+  }
+
+  // ============ HR (Tab 5) ============
+
+  @Get('dashboard/payroll-trend')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:payroll-trend')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get monthly payroll trend' })
+  getPayrollTrend(@CurrentOrg() orgId: string, @Query('months') months?: string) {
+    return this.dashboardService.getPayrollTrend(orgId, months ? parseInt(months) : 6);
+  }
+
+  @Get('dashboard/department-headcount')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:department-headcount')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get employee count by department' })
+  getDepartmentHeadcount(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getDepartmentHeadcount(orgId);
+  }
+
+  @Get('dashboard/attendance-overview')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:attendance-overview')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get attendance status overview' })
+  getAttendanceOverview(@CurrentOrg() orgId: string, @Query('days') days?: string) {
+    return this.dashboardService.getAttendanceOverview(orgId, days ? parseInt(days) : 30);
+  }
+
+  @Get('dashboard/salary-distribution')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:salary-distribution')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get salary range distribution' })
+  getSalaryDistribution(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getSalaryDistribution(orgId);
+  }
+
+  @Get('dashboard/attrition-risk')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:attrition-risk')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get employee attrition risk distribution' })
+  getAttritionRisk(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getAttritionRisk(orgId);
+  }
+
+  // ============ Inventory (Tab 6) ============
+
+  @Get('dashboard/stock-levels')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:stock-levels')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get current stock levels' })
+  getStockLevels(@CurrentOrg() orgId: string, @Query('limit') limit?: string) {
+    return this.dashboardService.getStockLevels(orgId, limit ? parseInt(limit) : 15);
+  }
+
+  @Get('dashboard/inventory-movements')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:inventory-movements')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get monthly inventory movements' })
+  getInventoryMovements(@CurrentOrg() orgId: string, @Query('months') months?: string) {
+    return this.dashboardService.getInventoryMovements(orgId, months ? parseInt(months) : 6);
+  }
+
+  @Get('dashboard/reorder-alerts')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:reorder-alerts')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get items needing reorder' })
+  getReorderAlerts(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getReorderAlerts(orgId);
+  }
+
+  @Get('dashboard/work-order-status')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:work-order-status')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get work order count by status' })
+  getWorkOrderStatus(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getWorkOrderStatus(orgId);
+  }
+
+  @Get('dashboard/production-efficiency')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:production-efficiency')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get monthly production efficiency' })
+  getProductionEfficiency(@CurrentOrg() orgId: string, @Query('months') months?: string) {
+    return this.dashboardService.getProductionEfficiency(orgId, months ? parseInt(months) : 6);
+  }
+
+  // ============ Projects (Tab 7) ============
+
+  @Get('dashboard/project-budgets')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:project-budgets')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get active project budgets vs actual' })
+  getProjectBudgets(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getProjectBudgets(orgId);
+  }
+
+  @Get('dashboard/billable-hours')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:billable-hours')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get monthly billable vs non-billable hours' })
+  getBillableHours(@CurrentOrg() orgId: string, @Query('months') months?: string) {
+    return this.dashboardService.getBillableHours(orgId, months ? parseInt(months) : 6);
+  }
+
+  @Get('dashboard/task-status')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:task-status')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get task count by status for active projects' })
+  getTaskStatus(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getTaskStatus(orgId);
+  }
+
+  @Get('dashboard/project-profitability')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:project-profitability')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get project profitability analysis' })
+  getProjectProfitability(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getProjectProfitability(orgId);
+  }
+
+  // ============ CRM (Tab 8) ============
+
+  @Get('dashboard/deal-pipeline')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:deal-pipeline')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get deal pipeline by stage' })
+  getDealPipeline(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getDealPipeline(orgId);
+  }
+
+  @Get('dashboard/leads-by-source')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:leads-by-source')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get lead count by source' })
+  getLeadsBySource(@CurrentOrg() orgId: string) {
+    return this.dashboardService.getLeadsBySource(orgId);
+  }
+
+  @Get('dashboard/lead-conversion-trend')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:lead-conversion-trend')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get monthly lead conversion count' })
+  getLeadConversionTrend(@CurrentOrg() orgId: string, @Query('months') months?: string) {
+    return this.dashboardService.getLeadConversionTrend(orgId, months ? parseInt(months) : 6);
+  }
+
+  @Get('dashboard/deal-win-rate')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:deal-win-rate')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get monthly deal win rate' })
+  getDealWinRate(@CurrentOrg() orgId: string, @Query('months') months?: string) {
+    return this.dashboardService.getDealWinRate(orgId, months ? parseInt(months) : 6);
+  }
+
+  // ============ AI (Tab 9) ============
+
+  @Get('dashboard/anomaly-timeline')
+  @Permissions('reports.view')
+  @CacheResponse('dashboard:anomaly-timeline')
+  @CacheTTL(300)
+  @ApiOperation({ summary: 'Get AI anomaly timeline' })
+  getAnomalyTimeline(@CurrentOrg() orgId: string, @Query('days') days?: string) {
+    return this.dashboardService.getAnomalyTimeline(orgId, days ? parseInt(days) : 90);
+  }
+
   // Financial Reports
   @Get('profit-and-loss')
   @Permissions('reports.view')

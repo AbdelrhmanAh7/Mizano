@@ -214,6 +214,21 @@ export function useDeleteAccount() {
 }
 
 /**
+ * Hook to fetch account balance
+ */
+export function useAccountBalance(id: string | undefined, asOfDate?: string) {
+  return useQuery({
+    queryKey: ['accounts', id, 'balance', asOfDate],
+    queryFn: async () => {
+      if (!id) throw new Error('Account ID is required');
+      const response = await accountsApi.getBalance(id, asOfDate ? { asOfDate } : undefined);
+      return response.data;
+    },
+    enabled: !!id,
+  });
+}
+
+/**
  * Hook to seed default accounts
  */
 export function useSeedAccounts() {

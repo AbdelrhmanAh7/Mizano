@@ -2,13 +2,26 @@
 
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Users, FileText, Receipt, CreditCard, TrendingUp, Clock, AlertCircle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Users,
+  FileText,
+  Receipt,
+  CreditCard,
+  TrendingUp,
+  Clock,
+  AlertCircle,
+  Plus,
+  DollarSign,
+  Truck,
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCustomers, formatCurrency } from '@/lib/hooks/use-customers';
 import { useInvoices } from '@/lib/hooks/use-invoices';
 import { useQuotes } from '@/lib/hooks/use-quotes';
+import { differenceInDays } from 'date-fns';
 
 export default function SalesPage() {
   const t = useTranslations('sales');
@@ -86,6 +99,14 @@ export default function SalesPage() {
       color: 'bg-cyan-500',
       stats: 'Track payments',
     },
+    {
+      title: 'Delivery Challans',
+      description: 'Track goods dispatch and returns',
+      icon: Truck,
+      href: '/sales/delivery-challans',
+      color: 'bg-rose-500',
+      stats: 'Track deliveries',
+    },
   ];
 
   return (
@@ -94,6 +115,28 @@ export default function SalesPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
         <p className="text-muted-foreground">{t('description')}</p>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="flex flex-wrap gap-2">
+        <Button asChild>
+          <Link href="/sales/invoices/new">
+            <Plus className="mr-2 h-4 w-4" />
+            New Invoice
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/sales/quotes/new">
+            <Plus className="mr-2 h-4 w-4" />
+            New Quote
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/sales/payments/new">
+            <DollarSign className="mr-2 h-4 w-4" />
+            Record Payment
+          </Link>
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -190,6 +233,114 @@ export default function SalesPage() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Recent Activity & Overdue */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Recent Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {invoices.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No recent activity</p>
+            ) : (
+              <div className="space-y-3">
+                {invoices
+                  .slice(0, 5)
+                  .map(
+                    (inv: {
+                      id: string;
+                      invoiceNumber: string;
+                      status: string;
+                      grandTotal?: string;
+                      date: string;
+                      customer?: { name?: string };
+                    }) => (
+                      <div
+                        key={inv.id}
+                        className="flex items-center justify-between py-2 border-b last:border-0"
+                      >
+                        <div>
+                          <Link
+                            href={`/sales/invoices/${inv.id}`}
+                            className="font-medium hover:underline text-sm"
+                          >
+                            {inv.invoiceNumber}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">{inv.customer?.name}</p>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant="outline" className="text-xs">
+                            {inv.status}
+                          </Badge>
+                          <p className="text-sm font-mono mt-1">
+                            {formatCurrency(parseFloat(inv.grandTotal || '0'), 'USD')}
+                          </p>
+                        </div>
+                      </div>
+                    ),
+                  )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Overdue Invoices */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg text-red-600">Overdue Invoices</CardTitle>
+            {overdueInvoices.length > 0 && (
+              <Button asChild variant="outline" size="sm">
+                <Link href="/sales/invoices?status=OVERDUE">View All</Link>
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            {overdueInvoices.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No overdue invoices</p>
+            ) : (
+              <div className="space-y-3">
+                {overdueInvoices
+                  .slice(0, 5)
+                  .map(
+                    (inv: {
+                      id: string;
+                      invoiceNumber: string;
+                      dueDate: string;
+                      balanceDue?: string;
+                      customer?: { name?: string };
+                    }) => {
+                      const daysOverdue = differenceInDays(new Date(), new Date(inv.dueDate));
+                      return (
+                        <div
+                          key={inv.id}
+                          className="flex items-center justify-between py-2 border-b last:border-0"
+                        >
+                          <div>
+                            <Link
+                              href={`/sales/invoices/${inv.id}`}
+                              className="font-medium hover:underline text-sm"
+                            >
+                              {inv.invoiceNumber}
+                            </Link>
+                            <p className="text-xs text-muted-foreground">{inv.customer?.name}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-red-600">{daysOverdue} days overdue</p>
+                            <p className="text-sm font-mono font-semibold text-red-600">
+                              {formatCurrency(parseFloat(inv.balanceDue || '0'), 'USD')}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    },
+                  )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

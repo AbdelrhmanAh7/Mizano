@@ -71,31 +71,31 @@ export interface WhatIfResult {
 // ============ API Functions ============
 
 const cashFlowApi = {
-  getCashFlowPrediction: async (horizon?: number) => {
+  getCashFlowPrediction: async (horizon?: number): Promise<CashFlowPredictionResult> => {
     const response = await api.get('/ai/cash-flow/forecast', {
       params: { horizon },
     });
-    return response.data;
+    return response.data?.data ?? response.data;
   },
-  getQuickCashForecast: async () => {
+  getQuickCashForecast: async (): Promise<QuickCashForecast> => {
     const response = await api.get('/ai/cash-flow/quick');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
-  getCashFlowScenarios: async () => {
+  getCashFlowScenarios: async (): Promise<CashFlowScenarios> => {
     const response = await api.get('/ai/cash-flow/scenarios');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
-  getCashFlowAlerts: async () => {
+  getCashFlowAlerts: async (): Promise<CashFlowAlert[]> => {
     const response = await api.get('/ai/cash-flow/alerts');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
-  whatIfAnalysis: async (scenario: WhatIfScenario) => {
+  whatIfAnalysis: async (scenario: WhatIfScenario): Promise<WhatIfResult> => {
     const response = await api.post('/ai/cash-flow/what-if', scenario);
-    return response.data;
+    return response.data?.data ?? response.data;
   },
   recalculateCashFlow: async () => {
     const response = await api.post('/ai/cash-flow/recalculate');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 };
 

@@ -57,7 +57,7 @@ interface BillAllocation {
 
 interface PaymentMadeFormProps {
   vendors: Array<{ id: string; name: string; currency: string }>;
-  accounts: Array<{ id: string; name: string; code: string }>;
+  bankAccounts: Array<{ id: string; name: string; type: string; linkedAccountId: string }>;
   onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -67,7 +67,7 @@ interface PaymentMadeFormProps {
 
 export function PaymentMadeForm({
   vendors,
-  accounts,
+  bankAccounts,
   onSubmit,
   onCancel,
   isSubmitting,
@@ -221,10 +221,7 @@ export function PaymentMadeForm({
     });
   };
 
-  // Filter accounts to show only bank/cash accounts
-  const bankAccounts = accounts.filter(
-    (a) => a.code.startsWith('1'), // Typically asset accounts
-  );
+  // bankAccounts are already the correct accounts from the banking module
 
   return (
     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -340,8 +337,8 @@ export function PaymentMadeForm({
                 </SelectTrigger>
                 <SelectContent>
                   {bankAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.code} - {account.name}
+                    <SelectItem key={account.id} value={account.linkedAccountId}>
+                      {account.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

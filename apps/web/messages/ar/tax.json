@@ -1,6 +1,29 @@
 {
   "title": "الضرائب",
   "description": "إدارة معدلات الضرائب وإقرارات ضريبة القيمة المضافة والمدفوعات الضريبية.",
+  "hub": {
+    "quickActions": "إجراءات سريعة",
+    "newReturn": "إقرار ضريبي جديد",
+    "newRate": "معدل ضريبي جديد",
+    "viewReturns": "عرض الإقرارات",
+    "stats": {
+      "activeRates": "معدلات الضرائب النشطة",
+      "activeRatesDesc": "{count} من {total} معدل نشط",
+      "pendingReturns": "إقرارات معلقة",
+      "pendingReturnsDesc": "{count} إقرار يحتاج اهتمام",
+      "outstandingVat": "ضريبة القيمة المضافة المستحقة",
+      "outstandingVatDesc": "عبر الإقرارات غير المقدمة",
+      "totalPaid": "إجمالي المدفوع",
+      "totalPaidDesc": "إجمالي مدفوعات ضريبة القيمة المضافة"
+    },
+    "recentReturns": "إقرارات ضريبة القيمة المضافة الأخيرة",
+    "noRecentReturns": "لا توجد إقرارات بعد",
+    "viewAllReturns": "عرض جميع الإقرارات",
+    "upcomingDeadlines": "المواعيد النهائية القادمة",
+    "noDeadlines": "لا توجد مواعيد نهائية قادمة",
+    "dueIn": "مستحق خلال {days} يوم",
+    "overdue": "متأخر بـ {days} يوم"
+  },
   "rates": {
     "title": "معدلات الضرائب",
     "description": "إدارة معدلات الضرائب للفواتير والفواتير الواردة",
@@ -15,6 +38,12 @@
     "deleteFail": "فشل حذف معدل الضريبة",
     "editDescription": "حدّث تفاصيل معدل الضريبة أدناه.",
     "createDescription": "أنشئ معدل ضريبة جديد.",
+    "searchPlaceholder": "البحث بالاسم...",
+    "filterByType": "تصفية حسب النوع",
+    "filterByStatus": "تصفية حسب الحالة",
+    "allTypes": "جميع الأنواع",
+    "activeOnly": "نشط",
+    "inactiveOnly": "غير نشط",
     "table": {
       "name": "الاسم",
       "rate": "المعدل",
@@ -34,11 +63,15 @@
     "generateFirst": "أنشئ أول إقرار",
     "fileReturn": "تقديم الإقرار",
     "fileReturns": "تقديم الإقرارات",
+    "calculateReturn": "حساب",
+    "submitReturn": "تقديم",
     "fileTitle": "تقديم إقرار ضريبة القيمة المضافة",
     "fileDescription": "هل أنت متأكد من تقديم هذا الإقرار؟ سيتم قفل معاملات الفترة ولا يمكن التراجع.",
     "fileDescriptionDetail": "تقديم هذا الإقرار سيقفل جميع المعاملات ضمن الفترة. لا يمكن التراجع عن هذا الإجراء.",
     "fileSuccess": "تم تقديم إقرار ضريبة القيمة المضافة بنجاح",
     "fileFail": "فشل تقديم إقرار ضريبة القيمة المضافة",
+    "calculateSuccess": "تم حساب إقرار ضريبة القيمة المضافة بنجاح",
+    "calculateFail": "فشل حساب إقرار ضريبة القيمة المضافة",
     "deleteTitle": "حذف إقرار ضريبة القيمة المضافة",
     "deleteDescription": "هل أنت متأكد من حذف هذا الإقرار؟ لا يمكن التراجع عن هذا الإجراء.",
     "deleteDescriptionShort": "هل أنت متأكد؟ لا يمكن التراجع عن هذا الإجراء.",
@@ -52,20 +85,63 @@
     "inputVat": "ضريبة المدخلات (المشتريات)",
     "netPayable": "صافي المستحق",
     "netRefundable": "صافي القابل للاسترداد",
+    "netPosition": "صافي الموقف",
     "filedDate": "تاريخ التقديم",
     "notFiled": "لم يتم التقديم",
     "recordPayment": "تسجيل الدفع",
     "filterByStatus": "تصفية حسب الحالة",
+    "searchPlaceholder": "البحث برقم الإقرار أو الفترة...",
     "allStatuses": "جميع الحالات",
     "bulkDeleteDescription": "سيتم حذف إقرارات ضريبة القيمة المضافة المسودة فقط.",
     "bulkFileDescription": "سيتم تقديم إقرارات ضريبة القيمة المضافة المسودة. سيؤدي ذلك إلى قفل معاملات الفترة.",
     "itemType": "إقرارات ضريبة القيمة المضافة",
+    "summary": {
+      "totalOutputVat": "إجمالي ضريبة المخرجات",
+      "totalInputVat": "إجمالي ضريبة المدخلات",
+      "netVatPosition": "صافي موقف ضريبة القيمة المضافة"
+    },
+    "statusFlow": {
+      "draft": "مسودة",
+      "calculated": "محسوب",
+      "submitted": "مقدم",
+      "filed": "مقدم ومدفوع"
+    },
+    "detail": {
+      "overview": "نظرة عامة",
+      "breakdown": "التفاصيل",
+      "payment": "الدفع",
+      "returnInfo": "معلومات الإقرار",
+      "returnNumber": "رقم الإقرار",
+      "period": "الفترة",
+      "status": "الحالة",
+      "createdDate": "تاريخ الإنشاء",
+      "submittedDate": "تاريخ التقديم",
+      "filedDate": "تاريخ الإيداع",
+      "dueDate": "تاريخ الاستحقاق",
+      "noDueDate": "غير محدد",
+      "salesBreakdown": "المبيعات (ضريبة المخرجات)",
+      "purchasesBreakdown": "المشتريات (ضريبة المدخلات)",
+      "totalSales": "إجمالي المبيعات",
+      "totalPurchases": "إجمالي المشتريات",
+      "invoiceCount": "من {count} فاتورة",
+      "billCount": "من {count} فاتورة ومصروف",
+      "paymentDetails": "تفاصيل الدفع",
+      "noPayment": "لم يتم تسجيل أي دفع بعد",
+      "paymentAmount": "المبلغ المدفوع",
+      "paymentDate": "تاريخ الدفع",
+      "paymentReference": "المرجع",
+      "paymentAccount": "دفع من",
+      "journalEntry": "تم إنشاء قيد يومية",
+      "journalEntryDesc": "قيد مزدوج: مدين ضريبة القيمة المضافة المستحقة / دائن البنك"
+    },
     "table": {
+      "returnNumber": "رقم الإقرار",
       "period": "الفترة",
       "outputVat": "ضريبة المخرجات",
       "inputVat": "ضريبة المدخلات",
       "netPayable": "صافي المستحق",
-      "status": "الحالة"
+      "status": "الحالة",
+      "dueDate": "تاريخ الاستحقاق"
     }
   },
   "generate": {
@@ -74,6 +150,7 @@
     "periodSelection": "اختيار الفترة",
     "periodDescription": "اختر الفترة لحساب إقرار ضريبة القيمة المضافة",
     "quickSelectQuarter": "اختيار سريع للربع",
+    "quickSelectMonth": "اختيار سريع للشهر",
     "startDate": "تاريخ البدء",
     "endDate": "تاريخ الانتهاء",
     "calculationNote": "سيحسب النظام ضريبة المخرجات من فواتير المبيعات وإشعارات الائتمان، وضريبة المدخلات من فواتير المشتريات والمصروفات ضمن هذه الفترة.",
@@ -84,9 +161,10 @@
   },
   "payments": {
     "title": "مدفوعات ضريبة القيمة المضافة",
-    "description": "عرض المدفوعات لإقرارات ضريبة القيمة المضافة",
-    "paymentsTitle": "مدفوعات ضريبة القيمة المضافة",
-    "paymentsDescription": "يتم تسجيل المدفوعات مباشرة من إقرارات ضريبة القيمة المضافة المقدمة. انتقل إلى إقرار مقدم لتسجيل الدفع.",
+    "description": "تتبع المدفوعات لإقرارات ضريبة القيمة المضافة",
+    "allPayments": "جميع مدفوعات ضريبة القيمة المضافة",
+    "noPayments": "لم يتم تسجيل أي مدفوعات بعد",
+    "noPaymentsDesc": "يتم تسجيل المدفوعات عند تقديم إقرار ضريبة القيمة المضافة ودفعه.",
     "viewReturns": "عرض إقرارات ضريبة القيمة المضافة",
     "recordTitle": "تسجيل دفع ضريبة القيمة المضافة",
     "recordDescription": "سجل الدفع المقدم لهذا الإقرار",
@@ -97,6 +175,18 @@
     "recordButton": "تسجيل الدفع",
     "recording": "جاري التسجيل...",
     "recordSuccess": "تم تسجيل الدفع بنجاح",
-    "recordFail": "فشل تسجيل الدفع"
+    "recordFail": "فشل تسجيل الدفع",
+    "summary": {
+      "totalPaid": "إجمالي ضريبة القيمة المضافة المدفوعة",
+      "paymentsCount": "إجمالي المدفوعات",
+      "latestPayment": "آخر دفعة"
+    },
+    "table": {
+      "returnNumber": "رقم الإقرار",
+      "period": "الفترة",
+      "amount": "المبلغ",
+      "date": "التاريخ",
+      "reference": "المرجع"
+    }
   }
 }

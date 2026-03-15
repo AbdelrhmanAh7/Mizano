@@ -16,6 +16,7 @@ import {
 import { LanguageSwitcher } from './language-switcher';
 import { NotificationPanel } from './notification-panel';
 import { useTourStore } from '@/lib/stores/use-tour-store';
+import { RunningTimerWidget } from '@/components/projects/running-timer-widget';
 
 interface HeaderProps {
   sessionUser?: { firstName: string; lastName: string };
@@ -45,7 +46,7 @@ export function Header({ sessionUser }: HeaderProps) {
   return (
     <header
       role="banner"
-      className="bg-white dark:bg-card border-b border-gray-200 dark:border-border px-6 py-4"
+      className="bg-white dark:bg-card border-b border-gray-200 dark:border-border px-6 py-4 ps-14 lg:ps-6"
     >
       <div className="flex items-center justify-between">
         <div>
@@ -68,6 +69,7 @@ export function Header({ sessionUser }: HeaderProps) {
             </kbd>
           </Button>
 
+          <RunningTimerWidget />
           <LanguageSwitcher />
 
           {getTourId() && (

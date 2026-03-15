@@ -15,7 +15,7 @@ export class PaginationDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(500)
   limit?: number = 20;
 
   @ApiProperty({ required: false })
@@ -32,4 +32,9 @@ export class PaginationDto {
   @IsOptional()
   @IsIn(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc' = 'desc';
+
+  @ApiProperty({ required: false, description: 'Filter by resource type (e.g. ASSET, GOODS)' })
+  @IsOptional()
+  @IsString()
+  type?: string;
 }

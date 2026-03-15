@@ -45,6 +45,7 @@
       "bomPlaceholder": "اختر قائمة المواد",
       "quantity": "الكمية",
       "plannedStartDate": "تاريخ البداية المخطط",
+      "plannedEndDate": "تاريخ النهاية المخطط",
       "notes": "ملاحظات",
       "notesPlaceholder": "أدخل الملاحظات"
     },

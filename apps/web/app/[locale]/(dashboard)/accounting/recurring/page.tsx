@@ -2,7 +2,19 @@
 
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { Plus, RefreshCw, Eye, Edit, Trash2, Play, Pause, Calendar } from 'lucide-react';
+import {
+  Plus,
+  RefreshCw,
+  Eye,
+  Edit,
+  Trash2,
+  Play,
+  Pause,
+  Calendar,
+  Activity,
+  Clock,
+  CheckCircle,
+} from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +49,8 @@ import {
   useRecurringProfiles,
   useDeleteRecurringProfile,
   useToggleRecurringProfile,
+  useExecuteRecurringProfile,
+  useRecurringProfileStatistics,
   RecurringProfile,
   getFrequencyLabel,
 } from '@/lib/hooks/use-recurring-profiles';
@@ -64,6 +78,8 @@ function RecurringProfilesPageContent() {
   });
   const deleteProfile = useDeleteRecurringProfile();
   const toggleProfile = useToggleRecurringProfile();
+  const executeProfile = useExecuteRecurringProfile();
+  const { data: statistics } = useRecurringProfileStatistics();
 
   const profiles = profilesData?.data || [];
   const meta = profilesData?.meta;
@@ -94,6 +110,18 @@ function RecurringProfilesPageContent() {
       }
       setDeleteDialogOpen(false);
       setProfileToDelete(null);
+    }
+  };
+
+  const handleExecute = async (profile: RecurringProfile) => {
+    try {
+      await executeProfile.mutateAsync(profile.id);
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to execute recurring profile.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -211,6 +239,10 @@ function RecurringProfilesPageContent() {
                       Edit
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExecute(profile)}>
+                    <Play className="mr-2 h-4 w-4" />
+                    Execute Now
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleToggle(profile)}>
                     {profile.isActive ? (
                       <>
@@ -258,6 +290,50 @@ function RecurringProfilesPageContent() {
           )}
         </div>
       </div>
+
+      {/* Statistics Cards */}
+      {statistics && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Profiles</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{statistics.total ?? 0}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{statistics.active ?? 0}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Paused</CardTitle>
+              <Pause className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{statistics.paused ?? 0}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Due This Week</CardTitle>
+              <Clock className="h-4 w-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">
+                {statistics.dueThisWeek ?? 0}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Filters */}
       <Card>

@@ -1,13 +1,38 @@
 {
   "title": "إدارة العلاقات",
-  "description": "إدارة العملاء المحتملين والصفقات",
+  "description": "إدارة العملاء المحتملين والصفقات وعلاقات العملاء",
+  "hub": {
+    "quickActions": "إجراءات سريعة",
+    "newLead": "عميل محتمل جديد",
+    "newDeal": "صفقة جديدة",
+    "viewPipeline": "عرض خط الأنابيب",
+    "stats": {
+      "totalLeads": "إجمالي العملاء المحتملين",
+      "totalLeadsDesc": "{qualified} مؤهل، {new} جديد",
+      "activeDeals": "الصفقات النشطة",
+      "activeDealsDesc": "في خط الأنابيب",
+      "pipelineValue": "قيمة خط الأنابيب",
+      "pipelineValueDesc": "المرجح: {weighted}",
+      "winRate": "معدل النجاح",
+      "winRateDesc": "من الصفقات المغلقة"
+    },
+    "recentActivity": "النشاط الأخير",
+    "noActivity": "لا يوجد نشاط حديث",
+    "leadsBySource": "العملاء المحتملون حسب المصدر",
+    "noLeads": "لا يوجد عملاء محتملون بعد",
+    "dealsByStage": "الصفقات حسب المرحلة",
+    "noDeals": "لا توجد صفقات بعد",
+    "dealsInStage": "{count} صفقات"
+  },
   "leads": {
     "title": "العملاء المحتملون",
+    "description": "تتبع وإدارة العملاء المحتملين",
     "newLead": "عميل محتمل جديد",
     "editLead": "تعديل العميل المحتمل",
     "deleteLead": "حذف العميل المحتمل",
     "leadDetails": "تفاصيل العميل المحتمل",
     "convertToDeal": "تحويل إلى صفقة",
+    "convertToCustomer": "تحويل إلى عميل",
     "form": {
       "name": "الاسم",
       "namePlaceholder": "أدخل اسم العميل المحتمل",
@@ -27,6 +52,7 @@
       "new": "جديد",
       "contacted": "تم التواصل",
       "qualified": "مؤهل",
+      "unqualified": "غير مؤهل",
       "junk": "غير مهتم"
     },
     "sources": {
@@ -35,6 +61,7 @@
       "googleAds": "إعلانات جوجل",
       "referral": "إحالة",
       "coldCall": "اتصال بارد",
+      "tradeShow": "معرض تجاري",
       "other": "أخرى"
     },
     "table": {
@@ -42,20 +69,26 @@
       "company": "الشركة",
       "source": "المصدر",
       "assignedTo": "المسؤول",
-      "status": "الحالة"
+      "status": "الحالة",
+      "score": "النقاط"
     },
     "empty": {
       "title": "لا يوجد عملاء محتملون بعد",
-      "description": "أضف أول عميل محتمل"
+      "description": "أضف أول عميل محتمل لبدء بناء خط الأنابيب"
     }
   },
   "deals": {
     "title": "الصفقات",
+    "description": "إدارة الصفقات وتتبع الإيرادات",
     "newDeal": "صفقة جديدة",
     "editDeal": "تعديل الصفقة",
     "deleteDeal": "حذف الصفقة",
     "dealDetails": "تفاصيل الصفقة",
     "convertToCustomer": "تحويل إلى عميل",
+    "markAsWon": "تحديد كناجحة",
+    "markAsLost": "تحديد كخاسرة",
+    "kanbanView": "كانبان",
+    "tableView": "جدول",
     "form": {
       "name": "اسم الصفقة",
       "namePlaceholder": "أدخل اسم الصفقة",
@@ -65,6 +98,7 @@
       "customerPlaceholder": "اختر العميل (اختياري)",
       "stage": "المرحلة",
       "value": "قيمة الصفقة",
+      "probability": "الاحتمال",
       "expectedCloseDate": "تاريخ الإغلاق المتوقع",
       "notes": "ملاحظات",
       "notesPlaceholder": "أدخل الملاحظات",
@@ -83,17 +117,32 @@
       "name": "الاسم",
       "customer": "العميل",
       "value": "القيمة",
+      "probability": "الاحتمال",
       "expectedClose": "الإغلاق المتوقع",
       "stage": "المرحلة"
     },
     "pipeline": {
       "title": "خط أنابيب الصفقات",
       "totalValue": "إجمالي القيمة",
-      "dealCount": "{count} صفقات"
+      "weightedValue": "القيمة المرجحة",
+      "dealCount": "{count} صفقات",
+      "totalDeals": "إجمالي الصفقات",
+      "conversionRate": "معدل التحويل"
     },
     "empty": {
       "title": "لا توجد صفقات بعد",
-      "description": "أنشئ أول صفقة"
+      "description": "أنشئ أول صفقة لبدء تتبع الإيرادات"
+    }
+  },
+  "activities": {
+    "title": "الأنشطة",
+    "logActivity": "تسجيل نشاط",
+    "types": {
+      "call": "مكالمة",
+      "email": "بريد إلكتروني",
+      "meeting": "اجتماع",
+      "note": "ملاحظة",
+      "task": "مهمة"
     }
   }
 }

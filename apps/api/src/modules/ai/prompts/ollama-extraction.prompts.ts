@@ -2,9 +2,10 @@
  * Prompts for Ollama-based document extraction (invoice/bill/receipt).
  */
 
-export const OLLAMA_EXTRACTION_SYSTEM_PROMPT = `You are a document data extraction assistant. You extract structured data from invoices, bills, and receipts. Return ONLY valid JSON with no explanation.`;
+export const OLLAMA_EXTRACTION_SYSTEM_PROMPT = `You are a document data extraction assistant. You extract structured data from invoices, bills, and receipts. Return ONLY valid JSON with no explanation. Do NOT think or reason — output the JSON immediately.`;
 
-export const OLLAMA_VISION_PROMPT = `Extract all data from this document image. Return a JSON object with these fields:
+export const OLLAMA_VISION_PROMPT = `/no_think
+Extract all data from this document image. Return ONLY a JSON object with these fields:
 
 {
   "vendorName": "company/vendor name or null",
@@ -22,8 +23,9 @@ export const OLLAMA_VISION_PROMPT = `Extract all data from this document image. 
   "currency": "3-letter currency code or null",
   "paymentTerms": "payment terms or null",
   "notes": "any notes or null",
+  "documentCategory": "INVOICE | RECEIPT | PURCHASE_ORDER | CONTRACT | TAX_DOCUMENT | BANK_STATEMENT | PAYSLIP | OTHER",
   "lineItems": [
-    { "description": "item description", "quantity": 1, "unitPrice": 0.00, "total": 0.00 }
+    { "description": "item description", "quantity": 1, "unitPrice": 0.00, "taxAmount": 0.00, "total": 0.00 }
   ],
   "confidence": {
     "overall": 0.85,
@@ -47,13 +49,16 @@ Rules:
 - Dates must be YYYY-MM-DD format
 - Confidence values should be between 0.0 and 1.0
 - Extract ALL line items visible in the document
-- Support both English and Arabic documents`;
+- taxAmount is the actual tax monetary amount for this line item (e.g. 5.60), use 0 if not shown
+- Support both English and Arabic documents
+- documentCategory must be one of: INVOICE, RECEIPT, PURCHASE_ORDER, CONTRACT, TAX_DOCUMENT, BANK_STATEMENT, PAYSLIP, OTHER`;
 
 /**
  * Build a prompt for extracting data from raw text (PDF text extraction).
  */
 export function buildTextExtractionPrompt(rawText: string): string {
-  return `Extract structured data from this document text. Return a JSON object with these fields:
+  return `/no_think
+Extract structured data from this document text. Return ONLY a JSON object with these fields:
 
 {
   "vendorName": "company/vendor name or null",
@@ -71,8 +76,9 @@ export function buildTextExtractionPrompt(rawText: string): string {
   "currency": "3-letter currency code or null",
   "paymentTerms": "payment terms or null",
   "notes": "any notes or null",
+  "documentCategory": "INVOICE | RECEIPT | PURCHASE_ORDER | CONTRACT | TAX_DOCUMENT | BANK_STATEMENT | PAYSLIP | OTHER",
   "lineItems": [
-    { "description": "item description", "quantity": 1, "unitPrice": 0.00, "total": 0.00 }
+    { "description": "item description", "quantity": 1, "unitPrice": 0.00, "taxAmount": 0.00, "total": 0.00 }
   ],
   "confidence": {
     "overall": 0.85,
@@ -95,6 +101,8 @@ Rules:
 - Use 0.00 for numeric fields you cannot determine
 - Dates must be YYYY-MM-DD format
 - Confidence values should be between 0.0 and 1.0
+- taxAmount is the actual tax monetary amount for this line item (e.g. 5.60), use 0 if not shown
+- documentCategory must be one of: INVOICE, RECEIPT, PURCHASE_ORDER, CONTRACT, TAX_DOCUMENT, BANK_STATEMENT, PAYSLIP, OTHER
 
 --- DOCUMENT TEXT ---
 ${rawText}`;

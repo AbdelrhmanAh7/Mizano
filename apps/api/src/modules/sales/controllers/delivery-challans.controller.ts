@@ -48,6 +48,21 @@ export class DeliveryChallansController {
     return this.deliveryChallansService.findAll(orgId, query);
   }
 
+  // Bulk Operations
+  @Post('bulk-delete')
+  @Permissions('sales.delete')
+  @ApiOperation({ summary: 'Bulk delete draft delivery challans' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.deliveryChallansService.bulkDelete(orgId, dto.ids);
+  }
+
+  @Post('bulk-issue')
+  @Permissions('sales.edit')
+  @ApiOperation({ summary: 'Bulk issue draft delivery challans' })
+  bulkIssue(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.deliveryChallansService.bulkIssue(orgId, dto.ids);
+  }
+
   @Get(':id')
   @Permissions('sales.view')
   @ApiOperation({ summary: 'Get delivery challan by ID' })

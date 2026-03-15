@@ -6,20 +6,16 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import {
-  CacheResponse,
-  CacheTTL,
-  CurrentOrg,
-  InvalidateCache,
-  Permissions,
-} from '../../../common/decorators';
+import { CurrentOrg, InvalidateCache, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { BankAccountQueryDto } from '../dto/bank-account-query.dto';
 import { BankAccountsService } from '../services/bank-accounts.service';
 import { CreateBankAccountDto } from '../dto/create-bank-account.dto';
 import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
@@ -41,10 +37,20 @@ export class BankAccountsController {
 
   @Get()
   @Permissions('banking.view')
-  @CacheResponse('bank-accounts:list')
-  @CacheTTL(120)
-  findAll(@CurrentOrg() orgId: string) {
-    return this.bankAccountsService.findAll(orgId);
+  findAll(@CurrentOrg() orgId: string, @Query() query: BankAccountQueryDto) {
+    return this.bankAccountsService.findAll(orgId, query);
+  }
+
+  @Get('stats')
+  @Permissions('banking.view')
+  getDashboardStats(@CurrentOrg() orgId: string) {
+    return this.bankAccountsService.getDashboardStats(orgId);
+  }
+
+  @Get(':id/balance-history')
+  @Permissions('banking.view')
+  getBalanceHistory(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.bankAccountsService.getBalanceHistory(orgId, id);
   }
 
   @Get(':id')

@@ -12,6 +12,21 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/components/ui/use-toast';
 import { useGenerateVATReturn } from '@/lib/hooks/use-tax';
 
+const MONTH_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
 export default function GenerateVATReturnPage() {
   const t = useTranslations('tax');
   const tCommon = useTranslations('common');
@@ -20,8 +35,9 @@ export default function GenerateVATReturnPage() {
   const generateReturn = useGenerateVATReturn();
 
   const now = new Date();
-  const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
-  const quarterEnd = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 + 3, 0);
+  const currentYear = now.getFullYear();
+  const quarterStart = new Date(currentYear, Math.floor(now.getMonth() / 3) * 3, 1);
+  const quarterEnd = new Date(currentYear, Math.floor(now.getMonth() / 3) * 3 + 3, 0);
 
   const [startDate, setStartDate] = useState(quarterStart.toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(quarterEnd.toISOString().split('T')[0]);
@@ -48,9 +64,15 @@ export default function GenerateVATReturnPage() {
   };
 
   const setQuarter = (quarter: number) => {
-    const year = now.getFullYear();
-    const start = new Date(year, (quarter - 1) * 3, 1);
-    const end = new Date(year, quarter * 3, 0);
+    const start = new Date(currentYear, (quarter - 1) * 3, 1);
+    const end = new Date(currentYear, quarter * 3, 0);
+    setStartDate(start.toISOString().split('T')[0]);
+    setEndDate(end.toISOString().split('T')[0]);
+  };
+
+  const setMonth = (monthIndex: number) => {
+    const start = new Date(currentYear, monthIndex, 1);
+    const end = new Date(currentYear, monthIndex + 1, 0);
     setStartDate(start.toISOString().split('T')[0]);
     setEndDate(end.toISOString().split('T')[0]);
   };
@@ -82,7 +104,25 @@ export default function GenerateVATReturnPage() {
             <div className="flex gap-2">
               {[1, 2, 3, 4].map((q) => (
                 <Button key={q} variant="outline" size="sm" onClick={() => setQuarter(q)}>
-                  Q{q} {now.getFullYear()}
+                  Q{q} {currentYear}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Month Selection */}
+          <div className="space-y-2">
+            <Label>{t('generate.quickSelectMonth')}</Label>
+            <div className="flex flex-wrap gap-2">
+              {MONTH_NAMES.map((name, idx) => (
+                <Button
+                  key={idx}
+                  variant="outline"
+                  size="sm"
+                  className="min-w-[4rem]"
+                  onClick={() => setMonth(idx)}
+                >
+                  {name}
                 </Button>
               ))}
             </div>

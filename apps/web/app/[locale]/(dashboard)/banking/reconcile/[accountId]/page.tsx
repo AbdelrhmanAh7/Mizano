@@ -106,7 +106,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              {t('reconciliation.reconcileAccount', { name: account.accountName })}
+              {t('reconciliation.reconcileAccount', { name: account.name })}
             </h1>
             <p className="text-muted-foreground">{t('reconciliation.matchDescription')}</p>
           </div>
@@ -121,7 +121,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">{t('reconciliation.bookBalance')}</p>
-            <p className="text-2xl font-bold font-mono">{formatCurrency(account.currentBalance)}</p>
+            <p className="text-2xl font-bold font-mono">{formatCurrency(account.systemBalance)}</p>
           </CardContent>
         </Card>
         <Card>

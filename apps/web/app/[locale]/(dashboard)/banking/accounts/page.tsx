@@ -46,7 +46,7 @@ import { useTranslations } from 'next-intl';
 
 function BankAccountsPageContent() {
   const t = useTranslations('banking');
-  const tableParams = useTableParams({ defaultSortBy: 'accountName' });
+  const tableParams = useTableParams({ defaultSortBy: 'name' });
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -70,17 +70,17 @@ function BankAccountsPageContent() {
   // Calculate totals
   const totalBalance = accounts.reduce((sum, acc) => {
     const balance =
-      typeof acc.currentBalance === 'string' ? parseFloat(acc.currentBalance) : acc.currentBalance;
+      typeof acc.systemBalance === 'string' ? parseFloat(acc.systemBalance) : acc.systemBalance;
     return sum + (balance || 0);
   }, 0);
 
   const columns: ColumnDef<BankAccount>[] = [
     {
-      accessorKey: 'accountName',
+      accessorKey: 'name',
       header: () => (
         <SortableHeader
           label={t('accounts.table.name')}
-          columnId="accountName"
+          columnId="name"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
           onSort={tableParams.setSort}
@@ -92,20 +92,17 @@ function BankAccountsPageContent() {
             href={`/banking/accounts/${row.original.id}`}
             className="font-medium hover:text-blue-600 hover:underline"
           >
-            {row.original.accountName}
+            {row.original.name}
           </Link>
-          {row.original.bankName && (
-            <p className="text-sm text-muted-foreground">{row.original.bankName}</p>
-          )}
         </div>
       ),
     },
     {
-      accessorKey: 'accountType',
+      accessorKey: 'type',
       header: t('accounts.table.type'),
       cell: ({ row }) => (
-        <Badge variant="outline" className={getAccountTypeColor(row.original.accountType)}>
-          {getAccountTypeLabel(row.original.accountType)}
+        <Badge variant="outline" className={getAccountTypeColor(row.original.type)}>
+          {getAccountTypeLabel(row.original.type)}
         </Badge>
       ),
     },
@@ -117,11 +114,11 @@ function BankAccountsPageContent() {
         row.original.accountNumber ? `.... ${row.original.accountNumber.slice(-4)}` : '-',
     },
     {
-      accessorKey: 'currentBalance',
+      accessorKey: 'systemBalance',
       header: () => (
         <SortableHeader
           label={t('accounts.table.balance')}
-          columnId="currentBalance"
+          columnId="systemBalance"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
           onSort={tableParams.setSort}
@@ -130,9 +127,9 @@ function BankAccountsPageContent() {
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => {
         const balance =
-          typeof row.original.currentBalance === 'string'
-            ? parseFloat(row.original.currentBalance)
-            : row.original.currentBalance;
+          typeof row.original.systemBalance === 'string'
+            ? parseFloat(row.original.systemBalance)
+            : row.original.systemBalance;
         return (
           <span
             className={cn('font-bold font-mono', balance < 0 ? 'text-red-600' : 'text-green-600')}
@@ -233,11 +230,9 @@ function BankAccountsPageContent() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="CHECKING">Checking</SelectItem>
-            <SelectItem value="SAVINGS">Savings</SelectItem>
+            <SelectItem value="BANK">Bank Account</SelectItem>
             <SelectItem value="CREDIT_CARD">Credit Card</SelectItem>
-            <SelectItem value="CASH">Cash</SelectItem>
-            <SelectItem value="OTHER">Other</SelectItem>
+            <SelectItem value="PETTY_CASH">Petty Cash</SelectItem>
           </SelectContent>
         </Select>
       </div>

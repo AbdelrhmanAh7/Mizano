@@ -30,6 +30,7 @@ export interface IntakeLineItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  taxAmount: number;
   total: number;
 }
 
@@ -42,8 +43,12 @@ export interface DocumentIntakeResult {
     total: number | null;
     subtotal: number | null;
     tax: number | null;
+    discount: number | null;
     documentNumber: string | null;
     vendorName: string | null;
+    vendorTaxId: string | null;
+    currency: string | null;
+    paymentTerms: string | null;
     customerName: string | null;
     lineItems: IntakeLineItem[];
   };
@@ -97,6 +102,8 @@ export interface ConfirmIntakeData {
   date: string;
   dueDate: string;
   documentNumber?: string;
+  reference?: string;
+  currencyCode?: string;
   lines: ConfirmIntakeLineData[];
   notes?: string;
   projectId?: string;

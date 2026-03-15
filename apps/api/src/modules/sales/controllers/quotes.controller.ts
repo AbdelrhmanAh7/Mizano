@@ -46,6 +46,28 @@ export class QuotesController {
     return this.quotesService.findAllCursor(orgId, query);
   }
 
+  // Bulk Operations
+  @Post('bulk-delete')
+  @Permissions('sales.delete')
+  @ApiOperation({ summary: 'Bulk delete draft quotes' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.quotesService.bulkDelete(orgId, dto.ids);
+  }
+
+  @Post('bulk-send')
+  @Permissions('sales.edit')
+  @ApiOperation({ summary: 'Bulk send quotes' })
+  bulkSend(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.quotesService.bulkSend(orgId, dto.ids);
+  }
+
+  @Post('bulk-decline')
+  @Permissions('sales.edit')
+  @ApiOperation({ summary: 'Bulk decline quotes' })
+  bulkDecline(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.quotesService.bulkDecline(orgId, dto.ids);
+  }
+
   @Get(':id')
   @Permissions('sales.view')
   findOne(@CurrentOrg() orgId: string, @Param('id') id: string) {
@@ -83,6 +105,13 @@ export class QuotesController {
     return this.quotesService.decline(orgId, id);
   }
 
+  @Post(':id/clone')
+  @Permissions('sales.create')
+  @ApiOperation({ summary: 'Clone a quote as a new draft' })
+  clone(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.quotesService.clone(orgId, id);
+  }
+
   @Post(':id/convert-to-invoice')
   @Permissions('sales.create')
   @ApiOperation({ summary: 'Convert quote to invoice' })
@@ -94,27 +123,5 @@ export class QuotesController {
   @Permissions('sales.delete')
   remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.quotesService.remove(orgId, id);
-  }
-
-  // Bulk Operations
-  @Post('bulk-delete')
-  @Permissions('sales.delete')
-  @ApiOperation({ summary: 'Bulk delete draft quotes' })
-  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
-    return this.quotesService.bulkDelete(orgId, dto.ids);
-  }
-
-  @Post('bulk-send')
-  @Permissions('sales.edit')
-  @ApiOperation({ summary: 'Bulk send quotes' })
-  bulkSend(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
-    return this.quotesService.bulkSend(orgId, dto.ids);
-  }
-
-  @Post('bulk-decline')
-  @Permissions('sales.edit')
-  @ApiOperation({ summary: 'Bulk decline quotes' })
-  bulkDecline(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
-    return this.quotesService.bulkDecline(orgId, dto.ids);
   }
 }

@@ -141,8 +141,20 @@ export class JournalsService {
     };
   }
 
+  private static readonly ALLOWED_SORT_FIELDS = [
+    'id',
+    'journalNumber',
+    'date',
+    'createdAt',
+    'updatedAt',
+    'isPosted',
+  ];
+
   async findAllCursor(organizationId: string, query: JournalCursorQueryDto) {
-    const { cursor, take, search, sortBy = 'date', sortOrder = 'desc', dateFrom, dateTo } = query;
+    const { cursor, take, search, sortOrder = 'desc', dateFrom, dateTo } = query;
+    const sortBy = JournalsService.ALLOWED_SORT_FIELDS.includes(query.sortBy || '')
+      ? query.sortBy!
+      : 'date';
     const where: Prisma.JournalWhereInput = { organizationId, deletedAt: null };
     if (search) {
       where.OR = [
@@ -429,6 +441,48 @@ export class JournalsService {
         `This period is locked. Transactions before ${lockDate.toISOString().split('T')[0]} cannot be modified.`,
       );
     }
+  }
+
+  async post(organizationId: string, id: string) {
+    const journal = await this.prisma.journal.findFirst({
+      where: { id, organizationId, deletedAt: null },
+      include: {
+        lines: {
+          include: {
+            account: {
+              select: { id: true, code: true, name: true, type: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!journal) {
+      throw new NotFoundException('Journal not found');
+    }
+
+    if (journal.isPosted) {
+      throw new BadRequestException('Journal is already posted');
+    }
+
+    // Check lock date
+    await this.checkLockDate(organizationId, journal.date);
+
+    const updatedJournal = await this.prisma.journal.update({
+      where: { id },
+      data: { isPosted: true },
+      include: {
+        lines: {
+          include: {
+            account: {
+              select: { id: true, code: true, name: true, type: true },
+            },
+          },
+        },
+      },
+    });
+
+    return updatedJournal;
   }
 
   // === Bulk Operations ===

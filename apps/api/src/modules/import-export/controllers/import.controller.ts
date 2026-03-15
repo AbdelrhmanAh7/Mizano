@@ -54,7 +54,9 @@ export class ImportController {
   @ApiOperation({ summary: 'Get field definitions for an entity type' })
   @ApiParam({ name: 'entityType', enum: ImportEntityType })
   @ApiResponse({ status: 200, description: 'Field definitions' })
-  getFieldDefinitions(@Param('entityType') entityType: ImportEntityType) {
+  getFieldDefinitions(@Param('entityType') rawEntityType: string) {
+    // Normalize hyphens to underscores (e.g. 'credit-notes' → 'credit_notes')
+    const entityType = rawEntityType.replace(/-/g, '_') as ImportEntityType;
     if (!Object.values(ImportEntityType).includes(entityType)) {
       throw new BadRequestException('Invalid entity type');
     }

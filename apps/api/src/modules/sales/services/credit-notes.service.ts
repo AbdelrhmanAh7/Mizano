@@ -205,6 +205,23 @@ export class CreditNotesService {
     return updated;
   }
 
+  // === Bulk Operations ===
+
+  async bulkDelete(
+    organizationId: string,
+    ids: string[],
+  ): Promise<{ deleted: number; total: number }> {
+    const result = await this.prisma.creditNote.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
   private async generateCreditNoteNumber(organizationId: string): Promise<string> {
     const last = await this.prisma.creditNote.findFirst({
       where: { organizationId },

@@ -2,12 +2,15 @@
 
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Layers, Wrench, ArrowRight } from 'lucide-react';
+import { Layers, Wrench, ArrowRight, Factory, CheckCircle, FileStack } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useManufacturingStats } from '@/lib/hooks/use-manufacturing';
 
 export default function ManufacturingPage() {
   const t = useTranslations('manufacturing');
+  const { data: stats, isLoading: statsLoading } = useManufacturingStats();
 
   const modules = [
     {
@@ -33,6 +36,82 @@ export default function ManufacturingPage() {
         <p className="text-muted-foreground">{t('description')}</p>
       </div>
 
+      {/* Stats Row */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Wrench className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Active Work Orders</p>
+                {statsLoading ? (
+                  <Skeleton className="h-7 w-12 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold">{stats?.active ?? 0}</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gray-100 rounded-lg">
+                <FileStack className="h-5 w-5 text-gray-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Draft Work Orders</p>
+                {statsLoading ? (
+                  <Skeleton className="h-7 w-12 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold">{stats?.draft ?? 0}</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Layers className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Active BOMs</p>
+                {statsLoading ? (
+                  <Skeleton className="h-7 w-12 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold">{stats?.activeBoms ?? 0}</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Completed This Month</p>
+                {statsLoading ? (
+                  <Skeleton className="h-7 w-12 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold">{stats?.completedThisMonth ?? 0}</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Module Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {modules.map((module) => (
           <Card key={module.href} className="hover:shadow-lg transition-shadow">

@@ -343,6 +343,27 @@ export function usePayslip(payslipIdOrPayrollId: string, payslipId?: string) {
   });
 }
 
+// Employee Summary Hooks
+export function useEmployeeCount() {
+  return useQuery({
+    queryKey: ['employees', 'count'],
+    queryFn: async () => {
+      const response = await api.get('/employees/count');
+      return response.data?.data || response.data;
+    },
+  });
+}
+
+export function useDepartmentSummary() {
+  return useQuery({
+    queryKey: ['employees', 'department-summary'],
+    queryFn: async () => {
+      const response = await api.get('/employees/summary');
+      return response.data?.data || response.data;
+    },
+  });
+}
+
 // Department Hook
 export function useDepartments() {
   return useQuery({

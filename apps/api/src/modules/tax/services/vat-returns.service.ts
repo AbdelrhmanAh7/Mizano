@@ -115,6 +115,7 @@ export class VatReturnsService {
     return this.prisma.vATReturn.findMany({
       where,
       orderBy: { startDate: 'desc' },
+      include: { payment: true },
     });
   }
 
@@ -269,6 +270,60 @@ export class VatReturnsService {
       netVAT,
       vatPayable: netVAT > 0 ? netVAT : 0,
       vatRefundable: netVAT < 0 ? Math.abs(netVAT) : 0,
+    };
+  }
+
+  async getDashboardStats(organizationId: string) {
+    const [taxRates, vatReturns, payments] = await Promise.all([
+      this.prisma.taxRate.findMany({
+        where: { organizationId, deletedAt: null },
+        select: { id: true, isActive: true },
+      }),
+      this.prisma.vATReturn.findMany({
+        where: { organizationId, deletedAt: null },
+        select: {
+          id: true,
+          status: true,
+          outputVAT: true,
+          inputVAT: true,
+          netPayable: true,
+          dueDate: true,
+          startDate: true,
+          endDate: true,
+          returnNumber: true,
+        },
+        orderBy: { startDate: 'desc' },
+      }),
+      this.prisma.vATPayment.findMany({
+        where: { organizationId },
+        select: { amount: true },
+      }),
+    ]);
+
+    const activeRates = taxRates.filter((r) => r.isActive).length;
+    const pendingReturns = vatReturns.filter(
+      (r) => r.status === 'DRAFT' || r.status === 'CALCULATED',
+    ).length;
+    const outstandingVAT = vatReturns
+      .filter((r) => r.status !== 'FILED')
+      .reduce((sum, r) => sum + parseFloat(r.netPayable.toString()), 0);
+    const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0);
+
+    const upcomingDeadlines = vatReturns
+      .filter((r) => r.dueDate && r.status !== 'FILED' && new Date(r.dueDate) > new Date())
+      .slice(0, 5);
+
+    const recentReturns = vatReturns.slice(0, 5);
+
+    return {
+      activeRates,
+      totalRates: taxRates.length,
+      pendingReturns,
+      totalReturns: vatReturns.length,
+      outstandingVAT,
+      totalPaid,
+      upcomingDeadlines,
+      recentReturns,
     };
   }
 

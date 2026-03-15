@@ -12,4 +12,24 @@ export class BankTransactionCursorQueryDto extends CursorPaginationDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  amountMin?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  amountMax?: string;
 }

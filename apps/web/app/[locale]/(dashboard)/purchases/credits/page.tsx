@@ -1,6 +1,8 @@
 'use client';
 
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
+import { ImportWizard } from '@/components/import/import-wizard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { vendorCreditsApi } from '@/lib/api';
+import { useBulkAction } from '@/lib/hooks/use-bulk-action';
+import type { ImportEntityType } from '@/lib/hooks/use-import-export';
+import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
   formatCurrency,
@@ -29,15 +35,19 @@ import {
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
-import { Eye, Plus } from 'lucide-react';
+import { Eye, Plus, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function VendorCreditsPageContent() {
   const t = useTranslations('purchases');
+  const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
+  const [importOpen, setImportOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkSelectedRows, setBulkSelectedRows] = useState<VendorCredit[]>([]);
 
   const {
     data: credits,
@@ -46,10 +56,35 @@ function VendorCreditsPageContent() {
     fetchNextPage,
     isFetchingNextPage,
     isLoading,
+    refetch,
   } = useInfiniteVendorCredits({
     ...tableParams.queryParams,
     status: statusFilter !== 'all' ? statusFilter : undefined,
   });
+
+  const canDelete = hasPermission('purchases.delete');
+
+  const bulkDeleteAction = useBulkAction({
+    mutationFn: (ids) => vendorCreditsApi.bulkDelete(ids).then((r) => r.data),
+    queryKeys: [['vendor-credits']],
+    successMessage: '{count} vendor credits deleted',
+  });
+
+  const bulkActions = [
+    ...(canDelete
+      ? [
+          {
+            label: 'Delete',
+            icon: Trash2,
+            variant: 'destructive' as const,
+            onClick: (rows: VendorCredit[]) => {
+              setBulkSelectedRows(rows);
+              setBulkDeleteOpen(true);
+            },
+          },
+        ]
+      : []),
+  ];
 
   const columns: ColumnDef<VendorCredit>[] = [
     {
@@ -162,12 +197,18 @@ function VendorCreditsPageContent() {
           <h1 className="text-3xl font-bold tracking-tight">{t('credits.title')}</h1>
           <p className="text-muted-foreground">{t('credits.pageDescription')}</p>
         </div>
-        <Button asChild>
-          <Link href="/purchases/credits/new">
-            <Plus className="mr-2 h-4 w-4" />
-            {t('credits.newCredit')}
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
+          <Button asChild>
+            <Link href="/purchases/credits/new">
+              <Plus className="mr-2 h-4 w-4" />
+              {t('credits.newCredit')}
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -211,6 +252,8 @@ function VendorCreditsPageContent() {
             onLoadMore={() => fetchNextPage()}
             enableColumnResizing
             tableId="vendor-credits"
+            enableSelection
+            bulkActions={bulkActions}
             emptyMessage={t('credits.noCredits')}
             emptyAction={
               <Button asChild>
@@ -220,6 +263,32 @@ function VendorCreditsPageContent() {
           />
         </CardContent>
       </Card>
+
+      {/* Bulk Action Dialogs */}
+      <BulkActionConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        action="delete"
+        count={bulkSelectedRows.length}
+        itemType="vendor credits"
+        description="Selected vendor credits will be deleted. Credits that have been applied will be skipped."
+        destructive
+        isLoading={bulkDeleteAction.isLoading}
+        onConfirm={async () => {
+          await bulkDeleteAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkDeleteOpen(false);
+          refetch();
+        }}
+      />
+
+      {/* Import Wizard */}
+      <ImportWizard
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        entityType={'vendor_credits' as ImportEntityType}
+        entityLabel="Vendor Credits"
+        onComplete={() => refetch()}
+      />
     </div>
   );
 }

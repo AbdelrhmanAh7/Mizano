@@ -19,11 +19,11 @@ import {
   InvalidateCache,
   Permissions,
 } from '../../../common/decorators';
-import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { BillCursorQueryDto } from '../dto/bill-cursor-query.dto';
+import { BillQueryDto } from '../dto/bill-query.dto';
 import { CheckDuplicateBillDto } from '../dto/check-duplicate-bill.dto';
 import { CreateBillDto } from '../dto/create-bill.dto';
 import { UpdateBillDto } from '../dto/update-bill.dto';
@@ -58,14 +58,14 @@ export class BillsController {
   @CacheTTL(120)
   @HttpCache('short')
   @ApiOperation({ summary: 'Get all bills' })
-  findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: BillQueryDto) {
     return this.billsService.findAll(orgId, query);
   }
 
   @Get('cursor')
   @Permissions('purchases.view')
   @ApiOperation({ summary: 'List bills with cursor-based pagination' })
-  findAllCursor(@CurrentOrg() orgId: string, @Query() query: CursorPaginationDto) {
+  findAllCursor(@CurrentOrg() orgId: string, @Query() query: BillCursorQueryDto) {
     return this.billsService.findAllCursor(orgId, query);
   }
 
@@ -90,6 +90,14 @@ export class BillsController {
   @ApiOperation({ summary: 'Open a draft bill (change status DRAFT → OPEN)' })
   open(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.billsService.open(orgId, id);
+  }
+
+  @Post(':id/clone')
+  @Permissions('purchases.create')
+  @InvalidateCache('bills:*')
+  @ApiOperation({ summary: 'Clone a bill as a new draft' })
+  clone(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.billsService.clone(orgId, id);
   }
 
   @Post(':id/approve')

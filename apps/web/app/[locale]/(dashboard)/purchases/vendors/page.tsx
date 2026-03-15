@@ -1,6 +1,8 @@
 'use client';
 
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
+import { ImportWizard } from '@/components/import/import-wizard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +22,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
+import { vendorsApi } from '@/lib/api';
+import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { useExportAll } from '@/lib/hooks/use-export-all';
+import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
@@ -33,7 +38,7 @@ import {
 import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
 import { useTranslations } from 'next-intl';
-import { Edit, Eye, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Edit, Eye, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
@@ -45,8 +50,11 @@ function VendorsPageContent() {
   const { onExportAll } = useExportAll('vendors', 'vendors');
   const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
 
+  const [importOpen, setImportOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [vendorToDelete, setVendorToDelete] = useState<Vendor | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkSelectedRows, setBulkSelectedRows] = useState<Vendor[]>([]);
 
   const {
     data: vendors,
@@ -64,6 +72,28 @@ function VendorsPageContent() {
   const canCreate = hasPermission('purchases.create');
   const canEdit = hasPermission('purchases.edit');
   const canDelete = hasPermission('purchases.delete');
+
+  const bulkDeleteAction = useBulkAction({
+    mutationFn: (ids) => vendorsApi.bulkDelete(ids).then((r) => r.data),
+    queryKeys: [['vendors']],
+    successMessage: '{count} vendors deleted',
+  });
+
+  const bulkActions = [
+    ...(canDelete
+      ? [
+          {
+            label: 'Delete',
+            icon: Trash2,
+            variant: 'destructive' as const,
+            onClick: (rows: Vendor[]) => {
+              setBulkSelectedRows(rows);
+              setBulkDeleteOpen(true);
+            },
+          },
+        ]
+      : []),
+  ];
 
   const handleDelete = (vendor: Vendor) => {
     setVendorToDelete(vendor);
@@ -203,6 +233,10 @@ function VendorsPageContent() {
           <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
           {canCreate && (
             <Button asChild>
               <Link href="/purchases/vendors/new">
@@ -257,6 +291,7 @@ function VendorsPageContent() {
             enableColumnVisibility
             exportFilename="vendors"
             onExportAll={onExportAll}
+            bulkActions={bulkActions}
             emptyMessage={t('vendors.empty.title')}
             emptyAction={
               canCreate ? (
@@ -271,6 +306,32 @@ function VendorsPageContent() {
           />
         </CardContent>
       </Card>
+
+      {/* Bulk Action Dialogs */}
+      <BulkActionConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        action="delete"
+        count={bulkSelectedRows.length}
+        itemType="vendors"
+        description="Selected vendors will be deleted. Vendors with transactions will be skipped."
+        destructive
+        isLoading={bulkDeleteAction.isLoading}
+        onConfirm={async () => {
+          await bulkDeleteAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkDeleteOpen(false);
+          refetch();
+        }}
+      />
+
+      {/* Import Wizard */}
+      <ImportWizard
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        entityType={'vendors' as ImportEntityType}
+        entityLabel="Vendors"
+        onComplete={() => refetch()}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

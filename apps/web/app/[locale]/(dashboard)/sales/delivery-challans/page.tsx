@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { Plus, FileText, Trash2 } from 'lucide-react';
+import { Plus, FileText, Trash2, Upload } from 'lucide-react';
+import { ImportWizard } from '@/components/import/import-wizard';
+import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +55,7 @@ import {
 export default function DeliveryChallansPage() {
   const t = useTranslations('sales');
   const [search, setSearch] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ChallanStatus | ''>('');
   const [typeFilter, setTypeFilter] = useState<ChallanType | ''>('');
 
@@ -82,12 +85,18 @@ export default function DeliveryChallansPage() {
           <h1 className="text-3xl font-bold tracking-tight">{t('deliveryChallans.title')}</h1>
           <p className="text-muted-foreground">{t('deliveryChallans.description')}</p>
         </div>
-        <Button asChild>
-          <Link href="/sales/delivery-challans/new">
-            <Plus className="mr-2 h-4 w-4" />
-            {t('deliveryChallans.newChallan')}
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
+          <Button asChild>
+            <Link href="/sales/delivery-challans/new">
+              <Plus className="mr-2 h-4 w-4" />
+              {t('deliveryChallans.newChallan')}
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex gap-4">
@@ -220,6 +229,17 @@ export default function DeliveryChallansPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Import Wizard */}
+      <ImportWizard
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        entityType={'delivery_challans' as ImportEntityType}
+        entityLabel="Delivery Challans"
+        onComplete={() => {
+          // Refetch handled by query invalidation
+        }}
+      />
     </div>
   );
 }

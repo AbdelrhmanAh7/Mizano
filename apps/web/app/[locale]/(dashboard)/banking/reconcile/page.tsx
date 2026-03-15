@@ -55,9 +55,9 @@ export default function ReconcilePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {accounts.map((account) => {
             const currentBalance =
-              typeof account.currentBalance === 'string'
-                ? parseFloat(account.currentBalance)
-                : account.currentBalance;
+              typeof account.systemBalance === 'string'
+                ? parseFloat(account.systemBalance)
+                : account.systemBalance;
 
             const bankBalance =
               typeof account.bankBalance === 'string'
@@ -72,12 +72,10 @@ export default function ReconcilePage() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div
-                        className={cn('p-2 rounded-lg', getAccountTypeColor(account.accountType))}
-                      >
+                      <div className={cn('p-2 rounded-lg', getAccountTypeColor(account.type))}>
                         <Landmark className="h-4 w-4" />
                       </div>
-                      <CardTitle className="text-base">{account.accountName}</CardTitle>
+                      <CardTitle className="text-base">{account.name}</CardTitle>
                     </div>
                     {needsReconciliation && (
                       <Badge variant="outline" className="bg-yellow-100 text-yellow-800">

@@ -31,6 +31,8 @@ import {
   useRecurringProfile,
   useDeleteRecurringProfile,
   useToggleRecurringProfile,
+  useExecuteRecurringProfile,
+  useRecurringProfileExecutions,
   getFrequencyLabel,
 } from '@/lib/hooks/use-recurring-profiles';
 import { formatJournalAmount } from '@/lib/hooks/use-journals';
@@ -51,9 +53,23 @@ export default function RecurringProfileDetailPage() {
   const { data: profile, isLoading } = useRecurringProfile(profileId);
   const deleteProfile = useDeleteRecurringProfile();
   const toggleProfile = useToggleRecurringProfile();
+  const executeProfile = useExecuteRecurringProfile();
+  const { data: executions } = useRecurringProfileExecutions(profileId, 10);
 
   const canEdit = hasPermission('accounting.edit');
   const canDelete = hasPermission('accounting.delete');
+
+  const handleExecute = async () => {
+    try {
+      await executeProfile.mutateAsync(profileId);
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to execute recurring profile.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleToggle = async () => {
     try {
@@ -160,6 +176,10 @@ export default function RecurringProfileDetailPage() {
         <div className="flex items-center gap-2">
           {canEdit && (
             <>
+              <Button variant="outline" onClick={handleExecute}>
+                <Play className="mr-2 h-4 w-4" />
+                Execute Now
+              </Button>
               <Button variant="outline" onClick={handleToggle}>
                 {profile.isActive ? (
                   <>
@@ -298,6 +318,51 @@ export default function RecurringProfileDetailPage() {
               </TableRow>
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      {/* Execution History */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Execution History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {executions && Array.isArray(executions) && executions.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Journal</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {executions.map(
+                  (
+                    exec: {
+                      id: string;
+                      executedAt: string;
+                      journalNumber?: string;
+                      status?: string;
+                    },
+                    index: number,
+                  ) => (
+                    <TableRow key={exec.id || index}>
+                      <TableCell>
+                        {format(new Date(exec.executedAt), 'MMM d, yyyy HH:mm')}
+                      </TableCell>
+                      <TableCell>{exec.journalNumber || '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{exec.status || 'Completed'}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ),
+                )}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-muted-foreground">No executions yet.</p>
+          )}
         </CardContent>
       </Card>
 

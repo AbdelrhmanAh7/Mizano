@@ -101,6 +101,7 @@ export class PaymentPredictionService {
   async predictPaymentDate(
     organizationId: string,
     invoiceId: string,
+    options?: { skipAiEnrichment?: boolean },
   ): Promise<PaymentPrediction | null> {
     // Get invoice with customer
     const invoice = await this.prisma.invoice.findFirst({
@@ -120,56 +121,58 @@ export class PaymentPredictionService {
     // Calculate statistical prediction
     const prediction = this.calculatePrediction(invoice, history);
 
-    // Try Ollama for collection priority recommendation
-    try {
-      const daysToPayArray = history.map((h) => h.daysToPayment);
-      const avgDays = daysToPayArray.length > 0 ? mean(daysToPayArray) : 30;
-      const onTimeCount = history.filter((h) => h.daysAfterDue <= 0).length;
-      const onTimeRate = history.length > 0 ? onTimeCount / history.length : 0;
+    // Try Ollama for collection priority recommendation (skip when called from batch/forecasting)
+    if (!options?.skipAiEnrichment) {
+      try {
+        const daysToPayArray = history.map((h) => h.daysToPayment);
+        const avgDays = daysToPayArray.length > 0 ? mean(daysToPayArray) : 30;
+        const onTimeCount = history.filter((h) => h.daysAfterDue <= 0).length;
+        const onTimeRate = history.length > 0 ? onTimeCount / history.length : 0;
 
-      const today = new Date();
-      const daysOutstanding = Math.floor(
-        (today.getTime() - new Date(invoice.date).getTime()) / (1000 * 60 * 60 * 24),
-      );
+        const today = new Date();
+        const daysOutstanding = Math.floor(
+          (today.getTime() - new Date(invoice.date).getTime()) / (1000 * 60 * 60 * 24),
+        );
 
-      const promptData = buildPaymentPredictionPrompt(
-        {
-          invoice_id: invoice.id,
-          invoice_number: invoice.invoiceNumber,
-          customer_id: invoice.customerId,
-          customer_name: invoice.customer?.name || 'Unknown',
-          amount: Number(invoice.grandTotal),
-          issue_date: new Date(invoice.date).toISOString().split('T')[0],
-          due_date: new Date(invoice.dueDate).toISOString().split('T')[0],
-          days_outstanding: daysOutstanding,
-        },
-        {
-          avg_days_to_pay: avgDays,
-          on_time_payment_rate: onTimeRate,
-          total_invoices: history.length,
-          total_paid: history.length,
-          total_outstanding: Number(invoice.grandTotal),
-          recent_payments: history.slice(0, 5).map((h) => ({
-            invoice_amount: h.amount,
-            days_to_pay: h.daysToPayment,
-            date: h.paidDate.toISOString().split('T')[0],
-          })),
-        },
-      );
+        const promptData = buildPaymentPredictionPrompt(
+          {
+            invoice_id: invoice.id,
+            invoice_number: invoice.invoiceNumber,
+            customer_id: invoice.customerId,
+            customer_name: invoice.customer?.name || 'Unknown',
+            amount: Number(invoice.grandTotal),
+            issue_date: new Date(invoice.date).toISOString().split('T')[0],
+            due_date: new Date(invoice.dueDate).toISOString().split('T')[0],
+            days_outstanding: daysOutstanding,
+          },
+          {
+            avg_days_to_pay: avgDays,
+            on_time_payment_rate: onTimeRate,
+            total_invoices: history.length,
+            total_paid: history.length,
+            total_outstanding: Number(invoice.grandTotal),
+            recent_payments: history.slice(0, 5).map((h) => ({
+              invoice_amount: h.amount,
+              days_to_pay: h.daysToPayment,
+              date: h.paidDate.toISOString().split('T')[0],
+            })),
+          },
+        );
 
-      const ollamaResult = await this.ollamaGateway.infer<PaymentPredictionResponse>(
-        promptData.user,
-        { systemPrompt: promptData.system },
-      );
+        const ollamaResult = await this.ollamaGateway.infer<PaymentPredictionResponse>(
+          promptData.user,
+          { systemPrompt: promptData.system },
+        );
 
-      if (ollamaResult?.data) {
-        prediction.collectionPriority = ollamaResult.data.collection_priority || undefined;
-        prediction.predictionMethod = 'HYBRID';
+        if (ollamaResult?.data) {
+          prediction.collectionPriority = ollamaResult.data.collection_priority || undefined;
+          prediction.predictionMethod = 'HYBRID';
+        }
+      } catch (error) {
+        this.logger.debug(
+          `Ollama collection priority unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
-    } catch (error) {
-      this.logger.debug(
-        `Ollama collection priority unavailable: ${error instanceof Error ? error.message : String(error)}`,
-      );
     }
 
     return prediction;

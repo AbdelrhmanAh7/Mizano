@@ -2,6 +2,8 @@
 
 import { CustomerAIInsights } from '@/components/ai';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
+import { ImportWizard } from '@/components/import/import-wizard';
 import { AutoTourTrigger } from '@/components/tour/auto-tour-trigger';
 import {
   AlertDialog,
@@ -29,12 +31,15 @@ import {
   useDeleteCustomer,
   useInfiniteCustomers,
 } from '@/lib/hooks/use-customers';
+import { customersApi } from '@/lib/api';
+import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { useExportAll } from '@/lib/hooks/use-export-all';
+import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Edit, Eye, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Edit, Eye, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
@@ -47,8 +52,11 @@ function CustomersPageContent() {
   const { onExportAll } = useExportAll('customers', 'customers');
   const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
 
+  const [importOpen, setImportOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkSelectedRows, setBulkSelectedRows] = useState<Customer[]>([]);
 
   const {
     data: customers,
@@ -66,6 +74,28 @@ function CustomersPageContent() {
   const canCreate = hasPermission('sales.create');
   const canEdit = hasPermission('sales.edit');
   const canDelete = hasPermission('sales.delete');
+
+  const bulkDeleteAction = useBulkAction({
+    mutationFn: (ids) => customersApi.bulkDelete(ids).then((r) => r.data),
+    queryKeys: [['customers']],
+    successMessage: '{count} customers deleted',
+  });
+
+  const bulkActions = [
+    ...(canDelete
+      ? [
+          {
+            label: 'Delete',
+            icon: Trash2,
+            variant: 'destructive' as const,
+            onClick: (rows: Customer[]) => {
+              setBulkSelectedRows(rows);
+              setBulkDeleteOpen(true);
+            },
+          },
+        ]
+      : []),
+  ];
 
   const handleDelete = (customer: Customer) => {
     setCustomerToDelete(customer);
@@ -206,6 +236,10 @@ function CustomersPageContent() {
           <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
           {canCreate && (
             <Button asChild data-tour="create-customer-btn">
               <Link href="/sales/customers/new">
@@ -259,6 +293,7 @@ function CustomersPageContent() {
             enableColumnResizing
             tableId="customers"
             enableSelection
+            bulkActions={bulkActions}
             enableExport
             enableColumnVisibility
             exportFilename="customers"
@@ -277,6 +312,32 @@ function CustomersPageContent() {
           />
         </CardContent>
       </Card>
+
+      {/* Bulk Action Dialogs */}
+      <BulkActionConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        action="delete"
+        count={bulkSelectedRows.length}
+        itemType="customers"
+        description="Selected customers will be deleted. Customers with transactions will be skipped."
+        destructive
+        isLoading={bulkDeleteAction.isLoading}
+        onConfirm={async () => {
+          await bulkDeleteAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkDeleteOpen(false);
+          refetch();
+        }}
+      />
+
+      {/* Import Wizard */}
+      <ImportWizard
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        entityType={'customers' as ImportEntityType}
+        entityLabel="Customers"
+        onComplete={() => refetch()}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

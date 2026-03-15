@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Brain, TrendingUp, AlertTriangle, Sparkles } from 'lucide-react';
+import { Brain, TrendingUp, AlertTriangle, Sparkles, CalendarClock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,40 +33,53 @@ function PulseSection({
   );
 }
 
+function ForecastCell({
+  label,
+  data,
+}: {
+  label: string;
+  data?: { low: number; expected: number; high: number };
+}) {
+  return (
+    <div className="text-center">
+      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
+        {label}
+      </p>
+      {data ? (
+        <>
+          <p className="text-base font-bold font-mono">{formatCompactCurrency(data.expected)}</p>
+          <p className="text-[10px] text-muted-foreground">
+            {formatCompactCurrency(data.low)} – {formatCompactCurrency(data.high)}
+          </p>
+        </>
+      ) : (
+        <p className="text-base font-bold font-mono text-muted-foreground">—</p>
+      )}
+    </div>
+  );
+}
+
+function SectionSkeleton() {
+  return (
+    <div className="space-y-2">
+      <Skeleton className="h-3 w-20" />
+      <Skeleton className="h-6 w-24" />
+      <Skeleton className="h-3 w-28" />
+    </div>
+  );
+}
+
 export const AIBusinessPulse = memo(function AIBusinessPulse() {
   const { data: cashForecast, isLoading: cashLoading } = useQuickCashForecast();
   const { data: alertSummary, isLoading: alertsLoading } = useAlertSummary();
   const { data: weeklySnapshot, isLoading: narrativeLoading } = useWeeklySnapshot();
 
-  const isLoading = cashLoading || alertsLoading || narrativeLoading;
-
-  if (isLoading) {
-    return (
-      <Card className="bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-900 dark:to-blue-950 border-blue-100 dark:border-blue-900">
-        <CardContent className="py-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Skeleton className="h-5 w-5 rounded" />
-            <Skeleton className="h-4 w-32" />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="space-y-2">
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-6 w-24" />
-                <Skeleton className="h-3 w-28" />
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const forecast30 = cashForecast?.next30Days;
   const criticalCount = alertSummary?.criticalCount ?? 0;
   const unreadCount = alertSummary?.unread ?? 0;
   const topRecommendation =
     weeklySnapshot?.recommendations?.[0] || weeklySnapshot?.summary || 'All systems operational';
+  const criticalDates: Array<{ date: string; reason: string; impact: number }> =
+    cashForecast?.criticalDates ?? [];
 
   return (
     <Card className="bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-900 dark:to-blue-950 border-blue-100 dark:border-blue-900">
@@ -81,48 +94,82 @@ export const AIBusinessPulse = memo(function AIBusinessPulse() {
           </Badge>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* 30-Day Cash Forecast */}
-          <PulseSection icon={TrendingUp} label="30-Day Cash Forecast">
-            {forecast30 ? (
-              <>
-                <p className="text-lg font-bold font-mono">
-                  {formatCompactCurrency(forecast30.expected)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Range: {formatCompactCurrency(forecast30.low)} –{' '}
-                  {formatCompactCurrency(forecast30.high)}
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-lg font-bold font-mono text-muted-foreground">—</p>
-                <p className="text-xs text-muted-foreground">Not enough data yet</p>
-              </>
-            )}
-          </PulseSection>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Cash Flow Forecasts — 7 / 30 / 90 days */}
+          {cashLoading ? (
+            <SectionSkeleton />
+          ) : (
+            <PulseSection icon={TrendingUp} label="Cash Flow Forecast">
+              <div className="flex items-end gap-3">
+                <ForecastCell label="7d" data={cashForecast?.next7Days} />
+                <ForecastCell label="30d" data={cashForecast?.next30Days} />
+                <ForecastCell label="90d" data={cashForecast?.next90Days} />
+              </div>
+            </PulseSection>
+          )}
+
+          {/* Critical Dates */}
+          {cashLoading ? (
+            <SectionSkeleton />
+          ) : (
+            <PulseSection icon={CalendarClock} label="Critical Dates">
+              {criticalDates.length > 0 ? (
+                <div className="space-y-1">
+                  {criticalDates.slice(0, 2).map((cd, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <span className="text-xs font-mono text-red-600">
+                        {formatCompactCurrency(Math.abs(cd.impact))}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">{cd.reason}</span>
+                    </div>
+                  ))}
+                  {criticalDates.length > 2 && (
+                    <p className="text-[10px] text-muted-foreground">
+                      +{criticalDates.length - 2} more
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm font-medium text-green-600">None</p>
+                  <p className="text-xs text-muted-foreground">No critical cash events ahead</p>
+                </>
+              )}
+            </PulseSection>
+          )}
 
           {/* Critical Alerts */}
-          <PulseSection icon={AlertTriangle} label="Critical Alerts">
-            <p
-              className={cn(
-                'text-lg font-bold font-mono',
-                criticalCount > 0 ? 'text-red-600' : 'text-green-600',
-              )}
-            >
-              {criticalCount}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {unreadCount > 0
-                ? `${unreadCount} unread alert${unreadCount !== 1 ? 's' : ''}`
-                : 'All clear'}
-            </p>
-          </PulseSection>
+          {alertsLoading ? (
+            <SectionSkeleton />
+          ) : (
+            <PulseSection icon={AlertTriangle} label="Critical Alerts">
+              <p
+                className={cn(
+                  'text-lg font-bold font-mono',
+                  criticalCount > 0 ? 'text-red-600' : 'text-green-600',
+                )}
+              >
+                {criticalCount}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {unreadCount > 0
+                  ? `${unreadCount} unread alert${unreadCount !== 1 ? 's' : ''}`
+                  : 'All clear'}
+              </p>
+            </PulseSection>
+          )}
 
           {/* AI Recommendation */}
-          <PulseSection icon={Sparkles} label="Top AI Recommendation" className="md:col-span-2">
-            <p className="text-sm leading-snug line-clamp-2">{topRecommendation}</p>
-          </PulseSection>
+          {narrativeLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-6 w-full" />
+            </div>
+          ) : (
+            <PulseSection icon={Sparkles} label="Top AI Recommendation">
+              <p className="text-sm leading-snug line-clamp-2">{topRecommendation}</p>
+            </PulseSection>
+          )}
         </div>
       </CardContent>
     </Card>

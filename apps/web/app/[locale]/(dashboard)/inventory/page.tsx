@@ -2,7 +2,16 @@
 
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Package, Warehouse, ClipboardList, ArrowRight } from 'lucide-react';
+import {
+  Package,
+  Warehouse,
+  ClipboardList,
+  ArrowRight,
+  Layers,
+  Activity,
+  ArrowLeftRight,
+  Tag,
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -30,6 +39,34 @@ export default function InventoryPage() {
       icon: ClipboardList,
       href: '/inventory/adjustments',
       color: 'text-purple-600',
+    },
+    {
+      title: 'Transfers',
+      description: 'Move inventory between warehouses with full tracking and status management.',
+      icon: ArrowLeftRight,
+      href: '/inventory/transfers',
+      color: 'text-cyan-600',
+    },
+    {
+      title: 'Price Lists',
+      description: 'Manage pricing tiers and custom price lists for different customer groups.',
+      icon: Tag,
+      href: '/inventory/price-lists',
+      color: 'text-orange-600',
+    },
+    {
+      title: 'Composite Items',
+      description: 'Create bundled products assembled from multiple component items.',
+      icon: Layers,
+      href: '/inventory/composite-items',
+      color: 'text-indigo-600',
+    },
+    {
+      title: 'Inventory Movements',
+      description: 'View all stock movements from sales, purchases, adjustments, and transfers.',
+      icon: Activity,
+      href: '/inventory/movements',
+      color: 'text-rose-600',
     },
   ];
 

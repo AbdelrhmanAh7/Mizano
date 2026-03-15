@@ -33,14 +33,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 import { useToast } from '@/components/ui/use-toast';
+import { ImportWizard } from '@/components/import/import-wizard';
 import { invoicesApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { useExportAll } from '@/lib/hooks/use-export-all';
+import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import {
   Invoice,
   InvoiceStatus,
   getInvoiceStatusColor,
   getInvoiceStatusLabel,
+  useCloneInvoice,
   useDeleteInvoice,
   useInfiniteInvoices,
   useSendInvoice,
@@ -51,7 +54,18 @@ import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { Ban, DollarSign, Edit, Eye, Plus, RefreshCw, Send, Trash2 } from 'lucide-react';
+import {
+  Ban,
+  Copy,
+  DollarSign,
+  Edit,
+  Eye,
+  Plus,
+  RefreshCw,
+  Send,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
@@ -76,6 +90,7 @@ function InvoicesPageContent() {
     filterKeys: ['status', 'dateFrom', 'dateTo'],
     mode: 'virtual',
   });
+  const [importOpen, setImportOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [voidDialogOpen, setVoidDialogOpen] = useState(false);
@@ -100,6 +115,7 @@ function InvoicesPageContent() {
     tableParams.filters.dateFrom && tableParams.filters.dateTo
       ? { from: new Date(tableParams.filters.dateFrom), to: new Date(tableParams.filters.dateTo) }
       : undefined;
+  const cloneInvoice = useCloneInvoice();
   const deleteInvoice = useDeleteInvoice();
   const sendInvoice = useSendInvoice();
   const voidInvoice = useVoidInvoice();
@@ -381,6 +397,12 @@ function InvoicesPageContent() {
                   View
                 </Link>
               </DropdownMenuItem>
+              {canCreate && (
+                <DropdownMenuItem onClick={() => cloneInvoice.mutate(invoice.id)}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Duplicate
+                </DropdownMenuItem>
+              )}
               {canEdit && invoice.status === 'DRAFT' && (
                 <>
                   <DropdownMenuItem asChild>
@@ -427,6 +449,10 @@ function InvoicesPageContent() {
           <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
           {canCreate && (
             <Button asChild data-tour="create-invoice-btn">
               <Link href="/sales/invoices/new">
@@ -637,6 +663,15 @@ function InvoicesPageContent() {
           setBulkPayOpen(false);
           refetch();
         }}
+      />
+
+      {/* Import Wizard */}
+      <ImportWizard
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        entityType={'invoices' as ImportEntityType}
+        entityLabel="Invoices"
+        onComplete={() => refetch()}
       />
     </div>
   );

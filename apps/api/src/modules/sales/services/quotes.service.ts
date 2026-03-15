@@ -255,6 +255,56 @@ export class QuotesService {
     return `EST-${String(num + 1).padStart(3, '0')}`;
   }
 
+  async clone(organizationId: string, id: string) {
+    const original = await this.prisma.quote.findFirst({
+      where: { id, organizationId, deletedAt: null },
+      include: {
+        lines: true,
+      },
+    });
+
+    if (!original) {
+      throw new NotFoundException('Quote not found');
+    }
+
+    const quoteNumber = await this.generateQuoteNumber(organizationId);
+    const today = new Date();
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + 30);
+
+    const cloned = await this.prisma.quote.create({
+      data: {
+        quoteNumber,
+        customerId: original.customerId,
+        date: today,
+        expiryDate,
+        subtotal: original.subtotal,
+        taxAmount: original.taxAmount,
+        grandTotal: original.grandTotal,
+        notes: original.notes,
+        terms: original.terms,
+        organizationId,
+        lines: {
+          create: original.lines.map((line) => ({
+            itemId: line.itemId,
+            description: line.description,
+            quantity: line.quantity,
+            rate: line.rate,
+            discount: line.discount,
+            taxRate: line.taxRate,
+            amount: line.amount,
+          })),
+        },
+      },
+      include: {
+        customer: { select: { id: true, name: true } },
+        lines: true,
+      },
+    });
+
+    return cloned;
+  }
+
   // === Bulk Operations ===
 
   async bulkDelete(organizationId: string, ids: string[]) {

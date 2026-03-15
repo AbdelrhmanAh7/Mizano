@@ -24,13 +24,18 @@ export class CursorPaginationDto {
   @IsString()
   search?: string;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false, description: 'Field to sort by (must be a valid model field)' })
   @IsOptional()
   @IsString()
-  sortBy?: string;
+  sortBy?: string = 'createdAt';
 
   @ApiProperty({ required: false, enum: ['asc', 'desc'], default: 'desc' })
   @IsOptional()
   @IsIn(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc' = 'desc';
+
+  @ApiProperty({ required: false, description: 'Filter by resource type (e.g. ASSET, GOODS)' })
+  @IsOptional()
+  @IsString()
+  type?: string;
 }

@@ -12,6 +12,10 @@ import { PriceListsService } from './services/price-lists.service';
 import { CostingService } from './services/costing.service';
 import { CompositeItemsService } from './services/composite-items.service';
 import { TransfersService } from './services/transfers.service';
+import { InventoryLevelsService } from './services/inventory-levels.service';
+import { InventoryMovementsService } from './services/inventory-movements.service';
+import { InventoryLevelsController } from './controllers/inventory-levels.controller';
+import { InventoryMovementsController } from './controllers/inventory-movements.controller';
 import { AccountingModule } from '../accounting/accounting.module';
 
 @Module({
@@ -23,6 +27,8 @@ import { AccountingModule } from '../accounting/accounting.module';
     PriceListsController,
     CompositeItemsController,
     TransfersController,
+    InventoryLevelsController,
+    InventoryMovementsController,
   ],
   providers: [
     ItemsService,
@@ -32,6 +38,8 @@ import { AccountingModule } from '../accounting/accounting.module';
     CostingService,
     CompositeItemsService,
     TransfersService,
+    InventoryLevelsService,
+    InventoryMovementsService,
   ],
   exports: [ItemsService, WarehousesService, CostingService],
 })

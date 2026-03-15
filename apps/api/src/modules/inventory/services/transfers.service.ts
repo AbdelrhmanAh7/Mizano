@@ -156,6 +156,26 @@ export class TransfersService {
     return transfer;
   }
 
+  async markInTransit(organizationId: string, id: string) {
+    const transfer = await this.findOne(organizationId, id);
+
+    if (transfer.status !== TransferStatus.PENDING) {
+      throw new BadRequestException('Only pending transfers can be marked as in-transit');
+    }
+
+    return this.prisma.inventoryTransfer.update({
+      where: { id },
+      data: { status: TransferStatus.IN_TRANSIT },
+      include: {
+        fromWarehouse: { select: { id: true, name: true, code: true } },
+        toWarehouse: { select: { id: true, name: true, code: true } },
+        lines: {
+          include: { item: { select: { id: true, name: true, sku: true, unit: true } } },
+        },
+      },
+    });
+  }
+
   async complete(organizationId: string, id: string) {
     const transfer = await this.findOne(organizationId, id);
 

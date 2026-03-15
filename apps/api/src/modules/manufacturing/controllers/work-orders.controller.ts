@@ -40,6 +40,13 @@ export class WorkOrdersController {
     return this.workOrdersService.findAll(orgId, query);
   }
 
+  @Get('stats')
+  @Permissions('manufacturing.view')
+  @ApiOperation({ summary: 'Get manufacturing dashboard stats' })
+  getStats(@CurrentOrg() orgId: string) {
+    return this.workOrdersService.getStats(orgId);
+  }
+
   @Get(':id')
   @Permissions('manufacturing.view')
   @ApiOperation({ summary: 'Get work order by ID' })

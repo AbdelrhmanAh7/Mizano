@@ -26,6 +26,13 @@ export class VatReturnsController {
     return this.vatReturnsService.findAll(orgId, query);
   }
 
+  @Get('dashboard-stats')
+  @Permissions('tax.view')
+  @ApiOperation({ summary: 'Get tax dashboard statistics' })
+  getDashboardStats(@CurrentOrg() orgId: string) {
+    return this.vatReturnsService.getDashboardStats(orgId);
+  }
+
   @Get('summary')
   @Permissions('tax.view')
   @ApiOperation({ summary: 'Get VAT summary for period' })

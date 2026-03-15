@@ -1,17 +1,51 @@
 {
   "title": "HR",
   "description": "Manage employees, attendance, and payroll",
+  "hub": {
+    "quickActions": "Quick Actions",
+    "addEmployee": "Add Employee",
+    "markAttendance": "Mark Attendance",
+    "runPayroll": "Run Payroll",
+    "stats": {
+      "totalEmployees": "Total Employees",
+      "totalEmployeesDesc": "{active} active, {inactive} inactive",
+      "monthlyPayroll": "Monthly Payroll",
+      "monthlyPayrollDesc": "From {count} payslips",
+      "attendanceRate": "Attendance Rate",
+      "attendanceRateDesc": "This month average",
+      "pendingPayroll": "Pending Payroll",
+      "pendingPayrollDesc": "{count} runs need processing"
+    },
+    "recentPayroll": "Recent Payroll Runs",
+    "noRecentPayroll": "No payroll runs yet",
+    "viewAllPayroll": "View All Runs",
+    "departmentBreakdown": "Department Breakdown",
+    "noDepartments": "No department data available",
+    "employeesInDept": "{count} employees"
+  },
   "employees": {
     "title": "Employees",
+    "description": "Manage your workforce",
     "newEmployee": "New Employee",
     "editEmployee": "Edit Employee",
     "deleteEmployee": "Delete Employee",
     "employeeDetails": "Employee Details",
+    "activeEmployees": "Active Employees",
+    "totalPayroll": "Total Monthly Payroll",
+    "overview": "Overview",
+    "salaryStructure": "Salary Structure",
+    "payslips": "Payslips",
+    "attendanceHistory": "Attendance",
+    "personalInfo": "Personal Information",
+    "employmentInfo": "Employment Information",
+    "bankingInfo": "Banking & Tax",
     "form": {
       "employeeId": "Employee ID",
       "employeeIdPlaceholder": "Enter employee ID",
       "name": "Full Name",
       "namePlaceholder": "Enter full name",
+      "firstName": "First Name",
+      "lastName": "Last Name",
       "email": "Email",
       "emailPlaceholder": "Enter email address",
       "phone": "Phone",
@@ -26,7 +60,15 @@
       "deductions": "Deductions",
       "bankAccount": "Bank Account",
       "bankAccountPlaceholder": "Enter bank account",
-      "isActive": "Active"
+      "bankName": "Bank Name",
+      "taxId": "Tax ID",
+      "isActive": "Active",
+      "status": "Status",
+      "salary": "Salary",
+      "grossSalary": "Gross Salary",
+      "netSalary": "Net Salary",
+      "totalAllowances": "Total Allowances",
+      "totalDeductions": "Total Deductions"
     },
     "table": {
       "employeeId": "Employee ID",
@@ -38,14 +80,30 @@
     },
     "empty": {
       "title": "No employees yet",
-      "description": "Add your first employee"
+      "description": "Add your first employee to get started"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "terminated": "Terminated"
     }
   },
   "attendance": {
     "title": "Attendance",
+    "description": "Track employee attendance and time",
     "newAttendance": "Record Attendance",
     "editAttendance": "Edit Attendance",
     "attendanceDetails": "Attendance Details",
+    "markForToday": "Mark for Today",
+    "bulkMark": "Bulk Mark",
+    "monthlyOverview": "Monthly Overview",
+    "dailyView": "Daily View",
+    "summary": {
+      "presentToday": "Present Today",
+      "absentToday": "Absent Today",
+      "onLeave": "On Leave",
+      "attendanceRate": "Attendance Rate"
+    },
     "form": {
       "employee": "Employee",
       "employeePlaceholder": "Select employee",
@@ -75,23 +133,38 @@
   },
   "payroll": {
     "title": "Payroll",
+    "description": "Process and manage payroll runs",
     "newRun": "New Payroll Run",
     "runDetails": "Payroll Run Details",
     "process": "Process Payroll",
     "markAsPaid": "Mark as Paid",
+    "totalPaid": "Total Paid (YTD)",
+    "pendingRuns": "Pending Runs",
+    "confirmedRuns": "Confirmed Runs",
+    "summary": {
+      "totalGross": "Total Gross",
+      "totalDeductions": "Total Deductions",
+      "totalNet": "Total Net Pay",
+      "employeeCount": "Employees Processed"
+    },
     "form": {
       "month": "Month",
-      "year": "Year"
+      "year": "Year",
+      "selectPeriod": "Select Period",
+      "preview": "Preview",
+      "confirm": "Confirm & Post"
     },
     "status": {
       "draft": "Draft",
       "processed": "Processed",
+      "confirmed": "Confirmed",
       "paid": "Paid"
     },
     "table": {
       "period": "Period",
       "employeeCount": "Employees",
       "grossAmount": "Gross Amount",
+      "deductions": "Deductions",
       "netAmount": "Net Amount",
       "status": "Status"
     },
@@ -103,11 +176,19 @@
       "allowances": "Allowances",
       "deductions": "Deductions",
       "grossPay": "Gross Pay",
-      "netPay": "Net Pay"
+      "netPay": "Net Pay",
+      "taxAmount": "Tax Amount",
+      "lopDays": "LOP Days",
+      "lopAmount": "LOP Amount",
+      "viewPayslip": "View Payslip",
+      "print": "Print",
+      "download": "Download",
+      "earnings": "Earnings",
+      "deductionsSection": "Deductions"
     },
     "empty": {
       "title": "No payroll runs yet",
-      "description": "Create your first payroll run"
+      "description": "Create your first payroll run to get started"
     }
   }
 }

@@ -96,6 +96,8 @@ const navigationConfig: NavItem[] = [
       { nameKey: 'accounting.chartOfAccounts', href: '/accounting/accounts', icon: BarChart3 },
       { nameKey: 'accounting.journalEntries', href: '/accounting/journals', icon: FileText },
       { nameKey: 'accounting.recurring', href: '/accounting/recurring', icon: Clock },
+      { nameKey: 'accounting.trialBalance', href: '/accounting/trial-balance', icon: BarChart3 },
+      { nameKey: 'accounting.generalLedger', href: '/accounting/general-ledger', icon: FileText },
     ],
   },
   {
@@ -121,6 +123,16 @@ const navigationConfig: NavItem[] = [
         href: '/inventory/price-lists',
         icon: DollarSign,
       },
+      {
+        nameKey: 'inventory.compositeItems.title',
+        href: '/inventory/composite-items',
+        icon: Layers,
+      },
+      {
+        nameKey: 'inventory.movements.title',
+        href: '/inventory/movements',
+        icon: Activity,
+      },
     ],
   },
   {
@@ -141,6 +153,7 @@ const navigationConfig: NavItem[] = [
     permission: 'projects.view',
     children: [
       { nameKey: 'projects.projects.title', href: '/projects', icon: Briefcase },
+      { nameKey: 'projects.myTasks', href: '/projects/my-tasks', icon: Clock },
       { nameKey: 'projects.timesheets.title', href: '/projects/timesheets', icon: Clock },
     ],
   },
@@ -249,9 +262,10 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
   );
 
   const renderNavItem = (item: NavItem, isChild = false) => {
-    const isActive =
-      pathnameWithoutLocale === item.href || pathnameWithoutLocale.startsWith(item.href + '/');
     const hasChildren = item.children && item.children.length > 0;
+    const isActive =
+      pathnameWithoutLocale === item.href ||
+      (hasChildren && pathnameWithoutLocale.startsWith(item.href + '/'));
     const isExpanded =
       expandedItems.includes(item.href) || pathnameWithoutLocale.startsWith(item.href);
     const translatedName = t(item.nameKey);

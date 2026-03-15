@@ -234,14 +234,14 @@ export function ItemForm({
             <div className="space-y-2">
               <Label htmlFor="taxRateId">Tax Rate</Label>
               <Select
-                value={form.watch('taxRateId') || ''}
-                onValueChange={(value) => form.setValue('taxRateId', value)}
+                value={form.watch('taxRateId') || 'none'}
+                onValueChange={(value) => form.setValue('taxRateId', value === 'none' ? '' : value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select tax rate" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No tax</SelectItem>
+                  <SelectItem value="none">No tax</SelectItem>
                   {taxRates.map((rate) => (
                     <SelectItem key={rate.id} value={rate.id}>
                       {rate.name} ({rate.rate}%)
@@ -326,13 +326,16 @@ export function ItemForm({
             <div className="space-y-2">
               <Label htmlFor="incomeAccountId">Income Account</Label>
               <Select
-                value={form.watch('incomeAccountId') || ''}
-                onValueChange={(value) => form.setValue('incomeAccountId', value)}
+                value={form.watch('incomeAccountId') || 'none'}
+                onValueChange={(value) =>
+                  form.setValue('incomeAccountId', value === 'none' ? '' : value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
                   {incomeAccounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.code} - {account.name}
@@ -346,13 +349,16 @@ export function ItemForm({
             <div className="space-y-2">
               <Label htmlFor="expenseAccountId">Expense Account</Label>
               <Select
-                value={form.watch('expenseAccountId') || ''}
-                onValueChange={(value) => form.setValue('expenseAccountId', value)}
+                value={form.watch('expenseAccountId') || 'none'}
+                onValueChange={(value) =>
+                  form.setValue('expenseAccountId', value === 'none' ? '' : value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
                   {expenseAccounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.code} - {account.name}
@@ -367,13 +373,16 @@ export function ItemForm({
               <div className="space-y-2">
                 <Label htmlFor="inventoryAccountId">Inventory Account</Label>
                 <Select
-                  value={form.watch('inventoryAccountId') || ''}
-                  onValueChange={(value) => form.setValue('inventoryAccountId', value)}
+                  value={form.watch('inventoryAccountId') || 'none'}
+                  onValueChange={(value) =>
+                    form.setValue('inventoryAccountId', value === 'none' ? '' : value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select account" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
                     {assetAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}

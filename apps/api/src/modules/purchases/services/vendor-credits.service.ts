@@ -185,6 +185,21 @@ export class VendorCreditsService {
     });
   }
 
+  async bulkDelete(organizationId: string, ids: string[]) {
+    // Only delete credits that haven't been applied or refunded
+    const result = await this.prisma.vendorCredit.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        appliedToBillId: null,
+        refundedAt: null,
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
   private async generateCreditNumber(organizationId: string): Promise<string> {
     const last = await this.prisma.vendorCredit.findFirst({
       where: { organizationId },

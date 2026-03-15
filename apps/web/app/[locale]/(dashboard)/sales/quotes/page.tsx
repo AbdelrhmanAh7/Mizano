@@ -30,14 +30,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
+import { ImportWizard } from '@/components/import/import-wizard';
 import { quotesApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { formatCurrency } from '@/lib/hooks/use-customers';
+import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import {
   Quote,
   QuoteStatus,
   useAcceptQuote,
+  useCloneQuote,
   useConvertToInvoice,
   useDeclineQuote,
   useDeleteQuote,
@@ -47,7 +50,18 @@ import {
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { Ban, Edit, Eye, FileText, Plus, RefreshCw, Send, Trash2 } from 'lucide-react';
+import {
+  Ban,
+  Copy,
+  Edit,
+  Eye,
+  FileText,
+  Plus,
+  RefreshCw,
+  Send,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
@@ -59,6 +73,7 @@ function QuotesPageContent() {
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
+  const [importOpen, setImportOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [quoteToDelete, setQuoteToDelete] = useState<Quote | null>(null);
@@ -76,6 +91,7 @@ function QuotesPageContent() {
     status: selectedStatus !== 'all' ? (selectedStatus as QuoteStatus) : undefined,
   });
 
+  const cloneQuote = useCloneQuote();
   const deleteQuote = useDeleteQuote();
   const sendQuote = useSendQuote();
   const acceptQuote = useAcceptQuote();
@@ -343,6 +359,12 @@ function QuotesPageContent() {
                   View
                 </Link>
               </DropdownMenuItem>
+              {canCreate && (
+                <DropdownMenuItem onClick={() => cloneQuote.mutate(quote.id)}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Duplicate
+                </DropdownMenuItem>
+              )}
 
               {canEdit && quote.status === 'DRAFT' && (
                 <>
@@ -408,6 +430,10 @@ function QuotesPageContent() {
           <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
           {canCreate && (
             <Button asChild>
               <Link href="/sales/quotes/new">
@@ -551,6 +577,15 @@ function QuotesPageContent() {
           setBulkDeclineOpen(false);
           refetch();
         }}
+      />
+
+      {/* Import Wizard */}
+      <ImportWizard
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        entityType={'quotes' as ImportEntityType}
+        entityLabel="Quotes"
+        onComplete={() => refetch()}
       />
     </div>
   );

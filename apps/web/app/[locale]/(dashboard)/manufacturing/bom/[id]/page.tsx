@@ -33,8 +33,12 @@ import {
   useDeleteBOM,
   getBOMStatusColor,
   getBOMStatusLabel,
+  getWorkOrderStatusColor,
+  getWorkOrderStatusLabel,
   formatCurrency,
   BOMComponent,
+  useWorkOrdersByBom,
+  type WorkOrderStatus,
 } from '@/lib/hooks/use-manufacturing';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { BOMForm } from '@/components/manufacturing/bom-form';
@@ -52,6 +56,7 @@ export default function BOMDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
 
   const { data: bom, isLoading } = useBOM(bomId);
+  const { data: relatedWorkOrders } = useWorkOrdersByBom(bomId);
   const deleteBOM = useDeleteBOM();
 
   const canEdit = hasPermission('manufacturing.edit');
@@ -258,6 +263,81 @@ export default function BOMDetailPage() {
             </Table>
           ) : (
             <div className="text-center py-8 text-muted-foreground">No components defined</div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Related Work Orders */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5" />
+              Related Work Orders
+            </CardTitle>
+            <Button asChild size="sm">
+              <Link href={`/manufacturing/work-orders/new?bomId=${bom.id}`}>
+                <Wrench className="mr-2 h-4 w-4" />
+                {t('workOrders.newWorkOrder')}
+              </Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!relatedWorkOrders || relatedWorkOrders.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Wrench className="h-8 w-8 mx-auto mb-2 opacity-40" />
+              <p>No work orders for this BOM yet.</p>
+              <Button asChild variant="outline" size="sm" className="mt-3">
+                <Link href={`/manufacturing/work-orders/new?bomId=${bom.id}`}>
+                  Create Work Order
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('workOrders.table.workOrderNumber')}</TableHead>
+                  <TableHead>{t('workOrders.table.quantity')}</TableHead>
+                  <TableHead>{t('workOrders.table.plannedStart')}</TableHead>
+                  <TableHead>{t('workOrders.table.status')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {relatedWorkOrders.map(
+                  (wo: {
+                    id: string;
+                    workOrderNumber: string;
+                    quantity: number;
+                    plannedStartDate?: string;
+                    status: WorkOrderStatus;
+                  }) => (
+                    <TableRow key={wo.id}>
+                      <TableCell>
+                        <Link
+                          href={`/manufacturing/work-orders/${wo.id}`}
+                          className="font-mono text-sm text-primary hover:underline"
+                        >
+                          {wo.workOrderNumber}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{wo.quantity}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {wo.plannedStartDate
+                          ? new Date(wo.plannedStartDate).toLocaleDateString()
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getWorkOrderStatusColor(wo.status)}>
+                          {getWorkOrderStatusLabel(wo.status)}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ),
+                )}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

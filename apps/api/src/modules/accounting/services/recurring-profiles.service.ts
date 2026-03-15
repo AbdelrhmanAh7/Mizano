@@ -58,7 +58,7 @@ interface ExpenseTemplateData {
   description?: string;
 }
 
-interface ExecutionResult {
+export interface ExecutionResult {
   success: boolean;
   createdEntityType: string;
   createdEntityId: string;

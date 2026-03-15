@@ -61,6 +61,15 @@ export class CustomersController {
     return this.customersService.findAllCursor(orgId, query);
   }
 
+  // Bulk Operations
+  @Post('bulk-delete')
+  @Permissions('sales.delete')
+  @InvalidateCache('customers:*')
+  @ApiOperation({ summary: 'Bulk delete customers' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.customersService.bulkDelete(orgId, dto.ids);
+  }
+
   @Get(':id')
   @Permissions('sales.view')
   @ApiOperation({ summary: 'Get customer by ID' })

@@ -61,6 +61,39 @@ export class InvoicesController {
     return this.invoicesService.findAllCursor(orgId, query);
   }
 
+  // Bulk Operations
+  @Post('bulk-delete')
+  @Permissions('sales.delete')
+  @InvalidateCache('invoices:*')
+  @ApiOperation({ summary: 'Bulk delete draft invoices' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.invoicesService.bulkDelete(orgId, dto.ids);
+  }
+
+  @Post('bulk-send')
+  @Permissions('sales.edit')
+  @InvalidateCache('invoices:*')
+  @ApiOperation({ summary: 'Bulk send invoices' })
+  bulkSend(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.invoicesService.bulkSend(orgId, dto.ids);
+  }
+
+  @Post('bulk-void')
+  @Permissions('sales.edit')
+  @InvalidateCache('invoices:*')
+  @ApiOperation({ summary: 'Bulk void invoices' })
+  bulkVoid(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.invoicesService.bulkVoid(orgId, dto.ids);
+  }
+
+  @Post('bulk-pay')
+  @Permissions('sales.edit')
+  @InvalidateCache('invoices:*')
+  @ApiOperation({ summary: 'Bulk mark invoices as paid' })
+  bulkPay(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.invoicesService.bulkPay(orgId, dto.ids);
+  }
+
   @Get(':id')
   @Permissions('sales.view')
   @ApiOperation({ summary: 'Get invoice by ID' })
@@ -108,44 +141,19 @@ export class InvoicesController {
     return this.invoicesService.recordPayment(orgId, id, dto);
   }
 
+  @Post(':id/clone')
+  @Permissions('sales.create')
+  @InvalidateCache('invoices:*')
+  @ApiOperation({ summary: 'Clone an invoice as a new draft' })
+  clone(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.invoicesService.clone(orgId, id);
+  }
+
   @Delete(':id')
   @Permissions('sales.delete')
   @InvalidateCache('invoices:*')
   @ApiOperation({ summary: 'Delete invoice' })
   remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.invoicesService.remove(orgId, id);
-  }
-
-  // Bulk Operations
-  @Post('bulk-delete')
-  @Permissions('sales.delete')
-  @InvalidateCache('invoices:*')
-  @ApiOperation({ summary: 'Bulk delete draft invoices' })
-  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
-    return this.invoicesService.bulkDelete(orgId, dto.ids);
-  }
-
-  @Post('bulk-send')
-  @Permissions('sales.edit')
-  @InvalidateCache('invoices:*')
-  @ApiOperation({ summary: 'Bulk send invoices' })
-  bulkSend(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
-    return this.invoicesService.bulkSend(orgId, dto.ids);
-  }
-
-  @Post('bulk-void')
-  @Permissions('sales.edit')
-  @InvalidateCache('invoices:*')
-  @ApiOperation({ summary: 'Bulk void invoices' })
-  bulkVoid(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
-    return this.invoicesService.bulkVoid(orgId, dto.ids);
-  }
-
-  @Post('bulk-pay')
-  @Permissions('sales.edit')
-  @InvalidateCache('invoices:*')
-  @ApiOperation({ summary: 'Bulk mark invoices as paid' })
-  bulkPay(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
-    return this.invoicesService.bulkPay(orgId, dto.ids);
   }
 }

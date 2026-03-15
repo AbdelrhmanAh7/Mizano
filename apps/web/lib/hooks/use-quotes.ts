@@ -337,6 +337,35 @@ export function useConvertToInvoice() {
 }
 
 /**
+ * Hook to clone/duplicate a quote
+ */
+export function useCloneQuote() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await quotesApi.clone(id);
+      return response.data as Quote;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      toast({
+        title: 'Quote duplicated',
+        description: 'A new draft copy has been created.',
+      });
+    },
+    onError: (error: ApiError) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error duplicating quote',
+        description: error.response?.data?.message || 'An error occurred',
+      });
+    },
+  });
+}
+
+/**
  * Get quote status color
  */
 export function getQuoteStatusColor(status: QuoteStatus): string {

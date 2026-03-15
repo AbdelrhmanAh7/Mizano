@@ -10,8 +10,8 @@ jest.mock('lucide-react', () => ({
   CalendarIcon: ({ className }: { className?: string }) => (
     <span data-testid="icon-calendar" className={className} />
   ),
-  X: ({ className, onClick }: { className?: string; onClick?: (e: React.MouseEvent) => void }) => (
-    <span data-testid="icon-x" className={className} onClick={onClick} />
+  X: ({ className, 'data-testid': testId }: { className?: string; 'data-testid'?: string }) => (
+    <span data-testid={testId ?? 'icon-x'} className={className} />
   ),
 }));
 

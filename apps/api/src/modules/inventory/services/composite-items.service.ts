@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CreateCompositeItemDto, UpdateCompositeItemDto } from '../dto/composite-item.dto';
 
@@ -54,6 +56,36 @@ export class CompositeItemsService {
         },
       },
     });
+  }
+
+  private static readonly ALLOWED_SORT_FIELDS = ['id', 'name', 'sku', 'createdAt', 'updatedAt'];
+
+  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+    const { cursor, take, search, sortOrder = 'asc' } = query;
+    const sortBy = CompositeItemsService.ALLOWED_SORT_FIELDS.includes(query.sortBy || '')
+      ? query.sortBy!
+      : 'name';
+    const where: Prisma.CompositeItemWhereInput = { organizationId };
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { sku: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    return cursorPaginate(
+      this.prisma.compositeItem,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: {
+          components: {
+            include: { item: { select: { id: true, name: true, sku: true } } },
+          },
+        },
+      },
+    );
   }
 
   async findAll(organizationId: string, query: PaginationDto) {

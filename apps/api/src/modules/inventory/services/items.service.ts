@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { ItemType, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
@@ -41,8 +41,9 @@ export class ItemsService {
   }
 
   async findAll(organizationId: string, query: PaginationDto) {
-    const { page = 1, limit = 20, search, sortBy = 'name', sortOrder = 'asc' } = query;
+    const { page = 1, limit = 20, search, sortBy = 'name', sortOrder = 'asc', type } = query;
     const where: Prisma.ItemWhereInput = { organizationId, deletedAt: null };
+    if (type) where.type = type as ItemType;
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },

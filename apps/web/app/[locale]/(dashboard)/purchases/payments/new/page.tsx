@@ -9,8 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PaymentMadeForm } from '@/components/purchases/payment-made-form';
 import { useCreatePaymentMade } from '@/lib/hooks/use-payments-made';
 import { useVendors } from '@/lib/hooks/use-vendors';
-import { useQuery } from '@tanstack/react-query';
-import { accountsApi } from '@/lib/api';
+import { useBankAccounts } from '@/lib/hooks/use-bank-accounts';
 
 export default function NewPaymentMadePage() {
   const router = useRouter();
@@ -25,17 +24,13 @@ export default function NewPaymentMadePage() {
   // Fetch vendors
   const { data: vendorsData, isLoading: vendorsLoading } = useVendors();
 
-  // Fetch accounts
-  const { data: accountsData, isLoading: accountsLoading } = useQuery({
-    queryKey: ['accounts'],
-    queryFn: async () => {
-      const response = await accountsApi.getAll();
-      return response.data;
-    },
+  // Fetch bank accounts
+  const { data: bankAccountsData, isLoading: bankAccountsLoading } = useBankAccounts({
+    isActive: true,
   });
 
   const vendors = vendorsData?.data || [];
-  const accounts = accountsData?.data || [];
+  const bankAccounts = bankAccountsData?.data || [];
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
@@ -48,7 +43,7 @@ export default function NewPaymentMadePage() {
     }
   };
 
-  if (vendorsLoading || accountsLoading) {
+  if (vendorsLoading || bankAccountsLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-12 w-64" />
@@ -75,7 +70,7 @@ export default function NewPaymentMadePage() {
       {/* Form */}
       <PaymentMadeForm
         vendors={vendors}
-        accounts={accounts}
+        bankAccounts={bankAccounts}
         onSubmit={handleSubmit}
         onCancel={() => router.push('/purchases/payments')}
         isSubmitting={createPayment.isPending}

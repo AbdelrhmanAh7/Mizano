@@ -59,6 +59,14 @@ export class VendorsController {
     return this.vendorsService.findAllCursor(orgId, query);
   }
 
+  @Post('bulk-delete')
+  @Permissions('purchases.delete')
+  @InvalidateCache('vendors:*')
+  @ApiOperation({ summary: 'Bulk delete vendors' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.vendorsService.bulkDelete(orgId, dto.ids);
+  }
+
   @Get(':id')
   @Permissions('purchases.view')
   findOne(@CurrentOrg() orgId: string, @Param('id') id: string) {

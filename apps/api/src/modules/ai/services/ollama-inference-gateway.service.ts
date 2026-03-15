@@ -324,10 +324,10 @@ export class OllamaInferenceGateway implements OnModuleInit {
       }
       messages.push(userMessage);
 
-      // On retry, increase token budget and lower temperature
+      // On retry, significantly increase token budget (thinking models need much more room)
       const maxTokens =
         attempt > 1
-          ? Math.max((options?.maxTokens ?? 4096) * 2, 8192)
+          ? Math.max((options?.maxTokens ?? 4096) * 4, 32768)
           : (options?.maxTokens ?? 4096);
       const temperature = attempt > 1 ? 0 : (options?.temperature ?? 0.1);
 
@@ -373,7 +373,19 @@ export class OllamaInferenceGateway implements OnModuleInit {
           `Ollama returned empty content (model=${model}, attempt=${attempt}, rawLen=${rawContent.length}, ` +
             `thinkingLen=${thinkLen}, done_reason=${doneReason}, time=${processingTimeMs}ms)`,
         );
-        return null;
+
+        // On done_reason=length with thinking content, try to build partial JSON from thinking
+        if (doneReason === 'length' && thinkLen > 0 && !options?.rawText) {
+          const partialJson = this.salvagePartialJsonFromThinking(
+            response.data?.message?.thinking ?? '',
+            model,
+          );
+          if (partialJson) {
+            content = partialJson;
+          }
+        }
+
+        if (!content) return null;
       }
 
       // For rawText mode, return the content as-is (no JSON parsing)
@@ -541,6 +553,81 @@ export class OllamaInferenceGateway implements OnModuleInit {
   // ---------------------------------------------------------------------------
   // Text processing helpers
   // ---------------------------------------------------------------------------
+
+  /**
+   * When the model exhausted tokens during thinking (done_reason=length),
+   * scan the thinking text for field mentions and build a partial JSON result.
+   * This allows extracting *some* data even from failed inference.
+   */
+  private salvagePartialJsonFromThinking(thinking: string, model: string): string | null {
+    // First try: maybe the model started writing JSON inside its thinking
+    const firstBrace = thinking.lastIndexOf('{');
+    if (firstBrace !== -1) {
+      // Try to find a substantial JSON-like block
+      const lastBrace = thinking.lastIndexOf('}');
+      if (lastBrace > firstBrace) {
+        try {
+          const candidate = thinking.slice(firstBrace, lastBrace + 1);
+          const parsed = JSON.parse(candidate) as Record<string, unknown>;
+          // Only accept if it has at least one extraction field
+          if (
+            parsed.vendorName ||
+            parsed.total ||
+            parsed.date ||
+            parsed.invoiceNumber ||
+            parsed.lineItems
+          ) {
+            this.logger.warn(
+              `Salvaged partial JSON from thinking text (model=${model}, keys=${Object.keys(parsed).length})`,
+            );
+            return JSON.stringify(parsed);
+          }
+        } catch {
+          // Not valid JSON — try nested braces
+        }
+      }
+    }
+
+    // Second try: scan for key-value patterns the model mentioned while reasoning
+    const result: Record<string, unknown> = {};
+    const patterns: Array<[string, RegExp, 'string' | 'number']> = [
+      [
+        'vendorName',
+        /(?:vendor|company|store|merchant)\s*(?:name|is|:)\s*["""]([^"""]+)["""]/i,
+        'string',
+      ],
+      ['total', /(?:total|grand\s*total|amount)\s*(?:is|:| =)\s*[\$]?\s*([\d,]+\.?\d*)/i, 'number'],
+      [
+        'invoiceNumber',
+        /(?:invoice|bill|receipt)\s*(?:number|#|no\.?)\s*(?:is|:)?\s*["""]?([A-Z0-9-]+)/i,
+        'string',
+      ],
+      [
+        'date',
+        /(?:date|dated)\s*(?:is|:)?\s*(\d{4}[-/]\d{2}[-/]\d{2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i,
+        'string',
+      ],
+      ['currency', /(?:currency|paid in)\s*(?:is|:)?\s*([A-Z]{3})/i, 'string'],
+      ['tax', /(?:tax|vat)\s*(?:amount)?\s*(?:is|:| =)\s*[\$]?\s*([\d,]+\.?\d*)/i, 'number'],
+    ];
+
+    for (const [field, regex, type] of patterns) {
+      const match = thinking.match(regex);
+      if (match?.[1]) {
+        result[field] =
+          type === 'number' ? parseFloat(match[1].replace(/,/g, '')) : match[1].trim();
+      }
+    }
+
+    if (Object.keys(result).length > 0) {
+      this.logger.warn(
+        `Salvaged ${Object.keys(result).length} fields from thinking reasoning (model=${model})`,
+      );
+      return JSON.stringify(result);
+    }
+
+    return null;
+  }
 
   /** Try to extract JSON from the thinking field when content is empty. */
   private salvageFromThinking(

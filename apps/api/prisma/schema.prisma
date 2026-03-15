@@ -1672,6 +1672,7 @@ model BankRule {
   conditions     Json // Array of condition objects
   action         Json // Action object
   isActive       Boolean  @default(true)
+  hitCount       Int      @default(0)
   organizationId String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -1861,6 +1862,7 @@ model WorkOrder {
   quantity         Int
   status           WorkOrderStatus @default(DRAFT)
   plannedStartDate DateTime?
+  plannedEndDate   DateTime?
   actualStartDate  DateTime?
   completedDate    DateTime?
   notes            String?

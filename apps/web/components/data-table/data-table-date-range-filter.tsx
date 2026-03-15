@@ -99,72 +99,82 @@ export function DataTableDateRangeFilter({
     setOpen(false);
   };
 
-  const handleClear = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleClear = () => {
     onChange(undefined);
+    setOpen(false);
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+    <div className="flex items-center">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              'h-9 border-dashed justify-start text-left font-normal',
+              value && 'rounded-e-none border-e-0',
+              !value && 'text-muted-foreground',
+            )}
+          >
+            <CalendarIcon className="me-2 h-4 w-4" />
+            {value ? (
+              <span>
+                {format(value.from, 'MMM d, yyyy')} – {format(value.to, 'MMM d, yyyy')}
+              </span>
+            ) : (
+              placeholder
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <div className="flex">
+            {showPresets && (
+              <div className="border-e p-3 space-y-1 min-w-[140px]">
+                <p className="text-xs font-medium text-muted-foreground mb-2 px-2">Quick Select</p>
+                {presets.map((preset) => (
+                  <Button
+                    key={preset.label}
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start text-xs"
+                    onClick={() => handlePreset(preset)}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+              </div>
+            )}
+            <div className="p-3">
+              <Calendar
+                mode="range"
+                selected={value ? { from: value.from, to: value.to } : undefined}
+                onSelect={(range: RDPDateRange | undefined) => {
+                  if (range?.from && range?.to) {
+                    onChange({ from: range.from, to: range.to });
+                  } else if (range?.from) {
+                    // User picked first date, waiting for second
+                    onChange({ from: range.from, to: range.from });
+                  }
+                }}
+                numberOfMonths={2}
+                disabled={maxDate ? { after: maxDate } : { after: new Date() }}
+              />
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+      {value && (
         <Button
           variant="outline"
           size="sm"
-          className={cn(
-            'h-9 border-dashed justify-start text-left font-normal',
-            !value && 'text-muted-foreground',
-          )}
+          className="h-9 rounded-s-none border-dashed px-2"
+          onClick={handleClear}
+          aria-label="Clear date range"
         >
-          <CalendarIcon className="me-2 h-4 w-4" />
-          {value ? (
-            <span className="flex items-center gap-1">
-              {format(value.from, 'MMM d, yyyy')} – {format(value.to, 'MMM d, yyyy')}
-              <X
-                className="ms-1 h-3 w-3 text-muted-foreground hover:text-foreground"
-                onClick={handleClear}
-              />
-            </span>
-          ) : (
-            placeholder
-          )}
+          <X className="h-3 w-3" data-testid="icon-x" />
         </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <div className="flex">
-          {showPresets && (
-            <div className="border-e p-3 space-y-1 min-w-[140px]">
-              <p className="text-xs font-medium text-muted-foreground mb-2 px-2">Quick Select</p>
-              {presets.map((preset) => (
-                <Button
-                  key={preset.label}
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start text-xs"
-                  onClick={() => handlePreset(preset)}
-                >
-                  {preset.label}
-                </Button>
-              ))}
-            </div>
-          )}
-          <div className="p-3">
-            <Calendar
-              mode="range"
-              selected={value ? { from: value.from, to: value.to } : undefined}
-              onSelect={(range: RDPDateRange | undefined) => {
-                if (range?.from && range?.to) {
-                  onChange({ from: range.from, to: range.to });
-                } else if (range?.from) {
-                  // User picked first date, waiting for second
-                  onChange({ from: range.from, to: range.from });
-                }
-              }}
-              numberOfMonths={2}
-              disabled={maxDate ? { after: maxDate } : { after: new Date() }}
-            />
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
+      )}
+    </div>
   );
 }

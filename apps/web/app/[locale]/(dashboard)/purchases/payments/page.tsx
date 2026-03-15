@@ -2,6 +2,8 @@
 
 import { useTranslations } from 'next-intl';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
+import { ImportWizard } from '@/components/import/import-wizard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +22,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { paymentsMadeApi } from '@/lib/api';
+import { useBulkAction } from '@/lib/hooks/use-bulk-action';
+import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import {
   formatCurrency,
   formatPaymentMode,
@@ -27,19 +32,24 @@ import {
   useDeletePaymentMade,
   useInfinitePaymentsMade,
 } from '@/lib/hooks/use-payments-made';
+import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { Eye, Plus, Trash2 } from 'lucide-react';
+import { Eye, Plus, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
 function PaymentsMadePageContent() {
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');
+  const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
+  const [importOpen, setImportOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkSelectedRows, setBulkSelectedRows] = useState<PaymentMade[]>([]);
 
   const {
     data: payments,
@@ -48,10 +58,35 @@ function PaymentsMadePageContent() {
     fetchNextPage,
     isFetchingNextPage,
     isLoading,
+    refetch,
   } = useInfinitePaymentsMade({
     ...tableParams.queryParams,
   });
   const deletePayment = useDeletePaymentMade();
+
+  const canDelete = hasPermission('purchases.delete');
+
+  const bulkDeleteAction = useBulkAction({
+    mutationFn: (ids) => paymentsMadeApi.bulkDelete(ids).then((r) => r.data),
+    queryKeys: [['payments-made']],
+    successMessage: '{count} payments deleted',
+  });
+
+  const bulkActions = [
+    ...(canDelete
+      ? [
+          {
+            label: 'Delete',
+            icon: Trash2,
+            variant: 'destructive' as const,
+            onClick: (rows: PaymentMade[]) => {
+              setBulkSelectedRows(rows);
+              setBulkDeleteOpen(true);
+            },
+          },
+        ]
+      : []),
+  ];
 
   const handleDelete = async () => {
     if (deleteId) {
@@ -164,12 +199,18 @@ function PaymentsMadePageContent() {
           <h1 className="text-3xl font-bold tracking-tight">{t('payments.title')}</h1>
           <p className="text-muted-foreground">{t('payments.pageDescription')}</p>
         </div>
-        <Button asChild>
-          <Link href="/purchases/payments/new">
-            <Plus className="mr-2 h-4 w-4" />
-            {t('payments.recordPayment')}
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
+          <Button asChild>
+            <Link href="/purchases/payments/new">
+              <Plus className="mr-2 h-4 w-4" />
+              {t('payments.recordPayment')}
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -202,6 +243,8 @@ function PaymentsMadePageContent() {
             onLoadMore={() => fetchNextPage()}
             enableColumnResizing
             tableId="payments-made"
+            enableSelection
+            bulkActions={bulkActions}
             emptyMessage={t('payments.noPayments')}
             emptyAction={
               <Button asChild>
@@ -211,6 +254,32 @@ function PaymentsMadePageContent() {
           />
         </CardContent>
       </Card>
+
+      {/* Bulk Action Dialogs */}
+      <BulkActionConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        action="delete"
+        count={bulkSelectedRows.length}
+        itemType="payments"
+        description="Selected payments will be permanently deleted."
+        destructive
+        isLoading={bulkDeleteAction.isLoading}
+        onConfirm={async () => {
+          await bulkDeleteAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkDeleteOpen(false);
+          refetch();
+        }}
+      />
+
+      {/* Import Wizard */}
+      <ImportWizard
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        entityType={'payments_made' as ImportEntityType}
+        entityLabel="Payments Made"
+        onComplete={() => refetch()}
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>

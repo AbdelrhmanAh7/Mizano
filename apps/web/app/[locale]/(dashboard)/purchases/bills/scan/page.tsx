@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -13,48 +12,27 @@ import {
   AlertTriangle,
   Sparkles,
   X,
-  Plus,
-  Trash2,
   UserPlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   useDocumentIntakeStream,
   useDocumentIntakeConfirm,
   type DocumentIntakeResult,
-  type IntakeLineItem,
 } from '@/lib/hooks/use-ai-document-intake';
-import { useVendors, useCreateVendor } from '@/lib/hooks/use-vendors';
+import { useCreateVendor } from '@/lib/hooks/use-vendors';
+import { BillForm, type BillFormDefaultValues } from '@/components/purchases/bill-form';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 type Step = 'upload' | 'processing' | 'review' | 'confirmed';
 
 export default function ScanBillPage() {
   const router = useRouter();
-  const t = useTranslations('purchases');
-  const tCommon = useTranslations('common');
 
   const [step, setStep] = useState<Step>('upload');
   const [dragOver, setDragOver] = useState(false);
@@ -63,23 +41,12 @@ export default function ScanBillPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [localResult, setLocalResult] = useState<DocumentIntakeResult | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
-
-  // Editable extracted fields
-  const [vendorName, setVendorName] = useState('');
-  const [selectedVendorId, setSelectedVendorId] = useState<string>('');
-  const [documentNumber, setDocumentNumber] = useState('');
-  const [date, setDate] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [lineItems, setLineItems] = useState<IntakeLineItem[]>([]);
-  const [notes, setNotes] = useState('');
+  const [scanDefaults, setScanDefaults] = useState<BillFormDefaultValues | null>(null);
 
   // SSE-based document intake
   const intake = useDocumentIntakeStream();
   const confirmIntake = useDocumentIntakeConfirm();
   const createVendor = useCreateVendor();
-
-  const { data: vendorsData } = useVendors({ limit: 100 });
-  const vendors: Array<{ id: string; name: string }> = vendorsData?.data || [];
 
   // Transition to review when SSE completes
   useEffect(() => {
@@ -87,20 +54,23 @@ export default function ScanBillPage() {
       const result = intake.result;
       setLocalResult(result);
 
-      // Populate editable fields
-      setVendorName(result.extractedFields.vendorName || '');
-      setDocumentNumber(result.extractedFields.documentNumber || '');
-      setDate(result.extractedFields.date || new Date().toISOString().slice(0, 10));
-      setDueDate(result.extractedFields.dueDate || '');
-      setLineItems(
-        result.extractedFields.lineItems.length > 0
-          ? result.extractedFields.lineItems
-          : [{ description: '', quantity: 1, unitPrice: 0, total: 0 }],
-      );
-
-      if (result.matchedVendor) {
-        setSelectedVendorId(result.matchedVendor.id);
-      }
+      setScanDefaults({
+        vendorId: result.matchedVendor?.id || '',
+        date: result.extractedFields.date || format(new Date(), 'yyyy-MM-dd'),
+        dueDate: result.extractedFields.dueDate || '',
+        reference: result.extractedFields.documentNumber || '',
+        currencyCode: result.extractedFields.currency || '',
+        notes: '',
+        lines:
+          result.extractedFields.lineItems.length > 0
+            ? result.extractedFields.lineItems.map((item) => ({
+                description: item.description,
+                quantity: String(item.quantity),
+                rate: String(item.unitPrice),
+                taxRate: String(item.taxAmount ?? 0),
+              }))
+            : [{ description: '', quantity: '1', rate: '', taxRate: '0' }],
+      });
 
       setStep('review');
     }
@@ -181,46 +151,48 @@ export default function ScanBillPage() {
     await intake.processDocument(formData);
   };
 
-  const handleConfirm = async () => {
-    if (!selectedVendorId) {
-      setLocalError('Please select a vendor.');
-      return;
-    }
-    if (lineItems.length === 0) {
-      setLocalError('Please add at least one line item.');
-      return;
-    }
-
+  const handleConfirm = async (formData: Record<string, unknown>) => {
     setLocalError(null);
-
     try {
+      const lines = (
+        formData.lines as Array<{
+          itemId: string | null;
+          accountId: string | null;
+          description: string;
+          quantity: number;
+          rate: number;
+          taxRate: number;
+        }>
+      ).map((l) => ({
+        description: l.description,
+        quantity: l.quantity,
+        rate: l.rate,
+        taxRate: l.taxRate,
+      }));
+
       const response = await confirmIntake.mutateAsync({
         type: 'BILL',
-        vendorId: selectedVendorId,
-        date: date || new Date().toISOString().slice(0, 10),
-        dueDate: dueDate || date || new Date().toISOString().slice(0, 10),
-        documentNumber: documentNumber || undefined,
-        lines: lineItems.map((item) => ({
-          description: item.description,
-          quantity: item.quantity,
-          rate: item.unitPrice,
-        })),
-        notes: notes || undefined,
+        vendorId: formData.vendorId as string,
+        date: formData.date as string,
+        dueDate: formData.dueDate as string,
+        reference: (formData.reference as string) || undefined,
+        currencyCode: (formData.currencyCode as string) || undefined,
+        lines,
+        notes: (formData.notes as string) || undefined,
+        projectId: (formData.projectId as string) || undefined,
         corrections: localResult
           ? {
-              vendorName,
-              documentNumber,
-              date,
-              dueDate,
+              vendorName: localResult.extractedFields.vendorName || '',
+              documentNumber: formData.reference as string,
+              date: formData.date as string,
+              dueDate: formData.dueDate as string,
             }
           : undefined,
       });
 
-      const created = response.data;
       setStep('confirmed');
-
       setTimeout(() => {
-        router.push(`/purchases/bills/${created.id}`);
+        router.push(`/purchases/bills/${response.data.id}`);
       }, 2000);
     } catch (err) {
       setLocalError(
@@ -229,26 +201,13 @@ export default function ScanBillPage() {
     }
   };
 
-  const updateLineItem = (index: number, field: keyof IntakeLineItem, value: string | number) => {
-    setLineItems((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
-      if (field === 'quantity' || field === 'unitPrice') {
-        updated[index].total = updated[index].quantity * updated[index].unitPrice;
-      }
-      return updated;
-    });
+  const handleReupload = () => {
+    setStep('upload');
+    setLocalResult(null);
+    setScanDefaults(null);
+    setLocalError(null);
+    intake.reset();
   };
-
-  const addLineItem = () => {
-    setLineItems((prev) => [...prev, { description: '', quantity: 1, unitPrice: 0, total: 0 }]);
-  };
-
-  const removeLineItem = (index: number) => {
-    setLineItems((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const grandTotal = lineItems.reduce((sum, item) => sum + (item.total || 0), 0);
 
   const getConfidenceBadge = (confidence: number) => {
     if (confidence >= 0.8) return <Badge variant="default">High</Badge>;
@@ -452,9 +411,11 @@ export default function ScanBillPage() {
       )}
 
       {/* Step 3: Review */}
-      {step === 'review' && result && (
+      {step === 'review' && result && scanDefaults && (
         <div className="space-y-6">
-          {/* Extraction Summary */}
+          {/* AI Context Panel */}
+
+          {/* Extraction Results header */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -467,6 +428,9 @@ export default function ScanBillPage() {
                     <Badge variant="outline">{result.extractionMethod}</Badge>
                   )}
                   {getConfidenceBadge(result.ocrConfidence)}
+                  <span className="text-xs text-muted-foreground">
+                    Classification: {Math.round(result.classificationConfidence * 100)}%
+                  </span>
                 </div>
               </div>
               <CardDescription>
@@ -493,196 +457,124 @@ export default function ScanBillPage() {
             </Card>
           )}
 
-          {/* Document Details */}
+          {/* AI Vendor Intelligence */}
           <Card>
             <CardHeader>
-              <CardTitle>Document Details</CardTitle>
+              <CardTitle className="text-sm">AI Vendor Intelligence</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Vendor Selection */}
-                <div className="space-y-2">
-                  <Label>Vendor</Label>
-                  {vendors.length > 0 ? (
-                    <Select value={selectedVendorId} onValueChange={setSelectedVendorId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select vendor..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {vendors.map((vendor) => (
-                          <SelectItem key={vendor.id} value={vendor.id}>
-                            {vendor.name}
-                            {result.matchedVendor?.id === vendor.id && ' (AI Match)'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+            <CardContent className="space-y-2 text-sm">
+              {result.matchedVendor ? (
+                <p>
+                  <span className="text-muted-foreground">AI matched:</span>{' '}
+                  <span className="font-medium">{result.matchedVendor.name}</span>{' '}
+                  <span className="text-muted-foreground">
+                    ({Math.round(result.matchedVendor.similarity * 100)}% confidence)
+                  </span>
+                </p>
+              ) : (
+                <p className="text-muted-foreground">No existing vendor matched.</p>
+              )}
+
+              {result.vendorCandidates.length > 1 && (
+                <p className="text-muted-foreground">
+                  Other candidates:{' '}
+                  {result.vendorCandidates
+                    .filter((c) => c.id !== result.matchedVendor?.id)
+                    .slice(0, 3)
+                    .map((c) => c.name)
+                    .join(', ')}
+                </p>
+              )}
+
+              {result.extractedFields.vendorTaxId && (
+                <p>
+                  <span className="text-muted-foreground">Vendor Tax ID / VAT:</span>{' '}
+                  {result.extractedFields.vendorTaxId}
+                </p>
+              )}
+
+              {result.extractedFields.paymentTerms && (
+                <p>
+                  <span className="text-muted-foreground">Payment Terms:</span>{' '}
+                  {result.extractedFields.paymentTerms}
+                </p>
+              )}
+
+              {!result.matchedVendor && result.suggestCreateVendor && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  disabled={createVendor.isPending}
+                  onClick={async () => {
+                    const suggestion = result.suggestCreateVendor!;
+                    const created = await createVendor.mutateAsync({
+                      name: suggestion.name,
+                      email: suggestion.email ?? undefined,
+                      phone: suggestion.phone ?? undefined,
+                      taxId: suggestion.taxId ?? undefined,
+                    });
+                    if (created?.data?.id) {
+                      setScanDefaults((prev) =>
+                        prev ? { ...prev, vendorId: created.data.id } : prev,
+                      );
+                    }
+                  }}
+                >
+                  {createVendor.isPending ? (
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
                   ) : (
-                    <Input value={vendorName} onChange={(e) => setVendorName(e.target.value)} />
+                    <UserPlus className="mr-2 h-3 w-3" />
                   )}
-                  {result.matchedVendor && (
-                    <p className="text-xs text-muted-foreground">
-                      AI matched: {result.matchedVendor.name} (
-                      {Math.round(result.matchedVendor.similarity * 100)}% confidence)
-                    </p>
-                  )}
-                  {result.vendorCandidates.length > 1 && (
-                    <div className="text-xs text-muted-foreground">
-                      Other candidates:{' '}
-                      {result.vendorCandidates
-                        .filter((c) => c.id !== result.matchedVendor?.id)
-                        .slice(0, 3)
-                        .map((c) => c.name)
-                        .join(', ')}
+                  Create &quot;{result.suggestCreateVendor.name}&quot; as new vendor
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Extracted Financial Summary */}
+          {(result.extractedFields.subtotal != null ||
+            result.extractedFields.tax != null ||
+            result.extractedFields.total != null) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Extracted Financial Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1 text-sm">
+                  {result.extractedFields.subtotal != null && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Extracted Subtotal</span>
+                      <span className="font-mono">
+                        {result.extractedFields.subtotal.toFixed(2)}
+                      </span>
                     </div>
                   )}
-                  {!selectedVendorId && result.suggestCreateVendor && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full mt-1"
-                      disabled={createVendor.isPending}
-                      onClick={async () => {
-                        const suggestion = result.suggestCreateVendor!;
-                        const created = await createVendor.mutateAsync({
-                          name: suggestion.name,
-                          email: suggestion.email,
-                          phone: suggestion.phone,
-                          taxId: suggestion.taxId,
-                        });
-                        if (created?.data?.id) {
-                          setSelectedVendorId(created.data.id);
-                        }
-                      }}
-                    >
-                      {createVendor.isPending ? (
-                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                      ) : (
-                        <UserPlus className="mr-2 h-3 w-3" />
-                      )}
-                      Create &quot;{result.suggestCreateVendor.name}&quot; as new vendor
-                    </Button>
+                  {result.extractedFields.tax != null && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Extracted Tax / VAT</span>
+                      <span className="font-mono">{result.extractedFields.tax.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {result.extractedFields.discount != null &&
+                    result.extractedFields.discount > 0 && (
+                      <div className="flex justify-between text-yellow-600">
+                        <span>Extracted Discount</span>
+                        <span className="font-mono">
+                          -{result.extractedFields.discount.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                  {result.extractedFields.total != null && (
+                    <div className="flex justify-between font-medium border-t pt-1 mt-1">
+                      <span>Extracted Total</span>
+                      <span className="font-mono">{result.extractedFields.total.toFixed(2)}</span>
+                    </div>
                   )}
                 </div>
-
-                {/* Document Number */}
-                <div className="space-y-2">
-                  <Label>Document Number</Label>
-                  <Input
-                    value={documentNumber}
-                    onChange={(e) => setDocumentNumber(e.target.value)}
-                    placeholder="e.g. INV-001"
-                  />
-                </div>
-
-                {/* Date */}
-                <div className="space-y-2">
-                  <Label>Date</Label>
-                  <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-                </div>
-
-                {/* Due Date */}
-                <div className="space-y-2">
-                  <Label>Due Date</Label>
-                  <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Line Items */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>{t('lineItems.title')}</CardTitle>
-                <Button variant="outline" size="sm" onClick={addLineItem}>
-                  <Plus className="mr-1 h-3 w-3" />
-                  Add Item
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40%]">{t('lineItems.description')}</TableHead>
-                    <TableHead className="text-right">{t('lineItems.quantity')}</TableHead>
-                    <TableHead className="text-right">{t('lineItems.rate')}</TableHead>
-                    <TableHead className="text-right">{t('lineItems.amount')}</TableHead>
-                    <TableHead className="w-[50px]" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {lineItems.map((item, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <Input
-                          value={item.description}
-                          onChange={(e) => updateLineItem(index, 'description', e.target.value)}
-                          placeholder="Item description"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min={0}
-                          step={1}
-                          className="text-right w-20"
-                          value={item.quantity}
-                          onChange={(e) =>
-                            updateLineItem(index, 'quantity', parseFloat(e.target.value) || 0)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          className="text-right w-28"
-                          value={item.unitPrice}
-                          onChange={(e) =>
-                            updateLineItem(index, 'unitPrice', parseFloat(e.target.value) || 0)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-medium">
-                        {item.total.toFixed(2)}
-                      </TableCell>
-                      <TableCell>
-                        {lineItems.length > 1 && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => removeLineItem(index)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              <div className="mt-4 flex justify-end">
-                <div className="w-64">
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>{tCommon('total')}</span>
-                    <span className="font-mono">{grandTotal.toFixed(2)}</span>
-                  </div>
-                  {result.extractedFields.total != null &&
-                    Math.abs(grandTotal - result.extractedFields.total) > 0.01 && (
-                      <p className="text-xs text-yellow-600 mt-1">
-                        AI extracted total: {result.extractedFields.total.toFixed(2)} (differs from
-                        line items)
-                      </p>
-                    )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Accounting Suggestion */}
           {result.accountingEntry && (
@@ -709,49 +601,14 @@ export default function ScanBillPage() {
             </Card>
           )}
 
-          {/* Notes */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Notes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add notes..."
-                rows={2}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Actions */}
-          <div className="flex justify-between">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setStep('upload');
-                setLocalResult(null);
-                setLocalError(null);
-                intake.reset();
-              }}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Re-upload
-            </Button>
-            <Button onClick={handleConfirm} disabled={confirmIntake.isPending} size="lg">
-              {confirmIntake.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Confirm &amp; Create Bill
-                </>
-              )}
-            </Button>
-          </div>
+          {/* Bill Form — same as New Bill */}
+          <BillForm
+            key={scanDefaults.vendorId}
+            scanDefaults={scanDefaults}
+            onSubmit={handleConfirm}
+            onCancel={handleReupload}
+            isSubmitting={confirmIntake.isPending}
+          />
         </div>
       )}
 

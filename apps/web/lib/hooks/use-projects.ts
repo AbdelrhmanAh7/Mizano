@@ -39,7 +39,7 @@ export interface Task {
   isBillable: boolean;
   estimatedHours: number | null;
   actualHours: number;
-  status: 'TODO' | 'IN_PROGRESS' | 'COMPLETED';
+  status: 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE';
   assigneeId: string | null;
   assignee?: {
     id: string;
@@ -101,10 +101,12 @@ const projectsApi = {
   getProfitability: (id: string) => api.get(`/projects/${id}/profitability`),
   createInvoice: (id: string, data: Record<string, unknown>) =>
     api.post(`/projects/${id}/invoice`, data),
+  getSummary: () => api.get('/projects/summary'),
 };
 
 const tasksApi = {
   getAll: (projectId: string) => api.get(`/tasks/project/${projectId}`),
+  getMyTasks: () => api.get('/tasks/my-tasks'),
   create: (data: Record<string, unknown>) => api.post('/tasks', data),
   update: (taskId: string, data: Record<string, unknown>) => api.put(`/tasks/${taskId}`, data),
   delete: (taskId: string) => api.delete(`/tasks/${taskId}`),
@@ -217,6 +219,16 @@ export function useCreateProjectInvoice() {
   });
 }
 
+export function useProjectSummary() {
+  return useQuery({
+    queryKey: ['projects', 'summary'],
+    queryFn: async () => {
+      const response = await projectsApi.getSummary();
+      return response.data?.data || response.data;
+    },
+  });
+}
+
 // Task Hooks
 export function useTasks(projectId: string) {
   return useQuery({
@@ -281,6 +293,16 @@ export function useDeleteTask() {
     },
     onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to delete task');
+    },
+  });
+}
+
+export function useMyTasks() {
+  return useQuery({
+    queryKey: ['tasks', 'my-tasks'],
+    queryFn: async () => {
+      const response = await tasksApi.getMyTasks();
+      return response.data?.data || response.data;
     },
   });
 }
@@ -388,7 +410,8 @@ export const projectStatusOptions = [
 export const taskStatusOptions = [
   { value: 'TODO', label: 'To Do' },
   { value: 'IN_PROGRESS', label: 'In Progress' },
-  { value: 'COMPLETED', label: 'Completed' },
+  { value: 'REVIEW', label: 'In Review' },
+  { value: 'DONE', label: 'Done' },
 ];
 
 export function getBillingMethodLabel(method: BillingMethod): string {
@@ -417,7 +440,8 @@ export function getTaskStatusColor(status: TaskStatus): string {
   const colors: Record<TaskStatus, string> = {
     TODO: 'bg-gray-100 text-gray-800',
     IN_PROGRESS: 'bg-blue-100 text-blue-800',
-    COMPLETED: 'bg-green-100 text-green-800',
+    REVIEW: 'bg-yellow-100 text-yellow-800',
+    DONE: 'bg-green-100 text-green-800',
   };
   return colors[status] || colors.TODO;
 }

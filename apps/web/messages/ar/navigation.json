@@ -21,7 +21,9 @@
     "title": "المحاسبة",
     "chartOfAccounts": "دليل الحسابات",
     "journalEntries": "قيود اليومية",
-    "recurring": "المتكررة"
+    "recurring": "المتكررة",
+    "trialBalance": "ميزان المراجعة",
+    "generalLedger": "دفتر الأستاذ العام"
   },
   "inventory": {
     "title": "المخزون",
@@ -39,12 +41,21 @@
     },
     "priceLists": {
       "title": "قوائم الأسعار"
+    },
+    "compositeItems": {
+      "title": "الأصناف المركبة"
+    },
+    "movements": {
+      "title": "الحركات"
     }
   },
   "banking": {
     "title": "البنوك",
     "accounts": {
       "title": "الحسابات البنكية"
+    },
+    "transactions": {
+      "title": "المعاملات"
     },
     "reconciliation": {
       "title": "المطابقة"
@@ -58,6 +69,7 @@
     "projects": {
       "title": "كل المشاريع"
     },
+    "myTasks": "مهامي",
     "timesheets": {
       "title": "سجلات الوقت"
     }

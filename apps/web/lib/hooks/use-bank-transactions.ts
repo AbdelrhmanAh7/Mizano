@@ -16,7 +16,7 @@ export interface BankTransaction {
   reference: string | null;
   amount: string | number;
   type: 'DEPOSIT' | 'WITHDRAWAL';
-  status: 'UNMATCHED' | 'MATCHED' | 'RECONCILED' | 'EXCLUDED';
+  status: 'PENDING' | 'MATCHED' | 'CREATED' | 'RECONCILED';
   matchedDocumentId: string | null;
   matchedDocumentType: 'INVOICE' | 'BILL' | 'EXPENSE' | 'JOURNAL' | null;
   confidence: number | null;
@@ -48,6 +48,8 @@ export interface TransactionFilters {
   status?: TransactionStatus;
   dateFrom?: string;
   dateTo?: string;
+  amountMin?: string;
+  amountMax?: string;
   search?: string;
 }
 
@@ -201,22 +203,22 @@ export function useImportTransactions() {
 // Helper functions
 export function getStatusLabel(status: TransactionStatus): string {
   const labels: Record<TransactionStatus, string> = {
-    UNMATCHED: 'Unmatched',
+    PENDING: 'Pending',
     MATCHED: 'Matched',
+    CREATED: 'Created',
     RECONCILED: 'Reconciled',
-    EXCLUDED: 'Excluded',
   };
   return labels[status] || status;
 }
 
 export function getStatusColor(status: TransactionStatus): string {
   const colors: Record<TransactionStatus, string> = {
-    UNMATCHED: 'bg-yellow-100 text-yellow-800',
+    PENDING: 'bg-yellow-100 text-yellow-800',
     MATCHED: 'bg-blue-100 text-blue-800',
+    CREATED: 'bg-purple-100 text-purple-800',
     RECONCILED: 'bg-green-100 text-green-800',
-    EXCLUDED: 'bg-gray-100 text-gray-800',
   };
-  return colors[status] || colors.UNMATCHED;
+  return colors[status] || colors.PENDING;
 }
 
 export function getConfidenceColor(confidence: number | null): string {

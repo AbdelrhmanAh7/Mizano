@@ -1,13 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { DollarSign, BarChart3, FileText, ArrowRight } from 'lucide-react';
+import {
+  DollarSign,
+  BarChart3,
+  FileText,
+  ArrowRight,
+  Landmark,
+  Clock,
+  TrendingUp,
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslations } from 'next-intl';
+import { useBankingStats } from '@/lib/hooks/use-bank-accounts';
+import { formatCurrency } from '@/lib/hooks/use-bank-accounts';
 
 export default function BankingPage() {
   const t = useTranslations('banking');
+  const { data: stats, isLoading: statsLoading } = useBankingStats();
 
   const modules = [
     {
@@ -31,6 +43,13 @@ export default function BankingPage() {
       href: '/banking/rules',
       color: 'text-purple-600',
     },
+    {
+      title: t('transactions.title'),
+      description: 'View all imported bank transactions and their matching status.',
+      icon: TrendingUp,
+      href: '/banking/transactions',
+      color: 'text-orange-600',
+    },
   ];
 
   return (
@@ -40,7 +59,85 @@ export default function BankingPage() {
         <p className="text-muted-foreground">{t('description')}</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {/* Stats Row */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Landmark className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Accounts</p>
+                {statsLoading ? (
+                  <Skeleton className="h-7 w-12 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold">{stats?.totalAccounts ?? 0}</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <DollarSign className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Balance</p>
+                {statsLoading ? (
+                  <Skeleton className="h-7 w-24 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold font-mono">
+                    {formatCurrency(stats?.totalSystemBalance ?? 0)}
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <Clock className="h-5 w-5 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Pending Transactions</p>
+                {statsLoading ? (
+                  <Skeleton className="h-7 w-12 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold">{stats?.pendingTransactionCount ?? 0}</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">This Month</p>
+                {statsLoading ? (
+                  <Skeleton className="h-7 w-12 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold">{stats?.monthlyTransactionCount ?? 0}</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Module Cards */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {modules.map((module) => (
           <Card key={module.href} className="hover:shadow-lg transition-shadow">
             <CardHeader>

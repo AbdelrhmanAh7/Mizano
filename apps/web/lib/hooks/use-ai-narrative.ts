@@ -49,39 +49,39 @@ export interface QueryResult {
 // ============ API Functions ============
 
 const narrativeApi = {
-  getMonthlyNarrative: async (month: number, year: number) => {
+  getMonthlyNarrative: async (month: number, year: number): Promise<GeneratedNarrative> => {
     const response = await api.get('/ai/narrative/monthly', {
       params: { month, year },
     });
-    return response.data;
+    return response.data?.data ?? response.data;
   },
-  getWeeklySnapshot: async (startDate?: string) => {
+  getWeeklySnapshot: async (startDate?: string): Promise<GeneratedNarrative> => {
     const response = await api.get('/ai/narrative/weekly', {
       params: { startDate },
     });
-    return response.data;
+    return response.data?.data ?? response.data;
   },
-  getCustomerNarrative: async (customerId: string) => {
+  getCustomerNarrative: async (customerId: string): Promise<GeneratedNarrative> => {
     const response = await api.get(`/ai/narrative/customer/${customerId}`);
-    return response.data;
+    return response.data?.data ?? response.data;
   },
-  getItemNarrative: async (itemId: string) => {
+  getItemNarrative: async (itemId: string): Promise<GeneratedNarrative> => {
     const response = await api.get(`/ai/narrative/item/${itemId}`);
-    return response.data;
+    return response.data?.data ?? response.data;
   },
-  getCashFlowNarrative: async () => {
+  getCashFlowNarrative: async (): Promise<GeneratedNarrative> => {
     const response = await api.get('/ai/narrative/cash-flow');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
-  getAvailableQueries: async () => {
+  getAvailableQueries: async (): Promise<QueryTemplate[]> => {
     const response = await api.get('/ai/narrative/queries');
-    return response.data;
+    return response.data?.data ?? response.data;
   },
-  executeQuery: async (queryId: string, params?: Record<string, unknown>) => {
+  executeQuery: async (queryId: string, params?: Record<string, unknown>): Promise<QueryResult> => {
     const response = await api.get(`/ai/narrative/query/${queryId}`, {
       params,
     });
-    return response.data;
+    return response.data?.data ?? response.data;
   },
 };
 

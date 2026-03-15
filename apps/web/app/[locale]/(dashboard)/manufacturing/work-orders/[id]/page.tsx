@@ -13,6 +13,8 @@ import {
   Layers,
   AlertTriangle,
   Calendar,
+  ClipboardList,
+  Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -53,9 +56,12 @@ import {
   useStartWorkOrder,
   useCompleteWorkOrder,
   useCancelWorkOrder,
+  useRecordProduction,
+  useProductionHistory,
   getWorkOrderStatusColor,
   getWorkOrderStatusLabel,
-  MaterialRequirement,
+  type MaterialRequirement,
+  type ProductionEntry,
 } from '@/lib/hooks/use-manufacturing';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTranslations } from 'next-intl';
@@ -73,16 +79,25 @@ export default function WorkOrderDetailPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+  const [recordDialogOpen, setRecordDialogOpen] = useState(false);
   const [producedQuantity, setProducedQuantity] = useState<number>(0);
+  const [rejectedQuantity, setRejectedQuantity] = useState<number>(0);
+  const [wastageQuantity, setWastageQuantity] = useState<number>(0);
+  const [productionNotes, setProductionNotes] = useState('');
+  const [productionDate, setProductionDate] = useState(new Date().toISOString().split('T')[0]);
 
   const { data: workOrder, isLoading } = useWorkOrder(workOrderId);
+  const { data: historyData } = useProductionHistory(workOrderId);
   const deleteWorkOrder = useDeleteWorkOrder();
   const startWorkOrder = useStartWorkOrder();
   const completeWorkOrder = useCompleteWorkOrder();
   const cancelWorkOrder = useCancelWorkOrder();
+  const recordProduction = useRecordProduction(workOrderId);
 
   const canEdit = hasPermission('manufacturing.edit');
   const canDelete = hasPermission('manufacturing.delete');
+
+  const productionHistory: ProductionEntry[] = Array.isArray(historyData) ? historyData : [];
 
   const handleStart = async () => {
     try {
@@ -110,6 +125,32 @@ export default function WorkOrderDetailPage() {
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           'Failed to complete work order',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRecordProduction = async () => {
+    try {
+      await recordProduction.mutateAsync({
+        quantityProduced: producedQuantity,
+        quantityRejected: rejectedQuantity || undefined,
+        wastageQuantity: wastageQuantity || undefined,
+        notes: productionNotes || undefined,
+        date: productionDate,
+      });
+      toast({ title: 'Production entry recorded' });
+      setRecordDialogOpen(false);
+      setProducedQuantity(0);
+      setRejectedQuantity(0);
+      setWastageQuantity(0);
+      setProductionNotes('');
+    } catch (error: unknown) {
+      toast({
+        title: 'Error',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to record production',
         variant: 'destructive',
       });
     }
@@ -156,10 +197,9 @@ export default function WorkOrderDetailPage() {
           <Skeleton className="h-8 w-48" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
         </div>
         <Skeleton className="h-[300px]" />
       </div>
@@ -175,9 +215,7 @@ export default function WorkOrderDetailPage() {
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Work Order Not Found</h1>
-          </div>
+          <h1 className="text-3xl font-bold tracking-tight">Work Order Not Found</h1>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
@@ -199,6 +237,8 @@ export default function WorkOrderDetailPage() {
   const materialRequirements = workOrder.materialRequirements || [];
   const stockAlerts = workOrder.stockAlerts || [];
   const hasShortages = stockAlerts.length > 0;
+
+  const plannedEnd = workOrder.plannedEndDate || workOrder.dueDate;
 
   return (
     <div className="space-y-6">
@@ -235,15 +275,28 @@ export default function WorkOrderDetailPage() {
             </Button>
           )}
           {canEdit && isInProcess && (
-            <Button
-              onClick={() => {
-                setProducedQuantity(workOrder.quantity);
-                setCompleteDialogOpen(true);
-              }}
-            >
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Complete
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setProducedQuantity(1);
+                  setProductionDate(new Date().toISOString().split('T')[0]);
+                  setRecordDialogOpen(true);
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                {t('workOrders.recordProduction')}
+              </Button>
+              <Button
+                onClick={() => {
+                  setProducedQuantity(workOrder.quantity);
+                  setCompleteDialogOpen(true);
+                }}
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Complete
+              </Button>
+            </>
           )}
           {canEdit && (isDraft || isInProcess) && (
             <Button
@@ -311,7 +364,11 @@ export default function WorkOrderDetailPage() {
               Start Date
             </div>
             <div className="text-lg font-bold">
-              {format(new Date(workOrder.startDate), 'MMM d, yyyy')}
+              {workOrder.plannedStartDate
+                ? format(new Date(workOrder.plannedStartDate), 'MMM d, yyyy')
+                : workOrder.startDate
+                  ? format(new Date(workOrder.startDate), 'MMM d, yyyy')
+                  : 'Not set'}
             </div>
           </CardContent>
         </Card>
@@ -320,10 +377,10 @@ export default function WorkOrderDetailPage() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Calendar className="h-4 w-4" />
-              Due Date
+              End Date
             </div>
             <div className="text-lg font-bold">
-              {workOrder.dueDate ? format(new Date(workOrder.dueDate), 'MMM d, yyyy') : 'Not set'}
+              {plannedEnd ? format(new Date(plannedEnd), 'MMM d, yyyy') : 'Not set'}
             </div>
           </CardContent>
         </Card>
@@ -375,6 +432,56 @@ export default function WorkOrderDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Production History */}
+      {(isInProcess || isCompleted) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5" />
+              Production History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {productionHistory.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                {t('production.empty.title')}. {t('production.empty.description')}.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t('production.table.date')}</TableHead>
+                    <TableHead className="text-right">{t('production.table.produced')}</TableHead>
+                    <TableHead className="text-right">{t('production.table.rejected')}</TableHead>
+                    <TableHead className="text-right">{t('production.table.wastage')}</TableHead>
+                    <TableHead>Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {productionHistory.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell>{format(new Date(entry.date), 'MMM d, yyyy')}</TableCell>
+                      <TableCell className="text-right font-mono font-medium text-green-700">
+                        {entry.quantityProduced}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-red-600">
+                        {entry.quantityRejected || 0}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-orange-600">
+                        {entry.wastageQuantity || 0}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {entry.notes || '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Notes */}
       {workOrder.notes && (
         <Card>
@@ -386,6 +493,75 @@ export default function WorkOrderDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Record Production Dialog */}
+      <Dialog open={recordDialogOpen} onOpenChange={setRecordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('workOrders.recordProduction')}</DialogTitle>
+            <DialogDescription>Record a production entry for this work order.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{t('production.form.date')}</Label>
+                <Input
+                  type="date"
+                  value={productionDate}
+                  onChange={(e) => setProductionDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t('production.form.quantityProduced')}</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={producedQuantity}
+                  onChange={(e) => setProducedQuantity(Number(e.target.value))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t('production.form.quantityRejected')}</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={rejectedQuantity}
+                  onChange={(e) => setRejectedQuantity(Number(e.target.value))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t('production.form.wastageQuantity')}</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={wastageQuantity}
+                  onChange={(e) => setWastageQuantity(Number(e.target.value))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{t('production.form.notes')}</Label>
+              <Textarea
+                placeholder="Optional notes..."
+                value={productionNotes}
+                onChange={(e) => setProductionNotes(e.target.value)}
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRecordDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleRecordProduction()}
+              disabled={recordProduction.isPending || producedQuantity <= 0}
+            >
+              {recordProduction.isPending ? 'Recording...' : 'Record Entry'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Complete Dialog */}
       <Dialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
@@ -418,7 +594,7 @@ export default function WorkOrderDetailPage() {
               Cancel
             </Button>
             <Button
-              onClick={handleComplete}
+              onClick={() => void handleComplete()}
               disabled={completeWorkOrder.isPending || producedQuantity <= 0}
             >
               {completeWorkOrder.isPending ? 'Completing...' : 'Complete Production'}
@@ -434,12 +610,14 @@ export default function WorkOrderDetailPage() {
             <AlertDialogTitle>Cancel Work Order</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to cancel work order &quot;{workOrder.workOrderNumber}&quot;?
-              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCancel} className="bg-orange-600 hover:bg-orange-700">
+            <AlertDialogAction
+              onClick={() => void handleCancel()}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
               Cancel Work Order
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -453,12 +631,14 @@ export default function WorkOrderDetailPage() {
             <AlertDialogTitle>Delete Work Order</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete work order &quot;{workOrder.workOrderNumber}&quot;?
-              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogAction
+              onClick={() => void confirmDelete()}
+              className="bg-red-600 hover:bg-red-700"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

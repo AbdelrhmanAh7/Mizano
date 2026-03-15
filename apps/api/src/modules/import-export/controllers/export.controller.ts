@@ -89,13 +89,15 @@ export class ExportController {
   async exportData(
     @Res() res: Response,
     @CurrentOrg() orgId: string,
-    @Param('entityType') entityType: ImportEntityType,
+    @Param('entityType') rawEntityType: string,
     @Query('format') format: ExportFormat = ExportFormat.CSV,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('fields') fields?: string,
     @Query('includeDeleted') includeDeleted?: string,
   ): Promise<void> {
+    // Normalize hyphens to underscores (e.g. 'credit-notes' → 'credit_notes')
+    const entityType = rawEntityType.replace(/-/g, '_') as ImportEntityType;
     if (!Object.values(ImportEntityType).includes(entityType)) {
       throw new BadRequestException('Invalid entity type');
     }
@@ -128,10 +130,12 @@ export class ExportController {
   @ApiQuery({ name: 'format', enum: ExportFormat, required: false })
   @ApiResponse({ status: 200, description: 'Template file' })
   async downloadTemplate(
-    @Param('entityType') entityType: ImportEntityType,
+    @Param('entityType') rawEntityType: string,
     @Query('format') format: ExportFormat = ExportFormat.XLSX,
     @Res() res: Response,
   ): Promise<void> {
+    // Normalize hyphens to underscores (e.g. 'payments-received' → 'payments_received')
+    const entityType = rawEntityType.replace(/-/g, '_') as ImportEntityType;
     if (!Object.values(ImportEntityType).includes(entityType)) {
       throw new BadRequestException('Invalid entity type');
     }

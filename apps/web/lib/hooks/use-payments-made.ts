@@ -128,8 +128,9 @@ export function useUnpaidBills(vendorId: string | undefined) {
       if (!vendorId) throw new Error('Vendor ID is required');
       const response = await billsApi.getAll({
         vendorId,
-        status: 'OPEN,OVERDUE',
-        hasBalance: true,
+        status: 'OPEN,OVERDUE,PARTIALLY_PAID',
+        hasBalance: 'true',
+        limit: 100,
       });
       return response.data;
     },

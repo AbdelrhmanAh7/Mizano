@@ -1,6 +1,11 @@
 'use client';
 
-import { DataTable, SortableHeader } from '@/components/data-table';
+import {
+  DataTable,
+  DataTableFacetedFilter,
+  DataTableSearch,
+  SortableHeader,
+} from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
 import {
   AlertDialog,
@@ -15,6 +20,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,13 +28,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { vatReturnsApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
@@ -38,33 +37,46 @@ import {
   formatCurrency,
   getVATReturnStatusColor,
   getVATReturnStatusLabel,
+  normalizeVATReturn,
   useDeleteVATReturn,
   useFileVATReturn,
   useVATReturns,
   VATReturn,
 } from '@/lib/hooks/use-tax';
+import { cn } from '@/lib/utils';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { Eye, FileCheck, Filter, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  DollarSign,
+  Eye,
+  FileCheck,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Suspense, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 
 function VATReturnsPageContent() {
   const t = useTranslations('tax');
   const tCommon = useTranslations('common');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
-  const tableParams = useTableParams({ defaultSortBy: 'createdAt' });
+  const tableParams = useTableParams({
+    defaultSortBy: 'startDate',
+    filterKeys: ['status'],
+  });
 
   const STATUS_OPTIONS = [
-    { value: 'all', label: t('returns.allStatuses') },
-    { value: 'DRAFT', label: tCommon('status.draft') },
-    { value: 'FILED', label: tCommon('status.filed') },
-    { value: 'PAID', label: tCommon('status.paid') },
+    { value: 'DRAFT', label: t('returns.statusFlow.draft') },
+    { value: 'CALCULATED', label: t('returns.statusFlow.calculated') },
+    { value: 'SUBMITTED', label: t('returns.statusFlow.submitted') },
+    { value: 'FILED', label: t('returns.statusFlow.filed') },
   ];
 
-  const [selectedStatus, setSelectedStatus] = useState('all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [fileDialogOpen, setFileDialogOpen] = useState(false);
   const [selectedReturn, setSelectedReturn] = useState<VATReturn | null>(null);
@@ -74,13 +86,37 @@ function VATReturnsPageContent() {
     isLoading,
     refetch,
   } = useVATReturns({
-    status: selectedStatus !== 'all' ? selectedStatus : undefined,
+    status: (tableParams.filters.status as string) || undefined,
   });
   const deleteReturn = useDeleteVATReturn();
   const fileReturn = useFileVATReturn();
 
-  const returns = returnsData?.data || [];
-  const meta = returnsData?.meta;
+  const rawReturns: VATReturn[] = returnsData?.data || returnsData || [];
+  const returns = useMemo(() => rawReturns.map(normalizeVATReturn), [rawReturns]);
+
+  // Client-side search
+  const filteredReturns = useMemo(() => {
+    if (!tableParams.search) return returns;
+    const q = tableParams.search.toLowerCase();
+    return returns.filter(
+      (r) =>
+        r.returnNumber?.toLowerCase().includes(q) ||
+        r.period?.toLowerCase().includes(q) ||
+        format(new Date(r.startDate), 'MMM yyyy').toLowerCase().includes(q),
+    );
+  }, [returns, tableParams.search]);
+
+  // Summary calculations
+  const totalOutputVat = returns.reduce(
+    (sum, r) =>
+      sum + (typeof r.outputVat === 'string' ? parseFloat(r.outputVat) : (r.outputVat ?? 0)),
+    0,
+  );
+  const totalInputVat = returns.reduce(
+    (sum, r) => sum + (typeof r.inputVat === 'string' ? parseFloat(r.inputVat) : (r.inputVat ?? 0)),
+    0,
+  );
+  const netPosition = totalOutputVat - totalInputVat;
 
   const canCreate = hasPermission('tax.create');
   const canEdit = hasPermission('tax.edit');
@@ -181,6 +217,23 @@ function VATReturnsPageContent() {
 
   const columns: ColumnDef<VATReturn>[] = [
     {
+      accessorKey: 'returnNumber',
+      header: () => (
+        <SortableHeader
+          label={t('returns.table.returnNumber')}
+          columnId="returnNumber"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <Link href={`/tax/returns/${row.original.id}`} className="font-medium hover:underline">
+          {row.original.returnNumber || '-'}
+        </Link>
+      ),
+    },
+    {
       id: 'period',
       header: () => (
         <SortableHeader
@@ -192,10 +245,10 @@ function VATReturnsPageContent() {
         />
       ),
       cell: ({ row }) => (
-        <Link href={`/tax/returns/${row.original.id}`} className="font-medium hover:underline">
+        <span className="text-sm">
           {format(new Date(row.original.startDate), 'MMM d')} -{' '}
           {format(new Date(row.original.endDate), 'MMM d, yyyy')}
-        </Link>
+        </span>
       ),
     },
     {
@@ -223,7 +276,10 @@ function VATReturnsPageContent() {
             : row.original.netVat;
         return (
           <span
-            className={`font-mono font-semibold ${netVat > 0 ? 'text-red-600' : 'text-green-600'}`}
+            className={cn(
+              'font-mono font-semibold',
+              netVat > 0 ? 'text-red-600' : 'text-green-600',
+            )}
           >
             {formatCurrency(row.original.netVat)}
           </span>
@@ -245,6 +301,8 @@ function VATReturnsPageContent() {
       meta: { cellClassName: 'text-right' },
       cell: ({ row }) => {
         const vatReturn = row.original;
+        const isDraft = vatReturn.status === 'DRAFT';
+        const isCalculated = vatReturn.status === 'CALCULATED';
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -259,13 +317,13 @@ function VATReturnsPageContent() {
                   {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
-              {canEdit && vatReturn.status === 'DRAFT' && (
+              {canEdit && (isDraft || isCalculated) && (
                 <DropdownMenuItem onClick={() => handleFile(vatReturn)}>
                   <FileCheck className="mr-2 h-4 w-4" />
-                  {t('returns.fileReturn')}
+                  {t('returns.submitReturn')}
                 </DropdownMenuItem>
               )}
-              {canDelete && vatReturn.status === 'DRAFT' && (
+              {canDelete && isDraft && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -304,23 +362,85 @@ function VATReturnsPageContent() {
         </div>
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              {t('returns.summary.totalOutputVat')}
+            </CardTitle>
+            <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <div className="text-2xl font-bold font-mono">{formatCurrency(totalOutputVat)}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              {t('returns.summary.totalInputVat')}
+            </CardTitle>
+            <ArrowDownLeft className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <div className="text-2xl font-bold font-mono">{formatCurrency(totalInputVat)}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              {t('returns.summary.netVatPosition')}
+            </CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <div
+                className={cn(
+                  'text-2xl font-bold font-mono',
+                  netPosition > 0 ? 'text-red-600' : 'text-green-600',
+                )}
+              >
+                {formatCurrency(Math.abs(netPosition))}
+                <span className="text-xs font-normal text-muted-foreground ml-2">
+                  {netPosition > 0 ? t('returns.netPayable') : t('returns.netRefundable')}
+                </span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-[180px]">
-                <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder={t('returns.filterByStatus')} />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <DataTableSearch
+              value={tableParams.search}
+              onChange={tableParams.setSearch}
+              placeholder={t('returns.searchPlaceholder')}
+            />
+            <DataTableFacetedFilter
+              title={t('returns.filterByStatus')}
+              options={STATUS_OPTIONS}
+              selected={tableParams.filters.status ? [tableParams.filters.status] : []}
+              onSelectionChange={(values) =>
+                tableParams.setFilter('status', values[0] || undefined)
+              }
+              singleSelect
+            />
             <Button variant="outline" size="icon" onClick={() => refetch()} aria-label="Refresh">
               <RefreshCw className="h-4 w-4" />
             </Button>
@@ -336,13 +456,8 @@ function VATReturnsPageContent() {
         <CardContent>
           <DataTable
             columns={columns}
-            data={returns}
-            page={meta?.page || 1}
-            totalPages={meta?.totalPages || 1}
-            total={meta?.total || 0}
-            limit={tableParams.limit}
-            onPageChange={tableParams.setPage}
-            onLimitChange={tableParams.setLimit}
+            data={filteredReturns}
+            total={filteredReturns.length}
             isLoading={isLoading}
             enableSelection
             bulkActions={bulkActions}
@@ -404,7 +519,7 @@ function VATReturnsPageContent() {
         onConfirm={async () => {
           await bulkDeleteAction.execute(bulkSelectedRows.map((r) => r.id));
           setBulkDeleteOpen(false);
-          refetch();
+          void refetch();
         }}
       />
       <BulkActionConfirmDialog
@@ -418,7 +533,7 @@ function VATReturnsPageContent() {
         onConfirm={async () => {
           await bulkSubmitAction.execute(bulkSelectedRows.map((r) => r.id));
           setBulkSubmitOpen(false);
-          refetch();
+          void refetch();
         }}
       />
     </div>

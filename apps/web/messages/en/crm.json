@@ -1,13 +1,38 @@
 {
   "title": "CRM",
-  "description": "Manage leads and deals",
+  "description": "Manage leads, deals, and customer relationships",
+  "hub": {
+    "quickActions": "Quick Actions",
+    "newLead": "New Lead",
+    "newDeal": "New Deal",
+    "viewPipeline": "View Pipeline",
+    "stats": {
+      "totalLeads": "Total Leads",
+      "totalLeadsDesc": "{qualified} qualified, {new} new",
+      "activeDeals": "Active Deals",
+      "activeDealsDesc": "In pipeline",
+      "pipelineValue": "Pipeline Value",
+      "pipelineValueDesc": "Weighted: {weighted}",
+      "winRate": "Win Rate",
+      "winRateDesc": "From closed deals"
+    },
+    "recentActivity": "Recent Activity",
+    "noActivity": "No recent activity",
+    "leadsBySource": "Leads by Source",
+    "noLeads": "No leads yet",
+    "dealsByStage": "Deals by Stage",
+    "noDeals": "No deals yet",
+    "dealsInStage": "{count} deals"
+  },
   "leads": {
     "title": "Leads",
+    "description": "Track and manage sales leads",
     "newLead": "New Lead",
     "editLead": "Edit Lead",
     "deleteLead": "Delete Lead",
     "leadDetails": "Lead Details",
     "convertToDeal": "Convert to Deal",
+    "convertToCustomer": "Convert to Customer",
     "form": {
       "name": "Name",
       "namePlaceholder": "Enter lead name",
@@ -27,6 +52,7 @@
       "new": "New",
       "contacted": "Contacted",
       "qualified": "Qualified",
+      "unqualified": "Unqualified",
       "junk": "Junk"
     },
     "sources": {
@@ -35,6 +61,7 @@
       "googleAds": "Google Ads",
       "referral": "Referral",
       "coldCall": "Cold Call",
+      "tradeShow": "Trade Show",
       "other": "Other"
     },
     "table": {
@@ -42,20 +69,26 @@
       "company": "Company",
       "source": "Source",
       "assignedTo": "Assigned To",
-      "status": "Status"
+      "status": "Status",
+      "score": "Score"
     },
     "empty": {
       "title": "No leads yet",
-      "description": "Add your first lead"
+      "description": "Add your first lead to start building your pipeline"
     }
   },
   "deals": {
     "title": "Deals",
+    "description": "Manage deals and track revenue",
     "newDeal": "New Deal",
     "editDeal": "Edit Deal",
     "deleteDeal": "Delete Deal",
     "dealDetails": "Deal Details",
     "convertToCustomer": "Convert to Customer",
+    "markAsWon": "Mark as Won",
+    "markAsLost": "Mark as Lost",
+    "kanbanView": "Kanban",
+    "tableView": "Table",
     "form": {
       "name": "Deal Name",
       "namePlaceholder": "Enter deal name",
@@ -65,6 +98,7 @@
       "customerPlaceholder": "Select customer (optional)",
       "stage": "Stage",
       "value": "Deal Value",
+      "probability": "Probability",
       "expectedCloseDate": "Expected Close Date",
       "notes": "Notes",
       "notesPlaceholder": "Enter notes",
@@ -83,17 +117,32 @@
       "name": "Name",
       "customer": "Customer",
       "value": "Value",
+      "probability": "Probability",
       "expectedClose": "Expected Close",
       "stage": "Stage"
     },
     "pipeline": {
       "title": "Deal Pipeline",
       "totalValue": "Total Value",
-      "dealCount": "{count} deals"
+      "weightedValue": "Weighted Value",
+      "dealCount": "{count} deals",
+      "totalDeals": "Total Deals",
+      "conversionRate": "Conversion Rate"
     },
     "empty": {
       "title": "No deals yet",
-      "description": "Create your first deal"
+      "description": "Create your first deal to start tracking revenue"
+    }
+  },
+  "activities": {
+    "title": "Activities",
+    "logActivity": "Log Activity",
+    "types": {
+      "call": "Call",
+      "email": "Email",
+      "meeting": "Meeting",
+      "note": "Note",
+      "task": "Task"
     }
   }
 }

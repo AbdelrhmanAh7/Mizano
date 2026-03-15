@@ -49,6 +49,14 @@ export class VendorCreditsController {
     return this.vendorCreditsService.findAll(orgId, query);
   }
 
+  @Post('bulk-delete')
+  @Permissions('purchases.delete')
+  @InvalidateCache('vendor-credits:*')
+  @ApiOperation({ summary: 'Bulk delete vendor credits' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.vendorCreditsService.bulkDelete(orgId, dto.ids);
+  }
+
   @Get('cursor')
   @Permissions('purchases.view')
   @ApiOperation({ summary: 'List vendor credits with cursor-based pagination' })

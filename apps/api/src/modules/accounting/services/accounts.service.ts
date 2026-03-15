@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AccountType, Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
@@ -37,6 +38,10 @@ export class AccountsService {
       if (!parent) {
         throw new BadRequestException('Parent account not found');
       }
+
+      if (parent.type !== type) {
+        throw new BadRequestException('Child account type must match parent account type');
+      }
     }
 
     const account = await this.prisma.account.create({
@@ -60,11 +65,12 @@ export class AccountsService {
   }
 
   async findAll(organizationId: string, query: PaginationDto) {
-    const { page = 1, limit = 100, search, sortBy = 'code', sortOrder = 'asc' } = query;
+    const { page = 1, limit = 100, search, sortBy = 'code', sortOrder = 'asc', type } = query;
 
-    const where = {
+    const where: Prisma.AccountWhereInput = {
       organizationId,
       deletedAt: null,
+      ...(type && { type: type as AccountType }),
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' as const } },
@@ -210,6 +216,10 @@ export class AccountsService {
       if (!parent) {
         throw new BadRequestException('Parent account not found');
       }
+
+      if (parent.type !== account.type) {
+        throw new BadRequestException('Child account type must match parent account type');
+      }
     }
 
     const updatedAccount = await this.prisma.account.update({
@@ -255,6 +265,59 @@ export class AccountsService {
     });
 
     return { message: 'Account deleted successfully' };
+  }
+
+  async getBalance(organizationId: string, accountId: string, asOfDate?: string) {
+    const account = await this.prisma.account.findFirst({
+      where: { id: accountId, organizationId, deletedAt: null },
+    });
+
+    if (!account) {
+      throw new NotFoundException('Account not found');
+    }
+
+    const dateFilter: Prisma.JournalWhereInput = {};
+    if (asOfDate) {
+      dateFilter.date = { lte: new Date(asOfDate) };
+    }
+
+    const aggregation = await this.prisma.journalLine.aggregate({
+      where: {
+        accountId,
+        journal: {
+          organizationId,
+          isPosted: true,
+          deletedAt: null,
+          ...dateFilter,
+        },
+      },
+      _sum: {
+        debit: true,
+        credit: true,
+      },
+    });
+
+    const totalDebits = new Decimal(aggregation._sum.debit?.toString() || '0');
+    const totalCredits = new Decimal(aggregation._sum.credit?.toString() || '0');
+    const openingBalance = new Decimal(account.openingBalance?.toString() || '0');
+
+    // Debit-normal: ASSET, EXPENSE; Credit-normal: LIABILITY, EQUITY, INCOME, REVENUE
+    const debitNormalTypes: string[] = [AccountType.ASSET, AccountType.EXPENSE];
+    const balance = debitNormalTypes.includes(account.type)
+      ? totalDebits.minus(totalCredits).plus(openingBalance)
+      : totalCredits.minus(totalDebits).plus(openingBalance);
+
+    return {
+      accountId,
+      accountCode: account.code,
+      accountName: account.name,
+      accountType: account.type,
+      balance,
+      totalDebits,
+      totalCredits,
+      openingBalance,
+      asOfDate: asOfDate || null,
+    };
   }
 
   async seedDefaultAccounts(organizationId: string) {

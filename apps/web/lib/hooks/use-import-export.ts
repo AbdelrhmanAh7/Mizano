@@ -13,7 +13,13 @@ export type ImportEntityType =
   | 'expenses'
   | 'journals'
   | 'bank_transactions'
-  | 'employees';
+  | 'employees'
+  | 'quotes'
+  | 'credit_notes'
+  | 'payments_received'
+  | 'delivery_challans'
+  | 'vendor_credits'
+  | 'payments_made';
 
 export type ExportFormat = 'csv' | 'xlsx' | 'json';
 
@@ -124,7 +130,7 @@ const importExportApi = {
     return response.data;
   },
   getExportTemplate: async (entityType: ImportEntityType, format: ExportFormat = 'csv') => {
-    const response = await api.get(`/import/template/${entityType}`, {
+    const response = await api.get(`/export/template/${entityType}`, {
       params: { format },
       responseType: 'blob',
     });
@@ -227,6 +233,12 @@ export function getEntityTypeLabel(type: ImportEntityType): string {
     journals: 'Journal Entries',
     bank_transactions: 'Bank Transactions',
     employees: 'Employees',
+    quotes: 'Quotes',
+    credit_notes: 'Credit Notes',
+    payments_received: 'Payments Received',
+    delivery_challans: 'Delivery Challans',
+    vendor_credits: 'Vendor Credits',
+    payments_made: 'Payments Made',
   };
   return labels[type] || type;
 }
@@ -243,6 +255,12 @@ export function getEntityTypeIcon(type: ImportEntityType): string {
     journals: '📔',
     bank_transactions: '🏦',
     employees: '👤',
+    quotes: '📝',
+    credit_notes: '📋',
+    payments_received: '💰',
+    delivery_challans: '🚚',
+    vendor_credits: '🏷️',
+    payments_made: '💸',
   };
   return icons[type] || '📋';
 }

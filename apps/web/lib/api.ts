@@ -216,6 +216,7 @@ export const customersApi = {
   ...crud('/customers'),
   getStatement: (id: string, params?: Record<string, unknown>) =>
     api.get(`/customers/${id}/statement`, { params }),
+  bulkDelete: (ids: string[]) => api.post('/customers/bulk-delete', { ids }),
 };
 
 export const quotesApi = {
@@ -224,6 +225,7 @@ export const quotesApi = {
   accept: (id: string) => api.patch(`/quotes/${id}/accept`),
   decline: (id: string) => api.patch(`/quotes/${id}/decline`),
   convertToInvoice: (id: string) => api.post(`/quotes/${id}/convert-to-invoice`),
+  clone: (id: string) => api.post(`/quotes/${id}/clone`),
   bulkDelete: (ids: string[]) => api.post('/quotes/bulk-delete', { ids }),
   bulkSend: (ids: string[]) => api.post('/quotes/bulk-send', { ids }),
   bulkDecline: (ids: string[]) => api.post('/quotes/bulk-decline', { ids }),
@@ -233,6 +235,7 @@ export const invoicesApi = {
   ...crud('/invoices'),
   send: (id: string) => api.patch(`/invoices/${id}/send`),
   void: (id: string) => api.patch(`/invoices/${id}/void`),
+  clone: (id: string) => api.post(`/invoices/${id}/clone`),
   bulkDelete: (ids: string[]) => api.post('/invoices/bulk-delete', { ids }),
   bulkSend: (ids: string[]) => api.post('/invoices/bulk-send', { ids }),
   bulkVoid: (ids: string[]) => api.post('/invoices/bulk-void', { ids }),
@@ -241,10 +244,20 @@ export const invoicesApi = {
 
 export const creditNotesApi = {
   ...crud('/credit-notes'),
+  bulkDelete: (ids: string[]) => api.post('/credit-notes/bulk-delete', { ids }),
 };
 
 export const paymentsReceivedApi = {
   ...crud('/payments-received'),
+  bulkDelete: (ids: string[]) => api.post('/payments-received/bulk-delete', { ids }),
+};
+
+export const deliveryChallansApi = {
+  ...crud('/delivery-challans'),
+  issue: (id: string) => api.post(`/delivery-challans/${id}/issue`),
+  markReturned: (id: string) => api.post(`/delivery-challans/${id}/mark-returned`),
+  bulkDelete: (ids: string[]) => api.post('/delivery-challans/bulk-delete', { ids }),
+  bulkIssue: (ids: string[]) => api.post('/delivery-challans/bulk-issue', { ids }),
 };
 
 // ===========================================================================
@@ -253,6 +266,7 @@ export const paymentsReceivedApi = {
 
 export const vendorsApi = {
   ...crud('/vendors'),
+  bulkDelete: (ids: string[]) => api.post('/vendors/bulk-delete', { ids }),
 };
 
 export const expensesApi = {
@@ -266,6 +280,7 @@ export const expensesApi = {
 export const billsApi = {
   ...crud('/bills'),
   open: (id: string) => api.patch(`/bills/${id}/open`),
+  clone: (id: string) => api.post(`/bills/${id}/clone`),
   bulkDelete: (ids: string[]) => api.post('/bills/bulk-delete', { ids }),
   bulkOpen: (ids: string[]) => api.post('/bills/bulk-open', { ids }),
   bulkApprove: (ids: string[]) => api.post('/bills/bulk-approve', { ids }),
@@ -274,6 +289,7 @@ export const billsApi = {
 
 export const paymentsMadeApi = {
   ...crud('/payments-made'),
+  bulkDelete: (ids: string[]) => api.post('/payments-made/bulk-delete', { ids }),
 };
 
 export const vendorCreditsApi = {
@@ -281,6 +297,7 @@ export const vendorCreditsApi = {
   applyToBill: (id: string, billId: string) => api.patch(`/vendor-credits/${id}/apply`, { billId }),
   refund: (id: string, bankAccountId: string) =>
     api.patch(`/vendor-credits/${id}/refund`, { bankAccountId }),
+  bulkDelete: (ids: string[]) => api.post('/vendor-credits/bulk-delete', { ids }),
 };
 
 // ===========================================================================
@@ -300,6 +317,27 @@ export const transfersApi = {
   ...crud('/transfers'),
   complete: (id: string) => api.patch(`/transfers/${id}/complete`),
   cancel: (id: string) => api.patch(`/transfers/${id}/cancel`),
+  markInTransit: (id: string) => api.patch(`/transfers/${id}/in-transit`),
+};
+
+export const compositeItemsApi = {
+  ...crud('/composite-items'),
+  checkAvailability: (id: string, quantity?: number) =>
+    api.get(`/composite-items/${id}/availability${quantity ? `?quantity=${quantity}` : ''}`),
+  assemble: (id: string, data: { quantity: number; warehouseId: string }) =>
+    api.post(`/composite-items/${id}/assemble`, data),
+};
+
+export const inventoryLevelsApi = {
+  getAll: (params?: { itemId?: string; warehouseId?: string }) =>
+    api.get('/inventory-levels', { params }),
+  getByItem: (itemId: string) => api.get(`/inventory-levels/by-item/${itemId}`),
+};
+
+export const inventoryMovementsApi = {
+  getAll: (params?: Record<string, unknown>) => api.get('/inventory-movements', { params }),
+  getAllCursor: (params?: Record<string, unknown>) =>
+    api.get('/inventory-movements/cursor', { params }),
 };
 
 export const adjustmentsApi = {
@@ -319,6 +357,8 @@ export const accountsApi = {
   getByType: (type: string) => api.get(`/accounts/by-type/${type}`),
   seedDefaults: () => api.post('/accounts/seed-defaults'),
   seedByIndustry: (industry: string) => api.post(`/accounts/seed/${industry}`),
+  getBalance: (id: string, params?: { asOfDate?: string }) =>
+    api.get(`/accounts/${id}/balance`, { params }),
 };
 
 export const journalsApi = {
@@ -331,6 +371,23 @@ export const journalsApi = {
 export const recurringProfilesApi = {
   ...crud('/recurring-profiles', { hasCursor: false }),
   toggle: (id: string) => api.patch(`/recurring-profiles/${id}/toggle`),
+  execute: (id: string) => api.post(`/recurring-profiles/${id}/execute`),
+  getStatistics: () => api.get('/recurring-profiles/statistics'),
+  getExecutionHistory: (id: string, params?: { limit?: number }) =>
+    api.get(`/recurring-profiles/${id}/executions`, { params }),
+  getUpcoming: (days?: number) =>
+    api.get(`/recurring-profiles/upcoming${days ? `?days=${days}` : ''}`),
+};
+
+// ===========================================================================
+// Accounting Reports
+// ===========================================================================
+
+export const accountingReportsApi = {
+  getTrialBalance: (params?: { asOfDate?: string }) =>
+    api.get('/accounting-reports/trial-balance', { params }),
+  getGeneralLedger: (accountId: string, params?: { dateFrom?: string; dateTo?: string }) =>
+    api.get(`/accounting-reports/general-ledger/${accountId}`, { params }),
 };
 
 // ===========================================================================
@@ -457,6 +514,8 @@ export const bankAccountsApi = {
   getTransactions: (id: string, params?: Record<string, unknown>) =>
     api.get(`/bank-accounts/${id}/transactions`, { params }),
   getReconciliation: (id: string) => api.get(`/bank-accounts/${id}/reconciliation`),
+  getStats: () => api.get('/bank-accounts/stats'),
+  getBalanceHistory: (id: string) => api.get(`/bank-accounts/${id}/balance-history`),
 };
 
 export const bankTransactionsApi = {
@@ -472,10 +531,12 @@ export const bankTransactionsApi = {
     api.post(`/bank-transactions/${id}/create-expense`, data),
   createTransfer: (id: string, data: Record<string, unknown>) =>
     api.post(`/bank-transactions/${id}/create-transfer`, data),
-  import: (bankAccountId: string, data: FormData) =>
-    api.post(`/bank-transactions/import/${bankAccountId}`, data, {
+  import: (bankAccountId: string, data: FormData) => {
+    data.append('bankAccountId', bankAccountId);
+    return api.post('/bank-transactions/import-statement', data, {
       headers: { 'Content-Type': 'multipart/form-data' },
-    }),
+    });
+  },
 };
 
 export const bankRulesApi = {

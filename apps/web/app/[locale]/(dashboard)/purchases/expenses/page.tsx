@@ -8,6 +8,7 @@ import {
   SortableHeader,
 } from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
+import { ImportWizard } from '@/components/import/import-wizard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,12 +38,13 @@ import {
   useInfiniteExpenses,
 } from '@/lib/hooks/use-expenses';
 import { useExportAll } from '@/lib/hooks/use-export-all';
+import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
-import { CheckCircle, Eye, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { CheckCircle, Eye, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
@@ -58,6 +60,7 @@ function ExpensesPageContent() {
     mode: 'virtual',
   });
 
+  const [importOpen, setImportOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
 
@@ -265,6 +268,10 @@ function ExpensesPageContent() {
           <p className="text-muted-foreground">{t('expenses.pageDescription')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
           {canCreate && (
             <Button asChild>
               <Link href="/purchases/expenses/new">
@@ -394,6 +401,15 @@ function ExpensesPageContent() {
           setBulkApproveOpen(false);
           refetch();
         }}
+      />
+
+      {/* Import Wizard */}
+      <ImportWizard
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        entityType={'expenses' as ImportEntityType}
+        entityLabel="Expenses"
+        onComplete={() => refetch()}
       />
     </div>
   );

@@ -46,6 +46,13 @@ export class TransfersController {
     return this.transfersService.findOne(orgId, id);
   }
 
+  @Patch(':id/in-transit')
+  @Permissions('inventory.edit')
+  @ApiOperation({ summary: 'Mark a stock transfer as in-transit' })
+  markInTransit(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.transfersService.markInTransit(orgId, id);
+  }
+
   @Patch(':id/complete')
   @Permissions('inventory.edit')
   @ApiOperation({ summary: 'Complete a stock transfer' })

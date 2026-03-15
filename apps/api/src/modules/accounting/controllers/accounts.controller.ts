@@ -98,6 +98,17 @@ export class AccountsController {
     return this.accountsService.findByType(orgId, type);
   }
 
+  @Get(':id/balance')
+  @Permissions('accounting.view')
+  @ApiOperation({ summary: 'Get account balance' })
+  getBalance(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Query('asOfDate') asOfDate?: string,
+  ) {
+    return this.accountsService.getBalance(orgId, id, asOfDate);
+  }
+
   @Get(':id')
   @Permissions('accounting.view')
   @ApiOperation({ summary: 'Get account by ID' })

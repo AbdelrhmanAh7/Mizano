@@ -395,6 +395,39 @@ describe('JournalsService', () => {
     });
   });
 
+  describe('findAllCursor', () => {
+    it('should reject invalid sortBy (e.g. entryDate) and fall back to date', async () => {
+      prisma.journal.findMany.mockResolvedValue([]);
+      prisma.journal.count.mockResolvedValue(0);
+
+      await service.findAllCursor(ORG_ID, { sortBy: 'entryDate', take: 10 });
+
+      const findCall = prisma.journal.findMany.mock.calls[0]![0]!;
+      expect(findCall.orderBy).toEqual({ date: 'desc' });
+    });
+
+    it('should accept valid sortBy fields like journalNumber', async () => {
+      prisma.journal.findMany.mockResolvedValue([]);
+      prisma.journal.count.mockResolvedValue(0);
+
+      await service.findAllCursor(ORG_ID, { sortBy: 'journalNumber', sortOrder: 'asc', take: 10 });
+
+      const findCall = prisma.journal.findMany.mock.calls[0]![0]!;
+      expect(findCall.orderBy).toEqual({ journalNumber: 'asc' });
+    });
+
+    it('should include organizationId and exclude soft-deleted records', async () => {
+      prisma.journal.findMany.mockResolvedValue([]);
+      prisma.journal.count.mockResolvedValue(0);
+
+      await service.findAllCursor(ORG_ID, {});
+
+      const findCall = prisma.journal.findMany.mock.calls[0]![0]!;
+      expect(findCall.where!.organizationId).toBe(ORG_ID);
+      expect(findCall.where!.deletedAt).toBeNull();
+    });
+  });
+
   describe('update', () => {
     it('should reject updating lines with unbalanced totals', async () => {
       const journal = createMockJournalEntry({ id: 'j1', date: new Date('2025-06-01') });

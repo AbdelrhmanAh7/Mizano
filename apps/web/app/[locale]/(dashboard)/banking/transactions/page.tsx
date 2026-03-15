@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ArrowUpRight, ArrowDownLeft, Eye } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, Eye, Filter, X, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -22,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import {
@@ -31,18 +34,38 @@ import {
   type TransactionStatus,
 } from '@/lib/hooks/use-bank-transactions';
 import { useTranslations } from 'next-intl';
+import { StatementImportZone } from '@/components/banking/statement-import-zone';
 
 export default function BankTransactionsPage() {
   const t = useTranslations('banking');
   const [statusFilter, setStatusFilter] = useState<TransactionStatus | ''>('');
   const [bankAccountId] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [amountMin, setAmountMin] = useState('');
+  const [amountMax, setAmountMax] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+
+  const hasActiveFilters = dateFrom || dateTo || amountMin || amountMax;
 
   const { data, isLoading } = useBankTransactions({
     status: (statusFilter || undefined) as TransactionStatus | undefined,
     bankAccountId: bankAccountId || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    amountMin: amountMin || undefined,
+    amountMax: amountMax || undefined,
   });
 
   const transactions = data?.data || [];
+
+  const clearFilters = () => {
+    setDateFrom('');
+    setDateTo('');
+    setAmountMin('');
+    setAmountMax('');
+  };
 
   if (isLoading) {
     return (
@@ -60,7 +83,20 @@ export default function BankTransactionsPage() {
         <p className="text-muted-foreground">View and manage imported bank transactions</p>
       </div>
 
-      <div className="flex gap-4">
+      {/* Import Statement */}
+      <Collapsible open={importOpen} onOpenChange={setImportOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline">
+            <Upload className="mr-2 h-4 w-4" />
+            Import Statement
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-3">
+          <StatementImportZone />
+        </CollapsibleContent>
+      </Collapsible>
+
+      <div className="flex gap-4 items-center flex-wrap">
         <Select
           value={statusFilter}
           onValueChange={(v) => setStatusFilter(v as TransactionStatus | '')}
@@ -70,12 +106,81 @@ export default function BankTransactionsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">All Status</SelectItem>
-            <SelectItem value="UNMATCHED">Unmatched</SelectItem>
+            <SelectItem value="PENDING">Pending</SelectItem>
             <SelectItem value="MATCHED">Matched</SelectItem>
+            <SelectItem value="CREATED">Created</SelectItem>
             <SelectItem value="RECONCILED">Reconciled</SelectItem>
-            <SelectItem value="EXCLUDED">Excluded</SelectItem>
           </SelectContent>
         </Select>
+
+        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Filter className="mr-2 h-4 w-4" />
+              Filters
+              {hasActiveFilters && (
+                <Badge
+                  variant="secondary"
+                  className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                >
+                  !
+                </Badge>
+              )}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2">
+            <Card>
+              <CardContent className="pt-4 pb-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Date From</Label>
+                    <Input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Date To</Label>
+                    <Input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Min Amount</Label>
+                    <Input
+                      type="number"
+                      placeholder="0.00"
+                      value={amountMin}
+                      onChange={(e) => setAmountMin(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Max Amount</Label>
+                    <Input
+                      type="number"
+                      placeholder="0.00"
+                      value={amountMax}
+                      onChange={(e) => setAmountMax(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="mt-3">
+                    <X className="mr-1 h-3 w-3" />
+                    Clear filters
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       <Card>

@@ -42,6 +42,8 @@ export interface Bill {
   taxAmount: string;
   grandTotal: string;
   balanceDue: string;
+  reference: string | null;
+  currencyCode: string | null;
   notes: string | null;
   projectId: string | null;
   organizationId: string;
@@ -245,6 +247,35 @@ export function useDeleteBill() {
       toast({
         variant: 'destructive',
         title: 'Error deleting bill',
+        description: error.response?.data?.message || 'An error occurred',
+      });
+    },
+  });
+}
+
+/**
+ * Hook to clone a bill
+ */
+export function useCloneBill() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await billsApi.clone(id);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bills'] });
+      toast({
+        title: 'Bill duplicated',
+        description: 'A new draft copy has been created.',
+      });
+    },
+    onError: (error: ApiError) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error duplicating bill',
         description: error.response?.data?.message || 'An error occurred',
       });
     },

@@ -9,6 +9,7 @@ import {
   SortableHeader,
 } from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
+import { ImportWizard } from '@/components/import/import-wizard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,11 +38,13 @@ import {
   formatCurrency,
   getStatusText,
   getStatusVariant,
+  useCloneBill,
   useDeleteBill,
   useInfiniteBills,
 } from '@/lib/hooks/use-bills';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { useExportAll } from '@/lib/hooks/use-export-all';
+import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { cn } from '@/lib/utils';
@@ -50,6 +53,7 @@ import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
 import {
   CheckCircle,
+  Copy,
   DollarSign,
   Edit,
   Eye,
@@ -58,6 +62,8 @@ import {
   RefreshCw,
   Sparkles,
   Trash2,
+  Upload,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
@@ -83,6 +89,7 @@ function BillsPageContent() {
     mode: 'virtual',
   });
 
+  const [importOpen, setImportOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [billToDelete, setBillToDelete] = useState<Bill | null>(null);
 
@@ -106,6 +113,7 @@ function BillsPageContent() {
       ? { from: new Date(tableParams.filters.startDate), to: new Date(tableParams.filters.endDate) }
       : undefined;
   const deleteBill = useDeleteBill();
+  const cloneBill = useCloneBill();
 
   const canCreate = hasPermission('purchases.create');
   const canEdit = hasPermission('purchases.edit');
@@ -353,6 +361,12 @@ function BillsPageContent() {
                   </Link>
                 </DropdownMenuItem>
               )}
+              {canCreate && (
+                <DropdownMenuItem onClick={() => cloneBill.mutate(bill.id)}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Duplicate
+                </DropdownMenuItem>
+              )}
               {canDelete && bill.status === 'DRAFT' && (
                 <DropdownMenuItem onClick={() => handleDelete(bill)} className="text-red-600">
                   <Trash2 className="mr-2 h-4 w-4" />
@@ -375,6 +389,10 @@ function BillsPageContent() {
           <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
           {canCreate && (
             <>
               <Button asChild variant="outline">
@@ -426,6 +444,17 @@ function BillsPageContent() {
               }}
               placeholder="Date range"
             />
+            {(tableParams.activeFilterCount > 0 || tableParams.search) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={tableParams.resetParams}
+                className="text-muted-foreground"
+              >
+                <X className="mr-1 h-4 w-4" />
+                Reset
+              </Button>
+            )}
             <Button
               variant="outline"
               size="icon"
@@ -549,6 +578,15 @@ function BillsPageContent() {
           setBulkPayOpen(false);
           refetch();
         }}
+      />
+
+      {/* Import Wizard */}
+      <ImportWizard
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        entityType={'bills' as ImportEntityType}
+        entityLabel="Bills"
+        onComplete={() => refetch()}
       />
     </div>
   );

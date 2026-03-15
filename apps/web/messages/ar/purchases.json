@@ -298,5 +298,31 @@
     "rate": "السعر",
     "tax": "الضريبة",
     "amount": "المبلغ"
+  },
+  "overview": {
+    "quickActions": "إجراءات سريعة",
+    "recentActivity": "النشاط الأخير",
+    "overdueBills": "فواتير متأخرة",
+    "daysOverdue": "متأخر {days} يوم",
+    "noOverdue": "لا توجد فواتير متأخرة",
+    "noRecentActivity": "لا يوجد نشاط حديث",
+    "viewAll": "عرض الكل",
+    "totalPayable": "إجمالي المستحقات",
+    "overdueAmount": "المبلغ المتأخر",
+    "unpaidBills": "فواتير غير مدفوعة",
+    "paidThisMonth": "مدفوع هذا الشهر"
+  },
+  "vendor360": {
+    "billsTab": "الفواتير",
+    "expensesTab": "المصروفات",
+    "paymentsTab": "المدفوعات",
+    "creditsTab": "ائتمان الموردين",
+    "totalBills": "إجمالي الفواتير",
+    "totalCredits": "إجمالي الائتمان",
+    "createVendorCredit": "إنشاء ائتمان مورد",
+    "noBills": "لا توجد فواتير",
+    "noExpenses": "لا توجد مصروفات",
+    "noPayments": "لا توجد مدفوعات",
+    "noCredits": "لا توجد ائتمانات موردين"
   }
 }

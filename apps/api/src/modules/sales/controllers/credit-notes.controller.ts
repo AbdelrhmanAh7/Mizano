@@ -58,6 +58,15 @@ export class CreditNotesController {
     return this.creditNotesService.findAllCursor(orgId, query);
   }
 
+  // Bulk Operations
+  @Post('bulk-delete')
+  @Permissions('sales.delete')
+  @InvalidateCache('credit-notes:*')
+  @ApiOperation({ summary: 'Bulk delete credit notes' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.creditNotesService.bulkDelete(orgId, dto.ids);
+  }
+
   @Get(':id')
   @Permissions('sales.view')
   @ApiOperation({ summary: 'Get credit note by ID' })

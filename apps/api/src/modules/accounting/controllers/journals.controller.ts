@@ -80,6 +80,14 @@ export class JournalsController {
     return this.journalsService.update(orgId, id, updateJournalDto);
   }
 
+  @Post(':id/post')
+  @Permissions('accounting.edit')
+  @InvalidateCache('journals:*', 'accounts:*')
+  @ApiOperation({ summary: 'Post a journal entry' })
+  post(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.journalsService.post(orgId, id);
+  }
+
   @Post(':id/reverse')
   @Permissions('accounting.create')
   @InvalidateCache('journals:*', 'accounts:*')

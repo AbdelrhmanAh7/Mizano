@@ -89,6 +89,33 @@ export interface RecentTransaction {
   link: string;
 }
 
+export interface UpcomingPayment {
+  id: string;
+  reference: string;
+  vendorName: string;
+  dueDate: string;
+  amount: number;
+  link: string;
+}
+
+export interface BankAccountSummary {
+  id: string;
+  name: string;
+  systemBalance: number;
+  bankBalance: number;
+  currency: string;
+}
+
+export interface ProjectOverview {
+  id: string;
+  name: string;
+  status: string;
+  hoursLogged: number;
+  revenue: number;
+  budget: number;
+  budgetUsedPercent: number;
+}
+
 const REFETCH_INTERVAL = 60000;
 
 export interface DashboardStatsResult {
@@ -97,6 +124,10 @@ export interface DashboardStatsResult {
   receivablesVsPayables: ReceivablesPayables;
   alerts: AIAlert[];
   recentTransactions: RecentTransaction[];
+  upcomingPayments: UpcomingPayment[];
+  bankAccounts: BankAccountSummary[];
+  yearlyRevenue: number;
+  netPosition: number;
 }
 
 /**
@@ -104,7 +135,13 @@ export interface DashboardStatsResult {
  * Shared between client-side hook and server-side prefetch.
  */
 interface DashboardOverviewResponse {
-  bankBalances?: Array<{ systemBalance?: number }>;
+  bankBalances?: Array<{
+    id?: string;
+    name?: string;
+    systemBalance?: number;
+    bankBalance?: number;
+    currency?: string;
+  }>;
   alerts?: { overdueInvoices?: number; overdueBills?: number; activeProjects?: number };
   recentActivity?: {
     invoices?: Array<{
@@ -130,8 +167,18 @@ interface DashboardOverviewResponse {
     monthlyProfit?: number;
     totalReceivables?: number;
     totalPayables?: number;
+    yearlyRevenue?: number;
+    netPosition?: number;
   };
   trends?: { revenue?: Trend; expenses?: Trend; profit?: Trend };
+  upcomingPayments?: Array<{
+    id: string;
+    type: string;
+    reference: string;
+    vendorName: string;
+    dueDate: string;
+    amount: number;
+  }>;
 }
 
 export function transformDashboardOverview(
@@ -168,6 +215,29 @@ export function transformDashboardOverview(
       createdAt: now.toISOString(),
     });
   }
+
+  // Map individual bank accounts
+  const bankAccounts: BankAccountSummary[] = Array.isArray(overview.bankBalances)
+    ? overview.bankBalances.map((b) => ({
+        id: b.id || '',
+        name: b.name || 'Unknown',
+        systemBalance: b.systemBalance || 0,
+        bankBalance: b.bankBalance || 0,
+        currency: b.currency || 'USD',
+      }))
+    : [];
+
+  // Map upcoming payments
+  const upcomingPayments: UpcomingPayment[] = Array.isArray(overview.upcomingPayments)
+    ? overview.upcomingPayments.map((p) => ({
+        id: p.id,
+        reference: p.reference,
+        vendorName: p.vendorName,
+        dueDate: typeof p.dueDate === 'string' ? p.dueDate : new Date(p.dueDate).toISOString(),
+        amount: p.amount || 0,
+        link: `/purchases/bills/${p.id}`,
+      }))
+    : [];
 
   // Map recent activity
   const recentTransactions: RecentTransaction[] = [];
@@ -222,6 +292,10 @@ export function transformDashboardOverview(
     },
     alerts,
     recentTransactions,
+    upcomingPayments,
+    bankAccounts,
+    yearlyRevenue: overview.overview?.yearlyRevenue || 0,
+    netPosition: overview.overview?.netPosition || 0,
   };
 }
 
@@ -383,6 +457,42 @@ export function useDashboardInventory() {
             value: i.value || 0,
             itemCount: i.itemCount || 0,
           }))
+        : [];
+    },
+    refetchInterval: REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
+  });
+}
+
+/**
+ * Projects overview
+ */
+export function useDashboardProjects() {
+  return useQuery({
+    queryKey: ['dashboard', 'projects'],
+    queryFn: async (): Promise<ProjectOverview[]> => {
+      const res = await api.get('/reports/dashboard/projects');
+      const data = res.data?.data ?? res.data;
+      return Array.isArray(data)
+        ? data.map(
+            (p: {
+              id: string;
+              name: string;
+              status?: string;
+              hoursLogged?: number;
+              revenue?: number;
+              budget?: number;
+              budgetUsedPercent?: number;
+            }) => ({
+              id: p.id,
+              name: p.name,
+              status: p.status || 'UNKNOWN',
+              hoursLogged: p.hoursLogged || 0,
+              revenue: p.revenue || 0,
+              budget: p.budget || 0,
+              budgetUsedPercent: p.budgetUsedPercent || 0,
+            }),
+          )
         : [];
     },
     refetchInterval: REFETCH_INTERVAL,

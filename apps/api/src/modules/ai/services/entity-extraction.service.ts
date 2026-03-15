@@ -162,8 +162,15 @@ export class EntityExtractionService {
    * against existing Customer and Vendor records in the database.
    * Uses fuzzy string matching via `findBestMatch` from text-similarity util.
    */
-  async extractAndMatch(organizationId: string, text: string): Promise<ExtractionAndMatchResult> {
-    const entities = await this.extractEntitiesAsync(text);
+  async extractAndMatch(
+    organizationId: string,
+    text: string,
+    options?: { useOllama?: boolean },
+  ): Promise<ExtractionAndMatchResult> {
+    const entities =
+      options?.useOllama === false
+        ? { ...this.extractEntities(text), predictionMethod: 'RULE_BASED' as PredictionMethod }
+        : await this.extractEntitiesAsync(text);
     const matches: MatchedEntity[] = [];
 
     // Fetch all customer and vendor names for matching

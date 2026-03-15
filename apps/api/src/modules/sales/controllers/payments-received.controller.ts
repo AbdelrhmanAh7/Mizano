@@ -55,6 +55,15 @@ export class PaymentsReceivedController {
     return this.paymentsReceivedService.findAllCursor(orgId, query);
   }
 
+  // Bulk Operations
+  @Post('bulk-delete')
+  @Permissions('sales.delete')
+  @InvalidateCache('payments-received:*')
+  @ApiOperation({ summary: 'Bulk delete payments received' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.paymentsReceivedService.bulkDelete(orgId, dto.ids);
+  }
+
   @Get(':id')
   @Permissions('sales.view')
   findOne(@CurrentOrg() orgId: string, @Param('id') id: string) {

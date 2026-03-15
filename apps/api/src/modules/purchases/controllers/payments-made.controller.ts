@@ -47,6 +47,14 @@ export class PaymentsMadeController {
     return this.paymentsMadeService.findAll(orgId, query);
   }
 
+  @Post('bulk-delete')
+  @Permissions('purchases.delete')
+  @InvalidateCache('payments-made:*')
+  @ApiOperation({ summary: 'Bulk delete payments made' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.paymentsMadeService.bulkDelete(orgId, dto.ids);
+  }
+
   @Get('cursor')
   @Permissions('purchases.view')
   @ApiOperation({ summary: 'List payments made with cursor-based pagination' })

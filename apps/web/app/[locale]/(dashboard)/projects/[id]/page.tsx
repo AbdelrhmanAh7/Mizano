@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -13,6 +14,8 @@ import {
   CheckCircle,
   Circle,
   Play,
+  LayoutList,
+  LayoutGrid,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +45,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import {
   useProject,
+  useProjectProfitability,
   useTasks,
   useTimesheets,
   useDeleteProject,
@@ -54,9 +58,12 @@ import {
   getTaskStatusColor,
   formatCurrency,
   formatHours,
-  Task,
-  TimesheetEntry,
+  type Task,
+  type TaskStatus,
+  type TimesheetEntry,
 } from '@/lib/hooks/use-projects';
+import { KanbanBoard } from '@/components/projects/kanban-board';
+import { BudgetProgressCard } from '@/components/projects/budget-progress-card';
 import { useTranslations } from 'next-intl';
 
 interface ProjectDetailPageProps {
@@ -67,9 +74,12 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const { id } = params;
   const t = useTranslations('projects');
   const router = useRouter();
+  const [taskView, setTaskView] = useState<'list' | 'kanban'>('list');
+
   const { data: project, isLoading } = useProject(id);
   const { data: tasksData } = useTasks(id);
   const { data: timesheetsData } = useTimesheets({ projectId: id });
+  const { data: profitability, isLoading: profLoading } = useProjectProfitability(id);
   const deleteProject = useDeleteProject();
   const updateTask = useUpdateTask();
   const startTimer = useStartTimer();
@@ -83,10 +93,18 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   };
 
   const handleToggleTaskStatus = async (task: Task) => {
-    const newStatus = task.status === 'COMPLETED' ? 'TODO' : 'COMPLETED';
+    const newStatus: TaskStatus = task.status === 'DONE' ? 'TODO' : 'DONE';
     await updateTask.mutateAsync({
       projectId: id,
       taskId: task.id,
+      data: { status: newStatus },
+    });
+  };
+
+  const handleKanbanStatusChange = async (taskId: string, newStatus: TaskStatus) => {
+    await updateTask.mutateAsync({
+      projectId: id,
+      taskId,
       data: { status: newStatus },
     });
   };
@@ -96,10 +114,9 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       <div className="space-y-6">
         <Skeleton className="h-12 w-64" />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
         </div>
         <Skeleton className="h-64" />
       </div>
@@ -120,12 +137,14 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const budget =
     typeof project.budgetAmount === 'string'
       ? parseFloat(project.budgetAmount)
-      : project.budgetAmount;
+      : (project.budgetAmount as number);
   const billed =
-    typeof project.totalBilled === 'string' ? parseFloat(project.totalBilled) : project.totalBilled;
-  const progress = budget > 0 ? Math.min((billed / budget) * 100, 100) : 0;
+    typeof project.totalBilled === 'string'
+      ? parseFloat(project.totalBilled)
+      : (project.totalBilled as number);
+  const billedProgress = budget > 0 ? Math.min((billed / budget) * 100, 100) : 0;
 
-  const completedTasks = tasks.filter((t) => t.status === 'COMPLETED').length;
+  const completedTasks = tasks.filter((t) => t.status === 'DONE').length;
   const taskProgress = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
 
   return (
@@ -217,8 +236,8 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Budget Used</p>
-            <p className="text-2xl font-bold">{progress.toFixed(0)}%</p>
-            <Progress value={progress} className="h-2 mt-2" />
+            <p className="text-2xl font-bold">{billedProgress.toFixed(0)}%</p>
+            <Progress value={billedProgress} className="h-2 mt-2" />
           </CardContent>
         </Card>
 
@@ -233,6 +252,11 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
         </Card>
       </div>
 
+      {/* Budget Card */}
+      {(profitability || profLoading) && (
+        <BudgetProgressCard data={profitability} isLoading={profLoading} />
+      )}
+
       {/* Tabs */}
       <Tabs defaultValue="tasks">
         <TabsList>
@@ -246,12 +270,32 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>{t('tasks.title')}</CardTitle>
-                <Button size="sm" asChild>
-                  <Link href={`/projects/${id}/tasks/new`}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    {t('tasks.newTask')}
-                  </Link>
-                </Button>
+                <div className="flex items-center gap-2">
+                  <div className="flex rounded-md border">
+                    <Button
+                      variant={taskView === 'list' ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className="rounded-r-none border-r"
+                      onClick={() => setTaskView('list')}
+                    >
+                      <LayoutList className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={taskView === 'kanban' ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className="rounded-l-none"
+                      onClick={() => setTaskView('kanban')}
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Button size="sm" asChild>
+                    <Link href={`/projects/${id}/tasks/new`}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      {t('tasks.newTask')}
+                    </Link>
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -259,15 +303,17 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                 <div className="text-center py-8 text-muted-foreground">
                   {t('tasks.empty.title')}. {t('tasks.empty.description')}.
                 </div>
+              ) : taskView === 'kanban' ? (
+                <KanbanBoard tasks={tasks} onStatusChange={handleKanbanStatusChange} />
               ) : (
                 <div className="space-y-2">
                   {tasks.map((task) => (
                     <div key={task.id} className="flex items-center gap-4 p-4 border rounded-lg">
                       <button
-                        onClick={() => handleToggleTaskStatus(task)}
+                        onClick={() => void handleToggleTaskStatus(task)}
                         className="flex-shrink-0"
                       >
-                        {task.status === 'COMPLETED' ? (
+                        {task.status === 'DONE' ? (
                           <CheckCircle className="h-5 w-5 text-green-600" />
                         ) : (
                           <Circle className="h-5 w-5 text-muted-foreground" />
@@ -277,7 +323,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                         <p
                           className={cn(
                             'font-medium',
-                            task.status === 'COMPLETED' && 'line-through text-muted-foreground',
+                            task.status === 'DONE' && 'line-through text-muted-foreground',
                           )}
                         >
                           {task.name}

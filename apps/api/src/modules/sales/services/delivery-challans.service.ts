@@ -382,6 +382,40 @@ export class DeliveryChallansService {
     });
   }
 
+  // ============ Bulk Operations ============
+
+  async bulkDelete(
+    organizationId: string,
+    ids: string[],
+  ): Promise<{ deleted: number; total: number }> {
+    const result = await this.prisma.deliveryChallan.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        status: ChallanStatus.DRAFT,
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
+  async bulkIssue(
+    organizationId: string,
+    ids: string[],
+  ): Promise<{ issued: number; total: number }> {
+    const result = await this.prisma.deliveryChallan.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        status: ChallanStatus.DRAFT,
+      },
+      data: { status: ChallanStatus.ISSUED },
+    });
+    return { issued: result.count, total: ids.length };
+  }
+
   // ============ Helper Methods ============
 
   private async generateChallanNumber(organizationId: string): Promise<string> {

@@ -563,6 +563,65 @@ export class InvoicesService {
     });
   }
 
+  async clone(organizationId: string, id: string) {
+    const original = await this.prisma.invoice.findFirst({
+      where: { id, organizationId, deletedAt: null },
+      include: {
+        lines: true,
+      },
+    });
+
+    if (!original) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    const invoiceNumber = await this.generateInvoiceNumber(organizationId);
+    const today = new Date();
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30);
+
+    const cloned = await this.prisma.invoice.create({
+      data: {
+        invoiceNumber,
+        customerId: original.customerId,
+        date: today,
+        dueDate,
+        subtotal: original.subtotal,
+        taxAmount: original.taxAmount,
+        shippingAmount: original.shippingAmount,
+        grandTotal: original.grandTotal,
+        balanceDue: original.grandTotal,
+        notes: original.notes,
+        terms: original.terms,
+        projectId: original.projectId,
+        organizationId,
+        lines: {
+          create: original.lines.map((line) => ({
+            itemId: line.itemId,
+            description: line.description,
+            quantity: line.quantity,
+            rate: line.rate,
+            discount: line.discount,
+            taxRate: line.taxRate,
+            amount: line.amount,
+          })),
+        },
+      },
+      include: {
+        customer: {
+          select: { id: true, name: true, email: true },
+        },
+        lines: {
+          include: {
+            item: { select: { id: true, name: true, sku: true } },
+          },
+        },
+      },
+    });
+
+    return cloned;
+  }
+
   // === Bulk Operations ===
 
   async bulkDelete(organizationId: string, ids: string[]) {

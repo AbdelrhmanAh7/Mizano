@@ -18,6 +18,7 @@ import {
   useDashboardCustomers,
   useDashboardExpenses,
   useDashboardInventory,
+  useDashboardProjects,
   useDashboardRevenue,
   useDashboardStats,
 } from '@/lib/hooks/use-dashboard';
@@ -26,6 +27,7 @@ import { useDashboardLayout } from '@/lib/stores/use-dashboard-layout';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
+  ArrowLeftRight,
   CreditCard,
   DollarSign,
   ExternalLink,
@@ -48,6 +50,18 @@ import { BankBalanceChart } from '@/components/dashboard/bank-balance-chart';
 import { InventoryValueChart } from '@/components/dashboard/inventory-value-chart';
 import { CashFlowForecastChart } from '@/components/dashboard/cash-flow-forecast-chart';
 import { RevenueForecastChart } from '@/components/dashboard/revenue-forecast-chart';
+import { UpcomingPayments } from '@/components/dashboard/upcoming-payments';
+import { BankAccountsSummary } from '@/components/dashboard/bank-accounts-summary';
+import { ProjectsOverview } from '@/components/dashboard/projects-overview';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FinancialSection } from '@/components/dashboard/sections/financial-section';
+import { SalesSection } from '@/components/dashboard/sections/sales-section';
+import { PurchasesSection } from '@/components/dashboard/sections/purchases-section';
+import { HRSection } from '@/components/dashboard/sections/hr-section';
+import { InventorySection } from '@/components/dashboard/sections/inventory-section';
+import { ProjectsSection } from '@/components/dashboard/sections/projects-section';
+import { CRMSection } from '@/components/dashboard/sections/crm-section';
+import { AISection } from '@/components/dashboard/sections/ai-section';
 
 function ChartSkeleton() {
   return (
@@ -93,11 +107,12 @@ export function DashboardClient() {
   const { data: customersData } = useDashboardCustomers();
   const { data: bankingData } = useDashboardBanking();
   const { data: inventoryData } = useDashboardInventory();
+  const { data: projectsData } = useDashboardProjects();
 
   const queryClient = useQueryClient();
   const t = useTranslations('common.dashboard');
 
-  const { widgets, loadFromServer } = useDashboardLayout();
+  const { widgets, loadFromServer, activeTab, setActiveTab } = useDashboardLayout();
   const sortedWidgets = [...widgets].sort((a, b) => a.order - b.order);
   const _isVisible = (id: string) => widgets.find((w) => w.id === id)?.visible ?? true;
 
@@ -173,9 +188,9 @@ export function DashboardClient() {
 
       case 'kpi-row-2':
         return (
-          <div key={widgetId} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div key={widgetId} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {statsLoading ? (
-              Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
+              Array.from({ length: 6 }).map((_, i) => <StatCardSkeleton key={i} />)
             ) : (
               <>
                 <StatCard
@@ -191,6 +206,20 @@ export function DashboardClient() {
                   icon={CreditCard}
                   iconColor="text-orange-600"
                   iconBgColor="bg-orange-100"
+                />
+                <StatCard
+                  title={t('stats.netPosition')}
+                  value={statsData?.netPosition || 0}
+                  icon={ArrowLeftRight}
+                  iconColor={(statsData?.netPosition || 0) >= 0 ? 'text-green-600' : 'text-red-600'}
+                  iconBgColor={(statsData?.netPosition || 0) >= 0 ? 'bg-green-100' : 'bg-red-100'}
+                />
+                <StatCard
+                  title={t('stats.yearlyRevenue')}
+                  value={statsData?.yearlyRevenue || 0}
+                  icon={DollarSign}
+                  iconColor="text-cyan-600"
+                  iconBgColor="bg-cyan-100"
                 />
                 <StatCard
                   title={t('stats.overdueAmount')}
@@ -315,13 +344,24 @@ export function DashboardClient() {
 
       case 'insights-transactions':
         return (
-          <div key={widgetId} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div key={widgetId} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div data-tour="dashboard-ai-alerts">
               <EnhancedAIInsights />
             </div>
             <div data-tour="dashboard-transactions">
               <RecentTransactions transactions={statsData?.recentTransactions || []} />
             </div>
+            <div>
+              <UpcomingPayments payments={statsData?.upcomingPayments || []} />
+            </div>
+          </div>
+        );
+
+      case 'projects-bank-accounts':
+        return (
+          <div key={widgetId} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ProjectsOverview projects={projectsData || []} />
+            <BankAccountsSummary accounts={statsData?.bankAccounts || []} />
           </div>
         );
 
@@ -355,15 +395,72 @@ export function DashboardClient() {
         </div>
       </div>
 
-      {/* Render widgets in user-defined order */}
-      {sortedWidgets.map((widget) => {
-        if (!widget.visible) return null;
-        return (
-          <WidgetErrorBoundary key={widget.id} widgetId={widget.id}>
-            {renderWidget(widget.id)}
-          </WidgetErrorBoundary>
-        );
-      })}
+      {/* Tabbed Dashboard Sections */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap">
+          <TabsTrigger value="overview">{t('sections.overview')}</TabsTrigger>
+          <TabsTrigger value="financial">{t('sections.financial')}</TabsTrigger>
+          <TabsTrigger value="sales">{t('sections.sales')}</TabsTrigger>
+          <TabsTrigger value="purchases">{t('sections.purchases')}</TabsTrigger>
+          <TabsTrigger value="hr">{t('sections.hr')}</TabsTrigger>
+          <TabsTrigger value="inventory">{t('sections.inventory')}</TabsTrigger>
+          <TabsTrigger value="projects">{t('sections.projects')}</TabsTrigger>
+          <TabsTrigger value="crm">{t('sections.crm')}</TabsTrigger>
+          <TabsTrigger value="ai">{t('sections.ai')}</TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab — existing dashboard, unchanged */}
+        <TabsContent value="overview" className="space-y-6 mt-6">
+          {sortedWidgets.map((widget) => {
+            if (!widget.visible) return null;
+            return (
+              <WidgetErrorBoundary key={widget.id} widgetId={widget.id}>
+                {renderWidget(widget.id)}
+              </WidgetErrorBoundary>
+            );
+          })}
+        </TabsContent>
+
+        {/* Financial Tab */}
+        <TabsContent value="financial" className="mt-6">
+          <FinancialSection enabled={activeTab === 'financial'} />
+        </TabsContent>
+
+        {/* Sales Tab */}
+        <TabsContent value="sales" className="mt-6">
+          <SalesSection enabled={activeTab === 'sales'} />
+        </TabsContent>
+
+        {/* Purchases Tab */}
+        <TabsContent value="purchases" className="mt-6">
+          <PurchasesSection enabled={activeTab === 'purchases'} />
+        </TabsContent>
+
+        {/* HR & Payroll Tab */}
+        <TabsContent value="hr" className="mt-6">
+          <HRSection enabled={activeTab === 'hr'} />
+        </TabsContent>
+
+        {/* Inventory & Manufacturing Tab */}
+        <TabsContent value="inventory" className="mt-6">
+          <InventorySection enabled={activeTab === 'inventory'} />
+        </TabsContent>
+
+        {/* Projects Tab */}
+        <TabsContent value="projects" className="mt-6">
+          <ProjectsSection enabled={activeTab === 'projects'} />
+        </TabsContent>
+
+        {/* CRM Tab */}
+        <TabsContent value="crm" className="mt-6">
+          <CRMSection enabled={activeTab === 'crm'} />
+        </TabsContent>
+
+        {/* AI Analytics Tab */}
+        <TabsContent value="ai" className="mt-6">
+          <AISection enabled={activeTab === 'ai'} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

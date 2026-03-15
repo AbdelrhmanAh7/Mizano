@@ -233,6 +233,23 @@ export class CustomersService {
     return { message: 'Customer deleted successfully' };
   }
 
+  // === Bulk Operations ===
+
+  async bulkDelete(
+    organizationId: string,
+    ids: string[],
+  ): Promise<{ deleted: number; total: number }> {
+    const result = await this.prisma.customer.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
   private async calculateOutstandingBalance(customerId: string): Promise<string> {
     const invoices = await this.prisma.invoice.findMany({
       where: {

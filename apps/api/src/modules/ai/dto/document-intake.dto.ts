@@ -121,6 +121,16 @@ export class ConfirmIntakeDto {
   @Type(() => ConfirmIntakeLineDto)
   lines: ConfirmIntakeLineDto[];
 
+  @ApiPropertyOptional({ description: 'Vendor document reference number', example: 'INV-001' })
+  @IsString()
+  @IsOptional()
+  reference?: string;
+
+  @ApiPropertyOptional({ description: 'Currency code (ISO 4217)', example: 'USD' })
+  @IsString()
+  @IsOptional()
+  currencyCode?: string;
+
   @ApiPropertyOptional({ description: 'Notes', example: 'Scanned from PDF' })
   @IsString()
   @IsOptional()

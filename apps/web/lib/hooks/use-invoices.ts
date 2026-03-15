@@ -288,6 +288,35 @@ export function useVoidInvoice() {
 }
 
 /**
+ * Hook to clone/duplicate an invoice
+ */
+export function useCloneInvoice() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await invoicesApi.clone(id);
+      return response.data as Invoice;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast({
+        title: 'Invoice duplicated',
+        description: 'A new draft copy has been created.',
+      });
+    },
+    onError: (error: ApiError) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error duplicating invoice',
+        description: error.response?.data?.message || 'An error occurred',
+      });
+    },
+  });
+}
+
+/**
  * Get invoice status color
  */
 export function getInvoiceStatusColor(status: InvoiceStatus): string {

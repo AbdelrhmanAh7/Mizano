@@ -16,6 +16,7 @@ import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 
 @ApiTags('Composite Items')
 @ApiBearerAuth()
@@ -38,6 +39,13 @@ export class CompositeItemsController {
     return this.compositeItemsService.findAll(orgId, query);
   }
 
+  @Get('cursor')
+  @Permissions('inventory.view')
+  @ApiOperation({ summary: 'List composite items with cursor-based pagination' })
+  findAllCursor(@CurrentOrg() orgId: string, @Query() query: CursorPaginationDto) {
+    return this.compositeItemsService.findAllCursor(orgId, query);
+  }
+
   @Get(':id')
   @Permissions('inventory.view')
   @ApiOperation({ summary: 'Get a composite item by ID' })
@@ -57,7 +65,7 @@ export class CompositeItemsController {
   }
 
   @Delete(':id')
-  @Permissions('inventory.create')
+  @Permissions('inventory.delete')
   @ApiOperation({ summary: 'Delete a composite item' })
   remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.compositeItemsService.remove(orgId, id);

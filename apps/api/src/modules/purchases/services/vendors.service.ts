@@ -101,4 +101,29 @@ export class VendorsService {
     await this.prisma.vendor.update({ where: { id }, data: { deletedAt: new Date() } });
     return { message: 'Vendor deleted' };
   }
+
+  async bulkDelete(organizationId: string, ids: string[]) {
+    // Exclude vendors that have bills
+    const vendorsWithBills = await this.prisma.vendor.findMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        bills: { some: { deletedAt: null } },
+      },
+      select: { id: true },
+    });
+    const excludeIds = new Set(vendorsWithBills.map((v) => v.id));
+    const deletableIds = ids.filter((id) => !excludeIds.has(id));
+
+    const result = await this.prisma.vendor.updateMany({
+      where: {
+        id: { in: deletableIds },
+        organizationId,
+        deletedAt: null,
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length, skipped: excludeIds.size };
+  }
 }

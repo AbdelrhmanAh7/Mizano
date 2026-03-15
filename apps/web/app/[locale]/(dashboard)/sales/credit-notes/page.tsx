@@ -1,6 +1,8 @@
 'use client';
 
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
+import { ImportWizard } from '@/components/import/import-wizard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +13,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { creditNotesApi } from '@/lib/api';
+import { useBulkAction } from '@/lib/hooks/use-bulk-action';
+import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import {
   CreditNote,
   CreditNoteType,
@@ -22,7 +27,7 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { Eye, Filter, Plus, RefreshCw } from 'lucide-react';
+import { Eye, Filter, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
@@ -40,6 +45,9 @@ function CreditNotesPageContent() {
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [importOpen, setImportOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkSelectedRows, setBulkSelectedRows] = useState<CreditNote[]>([]);
 
   const {
     data: creditNotes,
@@ -55,6 +63,29 @@ function CreditNotesPageContent() {
   });
 
   const canCreate = hasPermission('sales.create');
+  const canDelete = hasPermission('sales.delete');
+
+  const bulkDeleteAction = useBulkAction({
+    mutationFn: (ids) => creditNotesApi.bulkDelete(ids).then((r) => r.data),
+    queryKeys: [['credit-notes']],
+    successMessage: '{count} credit notes deleted',
+  });
+
+  const bulkActions = [
+    ...(canDelete
+      ? [
+          {
+            label: 'Delete',
+            icon: Trash2,
+            variant: 'destructive' as const,
+            onClick: (rows: CreditNote[]) => {
+              setBulkSelectedRows(rows);
+              setBulkDeleteOpen(true);
+            },
+          },
+        ]
+      : []),
+  ];
 
   const formatCurrency = (amount: string | number, currency: string = 'USD') => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -175,6 +206,10 @@ function CreditNotesPageContent() {
           <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
           {canCreate && (
             <Button asChild>
               <Link href="/sales/credit-notes/new">
@@ -237,6 +272,8 @@ function CreditNotesPageContent() {
             onLoadMore={() => fetchNextPage()}
             enableColumnResizing
             tableId="credit-notes"
+            enableSelection
+            bulkActions={bulkActions}
             emptyMessage={t('creditNotes.empty.title')}
             emptyAction={
               canCreate ? (
@@ -251,6 +288,32 @@ function CreditNotesPageContent() {
           />
         </CardContent>
       </Card>
+
+      {/* Bulk Action Dialogs */}
+      <BulkActionConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        action="delete"
+        count={bulkSelectedRows.length}
+        itemType="credit notes"
+        description="Selected credit notes will be deleted. Credit notes that have been applied will be skipped."
+        destructive
+        isLoading={bulkDeleteAction.isLoading}
+        onConfirm={async () => {
+          await bulkDeleteAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkDeleteOpen(false);
+          refetch();
+        }}
+      />
+
+      {/* Import Wizard */}
+      <ImportWizard
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        entityType={'credit_notes' as ImportEntityType}
+        entityLabel="Credit Notes"
+        onComplete={() => refetch()}
+      />
     </div>
   );
 }

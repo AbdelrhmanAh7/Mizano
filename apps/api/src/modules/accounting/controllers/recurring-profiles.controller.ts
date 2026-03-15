@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { RecurringProfilesService } from '../services/recurring-profiles.service';
 import { CreateRecurringProfileDto } from '../dto/create-recurring-profile.dto';
@@ -24,11 +34,47 @@ export class RecurringProfilesController {
     return this.recurringProfilesService.create(orgId, createRecurringProfileDto);
   }
 
+  @Get('statistics')
+  @Permissions('accounting.view')
+  @ApiOperation({ summary: 'Get recurring profile statistics' })
+  getStatistics(@CurrentOrg() orgId: string) {
+    return this.recurringProfilesService.getStatistics(orgId);
+  }
+
+  @Get('upcoming')
+  @Permissions('accounting.view')
+  @ApiOperation({ summary: 'Get upcoming recurring profile executions' })
+  getUpcoming(@CurrentOrg() orgId: string, @Query('days') days?: string) {
+    return this.recurringProfilesService.getUpcoming(orgId, days ? parseInt(days, 10) : undefined);
+  }
+
   @Get()
   @Permissions('accounting.view')
   @ApiOperation({ summary: 'Get all recurring profiles' })
   findAll(@CurrentOrg() orgId: string) {
     return this.recurringProfilesService.findAll(orgId);
+  }
+
+  @Get(':id/executions')
+  @Permissions('accounting.view')
+  @ApiOperation({ summary: 'Get execution history for a recurring profile' })
+  getExecutionHistory(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.recurringProfilesService.getExecutionHistory(
+      orgId,
+      id,
+      limit ? parseInt(limit, 10) : undefined,
+    );
+  }
+
+  @Post(':id/execute')
+  @Permissions('accounting.edit')
+  @ApiOperation({ summary: 'Manually execute a recurring profile' })
+  executeProfile(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.recurringProfilesService.executeProfile(orgId, id);
   }
 
   @Get(':id')

@@ -3,7 +3,18 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Edit, Trash2, Mail, Phone, MapPin, FileText, CreditCard } from 'lucide-react';
+import {
+  ArrowLeft,
+  Edit,
+  Trash2,
+  Mail,
+  Phone,
+  MapPin,
+  FileText,
+  CreditCard,
+  Receipt,
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -34,8 +45,10 @@ import {
   formatAddress,
   getBalanceColor,
 } from '@/lib/hooks/use-customers';
+import { useCreditNotes } from '@/lib/hooks/use-credit-notes';
 import { useInvoices } from '@/lib/hooks/use-invoices';
 import { usePaymentsReceived } from '@/lib/hooks/use-payments-received';
+import { useQuotes } from '@/lib/hooks/use-quotes';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { CustomerStatement } from '@/components/sales/customer-statement';
 import { InvoiceStatusBadge, type InvoiceStatus } from '@/components/sales/status-badge';
@@ -57,6 +70,8 @@ export default function CustomerDetailPage() {
   const { data: customer, isLoading } = useCustomer(customerId);
   const { data: invoicesData } = useInvoices({ customerId, limit: 10 });
   const { data: paymentsData } = usePaymentsReceived({ customerId, limit: 10 });
+  const { data: quotesData } = useQuotes({ customerId, limit: 10 });
+  const { data: creditNotesData } = useCreditNotes({ customerId, limit: 10 });
   const deleteCustomer = useDeleteCustomer();
 
   const canEdit = hasPermission('sales.edit');
@@ -64,6 +79,8 @@ export default function CustomerDetailPage() {
 
   const invoices = invoicesData?.data || [];
   const payments = paymentsData?.data || [];
+  const quotes = quotesData?.data || [];
+  const creditNotes = creditNotesData?.data || [];
 
   const confirmDelete = async () => {
     try {
@@ -172,13 +189,37 @@ export default function CustomerDetailPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
+          <TabsTrigger value="quotes">Quotes</TabsTrigger>
+          <TabsTrigger value="credit-notes">Credit Notes</TabsTrigger>
           <TabsTrigger value="statement">Statement</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
+          {/* Quick Actions */}
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm">
+              <Link href={`/sales/invoices/new?customerId=${customerId}`}>
+                <Receipt className="mr-2 h-4 w-4" />
+                Create Invoice
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/sales/quotes/new?customerId=${customerId}`}>
+                <FileText className="mr-2 h-4 w-4" />
+                Create Quote
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/sales/payments/new?customerId=${customerId}`}>
+                <CreditCard className="mr-2 h-4 w-4" />
+                Record Payment
+              </Link>
+            </Button>
+          </div>
+
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Card>
               <CardContent className="pt-6">
                 <div className="text-sm text-muted-foreground">Outstanding Balance</div>
@@ -199,6 +240,20 @@ export default function CustomerDetailPage() {
               <CardContent className="pt-6">
                 <div className="text-sm text-muted-foreground">Total Payments</div>
                 <div className="text-2xl font-bold">{payments.length}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-sm text-muted-foreground">Total Quotes</div>
+                <div className="text-2xl font-bold">{quotes.length}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-sm text-muted-foreground">Credit Notes</div>
+                <div className="text-2xl font-bold">{creditNotes.length}</div>
               </CardContent>
             </Card>
           </div>
@@ -431,6 +486,135 @@ export default function CustomerDetailPage() {
                           <TableCell>{payment.reference || '-'}</TableCell>
                           <TableCell className="text-right font-mono text-green-600">
                             {formatCurrency(parseFloat(payment.amount || '0'), customer.currency)}
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Quotes Tab */}
+        <TabsContent value="quotes">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Recent Quotes
+              </CardTitle>
+              <Button asChild size="sm">
+                <Link href={`/sales/quotes/new?customerId=${customerId}`}>Create Quote</Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {quotes.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No quotes yet</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Quote #</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Expiry Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {quotes.map(
+                      (quote: {
+                        id: string;
+                        quoteNumber: string;
+                        date: string;
+                        expiryDate: string;
+                        status: string;
+                        grandTotal?: string;
+                      }) => (
+                        <TableRow key={quote.id}>
+                          <TableCell>
+                            <Link
+                              href={`/sales/quotes/${quote.id}`}
+                              className="font-medium hover:underline"
+                            >
+                              {quote.quoteNumber}
+                            </Link>
+                          </TableCell>
+                          <TableCell>{format(new Date(quote.date), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>{format(new Date(quote.expiryDate), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{quote.status}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatCurrency(parseFloat(quote.grandTotal || '0'), customer.currency)}
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Credit Notes Tab */}
+        <TabsContent value="credit-notes">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Credit Notes
+              </CardTitle>
+              <Button asChild size="sm">
+                <Link href={`/sales/credit-notes/new?customerId=${customerId}`}>
+                  Create Credit Note
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {creditNotes.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No credit notes yet</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Credit Note #</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {creditNotes.map(
+                      (cn: {
+                        id: string;
+                        creditNoteNumber: string;
+                        date: string;
+                        type: string;
+                        amount?: string;
+                      }) => (
+                        <TableRow key={cn.id}>
+                          <TableCell>
+                            <Link
+                              href={`/sales/credit-notes/${cn.id}`}
+                              className="font-medium hover:underline"
+                            >
+                              {cn.creditNoteNumber}
+                            </Link>
+                          </TableCell>
+                          <TableCell>{format(new Date(cn.date), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{cn.type.replace('_', ' ')}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-orange-600">
+                            {formatCurrency(parseFloat(cn.amount || '0'), customer.currency)}
                           </TableCell>
                         </TableRow>
                       ),

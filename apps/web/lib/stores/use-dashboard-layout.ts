@@ -36,16 +36,24 @@ const DEFAULT_WIDGETS: DashboardWidget[] = [
     visible: true,
     order: 8,
   },
+  {
+    id: 'projects-bank-accounts',
+    label: 'Projects & Bank Accounts',
+    visible: true,
+    order: 9,
+  },
 ];
 
 interface DashboardLayoutState {
   widgets: DashboardWidget[];
   isEditing: boolean;
+  activeTab: string;
   setWidgets: (widgets: DashboardWidget[]) => void;
   toggleWidget: (id: string) => void;
   moveWidget: (id: string, direction: 'up' | 'down') => void;
   resetLayout: () => void;
   setEditing: (editing: boolean) => void;
+  setActiveTab: (tab: string) => void;
   saveToServer: () => Promise<void>;
   loadFromServer: () => Promise<void>;
 }
@@ -55,6 +63,7 @@ export const useDashboardLayout = create<DashboardLayoutState>()(
     (set, get) => ({
       widgets: DEFAULT_WIDGETS,
       isEditing: false,
+      activeTab: 'overview',
       setWidgets: (widgets) => set({ widgets }),
       toggleWidget: (id) =>
         set((state) => ({
@@ -75,6 +84,7 @@ export const useDashboardLayout = create<DashboardLayoutState>()(
         }),
       resetLayout: () => set({ widgets: DEFAULT_WIDGETS }),
       setEditing: (editing) => set({ isEditing: editing }),
+      setActiveTab: (tab) => set({ activeTab: tab }),
       saveToServer: async () => {
         const { widgets } = get();
         try {

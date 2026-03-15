@@ -4,15 +4,22 @@ import api from '@/lib/api';
 // ============ Types ============
 
 export type TaxRateType = 'OUTPUT' | 'INPUT' | 'BOTH';
-export type VATReturnStatus = 'DRAFT' | 'FILED' | 'PAID';
+export type VATReturnStatus = 'DRAFT' | 'CALCULATED' | 'SUBMITTED' | 'FILED';
 
 export interface TaxRate {
   id: string;
   name: string;
+  description?: string;
   rate: number | string;
   type: TaxRateType;
   accountId: string;
   account?: {
+    id: string;
+    name: string;
+    code: string;
+  };
+  collectAccountId?: string;
+  collectAccount?: {
     id: string;
     name: string;
     code: string;
@@ -25,13 +32,23 @@ export interface TaxRate {
 
 export interface VATReturn {
   id: string;
+  returnNumber?: string;
+  period?: string;
   startDate: string;
   endDate: string;
+  dueDate?: string;
+  totalSales: number | string;
   outputVat: number | string;
+  outputVAT?: number | string;
+  totalPurchases: number | string;
   inputVat: number | string;
+  inputVAT?: number | string;
   netVat: number | string;
+  netPayable?: number | string;
   status: VATReturnStatus;
   filedAt?: string;
+  submittedAt?: string;
+  payment?: VATPayment;
   breakdown?: {
     invoices?: unknown[];
     creditNotes?: unknown[];
@@ -47,14 +64,43 @@ export interface VATPayment {
   vatReturnId: string;
   vatReturn?: VATReturn;
   amount: number | string;
-  paymentDate: string;
+  date: string;
+  paymentDate?: string;
+  paidFromAccountId?: string;
   reference?: string;
-  bankAccountId: string;
+  bankAccountId?: string;
   bankAccount?: {
     id: string;
     name: string;
   };
   createdAt: string;
+}
+
+export interface TaxDashboardStats {
+  activeRates: number;
+  totalRates: number;
+  pendingReturns: number;
+  totalReturns: number;
+  outstandingVAT: number;
+  totalPaid: number;
+  upcomingDeadlines: Array<{
+    id: string;
+    returnNumber?: string;
+    dueDate?: string;
+    status: VATReturnStatus;
+    startDate: string;
+    endDate: string;
+  }>;
+  recentReturns: Array<{
+    id: string;
+    returnNumber?: string;
+    status: VATReturnStatus;
+    outputVAT: number | string;
+    inputVAT: number | string;
+    netPayable: number | string;
+    startDate: string;
+    endDate: string;
+  }>;
 }
 
 // ============ API Functions ============
@@ -91,11 +137,19 @@ const vatReturnsApi = {
     const response = await api.get(`/vat-returns/${id}`);
     return response.data;
   },
+  dashboardStats: async () => {
+    const response = await api.get('/vat-returns/dashboard-stats');
+    return response.data;
+  },
   generate: async (startDate: string, endDate: string) => {
     const response = await api.post('/vat-returns', {
       startDate,
       endDate,
     });
+    return response.data;
+  },
+  calculate: async (id: string) => {
+    const response = await api.post(`/vat-returns/${id}/calculate`);
     return response.data;
   },
   file: async (id: string) => {
@@ -145,6 +199,7 @@ export function useCreateTaxRate() {
     mutationFn: taxRatesApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tax-rates'] });
+      queryClient.invalidateQueries({ queryKey: ['tax-dashboard-stats'] });
     },
   });
 }
@@ -156,6 +211,7 @@ export function useUpdateTaxRate() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['tax-rates'] });
       queryClient.invalidateQueries({ queryKey: ['tax-rates', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['tax-dashboard-stats'] });
     },
   });
 }
@@ -166,6 +222,7 @@ export function useDeleteTaxRate() {
     mutationFn: taxRatesApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tax-rates'] });
+      queryClient.invalidateQueries({ queryKey: ['tax-dashboard-stats'] });
     },
   });
 }
@@ -187,6 +244,13 @@ export function useVATReturn(id: string) {
   });
 }
 
+export function useTaxDashboardStats() {
+  return useQuery({
+    queryKey: ['tax-dashboard-stats'],
+    queryFn: () => vatReturnsApi.dashboardStats(),
+  });
+}
+
 export function useGenerateVATReturn() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -194,6 +258,19 @@ export function useGenerateVATReturn() {
       vatReturnsApi.generate(startDate, endDate),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vat-returns'] });
+      queryClient.invalidateQueries({ queryKey: ['tax-dashboard-stats'] });
+    },
+  });
+}
+
+export function useCalculateVATReturn() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: vatReturnsApi.calculate,
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['vat-returns'] });
+      queryClient.invalidateQueries({ queryKey: ['vat-returns', id] });
+      queryClient.invalidateQueries({ queryKey: ['tax-dashboard-stats'] });
     },
   });
 }
@@ -205,6 +282,7 @@ export function useFileVATReturn() {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['vat-returns'] });
       queryClient.invalidateQueries({ queryKey: ['vat-returns', id] });
+      queryClient.invalidateQueries({ queryKey: ['tax-dashboard-stats'] });
     },
   });
 }
@@ -215,6 +293,7 @@ export function useDeleteVATReturn() {
     mutationFn: vatReturnsApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vat-returns'] });
+      queryClient.invalidateQueries({ queryKey: ['tax-dashboard-stats'] });
     },
   });
 }
@@ -227,6 +306,7 @@ export function useRecordVATPayment() {
     mutationFn: vatPaymentsApi.recordPayment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vat-returns'] });
+      queryClient.invalidateQueries({ queryKey: ['tax-dashboard-stats'] });
     },
   });
 }
@@ -245,8 +325,9 @@ export function getTaxRateTypeLabel(type: TaxRateType): string {
 export function getVATReturnStatusLabel(status: VATReturnStatus): string {
   const labels: Record<VATReturnStatus, string> = {
     DRAFT: 'Draft',
+    CALCULATED: 'Calculated',
+    SUBMITTED: 'Submitted',
     FILED: 'Filed',
-    PAID: 'Paid',
   };
   return labels[status] || status;
 }
@@ -254,10 +335,21 @@ export function getVATReturnStatusLabel(status: VATReturnStatus): string {
 export function getVATReturnStatusColor(status: VATReturnStatus): string {
   const colors: Record<VATReturnStatus, string> = {
     DRAFT: 'bg-gray-100 text-gray-800 border-gray-200',
-    FILED: 'bg-blue-100 text-blue-800 border-blue-200',
-    PAID: 'bg-green-100 text-green-800 border-green-200',
+    CALCULATED: 'bg-amber-100 text-amber-800 border-amber-200',
+    SUBMITTED: 'bg-blue-100 text-blue-800 border-blue-200',
+    FILED: 'bg-green-100 text-green-800 border-green-200',
   };
   return colors[status] || '';
+}
+
+export function getVATReturnStatusStep(status: VATReturnStatus): number {
+  const steps: Record<VATReturnStatus, number> = {
+    DRAFT: 0,
+    CALCULATED: 1,
+    SUBMITTED: 2,
+    FILED: 3,
+  };
+  return steps[status] ?? 0;
 }
 
 export function formatCurrency(amount: number | string | undefined): string {
@@ -273,4 +365,14 @@ export function formatPercentage(rate: number | string | undefined): string {
   if (rate === undefined || rate === null) return '0%';
   const numRate = typeof rate === 'string' ? parseFloat(rate) : rate;
   return `${numRate}%`;
+}
+
+/** Normalize VAT return field names (backend uses outputVAT, frontend expects outputVat) */
+export function normalizeVATReturn(r: VATReturn): VATReturn {
+  return {
+    ...r,
+    outputVat: r.outputVat ?? r.outputVAT ?? 0,
+    inputVat: r.inputVat ?? r.inputVAT ?? 0,
+    netVat: r.netVat ?? r.netPayable ?? 0,
+  };
 }

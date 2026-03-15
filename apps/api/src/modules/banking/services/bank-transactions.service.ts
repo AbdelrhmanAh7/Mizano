@@ -71,6 +71,10 @@ export class BankTransactionsService {
     query: PaginationDto & {
       bankAccountId?: string;
       status?: Prisma.EnumReconciliationStatusFilter | string;
+      dateFrom?: string;
+      dateTo?: string;
+      amountMin?: string;
+      amountMax?: string;
     },
   ) {
     const {
@@ -80,11 +84,31 @@ export class BankTransactionsService {
       sortOrder = 'desc',
       bankAccountId,
       status,
+      dateFrom,
+      dateTo,
+      amountMin,
+      amountMax,
     } = query;
     const where: Prisma.BankTransactionWhereInput = {
       organizationId,
       ...(bankAccountId ? { bankAccountId } : {}),
       ...(status ? { status: status as Prisma.EnumReconciliationStatusFilter } : {}),
+      ...(dateFrom || dateTo
+        ? {
+            date: {
+              ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+              ...(dateTo ? { lte: new Date(dateTo) } : {}),
+            },
+          }
+        : {}),
+      ...(amountMin || amountMax
+        ? {
+            amount: {
+              ...(amountMin ? { gte: new Decimal(amountMin) } : {}),
+              ...(amountMax ? { lte: new Decimal(amountMax) } : {}),
+            },
+          }
+        : {}),
     };
 
     const [transactions, total] = await Promise.all([
@@ -104,11 +128,38 @@ export class BankTransactionsService {
   }
 
   async findAllCursor(organizationId: string, query: BankTransactionCursorQueryDto) {
-    const { cursor, take, sortBy = 'date', sortOrder = 'desc', bankAccountId, status } = query;
+    const {
+      cursor,
+      take,
+      sortBy = 'date',
+      sortOrder = 'desc',
+      bankAccountId,
+      status,
+      dateFrom,
+      dateTo,
+      amountMin,
+      amountMax,
+    } = query;
     const where: Prisma.BankTransactionWhereInput = {
       organizationId,
       ...(bankAccountId ? { bankAccountId } : {}),
       ...(status ? { status: status as Prisma.EnumReconciliationStatusFilter } : {}),
+      ...(dateFrom || dateTo
+        ? {
+            date: {
+              ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+              ...(dateTo ? { lte: new Date(dateTo) } : {}),
+            },
+          }
+        : {}),
+      ...(amountMin || amountMax
+        ? {
+            amount: {
+              ...(amountMin ? { gte: new Decimal(amountMin) } : {}),
+              ...(amountMax ? { lte: new Decimal(amountMax) } : {}),
+            },
+          }
+        : {}),
     };
     return cursorPaginate(
       this.prisma.bankTransaction,

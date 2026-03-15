@@ -42,6 +42,8 @@ const billSchema = z.object({
   vendorId: z.string().min(1, 'Vendor is required'),
   date: z.string().min(1, 'Date is required'),
   dueDate: z.string().min(1, 'Due date is required'),
+  reference: z.string().optional(),
+  currencyCode: z.string().optional(),
   notes: z.string().optional(),
   projectId: z.string().optional(),
   lines: z.array(lineSchema).min(1, 'At least one line item is required'),
@@ -53,6 +55,8 @@ export interface BillFormDefaultValues {
   vendorId?: string;
   date?: string;
   dueDate?: string;
+  reference?: string;
+  currencyCode?: string;
   notes?: string;
   projectId?: string;
   lines?: Array<{
@@ -75,14 +79,6 @@ interface BillFormProps {
   /** Pre-fill form from AI document scan */
   scanDefaults?: BillFormDefaultValues;
 }
-
-const taxRates = [
-  { value: '0', label: 'No Tax (0%)' },
-  { value: '5', label: '5%' },
-  { value: '10', label: '10%' },
-  { value: '14', label: 'VAT 14%' },
-  { value: '15', label: '15%' },
-];
 
 export function BillForm({
   bill,
@@ -108,6 +104,8 @@ export function BillForm({
       vendorId: scanDefaults?.vendorId || defaultVendorId || '',
       date: scanDefaults?.date || format(new Date(), 'yyyy-MM-dd'),
       dueDate: scanDefaults?.dueDate || format(addDays(new Date(), 30), 'yyyy-MM-dd'),
+      reference: scanDefaults?.reference || '',
+      currencyCode: scanDefaults?.currencyCode || '',
       notes: scanDefaults?.notes || '',
       projectId: scanDefaults?.projectId || '',
       lines: scanDefaults?.lines?.length
@@ -132,6 +130,8 @@ export function BillForm({
         vendorId: bill.vendorId,
         date: bill.date.split('T')[0],
         dueDate: bill.dueDate.split('T')[0],
+        reference: bill.reference || '',
+        currencyCode: bill.currencyCode || '',
         notes: bill.notes || '',
         projectId: bill.projectId || '',
         lines: bill.lines?.map((line) => ({
@@ -175,6 +175,8 @@ export function BillForm({
       vendorId: data.vendorId,
       date: data.date,
       dueDate: data.dueDate,
+      reference: data.reference || null,
+      currencyCode: data.currencyCode || null,
       notes: data.notes || null,
       projectId: data.projectId || null,
       lines,
@@ -192,9 +194,8 @@ export function BillForm({
       const qty = parseFloat(line.quantity || '0');
       const rate = parseFloat(line.rate || '0');
       const lineAmount = qty * rate;
-      const lineTax = lineAmount * (parseFloat(line.taxRate || '0') / 100);
       subtotal += lineAmount;
-      taxAmount += lineTax;
+      taxAmount += parseFloat(line.taxRate || '0');
     });
 
     return { subtotal, taxAmount, grandTotal: subtotal + taxAmount };
@@ -266,9 +267,40 @@ export function BillForm({
             </div>
           </div>
 
-          {/* Project */}
-          {projects.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Reference, Currency, Project */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Reference */}
+            <div className="space-y-2">
+              <Label htmlFor="reference">Reference (Vendor Doc #)</Label>
+              <Input id="reference" {...form.register('reference')} placeholder="e.g. INV-001" />
+            </div>
+
+            {/* Currency */}
+            <div className="space-y-2">
+              <Label htmlFor="currencyCode">Currency</Label>
+              <Select
+                value={form.watch('currencyCode') || ''}
+                onValueChange={(value) =>
+                  form.setValue('currencyCode', value === 'default' ? '' : value)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Default</SelectItem>
+                  <SelectItem value="USD">USD — US Dollar</SelectItem>
+                  <SelectItem value="EUR">EUR — Euro</SelectItem>
+                  <SelectItem value="EGP">EGP — Egyptian Pound</SelectItem>
+                  <SelectItem value="GBP">GBP — British Pound</SelectItem>
+                  <SelectItem value="AED">AED — UAE Dirham</SelectItem>
+                  <SelectItem value="SAR">SAR — Saudi Riyal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Project */}
+            {projects.length > 0 && (
               <div className="space-y-2">
                 <Label htmlFor="projectId">Project (Optional)</Label>
                 <Select
@@ -290,8 +322,8 @@ export function BillForm({
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -363,21 +395,14 @@ export function BillForm({
                       />
                     </TableCell>
                     <TableCell>
-                      <Select
-                        value={form.watch(`lines.${index}.taxRate`) || '0'}
-                        onValueChange={(value) => form.setValue(`lines.${index}.taxRate`, value)}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {taxRates.map((rate) => (
-                            <SelectItem key={rate.value} value={rate.value}>
-                              {rate.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Input
+                        {...form.register(`lines.${index}.taxRate`)}
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        placeholder="0.00"
+                        className="h-8 w-24"
+                      />
                     </TableCell>
                     <TableCell className="text-right font-mono">${lineAmount.toFixed(2)}</TableCell>
                     <TableCell>

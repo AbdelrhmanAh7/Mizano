@@ -45,6 +45,7 @@
       "bomPlaceholder": "Select BOM",
       "quantity": "Quantity",
       "plannedStartDate": "Planned Start Date",
+      "plannedEndDate": "Planned End Date",
       "notes": "Notes",
       "notesPlaceholder": "Enter notes"
     },

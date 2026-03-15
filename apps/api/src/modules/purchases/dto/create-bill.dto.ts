@@ -5,6 +5,7 @@ import {
   ValidateNested,
   ArrayMinSize,
   IsOptional,
+  Length,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
@@ -23,6 +24,8 @@ export class CreateBillDto {
   @ApiProperty() @IsString() billNumber: string;
   @ApiProperty() @IsDateString() date: string;
   @ApiProperty() @IsDateString() dueDate: string;
+  @ApiProperty({ required: false }) @IsString() @IsOptional() reference?: string;
+  @ApiProperty({ required: false }) @IsString() @IsOptional() @Length(3, 3) currencyCode?: string;
   @ApiProperty({ required: false }) @IsString() @IsOptional() notes?: string;
   @ApiProperty({ required: false }) @IsString() @IsOptional() projectId?: string;
   @ApiProperty({ type: [BillLineDto] })

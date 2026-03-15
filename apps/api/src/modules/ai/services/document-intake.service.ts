@@ -34,6 +34,7 @@ export interface IntakeLineItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  taxAmount: number;
   total: number;
 }
 
@@ -122,6 +123,8 @@ export interface ConfirmIntakeDto {
   date: string;
   dueDate: string;
   documentNumber?: string;
+  reference?: string;
+  currencyCode?: string;
   lines: ConfirmIntakeLineDto[];
   notes?: string;
   projectId?: string;
@@ -157,6 +160,9 @@ export interface IntakeJob {
   error: string | null;
   createdAt: number;
 }
+
+/** Truncate PDF raw text to this length before sending to Ollama (speeds up inference). */
+const PDF_TEXT_TRUNCATION_LIMIT = 4000;
 
 // ---------------------------------------------------------------------------
 // Service
@@ -328,6 +334,9 @@ export class DocumentIntakeService {
       }
 
       if (rawText) {
+        if (rawText.length > PDF_TEXT_TRUNCATION_LIMIT) {
+          rawText = rawText.slice(0, PDF_TEXT_TRUNCATION_LIMIT);
+        }
         extraction = await this.ollamaService.extractFromText(rawText);
         if (extraction) {
           rawText = extraction.rawText || rawText;
@@ -345,25 +354,37 @@ export class DocumentIntakeService {
       extraction = this.ollamaService.buildEmptyResult(rawText);
     }
 
-    // Step 2: Classify document
-    onProgress?.('classifying', 60, 'Classifying document type...');
-    const classification = await this.classificationService.classifyDocument(
-      organizationId,
-      rawText,
-      filename,
-    );
+    // Step 2: Classify document — use embedded category from extraction, or fall back to classifier
+    let classificationPromise: Promise<{ category: DocumentCategory; confidence: number }>;
+    if (extraction.documentCategory) {
+      const category = this.mapRawCategoryToDocumentCategory(extraction.documentCategory);
+      classificationPromise = Promise.resolve({
+        category,
+        confidence: extraction.ocrConfidence || 0.8,
+      });
+    } else {
+      classificationPromise = this.classificationService.classifyDocument(
+        organizationId,
+        rawText,
+        filename,
+      );
+    }
+
+    onProgress?.('classifying', 60, 'Classifying and matching...');
+
+    // Step 3: Run classification + entity matching in parallel (both only need rawText)
+    const [classification, entityResult] = await Promise.all([
+      classificationPromise,
+      this.entityExtractionService.extractAndMatch(organizationId, rawText, { useOllama: false }),
+    ]);
+
     const documentType = this.mapClassificationToType(classification.category);
 
     this.logger.log(
       `Classification: ${classification.category} (${(classification.confidence * 100).toFixed(1)}%) → ${documentType}`,
     );
 
-    // Step 3: Extract entities and match against vendors/customers
     onProgress?.('matching', 80, 'Matching vendors and customers...');
-    const entityResult = await this.entityExtractionService.extractAndMatch(
-      organizationId,
-      rawText,
-    );
 
     // Step 4: Build vendor/customer candidate lists
     const { vendorCandidates, matchedVendor } = await this.matchVendors(
@@ -499,7 +520,7 @@ export class DocumentIntakeService {
       const tax = line.taxRate || 0;
       const lineTotal = qty * rate;
       subtotal += lineTotal;
-      taxAmount += lineTotal * (tax / 100);
+      taxAmount += tax;
       return { ...line, amount: lineTotal };
     });
 
@@ -515,6 +536,8 @@ export class DocumentIntakeService {
         taxAmount: new Decimal(taxAmount),
         grandTotal: new Decimal(grandTotal),
         balanceDue: new Decimal(grandTotal),
+        reference: dto.reference,
+        currencyCode: dto.currencyCode,
         notes: dto.notes || 'Created from document scan',
         projectId: dto.projectId,
         organizationId,
@@ -578,7 +601,7 @@ export class DocumentIntakeService {
       const tax = line.taxRate || 0;
       const lineTotal = qty * rate;
       subtotal += lineTotal;
-      taxAmount += lineTotal * (tax / 100);
+      taxAmount += tax;
       return { ...line, amount: lineTotal };
     });
 
@@ -622,6 +645,13 @@ export class DocumentIntakeService {
     );
 
     return { type: 'invoice', id: invoice.id, number: invoiceNumber };
+  }
+
+  private mapRawCategoryToDocumentCategory(raw: string): DocumentCategory {
+    const upper = raw.toUpperCase().trim();
+    return Object.values(DocumentCategory).includes(upper as DocumentCategory)
+      ? (upper as DocumentCategory)
+      : DocumentCategory.OTHER;
   }
 
   private mapClassificationToType(category: DocumentCategory): IntakeDocumentType {
