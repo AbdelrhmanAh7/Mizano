@@ -474,6 +474,13 @@ export class BankStatementImportService {
               data: updateData as Prisma.BankTransactionUncheckedUpdateInput,
             });
           }
+
+          // Increment rule hit count (cast required until Prisma client is regenerated)
+          await this.prisma.bankRule.update({
+            where: { id: rule.id },
+            data: { hitCount: { increment: 1 } } as Prisma.BankRuleUpdateInput,
+          });
+
           appliedCount++;
           break; // First matching rule wins
         }

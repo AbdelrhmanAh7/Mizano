@@ -7,12 +7,14 @@ export interface CreateWorkOrderData {
   bomId: string;
   quantity: number;
   plannedStartDate?: string;
+  plannedEndDate?: string;
   notes?: string;
 }
 
 export interface UpdateWorkOrderData {
   quantity?: number;
   plannedStartDate?: string;
+  plannedEndDate?: string;
   notes?: string;
   bomId?: string;
 }
@@ -55,10 +57,11 @@ export class WorkOrdersService {
         bomId: dto.bomId,
         quantity: dto.quantity,
         plannedStartDate: dto.plannedStartDate ? new Date(dto.plannedStartDate) : null,
+        plannedEndDate: dto.plannedEndDate ? new Date(dto.plannedEndDate) : null,
         status: WorkOrderStatus.DRAFT,
         notes: dto.notes,
         organizationId,
-      },
+      } as Prisma.WorkOrderUncheckedCreateInput,
       include: {
         bom: {
           include: {
@@ -111,12 +114,13 @@ export class WorkOrdersService {
       throw new BadRequestException('Cannot update completed or cancelled work order');
     }
 
-    const data: Prisma.WorkOrderUncheckedUpdateInput = { ...dto };
+    const data: Record<string, unknown> = { ...dto };
     if (dto.plannedStartDate) data.plannedStartDate = new Date(dto.plannedStartDate);
+    if (dto.plannedEndDate) data.plannedEndDate = new Date(dto.plannedEndDate);
 
     return this.prisma.workOrder.update({
       where: { id },
-      data,
+      data: data as Prisma.WorkOrderUncheckedUpdateInput,
       include: {
         bom: {
           include: { outputItem: { select: { id: true, name: true, sku: true } } },
@@ -466,7 +470,13 @@ export class WorkOrdersService {
   async recordProduction(
     organizationId: string,
     id: string,
-    dto: { quantityProduced: number; notes?: string },
+    dto: {
+      quantityProduced: number;
+      quantityRejected?: number;
+      wastageQuantity?: number;
+      notes?: string;
+      date?: string;
+    },
   ) {
     const workOrder = await this.findOne(organizationId, id);
     if (workOrder.status !== WorkOrderStatus.IN_PROCESS) {
@@ -475,68 +485,45 @@ export class WorkOrdersService {
 
     const quantityProduced = dto.quantityProduced;
 
+    // Create ProductionEntry record
+    const entry = await this.prisma.productionEntry.create({
+      data: {
+        workOrderId: id,
+        date: dto.date ? new Date(dto.date) : new Date(),
+        quantityProduced: Math.round(quantityProduced),
+        quantityRejected: dto.quantityRejected ? Math.round(dto.quantityRejected) : 0,
+        wastageQuantity: dto.wastageQuantity ? Math.round(dto.wastageQuantity) : 0,
+        notes: dto.notes,
+        organizationId,
+      },
+    });
+
     // Consume materials proportionally
     await this.consumeMaterials(organizationId, workOrder, quantityProduced);
 
     // Add finished goods to inventory
     await this.addFinishedGoods(organizationId, workOrder, quantityProduced);
 
-    // Update work order notes with production entry
-    const timestamp = new Date().toISOString();
-    const productionNote = `[${timestamp}] Produced: ${quantityProduced} units${dto.notes ? ' - ' + dto.notes : ''}`;
-
-    return this.prisma.workOrder.update({
-      where: { id },
-      data: {
-        notes: workOrder.notes ? `${workOrder.notes}\n${productionNote}` : productionNote,
-      },
-      include: {
-        bom: {
-          include: { outputItem: { select: { id: true, name: true, sku: true } } },
-        },
-      },
-    });
+    return entry;
   }
 
   async getProductionHistory(organizationId: string, id: string) {
-    const workOrder = await this.findOne(organizationId, id);
+    await this.findOne(organizationId, id);
 
-    // Get all inventory movements related to this work order
-    const movements = await this.prisma.inventoryMovement.findMany({
-      where: {
-        organizationId,
-        referenceType: 'workOrder',
-        referenceId: id,
-      },
-      include: {
-        item: { select: { id: true, name: true, sku: true } },
-        warehouse: { select: { id: true, name: true } },
-      },
+    const entries = await this.prisma.productionEntry.findMany({
+      where: { workOrderId: id, organizationId },
       orderBy: { createdAt: 'desc' },
     });
 
-    // Separate consumed materials and produced goods
-    const consumed = movements.filter((m) => parseFloat(m.quantity.toString()) < 0);
-    const produced = movements.filter((m) => parseFloat(m.quantity.toString()) > 0);
-
-    return {
-      workOrderId: id,
-      workOrderNumber: workOrder.workOrderNumber,
-      status: workOrder.status,
-      consumed: consumed.map((m) => ({
-        item: m.item,
-        warehouse: m.warehouse,
-        quantity: Math.abs(parseFloat(m.quantity.toString())),
-        date: m.createdAt,
-      })),
-      produced: produced.map((m) => ({
-        item: m.item,
-        warehouse: m.warehouse,
-        quantity: parseFloat(m.quantity.toString()),
-        date: m.createdAt,
-      })),
-      totalProduced: produced.reduce((sum, m) => sum + parseFloat(m.quantity.toString()), 0),
-    };
+    return entries.map((e) => ({
+      id: e.id,
+      date: e.date,
+      quantityProduced: parseFloat(e.quantityProduced.toString()),
+      quantityRejected: parseFloat(e.quantityRejected.toString()),
+      wastageQuantity: parseFloat(e.wastageQuantity.toString()),
+      notes: e.notes,
+      createdAt: e.createdAt,
+    }));
   }
 
   async remove(organizationId: string, id: string) {
@@ -603,6 +590,38 @@ export class WorkOrdersService {
       data: { status: WorkOrderStatus.CANCELLED },
     });
     return { cancelled: result.count, total: ids.length };
+  }
+
+  async getStats(organizationId: string) {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [statusCounts, activeBoms, completedThisMonth] = await Promise.all([
+      this.prisma.workOrder.groupBy({
+        by: ['status'],
+        where: { organizationId, deletedAt: null },
+        _count: { id: true },
+      }),
+      this.prisma.bOM.count({
+        where: { organizationId, isActive: true, deletedAt: null },
+      }),
+      this.prisma.workOrder.count({
+        where: {
+          organizationId,
+          status: WorkOrderStatus.COMPLETED,
+          completedDate: { gte: startOfMonth },
+        },
+      }),
+    ]);
+
+    const counts = Object.fromEntries(statusCounts.map((s) => [s.status, s._count.id]));
+
+    return {
+      active: counts['IN_PROCESS'] || 0,
+      draft: counts['DRAFT'] || 0,
+      activeBoms,
+      completedThisMonth,
+    };
   }
 
   private async generateWorkOrderNumber(organizationId: string): Promise<string> {
