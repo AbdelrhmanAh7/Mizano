@@ -48,15 +48,57 @@ export class ProjectsService {
     const where: Prisma.ProjectWhereInput = { organizationId, deletedAt: null };
     if (query.status) where.status = query.status;
     if (query.customerId) where.customerId = query.customerId;
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { description: { contains: query.search, mode: 'insensitive' } },
+        { projectNumber: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
 
-    return this.prisma.project.findMany({
-      where,
-      include: {
-        customer: { select: { id: true, name: true } },
-        _count: { select: { tasks: true, timesheetEntries: true } },
-      },
-      orderBy: { createdAt: 'desc' },
+    const [projects, total] = await Promise.all([
+      this.prisma.project.findMany({
+        where,
+        include: {
+          customer: { select: { id: true, name: true } },
+          _count: { select: { tasks: true, timesheetEntries: true } },
+          timesheetEntries: { select: { hours: true, duration: true } },
+          invoices: { select: { total: true, grandTotal: true, balanceDue: true } },
+          expenses: { select: { amount: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.project.count({ where }),
+    ]);
+
+    const data = projects.map((p) => {
+      const totalHours = p.timesheetEntries.reduce(
+        (sum, e) => sum + parseFloat((e.hours ?? e.duration ?? 0).toString()),
+        0,
+      );
+      const totalBilled = p.invoices.reduce((sum, inv) => {
+        const invTotal = parseFloat((inv.total ?? inv.grandTotal).toString());
+        return sum + invTotal - parseFloat(inv.balanceDue.toString());
+      }, 0);
+      const totalExpenses = p.expenses.reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0);
+      const budgetAmount = p.budgetAmount ?? p.budget;
+      const budgetType: 'HOURS' | 'COST' = p.budgetHours ? 'HOURS' : 'COST';
+      const budgetNum = budgetAmount ? parseFloat(budgetAmount.toString()) : 0;
+      const profitMargin =
+        budgetNum > 0 ? Math.round(((totalBilled - totalExpenses) / budgetNum) * 100) : null;
+      const { timesheetEntries: _te, invoices: _inv, expenses: _exp, ...rest } = p;
+      return {
+        ...rest,
+        budgetAmount,
+        budgetType,
+        totalHours,
+        totalBilled,
+        totalExpenses,
+        profitMargin,
+      };
     });
+
+    return { data, meta: { page: 1, limit: total, total, totalPages: 1 } };
   }
 
   async findOne(organizationId: string, id: string) {

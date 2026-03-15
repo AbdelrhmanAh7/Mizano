@@ -278,7 +278,8 @@ function ProjectsPageContent() {
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.startDate), 'MMM d, yyyy'),
+      cell: ({ row }) =>
+        row.original.startDate ? format(new Date(row.original.startDate), 'MMM d, yyyy') : '-',
     },
     {
       id: 'actions',
@@ -393,7 +394,9 @@ function ProjectsPageContent() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="PLANNING">Planning</SelectItem>
                 <SelectItem value="ACTIVE">Active</SelectItem>
+                <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
                 <SelectItem value="COMPLETED">Completed</SelectItem>
                 <SelectItem value="ON_HOLD">On Hold</SelectItem>
                 <SelectItem value="CANCELLED">Cancelled</SelectItem>

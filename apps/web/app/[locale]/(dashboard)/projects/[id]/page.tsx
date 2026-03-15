@@ -134,10 +134,11 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     );
   }
 
-  const budget =
-    typeof project.budgetAmount === 'string'
+  const budget = project.budgetAmount
+    ? typeof project.budgetAmount === 'string'
       ? parseFloat(project.budgetAmount)
-      : (project.budgetAmount as number);
+      : (project.budgetAmount as number)
+    : 0;
   const billed =
     typeof project.totalBilled === 'string'
       ? parseFloat(project.totalBilled)
@@ -446,7 +447,9 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{t('projects.form.startDate')}</span>
-                  <span>{format(new Date(project.startDate), 'MMM d, yyyy')}</span>
+                  <span>
+                    {project.startDate ? format(new Date(project.startDate), 'MMM d, yyyy') : '-'}
+                  </span>
                 </div>
                 {project.endDate && (
                   <div className="flex justify-between">

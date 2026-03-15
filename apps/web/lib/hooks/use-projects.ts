@@ -14,12 +14,12 @@ export interface Project {
     id: string;
     name: string;
   };
-  billingMethod: 'FIXED' | 'PROJECT_HOURLY' | 'TASK_HOURLY' | 'STAFF_HOURLY';
+  billingMethod: 'FIXED' | 'HOURLY' | 'PROJECT_HOURLY' | 'TASK_HOURLY' | 'STAFF_HOURLY';
   budgetType: 'COST' | 'HOURS';
-  budgetAmount: string | number;
+  budgetAmount: string | number | null;
   hourlyRate: string | number | null;
-  status: 'ACTIVE' | 'COMPLETED' | 'ON_HOLD' | 'CANCELLED';
-  startDate: string;
+  status: 'PLANNING' | 'ACTIVE' | 'IN_PROGRESS' | 'COMPLETED' | 'ON_HOLD' | 'CANCELLED';
+  startDate: string | null;
   endDate: string | null;
   totalHours: number;
   totalBilled: string | number;
@@ -395,13 +395,16 @@ export function useStopTimer() {
 // Helper functions
 export const billingMethodOptions = [
   { value: 'FIXED', label: 'Fixed Price', description: 'Bill a fixed amount for the project' },
+  { value: 'HOURLY', label: 'Hourly', description: 'Bill hours at a set rate' },
   { value: 'PROJECT_HOURLY', label: 'Project Hourly', description: 'Bill hours at project rate' },
   { value: 'TASK_HOURLY', label: 'Task Hourly', description: 'Bill hours at task-specific rates' },
   { value: 'STAFF_HOURLY', label: 'Staff Hourly', description: 'Bill hours at staff rates' },
 ];
 
 export const projectStatusOptions = [
+  { value: 'PLANNING', label: 'Planning' },
   { value: 'ACTIVE', label: 'Active' },
+  { value: 'IN_PROGRESS', label: 'In Progress' },
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'ON_HOLD', label: 'On Hold' },
   { value: 'CANCELLED', label: 'Cancelled' },
@@ -424,8 +427,10 @@ export function getProjectStatusLabel(status: ProjectStatus): string {
 
 export function getProjectStatusColor(status: ProjectStatus): string {
   const colors: Record<ProjectStatus, string> = {
+    PLANNING: 'bg-purple-100 text-purple-800',
     ACTIVE: 'bg-green-100 text-green-800',
-    COMPLETED: 'bg-blue-100 text-blue-800',
+    IN_PROGRESS: 'bg-blue-100 text-blue-800',
+    COMPLETED: 'bg-sky-100 text-sky-800',
     ON_HOLD: 'bg-yellow-100 text-yellow-800',
     CANCELLED: 'bg-gray-100 text-gray-800',
   };

@@ -12,4 +12,9 @@ export class ProjectQueryDto {
   @IsString()
   @IsOptional()
   customerId?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  search?: string;
 }
