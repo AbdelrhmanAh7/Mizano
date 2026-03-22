@@ -27,6 +27,9 @@ COPY packages ./packages
 # Generate Prisma client
 RUN cd apps/api && pnpm exec prisma generate
 
+# Build shared packages first
+RUN pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/validators build
+
 # Build the application
 RUN pnpm --filter api build
 
