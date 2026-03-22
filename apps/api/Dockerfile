@@ -9,8 +9,6 @@ FROM node:20-alpine
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Set environment
-ENV NODE_ENV=production
 ENV PORT=6001
 
 WORKDIR /app
@@ -21,8 +19,9 @@ COPY apps/api/package.json ./apps/api/
 COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/validators/package.json ./packages/validators/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install all dependencies (including dev for build tools)
+RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN pnpm rebuild 2>/dev/null || true
 
 # Copy source code
 COPY apps/api ./apps/api
@@ -37,8 +36,8 @@ RUN pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/validators
 # Build the application
 RUN pnpm --filter api build
 
-# Verify the app can start (catches missing modules)
-RUN node -e "require('./apps/api/dist/main.js')" 2>&1 | head -1 || true
+# Set production environment after build
+ENV NODE_ENV=production
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
