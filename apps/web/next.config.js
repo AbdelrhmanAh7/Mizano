@@ -11,6 +11,7 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 // APP_ENV (local|dev|sit|prod) is used by the API; Next.js uses NODE_ENV.
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   reactStrictMode: true,
   transpilePackages: ['@mizano/validators', '@mizano/shared-types'],
   eslint: {
