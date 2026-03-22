@@ -252,9 +252,9 @@ function ProjectsPageContent() {
           typeof project.totalBilled === 'string'
             ? parseFloat(project.totalBilled)
             : project.totalBilled;
-        const progress = budget > 0 ? Math.min((billed / budget) * 100, 100) : 0;
+        const progress = budget && budget > 0 ? Math.min((billed / budget) * 100, 100) : 0;
 
-        return budget > 0 ? (
+        return budget && budget > 0 ? (
           <div className="min-w-[120px]">
             <div className="flex justify-between text-xs mb-1">
               <span>{formatCurrency(billed)}</span>
