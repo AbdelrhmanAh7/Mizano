@@ -14,7 +14,7 @@ export class PayrollService {
         organizationId,
         month: dto.month,
         year: dto.year,
-        status: { in: [PayrollStatus.CONFIRMED, PayrollStatus.PAID] },
+        status: { in: [PayrollStatus.PROCESSED, PayrollStatus.PAID] },
       },
     });
     if (existing) throw new BadRequestException('Payroll run already exists for this period');

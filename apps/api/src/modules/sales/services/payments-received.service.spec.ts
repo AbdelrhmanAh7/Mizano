@@ -8,6 +8,7 @@ import { JournalsService } from '../../accounting/services/journals.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
 import { createMockCustomer, createMockInvoice } from '../../../test/helpers/test-utils';
 import { dec } from '../../../test/helpers/decimal.helpers';
+import { PaymentModeFilter } from '../dto/payment-received-query.dto';
 
 describe('PaymentsReceivedService', () => {
   let service: PaymentsReceivedService;
@@ -370,7 +371,7 @@ describe('PaymentsReceivedService', () => {
       prisma.paymentReceived.findMany.mockResolvedValue([]);
       prisma.paymentReceived.count.mockResolvedValue(0);
 
-      await service.findAll(ORG_ID, { paymentMode: 'BANK_TRANSFER' });
+      await service.findAll(ORG_ID, { paymentMode: PaymentModeFilter.BANK_TRANSFER });
 
       const whereArg = prisma.paymentReceived.findMany.mock.calls[0]![0]!.where!;
       expect(whereArg.paymentMode).toBe('BANK_TRANSFER');
@@ -468,7 +469,7 @@ describe('PaymentsReceivedService', () => {
 
       await service.findAll(ORG_ID, {
         customerId: 'cust-xyz',
-        paymentMode: 'CASH',
+        paymentMode: PaymentModeFilter.CASH,
         dateFrom: '2026-03-01',
         dateTo: '2026-03-31',
       });
