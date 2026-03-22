@@ -34,7 +34,7 @@ RUN pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/validators
 RUN pnpm --filter api build
 
 # Deploy a self-contained production bundle (resolves pnpm symlinks)
-RUN pnpm --filter api deploy --prod /app/deployed
+RUN pnpm --filter api deploy /app/deployed
 
 # Copy Prisma client — remove symlinks and copy real files using -L (dereference)
 RUN rm -rf /app/deployed/node_modules/.prisma /app/deployed/node_modules/@prisma/client && \
