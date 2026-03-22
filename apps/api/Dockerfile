@@ -36,11 +36,13 @@ RUN pnpm --filter api build
 # Deploy a self-contained production bundle (resolves pnpm symlinks)
 RUN pnpm --filter api deploy --prod /app/deployed
 
-# Copy Prisma client (generated in the pnpm store) into deployed bundle
-RUN mkdir -p /app/deployed/node_modules/.prisma && \
-    find /app -path "*/node_modules/.prisma/client" -not -path "*/deployed/*" -type d | head -1 | xargs -I{} cp -r {} /app/deployed/node_modules/.prisma/client
-RUN mkdir -p /app/deployed/node_modules/@prisma && \
-    find /app -path "*/@prisma/client" -not -path "*/deployed/*" -type d | head -1 | xargs -I{} cp -r {} /app/deployed/node_modules/@prisma/client
+# Copy Prisma client — remove symlinks and copy real files using -L (dereference)
+RUN rm -rf /app/deployed/node_modules/.prisma /app/deployed/node_modules/@prisma/client && \
+    mkdir -p /app/deployed/node_modules/.prisma /app/deployed/node_modules/@prisma && \
+    cp -rL /app/node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client /app/deployed/node_modules/.prisma/client && \
+    cp -rL /app/node_modules/.pnpm/@prisma+client@*/node_modules/@prisma/client /app/deployed/node_modules/@prisma/client
+# Verify Prisma enums are loadable
+RUN node -e "const {AccountType}=require('/app/deployed/node_modules/@prisma/client');if(!AccountType)throw new Error('Prisma enums missing');console.log('Prisma OK:',Object.keys(AccountType))"
 
 # ============================================
 # Stage 2: Production
