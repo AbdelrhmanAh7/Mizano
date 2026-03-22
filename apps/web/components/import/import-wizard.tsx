@@ -417,8 +417,11 @@ export function ImportWizard({
             </Label>
             <Select
               value={state.duplicateHandling}
-              onValueChange={(value: ImportConfig['duplicateHandling']) =>
-                setState((prev) => ({ ...prev, duplicateHandling: value }))
+              onValueChange={(value) =>
+                setState((prev) => ({
+                  ...prev,
+                  duplicateHandling: value as ImportConfig['duplicateHandling'],
+                }))
               }
             >
               <SelectTrigger id="duplicateHandling" className="h-8 w-40">

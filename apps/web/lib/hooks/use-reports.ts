@@ -536,7 +536,7 @@ interface CashFlowSection {
   items: Array<{ name: string; amount: number }>;
   total: number;
 }
-interface CashFlowReport {
+interface TransformedCashFlowReport {
   operatingActivities: CashFlowSection;
   investingActivities: CashFlowSection;
   financingActivities: CashFlowSection;
@@ -569,7 +569,7 @@ interface CashFlowApiResponse {
   closingCashBalance?: number;
 }
 
-function transformCashFlow(raw: CashFlowApiResponse): CashFlowReport {
+function transformCashFlow(raw: CashFlowApiResponse): TransformedCashFlowReport {
   const opAdj = raw.operating?.adjustments ?? {};
   return {
     operatingActivities: {
@@ -599,7 +599,7 @@ function transformCashFlow(raw: CashFlowApiResponse): CashFlowReport {
 }
 
 export function useCashFlowReport(params: DateRange) {
-  return useQuery<CashFlowReport>({
+  return useQuery<TransformedCashFlowReport>({
     queryKey: ['reports', 'cash-flow', params],
     queryFn: async () => {
       const response = await reportsApi.getCashFlow(params);

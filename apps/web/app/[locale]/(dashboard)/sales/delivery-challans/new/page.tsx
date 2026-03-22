@@ -45,8 +45,8 @@ export default function NewDeliveryChallanPage() {
   const { data: customersData } = useCustomers();
   const { data: itemsData } = useItems();
 
-  const customers = customersData?.data ?? [];
-  const items = itemsData?.data ?? [];
+  const customers: Array<{ id: string; name: string }> = customersData?.data ?? [];
+  const items: Array<{ id: string; name: string; sku?: string | null }> = itemsData?.data ?? [];
 
   const [customerId, setCustomerId] = useState(searchParams.get('customerId') ?? '');
   const [challanType, setChallanType] = useState<ChallanType>('SUPPLY');

@@ -92,7 +92,7 @@ export function ItemForm({
         unit: item.unit || 'pcs',
         salesPrice: item.salesPrice ? parseFloat(item.salesPrice) : 0,
         purchasePrice: item.purchasePrice ? parseFloat(item.purchasePrice) : 0,
-        taxRateId: item.taxRateId || '',
+        taxRateId: item.taxRate || '',
         trackInventory: item.trackInventory ?? true,
         openingStock: item.currentStock || 0,
         reorderPoint: item.reorderPoint || 10,

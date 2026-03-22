@@ -48,6 +48,7 @@ cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && docker-compose -f
 
 ## Deployment Targets
 
+- **Kamatera VPS** (primary): CI/CD via `.github/workflows/deploy.yml` -> SSH to 185.247.117.157
 - **Railway**: See `railway.toml` for configuration
 - **Render**: See `render.yaml` for configuration
 - **Docker**: Use `docker-compose.production.yml`

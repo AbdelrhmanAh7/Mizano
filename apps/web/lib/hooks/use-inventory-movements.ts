@@ -56,7 +56,7 @@ export function useInventoryMovements(params?: InventoryMovementParams) {
   return useQuery({
     queryKey: ['inventory-movements', params],
     queryFn: async () => {
-      const response = await inventoryMovementsApi.getAll(params);
+      const response = await inventoryMovementsApi.getAll(params as Record<string, unknown>);
       return response.data;
     },
   });

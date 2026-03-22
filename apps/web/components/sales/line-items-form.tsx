@@ -150,8 +150,8 @@ export function LineItemsForm({
       setValue(`${name}.${index}.itemId`, itemId);
       setValue(`${name}.${index}.description`, item.description || item.name);
       setValue(`${name}.${index}.rate`, item.sellingPrice);
-      if (item.taxRateId) {
-        setValue(`${name}.${index}.taxRateId`, item.taxRateId);
+      if (item.taxRate) {
+        setValue(`${name}.${index}.taxRateId`, item.taxRate);
       }
       // Recalculate amount
       const qty = watch(`${name}.${index}.quantity`) || '1';

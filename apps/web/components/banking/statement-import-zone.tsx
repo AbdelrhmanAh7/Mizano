@@ -46,7 +46,8 @@ export function StatementImportZone() {
 
     try {
       const res = await importMutation.mutateAsync({ bankAccountId: selectedAccountId, file });
-      const data = (res as { data?: ImportResult })?.data || (res as ImportResult);
+      const data =
+        (res as unknown as { data?: ImportResult })?.data || (res as unknown as ImportResult);
       setResult(data);
     } catch (err: unknown) {
       const apiErr = err as { response?: { data?: { message?: string } } };

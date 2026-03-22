@@ -63,10 +63,17 @@ export function TaskForm({ task, onSubmit, onCancel, isSubmitting }: TaskFormPro
 
   useEffect(() => {
     if (task) {
+      const statusMap: Record<string, 'TODO' | 'IN_PROGRESS' | 'COMPLETED'> = {
+        TODO: 'TODO',
+        IN_PROGRESS: 'IN_PROGRESS',
+        REVIEW: 'IN_PROGRESS',
+        DONE: 'COMPLETED',
+        COMPLETED: 'COMPLETED',
+      };
       form.reset({
         name: task.name || '',
         description: task.description || '',
-        status: task.status || 'TODO',
+        status: statusMap[task.status] || 'TODO',
         priority: 'MEDIUM',
         isBillable: task.isBillable ?? true,
         ratePerHour: task.hourlyRate ? parseFloat(task.hourlyRate as string) : 0,

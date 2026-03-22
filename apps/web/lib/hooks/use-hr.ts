@@ -398,16 +398,16 @@ export const payrollStatusOptions = [
 ];
 
 export function getEmployeeStatusLabel(status: EmployeeStatus): string {
-  return employeeStatusOptions.find((s) => s.value === status)?.label || status;
+  return employeeStatusOptions.find((s) => s.value === status)?.label || status || 'Unknown';
 }
 
 export function getEmployeeStatusColor(status: EmployeeStatus): string {
-  const colors: Record<EmployeeStatus, string> = {
+  const colors: Record<string, string> = {
     ACTIVE: 'bg-green-100 text-green-800',
     INACTIVE: 'bg-yellow-100 text-yellow-800',
     TERMINATED: 'bg-red-100 text-red-800',
   };
-  return colors[status] || colors.ACTIVE;
+  return (status && colors[status]) || colors.ACTIVE;
 }
 
 export function getAttendanceStatusLabel(status: AttendanceStatus): string {

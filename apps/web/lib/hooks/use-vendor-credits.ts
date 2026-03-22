@@ -42,6 +42,7 @@ export interface VendorCredit {
   date: string;
   /** Actual Prisma field — use this for Total/Balance rendering */
   amount: string;
+  status?: VendorCreditStatus;
   refundedAt?: string | null;
   reason: string | null;
   organizationId: string;

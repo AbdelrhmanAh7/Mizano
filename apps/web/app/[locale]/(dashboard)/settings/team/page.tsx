@@ -175,7 +175,7 @@ function usePermissionsMatrix(initial?: Permission[]) {
   const toPayload = (): Permission[] =>
     Object.entries(matrix)
       .filter(([, actions]) => actions.size > 0)
-      .map(([module, actions]) => ({ module, actions: [...actions] }));
+      .map(([module, actions]) => ({ module, actions: Array.from(actions) }));
 
   const reset = (perms?: Permission[]) => {
     const m: Record<string, Set<string>> = {};

@@ -76,15 +76,30 @@ export function ProjectForm({
 
   useEffect(() => {
     if (project) {
+      const validBillingMethods = [
+        'FIXED',
+        'PROJECT_HOURLY',
+        'TASK_HOURLY',
+        'STAFF_HOURLY',
+      ] as const;
+      const validStatuses = ['ACTIVE', 'COMPLETED', 'ON_HOLD', 'CANCELLED'] as const;
+      const billingMethod = validBillingMethods.includes(
+        project.billingMethod as (typeof validBillingMethods)[number],
+      )
+        ? (project.billingMethod as (typeof validBillingMethods)[number])
+        : 'PROJECT_HOURLY';
+      const status = validStatuses.includes(project.status as (typeof validStatuses)[number])
+        ? (project.status as (typeof validStatuses)[number])
+        : 'ACTIVE';
       form.reset({
         name: project.name || '',
         description: project.description || '',
         customerId: project.customerId || '',
-        billingMethod: project.billingMethod || 'PROJECT_HOURLY',
+        billingMethod,
         budgetType: project.budgetType || 'COST',
         budgetAmount: project.budgetAmount ? parseFloat(project.budgetAmount as string) : 0,
         hourlyRate: project.hourlyRate ? parseFloat(project.hourlyRate as string) : 0,
-        status: project.status || 'ACTIVE',
+        status,
         startDate: project.startDate ? new Date(project.startDate) : new Date(),
         endDate: project.endDate ? new Date(project.endDate) : null,
       });

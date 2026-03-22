@@ -263,16 +263,55 @@ sudo certbot certonly --standalone -d yourdomain.com -d api.yourdomain.com
 
 ---
 
+## Current Deployment: Kamatera VPS
+
+| Property     | Value                                               |
+| ------------ | --------------------------------------------------- |
+| **Provider** | Kamatera                                            |
+| **Zone**     | EU — Amsterdam, The Netherlands                     |
+| **IP**       | 185.247.117.157                                     |
+| **Hostname** | 185-247-117-157.eu-cloud-xip.com                    |
+| **OS**       | Ubuntu 22.04 LTS                                    |
+| **CPU**      | 4 cores                                             |
+| **RAM**      | 8 GB (+4 GB swap)                                   |
+| **Disk**     | 100 GB SSD                                          |
+| **AI**       | Disabled (not enough RAM for Ollama + app services) |
+
+### Server Setup
+
+```bash
+# SSH into the server as root and run:
+sudo bash scripts/kamatera-server-setup.sh 185-247-117-157.eu-cloud-xip.com
+```
+
+### GitHub Secrets Required
+
+| Secret           | Value                                         |
+| ---------------- | --------------------------------------------- |
+| `DEPLOY_HOST`    | `185.247.117.157`                             |
+| `DEPLOY_USER`    | `deploy`                                      |
+| `DEPLOY_SSH_KEY` | Private SSH key for the deploy user           |
+| `PRODUCTION_URL` | `http://185-247-117-157.eu-cloud-xip.com`     |
+| `API_URL`        | `http://185-247-117-157.eu-cloud-xip.com/api` |
+
+---
+
 ## VPS Provider Recommendations
+
+### Current: Kamatera (Amsterdam)
+
+| Plan       | CPU     | RAM  | Disk       | Price   |
+| ---------- | ------- | ---- | ---------- | ------- |
+| **Active** | 4 cores | 8 GB | 100 GB SSD | ~$40/mo |
 
 ### For CPU-only (no AI or slow AI)
 
 | Provider     | Plan    | CPU    | RAM   | Disk   | Price   |
 | ------------ | ------- | ------ | ----- | ------ | ------- |
+| Kamatera     | Custom  | 4 vCPU | 16 GB | 100 GB | ~$50/mo |
 | Hetzner      | CX31    | 4 vCPU | 16 GB | 160 GB | ~€15/mo |
 | DigitalOcean | Premium | 4 vCPU | 16 GB | 100 GB | ~$48/mo |
 | Contabo      | VPS L   | 6 vCPU | 16 GB | 400 GB | ~€12/mo |
-| OVHcloud     | B2-30   | 4 vCPU | 30 GB | 200 GB | ~€22/mo |
 
 ### For GPU (fast AI inference)
 
@@ -283,7 +322,7 @@ sudo certbot certonly --standalone -d yourdomain.com -d api.yourdomain.com
 | Vast.ai     | Community | RTX 4090 | 24 GB | 32 GB | ~$0.30/hr |
 | RunPod      | GPU Pod   | RTX 4090 | 24 GB | 32 GB | ~$0.44/hr |
 
-> **Tip:** For budget setups, start CPU-only and add GPU later when AI usage grows. Ollama gracefully falls back to CPU.
+> **Tip:** Current 8GB server is fine for app services without AI. To enable Ollama AI, upgrade to 16GB+ RAM or offload Ollama to a separate server.
 
 ---
 

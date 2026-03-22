@@ -22,7 +22,13 @@ services:
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5001}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://localhost:11434}
-      - OLLAMA_ENABLED=${OLLAMA_ENABLED:-true}
+      - OLLAMA_ENABLED=${OLLAMA_ENABLED:-false}
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,6 +60,12 @@ services:
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:5001}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://api:6001}
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
     depends_on:
       api:
         condition: service_healthy
@@ -80,6 +92,19 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-mizano}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mizano_secret}
       - POSTGRES_DB=${POSTGRES_DB:-mizano_db}
+    command: >
+      postgres
+        -c shared_buffers=256MB
+        -c effective_cache_size=512MB
+        -c work_mem=4MB
+        -c maintenance_work_mem=64MB
+        -c max_connections=100
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -102,6 +127,12 @@ services:
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 64M
     volumes:
       - redis_data:/data
     networks:

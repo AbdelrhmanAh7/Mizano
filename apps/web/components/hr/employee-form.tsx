@@ -76,12 +76,12 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
     resolver: zodResolver(employeeSchema),
     defaultValues: employee
       ? {
-          employeeNumber: employee.employeeNumber,
+          employeeNumber: employee.employeeNumber ?? '',
           name: employee.name,
-          email: employee.email,
+          email: employee.email ?? '',
           phone: employee.phone || '',
-          joiningDate: employee.joiningDate ? new Date(employee.joiningDate) : new Date(),
-          department: employee.departmentId || '',
+          joiningDate: employee.dateOfJoining ? new Date(employee.dateOfJoining) : new Date(),
+          department: employee.department || '',
           jobTitle: employee.jobTitle || '',
           basicSalary:
             typeof employee.basicSalary === 'string'
@@ -89,10 +89,10 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
               : employee.basicSalary,
           allowances: allowancesToArray(employee.allowances as Record<string, number> | null),
           deductions: deductionsToArray(employee.deductions as Record<string, number> | null),
-          bankName: employee.bankName || '',
-          bankAccountNumber: employee.bankAccountNumber || '',
-          taxId: employee.taxId || '',
-          status: employee.status,
+          bankName: employee.bankAccount || '',
+          bankAccountNumber: '',
+          taxId: employee.nationalId || '',
+          status: (employee.status as 'ACTIVE' | 'INACTIVE' | 'TERMINATED') ?? 'ACTIVE',
         }
       : {
           employeeNumber: '',
