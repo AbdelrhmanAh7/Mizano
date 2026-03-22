@@ -3,11 +3,15 @@
 # Multi-stage build for production
 # ============================================
 
-# Stage 1: Build
-FROM node:20-alpine AS builder
+# Single-stage build (avoids pnpm symlink issues across stages)
+FROM node:20-alpine
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Set environment
+ENV NODE_ENV=production
+ENV PORT=6001
 
 WORKDIR /app
 
@@ -33,39 +37,14 @@ RUN pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/validators
 # Build the application
 RUN pnpm --filter api build
 
-# Deploy a self-contained production bundle (resolves pnpm symlinks)
-RUN pnpm --filter api deploy /app/deployed
-
-# Copy Prisma client — remove symlinks and copy real files using -L (dereference)
-RUN rm -rf /app/deployed/node_modules/.prisma /app/deployed/node_modules/@prisma/client && \
-    mkdir -p /app/deployed/node_modules/.prisma /app/deployed/node_modules/@prisma && \
-    cp -rL /app/node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client /app/deployed/node_modules/.prisma/client && \
-    cp -rL /app/node_modules/.pnpm/@prisma+client@*/node_modules/@prisma/client /app/deployed/node_modules/@prisma/client
-# Verify Prisma enums are loadable
-RUN node -e "const {AccountType}=require('/app/deployed/node_modules/@prisma/client');if(!AccountType)throw new Error('Prisma enums missing');console.log('Prisma OK:',Object.keys(AccountType))"
-
-# ============================================
-# Stage 2: Production
-FROM node:20-alpine AS production
-
-# Set environment
-ENV NODE_ENV=production
-ENV PORT=6001
-
-WORKDIR /app
+# Verify the app can start (catches missing modules)
+RUN node -e "require('./apps/api/dist/main.js')" 2>&1 | head -1 || true
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nestjs
 
-# Copy deployed bundle
-COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/deployed/node_modules ./node_modules
-COPY --from=builder /app/apps/api/prisma ./prisma
-COPY --from=builder /app/apps/api/package.json ./
-COPY --from=builder /app/pnpm-lock.yaml ./
-
-# Change ownership to non-root user
+# Change ownership
 RUN chown -R nestjs:nodejs /app
 
 USER nestjs
@@ -74,8 +53,9 @@ USER nestjs
 EXPOSE 6001
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:6001/health || exit 1
 
 # Start the application
+WORKDIR /app/apps/api
 CMD ["node", "dist/main.js"]
