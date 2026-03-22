@@ -36,9 +36,9 @@ RUN pnpm --filter api build
 # Deploy a self-contained production bundle (resolves pnpm symlinks)
 RUN pnpm --filter api deploy --prod /app/deployed
 
-# Copy Prisma client into deployed node_modules
-RUN cp -r /app/node_modules/.prisma /app/deployed/node_modules/.prisma 2>/dev/null || true
-RUN cp -r /app/node_modules/@prisma /app/deployed/node_modules/@prisma 2>/dev/null || true
+# Copy Prisma client (generated in the pnpm store) into deployed bundle
+RUN find /app -path "*/node_modules/.prisma/client" -type d | head -1 | xargs -I{} cp -r {} /app/deployed/node_modules/.prisma/client
+RUN find /app -path "*/@prisma/client" -not -path "*/deployed/*" -type d | head -1 | xargs -I{} sh -c 'mkdir -p /app/deployed/node_modules/@prisma && cp -r {} /app/deployed/node_modules/@prisma/client'
 
 # ============================================
 # Stage 2: Production
@@ -59,6 +59,10 @@ COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/deployed/node_modules ./node_modules
 COPY --from=builder /app/apps/api/prisma ./prisma
 COPY --from=builder /app/apps/api/package.json ./
+COPY --from=builder /app/pnpm-lock.yaml ./
+
+# Regenerate Prisma client to ensure enums are available
+RUN npx prisma generate
 
 # Change ownership to non-root user
 RUN chown -R nestjs:nodejs /app
