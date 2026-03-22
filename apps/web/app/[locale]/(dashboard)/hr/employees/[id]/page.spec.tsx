@@ -59,6 +59,7 @@ const defaultMutation = { mutateAsync: jest.fn(), isPending: false };
 const makeEmployee = (overrides?: Record<string, unknown>) => ({
   id: 'emp-001',
   employeeNumber: 'EMP-001',
+  name: 'John Doe',
   firstName: 'John',
   lastName: 'Doe',
   email: 'john@example.com',

@@ -61,9 +61,10 @@ import AttendancePage from './page';
 const defaultBulkMark = { mutateAsync: jest.fn() };
 
 const makeEmployee = (
-  overrides?: Partial<{ firstName: string | null; lastName: string | null }>,
+  overrides?: Partial<{ name: string | null; firstName: string | null; lastName: string | null }>,
 ) => ({
   id: 'emp-001',
+  name: 'John Doe',
   firstName: 'John',
   lastName: 'Doe',
   jobTitle: 'Engineer',
@@ -91,7 +92,7 @@ describe('AttendancePage', () => {
 
   it('does not crash when employee.firstName is null (regression: Cannot read properties of undefined)', () => {
     mockUseEmployees.mockReturnValue({
-      data: { data: [makeEmployee({ firstName: null })], meta: { total: 1 } },
+      data: { data: [makeEmployee({ name: 'John', firstName: null })], meta: { total: 1 } },
       isLoading: false,
     });
     expect(() => renderPage()).not.toThrow();
@@ -99,7 +100,7 @@ describe('AttendancePage', () => {
 
   it('does not crash when employee.lastName is null', () => {
     mockUseEmployees.mockReturnValue({
-      data: { data: [makeEmployee({ lastName: null })], meta: { total: 1 } },
+      data: { data: [makeEmployee({ name: 'Doe', lastName: null })], meta: { total: 1 } },
       isLoading: false,
     });
     expect(() => renderPage()).not.toThrow();
@@ -107,19 +108,25 @@ describe('AttendancePage', () => {
 
   it('does not crash when both firstName and lastName are null', () => {
     mockUseEmployees.mockReturnValue({
-      data: { data: [makeEmployee({ firstName: null, lastName: null })], meta: { total: 1 } },
+      data: {
+        data: [makeEmployee({ name: null, firstName: null, lastName: null })],
+        meta: { total: 1 },
+      },
       isLoading: false,
     });
     expect(() => renderPage()).not.toThrow();
   });
 
-  it('shows fallback "?" in AvatarFallback when firstName is null', () => {
+  it('shows fallback "?" in AvatarFallback when name is null', () => {
     mockUseEmployees.mockReturnValue({
-      data: { data: [makeEmployee({ firstName: null, lastName: null })], meta: { total: 1 } },
+      data: {
+        data: [makeEmployee({ name: null, firstName: null, lastName: null })],
+        meta: { total: 1 },
+      },
       isLoading: false,
     });
     renderPage();
-    // Two '??' characters should appear (calendar + detail table avatars)
+    // '??' characters should appear (calendar + detail table avatars)
     const fallbacks = screen.getAllByText('??');
     expect(fallbacks.length).toBeGreaterThanOrEqual(1);
   });

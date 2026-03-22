@@ -156,8 +156,8 @@ describe('Sidebar', () => {
 
   it('renders the app name', () => {
     render(<Sidebar />);
-    // useTranslations returns the key itself, so the appName key is rendered
-    const appNames = screen.getAllByText('appName');
+    // tCommon('appName') returns 'appName' which is used as the alt attribute on Image elements
+    const appNames = screen.getAllByAltText('appName');
     expect(appNames.length).toBeGreaterThanOrEqual(1);
   });
 
