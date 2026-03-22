@@ -33,12 +33,16 @@ RUN pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/validators
 # Build the application
 RUN pnpm --filter api build
 
+# Deploy a self-contained production bundle (resolves pnpm symlinks)
+RUN pnpm --filter api deploy --prod /app/deployed
+
+# Copy Prisma client into deployed node_modules
+RUN cp -r /app/node_modules/.prisma /app/deployed/node_modules/.prisma 2>/dev/null || true
+RUN cp -r /app/node_modules/@prisma /app/deployed/node_modules/@prisma 2>/dev/null || true
+
 # ============================================
 # Stage 2: Production
 FROM node:20-alpine AS production
-
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Set environment
 ENV NODE_ENV=production
@@ -50,11 +54,11 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nestjs
 
-# Copy necessary files from builder
+# Copy deployed bundle
 COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/package.json ./
+COPY --from=builder /app/deployed/node_modules ./node_modules
 COPY --from=builder /app/apps/api/prisma ./prisma
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api/package.json ./
 
 # Change ownership to non-root user
 RUN chown -R nestjs:nodejs /app
