@@ -38,6 +38,9 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# Build shared packages first
+RUN pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/validators build
+
 # Build the application
 RUN pnpm --filter web build
 
