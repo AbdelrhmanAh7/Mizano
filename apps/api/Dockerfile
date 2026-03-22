@@ -63,9 +63,6 @@ COPY --from=builder /app/apps/api/prisma ./prisma
 COPY --from=builder /app/apps/api/package.json ./
 COPY --from=builder /app/pnpm-lock.yaml ./
 
-# Regenerate Prisma client to ensure enums are available
-RUN npx prisma generate
-
 # Change ownership to non-root user
 RUN chown -R nestjs:nodejs /app
 
