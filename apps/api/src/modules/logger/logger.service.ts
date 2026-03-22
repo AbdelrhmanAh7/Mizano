@@ -225,8 +225,11 @@ export class LoggerService {
       [LogSource.AI_MODEL]: 0,
     };
 
-    const byCategory = Object.values(LogCategory).reduce(
-      (acc, cat) => ({ ...acc, [cat]: 0 }),
+    const byCategory: Record<LogCategory, number> = Object.values(LogCategory).reduce(
+      (acc, cat) => {
+        acc[cat] = 0;
+        return acc;
+      },
       {} as Record<LogCategory, number>,
     );
 
