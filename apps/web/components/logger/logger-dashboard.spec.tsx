@@ -316,22 +316,22 @@ describe('LoggerDashboard', () => {
     expect(mockUseLogger.clearResolved).toHaveBeenCalled();
   });
 
-  it('should render Generate Fix Prompt button', () => {
+  it('should render Fix Prompt button', () => {
     render(<LoggerDashboard />);
-    expect(screen.getByText('Generate Fix Prompt')).toBeInTheDocument();
+    expect(screen.getByText(/Fix Prompt/)).toBeInTheDocument();
   });
 
-  it('should disable Generate Fix Prompt when no selections', () => {
+  it('should disable Fix Prompt when no selections', () => {
     mockUseLogger.selectedIds = [];
     render(<LoggerDashboard />);
-    const btn = screen.getByText('Generate Fix Prompt').closest('button');
+    const btn = screen.getByText(/Fix Prompt/).closest('button');
     expect(btn).toBeDisabled();
   });
 
-  it('should enable Generate Fix Prompt when selections exist', () => {
+  it('should enable Fix Prompt when selections exist', () => {
     mockUseLogger.selectedIds = ['abc123'];
     render(<LoggerDashboard />);
-    const btn = screen.getByText('Generate Fix Prompt').closest('button');
+    const btn = screen.getByText(/Fix Prompt/).closest('button');
     expect(btn).not.toBeDisabled();
   });
 
@@ -343,7 +343,7 @@ describe('LoggerDashboard', () => {
     });
 
     render(<LoggerDashboard />);
-    fireEvent.click(screen.getByText('Generate Fix Prompt'));
+    fireEvent.click(screen.getByText(/Fix Prompt/));
 
     await waitFor(() => {
       expect(mockUseLogger.generateClaudePrompt).toHaveBeenCalled();
