@@ -19,9 +19,13 @@ COPY apps/api/package.json ./apps/api/
 COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/validators/package.json ./packages/validators/
 
+# Install build tools for native modules (bcrypt, sharp, etc.)
+RUN apk add --no-cache python3 make g++
+
 # Install all dependencies (including dev for build tools)
-RUN pnpm install --frozen-lockfile --ignore-scripts
-RUN pnpm rebuild 2>/dev/null || true
+# HUSKY=0 disables the husky prepare hook so we don't need --ignore-scripts
+ENV HUSKY=0
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY apps/api ./apps/api
