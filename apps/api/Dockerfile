@@ -37,8 +37,10 @@ RUN pnpm --filter api build
 RUN pnpm --filter api deploy --prod /app/deployed
 
 # Copy Prisma client (generated in the pnpm store) into deployed bundle
-RUN find /app -path "*/node_modules/.prisma/client" -type d | head -1 | xargs -I{} cp -r {} /app/deployed/node_modules/.prisma/client
-RUN find /app -path "*/@prisma/client" -not -path "*/deployed/*" -type d | head -1 | xargs -I{} sh -c 'mkdir -p /app/deployed/node_modules/@prisma && cp -r {} /app/deployed/node_modules/@prisma/client'
+RUN mkdir -p /app/deployed/node_modules/.prisma && \
+    find /app -path "*/node_modules/.prisma/client" -not -path "*/deployed/*" -type d | head -1 | xargs -I{} cp -r {} /app/deployed/node_modules/.prisma/client
+RUN mkdir -p /app/deployed/node_modules/@prisma && \
+    find /app -path "*/@prisma/client" -not -path "*/deployed/*" -type d | head -1 | xargs -I{} cp -r {} /app/deployed/node_modules/@prisma/client
 
 # ============================================
 # Stage 2: Production
