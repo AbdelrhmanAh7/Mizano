@@ -1965,6 +1965,7 @@ model Task {
   assigneeId     String?
   dueDate        DateTime?
   estimatedHours Decimal?     @db.Decimal(10, 2)
+  completedAt    DateTime?
   tags           String[]     @default([])
   organizationId String
   createdAt      DateTime     @default(now())

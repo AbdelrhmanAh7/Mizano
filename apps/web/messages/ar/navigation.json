@@ -6,7 +6,8 @@
     "quotes": "عروض الأسعار",
     "invoices": "الفواتير",
     "creditNotes": "إشعارات الائتمان",
-    "payments": "المدفوعات"
+    "payments": "المدفوعات",
+    "deliveryChallans": "إذونات التسليم"
   },
   "purchases": {
     "title": "المشتريات",

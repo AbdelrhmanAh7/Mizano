@@ -25,6 +25,35 @@ describe('CursorPaginationDto', () => {
     });
   });
 
+  describe('page field (compatibility)', () => {
+    it('accepts page=1 alongside take (regression: GET /api/crm/leads/cursor?page=1&take=50 returned 400)', async () => {
+      const dto = plainToInstance(CursorPaginationDto, { page: '1', take: '50' });
+      const errors = await validate(dto);
+      expect(errors).toHaveLength(0);
+      expect(dto.page).toBe(1);
+    });
+
+    it('is optional — omitting page does not cause validation error', async () => {
+      const dto = plainToInstance(CursorPaginationDto, { take: '50' });
+      const errors = await validate(dto);
+      expect(errors).toHaveLength(0);
+      expect(dto.page).toBeUndefined();
+    });
+
+    it('coerces string page to number', async () => {
+      const dto = plainToInstance(CursorPaginationDto, { page: '3' });
+      const errors = await validate(dto);
+      expect(errors).toHaveLength(0);
+      expect(dto.page).toBe(3);
+    });
+
+    it('rejects page=0 (min is 1)', async () => {
+      const dto = plainToInstance(CursorPaginationDto, { page: '0' });
+      const errors = await validate(dto);
+      expect(errors.some((e) => e.property === 'page')).toBe(true);
+    });
+  });
+
   describe('cursor pagination fields', () => {
     it('applies defaults', async () => {
       const dto = plainToInstance(CursorPaginationDto, {});

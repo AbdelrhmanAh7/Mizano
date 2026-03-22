@@ -1,8 +1,19 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { WarehousesService } from '../services/warehouses.service';
 import { CreateWarehouseDto } from '../dto/create-warehouse.dto';
 import { UpdateWarehouseDto } from '../dto/update-warehouse.dto';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -22,8 +33,14 @@ export class WarehousesController {
 
   @Get()
   @Permissions('inventory.view')
-  findAll(@CurrentOrg() orgId: string) {
-    return this.warehousesService.findAll(orgId);
+  findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto) {
+    return this.warehousesService.findAll(orgId, query);
+  }
+
+  @Get(':id/stock')
+  @Permissions('inventory.view')
+  getStock(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.warehousesService.getStock(orgId, id);
   }
 
   @Get(':id')

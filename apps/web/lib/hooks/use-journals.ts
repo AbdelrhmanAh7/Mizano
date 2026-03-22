@@ -137,7 +137,11 @@ export function useInfiniteJournals(params?: Record<string, unknown>) {
     queryKey: ['journals'],
     fetchFn: async (p) => {
       const response = await journalsApi.getAllCursor(p);
-      return response.data;
+      const page = response.data;
+      if (page.data) {
+        page.data = page.data.map(transformJournal);
+      }
+      return page;
     },
     params: params || {},
   });

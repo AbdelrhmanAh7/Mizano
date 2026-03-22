@@ -37,11 +37,11 @@ export class InventoryMovementsService {
     const where: Prisma.InventoryMovementWhereInput = { organizationId };
     if (itemId) where.itemId = itemId;
     if (warehouseId) where.warehouseId = warehouseId;
-    if (type) where.type = type;
+    if (type) where.type = { equals: type, mode: 'insensitive' };
     if (dateFrom || dateTo) {
       where.createdAt = {};
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-      if (dateTo) where.createdAt.lte = new Date(dateTo);
+      if (dateFrom) (where.createdAt as Prisma.DateTimeFilter).gte = new Date(dateFrom);
+      if (dateTo) (where.createdAt as Prisma.DateTimeFilter).lte = new Date(dateTo);
     }
 
     const [movements, total] = await Promise.all([
@@ -79,21 +79,50 @@ export class InventoryMovementsService {
     query: {
       cursor?: string;
       take?: number;
+      search?: string;
       itemId?: string;
       warehouseId?: string;
       type?: string;
+      source?: string;
+      dateFrom?: string;
+      dateTo?: string;
       sortBy?: string;
       sortOrder?: string;
     },
   ) {
-    const { cursor, take, itemId, warehouseId, type, sortOrder = 'desc' } = query;
+    const {
+      cursor,
+      take,
+      search,
+      itemId,
+      warehouseId,
+      type,
+      source,
+      dateFrom,
+      dateTo,
+      sortOrder = 'desc',
+    } = query;
     const sortBy = InventoryMovementsService.ALLOWED_SORT_FIELDS.includes(query.sortBy || '')
       ? query.sortBy!
       : 'createdAt';
     const where: Prisma.InventoryMovementWhereInput = { organizationId };
     if (itemId) where.itemId = itemId;
     if (warehouseId) where.warehouseId = warehouseId;
-    if (type) where.type = type;
+    if (source) where.type = { equals: source, mode: 'insensitive' }; // DB stores lowercase, frontend sends uppercase
+    if (type) where.movementType = type; // DB "movementType" stores IN/OUT
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) (where.createdAt as Prisma.DateTimeFilter).gte = new Date(dateFrom);
+      if (dateTo) (where.createdAt as Prisma.DateTimeFilter).lte = new Date(dateTo);
+    }
+    if (search) {
+      where.OR = [
+        { item: { name: { contains: search, mode: 'insensitive' } } },
+        { item: { sku: { contains: search, mode: 'insensitive' } } },
+        { warehouse: { name: { contains: search, mode: 'insensitive' } } },
+        { reference: { contains: search, mode: 'insensitive' } },
+      ];
+    }
 
     return cursorPaginate(
       this.prisma.inventoryMovement,

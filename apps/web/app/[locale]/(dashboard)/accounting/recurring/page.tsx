@@ -62,7 +62,7 @@ function RecurringProfilesPageContent() {
   const t = useTranslations('accounting');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
-  const tableParams = useTableParams({ defaultSortBy: 'nextExecutionDate' });
+  const tableParams = useTableParams({ defaultSortBy: 'nextRunDate' });
 
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -172,11 +172,11 @@ function RecurringProfilesPageContent() {
       ),
     },
     {
-      accessorKey: 'nextExecutionDate',
+      accessorKey: 'nextRunDate',
       header: () => (
         <SortableHeader
           label={t('recurring.table.nextRun')}
-          columnId="nextExecutionDate"
+          columnId="nextRunDate"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
           onSort={tableParams.setSort}
@@ -185,7 +185,7 @@ function RecurringProfilesPageContent() {
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />
-          {format(new Date(row.original.nextExecutionDate), 'MMM d, yyyy')}
+          {format(new Date(row.original.nextRunDate), 'MMM d, yyyy')}
         </div>
       ),
     },

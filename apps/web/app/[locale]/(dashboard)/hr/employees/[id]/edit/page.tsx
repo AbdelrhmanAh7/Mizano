@@ -44,9 +44,7 @@ export default function EditEmployeePage({ params }: { params: { id: string } })
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('employees.editEmployee')}</h1>
-          <p className="text-muted-foreground">
-            Update employee information for {employee.firstName} {employee.lastName}
-          </p>
+          <p className="text-muted-foreground">Update employee information for {employee.name}</p>
         </div>
       </div>
 

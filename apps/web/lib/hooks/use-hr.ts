@@ -11,27 +11,28 @@ type ApiError = { response?: { data?: { message?: string } } };
 // Employee Types
 export interface Employee {
   id: string;
-  employeeNumber: string;
-  firstName: string;
-  lastName: string;
-  email: string;
+  employeeId: string;
+  employeeNumber: string | null;
+  name: string;
+  email: string | null;
   phone: string | null;
-  joiningDate: string;
-  departmentId: string | null;
-  department?: {
-    id: string;
-    name: string;
-  };
+  department: string | null;
   jobTitle: string | null;
+  position: string | null;
+  dateOfJoining: string;
+  hireDate: string | null;
   basicSalary: string | number;
+  baseSalary: string | number | null;
   allowances: Record<string, number> | null;
   deductions: Record<string, number> | null;
-  bankName: string | null;
-  bankAccountNumber: string | null;
-  taxId: string | null;
-  status: 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
+  bankAccount: string | null;
+  nationalId: string | null;
+  status: string | null;
+  isActive: boolean;
+  organizationId: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
 }
 
 // Attendance Types
@@ -88,6 +89,7 @@ export interface EmployeeParams {
   limit?: number;
   search?: string;
   status?: EmployeeStatus;
+  isActive?: boolean;
   departmentId?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
@@ -313,7 +315,7 @@ export function useEmployeePayslips(employeeId: string) {
   return useQuery({
     queryKey: ['payslips', 'employee', employeeId],
     queryFn: async () => {
-      const response = await api.get(`/employees/${employeeId}/payslips`);
+      const response = await api.get(`/payroll/payslips/employee/${employeeId}`);
       return response.data?.data || response.data;
     },
     enabled: !!employeeId,
@@ -331,7 +333,7 @@ export function usePayslip(payslipIdOrPayrollId: string, payslipId?: string) {
     queryFn: async () => {
       if (isDirectAccess) {
         // Direct access by payslip ID
-        const response = await api.get(`/payslips/${payslipIdOrPayrollId}`);
+        const response = await api.get(`/payroll/payslips/${payslipIdOrPayrollId}`);
         return response.data?.data || response.data;
       } else {
         // Access via payroll run

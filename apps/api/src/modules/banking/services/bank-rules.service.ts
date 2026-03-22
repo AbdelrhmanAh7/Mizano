@@ -29,19 +29,28 @@ export class BankRulesService {
   }
 
   async findAll(organizationId: string, query: BankRuleQueryDto) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const sortBy = query.sortBy || 'createdAt';
+    const sortOrder = query.sortOrder || 'asc';
     const where: Prisma.BankRuleWhereInput = { organizationId, deletedAt: null };
     if (query.isActive !== undefined) where.isActive = query.isActive;
     if (query.search) {
       where.name = { contains: query.search, mode: 'insensitive' };
     }
 
-    return this.prisma.bankRule.findMany({
-      where,
-      include: {
-        bankAccount: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+    const [data, total] = await Promise.all([
+      this.prisma.bankRule.findMany({
+        where,
+        include: { bankAccount: { select: { id: true, name: true } } },
+        orderBy: { [sortBy]: sortOrder },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.bankRule.count({ where }),
+    ]);
+
+    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async findOne(organizationId: string, id: string) {

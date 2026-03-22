@@ -29,18 +29,18 @@ function getStatusVariant(status: string): 'default' | 'secondary' | 'destructiv
   }
 }
 
-function getStatusLabel(status: string): string {
+function getStatusLabel(status: string, t: (key: string) => string): string {
   switch (status) {
     case 'IN_PROGRESS':
-      return 'Active';
+      return t('status.inProgress');
     case 'COMPLETED':
-      return 'Done';
+      return t('status.completed');
     case 'ON_HOLD':
-      return 'On Hold';
+      return t('status.onHold');
     case 'CANCELLED':
-      return 'Cancelled';
+      return t('status.cancelled');
     case 'NOT_STARTED':
-      return 'Not Started';
+      return t('status.notStarted');
     default:
       return status;
   }
@@ -79,11 +79,12 @@ export function ProjectsOverview({ projects }: ProjectsOverviewProps) {
                       variant={getStatusVariant(project.status)}
                       className="text-[10px] px-1.5 py-0 shrink-0"
                     >
-                      {getStatusLabel(project.status)}
+                      {getStatusLabel(project.status, t)}
                     </Badge>
                   </div>
                   <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                    {project.hoursLogged.toFixed(1)}h
+                    {project.hoursLogged.toFixed(1)}
+                    {t('hoursAbbr')}
                   </span>
                 </div>
                 {project.budget > 0 && (

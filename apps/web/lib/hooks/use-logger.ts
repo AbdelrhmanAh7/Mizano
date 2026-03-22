@@ -134,8 +134,12 @@ export function useLogger() {
 
   // Generate prompt mutation
   const generatePromptMutation = useMutation({
-    mutationFn: async (logIds: string[]) => {
-      const res = await api.post('/logger/generate-prompt', { logIds });
+    mutationFn: async (params: {
+      logIds: string[];
+      includeStacks?: boolean;
+      includeContext?: boolean;
+    }) => {
+      const res = await api.post('/logger/generate-prompt', params);
       return res.data as GeneratePromptResponse;
     },
   });
@@ -266,10 +270,13 @@ export function useLogger() {
 
   // Generate Claude prompt
   const generateClaudePrompt = useCallback(
-    async (ids?: string[]) => {
+    async (ids?: string[], options?: { includeStacks?: boolean; includeContext?: boolean }) => {
       const targetIds = ids || store.selectedIds;
       if (targetIds.length === 0) return null;
-      const result = await generatePromptMutation.mutateAsync(targetIds);
+      const result = await generatePromptMutation.mutateAsync({
+        logIds: targetIds,
+        ...options,
+      });
       return result;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

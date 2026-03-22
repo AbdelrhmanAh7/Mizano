@@ -40,6 +40,24 @@ export class AttendanceController {
     return this.attendanceService.bulkRecordAttendance(orgId, dto.records);
   }
 
+  @Get()
+  @Permissions('hr.view')
+  @ApiOperation({ summary: 'Get all attendance records with optional filters' })
+  findAll(
+    @CurrentOrg() orgId: string,
+    @Query()
+    query: {
+      page?: number | string;
+      limit?: number | string;
+      startDate?: string;
+      endDate?: string;
+      employeeId?: string;
+      status?: string;
+    },
+  ) {
+    return this.attendanceService.findAll(orgId, query);
+  }
+
   @Get('by-employee/:employeeId')
   @Permissions('hr.view')
   @ApiOperation({ summary: 'Get attendance records for an employee' })

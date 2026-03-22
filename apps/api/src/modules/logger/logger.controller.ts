@@ -9,7 +9,15 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { IsString, IsOptional, IsArray, IsEnum, IsNumber, IsObject } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsEnum,
+  IsNumber,
+  IsObject,
+  IsBoolean,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { LoggerService } from './logger.service';
 import { LogLevel, LogSource, LogCategory, LogStatus, LogFilter } from '@mizano/shared-types';
@@ -87,6 +95,14 @@ class GeneratePromptDto {
   @IsArray()
   @IsString({ each: true })
   logIds: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  includeStacks?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  includeContext?: boolean;
 }
 
 @Controller('logger')
@@ -159,6 +175,9 @@ export class LoggerController {
   @Post('generate-prompt')
   @HttpCode(HttpStatus.OK)
   generatePrompt(@Body() dto: GeneratePromptDto) {
-    return this.loggerService.generatePrompt(dto.logIds);
+    return this.loggerService.generatePrompt(dto.logIds, {
+      includeStacks: dto.includeStacks,
+      includeContext: dto.includeContext,
+    });
   }
 }

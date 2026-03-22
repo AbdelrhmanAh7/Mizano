@@ -43,7 +43,8 @@ export async function cursorPaginate<T extends { id: string }>(
   orderBy: Record<string, string> | Record<string, string>[],
   options: CursorPaginateOptions = {},
 ): Promise<CursorPaginatedResult<T>> {
-  const { cursor, take = 50, include, select } = options;
+  const { cursor, take: rawTake = 50, include, select } = options;
+  const take = typeof rawTake === 'string' ? parseInt(rawTake, 10) : rawTake;
 
   const findArgs: Record<string, unknown> = {
     where,

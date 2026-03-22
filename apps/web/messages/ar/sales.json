@@ -47,13 +47,19 @@
       "title": "لا يوجد عملاء بعد",
       "description": "ابدأ بإضافة أول عميل"
     },
+    "notFoundMessage": "العميل الذي تبحث عنه غير موجود.",
+    "backToCustomers": "العودة للعملاء",
+    "deleteConfirmDescription": "هل أنت متأكد من حذف هذا العميل؟ لا يمكن التراجع عن هذا الإجراء.",
     "toast": {
       "created": "تم إنشاء العميل",
       "createdDescription": "تم إنشاء العميل بنجاح.",
       "updated": "تم تحديث العميل",
       "updatedDescription": "تم تحديث العميل بنجاح.",
+      "deleted": "تم حذف العميل",
+      "deletedDescription": "تم حذف العميل بنجاح.",
       "createError": "فشل في إنشاء العميل.",
-      "updateError": "فشل في تحديث العميل."
+      "updateError": "فشل في تحديث العميل.",
+      "deleteError": "فشل في حذف العميل. قد يكون له معاملات مرتبطة."
     }
   },
   "quotes": {
@@ -298,6 +304,7 @@
     "title": "سندات التسليم",
     "description": "إدارة سندات تسليم البضائع",
     "newChallan": "سند تسليم جديد",
+    "import": "استيراد",
     "issueChallan": "إصدار السند",
     "markReturned": "تحديد كمرتجع",
     "deleteChallan": "حذف السند",
@@ -309,6 +316,7 @@
     "searchPlaceholder": "البحث في السندات...",
     "allStatus": "جميع الحالات",
     "allTypes": "جميع الأنواع",
+    "itemsCount": "{count} عناصر",
     "emptyMessage": "لا توجد سندات تسليم. أنشئ أول سند للبدء.",
     "customer": "العميل",
     "date": "التاريخ",
@@ -362,12 +370,32 @@
     "viewAll": "عرض الكل"
   },
   "customer360": {
+    "overviewTab": "نظرة عامة",
+    "invoicesTab": "الفواتير",
+    "paymentsTab": "المدفوعات",
     "quotesTab": "عروض الأسعار",
     "creditNotesTab": "إشعارات الائتمان",
+    "statementTab": "كشف الحساب",
     "createInvoice": "إنشاء فاتورة",
     "createQuote": "إنشاء عرض أسعار",
     "recordPayment": "تسجيل دفعة",
+    "createCreditNote": "إنشاء إشعار ائتمان",
+    "outstandingBalance": "الرصيد المستحق",
+    "totalInvoices": "إجمالي الفواتير",
+    "totalPayments": "إجمالي المدفوعات",
     "totalQuotes": "إجمالي العروض",
-    "totalCreditNotes": "إجمالي الإشعارات"
+    "totalCreditNotes": "إجمالي الإشعارات",
+    "netDays": "صافي {days} يوم",
+    "paymentTermsNotSet": "غير محدد",
+    "noBillingAddress": "لا يوجد عنوان فوترة",
+    "noShippingAddress": "لا يوجد عنوان شحن",
+    "notes": "ملاحظات",
+    "recentInvoices": "الفواتير الأخيرة",
+    "noInvoicesYet": "لا توجد فواتير بعد",
+    "recentPayments": "المدفوعات الأخيرة",
+    "noPaymentsRecorded": "لا توجد مدفوعات مسجلة",
+    "recentQuotes": "عروض الأسعار الأخيرة",
+    "noQuotesYet": "لا توجد عروض أسعار بعد",
+    "noCreditNotesYet": "لا توجد إشعارات ائتمان بعد"
   }
 }

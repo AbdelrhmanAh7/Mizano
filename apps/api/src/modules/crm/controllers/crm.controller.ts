@@ -144,6 +144,18 @@ export class CrmController {
     return this.leadsService.bulkAssign(orgId, dto.leadIds, dto.assignedToId);
   }
 
+  @Get('leads/:id/activities')
+  @Permissions('crm.view')
+  @ApiOperation({ summary: 'Get activities for a lead' })
+  @ApiParam({ name: 'id', description: 'Lead ID' })
+  getLeadActivities(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.activitiesService.findAll(orgId, { leadId: id, limit: limit ? Number(limit) : 50 });
+  }
+
   // ============ Deals ============
 
   @Post('deals')
@@ -183,6 +195,15 @@ export class CrmController {
   @ApiOperation({ summary: 'Get deal statistics' })
   getDealStats(@CurrentOrg() orgId: string) {
     return this.dealsService.getDealStats(orgId);
+  }
+
+  @Get('deals/pipeline-metrics')
+  @Permissions('crm.view')
+  @ApiOperation({
+    summary: 'Get pipeline metrics (totals, weighted value, conversion rate, by-stage breakdown)',
+  })
+  getPipelineMetrics(@CurrentOrg() orgId: string) {
+    return this.dealsService.getPipelineMetrics(orgId);
   }
 
   @Get('deals/:id')
@@ -251,6 +272,18 @@ export class CrmController {
     @Body() dto: { assignedToId: string },
   ) {
     return this.dealsService.assignDeal(orgId, id, dto.assignedToId);
+  }
+
+  @Get('deals/:id/activities')
+  @Permissions('crm.view')
+  @ApiOperation({ summary: 'Get activities for a deal' })
+  @ApiParam({ name: 'id', description: 'Deal ID' })
+  getDealActivities(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.activitiesService.findAll(orgId, { dealId: id, limit: limit ? Number(limit) : 50 });
   }
 
   @Delete('deals/:id')

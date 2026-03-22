@@ -45,6 +45,15 @@ export const metadata: Metadata = {
     title: 'Mizano - AI-Powered ERP',
     description: 'Autonomous Accounting Platform - Zero-touch accounting powered by AI.',
   },
+  manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/ico/favicon.ico', sizes: 'any' },
+      { url: '/png/icon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/png/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: [{ url: '/png/apple-touch-icon.png' }],
+  },
   robots: {
     index: true,
     follow: true,

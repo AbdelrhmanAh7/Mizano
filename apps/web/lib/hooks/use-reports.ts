@@ -533,23 +533,77 @@ export function useBalanceSheetReport(asOfDate: string) {
 }
 
 interface CashFlowSection {
-  items?: Array<{ name?: string; description?: string; amount: number }>;
-  total?: number;
+  items: Array<{ name: string; amount: number }>;
+  total: number;
 }
-interface CashFlowRawReport {
-  operatingActivities?: CashFlowSection;
-  investingActivities?: CashFlowSection;
-  financingActivities?: CashFlowSection;
-  netCashFlow?: number;
-  openingBalance?: number;
-  closingBalance?: number;
+interface CashFlowReport {
+  operatingActivities: CashFlowSection;
+  investingActivities: CashFlowSection;
+  financingActivities: CashFlowSection;
+  netCashFlow: number;
+  openingBalance: number;
+  closingBalance: number;
 }
+
+interface CashFlowApiResponse {
+  openingCashBalance?: number;
+  operating?: {
+    netIncome?: number;
+    adjustments?: {
+      accountsReceivableChange?: number;
+      accountsPayableChange?: number;
+      inventoryChange?: number;
+    };
+    netCashFromOperating?: number;
+  };
+  investing?: {
+    fixedAssetPurchases?: number;
+    netCashFromInvesting?: number;
+  };
+  financing?: {
+    equityChanges?: number;
+    debtChanges?: number;
+    netCashFromFinancing?: number;
+  };
+  netCashChange?: number;
+  closingCashBalance?: number;
+}
+
+function transformCashFlow(raw: CashFlowApiResponse): CashFlowReport {
+  const opAdj = raw.operating?.adjustments ?? {};
+  return {
+    operatingActivities: {
+      items: [
+        { name: 'Net Income', amount: raw.operating?.netIncome ?? 0 },
+        { name: 'Accounts Receivable Change', amount: opAdj.accountsReceivableChange ?? 0 },
+        { name: 'Accounts Payable Change', amount: opAdj.accountsPayableChange ?? 0 },
+        { name: 'Inventory Change', amount: opAdj.inventoryChange ?? 0 },
+      ],
+      total: raw.operating?.netCashFromOperating ?? 0,
+    },
+    investingActivities: {
+      items: [{ name: 'Fixed Asset Purchases', amount: raw.investing?.fixedAssetPurchases ?? 0 }],
+      total: raw.investing?.netCashFromInvesting ?? 0,
+    },
+    financingActivities: {
+      items: [
+        { name: 'Equity Changes', amount: raw.financing?.equityChanges ?? 0 },
+        { name: 'Debt Changes', amount: raw.financing?.debtChanges ?? 0 },
+      ],
+      total: raw.financing?.netCashFromFinancing ?? 0,
+    },
+    netCashFlow: raw.netCashChange ?? 0,
+    openingBalance: raw.openingCashBalance ?? 0,
+    closingBalance: raw.closingCashBalance ?? 0,
+  };
+}
+
 export function useCashFlowReport(params: DateRange) {
-  return useQuery<CashFlowRawReport>({
+  return useQuery<CashFlowReport>({
     queryKey: ['reports', 'cash-flow', params],
     queryFn: async () => {
       const response = await reportsApi.getCashFlow(params);
-      return unwrap<CashFlowRawReport>(response);
+      return transformCashFlow(unwrap<CashFlowApiResponse>(response));
     },
     enabled: !!params.startDate && !!params.endDate,
   });

@@ -24,7 +24,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import {
@@ -38,7 +37,8 @@ import { StatementImportZone } from '@/components/banking/statement-import-zone'
 
 export default function BankTransactionsPage() {
   const t = useTranslations('banking');
-  const [statusFilter, setStatusFilter] = useState<TransactionStatus | ''>('');
+  const tCommon = useTranslations('common');
+  const [statusFilter, setStatusFilter] = useState<TransactionStatus | 'all'>('all');
   const [bankAccountId] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -50,7 +50,7 @@ export default function BankTransactionsPage() {
   const hasActiveFilters = dateFrom || dateTo || amountMin || amountMax;
 
   const { data, isLoading } = useBankTransactions({
-    status: (statusFilter || undefined) as TransactionStatus | undefined,
+    status: (statusFilter === 'all' ? undefined : statusFilter) as TransactionStatus | undefined,
     bankAccountId: bankAccountId || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
@@ -80,107 +80,107 @@ export default function BankTransactionsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">{t('transactions.title')}</h1>
-        <p className="text-muted-foreground">View and manage imported bank transactions</p>
+        <p className="text-muted-foreground">{t('transactions.description')}</p>
       </div>
 
       {/* Import Statement */}
-      <Collapsible open={importOpen} onOpenChange={setImportOpen}>
-        <CollapsibleTrigger asChild>
-          <Button variant="outline">
-            <Upload className="mr-2 h-4 w-4" />
-            Import Statement
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mt-3">
-          <StatementImportZone />
-        </CollapsibleContent>
-      </Collapsible>
+      <div>
+        <Button variant="outline" onClick={() => setImportOpen((o) => !o)}>
+          <Upload className="mr-2 h-4 w-4" />
+          {t('transactions.importStatement')}
+        </Button>
+        {importOpen && (
+          <div className="mt-3">
+            <StatementImportZone />
+          </div>
+        )}
+      </div>
 
       <div className="flex gap-4 items-center flex-wrap">
         <Select
           value={statusFilter}
-          onValueChange={(v) => setStatusFilter(v as TransactionStatus | '')}
+          onValueChange={(v) => setStatusFilter(v as TransactionStatus | 'all')}
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Status" />
+            <SelectValue placeholder={t('transactions.allStatus')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Status</SelectItem>
-            <SelectItem value="PENDING">Pending</SelectItem>
-            <SelectItem value="MATCHED">Matched</SelectItem>
-            <SelectItem value="CREATED">Created</SelectItem>
-            <SelectItem value="RECONCILED">Reconciled</SelectItem>
+            <SelectItem value="all">{t('transactions.allStatus')}</SelectItem>
+            <SelectItem value="PENDING">{t('transactions.status.pending')}</SelectItem>
+            <SelectItem value="MATCHED">{t('transactions.status.matched')}</SelectItem>
+            <SelectItem value="CREATED">{t('transactions.status.created')}</SelectItem>
+            <SelectItem value="RECONCILED">{t('transactions.status.reconciled')}</SelectItem>
           </SelectContent>
         </Select>
 
-        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-          <CollapsibleTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Filter className="mr-2 h-4 w-4" />
-              Filters
-              {hasActiveFilters && (
-                <Badge
-                  variant="secondary"
-                  className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-                >
-                  !
-                </Badge>
-              )}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-2">
-            <Card>
-              <CardContent className="pt-4 pb-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Date From</Label>
-                    <Input
-                      type="date"
-                      value={dateFrom}
-                      onChange={(e) => setDateFrom(e.target.value)}
-                      className="h-8 text-sm"
-                    />
+        <div>
+          <Button variant="outline" size="sm" onClick={() => setFiltersOpen((o) => !o)}>
+            <Filter className="mr-2 h-4 w-4" />
+            {t('transactions.filters.title')}
+            {hasActiveFilters && (
+              <Badge
+                variant="secondary"
+                className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+              >
+                !
+              </Badge>
+            )}
+          </Button>
+          {filtersOpen && (
+            <div className="mt-2">
+              <Card>
+                <CardContent className="pt-4 pb-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t('transactions.filters.dateFrom')}</Label>
+                      <Input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t('transactions.filters.dateTo')}</Label>
+                      <Input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t('transactions.filters.minAmount')}</Label>
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        value={amountMin}
+                        onChange={(e) => setAmountMin(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t('transactions.filters.maxAmount')}</Label>
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        value={amountMax}
+                        onChange={(e) => setAmountMax(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Date To</Label>
-                    <Input
-                      type="date"
-                      value={dateTo}
-                      onChange={(e) => setDateTo(e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Min Amount</Label>
-                    <Input
-                      type="number"
-                      placeholder="0.00"
-                      value={amountMin}
-                      onChange={(e) => setAmountMin(e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Max Amount</Label>
-                    <Input
-                      type="number"
-                      placeholder="0.00"
-                      value={amountMax}
-                      onChange={(e) => setAmountMax(e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                </div>
-                {hasActiveFilters && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters} className="mt-3">
-                    <X className="mr-1 h-3 w-3" />
-                    Clear filters
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          </CollapsibleContent>
-        </Collapsible>
+                  {hasActiveFilters && (
+                    <Button variant="ghost" size="sm" onClick={clearFilters} className="mt-3">
+                      <X className="mr-1 h-3 w-3" />
+                      {t('transactions.filters.clearFilters')}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -198,7 +198,7 @@ export default function BankTransactionsPage() {
                   <TableHead>{t('transactions.table.payee')}</TableHead>
                   <TableHead className="text-right">{t('transactions.table.amount')}</TableHead>
                   <TableHead>{t('transactions.table.status')}</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">{tCommon('table.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

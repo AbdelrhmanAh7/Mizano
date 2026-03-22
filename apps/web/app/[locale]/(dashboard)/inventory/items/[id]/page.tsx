@@ -181,7 +181,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 <p className="text-sm text-muted-foreground">{t('items.table.stock')}</p>
                 {item.trackInventory ? (
                   <p className={cn('text-2xl font-bold font-mono', stockStatus.color)}>
-                    {item.stockLevel} {item.unit || 'units'}
+                    {item.currentStock} {item.unit || 'units'}
                   </p>
                 ) : (
                   <p className="text-2xl font-bold text-muted-foreground">N/A</p>
@@ -251,9 +251,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
             {item.taxRate && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Tax Rate</span>
-                <span>
-                  {item.taxRate.name} ({item.taxRate.rate}%)
-                </span>
+                <span>{item.taxRate}%</span>
               </div>
             )}
             {item.description && (
@@ -274,7 +272,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Current Stock</span>
                 <span className="font-mono font-medium">
-                  {item.stockLevel} {item.unit || 'units'}
+                  {item.currentStock} {item.unit || 'units'}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -284,9 +282,9 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Reorder Quantity</span>
+                <span className="text-muted-foreground">Reorder Level</span>
                 <span className="font-mono">
-                  {item.reorderQuantity ?? '-'} {item.reorderQuantity ? item.unit || 'units' : ''}
+                  {item.reorderLevel ?? '-'} {item.reorderLevel ? item.unit || 'units' : ''}
                 </span>
               </div>
             </CardContent>
@@ -301,16 +299,14 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Income Account</span>
               <span>
-                {item.incomeAccount
-                  ? `${item.incomeAccount.code} - ${item.incomeAccount.name}`
-                  : '-'}
+                {item.salesAccount ? `${item.salesAccount.code} - ${item.salesAccount.name}` : '-'}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Expense Account</span>
               <span>
-                {item.expenseAccount
-                  ? `${item.expenseAccount.code} - ${item.expenseAccount.name}`
+                {item.purchaseAccount
+                  ? `${item.purchaseAccount.code} - ${item.purchaseAccount.name}`
                   : '-'}
               </span>
             </div>

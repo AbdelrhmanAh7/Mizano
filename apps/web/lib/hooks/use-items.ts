@@ -21,30 +21,25 @@ export interface Item {
   salesPrice: string | null;
   purchasePrice: string | null;
   costPrice: string | null;
-  taxRateId: string | null;
-  taxRate?: {
-    id: string;
-    name: string;
-    rate: number;
-  };
+  taxRate: string | null;
   trackInventory: boolean;
-  stockLevel: number;
+  currentStock: number;
   reorderPoint: number | null;
-  reorderQuantity: number | null;
-  incomeAccountId: string | null;
-  expenseAccountId: string | null;
+  reorderLevel: number | null;
+  salesAccountId: string | null;
+  purchaseAccountId: string | null;
   inventoryAccountId: string | null;
   isActive: boolean;
   organizationId: string;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
-  incomeAccount?: {
+  salesAccount?: {
     id: string;
     name: string;
     code: string;
   };
-  expenseAccount?: {
+  purchaseAccount?: {
     id: string;
     name: string;
     code: string;
@@ -281,10 +276,10 @@ export function getStockStatus(item: Item): {
   if (!item.trackInventory) {
     return { status: 'ok', label: 'N/A', color: 'text-gray-500' };
   }
-  if (item.stockLevel <= 0) {
+  if (item.currentStock <= 0) {
     return { status: 'out', label: 'Out of Stock', color: 'text-red-600' };
   }
-  if (item.reorderPoint && item.stockLevel <= item.reorderPoint) {
+  if (item.reorderPoint && item.currentStock <= item.reorderPoint) {
     return { status: 'low', label: 'Low Stock', color: 'text-yellow-600' };
   }
   return { status: 'ok', label: 'In Stock', color: 'text-green-600' };

@@ -81,6 +81,11 @@ export interface ProjectFilters {
 }
 
 export interface TimesheetFilters {
+  page?: number;
+  limit?: number;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
   projectId?: string;
   employeeId?: string;
   status?: 'UNBILLED' | 'INVOICED';
@@ -273,6 +278,7 @@ export function useUpdateTask() {
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', 'my-tasks'] });
       toast.success('Task updated successfully');
     },
     onError: (error: ApiError) => {
@@ -289,6 +295,7 @@ export function useDeleteTask() {
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', 'my-tasks'] });
       toast.success('Task deleted successfully');
     },
     onError: (error: ApiError) => {

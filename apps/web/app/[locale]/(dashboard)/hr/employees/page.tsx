@@ -47,6 +47,7 @@ import { useTranslations } from 'next-intl';
 
 function EmployeesPageContent() {
   const t = useTranslations('hr');
+  const tCommon = useTranslations('common');
   const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
   const { onExportAll } = useExportAll('employees', 'employees');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -84,11 +85,11 @@ function EmployeesPageContent() {
 
   const columns: ColumnDef<Employee>[] = [
     {
-      accessorKey: 'firstName',
+      accessorKey: 'name',
       header: () => (
         <SortableHeader
-          label="Name"
-          columnId="firstName"
+          label={t('employees.table.name')}
+          columnId="name"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
           onSort={tableParams.setSort}
@@ -99,7 +100,7 @@ function EmployeesPageContent() {
         return (
           <div>
             <Link href={`/hr/employees/${employee.id}`} className="font-medium hover:underline">
-              {employee.firstName} {employee.lastName}
+              {employee.name}
             </Link>
             <p className="text-sm text-muted-foreground">{employee.jobTitle || 'No title'}</p>
           </div>
@@ -108,17 +109,17 @@ function EmployeesPageContent() {
     },
     {
       accessorKey: 'email',
-      header: 'Email',
+      header: t('employees.table.email'),
       cell: ({ row }) => row.original.email || '-',
     },
     {
       accessorKey: 'phone',
-      header: 'Phone',
+      header: t('employees.table.phone'),
       cell: ({ row }) => row.original.phone || '-',
     },
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: t('employees.table.status'),
       cell: ({ row }) => (
         <Badge variant="outline" className={getEmployeeStatusColor(row.original.status)}>
           {getEmployeeStatusLabel(row.original.status)}
@@ -129,20 +130,21 @@ function EmployeesPageContent() {
       accessorKey: 'joiningDate',
       header: () => (
         <SortableHeader
-          label="Joined"
+          label={t('employees.table.joinedDate')}
           columnId="joiningDate"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.joiningDate), 'MMM yyyy'),
+      cell: ({ row }) =>
+        row.original.joiningDate ? format(new Date(row.original.joiningDate), 'MMM yyyy') : '-',
     },
     {
       accessorKey: 'basicSalary',
       header: () => (
         <SortableHeader
-          label="Salary"
+          label={t('employees.table.salary')}
           columnId="basicSalary"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -171,18 +173,18 @@ function EmployeesPageContent() {
               <DropdownMenuItem asChild>
                 <Link href={`/hr/employees/${employee.id}`}>
                   <Eye className="mr-2 h-4 w-4" />
-                  View
+                  {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href={`/hr/employees/${employee.id}/edit`}>
                   <Pencil className="mr-2 h-4 w-4" />
-                  Edit
+                  {tCommon('buttons.edit')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(employee.id)}>
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                {tCommon('buttons.delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -197,7 +199,7 @@ function EmployeesPageContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('employees.title')}</h1>
-          <p className="text-muted-foreground">Manage your team members and their information</p>
+          <p className="text-muted-foreground">{t('employees.description')}</p>
         </div>
         <Button asChild>
           <Link href="/hr/employees/new">
@@ -216,7 +218,7 @@ function EmployeesPageContent() {
                 <UserCircle className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Active Employees</p>
+                <p className="text-sm text-muted-foreground">{t('employees.activeEmployees')}</p>
                 <p className="text-2xl font-bold">{activeCount}</p>
               </div>
             </div>
@@ -224,7 +226,7 @@ function EmployeesPageContent() {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Monthly Payroll</p>
+            <p className="text-sm text-muted-foreground">{t('employees.totalPayroll')}</p>
             <p className="text-2xl font-bold font-mono">{formatCurrency(totalSalary)}</p>
           </CardContent>
         </Card>
@@ -240,17 +242,17 @@ function EmployeesPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search employees..."
+              placeholder={t('employees.searchPlaceholder')}
             />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-36">
-                <SelectValue placeholder="Status" />
+                <SelectValue placeholder={t('employees.allStatus')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="ACTIVE">Active</SelectItem>
-                <SelectItem value="INACTIVE">Inactive</SelectItem>
-                <SelectItem value="TERMINATED">Terminated</SelectItem>
+                <SelectItem value="all">{t('employees.allStatus')}</SelectItem>
+                <SelectItem value="ACTIVE">{t('employees.status.active')}</SelectItem>
+                <SelectItem value="INACTIVE">{t('employees.status.inactive')}</SelectItem>
+                <SelectItem value="TERMINATED">{t('employees.status.terminated')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -293,14 +295,12 @@ function EmployeesPageContent() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('employees.deleteEmployee')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this employee? This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogDescription>{tCommon('confirm.deleteMessage')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -94,11 +94,11 @@ export function ItemForm({
         purchasePrice: item.purchasePrice ? parseFloat(item.purchasePrice) : 0,
         taxRateId: item.taxRateId || '',
         trackInventory: item.trackInventory ?? true,
-        openingStock: item.stockLevel || 0,
+        openingStock: item.currentStock || 0,
         reorderPoint: item.reorderPoint || 10,
-        reorderQuantity: item.reorderQuantity || 20,
-        incomeAccountId: item.incomeAccountId || '',
-        expenseAccountId: item.expenseAccountId || '',
+        reorderQuantity: item.reorderLevel || 20,
+        incomeAccountId: item.salesAccountId || '',
+        expenseAccountId: item.purchaseAccountId || '',
         inventoryAccountId: item.inventoryAccountId || '',
       });
     }

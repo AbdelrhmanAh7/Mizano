@@ -44,7 +44,7 @@ export class EmployeesService {
 
   async findAll(
     organizationId: string,
-    query: PaginationDto & { isActive?: boolean; department?: string },
+    query: PaginationDto & { isActive?: boolean | string; status?: string; department?: string },
   ) {
     const {
       page = 1,
@@ -52,10 +52,15 @@ export class EmployeesService {
       sortBy = 'name',
       sortOrder = 'asc',
       isActive,
+      status,
       department,
     } = query;
     const where: Prisma.EmployeeWhereInput = { organizationId, deletedAt: null };
-    if (isActive !== undefined) where.isActive = isActive;
+    if (isActive !== undefined) {
+      where.isActive = typeof isActive === 'string' ? isActive === 'true' : isActive;
+    }
+    if (status === 'ACTIVE') where.isActive = true;
+    if (status === 'INACTIVE' || status === 'TERMINATED') where.isActive = false;
     if (department) where.department = department;
 
     const [employees, total] = await Promise.all([
@@ -75,9 +80,19 @@ export class EmployeesService {
   }
 
   async findAllCursor(organizationId: string, query: EmployeeCursorQueryDto) {
-    const { cursor, take, sortBy = 'name', sortOrder = 'asc', isActive, department } = query;
+    const {
+      cursor,
+      take,
+      sortBy = 'name',
+      sortOrder = 'asc',
+      isActive,
+      department,
+      status,
+    } = query;
     const where: Prisma.EmployeeWhereInput = { organizationId, deletedAt: null };
-    if (isActive !== undefined) where.isActive = isActive;
+    if (status === 'ACTIVE') where.isActive = true;
+    else if (status === 'INACTIVE' || status === 'TERMINATED') where.isActive = false;
+    else if (isActive !== undefined) where.isActive = isActive;
     if (department) where.department = department;
     return cursorPaginate(this.prisma.employee, where, { [sortBy]: sortOrder }, { cursor, take });
   }

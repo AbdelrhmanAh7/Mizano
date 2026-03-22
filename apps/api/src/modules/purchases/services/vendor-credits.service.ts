@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { VendorCreditQueryDto } from '../dto/vendor-credit-query.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
@@ -82,7 +82,7 @@ export class VendorCreditsService {
     return credit;
   }
 
-  async findAll(organizationId: string, query: PaginationDto & { vendorId?: string }) {
+  async findAll(organizationId: string, query: VendorCreditQueryDto) {
     const where: { organizationId: string; deletedAt: null; vendorId?: string } = {
       organizationId,
       deletedAt: null,

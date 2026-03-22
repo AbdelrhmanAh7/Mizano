@@ -41,6 +41,9 @@ export class InventoryMovementsController {
       itemId?: string;
       warehouseId?: string;
       type?: string;
+      source?: string;
+      dateFrom?: string;
+      dateTo?: string;
     },
   ) {
     return this.inventoryMovementsService.findAllCursor(orgId, query);

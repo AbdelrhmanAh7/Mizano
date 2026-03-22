@@ -8,15 +8,26 @@ export class PayrollService {
   constructor(private prisma: PrismaService) {}
 
   async createPayrollRun(organizationId: string, dto: { month: number; year: number }) {
-    // Check for existing payroll run for this month/year
+    // Check for existing confirmed/paid payroll run for this month/year
     const existing = await this.prisma.payrollRun.findFirst({
       where: {
         organizationId,
         month: dto.month,
         year: dto.year,
+        status: { in: [PayrollStatus.CONFIRMED, PayrollStatus.PAID] },
       },
     });
     if (existing) throw new BadRequestException('Payroll run already exists for this period');
+
+    // Delete any existing DRAFT run for this period before creating a new one
+    await this.prisma.payrollRun.deleteMany({
+      where: {
+        organizationId,
+        month: dto.month,
+        year: dto.year,
+        status: PayrollStatus.DRAFT,
+      },
+    });
 
     return this.prisma.payrollRun.create({
       data: {
@@ -293,18 +304,38 @@ export class PayrollService {
     return `JRN-${String(lastNumber + 1).padStart(3, '0')}`;
   }
 
-  async getPayrollRuns(organizationId: string, query: { status?: string; year?: number }) {
+  async getPayrollRuns(
+    organizationId: string,
+    query: {
+      status?: string;
+      year?: number;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: string;
+    },
+  ) {
     const where: Prisma.PayrollRunWhereInput = { organizationId, deletedAt: null };
     if (query.status) where.status = query.status as PayrollStatus;
-    if (query.year) where.year = query.year;
+    if (query.year) where.year = Number(query.year);
 
-    return this.prisma.payrollRun.findMany({
-      where,
-      orderBy: [{ year: 'desc' }, { month: 'desc' }],
-      include: {
-        _count: { select: { payslips: true } },
-      },
-    });
+    const page = Number(query.page ?? 1);
+    const limit = Number(query.limit ?? 20);
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortOrder = (query.sortOrder ?? 'desc') as 'asc' | 'desc';
+
+    const [data, total] = await Promise.all([
+      this.prisma.payrollRun.findMany({
+        where,
+        orderBy: { [sortBy]: sortOrder },
+        include: { _count: { select: { payslips: true } } },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.payrollRun.count({ where }),
+    ]);
+
+    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async getPayrollRun(organizationId: string, id: string) {

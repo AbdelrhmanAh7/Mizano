@@ -238,7 +238,7 @@ export default function PayrollDetailPage({ params }: { params: { id: string } }
               {payslips.map(
                 (slip: {
                   id: string;
-                  employee?: { firstName?: string; lastName?: string; employeeNumber?: string };
+                  employee?: { name?: string; employeeNumber?: string };
                   basicSalary?: number;
                   allowances?: Record<string, number>;
                   gross?: number;
@@ -250,9 +250,7 @@ export default function PayrollDetailPage({ params }: { params: { id: string } }
                   <TableRow key={slip.id}>
                     <TableCell>
                       <div>
-                        <p className="font-medium">
-                          {slip.employee?.firstName} {slip.employee?.lastName}
-                        </p>
+                        <p className="font-medium">{slip.employee?.name}</p>
                         <p className="text-xs text-muted-foreground">
                           {slip.employee?.employeeNumber}
                         </p>

@@ -56,7 +56,13 @@ export default function BOMDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
 
   const { data: bom, isLoading } = useBOM(bomId);
-  const { data: relatedWorkOrders } = useWorkOrdersByBom(bomId);
+  const { data: workOrdersResponse } = useWorkOrdersByBom(bomId);
+  // API returns { data: WorkOrder[], meta: {...} } — normalise to plain array
+  const relatedWorkOrders = Array.isArray(workOrdersResponse?.data)
+    ? workOrdersResponse.data
+    : Array.isArray(workOrdersResponse)
+      ? workOrdersResponse
+      : [];
   const deleteBOM = useDeleteBOM();
 
   const canEdit = hasPermission('manufacturing.edit');
@@ -69,10 +75,10 @@ export default function BOMDetailPage() {
       router.push('/manufacturing/bom');
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: tCommon('errors.generic'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to delete BOM',
+          tCommon('errors.generic'),
         variant: 'destructive',
       });
     }
@@ -158,7 +164,7 @@ export default function BOMDetailPage() {
             </div>
             {bom.outputItem && (
               <p className="text-muted-foreground">
-                Produces: {bom.outputItem.code} - {bom.outputItem.name}
+                {t('bom.produces', { code: bom.outputItem.code, name: bom.outputItem.name })}
               </p>
             )}
           </div>
@@ -205,7 +211,7 @@ export default function BOMDetailPage() {
               {t('bom.form.outputQuantity')}
             </div>
             <div className="text-2xl font-bold">{bom.outputQuantity}</div>
-            <div className="text-xs text-muted-foreground">per production run</div>
+            <div className="text-xs text-muted-foreground">{t('bom.perProductionRun')}</div>
           </CardContent>
         </Card>
 
@@ -216,7 +222,7 @@ export default function BOMDetailPage() {
               {t('bom.form.items')}
             </div>
             <div className="text-2xl font-bold">{bom.components?.length || 0}</div>
-            <div className="text-xs text-muted-foreground">raw materials</div>
+            <div className="text-xs text-muted-foreground">{t('bom.rawMaterials')}</div>
           </CardContent>
         </Card>
 
@@ -236,7 +242,7 @@ export default function BOMDetailPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Layers className="h-5 w-5" />
-            Components (Raw Materials)
+            {t('bom.components')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -262,7 +268,7 @@ export default function BOMDetailPage() {
               </TableBody>
             </Table>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">No components defined</div>
+            <div className="text-center py-8 text-muted-foreground">{t('bom.noComponents')}</div>
           )}
         </CardContent>
       </Card>
@@ -273,7 +279,7 @@ export default function BOMDetailPage() {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Wrench className="h-5 w-5" />
-              Related Work Orders
+              {t('bom.relatedWorkOrders')}
             </CardTitle>
             <Button asChild size="sm">
               <Link href={`/manufacturing/work-orders/new?bomId=${bom.id}`}>
@@ -287,10 +293,10 @@ export default function BOMDetailPage() {
           {!relatedWorkOrders || relatedWorkOrders.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Wrench className="h-8 w-8 mx-auto mb-2 opacity-40" />
-              <p>No work orders for this BOM yet.</p>
+              <p>{t('bom.noWorkOrders')}</p>
               <Button asChild variant="outline" size="sm" className="mt-3">
                 <Link href={`/manufacturing/work-orders/new?bomId=${bom.id}`}>
-                  Create Work Order
+                  {t('bom.createWorkOrder')}
                 </Link>
               </Button>
             </div>

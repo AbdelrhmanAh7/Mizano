@@ -48,7 +48,6 @@ export interface AiSettings {
   aiForecastingEnabled: boolean;
   aiAnomalyEnabled: boolean;
   aiLeadScoringEnabled: boolean;
-  aiRetrainingFrequency: string;
   anomalySensitivity: number;
 }
 

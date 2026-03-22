@@ -12,10 +12,10 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CreateQuoteDto } from '../dto/create-quote.dto';
+import { QuoteQueryDto } from '../dto/quote-query.dto';
 import { UpdateQuoteDto } from '../dto/update-quote.dto';
 import { QuotesService } from '../services/quotes.service';
 
@@ -35,7 +35,7 @@ export class QuotesController {
 
   @Get()
   @Permissions('sales.view')
-  findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: QuoteQueryDto) {
     return this.quotesService.findAll(orgId, query);
   }
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { InsightDataViewer } from '@/components/ai';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -31,6 +32,7 @@ import {
   getInsightPriorityLabel,
   getInsightPriorityColor,
   InsightType,
+  type AIInsight,
 } from '@/lib/hooks/use-ai';
 
 const insightIcons: Record<InsightType, React.ReactNode> = {
@@ -47,7 +49,8 @@ export default function InsightDetailPage({ params }: { params: { id: string } }
   const tInsights = useTranslations('ai.insights');
   const { id } = params;
   const router = useRouter();
-  const { data: insight, isLoading } = useAIInsight(id);
+  const { data: insightResponse, isLoading } = useAIInsight(id);
+  const insight: AIInsight | undefined = insightResponse?.data;
   const dismissInsight = useDismissInsight();
   const actionInsight = useActionInsight();
 
@@ -178,18 +181,16 @@ export default function InsightDetailPage({ params }: { params: { id: string } }
             </Card>
           )}
 
-          {insight.data && (
+          {insight.data ? (
             <Card>
               <CardHeader>
                 <CardTitle>{t('supportingData')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <pre className="bg-muted p-4 rounded-lg overflow-auto text-sm">
-                  {JSON.stringify(insight.data, null, 2)}
-                </pre>
+                <InsightDataViewer data={insight.data as Record<string, unknown>} />
               </CardContent>
             </Card>
-          )}
+          ) : null}
         </div>
 
         {/* Sidebar */}

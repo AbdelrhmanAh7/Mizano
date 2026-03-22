@@ -106,27 +106,26 @@ function AttendancePageContent() {
   // Columns for the selected date details table
   const detailColumns: ColumnDef<{
     id: string;
-    firstName: string;
-    lastName: string;
+    name: string;
     jobTitle?: string;
   }>[] = [
     {
-      accessorKey: 'firstName',
-      header: 'Employee',
+      accessorKey: 'name',
+      header: t('attendance.table.employee'),
       cell: ({ row }) => {
         const employee = row.original;
+        const nameParts = (employee.name || '').split(' ');
+        const initials =
+          nameParts.length >= 2
+            ? nameParts[0][0] + nameParts[nameParts.length - 1][0]
+            : (employee.name || '??').slice(0, 2);
         return (
           <div className="flex items-center gap-2">
             <Avatar className="h-8 w-8">
-              <AvatarFallback className="text-xs">
-                {employee.firstName[0]}
-                {employee.lastName[0]}
-              </AvatarFallback>
+              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
             </Avatar>
             <div>
-              <p className="font-medium">
-                {employee.firstName} {employee.lastName}
-              </p>
+              <p className="font-medium">{employee.name}</p>
               <p className="text-xs text-muted-foreground">{employee.jobTitle}</p>
             </div>
           </div>
@@ -135,7 +134,7 @@ function AttendancePageContent() {
     },
     {
       id: 'status',
-      header: 'Status',
+      header: t('attendance.table.status'),
       cell: ({ row }) => {
         const att = getAttendanceForDay(row.original.id, selectedDate);
         return att ? (
@@ -143,13 +142,13 @@ function AttendancePageContent() {
             {getAttendanceStatusLabel(att.status)}
           </Badge>
         ) : (
-          <span className="text-muted-foreground">Not marked</span>
+          <span className="text-muted-foreground">{t('attendance.notMarked')}</span>
         );
       },
     },
     {
       id: 'checkIn',
-      header: 'Check In',
+      header: t('attendance.table.checkIn'),
       cell: ({ row }) => {
         const att = getAttendanceForDay(row.original.id, selectedDate);
         return att?.checkIn ? format(new Date(att.checkIn), 'HH:mm') : '-';
@@ -157,7 +156,7 @@ function AttendancePageContent() {
     },
     {
       id: 'checkOut',
-      header: 'Check Out',
+      header: t('attendance.table.checkOut'),
       cell: ({ row }) => {
         const att = getAttendanceForDay(row.original.id, selectedDate);
         return att?.checkOut ? format(new Date(att.checkOut), 'HH:mm') : '-';
@@ -165,7 +164,7 @@ function AttendancePageContent() {
     },
     {
       id: 'notes',
-      header: 'Notes',
+      header: t('attendance.form.notes'),
       cell: ({ row }) => {
         const att = getAttendanceForDay(row.original.id, selectedDate);
         return att?.notes || '-';
@@ -173,20 +172,22 @@ function AttendancePageContent() {
     },
     {
       id: 'action',
-      header: 'Action',
+      header: t('attendance.action'),
       cell: ({ row }) => {
         const att = getAttendanceForDay(row.original.id, selectedDate);
         return (
           <Select
-            value={att?.status || ''}
-            onValueChange={(value: AttendanceStatus) =>
-              handleStatusChange(row.original.id, selectedDate, value)
-            }
+            value={att?.status ?? '__none__'}
+            onValueChange={(value) => {
+              if (value === '__none__') return;
+              void handleStatusChange(row.original.id, selectedDate, value as AttendanceStatus);
+            }}
           >
             <SelectTrigger className="w-32">
-              <SelectValue placeholder="Mark" />
+              <SelectValue placeholder={t('attendance.mark')} />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="__none__">{t('attendance.mark')}</SelectItem>
               {attendanceStatuses.map((status) => (
                 <SelectItem key={status} value={status}>
                   {getAttendanceStatusLabel(status)}
@@ -205,7 +206,7 @@ function AttendancePageContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('attendance.title')}</h1>
-          <p className="text-muted-foreground">Track employee attendance and working hours</p>
+          <p className="text-muted-foreground">{t('attendance.description')}</p>
         </div>
         <Button asChild>
           <Link href="/hr/attendance/mark">
@@ -235,7 +236,7 @@ function AttendancePageContent() {
             setSelectedDate(new Date());
           }}
         >
-          Today
+          {t('attendance.today')}
         </Button>
       </div>
 
@@ -248,7 +249,7 @@ function AttendancePageContent() {
                 <UserCheck className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Employees</p>
+                <p className="text-sm text-muted-foreground">{t('attendance.totalEmployees')}</p>
                 <p className="text-2xl font-bold">{employees.length}</p>
               </div>
             </div>
@@ -262,7 +263,7 @@ function AttendancePageContent() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Present ({format(selectedDate, 'MMM d')})
+                  {t('attendance.presentOn', { date: format(selectedDate, 'MMM d') })}
                 </p>
                 <p className="text-2xl font-bold text-green-600">{presentCount}</p>
               </div>
@@ -277,7 +278,7 @@ function AttendancePageContent() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Absent ({format(selectedDate, 'MMM d')})
+                  {t('attendance.absentOn', { date: format(selectedDate, 'MMM d') })}
                 </p>
                 <p className="text-2xl font-bold text-red-600">{absentCount}</p>
               </div>
@@ -292,7 +293,7 @@ function AttendancePageContent() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  On Leave ({format(selectedDate, 'MMM d')})
+                  {t('attendance.onLeaveOn', { date: format(selectedDate, 'MMM d') })}
                 </p>
                 <p className="text-2xl font-bold text-yellow-600">{leaveCount}</p>
               </div>
@@ -304,7 +305,7 @@ function AttendancePageContent() {
       {/* Calendar View - kept as manual Table due to dynamic date columns */}
       <Card>
         <CardHeader>
-          <CardTitle>Attendance Calendar</CardTitle>
+          <CardTitle>{t('attendance.calendar')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -312,7 +313,7 @@ function AttendancePageContent() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="sticky left-0 bg-background min-w-[200px]">
-                    Employee
+                    {t('attendance.table.employee')}
                   </TableHead>
                   {daysInMonth.map((day) => (
                     <TableHead
@@ -341,53 +342,55 @@ function AttendancePageContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {employees.map((employee: { id: string; firstName: string; lastName: string }) => (
-                  <TableRow key={employee.id}>
-                    <TableCell className="sticky left-0 bg-background">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs">
-                            {employee.firstName[0]}
-                            {employee.lastName[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm font-medium">
-                          {employee.firstName} {employee.lastName}
-                        </span>
-                      </div>
-                    </TableCell>
-                    {daysInMonth.map((day) => {
-                      const att = getAttendanceForDay(employee.id, day);
-                      const isSelected = isSameDay(day, selectedDate);
-                      return (
-                        <TableCell
-                          key={day.toISOString()}
-                          className={cn(
-                            'text-center p-1',
-                            isWeekend(day) && 'bg-muted/50',
-                            isSelected && 'bg-primary/10',
-                          )}
-                        >
-                          {att ? (
-                            <Badge
-                              variant="outline"
-                              className={cn('text-xs px-1', getAttendanceStatusColor(att.status))}
-                            >
-                              {att.status === 'PRESENT' && 'P'}
-                              {att.status === 'ABSENT' && 'A'}
-                              {att.status === 'LEAVE' && 'L'}
-                              {att.status === 'HALF_DAY' && 'H'}
-                            </Badge>
-                          ) : isWeekend(day) ? (
-                            <span className="text-xs text-muted-foreground">-</span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))}
+                {employees.map((employee: { id: string; name: string }) => {
+                  const nameParts = (employee.name || '').split(' ');
+                  const initials =
+                    nameParts.length >= 2
+                      ? nameParts[0][0] + nameParts[nameParts.length - 1][0]
+                      : (employee.name || '??').slice(0, 2);
+                  return (
+                    <TableRow key={employee.id}>
+                      <TableCell className="sticky left-0 bg-background">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm font-medium">{employee.name}</span>
+                        </div>
+                      </TableCell>
+                      {daysInMonth.map((day) => {
+                        const att = getAttendanceForDay(employee.id, day);
+                        const isSelected = isSameDay(day, selectedDate);
+                        return (
+                          <TableCell
+                            key={day.toISOString()}
+                            className={cn(
+                              'text-center p-1',
+                              isWeekend(day) && 'bg-muted/50',
+                              isSelected && 'bg-primary/10',
+                            )}
+                          >
+                            {att ? (
+                              <Badge
+                                variant="outline"
+                                className={cn('text-xs px-1', getAttendanceStatusColor(att.status))}
+                              >
+                                {att.status === 'PRESENT' && 'P'}
+                                {att.status === 'ABSENT' && 'A'}
+                                {att.status === 'LEAVE' && 'L'}
+                                {att.status === 'HALF_DAY' && 'H'}
+                              </Badge>
+                            ) : isWeekend(day) ? (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -404,7 +407,7 @@ function AttendancePageContent() {
             columns={detailColumns}
             data={employees}
             isLoading={isLoading}
-            emptyMessage="No employees found"
+            emptyMessage={t('employees.empty.title')}
           />
         </CardContent>
       </Card>

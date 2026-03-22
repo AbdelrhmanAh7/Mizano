@@ -17,11 +17,11 @@ import {
   Permissions,
 } from '../../../common/decorators';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import { CreatePaymentMadeDto } from '../dto/create-payment-made.dto';
+import { PaymentMadeQueryDto } from '../dto/payment-made-query.dto';
 import { PaymentsMadeService } from '../services/payments-made.service';
 
 @ApiTags('Payments Made')
@@ -43,7 +43,7 @@ export class PaymentsMadeController {
   @Permissions('purchases.view')
   @CacheResponse('payments-made:list')
   @CacheTTL(120)
-  findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: PaymentMadeQueryDto) {
     return this.paymentsMadeService.findAll(orgId, query);
   }
 

@@ -338,7 +338,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                       <TableHead>{t('vendors.billNumber')}</TableHead>
                       <TableHead>{tCommon('date')}</TableHead>
                       <TableHead>{t('vendors.dueDate')}</TableHead>
-                      <TableHead>{tCommon('status')}</TableHead>
+                      <TableHead>{t('vendors.table.status')}</TableHead>
                       <TableHead className="text-right">{tCommon('amount')}</TableHead>
                       <TableHead className="text-right">{t('vendors.balance')}</TableHead>
                     </TableRow>
@@ -478,7 +478,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                     <TableRow>
                       <TableHead>{t('vendors.creditNumber')}</TableHead>
                       <TableHead>{tCommon('date')}</TableHead>
-                      <TableHead>{tCommon('status')}</TableHead>
+                      <TableHead>{t('credits.status')}</TableHead>
                       <TableHead className="text-right">{tCommon('amount')}</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -495,12 +495,16 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                         </TableCell>
                         <TableCell>{format(new Date(credit.date), 'MMM dd, yyyy')}</TableCell>
                         <TableCell>
-                          <Badge variant={getCreditStatusVariant(credit.status)}>
-                            {getCreditStatusText(credit.status)}
-                          </Badge>
+                          {credit.status ? (
+                            <Badge variant={getCreditStatusVariant(credit.status)}>
+                              {getCreditStatusText(credit.status)}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">-</Badge>
+                          )}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(credit.total, vendor.currency)}
+                          {formatCurrency(credit.amount, vendor.currency)}
                         </TableCell>
                       </TableRow>
                     ))}

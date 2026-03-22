@@ -11,6 +11,16 @@ export class CursorPaginationDto {
   @IsString()
   cursor?: string;
 
+  @ApiProperty({
+    required: false,
+    description: 'Page number (ignored in cursor mode, accepted for compatibility)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
   @ApiProperty({ required: false, default: 50, description: 'Number of items to fetch per batch' })
   @IsOptional()
   @Type(() => Number)

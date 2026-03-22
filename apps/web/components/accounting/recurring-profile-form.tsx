@@ -84,7 +84,7 @@ export function RecurringProfileForm({
         name: profile.name,
         description: profile.description || '',
         frequency: profile.frequency,
-        startDate: profile.nextExecutionDate.split('T')[0],
+        startDate: profile.nextRunDate.split('T')[0],
         autoPost: profile.autoPost,
         lines: profile.lines.map((line) => ({
           accountId: line.accountId,

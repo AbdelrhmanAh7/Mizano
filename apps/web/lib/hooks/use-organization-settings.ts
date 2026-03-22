@@ -36,7 +36,7 @@ export function useAccountSettings() {
   return useQuery({
     queryKey: ['organization', 'account-settings'],
     queryFn: async () => {
-      const response = await api.get('/organizations/account-settings');
+      const response = await api.get('/organization/account-settings');
       return response.data as AccountSettings;
     },
   });
@@ -51,7 +51,7 @@ export function useUpdateAccountSettings() {
 
   return useMutation({
     mutationFn: async (data: UpdateAccountSettingsData) => {
-      const response = await api.patch('/organizations/account-settings', data);
+      const response = await api.patch('/organization/account-settings', data);
       return response.data;
     },
     onSuccess: () => {

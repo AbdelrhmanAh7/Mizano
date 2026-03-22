@@ -23,6 +23,9 @@
     "noDepartments": "No department data available",
     "employeesInDept": "{count} employees"
   },
+  "openModule": "Open {title}",
+  "trackTime": "Track time",
+  "unassigned": "Unassigned",
   "employees": {
     "title": "Employees",
     "description": "Manage your workforce",
@@ -73,11 +76,29 @@
     "table": {
       "employeeId": "Employee ID",
       "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
       "department": "Department",
       "jobTitle": "Job Title",
       "salary": "Salary",
+      "joinedDate": "Joined",
       "status": "Status"
     },
+    "searchPlaceholder": "Search employees...",
+    "allStatus": "All Status",
+    "notFound": "Employee not found",
+    "contactInfo": "Contact Information",
+    "bankingDetails": "Banking Details",
+    "monthlySalary": "Monthly Salary",
+    "netSalaryAfterDeductions": "Net salary after deductions",
+    "joined": "Joined {date}",
+    "noBankingDetails": "No banking details provided",
+    "bankAccount": "Account: ****{last4}",
+    "taxId": "Tax ID: {id}",
+    "overview": "Overview",
+    "salaryStructure": "Salary Structure",
+    "earnings": "Earnings",
+    "totalDeductions": "Total Deductions",
     "empty": {
       "title": "No employees yet",
       "description": "Add your first employee to get started"
@@ -126,6 +147,17 @@
       "checkOut": "Check Out",
       "status": "Status"
     },
+    "searchPlaceholder": "Search attendance...",
+    "allStatus": "All Status",
+    "calendar": "Attendance Calendar",
+    "today": "Today",
+    "totalEmployees": "Total Employees",
+    "presentOn": "Present ({date})",
+    "absentOn": "Absent ({date})",
+    "onLeaveOn": "On Leave ({date})",
+    "notMarked": "Not marked",
+    "mark": "Mark",
+    "action": "Action",
     "empty": {
       "title": "No attendance records yet",
       "description": "Start recording employee attendance"
@@ -186,6 +218,59 @@
       "earnings": "Earnings",
       "deductionsSection": "Deductions"
     },
+    "selectPeriod": {
+      "title": "Select Pay Period",
+      "description": "Choose the month and year for this payroll run",
+      "processingFor": "Processing payroll for {month} {year}",
+      "employeesIncluded": "{count} active employees will be included",
+      "generatePreview": "Generate Preview"
+    },
+    "preview": {
+      "title": "Payroll Preview - {month} {year}",
+      "description": "Review the calculated salaries before processing",
+      "employees": "Employees",
+      "totalGross": "Total Gross",
+      "totalDeductions": "Total Deductions",
+      "totalNetPay": "Total Net Pay"
+    },
+    "previewTable": {
+      "employee": "Employee",
+      "basic": "Basic",
+      "allowances": "Allowances",
+      "gross": "Gross",
+      "lop": "LOP",
+      "deductions": "Deductions",
+      "tax": "Tax",
+      "netPay": "Net Pay"
+    },
+    "steps": {
+      "selectPeriod": "Select Period",
+      "preview": "Preview",
+      "confirm": "Confirm"
+    },
+    "actions": {
+      "back": "Back",
+      "runPayroll": "Run Payroll",
+      "processing": "Processing...",
+      "viewDetails": "View Details",
+      "confirmPost": "Confirm & Post",
+      "confirming": "Confirming...",
+      "confirmPayroll": "Confirm Payroll"
+    },
+    "success": {
+      "title": "Payroll Generated Successfully",
+      "description": "Payslips for {month} {year} have been created for {count} employees.",
+      "totalNetPay": "Total Net Pay: {amount}"
+    },
+    "confirmDialog": {
+      "title": "Confirm Payroll",
+      "description": "This will finalize the payroll and create accounting entries. This action cannot be undone. Make sure all details are correct."
+    },
+    "lopDays": "{days} days",
+    "noDeductions": "No deductions",
+    "noPayslips": "No payslips yet",
+    "noPayslipsDesc": "Payslips will appear here after running payroll",
+    "viewPayslip": "View",
     "empty": {
       "title": "No payroll runs yet",
       "description": "Create your first payroll run to get started"

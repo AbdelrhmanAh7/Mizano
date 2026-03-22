@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { CreditNoteQueryDto } from '../dto/credit-note-query.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
@@ -103,9 +103,10 @@ export class CreditNotesService {
     return creditNote;
   }
 
-  async findAll(organizationId: string, query: PaginationDto) {
-    const { page = 1, limit = 20, sortBy = 'date', sortOrder = 'desc' } = query;
-    const where = { organizationId, deletedAt: null };
+  async findAll(organizationId: string, query: CreditNoteQueryDto) {
+    const { page = 1, limit = 20, sortBy = 'date', sortOrder = 'desc', customerId } = query;
+    const where: Record<string, unknown> = { organizationId, deletedAt: null };
+    if (customerId) where.customerId = customerId;
 
     const [creditNotes, total] = await Promise.all([
       this.prisma.creditNote.findMany({

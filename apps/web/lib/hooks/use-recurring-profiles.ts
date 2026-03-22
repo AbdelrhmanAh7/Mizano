@@ -27,7 +27,7 @@ export interface RecurringProfile {
   name: string;
   description: string | null;
   frequency: RecurringFrequency;
-  nextExecutionDate: string;
+  nextRunDate: string;
   autoPost: boolean;
   isActive: boolean;
   organizationId: string;

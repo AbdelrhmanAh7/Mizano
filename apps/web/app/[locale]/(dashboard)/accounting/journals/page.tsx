@@ -63,7 +63,7 @@ function JournalsPageContent() {
   const { hasPermission } = usePermissions();
   const { onExportAll } = useExportAll('journals', 'journals');
   const tableParams = useTableParams({
-    defaultSortBy: 'entryDate',
+    defaultSortBy: 'date',
     filterKeys: ['status', 'dateFrom', 'dateTo'],
     mode: 'virtual',
   });
@@ -206,7 +206,7 @@ function JournalsPageContent() {
       header: () => (
         <SortableHeader
           label={t('journals.table.date')}
-          columnId="entryDate"
+          columnId="date"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
           onSort={tableParams.setSort}

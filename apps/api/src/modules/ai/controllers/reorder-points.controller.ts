@@ -37,8 +37,9 @@ export class ReorderPointsController {
   @Get('summary')
   @Permissions('inventory.view')
   @ApiOperation({ summary: 'Get reorder summary for dashboard' })
-  getReorderSummary(@CurrentOrg() orgId: string) {
-    return this.reorderService.getReorderSummary(orgId);
+  async getReorderSummary(@CurrentOrg() orgId: string) {
+    const summary = await this.reorderService.getReorderSummary(orgId);
+    return { data: summary };
   }
 
   @Get('dead-stock')

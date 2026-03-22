@@ -28,7 +28,7 @@ export class EmployeesController {
   @ApiOperation({ summary: 'Get all employees' })
   findAll(
     @CurrentOrg() orgId: string,
-    @Query() query: PaginationDto & { status?: string; department?: string },
+    @Query() query: PaginationDto & { status?: string; isActive?: string; department?: string },
   ) {
     return this.employeesService.findAll(orgId, query);
   }

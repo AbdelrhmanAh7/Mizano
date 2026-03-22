@@ -17,7 +17,7 @@ import {
   Permissions,
 } from '../../../common/decorators';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { PaymentReceivedQueryDto } from '../dto/payment-received-query.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
@@ -44,7 +44,7 @@ export class PaymentsReceivedController {
   @Permissions('sales.view')
   @CacheResponse('payments-received:list')
   @CacheTTL(120)
-  findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: PaymentReceivedQueryDto) {
     return this.paymentsReceivedService.findAll(orgId, query);
   }
 

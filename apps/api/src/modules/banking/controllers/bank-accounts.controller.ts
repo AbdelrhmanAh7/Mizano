@@ -15,8 +15,10 @@ import { CurrentOrg, InvalidateCache, Permissions } from '../../../common/decora
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { BankAccountQueryDto } from '../dto/bank-account-query.dto';
 import { BankAccountsService } from '../services/bank-accounts.service';
+import { BankTransactionsService } from '../services/bank-transactions.service';
 import { CreateBankAccountDto } from '../dto/create-bank-account.dto';
 import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
 
@@ -26,7 +28,10 @@ import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @UseInterceptors(CacheInvalidationInterceptor)
 export class BankAccountsController {
-  constructor(private readonly bankAccountsService: BankAccountsService) {}
+  constructor(
+    private readonly bankAccountsService: BankAccountsService,
+    private readonly bankTransactionsService: BankTransactionsService,
+  ) {}
 
   @Post()
   @Permissions('banking.create')
@@ -51,6 +56,16 @@ export class BankAccountsController {
   @Permissions('banking.view')
   getBalanceHistory(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.bankAccountsService.getBalanceHistory(orgId, id);
+  }
+
+  @Get(':id/transactions')
+  @Permissions('banking.view')
+  getTransactions(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Query() query: PaginationDto & { status?: string },
+  ) {
+    return this.bankTransactionsService.findAll(orgId, { ...query, bankAccountId: id });
   }
 
   @Get(':id')

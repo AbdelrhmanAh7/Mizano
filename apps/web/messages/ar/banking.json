@@ -37,6 +37,17 @@
   },
   "transactions": {
     "title": "المعاملات البنكية",
+    "description": "عرض وإدارة المعاملات البنكية المستوردة",
+    "importStatement": "استيراد كشف الحساب",
+    "allStatus": "جميع الحالات",
+    "filters": {
+      "title": "الفلاتر",
+      "dateFrom": "من تاريخ",
+      "dateTo": "إلى تاريخ",
+      "minAmount": "الحد الأدنى للمبلغ",
+      "maxAmount": "الحد الأقصى للمبلغ",
+      "clearFilters": "مسح الفلاتر"
+    },
     "newTransaction": "معاملة جديدة",
     "editTransaction": "تعديل المعاملة",
     "deleteTransaction": "حذف المعاملة",
@@ -84,6 +95,8 @@
     "newRule": "قاعدة جديدة",
     "newRuleTitle": "قاعدة بنكية جديدة",
     "newRuleDescription": "أنشئ قاعدة لأتمتة تصنيف المعاملات",
+    "editRuleTitle": "تعديل القاعدة البنكية",
+    "editRuleDescription": "تحديث شروط وإجراءات هذه القاعدة",
     "editRule": "تعديل القاعدة",
     "deleteRule": "حذف القاعدة",
     "ruleDetails": "تفاصيل القاعدة",

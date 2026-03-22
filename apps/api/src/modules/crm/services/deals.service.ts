@@ -412,6 +412,57 @@ export class DealsService {
     };
   }
 
+  async getPipelineMetrics(organizationId: string) {
+    const stages = Object.values(DealStage);
+
+    // Single pass: aggregate per-stage counts and sums
+    const [stageAggregates, closedAggregates] = await Promise.all([
+      this.prisma.deal.groupBy({
+        by: ['stage'],
+        where: { organizationId, deletedAt: null },
+        _count: { id: true },
+        _sum: { expectedAmount: true },
+      }),
+      this.prisma.deal.aggregate({
+        where: { organizationId, deletedAt: null, stage: { in: [DealStage.WON, DealStage.LOST] } },
+        _count: { id: true },
+      }),
+    ]);
+
+    // Weighted value needs per-deal probability — fetch open deals only
+    const openDeals = await this.prisma.deal.findMany({
+      where: { organizationId, deletedAt: null, stage: { notIn: [DealStage.WON, DealStage.LOST] } },
+      select: { expectedAmount: true, probability: true },
+    });
+
+    const byStage: Record<string, { count: number; value: number }> = {};
+    let totalDeals = 0;
+    let totalValue = 0;
+
+    for (const stage of stages) {
+      byStage[stage] = { count: 0, value: 0 };
+    }
+
+    for (const row of stageAggregates) {
+      const count = row._count.id;
+      const value = row._sum.expectedAmount?.toNumber() ?? 0;
+      byStage[row.stage] = { count, value };
+      totalDeals += count;
+      totalValue += value;
+    }
+
+    const weightedValue = openDeals.reduce(
+      (sum, d) => sum + d.expectedAmount.toNumber() * (d.probability / 100),
+      0,
+    );
+
+    const wonCount = byStage[DealStage.WON]?.count ?? 0;
+    const closedCount = closedAggregates._count.id;
+    const conversionRate = closedCount > 0 ? (wonCount / closedCount) * 100 : 0;
+
+    return { totalDeals, totalValue, weightedValue, conversionRate, byStage };
+  }
+
   async updateStage(organizationId: string, id: string, stage: DealStage) {
     const deal = await this.findOne(organizationId, id);
 

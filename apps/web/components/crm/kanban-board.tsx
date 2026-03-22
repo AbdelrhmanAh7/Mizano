@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { DollarSign, User, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +30,8 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ deals }: KanbanBoardProps) {
+  const t = useTranslations('crm');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
   const updateStage = useUpdateDealStage();
   const [draggedDeal, setDraggedDeal] = useState<string | null>(null);
@@ -60,12 +63,12 @@ export function KanbanBoard({ deals }: KanbanBoardProps) {
 
     try {
       await updateStage.mutateAsync({ id: draggedDeal, stage });
-      toast({ title: `Deal moved to ${getDealStageLabel(stage)}` });
+      toast({ title: t('deals.movedToStage', { stage: getDealStageLabel(stage) }) });
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast({
-        title: 'Error',
-        description: err.response?.data?.message || 'Failed to update stage',
+        title: tCommon('errors.generic'),
+        description: err.response?.data?.message || t('deals.stageFailed'),
         variant: 'destructive',
       });
     }
@@ -124,7 +127,7 @@ export function KanbanBoard({ deals }: KanbanBoardProps) {
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <User className="h-3 w-3" />
-                              {deal.assignedTo?.name || 'Unassigned'}
+                              {deal.assignedTo?.name || t('deals.unassigned')}
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
@@ -132,14 +135,16 @@ export function KanbanBoard({ deals }: KanbanBoardProps) {
                             </span>
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {deal.probability}% probability
+                            {t('deals.kanban.probability', { value: deal.probability })}
                           </div>
                         </CardContent>
                       </Card>
                     </Link>
                   ))}
                   {(!dealsByStage[stage] || dealsByStage[stage].length === 0) && (
-                    <div className="text-center py-4 text-xs text-muted-foreground">No deals</div>
+                    <div className="text-center py-4 text-xs text-muted-foreground">
+                      {t('deals.kanban.noDeals')}
+                    </div>
                   )}
                 </div>
               </ScrollArea>

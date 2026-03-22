@@ -21,6 +21,7 @@ import {
   Wifi,
   Server,
 } from 'lucide-react';
+import Image from 'next/image';
 
 const featureCards = [
   { key: 'zeroTouch' as const, icon: Zap },
@@ -51,7 +52,20 @@ export default function OnboardingPage() {
       {/* Nav */}
       <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
         <div className="container mx-auto flex items-center justify-between h-16 px-4">
-          <span className="text-2xl font-bold text-primary">Mizano</span>
+          <Image
+            src="/svg/logo-full.svg"
+            alt="Mizano"
+            width={120}
+            height={32}
+            className="dark:hidden"
+          />
+          <Image
+            src="/svg/logo-full-dark.svg"
+            alt="Mizano"
+            width={120}
+            height={32}
+            className="hidden dark:block"
+          />
           <div className="flex items-center gap-3">
             <LanguageSwitcher />
             <Button variant="ghost" asChild>
@@ -73,7 +87,7 @@ export default function OnboardingPage() {
         </div>
         <div className="container mx-auto px-4 py-24 md:py-32 text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
-            <Brain className="h-4 w-4" />
+            <Image src="/svg/logo-icon.svg" alt="Mizano" width={20} height={20} />
             Mizano ERP
           </div>
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight max-w-4xl mx-auto leading-tight">
@@ -233,7 +247,8 @@ export default function OnboardingPage() {
 
       {/* Footer */}
       <footer className="border-t py-6">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+        <div className="container mx-auto px-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Image src="/svg/logo-icon.svg" alt="Mizano" width={18} height={18} />
           Mizano ERP - AI-Powered Autonomous Accounting Platform
         </div>
       </footer>

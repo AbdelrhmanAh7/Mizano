@@ -26,9 +26,6 @@ import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
   formatCurrency,
-  getStatusText,
-  getStatusVariant,
-  getTypeText,
   useInfiniteVendorCredits,
   VendorCredit,
 } from '@/lib/hooks/use-vendor-credits';
@@ -126,44 +123,28 @@ function VendorCreditsPageContent() {
       cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
     },
     {
-      accessorKey: 'type',
-      header: 'Type',
-      cell: ({ row }) => (
-        <Badge variant="outline">{row.original.type ? getTypeText(row.original.type) : '-'}</Badge>
-      ),
-    },
-    {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) =>
-        row.original.status ? (
-          <Badge variant={getStatusVariant(row.original.status)}>
-            {getStatusText(row.original.status)}
-          </Badge>
-        ) : (
-          <Badge variant="outline">-</Badge>
-        ),
-    },
-    {
-      accessorKey: 'total',
+      accessorKey: 'amount',
       header: () => (
         <SortableHeader
           label="Total"
-          columnId="total"
+          columnId="amount"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
           onSort={tableParams.setSort}
         />
       ),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) => formatCurrency(row.original.total, row.original.vendor?.currency || 'USD'),
+      cell: ({ row }) =>
+        formatCurrency(row.original.amount, row.original.vendor?.currency || 'USD'),
     },
     {
-      accessorKey: 'balanceRemaining',
+      id: 'balance',
       header: 'Balance',
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) =>
-        formatCurrency(row.original.balanceRemaining, row.original.vendor?.currency || 'USD'),
+      cell: ({ row }) => {
+        const balance = row.original.appliedToBillId ? '0' : row.original.amount;
+        return formatCurrency(balance, row.original.vendor?.currency || 'USD');
+      },
     },
     {
       id: 'actions',

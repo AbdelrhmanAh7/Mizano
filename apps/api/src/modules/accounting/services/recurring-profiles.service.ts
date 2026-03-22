@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateRecurringProfileDto } from '../dto/create-recurring-profile.dto';
+import { RecurringProfileQueryDto } from '../dto/recurring-profile-query.dto';
 import { UpdateRecurringProfileDto } from '../dto/update-recurring-profile.dto';
 import { RecurringFrequency, RecurringType, Prisma, RecurringProfile } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -124,23 +125,58 @@ export class RecurringProfilesService {
     return mapping[entityType.toLowerCase()] || null;
   }
 
-  async findAll(organizationId: string, options?: { isActive?: boolean; type?: RecurringType }) {
+  private static readonly ALLOWED_SORT_FIELDS = [
+    'name',
+    'frequency',
+    'nextRunDate',
+    'createdAt',
+    'updatedAt',
+    'isActive',
+    'executionCount',
+  ];
+
+  async findAll(organizationId: string, query: RecurringProfileQueryDto) {
+    const { page = 1, limit = 20, search, sortOrder = 'asc', isActive, type } = query;
+    const sortBy = RecurringProfilesService.ALLOWED_SORT_FIELDS.includes(query.sortBy || '')
+      ? query.sortBy!
+      : 'nextRunDate';
+
     const where: Prisma.RecurringProfileWhereInput = { organizationId, deletedAt: null };
-    if (options?.isActive !== undefined) where.isActive = options.isActive;
-    if (options?.type) where.type = options.type;
+    if (isActive !== undefined) where.isActive = isActive;
+    if (type) where.type = type as RecurringType;
 
-    const profiles = await this.prisma.recurringProfile.findMany({
-      where,
-      include: {
-        executions: {
-          orderBy: { executedAt: 'desc' },
-          take: 1,
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { entityType: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [profiles, total] = await Promise.all([
+      this.prisma.recurringProfile.findMany({
+        where,
+        include: {
+          executions: {
+            orderBy: { executedAt: 'desc' },
+            take: 1,
+          },
         },
-      },
-      orderBy: { nextRunDate: 'asc' },
-    });
+        orderBy: { [sortBy]: sortOrder },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.recurringProfile.count({ where }),
+    ]);
 
-    return profiles;
+    return {
+      data: profiles,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(organizationId: string, id: string) {

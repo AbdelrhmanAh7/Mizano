@@ -319,28 +319,179 @@ describe('PaymentsReceivedService', () => {
   });
 
   describe('findAll', () => {
-    it('should return paginated results with meta', async () => {
-      prisma.paymentReceived.findMany.mockResolvedValue([
-        { id: 'pmt-1', paymentNumber: 'PMT-001' },
-        { id: 'pmt-2', paymentNumber: 'PMT-002' },
-      ] as any);
-      prisma.paymentReceived.count.mockResolvedValue(2);
+    it('should return paginated results with default params', async () => {
+      const mockPayment = {
+        id: 'pmt-1',
+        paymentNumber: 'PMT-001',
+        amount: dec('1000'),
+        customer: { id: 'cust-1', name: 'Acme Corp' },
+      };
+      prisma.paymentReceived.findMany.mockResolvedValue([mockPayment] as never);
+      prisma.paymentReceived.count.mockResolvedValue(1);
 
-      const result = await service.findAll(ORG_ID, { page: 1, limit: 20 });
+      const result = await service.findAll(ORG_ID, {});
 
-      expect(result.data).toHaveLength(2);
-      expect(result.meta.total).toBe(2);
-      expect(result.meta.totalPages).toBe(1);
+      expect(result).toEqual({
+        data: [mockPayment],
+        meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      });
+
+      const findManyArgs = prisma.paymentReceived.findMany.mock.calls[0]![0]!;
+      expect(findManyArgs.where!.organizationId).toBe(ORG_ID);
+      expect(findManyArgs.where!.deletedAt).toBeNull();
+      expect(findManyArgs.orderBy).toEqual({ date: 'desc' });
+      expect(findManyArgs.skip).toBe(0);
+      expect(findManyArgs.take).toBe(20);
     });
 
-    it('should always filter by organizationId', async () => {
+    it('should filter by customerId when provided', async () => {
+      prisma.paymentReceived.findMany.mockResolvedValue([]);
+      prisma.paymentReceived.count.mockResolvedValue(0);
+
+      await service.findAll(ORG_ID, { customerId: 'cust-abc' });
+
+      const whereArg = prisma.paymentReceived.findMany.mock.calls[0]![0]!.where!;
+      expect(whereArg.customerId).toBe('cust-abc');
+      expect(whereArg.organizationId).toBe(ORG_ID);
+      expect(whereArg.deletedAt).toBeNull();
+    });
+
+    it('should not add customerId to where when not provided', async () => {
       prisma.paymentReceived.findMany.mockResolvedValue([]);
       prisma.paymentReceived.count.mockResolvedValue(0);
 
       await service.findAll(ORG_ID, {});
 
-      const findCall = prisma.paymentReceived.findMany.mock.calls[0]![0]!;
-      expect(findCall.where!.organizationId).toBe(ORG_ID);
+      const whereArg = prisma.paymentReceived.findMany.mock.calls[0]![0]!.where!;
+      expect(whereArg.customerId).toBeUndefined();
+    });
+
+    it('should filter by paymentMode when provided', async () => {
+      prisma.paymentReceived.findMany.mockResolvedValue([]);
+      prisma.paymentReceived.count.mockResolvedValue(0);
+
+      await service.findAll(ORG_ID, { paymentMode: 'BANK_TRANSFER' });
+
+      const whereArg = prisma.paymentReceived.findMany.mock.calls[0]![0]!.where!;
+      expect(whereArg.paymentMode).toBe('BANK_TRANSFER');
+    });
+
+    it('should not add paymentMode to where when not provided', async () => {
+      prisma.paymentReceived.findMany.mockResolvedValue([]);
+      prisma.paymentReceived.count.mockResolvedValue(0);
+
+      await service.findAll(ORG_ID, {});
+
+      const whereArg = prisma.paymentReceived.findMany.mock.calls[0]![0]!.where!;
+      expect(whereArg.paymentMode).toBeUndefined();
+    });
+
+    it('should filter by dateFrom only', async () => {
+      prisma.paymentReceived.findMany.mockResolvedValue([]);
+      prisma.paymentReceived.count.mockResolvedValue(0);
+
+      await service.findAll(ORG_ID, { dateFrom: '2026-01-01' });
+
+      const whereArg = prisma.paymentReceived.findMany.mock.calls[0]![0]!.where!;
+      expect(whereArg.date).toBeDefined();
+      expect((whereArg.date as Record<string, unknown>).gte).toEqual(new Date('2026-01-01'));
+      expect((whereArg.date as Record<string, unknown>).lte).toBeUndefined();
+    });
+
+    it('should filter by dateTo only', async () => {
+      prisma.paymentReceived.findMany.mockResolvedValue([]);
+      prisma.paymentReceived.count.mockResolvedValue(0);
+
+      await service.findAll(ORG_ID, { dateTo: '2026-12-31' });
+
+      const whereArg = prisma.paymentReceived.findMany.mock.calls[0]![0]!.where!;
+      expect(whereArg.date).toBeDefined();
+      expect((whereArg.date as Record<string, unknown>).lte).toEqual(new Date('2026-12-31'));
+      expect((whereArg.date as Record<string, unknown>).gte).toBeUndefined();
+    });
+
+    it('should filter by date range (dateFrom and dateTo)', async () => {
+      prisma.paymentReceived.findMany.mockResolvedValue([]);
+      prisma.paymentReceived.count.mockResolvedValue(0);
+
+      await service.findAll(ORG_ID, { dateFrom: '2026-01-01', dateTo: '2026-06-30' });
+
+      const whereArg = prisma.paymentReceived.findMany.mock.calls[0]![0]!.where!;
+      expect(whereArg.date).toBeDefined();
+      expect((whereArg.date as Record<string, unknown>).gte).toEqual(new Date('2026-01-01'));
+      expect((whereArg.date as Record<string, unknown>).lte).toEqual(new Date('2026-06-30'));
+    });
+
+    it('should not add date filter when no date params provided', async () => {
+      prisma.paymentReceived.findMany.mockResolvedValue([]);
+      prisma.paymentReceived.count.mockResolvedValue(0);
+
+      await service.findAll(ORG_ID, {});
+
+      const whereArg = prisma.paymentReceived.findMany.mock.calls[0]![0]!.where!;
+      expect(whereArg.date).toBeUndefined();
+    });
+
+    it('should respect page and limit parameters', async () => {
+      prisma.paymentReceived.findMany.mockResolvedValue([]);
+      prisma.paymentReceived.count.mockResolvedValue(50);
+
+      await service.findAll(ORG_ID, { page: 3, limit: 10 });
+
+      const findManyArgs = prisma.paymentReceived.findMany.mock.calls[0]![0]!;
+      expect(findManyArgs.skip).toBe(20); // (3-1) * 10
+      expect(findManyArgs.take).toBe(10);
+    });
+
+    it('should respect sortBy and sortOrder parameters', async () => {
+      prisma.paymentReceived.findMany.mockResolvedValue([]);
+      prisma.paymentReceived.count.mockResolvedValue(0);
+
+      await service.findAll(ORG_ID, { sortBy: 'amount', sortOrder: 'asc' });
+
+      const findManyArgs = prisma.paymentReceived.findMany.mock.calls[0]![0]!;
+      expect(findManyArgs.orderBy).toEqual({ amount: 'asc' });
+    });
+
+    it('should return correct totalPages calculation', async () => {
+      prisma.paymentReceived.findMany.mockResolvedValue([]);
+      prisma.paymentReceived.count.mockResolvedValue(45);
+
+      const result = await service.findAll(ORG_ID, { limit: 10 });
+
+      expect(result.meta.totalPages).toBe(5); // ceil(45/10)
+    });
+
+    it('should combine multiple filters simultaneously', async () => {
+      prisma.paymentReceived.findMany.mockResolvedValue([]);
+      prisma.paymentReceived.count.mockResolvedValue(0);
+
+      await service.findAll(ORG_ID, {
+        customerId: 'cust-xyz',
+        paymentMode: 'CASH',
+        dateFrom: '2026-03-01',
+        dateTo: '2026-03-31',
+      });
+
+      const whereArg = prisma.paymentReceived.findMany.mock.calls[0]![0]!.where!;
+      expect(whereArg.organizationId).toBe(ORG_ID);
+      expect(whereArg.customerId).toBe('cust-xyz');
+      expect(whereArg.paymentMode).toBe('CASH');
+      expect((whereArg.date as Record<string, unknown>).gte).toEqual(new Date('2026-03-01'));
+      expect((whereArg.date as Record<string, unknown>).lte).toEqual(new Date('2026-03-31'));
+      expect(whereArg.deletedAt).toBeNull();
+    });
+
+    it('should include customer relation in query', async () => {
+      prisma.paymentReceived.findMany.mockResolvedValue([]);
+      prisma.paymentReceived.count.mockResolvedValue(0);
+
+      await service.findAll(ORG_ID, {});
+
+      const findManyArgs = prisma.paymentReceived.findMany.mock.calls[0]![0]!;
+      expect(findManyArgs.include).toEqual({
+        customer: { select: { id: true, name: true } },
+      });
     });
   });
 });

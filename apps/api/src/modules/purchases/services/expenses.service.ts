@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { ExpenseQueryDto } from '../dto/expense-query.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
@@ -89,9 +89,31 @@ export class ExpensesService {
     return expense;
   }
 
-  async findAll(organizationId: string, query: PaginationDto) {
-    const { page = 1, limit = 20, sortBy = 'date', sortOrder = 'desc' } = query;
-    const where = { organizationId, deletedAt: null };
+  async findAll(organizationId: string, query: ExpenseQueryDto) {
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = 'date',
+      sortOrder = 'desc',
+      vendorId,
+      accountId,
+      dateFrom,
+      dateTo,
+    } = query;
+    const where: {
+      organizationId: string;
+      deletedAt: null;
+      vendorId?: string;
+      accountId?: string;
+      date?: { gte?: Date; lte?: Date };
+    } = { organizationId, deletedAt: null };
+    if (vendorId) where.vendorId = vendorId;
+    if (accountId) where.accountId = accountId;
+    if (dateFrom || dateTo) {
+      where.date = {};
+      if (dateFrom) where.date.gte = new Date(dateFrom);
+      if (dateTo) where.date.lte = new Date(dateTo);
+    }
     const [expenses, total] = await Promise.all([
       this.prisma.expense.findMany({
         where,

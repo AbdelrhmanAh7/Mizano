@@ -73,20 +73,42 @@ export class WorkOrdersService {
     });
   }
 
-  async findAll(organizationId: string, query: { status?: string; bomId?: string }) {
+  async findAll(
+    organizationId: string,
+    query: {
+      page?: number | string;
+      limit?: number | string;
+      sortBy?: string;
+      sortOrder?: string;
+      status?: string;
+      bomId?: string;
+    },
+  ) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const sortBy = query.sortBy || 'plannedStartDate';
+    const sortOrder = query.sortOrder || 'asc';
+
     const where: Prisma.WorkOrderWhereInput = { organizationId, deletedAt: null };
     if (query.status) where.status = query.status as WorkOrderStatus;
     if (query.bomId) where.bomId = query.bomId;
 
-    return this.prisma.workOrder.findMany({
-      where,
-      include: {
-        bom: {
-          include: { outputItem: { select: { id: true, name: true, sku: true } } },
+    const [data, total] = await Promise.all([
+      this.prisma.workOrder.findMany({
+        where,
+        include: {
+          bom: {
+            include: { outputItem: { select: { id: true, name: true, sku: true } } },
+          },
         },
-      },
-      orderBy: { plannedStartDate: 'asc' },
-    });
+        orderBy: { [sortBy]: sortOrder },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.workOrder.count({ where }),
+    ]);
+
+    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async findOne(organizationId: string, id: string) {

@@ -180,7 +180,10 @@
     "upcomingPayments": {
       "title": "المدفوعات القادمة",
       "noPayments": "لا توجد مدفوعات قادمة",
-      "viewAll": "عرض الكل"
+      "viewAll": "عرض الكل",
+      "overdue": "متأخرة",
+      "dueToday": "مستحقة اليوم",
+      "tomorrow": "غداً"
     },
     "bankAccounts": {
       "title": "الحسابات البنكية",
@@ -191,7 +194,15 @@
     "projects": {
       "title": "نظرة عامة على المشاريع",
       "noProjects": "لا توجد مشاريع نشطة",
-      "viewAll": "عرض الكل"
+      "viewAll": "عرض الكل",
+      "hoursAbbr": "س",
+      "status": {
+        "inProgress": "نشط",
+        "completed": "منتهي",
+        "onHold": "موقوف",
+        "cancelled": "ملغى",
+        "notStarted": "لم يبدأ"
+      }
     },
     "drillLinks": {
       "viewTransactions": "عرض المعاملات",
@@ -359,6 +370,7 @@
   "state": "المنطقة",
   "country": "الدولة",
   "postalCode": "الرمز البريدي",
+  "overview": "نظرة عامة",
   "all": "الكل",
   "none": "لا شيء",
   "select": "اختر",

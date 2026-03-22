@@ -138,7 +138,7 @@ describe('LoggerController', () => {
       const result = controller.generatePrompt({ logIds: [e1.id] });
       expect(result.logCount).toBe(1);
       expect(result.prompt).toContain('DB error');
-      expect(result.prompt).toContain('Fix Errors');
+      expect(result.prompt).toContain('Fix 1 error(s)');
     });
   });
 });

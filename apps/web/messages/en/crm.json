@@ -79,6 +79,7 @@
   },
   "deals": {
     "title": "Deals",
+    "subtitle": "Manage your sales deals and track pipeline",
     "description": "Manage deals and track revenue",
     "newDeal": "New Deal",
     "editDeal": "Edit Deal",
@@ -89,6 +90,13 @@
     "markAsLost": "Mark as Lost",
     "kanbanView": "Kanban",
     "tableView": "Table",
+    "unassigned": "Unassigned",
+    "movedToStage": "Deal moved to {stage}",
+    "stageFailed": "Failed to update stage",
+    "kanban": {
+      "noDeals": "No deals",
+      "probability": "{value}% probability"
+    },
     "form": {
       "name": "Deal Name",
       "namePlaceholder": "Enter deal name",
@@ -124,14 +132,17 @@
     "pipeline": {
       "title": "Deal Pipeline",
       "totalValue": "Total Value",
+      "pipelineValue": "Pipeline Value",
       "weightedValue": "Weighted Value",
       "dealCount": "{count} deals",
       "totalDeals": "Total Deals",
-      "conversionRate": "Conversion Rate"
+      "conversionRate": "Conversion Rate",
+      "byStage": "Pipeline by Stage"
     },
     "empty": {
       "title": "No deals yet",
-      "description": "Create your first deal to start tracking revenue"
+      "description": "Create your first deal to start tracking revenue",
+      "action": "Create Your First Deal"
     }
   },
   "activities": {

@@ -47,13 +47,19 @@
       "title": "No customers yet",
       "description": "Get started by adding your first customer"
     },
+    "notFoundMessage": "The customer you're looking for doesn't exist.",
+    "backToCustomers": "Back to Customers",
+    "deleteConfirmDescription": "Are you sure you want to delete this customer? This action cannot be undone.",
     "toast": {
       "created": "Customer created",
       "createdDescription": "The customer has been created successfully.",
       "updated": "Customer updated",
       "updatedDescription": "The customer has been updated successfully.",
+      "deleted": "Customer deleted",
+      "deletedDescription": "The customer has been deleted.",
       "createError": "Failed to create customer.",
-      "updateError": "Failed to update customer."
+      "updateError": "Failed to update customer.",
+      "deleteError": "Failed to delete customer. They may have associated transactions."
     }
   },
   "quotes": {
@@ -298,6 +304,7 @@
     "title": "Delivery Challans",
     "description": "Manage delivery challans for goods dispatch",
     "newChallan": "New Challan",
+    "import": "Import",
     "issueChallan": "Issue Challan",
     "markReturned": "Mark Returned",
     "deleteChallan": "Delete Challan",
@@ -309,6 +316,7 @@
     "searchPlaceholder": "Search challans...",
     "allStatus": "All Status",
     "allTypes": "All Types",
+    "itemsCount": "{count} items",
     "emptyMessage": "No delivery challans found. Create your first challan to get started.",
     "customer": "Customer",
     "date": "Date",
@@ -362,12 +370,32 @@
     "viewAll": "View All"
   },
   "customer360": {
+    "overviewTab": "Overview",
+    "invoicesTab": "Invoices",
+    "paymentsTab": "Payments",
     "quotesTab": "Quotes",
     "creditNotesTab": "Credit Notes",
+    "statementTab": "Statement",
     "createInvoice": "Create Invoice",
     "createQuote": "Create Quote",
     "recordPayment": "Record Payment",
+    "createCreditNote": "Create Credit Note",
+    "outstandingBalance": "Outstanding Balance",
+    "totalInvoices": "Total Invoices",
+    "totalPayments": "Total Payments",
     "totalQuotes": "Total Quotes",
-    "totalCreditNotes": "Total Credit Notes"
+    "totalCreditNotes": "Total Credit Notes",
+    "netDays": "Net {days} days",
+    "paymentTermsNotSet": "Not set",
+    "noBillingAddress": "No billing address",
+    "noShippingAddress": "No shipping address",
+    "notes": "Notes",
+    "recentInvoices": "Recent Invoices",
+    "noInvoicesYet": "No invoices yet",
+    "recentPayments": "Recent Payments",
+    "noPaymentsRecorded": "No payments recorded",
+    "recentQuotes": "Recent Quotes",
+    "noQuotesYet": "No quotes yet",
+    "noCreditNotesYet": "No credit notes yet"
   }
 }

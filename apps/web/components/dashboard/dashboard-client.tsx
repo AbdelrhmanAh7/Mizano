@@ -388,7 +388,7 @@ export function DashboardClient() {
             size="icon"
             onClick={handleRefresh}
             disabled={isRefetching}
-            aria-label="Refresh dashboard"
+            aria-label={t('refresh')}
           >
             <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
           </Button>

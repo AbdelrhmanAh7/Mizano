@@ -20,7 +20,7 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -126,9 +126,13 @@ function LogRow({
 }) {
   return (
     <div
-      className={`border-b border-border/50 transition-colors ${
-        isSelected ? 'bg-accent/50' : 'hover:bg-accent/20'
-      }`}
+      className={`border-b border-border/50 border-l-2 transition-colors ${
+        log.level === LogLevel.ERROR
+          ? 'border-l-destructive'
+          : log.level === LogLevel.WARN
+            ? 'border-l-yellow-500'
+            : 'border-l-transparent'
+      } ${isSelected ? 'bg-accent/50' : 'hover:bg-accent/20'}`}
     >
       <div className="flex items-center gap-2 px-3 py-2">
         <Checkbox checked={isSelected} onCheckedChange={onToggle} />
@@ -214,16 +218,34 @@ function LogRow({
 
 // ---- Prompt Dialog ----
 
+function promptSizeInfo(chars: number): { label: string; className: string } {
+  if (chars < 3000) return { label: 'Compact', className: 'text-green-600 dark:text-green-400' };
+  if (chars < 8000) return { label: 'Medium', className: 'text-yellow-600 dark:text-yellow-400' };
+  return { label: 'Large', className: 'text-red-600 dark:text-red-400' };
+}
+
 function PromptDialog({
   prompt,
   open,
   onClose,
+  onRegenerate,
+  isRegenerating,
 }: {
   prompt: string;
   open: boolean;
   onClose: () => void;
+  onRegenerate: (options: { includeStacks: boolean; includeContext: boolean }) => void;
+  isRegenerating: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  const [includeStacks, setIncludeStacks] = useState(true);
+  const [includeContext, setIncludeContext] = useState(true);
+  const [optionsDirty, setOptionsDirty] = useState(false);
+
+  // Reset dirty flag whenever a fresh prompt arrives
+  useEffect(() => {
+    setOptionsDirty(false);
+  }, [prompt]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -245,28 +267,81 @@ function PromptDialog({
     }
   }, [prompt]);
 
+  const charCount = prompt.length;
+  const tokenEstimate = Math.round(charCount / 4);
+  const size = promptSizeInfo(charCount);
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col gap-4">
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col gap-3 overflow-hidden">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-purple-500" />
             <DialogTitle>Claude Fix Prompt</DialogTitle>
           </div>
           <DialogDescription>
-            Copy this prompt and paste it into Claude (or any AI assistant) to get fixes with test
-            coverage for the selected errors.
+            Copy this prompt and paste it into Claude to get fixes with test coverage.
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 max-h-[55vh] rounded-md border bg-muted/50 p-4">
-          <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed select-text">
-            {prompt}
-          </pre>
-        </ScrollArea>
+        {/* Options bar */}
+        <div className="flex items-center gap-4 rounded-md border bg-muted/30 px-3 py-2">
+          <span className="text-xs font-medium text-muted-foreground">Include:</span>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <Checkbox
+              checked={includeStacks}
+              onCheckedChange={(checked) => {
+                setIncludeStacks(!!checked);
+                setOptionsDirty(true);
+              }}
+            />
+            <span className="text-xs">Stack Traces</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <Checkbox
+              checked={includeContext}
+              onCheckedChange={(checked) => {
+                setIncludeContext(!!checked);
+                setOptionsDirty(true);
+              }}
+            />
+            <span className="text-xs">Context</span>
+          </label>
+          {optionsDirty && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="ml-auto h-7 gap-1 text-xs"
+              onClick={() => onRegenerate({ includeStacks, includeContext })}
+              disabled={isRegenerating}
+            >
+              <RefreshCw className={`h-3 w-3 ${isRegenerating ? 'animate-spin' : ''}`} />
+              Regenerate
+            </Button>
+          )}
+        </div>
 
-        <div className="flex items-center justify-between pt-2">
-          <p className="text-xs text-muted-foreground">{prompt.length} characters</p>
+        <div className="flex-1 min-h-0 overflow-y-auto rounded-md border bg-muted/50 p-4">
+          {isRegenerating ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground">
+              <RefreshCw className="h-5 w-5 animate-spin mr-2" />
+              Regenerating prompt…
+            </div>
+          ) : (
+            <pre className="text-sm whitespace-pre-wrap font-mono leading-relaxed select-text">
+              {prompt}
+            </pre>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{charCount.toLocaleString()} chars</span>
+            <span>·</span>
+            <span>~{tokenEstimate.toLocaleString()} tokens</span>
+            <span>·</span>
+            <span className={size.className}>{size.label}</span>
+          </div>
           <Button onClick={handleCopy} className="min-w-[140px]">
             {copied ? (
               <>
@@ -331,12 +406,15 @@ export function LoggerDashboard() {
     });
   }, []);
 
-  const handleGeneratePrompt = useCallback(async () => {
-    const result = await generateClaudePrompt();
-    if (result?.prompt) {
-      setPromptContent(result.prompt);
-    }
-  }, [generateClaudePrompt]);
+  const handleGeneratePrompt = useCallback(
+    async (options?: { includeStacks: boolean; includeContext: boolean }) => {
+      const result = await generateClaudePrompt(undefined, options);
+      if (result?.prompt) {
+        setPromptContent(result.prompt);
+      }
+    },
+    [generateClaudePrompt],
+  );
 
   const handleSearch = useCallback(
     (value: string) => {
@@ -549,12 +627,12 @@ export function LoggerDashboard() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={handleGeneratePrompt}
+                      onClick={() => handleGeneratePrompt()}
                       disabled={selectedIds.length === 0 || isGeneratingPrompt}
                       className="gap-1 text-purple-600 border-purple-200 hover:bg-purple-50 dark:border-purple-800 dark:hover:bg-purple-900/20"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
-                      {isGeneratingPrompt ? 'Generating...' : 'Generate Fix Prompt'}
+                      {isGeneratingPrompt ? 'Generating…' : `Fix Prompt (${selectedIds.length})`}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -667,6 +745,8 @@ export function LoggerDashboard() {
         prompt={promptContent || ''}
         open={!!promptContent}
         onClose={() => setPromptContent(null)}
+        onRegenerate={handleGeneratePrompt}
+        isRegenerating={isGeneratingPrompt}
       />
     </>
   );

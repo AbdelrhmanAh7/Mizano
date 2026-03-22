@@ -26,6 +26,7 @@ import { useTranslations } from 'next-intl';
 
 function DealsPageContent() {
   const t = useTranslations('crm');
+  const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
   const [view, setView] = useState<'kanban' | 'table'>('kanban');
@@ -51,7 +52,7 @@ function DealsPageContent() {
       accessorKey: 'dealName',
       header: () => (
         <SortableHeader
-          label="Deal Name"
+          label={t('deals.form.name')}
           columnId="dealName"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -66,7 +67,7 @@ function DealsPageContent() {
     },
     {
       accessorKey: 'stage',
-      header: 'Stage',
+      header: t('deals.table.stage'),
       cell: ({ row }) => (
         <Badge className={getDealStageColor(row.original.stage)}>
           {getDealStageLabel(row.original.stage)}
@@ -77,7 +78,7 @@ function DealsPageContent() {
       accessorKey: 'expectedAmount',
       header: () => (
         <SortableHeader
-          label="Amount"
+          label={tCommon('amount')}
           columnId="expectedAmount"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
@@ -91,13 +92,13 @@ function DealsPageContent() {
     },
     {
       accessorKey: 'probability',
-      header: 'Probability',
+      header: t('deals.table.probability'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => `${row.original.probability}%`,
     },
     {
       accessorKey: 'expectedCloseDate',
-      header: 'Expected Close',
+      header: t('deals.table.expectedClose'),
       cell: ({ row }) =>
         row.original.expectedCloseDate
           ? format(new Date(row.original.expectedCloseDate), 'MMM d, yyyy')
@@ -105,7 +106,7 @@ function DealsPageContent() {
     },
     {
       id: 'assignedTo',
-      header: 'Assigned To',
+      header: t('deals.form.assignedTo'),
       cell: ({ row }) => row.original.assignedTo?.name || '-',
     },
   ];
@@ -116,11 +117,12 @@ function DealsPageContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('deals.pipeline.title')}</h1>
-          <p className="text-muted-foreground">Manage your sales deals and track pipeline</p>
+          <p className="text-muted-foreground">{t('deals.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center border rounded-md">
             <Button
+              type="button"
               variant={view === 'kanban' ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => setView('kanban')}
@@ -128,6 +130,7 @@ function DealsPageContent() {
               <LayoutGrid className="h-4 w-4" />
             </Button>
             <Button
+              type="button"
               variant={view === 'table' ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => setView('table')}
@@ -153,7 +156,7 @@ function DealsPageContent() {
             <CardContent className="pt-6">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <Target className="h-4 w-4" />
-                Total Deals
+                {t('deals.pipeline.totalDeals')}
               </div>
               <div className="text-2xl font-bold">{metrics.totalDeals || 0}</div>
             </CardContent>
@@ -162,7 +165,7 @@ function DealsPageContent() {
             <CardContent className="pt-6">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <DollarSign className="h-4 w-4" />
-                Pipeline Value
+                {t('deals.pipeline.pipelineValue')}
               </div>
               <div className="text-2xl font-bold font-mono">
                 {formatCurrency(metrics.totalValue)}
@@ -173,7 +176,7 @@ function DealsPageContent() {
             <CardContent className="pt-6">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <TrendingUp className="h-4 w-4" />
-                Weighted Value
+                {t('deals.pipeline.weightedValue')}
               </div>
               <div className="text-2xl font-bold font-mono">
                 {formatCurrency(metrics.weightedValue)}
@@ -184,7 +187,7 @@ function DealsPageContent() {
             <CardContent className="pt-6">
               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                 <Clock className="h-4 w-4" />
-                Conversion Rate
+                {t('deals.pipeline.conversionRate')}
               </div>
               <div className="text-2xl font-bold">{(metrics.conversionRate || 0).toFixed(1)}%</div>
             </CardContent>
@@ -196,7 +199,9 @@ function DealsPageContent() {
       {metrics?.byStage && Object.keys(metrics.byStage).length > 0 && (
         <Card>
           <CardContent className="pt-6">
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Pipeline by Stage</h3>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">
+              {t('deals.pipeline.byStage')}
+            </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {Object.entries(
                 metrics.byStage as Record<string, { count: number; value: number }>,
@@ -205,7 +210,9 @@ function DealsPageContent() {
                   <Badge className={getDealStageColor(stage as DealStage)}>
                     {getDealStageLabel(stage as DealStage)}
                   </Badge>
-                  <span className="text-lg font-bold">{data.count} deals</span>
+                  <span className="text-lg font-bold">
+                    {t('deals.pipeline.dealCount', { count: data.count })}
+                  </span>
                   <span className="text-sm text-muted-foreground font-mono">
                     {formatCurrency(data.value)}
                   </span>
@@ -222,7 +229,12 @@ function DealsPageContent() {
       {/* Content */}
       {view === 'kanban' ? (
         isLoading ? (
-          <DataTable columns={columns} data={[]} isLoading={true} emptyMessage="No deals yet" />
+          <DataTable
+            columns={columns}
+            data={[]}
+            isLoading={true}
+            emptyMessage={t('deals.empty.title')}
+          />
         ) : deals.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
@@ -231,7 +243,7 @@ function DealsPageContent() {
                 <Button asChild>
                   <Link href="/crm/deals/new">
                     <Plus className="mr-2 h-4 w-4" />
-                    Create Your First Deal
+                    {t('deals.empty.action')}
                   </Link>
                 </Button>
               )}
@@ -260,7 +272,7 @@ function DealsPageContent() {
                   <Button asChild>
                     <Link href="/crm/deals/new">
                       <Plus className="mr-2 h-4 w-4" />
-                      Create Your First Deal
+                      {t('deals.empty.action')}
                     </Link>
                   </Button>
                 ) : undefined

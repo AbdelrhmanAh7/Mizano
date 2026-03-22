@@ -193,5 +193,19 @@
     "retrain": "إعادة التدريب",
     "generate": "توليد",
     "samples": "عينات"
+  },
+  "pipelineForecast": {
+    "title": "توقعات خط الأنابيب بالذكاء الاصطناعي",
+    "forecastedRevenue": "الإيرادات المتوقعة",
+    "activeDeals": "{count} صفقة نشطة",
+    "confidence": "{value}% ثقة",
+    "weightedPipeline": "خط الأنابيب المرجح",
+    "confidenceRange": "نطاق الثقة",
+    "expectedRangeFor": "النطاق المتوقع لـ {month}",
+    "avgDaysToClose": "متوسط أيام الإغلاق",
+    "avgDealSize": "متوسط حجم الصفقة {amount}",
+    "avgWinRate": "متوسط معدل النجاح",
+    "acrossAllStages": "عبر جميع المراحل",
+    "stageWinRates": "معدلات النجاح حسب المرحلة"
   }
 }

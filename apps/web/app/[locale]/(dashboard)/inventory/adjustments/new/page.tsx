@@ -20,11 +20,11 @@ export default function NewAdjustmentPage() {
   const { data: warehousesData, isLoading: warehousesLoading } = useWarehouses();
 
   const items = (itemsData?.data || []).map(
-    (item: { id: string; name: string; sku: string; stockLevel?: number }) => ({
+    (item: { id: string; name: string; sku: string; currentStock?: number }) => ({
       id: item.id,
       name: item.name,
       sku: item.sku,
-      stockLevel: item.stockLevel || 0,
+      currentStock: item.currentStock || 0,
     }),
   );
 

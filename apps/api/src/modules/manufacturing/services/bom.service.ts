@@ -79,19 +79,41 @@ export class BomService {
     });
   }
 
-  async findAll(organizationId: string, query: { itemId?: string; isActive?: boolean }) {
+  async findAll(
+    organizationId: string,
+    query: {
+      page?: number | string;
+      limit?: number | string;
+      sortBy?: string;
+      sortOrder?: string;
+      itemId?: string;
+      isActive?: boolean;
+    },
+  ) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const sortBy = query.sortBy || 'createdAt';
+    const sortOrder = query.sortOrder || 'desc';
+
     const where: Prisma.BOMWhereInput = { organizationId, deletedAt: null };
     if (query.itemId) where.outputItemId = query.itemId;
     if (query.isActive !== undefined) where.isActive = query.isActive;
 
-    return this.prisma.bOM.findMany({
-      where,
-      include: {
-        outputItem: { select: { id: true, name: true, sku: true } },
-        _count: { select: { items: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [data, total] = await Promise.all([
+      this.prisma.bOM.findMany({
+        where,
+        include: {
+          outputItem: { select: { id: true, name: true, sku: true } },
+          _count: { select: { items: true } },
+        },
+        orderBy: { [sortBy]: sortOrder },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.bOM.count({ where }),
+    ]);
+
+    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async findOne(organizationId: string, id: string) {

@@ -37,6 +37,17 @@
   },
   "transactions": {
     "title": "Bank Transactions",
+    "description": "View and manage imported bank transactions",
+    "importStatement": "Import Statement",
+    "allStatus": "All Status",
+    "filters": {
+      "title": "Filters",
+      "dateFrom": "Date From",
+      "dateTo": "Date To",
+      "minAmount": "Min Amount",
+      "maxAmount": "Max Amount",
+      "clearFilters": "Clear filters"
+    },
     "newTransaction": "New Transaction",
     "editTransaction": "Edit Transaction",
     "deleteTransaction": "Delete Transaction",
@@ -84,6 +95,8 @@
     "newRule": "New Rule",
     "newRuleTitle": "New Bank Rule",
     "newRuleDescription": "Create a rule to automate transaction categorization",
+    "editRuleTitle": "Edit Bank Rule",
+    "editRuleDescription": "Update this rule's conditions and actions",
     "editRule": "Edit Rule",
     "deleteRule": "Delete Rule",
     "ruleDetails": "Rule Details",

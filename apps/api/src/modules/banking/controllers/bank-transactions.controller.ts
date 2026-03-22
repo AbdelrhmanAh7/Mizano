@@ -106,6 +106,16 @@ export class BankTransactionsController {
     return this.bankTransactionsService.findAll(orgId, query);
   }
 
+  @Get('unmatched')
+  @Permissions('banking.view')
+  @ApiOperation({ summary: 'List unmatched (PENDING) bank transactions' })
+  findUnmatched(
+    @CurrentOrg() orgId: string,
+    @Query() query: PaginationDto & { bankAccountId?: string },
+  ) {
+    return this.bankTransactionsService.findAll(orgId, { ...query, status: 'PENDING' });
+  }
+
   @Get('cursor')
   @Permissions('banking.view')
   @ApiOperation({ summary: 'List bank transactions with cursor-based pagination' })

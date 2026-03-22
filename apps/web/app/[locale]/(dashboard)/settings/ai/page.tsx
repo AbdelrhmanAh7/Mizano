@@ -45,7 +45,7 @@ export default function AISettingsPage() {
       aiForecastingEnabled: true,
       aiAnomalyEnabled: true,
       aiLeadScoringEnabled: true,
-      anomalySensitivity: 50,
+      anomalySensitivity: 3,
     },
   });
 
@@ -58,7 +58,7 @@ export default function AISettingsPage() {
         aiForecastingEnabled: settings.ai.aiForecastingEnabled ?? true,
         aiAnomalyEnabled: settings.ai.aiAnomalyEnabled ?? true,
         aiLeadScoringEnabled: settings.ai.aiLeadScoringEnabled ?? true,
-        anomalySensitivity: settings.ai.anomalySensitivity ?? 50,
+        anomalySensitivity: settings.ai.anomalySensitivity ?? 3,
       });
     }
   }, [settings, form]);
@@ -138,12 +138,12 @@ export default function AISettingsPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>{t('ai.anomalySensitivity')}</Label>
-                <span className="text-sm font-medium">{form.watch('anomalySensitivity')}%</span>
+                <span className="text-sm font-medium">{form.watch('anomalySensitivity')}</span>
               </div>
               <Slider
-                min={10}
-                max={100}
-                step={5}
+                min={2}
+                max={4}
+                step={1}
                 value={[form.watch('anomalySensitivity')]}
                 onValueChange={([v]: number[]) =>
                   form.setValue('anomalySensitivity', v, { shouldDirty: true })

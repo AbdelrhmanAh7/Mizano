@@ -37,7 +37,7 @@ export class TaxRatesService {
     if (query.type) where.type = query.type;
     if (query.isActive !== undefined) where.isActive = query.isActive;
 
-    return this.prisma.taxRate.findMany({
+    const data = await this.prisma.taxRate.findMany({
       where,
       include: {
         linkedAccount: { select: { id: true, code: true, name: true } },
@@ -45,6 +45,8 @@ export class TaxRatesService {
       },
       orderBy: { name: 'asc' },
     });
+
+    return { data, meta: { total: data.length } };
   }
 
   async findOne(organizationId: string, id: string) {

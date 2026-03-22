@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { PaymentReceivedQueryDto } from '../dto/payment-received-query.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
@@ -142,9 +142,26 @@ export class PaymentsReceivedService {
     return payment;
   }
 
-  async findAll(organizationId: string, query: PaginationDto) {
-    const { page = 1, limit = 20, sortBy = 'date', sortOrder = 'desc' } = query;
-    const where = { organizationId, deletedAt: null };
+  async findAll(organizationId: string, query: PaymentReceivedQueryDto) {
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = 'date',
+      sortOrder = 'desc',
+      customerId,
+      paymentMode,
+      dateFrom,
+      dateTo,
+    } = query;
+    const where: Prisma.PaymentReceivedWhereInput = { organizationId, deletedAt: null };
+
+    if (customerId) where.customerId = customerId;
+    if (paymentMode) where.paymentMode = paymentMode;
+    if (dateFrom || dateTo) {
+      where.date = {};
+      if (dateFrom) where.date.gte = new Date(dateFrom);
+      if (dateTo) where.date.lte = new Date(dateTo);
+    }
 
     const [payments, total] = await Promise.all([
       this.prisma.paymentReceived.findMany({

@@ -1,8 +1,9 @@
-# Mizano ERP - Production Deployment Pipeline
-# ============================================
-# Deploys to production when a release is created or manually triggered
+# Mizano ERP - Oracle Cloud Deployment Pipeline
+# ==============================================
+# Builds Docker images, pushes to GHCR, and deploys to Oracle Cloud VPS via SSH.
+# Triggered on release publish or manual workflow dispatch.
 
-name: Deploy
+name: Deploy to Oracle Cloud
 
 on:
   release:
@@ -27,7 +28,7 @@ env:
 
 jobs:
   # ==========================================
-  # Build and Push Docker Images
+  # Build and Push Docker Images to GHCR
   # ==========================================
   build-and-push:
     name: Build & Push Docker Images
@@ -36,43 +37,25 @@ jobs:
       contents: read
       packages: write
     outputs:
-      api_image: ${{ steps.meta-api.outputs.tags }}
-      web_image: ${{ steps.meta-web.outputs.tags }}
+      api_tag: ${{ steps.vars.outputs.tag }}
+      web_tag: ${{ steps.vars.outputs.tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set image tag
+        id: vars
+        run: echo "tag=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container Registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata for API
-        id: meta-api
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Extract metadata for Web
-        id: meta-web
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push API image
         uses: docker/build-push-action@v5
@@ -80,8 +63,9 @@ jobs:
           context: .
           file: ./apps/api/Dockerfile
           push: true
-          tags: ${{ steps.meta-api.outputs.tags }}
-          labels: ${{ steps.meta-api.outputs.labels }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
@@ -93,21 +77,21 @@ jobs:
           context: .
           file: ./apps/web/Dockerfile
           push: true
-          tags: ${{ steps.meta-web.outputs.tags }}
-          labels: ${{ steps.meta-web.outputs.labels }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}:${{ steps.vars.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
             NEXT_PUBLIC_API_URL=${{ secrets.API_URL }}
 
   # ==========================================
-  # Deploy to VPS (SSH)
+  # Deploy to Oracle Cloud VPS via SSH
   # ==========================================
-  deploy-vps:
-    name: Deploy to VPS
+  deploy:
+    name: Deploy to Oracle Cloud
     runs-on: ubuntu-latest
     needs: build-and-push
-    if: ${{ github.event.inputs.environment == 'production' || github.event_name == 'release' }}
     environment:
       name: production
       url: ${{ secrets.PRODUCTION_URL }}
@@ -115,100 +99,91 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to VPS via SSH
-        uses: appleboy/ssh-action@v1.0.0
+      - name: Copy deployment files to server
+        uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ${{ secrets.ORACLE_USER }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          port: ${{ secrets.ORACLE_SSH_PORT || 22 }}
+          source: "docker-compose.production.yml,nginx/nginx.conf,scripts/deploy.sh,apps/api/prisma/"
+          target: /opt/mizano
+          overwrite: true
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ${{ secrets.ORACLE_USER }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          port: ${{ secrets.ORACLE_SSH_PORT || 22 }}
           script: |
+            set -e
+
             cd /opt/mizano
+            export TAG=${{ needs.build-and-push.outputs.api_tag }}
+
+            # Login to GHCR
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
             # Pull latest images
-            docker pull ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:latest
-            docker pull ${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}:latest
+            docker pull ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:${TAG}
+            docker pull ${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}:${TAG}
 
-            # Update docker-compose with new images
-            export API_IMAGE=${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:latest
-            export WEB_IMAGE=${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}:latest
+            # Tag as latest locally
+            docker tag ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:${TAG} mizano-api:latest
+            docker tag ${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}:${TAG} mizano-web:latest
 
             # Run database migrations
-            docker-compose -f docker-compose.production.yml run --rm api npx prisma migrate deploy
+            docker compose -f docker-compose.production.yml run --rm api npx prisma migrate deploy
 
-            # Restart services with zero downtime
-            docker-compose -f docker-compose.production.yml up -d --no-deps api
-            docker-compose -f docker-compose.production.yml up -d --no-deps web
+            # Rolling restart — bring up new containers one at a time
+            docker compose -f docker-compose.production.yml up -d --no-deps --build api
+            sleep 10
+            docker compose -f docker-compose.production.yml up -d --no-deps --build web
+
+            # Start nginx if using the profile
+            docker compose -f docker-compose.production.yml --profile with-nginx up -d nginx
 
             # Cleanup old images
             docker image prune -f
 
-      - name: Health Check
+            echo "Deployment completed: tag=${TAG}"
+
+      - name: Health check
         run: |
+          echo "Waiting for services to stabilize..."
           sleep 30
-          curl -f ${{ secrets.PRODUCTION_URL }}/api/health || exit 1
-
-      - name: Notify on success
-        if: success()
-        run: |
-          echo "✅ Deployment successful!"
-          # Add Slack/Discord notification here
-
-      - name: Notify on failure
-        if: failure()
-        run: |
-          echo "❌ Deployment failed!"
-          # Add Slack/Discord notification here
+          curl -sf "${{ secrets.PRODUCTION_URL }}/api/health" || (echo "Health check failed!" && exit 1)
+          echo "Health check passed!"
 
   # ==========================================
-  # Deploy to Railway (Alternative)
+  # Post-deployment verification
   # ==========================================
-  deploy-railway:
-    name: Deploy to Railway
+  verify:
+    name: Post-Deploy Verification
     runs-on: ubuntu-latest
-    needs: build-and-push
-    if: false  # Enable by setting to: ${{ github.event.inputs.environment == 'staging' }}
-    environment:
-      name: staging
-      url: ${{ secrets.STAGING_URL }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
-        run: railway up --service api && railway up --service web
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-  # ==========================================
-  # Post-Deployment Tasks
-  # ==========================================
-  post-deploy:
-    name: Post-Deployment Tasks
-    runs-on: ubuntu-latest
-    needs: deploy-vps
+    needs: deploy
     if: success()
     steps:
-      - name: Purge CDN Cache (if using CDN)
+      - name: Verify API health
         run: |
-          echo "CDN cache purge would happen here"
-          # curl -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CF_ZONE_ID }}/purge_cache" \
-          #   -H "Authorization: Bearer ${{ secrets.CF_API_TOKEN }}" \
-          #   -H "Content-Type: application/json" \
-          #   --data '{"purge_everything":true}'
+          for i in 1 2 3; do
+            status=$(curl -sf -o /dev/null -w "%{http_code}" "${{ secrets.PRODUCTION_URL }}/api/health" || true)
+            if [ "$status" = "200" ]; then
+              echo "API is healthy (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i failed (status: $status), retrying in 10s..."
+            sleep 10
+          done
+          echo "API health check failed after 3 attempts"
+          exit 1
 
-      - name: Create Sentry Release
-        if: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: |
-          echo "Sentry release would be created here"
-          # sentry-cli releases new ${{ github.sha }}
-          # sentry-cli releases set-commits --auto ${{ github.sha }}
-          # sentry-cli releases finalize ${{ github.sha }}
+      - name: Notify success
+        if: success()
+        run: echo "Deployment to Oracle Cloud verified successfully at $(date)"
 
-      - name: Update deployment status
-        run: |
-          echo "Deployment completed at $(date)"
-          echo "Version: ${{ github.sha }}"
+      - name: Notify failure
+        if: failure()
+        run: echo "Deployment verification FAILED at $(date)"

@@ -52,7 +52,7 @@ const transferSchema = z
 type TransferFormData = z.infer<typeof transferSchema>;
 
 interface TransferFormProps {
-  items: Array<{ id: string; name: string; sku: string | null; stockLevel: number }>;
+  items: Array<{ id: string; name: string; sku: string | null; currentStock: number }>;
   warehouses: Array<{ id: string; name: string; code: string }>;
   onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
@@ -247,7 +247,7 @@ export function TransferForm({
               {fields.map((field, index) => {
                 const selectedItemId = form.watch(`lines.${index}.itemId`);
                 const selectedItem = items.find((i) => i.id === selectedItemId);
-                const availableStock = selectedItem?.stockLevel || 0;
+                const availableStock = selectedItem?.currentStock || 0;
                 const transferQty = form.watch(`lines.${index}.quantity`) || 0;
 
                 return (

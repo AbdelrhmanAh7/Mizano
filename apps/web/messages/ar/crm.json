@@ -79,6 +79,7 @@
   },
   "deals": {
     "title": "الصفقات",
+    "subtitle": "إدارة صفقاتك وتتبع خط الأنابيب",
     "description": "إدارة الصفقات وتتبع الإيرادات",
     "newDeal": "صفقة جديدة",
     "editDeal": "تعديل الصفقة",
@@ -89,6 +90,13 @@
     "markAsLost": "تحديد كخاسرة",
     "kanbanView": "كانبان",
     "tableView": "جدول",
+    "unassigned": "غير مُعيَّن",
+    "movedToStage": "تم نقل الصفقة إلى {stage}",
+    "stageFailed": "فشل تحديث المرحلة",
+    "kanban": {
+      "noDeals": "لا توجد صفقات",
+      "probability": "{value}% احتمالية"
+    },
     "form": {
       "name": "اسم الصفقة",
       "namePlaceholder": "أدخل اسم الصفقة",
@@ -124,14 +132,17 @@
     "pipeline": {
       "title": "خط أنابيب الصفقات",
       "totalValue": "إجمالي القيمة",
+      "pipelineValue": "قيمة خط الأنابيب",
       "weightedValue": "القيمة المرجحة",
       "dealCount": "{count} صفقات",
       "totalDeals": "إجمالي الصفقات",
-      "conversionRate": "معدل التحويل"
+      "conversionRate": "معدل التحويل",
+      "byStage": "خط الأنابيب حسب المرحلة"
     },
     "empty": {
       "title": "لا توجد صفقات بعد",
-      "description": "أنشئ أول صفقة لبدء تتبع الإيرادات"
+      "description": "أنشئ أول صفقة لبدء تتبع الإيرادات",
+      "action": "أنشئ أول صفقة"
     }
   },
   "activities": {

@@ -6,7 +6,8 @@
     "quotes": "Quotes",
     "invoices": "Invoices",
     "creditNotes": "Credit Notes",
-    "payments": "Payments"
+    "payments": "Payments",
+    "deliveryChallans": "Delivery Challans"
   },
   "purchases": {
     "title": "Purchases",

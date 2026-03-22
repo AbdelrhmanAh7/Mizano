@@ -51,7 +51,6 @@ export interface AISettings {
   aiForecastingEnabled: boolean;
   aiAnomalyEnabled: boolean;
   aiLeadScoringEnabled: boolean;
-  aiRetrainingFrequency: string;
   anomalySensitivity: number;
 }
 
@@ -98,7 +97,7 @@ export function useAllOrganizationSettings() {
   return useQuery({
     queryKey: SETTINGS_KEY,
     queryFn: async () => {
-      const response = await api.get('/organizations/settings');
+      const response = await api.get('/organization/settings');
       return response.data as AllOrganizationSettings;
     },
   });
@@ -110,7 +109,7 @@ function useUpdateSection<T>(section: string) {
 
   return useMutation({
     mutationFn: async (data: Partial<T>) => {
-      const response = await api.patch(`/organizations/settings/${section}`, data);
+      const response = await api.patch(`/organization/settings/${section}`, data);
       return response.data;
     },
     onSuccess: () => {
@@ -168,7 +167,7 @@ export function useOrganization() {
   return useQuery({
     queryKey: ['organization'],
     queryFn: async () => {
-      const response = await api.get('/organizations');
+      const response = await api.get('/organization');
       return response.data;
     },
   });
@@ -183,7 +182,7 @@ export function useUpdateLockDate() {
 
   return useMutation({
     mutationFn: async (lockDate: string | null) => {
-      const response = await api.patch('/organizations/lock-date', { lockDate });
+      const response = await api.patch('/organization/lock-date', { lockDate });
       return response.data;
     },
     onSuccess: () => {

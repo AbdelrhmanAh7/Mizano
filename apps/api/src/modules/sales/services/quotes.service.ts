@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma, QuoteStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { QuoteQueryDto } from '../dto/quote-query.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateQuoteDto } from '../dto/create-quote.dto';
@@ -63,8 +63,16 @@ export class QuotesService {
     });
   }
 
-  async findAll(organizationId: string, query: PaginationDto) {
-    const { page = 1, limit = 20, search, sortBy = 'date', sortOrder = 'desc' } = query;
+  async findAll(organizationId: string, query: QuoteQueryDto) {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      sortBy = 'date',
+      sortOrder = 'desc',
+      customerId,
+      status,
+    } = query;
     const where: Prisma.QuoteWhereInput = { organizationId, deletedAt: null };
     if (search) {
       where.OR = [
@@ -72,6 +80,8 @@ export class QuotesService {
         { customer: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
+    if (customerId) where.customerId = customerId;
+    if (status) where.status = status as QuoteStatus;
 
     const [quotes, total] = await Promise.all([
       this.prisma.quote.findMany({

@@ -86,16 +86,16 @@ export default function CustomerDetailPage() {
     try {
       await deleteCustomer.mutateAsync(customerId);
       toast({
-        title: 'Customer deleted',
-        description: 'The customer has been deleted.',
+        title: t('customers.toast.deleted'),
+        description: t('customers.toast.deletedDescription'),
       });
       router.push('/sales/customers');
     } catch (error: unknown) {
       toast({
-        title: 'Error',
+        title: tCommon('error'),
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to delete customer. They may have associated transactions.',
+          t('customers.toast.deleteError'),
         variant: 'destructive',
       });
     }
@@ -119,22 +119,20 @@ export default function CustomerDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/sales/customers">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Customer Not Found</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('customers.customerNotFound')}</h1>
           </div>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              The customer you&apos;re looking for doesn&apos;t exist.
-            </p>
+            <p className="text-muted-foreground">{t('customers.notFoundMessage')}</p>
             <Button asChild className="mt-4">
-              <Link href="/sales/customers">Back to Customers</Link>
+              <Link href="/sales/customers">{t('customers.backToCustomers')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -151,7 +149,7 @@ export default function CustomerDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild aria-label="Go back">
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/sales/customers">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -186,12 +184,12 @@ export default function CustomerDetailPage() {
       {/* Tabs */}
       <Tabs defaultValue="overview">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="invoices">Invoices</TabsTrigger>
-          <TabsTrigger value="payments">Payments</TabsTrigger>
-          <TabsTrigger value="quotes">Quotes</TabsTrigger>
-          <TabsTrigger value="credit-notes">Credit Notes</TabsTrigger>
-          <TabsTrigger value="statement">Statement</TabsTrigger>
+          <TabsTrigger value="overview">{t('customer360.overviewTab')}</TabsTrigger>
+          <TabsTrigger value="invoices">{t('customer360.invoicesTab')}</TabsTrigger>
+          <TabsTrigger value="payments">{t('customer360.paymentsTab')}</TabsTrigger>
+          <TabsTrigger value="quotes">{t('customer360.quotesTab')}</TabsTrigger>
+          <TabsTrigger value="credit-notes">{t('customer360.creditNotesTab')}</TabsTrigger>
+          <TabsTrigger value="statement">{t('customer360.statementTab')}</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -201,19 +199,19 @@ export default function CustomerDetailPage() {
             <Button asChild size="sm">
               <Link href={`/sales/invoices/new?customerId=${customerId}`}>
                 <Receipt className="mr-2 h-4 w-4" />
-                Create Invoice
+                {t('customer360.createInvoice')}
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
               <Link href={`/sales/quotes/new?customerId=${customerId}`}>
                 <FileText className="mr-2 h-4 w-4" />
-                Create Quote
+                {t('customer360.createQuote')}
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
               <Link href={`/sales/payments/new?customerId=${customerId}`}>
                 <CreditCard className="mr-2 h-4 w-4" />
-                Record Payment
+                {t('customer360.recordPayment')}
               </Link>
             </Button>
           </div>
@@ -222,7 +220,9 @@ export default function CustomerDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Card>
               <CardContent className="pt-6">
-                <div className="text-sm text-muted-foreground">Outstanding Balance</div>
+                <div className="text-sm text-muted-foreground">
+                  {t('customer360.outstandingBalance')}
+                </div>
                 <div className={cn('text-2xl font-bold font-mono', getBalanceColor(balance))}>
                   {formatCurrency(balance, customer.currency)}
                 </div>
@@ -231,28 +231,34 @@ export default function CustomerDetailPage() {
 
             <Card>
               <CardContent className="pt-6">
-                <div className="text-sm text-muted-foreground">Total Invoices</div>
+                <div className="text-sm text-muted-foreground">
+                  {t('customer360.totalInvoices')}
+                </div>
                 <div className="text-2xl font-bold">{invoices.length}</div>
               </CardContent>
             </Card>
 
             <Card>
               <CardContent className="pt-6">
-                <div className="text-sm text-muted-foreground">Total Payments</div>
+                <div className="text-sm text-muted-foreground">
+                  {t('customer360.totalPayments')}
+                </div>
                 <div className="text-2xl font-bold">{payments.length}</div>
               </CardContent>
             </Card>
 
             <Card>
               <CardContent className="pt-6">
-                <div className="text-sm text-muted-foreground">Total Quotes</div>
+                <div className="text-sm text-muted-foreground">{t('customer360.totalQuotes')}</div>
                 <div className="text-2xl font-bold">{quotes.length}</div>
               </CardContent>
             </Card>
 
             <Card>
               <CardContent className="pt-6">
-                <div className="text-sm text-muted-foreground">Credit Notes</div>
+                <div className="text-sm text-muted-foreground">
+                  {t('customer360.totalCreditNotes')}
+                </div>
                 <div className="text-2xl font-bold">{creditNotes.length}</div>
               </CardContent>
             </Card>
@@ -269,7 +275,9 @@ export default function CustomerDetailPage() {
                   <div className="flex items-start gap-3">
                     <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
-                      <dt className="text-sm font-medium text-muted-foreground">Email</dt>
+                      <dt className="text-sm font-medium text-muted-foreground">
+                        {t('customers.form.email')}
+                      </dt>
                       <dd>
                         <a
                           href={`mailto:${customer.email}`}
@@ -285,7 +293,9 @@ export default function CustomerDetailPage() {
                   <div className="flex items-start gap-3">
                     <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
-                      <dt className="text-sm font-medium text-muted-foreground">Phone</dt>
+                      <dt className="text-sm font-medium text-muted-foreground">
+                        {t('customers.form.phone')}
+                      </dt>
                       <dd>
                         <a href={`tel:${customer.phone}`} className="hover:underline">
                           {customer.phone}
@@ -295,12 +305,20 @@ export default function CustomerDetailPage() {
                   </div>
                 )}
                 <div>
-                  <dt className="text-sm font-medium text-muted-foreground">Currency</dt>
+                  <dt className="text-sm font-medium text-muted-foreground">
+                    {t('customers.form.currency')}
+                  </dt>
                   <dd>{customer.currency}</dd>
                 </div>
                 <div>
-                  <dt className="text-sm font-medium text-muted-foreground">Payment Terms</dt>
-                  <dd>{customer.paymentTerms ? `Net ${customer.paymentTerms} days` : 'Not set'}</dd>
+                  <dt className="text-sm font-medium text-muted-foreground">
+                    {t('customers.form.paymentTerms')}
+                  </dt>
+                  <dd>
+                    {customer.paymentTerms
+                      ? t('customer360.netDays', { days: customer.paymentTerms })
+                      : t('customer360.paymentTermsNotSet')}
+                  </dd>
                 </div>
               </dl>
             </CardContent>
@@ -312,14 +330,14 @@ export default function CustomerDetailPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MapPin className="h-5 w-5" />
-                  Billing Address
+                  {t('customers.form.billingAddress')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {billingAddress ? (
                   <p className="whitespace-pre-line">{billingAddress}</p>
                 ) : (
-                  <p className="text-muted-foreground">No billing address</p>
+                  <p className="text-muted-foreground">{t('customer360.noBillingAddress')}</p>
                 )}
               </CardContent>
             </Card>
@@ -328,14 +346,14 @@ export default function CustomerDetailPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MapPin className="h-5 w-5" />
-                  Shipping Address
+                  {t('customers.form.shippingAddress')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {shippingAddress ? (
                   <p className="whitespace-pre-line">{shippingAddress}</p>
                 ) : (
-                  <p className="text-muted-foreground">No shipping address</p>
+                  <p className="text-muted-foreground">{t('customer360.noShippingAddress')}</p>
                 )}
               </CardContent>
             </Card>
@@ -345,7 +363,7 @@ export default function CustomerDetailPage() {
           {customer.notes && (
             <Card>
               <CardHeader>
-                <CardTitle>Notes</CardTitle>
+                <CardTitle>{t('customer360.notes')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="whitespace-pre-wrap">{customer.notes}</p>
@@ -360,27 +378,29 @@ export default function CustomerDetailPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Recent Invoices
+                {t('customer360.recentInvoices')}
               </CardTitle>
               <Button asChild size="sm">
-                <Link href={`/sales/invoices/new?customerId=${customerId}`}>Create Invoice</Link>
+                <Link href={`/sales/invoices/new?customerId=${customerId}`}>
+                  {t('customer360.createInvoice')}
+                </Link>
               </Button>
             </CardHeader>
             <CardContent>
               {invoices.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">No invoices yet</p>
+                  <p className="text-muted-foreground">{t('customer360.noInvoicesYet')}</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Invoice #</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead>{t('invoices.table.invoiceNumber')}</TableHead>
+                      <TableHead>{t('invoices.table.date')}</TableHead>
+                      <TableHead>{t('invoices.table.dueDate')}</TableHead>
+                      <TableHead>{t('invoices.table.status')}</TableHead>
+                      <TableHead className="text-right">{t('invoices.table.amount')}</TableHead>
+                      <TableHead className="text-right">{t('invoices.table.balance')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -404,9 +424,15 @@ export default function CustomerDetailPage() {
                             </Link>
                           </TableCell>
                           <TableCell>
-                            {format(new Date(invoice.invoiceDate), 'MMM d, yyyy')}
+                            {invoice.invoiceDate
+                              ? format(new Date(invoice.invoiceDate), 'MMM d, yyyy')
+                              : '-'}
                           </TableCell>
-                          <TableCell>{format(new Date(invoice.dueDate), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>
+                            {invoice.dueDate
+                              ? format(new Date(invoice.dueDate), 'MMM d, yyyy')
+                              : '-'}
+                          </TableCell>
                           <TableCell>
                             <InvoiceStatusBadge status={invoice.status as InvoiceStatus} />
                           </TableCell>
@@ -438,26 +464,28 @@ export default function CustomerDetailPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
-                Recent Payments
+                {t('customer360.recentPayments')}
               </CardTitle>
               <Button asChild size="sm">
-                <Link href={`/sales/payments/new?customerId=${customerId}`}>Record Payment</Link>
+                <Link href={`/sales/payments/new?customerId=${customerId}`}>
+                  {t('customer360.recordPayment')}
+                </Link>
               </Button>
             </CardHeader>
             <CardContent>
               {payments.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">No payments recorded</p>
+                  <p className="text-muted-foreground">{t('customer360.noPaymentsRecorded')}</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Payment #</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Mode</TableHead>
-                      <TableHead>Reference</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>{t('payments.table.paymentNumber')}</TableHead>
+                      <TableHead>{t('payments.table.date')}</TableHead>
+                      <TableHead>{t('payments.table.mode')}</TableHead>
+                      <TableHead>{t('payments.reference')}</TableHead>
+                      <TableHead className="text-right">{t('payments.table.amount')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -480,7 +508,9 @@ export default function CustomerDetailPage() {
                             </Link>
                           </TableCell>
                           <TableCell>
-                            {format(new Date(payment.paymentDate), 'MMM d, yyyy')}
+                            {payment.paymentDate
+                              ? format(new Date(payment.paymentDate), 'MMM d, yyyy')
+                              : '-'}
                           </TableCell>
                           <TableCell>{payment.paymentMode?.replace('_', ' ')}</TableCell>
                           <TableCell>{payment.reference || '-'}</TableCell>
@@ -503,26 +533,28 @@ export default function CustomerDetailPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Recent Quotes
+                {t('customer360.recentQuotes')}
               </CardTitle>
               <Button asChild size="sm">
-                <Link href={`/sales/quotes/new?customerId=${customerId}`}>Create Quote</Link>
+                <Link href={`/sales/quotes/new?customerId=${customerId}`}>
+                  {t('customer360.createQuote')}
+                </Link>
               </Button>
             </CardHeader>
             <CardContent>
               {quotes.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">No quotes yet</p>
+                  <p className="text-muted-foreground">{t('customer360.noQuotesYet')}</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Quote #</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Expiry Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>{t('quotes.table.quoteNumber')}</TableHead>
+                      <TableHead>{t('quotes.table.date')}</TableHead>
+                      <TableHead>{t('quotes.table.expiryDate')}</TableHead>
+                      <TableHead>{t('quotes.table.status')}</TableHead>
+                      <TableHead className="text-right">{t('quotes.table.amount')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -544,8 +576,14 @@ export default function CustomerDetailPage() {
                               {quote.quoteNumber}
                             </Link>
                           </TableCell>
-                          <TableCell>{format(new Date(quote.date), 'MMM d, yyyy')}</TableCell>
-                          <TableCell>{format(new Date(quote.expiryDate), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>
+                            {quote.date ? format(new Date(quote.date), 'MMM d, yyyy') : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {quote.expiryDate
+                              ? format(new Date(quote.expiryDate), 'MMM d, yyyy')
+                              : '-'}
+                          </TableCell>
                           <TableCell>
                             <Badge variant="outline">{quote.status}</Badge>
                           </TableCell>
@@ -568,27 +606,27 @@ export default function CustomerDetailPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
-                Credit Notes
+                {t('customer360.creditNotesTab')}
               </CardTitle>
               <Button asChild size="sm">
                 <Link href={`/sales/credit-notes/new?customerId=${customerId}`}>
-                  Create Credit Note
+                  {t('customer360.createCreditNote')}
                 </Link>
               </Button>
             </CardHeader>
             <CardContent>
               {creditNotes.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">No credit notes yet</p>
+                  <p className="text-muted-foreground">{t('customer360.noCreditNotesYet')}</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Credit Note #</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>{t('creditNotes.table.creditNoteNumber')}</TableHead>
+                      <TableHead>{t('creditNotes.table.date')}</TableHead>
+                      <TableHead>{t('creditNotes.type')}</TableHead>
+                      <TableHead className="text-right">{t('creditNotes.table.amount')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -609,7 +647,9 @@ export default function CustomerDetailPage() {
                               {cn.creditNoteNumber}
                             </Link>
                           </TableCell>
-                          <TableCell>{format(new Date(cn.date), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>
+                            {cn.date ? format(new Date(cn.date), 'MMM d, yyyy') : '-'}
+                          </TableCell>
                           <TableCell>
                             <Badge variant="outline">{cn.type.replace('_', ' ')}</Badge>
                           </TableCell>
@@ -636,15 +676,15 @@ export default function CustomerDetailPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+            <AlertDialogTitle>{t('customers.deleteCustomer')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this customer? This action cannot be undone.
+              {t('customers.deleteConfirmDescription')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

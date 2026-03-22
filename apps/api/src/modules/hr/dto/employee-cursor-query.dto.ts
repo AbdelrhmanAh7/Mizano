@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 
 export class EmployeeCursorQueryDto extends CursorPaginationDto {
@@ -14,4 +14,9 @@ export class EmployeeCursorQueryDto extends CursorPaginationDto {
   @IsOptional()
   @IsString()
   department?: string;
+
+  @ApiProperty({ required: false, enum: ['ACTIVE', 'INACTIVE', 'TERMINATED'] })
+  @IsOptional()
+  @IsEnum(['ACTIVE', 'INACTIVE', 'TERMINATED'])
+  status?: 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
 }

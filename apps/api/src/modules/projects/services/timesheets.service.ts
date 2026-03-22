@@ -134,32 +134,60 @@ export class TimesheetsService {
   async findAll(
     organizationId: string,
     query: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
       userId?: string;
       projectId?: string;
       startDate?: string;
       endDate?: string;
+      status?: string;
       isBilled?: boolean;
     },
   ) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const sortBy = query.sortBy || 'date';
+    const sortOrder = query.sortOrder || 'desc';
     const where: Prisma.TimesheetEntryWhereInput = { organizationId };
     if (query.userId) where.userId = query.userId;
     if (query.projectId) where.projectId = query.projectId;
     if (query.isBilled !== undefined) where.isBilled = query.isBilled;
+    if (query.status === 'UNBILLED') where.isBilled = false;
+    if (query.status === 'INVOICED') where.isBilled = true;
     if (query.startDate || query.endDate) {
       where.date = {};
-      if (query.startDate) where.date.gte = new Date(query.startDate);
-      if (query.endDate) where.date.lte = new Date(query.endDate);
+      if (query.startDate) (where.date as Prisma.DateTimeFilter).gte = new Date(query.startDate);
+      if (query.endDate) (where.date as Prisma.DateTimeFilter).lte = new Date(query.endDate);
+    }
+    if (query.search) {
+      where.OR = [
+        { description: { contains: query.search, mode: 'insensitive' } },
+        { project: { name: { contains: query.search, mode: 'insensitive' } } },
+        { task: { name: { contains: query.search, mode: 'insensitive' } } },
+        { user: { firstName: { contains: query.search, mode: 'insensitive' } } },
+        { user: { lastName: { contains: query.search, mode: 'insensitive' } } },
+      ];
     }
 
-    return this.prisma.timesheetEntry.findMany({
-      where,
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true } },
-        project: { select: { id: true, name: true, color: true } },
-        task: { select: { id: true, name: true } },
-      },
-      orderBy: { date: 'desc' },
-    });
+    const [data, total] = await Promise.all([
+      this.prisma.timesheetEntry.findMany({
+        where,
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true } },
+          project: { select: { id: true, name: true, color: true } },
+          task: { select: { id: true, name: true } },
+        },
+        orderBy: { [sortBy]: sortOrder },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.timesheetEntry.count({ where }),
+    ]);
+
+    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async findOne(organizationId: string, id: string) {

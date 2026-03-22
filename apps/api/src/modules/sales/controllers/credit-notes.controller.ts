@@ -19,11 +19,11 @@ import {
   Permissions,
 } from '../../../common/decorators';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import { CreateCreditNoteDto } from '../dto/create-credit-note.dto';
+import { CreditNoteQueryDto } from '../dto/credit-note-query.dto';
 import { CreditNotesService } from '../services/credit-notes.service';
 
 @ApiTags('Credit Notes')
@@ -47,7 +47,7 @@ export class CreditNotesController {
   @CacheResponse('credit-notes:list')
   @CacheTTL(120)
   @ApiOperation({ summary: 'Get all credit notes' })
-  findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: CreditNoteQueryDto) {
     return this.creditNotesService.findAll(orgId, query);
   }
 

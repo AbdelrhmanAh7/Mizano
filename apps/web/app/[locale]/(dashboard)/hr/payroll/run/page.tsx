@@ -68,6 +68,7 @@ interface PayslipPreview {
 
 export default function RunPayrollPage() {
   const t = useTranslations('hr');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const today = new Date();
   const [month, setMonth] = useState(getMonth(today) + 1);
@@ -89,16 +90,15 @@ export default function RunPayrollPage() {
     const previewData: PayslipPreview[] = employees.map(
       (emp: {
         id: string;
-        firstName: string;
-        lastName: string;
+        name: string;
         basicSalary: string | number;
         allowances?: { amount?: number }[];
         deductions?: { amount?: number }[];
       }) => {
         const basicSalary =
           typeof emp.basicSalary === 'string' ? parseFloat(emp.basicSalary) : emp.basicSalary;
-        const allowances = emp.allowances || [];
-        const deductions = emp.deductions || [];
+        const allowances = Array.isArray(emp.allowances) ? emp.allowances : [];
+        const deductions = Array.isArray(emp.deductions) ? emp.deductions : [];
         const totalAllowances = allowances.reduce(
           (sum: number, a: { amount?: number }) => sum + (a.amount || 0),
           0,
@@ -115,7 +115,7 @@ export default function RunPayrollPage() {
 
         return {
           employeeId: emp.id,
-          employeeName: `${emp.firstName} ${emp.lastName}`,
+          employeeName: emp.name,
           basicSalary,
           totalAllowances,
           gross,
@@ -193,7 +193,7 @@ export default function RunPayrollPage() {
           >
             {step === 'select' ? '1' : <CheckCircle2 className="h-5 w-5" />}
           </div>
-          <span className="font-medium">Select Period</span>
+          <span className="font-medium">{t('payroll.steps.selectPeriod')}</span>
         </div>
         <div className="flex-1 h-1 bg-muted">
           <div
@@ -214,7 +214,7 @@ export default function RunPayrollPage() {
           >
             {step === 'confirm' ? <CheckCircle2 className="h-5 w-5" /> : '2'}
           </div>
-          <span className="font-medium">Preview</span>
+          <span className="font-medium">{t('payroll.steps.preview')}</span>
         </div>
         <div className="flex-1 h-1 bg-muted">
           <div
@@ -231,7 +231,7 @@ export default function RunPayrollPage() {
           >
             3
           </div>
-          <span className="font-medium">Confirm</span>
+          <span className="font-medium">{t('payroll.steps.confirm')}</span>
         </div>
       </div>
 
@@ -239,8 +239,8 @@ export default function RunPayrollPage() {
       {step === 'select' && (
         <Card>
           <CardHeader>
-            <CardTitle>Select Pay Period</CardTitle>
-            <CardDescription>Choose the month and year for this payroll run</CardDescription>
+            <CardTitle>{t('payroll.selectPeriod.title')}</CardTitle>
+            <CardDescription>{t('payroll.selectPeriod.description')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-2 gap-4 max-w-md">
@@ -281,17 +281,17 @@ export default function RunPayrollPage() {
                 <AlertCircle className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <p className="font-medium">
-                    Processing payroll for {months[month - 1]} {year}
+                    {t('payroll.selectPeriod.processingFor', { month: months[month - 1], year })}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {employees.length} active employees will be included
+                    {t('payroll.selectPeriod.employeesIncluded', { count: employees.length })}
                   </p>
                 </div>
               </div>
             </div>
 
             <Button onClick={handleGeneratePreview} disabled={employees.length === 0}>
-              Generate Preview
+              {t('payroll.selectPeriod.generatePreview')}
             </Button>
           </CardContent>
         </Card>
@@ -303,19 +303,21 @@ export default function RunPayrollPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Employees</p>
+                <p className="text-sm text-muted-foreground">{t('payroll.preview.employees')}</p>
                 <p className="text-2xl font-bold">{preview.length}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Total Gross</p>
+                <p className="text-sm text-muted-foreground">{t('payroll.preview.totalGross')}</p>
                 <p className="text-2xl font-bold font-mono">{formatCurrency(totalGross)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Total Deductions</p>
+                <p className="text-sm text-muted-foreground">
+                  {t('payroll.preview.totalDeductions')}
+                </p>
                 <p className="text-2xl font-bold font-mono text-red-600">
                   -{formatCurrency(totalDeductions)}
                 </p>
@@ -323,7 +325,7 @@ export default function RunPayrollPage() {
             </Card>
             <Card className="bg-primary/5">
               <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Total Net Pay</p>
+                <p className="text-sm text-muted-foreground">{t('payroll.preview.totalNetPay')}</p>
                 <p className="text-2xl font-bold font-mono">{formatCurrency(totalNetPay)}</p>
               </CardContent>
             </Card>
@@ -332,22 +334,26 @@ export default function RunPayrollPage() {
           <Card>
             <CardHeader>
               <CardTitle>
-                Payroll Preview - {months[month - 1]} {year}
+                {t('payroll.preview.title', { month: months[month - 1], year })}
               </CardTitle>
-              <CardDescription>Review the calculated salaries before processing</CardDescription>
+              <CardDescription>{t('payroll.preview.description')}</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead className="text-right">Basic</TableHead>
-                    <TableHead className="text-right">Allowances</TableHead>
-                    <TableHead className="text-right">Gross</TableHead>
-                    <TableHead className="text-right">LOP</TableHead>
-                    <TableHead className="text-right">Deductions</TableHead>
-                    <TableHead className="text-right">Tax</TableHead>
-                    <TableHead className="text-right">Net Pay</TableHead>
+                    <TableHead>{t('payroll.previewTable.employee')}</TableHead>
+                    <TableHead className="text-right">{t('payroll.previewTable.basic')}</TableHead>
+                    <TableHead className="text-right">
+                      {t('payroll.previewTable.allowances')}
+                    </TableHead>
+                    <TableHead className="text-right">{t('payroll.previewTable.gross')}</TableHead>
+                    <TableHead className="text-right">{t('payroll.previewTable.lop')}</TableHead>
+                    <TableHead className="text-right">
+                      {t('payroll.previewTable.deductions')}
+                    </TableHead>
+                    <TableHead className="text-right">{t('payroll.previewTable.tax')}</TableHead>
+                    <TableHead className="text-right">{t('payroll.previewTable.netPay')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -365,7 +371,9 @@ export default function RunPayrollPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         {slip.lopDays > 0 ? (
-                          <span className="text-red-600">{slip.lopDays} days</span>
+                          <span className="text-red-600">
+                            {t('payroll.lopDays', { days: slip.lopDays })}
+                          </span>
                         ) : (
                           '-'
                         )}
@@ -388,11 +396,13 @@ export default function RunPayrollPage() {
 
           <div className="flex justify-between">
             <Button variant="outline" onClick={() => setStep('select')}>
-              Back
+              {t('payroll.actions.back')}
             </Button>
             <Button onClick={handleRunPayroll} disabled={runPayroll.isPending}>
               <Play className="mr-2 h-4 w-4" />
-              {runPayroll.isPending ? 'Processing...' : 'Run Payroll'}
+              {runPayroll.isPending
+                ? t('payroll.actions.processing')
+                : t('payroll.actions.runPayroll')}
             </Button>
           </div>
         </>
@@ -404,23 +414,28 @@ export default function RunPayrollPage() {
           <CardContent className="pt-6">
             <div className="text-center space-y-4">
               <CheckCircle2 className="mx-auto h-16 w-16 text-green-500" />
-              <h2 className="text-2xl font-bold">Payroll Generated Successfully</h2>
+              <h2 className="text-2xl font-bold">{t('payroll.success.title')}</h2>
               <p className="text-muted-foreground">
-                Payslips for {months[month - 1]} {year} have been created for {preview.length}{' '}
-                employees.
+                {t('payroll.success.description', {
+                  month: months[month - 1],
+                  year,
+                  count: preview.length,
+                })}
               </p>
               <div className="py-4">
                 <Badge variant="outline" className="text-lg px-4 py-2">
-                  Total Net Pay: {formatCurrency(totalNetPay)}
+                  {t('payroll.success.totalNetPay', { amount: formatCurrency(totalNetPay) })}
                 </Badge>
               </div>
               <div className="flex justify-center gap-4">
                 <Button variant="outline" asChild>
-                  <Link href={`/hr/payroll/${payrollRunId}`}>View Details</Link>
+                  <Link href={`/hr/payroll/${payrollRunId}`}>
+                    {t('payroll.actions.viewDetails')}
+                  </Link>
                 </Button>
                 <Button onClick={() => setShowConfirmDialog(true)}>
                   <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Confirm & Post
+                  {t('payroll.actions.confirmPost')}
                 </Button>
               </div>
             </div>
@@ -432,16 +447,17 @@ export default function RunPayrollPage() {
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Payroll</AlertDialogTitle>
+            <AlertDialogTitle>{t('payroll.confirmDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will finalize the payroll and create accounting entries. This action cannot be
-              undone. Make sure all details are correct.
+              {t('payroll.confirmDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmPayroll} disabled={confirmPayroll.isPending}>
-              {confirmPayroll.isPending ? 'Confirming...' : 'Confirm Payroll'}
+              {confirmPayroll.isPending
+                ? t('payroll.actions.confirming')
+                : t('payroll.actions.confirmPayroll')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

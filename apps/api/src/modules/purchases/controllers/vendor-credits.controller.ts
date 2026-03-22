@@ -17,11 +17,11 @@ import {
   Permissions,
 } from '../../../common/decorators';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import { CreateVendorCreditDto } from '../dto/create-vendor-credit.dto';
+import { VendorCreditQueryDto } from '../dto/vendor-credit-query.dto';
 import { VendorCreditsService } from '../services/vendor-credits.service';
 
 @ApiTags('Vendor Credits')
@@ -45,7 +45,7 @@ export class VendorCreditsController {
   @CacheResponse('vendor-credits:list')
   @CacheTTL(120)
   @ApiOperation({ summary: 'Get all vendor credits' })
-  findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto & { vendorId?: string }) {
+  findAll(@CurrentOrg() orgId: string, @Query() query: VendorCreditQueryDto) {
     return this.vendorCreditsService.findAll(orgId, query);
   }
 

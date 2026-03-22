@@ -48,14 +48,6 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
 
-const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'all', label: 'All Statuses' },
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'IN_PROCESS', label: 'In Process' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-];
-
 function WorkOrdersPageContent() {
   const t = useTranslations('manufacturing');
   const tCommon = useTranslations('common');
@@ -119,7 +111,7 @@ function WorkOrdersPageContent() {
     ...(canEdit
       ? [
           {
-            label: 'Start',
+            label: t('workOrders.bulkActions.start'),
             icon: Play,
             onClick: (rows: WorkOrder[]) => {
               setBulkSelectedRows(rows);
@@ -127,7 +119,7 @@ function WorkOrdersPageContent() {
             },
           },
           {
-            label: 'Complete',
+            label: t('workOrders.bulkActions.complete'),
             icon: CheckCircle,
             onClick: (rows: WorkOrder[]) => {
               setBulkSelectedRows(rows);
@@ -135,7 +127,7 @@ function WorkOrdersPageContent() {
             },
           },
           {
-            label: 'Cancel',
+            label: t('workOrders.bulkActions.cancel'),
             icon: XCircle,
             variant: 'destructive' as const,
             onClick: (rows: WorkOrder[]) => {
@@ -148,7 +140,7 @@ function WorkOrdersPageContent() {
     ...(canDelete
       ? [
           {
-            label: 'Delete',
+            label: t('workOrders.bulkActions.delete'),
             icon: Trash2,
             variant: 'destructive' as const,
             onClick: (rows: WorkOrder[]) => {
@@ -172,10 +164,10 @@ function WorkOrdersPageContent() {
         toast({ title: t('workOrders.deleteWorkOrder') });
       } catch (error: unknown) {
         toast({
-          title: 'Error',
+          title: tCommon('errors.generic'),
           description:
             (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-            'Failed to delete work order',
+            tCommon('errors.generic'),
           variant: 'destructive',
         });
       }
@@ -227,17 +219,20 @@ function WorkOrdersPageContent() {
       cell: ({ row }) => <span className="font-mono">{row.original.quantity}</span>,
     },
     {
-      accessorKey: 'startDate',
+      accessorKey: 'plannedStartDate',
       header: () => (
         <SortableHeader
           label={t('workOrders.table.plannedStart')}
-          columnId="startDate"
+          columnId="plannedStartDate"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
           onSort={tableParams.setSort}
         />
       ),
-      cell: ({ row }) => format(new Date(row.original.startDate), 'MMM d, yyyy'),
+      cell: ({ row }) =>
+        row.original.plannedStartDate
+          ? format(new Date(row.original.plannedStartDate), 'MMM d, yyyy')
+          : '-',
     },
     {
       accessorKey: 'dueDate',
@@ -317,19 +312,19 @@ function WorkOrdersPageContent() {
             <DataTableSearch
               value={tableParams.search}
               onChange={tableParams.setSearch}
-              placeholder="Search by WO number or BOM..."
+              placeholder={t('workOrders.searchPlaceholder')}
             />
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger className="w-[180px]">
                 <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter by status" />
+                <SelectValue placeholder={t('workOrders.filterByStatus')} />
               </SelectTrigger>
               <SelectContent>
-                {STATUS_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all">{t('workOrders.allStatuses')}</SelectItem>
+                <SelectItem value="DRAFT">{t('workOrders.status.draft')}</SelectItem>
+                <SelectItem value="IN_PROCESS">{t('workOrders.status.inProcess')}</SelectItem>
+                <SelectItem value="COMPLETED">{t('workOrders.status.completed')}</SelectItem>
+                <SelectItem value="CANCELLED">{t('workOrders.status.cancelled')}</SelectItem>
               </SelectContent>
             </Select>
             <Button variant="outline" size="icon" onClick={() => refetch()}>

@@ -306,7 +306,13 @@ export class LoggerService {
   /**
    * Generate a Claude prompt for fixing selected errors
    */
-  generatePrompt(ids: string[]): GeneratePromptResponse {
+  generatePrompt(
+    ids: string[],
+    options?: { includeStacks?: boolean; includeContext?: boolean },
+  ): GeneratePromptResponse {
+    const includeStacks = options?.includeStacks ?? true;
+    const includeContext = options?.includeContext ?? true;
+
     const selectedLogs = ids.map((id) => this.logs.get(id)).filter((l): l is LogEntry => !!l);
 
     if (selectedLogs.length === 0) {
@@ -315,79 +321,37 @@ export class LoggerService {
 
     const errorDetails = selectedLogs
       .map((log, i) => {
-        const parts = [
+        const parts: string[] = [
           `### Error ${i + 1}: ${log.message}`,
-          `- **Level**: ${log.level}`,
-          `- **Source**: ${log.source}`,
-          `- **Category**: ${log.category}`,
-          `- **Occurrences**: ${log.occurrences}`,
-          `- **Timestamp**: ${log.timestamp}`,
+          `**${log.level}** · ${log.source} · ${log.category} · ×${log.occurrences}`,
         ];
-        if (log.url) parts.push(`- **URL**: ${log.method || 'GET'} ${log.url}`);
-        if (log.statusCode) parts.push(`- **Status Code**: ${log.statusCode}`);
-        if (log.stack) parts.push(`- **Stack Trace**:\n\`\`\`\n${log.stack}\n\`\`\``);
-        if (log.context && Object.keys(log.context).length) {
-          parts.push(`- **Context**: \`\`\`json\n${JSON.stringify(log.context, null, 2)}\n\`\`\``);
+        if (log.url) {
+          parts.push(
+            `**Endpoint**: \`${log.method ?? 'GET'} ${log.url}\`${log.statusCode ? ` → ${log.statusCode}` : ''}`,
+          );
         }
         if (log.filePaths?.length) {
-          parts.push(`- **Related Files**: ${log.filePaths.join(', ')}`);
+          parts.push(`**Files**: ${log.filePaths.join(', ')}`);
+        }
+        if (includeStacks && log.stack) {
+          const lines = log.stack.split('\n').slice(0, 8).join('\n');
+          parts.push(`**Stack**:\n\`\`\`\n${lines}\n\`\`\``);
+        }
+        if (includeContext && log.context && Object.keys(log.context).length > 0) {
+          const ctxStr = JSON.stringify(log.context);
+          const truncated = ctxStr.length > 400 ? `${ctxStr.substring(0, 400)}…}` : ctxStr;
+          parts.push(`**Context**: \`${truncated}\``);
         }
         return parts.join('\n');
       })
       .join('\n\n---\n\n');
 
-    const prompt = `# Fix Errors and Add Test Coverage
-
-I have ${selectedLogs.length} error(s)/warning(s) in my Mizano ERP application that need to be fixed with proper test coverage.
-
-## Project Context
-- **Backend**: NestJS with Prisma ORM, TypeScript
-- **Frontend**: Next.js 14 (App Router) with React, TypeScript, TailwindCSS, shadcn/ui
-- **AI Models**: TensorFlow.js based ML models
-- **Testing**: Jest (backend e2e + unit), Jest + React Testing Library (frontend)
-- **Monorepo**: Turborepo with pnpm workspaces
-
-## Errors to Fix
+    const prompt = `Fix ${selectedLogs.length} error(s) in Mizano ERP (NestJS/Next.js 14/TypeScript/Prisma monorepo).
 
 ${errorDetails}
 
-## Requirements
-
-For each error above, please:
-
-1. **Root Cause Analysis**: Explain why this error occurs
-2. **Fix Implementation**: Provide the exact code changes needed to fix the error
-3. **Test Coverage**: Write comprehensive tests that:
-   - Cover the error scenario (regression test)
-   - Cover the fix working correctly
-   - Cover edge cases related to this error
-   - Follow existing project testing patterns
-4. **Prevention**: Suggest any guards, validators, or patterns to prevent recurrence
-
-## Output Format
-
-For each error, provide:
-\`\`\`
-### Fix for Error N: [Brief Description]
-
-**Root Cause**: ...
-
-**Files to Modify**: 
-- path/to/file.ts
-
-**Code Changes**:
-\`\`\`diff
-// show the diff
-\`\`\`
-
-**Test File**: path/to/file.spec.ts
-\`\`\`typescript
-// complete test code
-\`\`\`
-
-**Prevention Notes**: ...
-\`\`\`
-`;
+For each error: root cause → exact code fix → regression test (Jest) → prevention tip.
+Rules: \`Decimal\` for money, \`organizationId\` in all DB queries, no \`any\` types, no \`console.log\`.`;
 
     return { prompt, logCount: selectedLogs.length };
   }

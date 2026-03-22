@@ -231,7 +231,7 @@ export default function RecurringProfileDetailPage() {
               </dt>
               <dd className="mt-1 flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                {format(new Date(profile.nextExecutionDate), 'MMMM d, yyyy')}
+                {format(new Date(profile.nextRunDate), 'MMMM d, yyyy')}
               </dd>
             </div>
             <div>

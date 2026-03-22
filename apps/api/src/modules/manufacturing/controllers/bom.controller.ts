@@ -32,7 +32,18 @@ export class BomController {
   @Get()
   @Permissions('manufacturing.view')
   @ApiOperation({ summary: 'Get all BOMs' })
-  findAll(@CurrentOrg() orgId: string, @Query() query: { itemId?: string; isActive?: boolean }) {
+  findAll(
+    @CurrentOrg() orgId: string,
+    @Query()
+    query: {
+      page?: number | string;
+      limit?: number | string;
+      sortBy?: string;
+      sortOrder?: string;
+      itemId?: string;
+      isActive?: boolean;
+    },
+  ) {
     return this.bomService.findAll(orgId, query);
   }
 

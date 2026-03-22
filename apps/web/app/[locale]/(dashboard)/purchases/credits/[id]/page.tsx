@@ -38,9 +38,6 @@ import {
   useVendorCredit,
   useApplyVendorCredit,
   useRefundVendorCredit,
-  getStatusVariant,
-  getStatusText,
-  getTypeText,
   formatCurrency,
 } from '@/lib/hooks/use-vendor-credits';
 import { useQuery } from '@tanstack/react-query';
@@ -76,7 +73,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
       });
       return response.data;
     },
-    enabled: !!credit?.vendorId && credit?.status === 'OPEN',
+    enabled: !!credit?.vendorId && !credit?.appliedToBillId,
   });
 
   // Fetch bank accounts for refund
@@ -86,7 +83,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
       const response = await accountsApi.getAll();
       return response.data;
     },
-    enabled: credit?.status === 'OPEN',
+    enabled: !!credit && !credit.appliedToBillId && !credit.refundedAt,
   });
 
   const unpaidBills = billsData?.data || [];
@@ -146,10 +143,9 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight font-mono">{credit.creditNumber}</h1>
-              <Badge variant={getStatusVariant(credit.status)}>
-                {getStatusText(credit.status)}
+              <Badge variant={credit.appliedToBillId ? 'secondary' : 'default'}>
+                {credit.appliedToBillId ? 'Applied' : credit.refundedAt ? 'Refunded' : 'Open'}
               </Badge>
-              <Badge variant="outline">{getTypeText(credit.type)}</Badge>
             </div>
             <p className="text-muted-foreground">
               {t('credits.creditFrom', { name: credit.vendor?.name || '' })}
@@ -158,7 +154,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
         </div>
 
         {/* Actions */}
-        {credit.status === 'OPEN' && parseFloat(credit.balanceRemaining) > 0 && (
+        {!credit.appliedToBillId && !credit.refundedAt && (
           <div className="flex items-center gap-2">
             <Dialog open={applyDialogOpen} onOpenChange={setApplyDialogOpen}>
               <DialogTrigger asChild>
@@ -246,7 +242,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                   <div className="p-4 bg-muted rounded-lg">
                     <p className="text-sm text-muted-foreground">{t('credits.refundAmount')}</p>
                     <p className="text-2xl font-bold font-mono">
-                      {formatCurrency(credit.balanceRemaining, currency)}
+                      {formatCurrency(credit.appliedToBillId ? '0' : credit.amount, currency)}
                     </p>
                   </div>
                 </div>
@@ -278,7 +274,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
               <div>
                 <p className="text-sm text-muted-foreground">{t('credits.total')}</p>
                 <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(credit.total, currency)}
+                  {formatCurrency(credit.amount, currency)}
                 </p>
               </div>
             </div>
@@ -308,7 +304,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
               <div>
                 <p className="text-sm text-muted-foreground">{t('credits.balanceRemaining')}</p>
                 <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(credit.balanceRemaining, currency)}
+                  {formatCurrency(credit.appliedToBillId ? '0' : credit.amount, currency)}
                 </p>
               </div>
             </div>
@@ -333,13 +329,9 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
               </Link>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">{t('credits.type')}</span>
-              <span>{getTypeText(credit.type)}</span>
-            </div>
-            <div className="flex justify-between">
               <span className="text-muted-foreground">{t('credits.status')}</span>
-              <Badge variant={getStatusVariant(credit.status)}>
-                {getStatusText(credit.status)}
+              <Badge variant={credit.appliedToBillId ? 'secondary' : 'default'}>
+                {credit.appliedToBillId ? 'Applied' : credit.refundedAt ? 'Refunded' : 'Open'}
               </Badge>
             </div>
             {credit.bill && (
@@ -359,12 +351,6 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                 <p className="text-sm">{credit.reason}</p>
               </div>
             )}
-            {credit.notes && (
-              <div className="pt-2 border-t">
-                <p className="text-sm text-muted-foreground mb-1">{t('credits.notes')}</p>
-                <p className="text-sm">{credit.notes}</p>
-              </div>
-            )}
           </CardContent>
         </Card>
 
@@ -375,22 +361,14 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t('credits.subtotal')}</span>
-                <span className="font-mono">{formatCurrency(credit.subtotal, currency)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t('credits.tax')}</span>
-                <span className="font-mono">{formatCurrency(credit.taxAmount, currency)}</span>
-              </div>
               <div className="flex justify-between text-lg font-semibold border-t pt-3">
                 <span>{t('credits.total')}</span>
-                <span className="font-mono">{formatCurrency(credit.total, currency)}</span>
+                <span className="font-mono">{formatCurrency(credit.amount, currency)}</span>
               </div>
               <div className="flex justify-between text-lg border-t pt-3">
                 <span className="text-muted-foreground">{t('credits.balanceRemaining')}</span>
                 <span className="font-mono font-bold text-green-600">
-                  {formatCurrency(credit.balanceRemaining, currency)}
+                  {formatCurrency(credit.appliedToBillId ? '0' : credit.amount, currency)}
                 </span>
               </div>
             </div>

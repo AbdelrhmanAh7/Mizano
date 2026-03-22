@@ -137,7 +137,7 @@ function ItemsPageContent() {
       cell: ({ row }) => formatCurrency(row.original.purchasePrice),
     },
     {
-      accessorKey: 'stockLevel',
+      accessorKey: 'currentStock',
       header: t('items.table.stock'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => {
@@ -150,7 +150,7 @@ function ItemsPageContent() {
           <div className="flex items-center justify-end gap-2">
             {stockStatus.status === 'low' && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
             {stockStatus.status === 'out' && <AlertTriangle className="h-4 w-4 text-red-500" />}
-            <span className={cn('font-mono', stockStatus.color)}>{item.stockLevel}</span>
+            <span className={cn('font-mono', stockStatus.color)}>{item.currentStock}</span>
           </div>
         );
       },

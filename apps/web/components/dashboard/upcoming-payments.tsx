@@ -14,11 +14,14 @@ interface UpcomingPaymentsProps {
   payments: UpcomingPayment[];
 }
 
-function getDueDateLabel(dueDate: string): { label: string; urgent: boolean } {
+function getDueDateLabel(
+  dueDate: string,
+  t: (key: string) => string,
+): { label: string; urgent: boolean } {
   const date = new Date(dueDate);
-  if (isPast(date) && !isToday(date)) return { label: 'Overdue', urgent: true };
-  if (isToday(date)) return { label: 'Due Today', urgent: true };
-  if (isTomorrow(date)) return { label: 'Tomorrow', urgent: false };
+  if (isPast(date) && !isToday(date)) return { label: t('overdue'), urgent: true };
+  if (isToday(date)) return { label: t('dueToday'), urgent: true };
+  if (isTomorrow(date)) return { label: t('tomorrow'), urgent: false };
   return { label: format(date, 'MMM d'), urgent: false };
 }
 
@@ -41,7 +44,7 @@ export function UpcomingPayments({ payments }: UpcomingPaymentsProps) {
         ) : (
           <div className="space-y-4">
             {payments.map((payment) => {
-              const due = getDueDateLabel(payment.dueDate);
+              const due = getDueDateLabel(payment.dueDate, t);
 
               return (
                 <div

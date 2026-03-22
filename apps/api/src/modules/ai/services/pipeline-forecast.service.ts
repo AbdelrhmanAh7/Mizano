@@ -205,7 +205,7 @@ export class PipelineForecastService {
 
       const ollamaResult = await this.ollamaGateway.infer<PipelineNarrativeResponse>(
         promptData.user,
-        { systemPrompt: promptData.system },
+        { systemPrompt: promptData.system, timeoutMs: 15_000 },
       );
 
       if (ollamaResult?.data) {

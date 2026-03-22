@@ -41,12 +41,14 @@ import {
   Settings,
   ShoppingCart,
   Target,
+  Truck,
   UserCircle,
   Users,
   Warehouse,
   Wrench,
 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
@@ -72,6 +74,7 @@ const navigationConfig: NavItem[] = [
       { nameKey: 'sales.invoices', href: '/sales/invoices', icon: Receipt },
       { nameKey: 'sales.creditNotes', href: '/sales/credit-notes', icon: CreditCard },
       { nameKey: 'sales.payments', href: '/sales/payments', icon: Banknote },
+      { nameKey: 'sales.deliveryChallans', href: '/sales/delivery-challans', icon: Truck },
     ],
   },
   {
@@ -374,8 +377,21 @@ export function Sidebar() {
           </SheetTrigger>
           <SheetContent side={isRtl ? 'right' : 'left'} className="w-64 p-0">
             <SheetHeader className="px-4 py-5 border-b">
-              <SheetTitle className="text-2xl font-bold text-primary">
-                {tCommon('appName')}
+              <SheetTitle>
+                <Image
+                  src="/svg/logo-full.svg"
+                  alt={tCommon('appName')}
+                  width={120}
+                  height={32}
+                  className="dark:hidden"
+                />
+                <Image
+                  src="/svg/logo-full-dark.svg"
+                  alt={tCommon('appName')}
+                  width={120}
+                  height={32}
+                  className="hidden dark:block"
+                />
               </SheetTitle>
               <SheetDescription className="sr-only">Main navigation menu</SheetDescription>
             </SheetHeader>
@@ -398,8 +414,25 @@ export function Sidebar() {
             )}
           >
             <div className="flex items-center justify-between flex-shrink-0 px-4 py-5">
-              {!collapsed && (
-                <span className="text-2xl font-bold text-primary">{tCommon('appName')}</span>
+              {collapsed ? (
+                <Image src="/svg/logo-icon.svg" alt={tCommon('appName')} width={28} height={28} />
+              ) : (
+                <>
+                  <Image
+                    src="/svg/logo-full.svg"
+                    alt={tCommon('appName')}
+                    width={120}
+                    height={32}
+                    className="dark:hidden"
+                  />
+                  <Image
+                    src="/svg/logo-full-dark.svg"
+                    alt={tCommon('appName')}
+                    width={120}
+                    height={32}
+                    className="hidden dark:block"
+                  />
+                </>
               )}
               <Button
                 variant="ghost"

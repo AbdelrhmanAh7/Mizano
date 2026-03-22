@@ -364,13 +364,12 @@ describe('LoggerService', () => {
       const result = service.generatePrompt([e1.id, e2.id]);
 
       expect(result.logCount).toBe(2);
-      expect(result.prompt).toContain('Fix Errors and Add Test Coverage');
+      expect(result.prompt).toContain('Fix 2 error(s)');
       expect(result.prompt).toContain('Database connection failed');
       expect(result.prompt).toContain('Component render timeout');
       expect(result.prompt).toContain('NestJS');
       expect(result.prompt).toContain('Next.js');
-      expect(result.prompt).toContain('Root Cause Analysis');
-      expect(result.prompt).toContain('Test Coverage');
+      expect(result.prompt).toContain('root cause');
     });
 
     it('should return empty prompt message for no selection', () => {
@@ -388,7 +387,7 @@ describe('LoggerService', () => {
       });
 
       const result = service.generatePrompt([e1.id]);
-      expect(result.prompt).toContain('Stack Trace');
+      expect(result.prompt).toContain('**Stack**');
       expect(result.prompt).toContain('/src/test.ts:10:5');
     });
   });

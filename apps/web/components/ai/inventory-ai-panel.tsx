@@ -39,24 +39,31 @@ export function InventoryAIPanel() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-orange-600" />
-                  <span className="text-sm text-muted-foreground">Need Reorder</span>
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                  <span className="text-sm text-muted-foreground">Critical</span>
                 </div>
-                <Badge variant="destructive">{reorder.needsReorder || 0}</Badge>
+                <Badge variant="destructive">{reorder.criticalCount || 0}</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-orange-600" />
+                  <span className="text-sm text-muted-foreground">Low Stock</span>
+                </div>
+                <Badge variant="secondary">{reorder.lowStockCount || 0}</Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Package className="h-4 w-4 text-gray-600" />
                   <span className="text-sm text-muted-foreground">Dead Stock</span>
                 </div>
-                <Badge variant="secondary">{reorder.deadStock || 0}</Badge>
+                <Badge variant="secondary">{reorder.deadStockCount || 0}</Badge>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-green-600" />
-                  <span className="text-sm text-muted-foreground">Optimal Stock</span>
+                  <span className="text-sm text-muted-foreground">Total Items</span>
                 </div>
-                <Badge variant="outline">{reorder.optimal || 0}</Badge>
+                <Badge variant="outline">{reorder.totalItems || 0}</Badge>
               </div>
             </div>
           </CardContent>
@@ -76,20 +83,26 @@ export function InventoryAIPanel() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Items with Forecasts</span>
-                <span className="text-sm font-medium">{forecast.totalForecasts || 0}</span>
+                <span className="text-sm font-medium">
+                  {forecast.itemsWithForecasts || 0} / {forecast.totalItems || 0}
+                </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Avg Accuracy</span>
+                <span className="text-sm text-muted-foreground">High Confidence</span>
                 <Badge variant="outline" className="bg-green-50 text-green-700">
-                  {forecast.averageAccuracy
-                    ? `${(forecast.averageAccuracy * 100).toFixed(1)}%`
-                    : 'N/A'}
+                  {forecast.highConfidenceCount || 0}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Next Update</span>
-                <span className="text-xs text-muted-foreground">
-                  {forecast.nextUpdate ? new Date(forecast.nextUpdate).toLocaleDateString() : 'N/A'}
+                <span className="text-sm text-muted-foreground">Top Growing</span>
+                <span className="text-sm font-medium">
+                  {forecast.topGrowingItems?.length || 0} items
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Declining</span>
+                <span className="text-sm font-medium text-orange-600">
+                  {forecast.topDecliningItems?.length || 0} items
                 </span>
               </div>
             </div>

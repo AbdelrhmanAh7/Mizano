@@ -36,7 +36,18 @@ export class WorkOrdersController {
   @Get()
   @Permissions('manufacturing.view')
   @ApiOperation({ summary: 'Get all work orders' })
-  findAll(@CurrentOrg() orgId: string, @Query() query: { status?: string; bomId?: string }) {
+  findAll(
+    @CurrentOrg() orgId: string,
+    @Query()
+    query: {
+      page?: number | string;
+      limit?: number | string;
+      sortBy?: string;
+      sortOrder?: string;
+      status?: string;
+      bomId?: string;
+    },
+  ) {
     return this.workOrdersService.findAll(orgId, query);
   }
 

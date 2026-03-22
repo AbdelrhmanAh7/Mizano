@@ -180,7 +180,10 @@
     "upcomingPayments": {
       "title": "Upcoming Payments",
       "noPayments": "No upcoming payments",
-      "viewAll": "View All"
+      "viewAll": "View All",
+      "overdue": "Overdue",
+      "dueToday": "Due Today",
+      "tomorrow": "Tomorrow"
     },
     "bankAccounts": {
       "title": "Bank Accounts",
@@ -191,7 +194,15 @@
     "projects": {
       "title": "Projects Overview",
       "noProjects": "No active projects",
-      "viewAll": "View All"
+      "viewAll": "View All",
+      "hoursAbbr": "h",
+      "status": {
+        "inProgress": "Active",
+        "completed": "Done",
+        "onHold": "On Hold",
+        "cancelled": "Cancelled",
+        "notStarted": "Not Started"
+      }
     },
     "drillLinks": {
       "viewTransactions": "View Transactions",
@@ -359,6 +370,7 @@
   "state": "State",
   "country": "Country",
   "postalCode": "Postal Code",
+  "overview": "Overview",
   "all": "All",
   "none": "None",
   "select": "Select",

@@ -49,7 +49,7 @@ const adjustmentSchema = z.object({
 type AdjustmentFormData = z.infer<typeof adjustmentSchema>;
 
 interface AdjustmentFormProps {
-  items: Array<{ id: string; name: string; sku: string | null; stockLevel: number }>;
+  items: Array<{ id: string; name: string; sku: string | null; currentStock: number }>;
   warehouses: Array<{ id: string; name: string; code: string }>;
   onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
@@ -239,7 +239,7 @@ export function AdjustmentForm({
               {fields.map((field, index) => {
                 const selectedItemId = form.watch(`lines.${index}.itemId`);
                 const selectedItem = items.find((i) => i.id === selectedItemId);
-                const currentStock = selectedItem?.stockLevel || 0;
+                const currentStock = selectedItem?.currentStock || 0;
                 const adjustment = form.watch(`lines.${index}.quantityAdjusted`) || 0;
                 const newStock =
                   watchType === 'INCREASE' ? currentStock + adjustment : currentStock - adjustment;

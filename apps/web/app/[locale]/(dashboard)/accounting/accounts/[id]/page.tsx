@@ -30,7 +30,7 @@ export default function AccountDetailPage() {
 
   const { data: account, isLoading: accountLoading } = useAccount(accountId);
   const { data: balance, isLoading: balanceLoading } = useAccountBalance(accountId);
-  const { data: journalsData } = useJournals({ limit: 10, sortBy: 'entryDate', sortOrder: 'desc' });
+  const { data: journalsData } = useJournals({ limit: 10, sortBy: 'date', sortOrder: 'desc' });
 
   if (accountLoading) {
     return (

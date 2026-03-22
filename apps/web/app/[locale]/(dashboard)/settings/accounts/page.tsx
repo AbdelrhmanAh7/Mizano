@@ -124,14 +124,16 @@ export default function AccountSettingsPage() {
                   {t('accountSettings.accountsReceivable')}
                 </Label>
                 <Select
-                  value={form.watch('defaultArAccountId') || ''}
-                  onValueChange={(value) => form.setValue('defaultArAccountId', value)}
+                  value={form.watch('defaultArAccountId') || '__none__'}
+                  onValueChange={(value) =>
+                    form.setValue('defaultArAccountId', value === '__none__' ? '' : value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
+                    <SelectItem value="__none__">{t('accountSettings.notSet')}</SelectItem>
                     {assetAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}
@@ -147,14 +149,16 @@ export default function AccountSettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="defaultRevenueAccountId">{t('accountSettings.salesRevenue')}</Label>
                 <Select
-                  value={form.watch('defaultRevenueAccountId') || ''}
-                  onValueChange={(value) => form.setValue('defaultRevenueAccountId', value)}
+                  value={form.watch('defaultRevenueAccountId') || '__none__'}
+                  onValueChange={(value) =>
+                    form.setValue('defaultRevenueAccountId', value === '__none__' ? '' : value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
+                    <SelectItem value="__none__">{t('accountSettings.notSet')}</SelectItem>
                     {revenueAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}
@@ -172,14 +176,16 @@ export default function AccountSettingsPage() {
                   {t('accountSettings.vatPayable')}
                 </Label>
                 <Select
-                  value={form.watch('defaultVatPayableAccountId') || ''}
-                  onValueChange={(value) => form.setValue('defaultVatPayableAccountId', value)}
+                  value={form.watch('defaultVatPayableAccountId') || '__none__'}
+                  onValueChange={(value) =>
+                    form.setValue('defaultVatPayableAccountId', value === '__none__' ? '' : value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
+                    <SelectItem value="__none__">{t('accountSettings.notSet')}</SelectItem>
                     {liabilityAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}
@@ -197,14 +203,16 @@ export default function AccountSettingsPage() {
                   {t('accountSettings.salesReturns')}
                 </Label>
                 <Select
-                  value={form.watch('defaultSalesReturnsAccountId') || ''}
-                  onValueChange={(value) => form.setValue('defaultSalesReturnsAccountId', value)}
+                  value={form.watch('defaultSalesReturnsAccountId') || '__none__'}
+                  onValueChange={(value) =>
+                    form.setValue('defaultSalesReturnsAccountId', value === '__none__' ? '' : value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
+                    <SelectItem value="__none__">{t('accountSettings.notSet')}</SelectItem>
                     {[...revenueAccounts, ...expenseAccounts].map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}
@@ -234,14 +242,16 @@ export default function AccountSettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="defaultApAccountId">{t('accountSettings.accountsPayable')}</Label>
                 <Select
-                  value={form.watch('defaultApAccountId') || ''}
-                  onValueChange={(value) => form.setValue('defaultApAccountId', value)}
+                  value={form.watch('defaultApAccountId') || '__none__'}
+                  onValueChange={(value) =>
+                    form.setValue('defaultApAccountId', value === '__none__' ? '' : value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
+                    <SelectItem value="__none__">{t('accountSettings.notSet')}</SelectItem>
                     {liabilityAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}
@@ -259,14 +269,19 @@ export default function AccountSettingsPage() {
                   {t('accountSettings.vatReceivable')}
                 </Label>
                 <Select
-                  value={form.watch('defaultVatReceivableAccountId') || ''}
-                  onValueChange={(value) => form.setValue('defaultVatReceivableAccountId', value)}
+                  value={form.watch('defaultVatReceivableAccountId') || '__none__'}
+                  onValueChange={(value) =>
+                    form.setValue(
+                      'defaultVatReceivableAccountId',
+                      value === '__none__' ? '' : value,
+                    )
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
+                    <SelectItem value="__none__">{t('accountSettings.notSet')}</SelectItem>
                     {assetAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}
@@ -298,14 +313,16 @@ export default function AccountSettingsPage() {
                   {t('accountSettings.defaultBankAccount')}
                 </Label>
                 <Select
-                  value={form.watch('defaultBankAccountId') || ''}
-                  onValueChange={(value) => form.setValue('defaultBankAccountId', value)}
+                  value={form.watch('defaultBankAccountId') || '__none__'}
+                  onValueChange={(value) =>
+                    form.setValue('defaultBankAccountId', value === '__none__' ? '' : value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
+                    <SelectItem value="__none__">{t('accountSettings.notSet')}</SelectItem>
                     {assetAccounts
                       .filter(
                         (a) => a.name.toLowerCase().includes('bank') || a.code.startsWith('1001'),
@@ -327,14 +344,16 @@ export default function AccountSettingsPage() {
                   {t('accountSettings.defaultCashAccount')}
                 </Label>
                 <Select
-                  value={form.watch('defaultCashAccountId') || ''}
-                  onValueChange={(value) => form.setValue('defaultCashAccountId', value)}
+                  value={form.watch('defaultCashAccountId') || '__none__'}
+                  onValueChange={(value) =>
+                    form.setValue('defaultCashAccountId', value === '__none__' ? '' : value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t('accountSettings.selectAccount')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">{t('accountSettings.notSet')}</SelectItem>
+                    <SelectItem value="__none__">{t('accountSettings.notSet')}</SelectItem>
                     {assetAccounts
                       .filter(
                         (a) => a.name.toLowerCase().includes('cash') || a.code.startsWith('1000'),

@@ -64,10 +64,16 @@ export class TimesheetsController {
     @CurrentOrg() orgId: string,
     @Query()
     query: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
       userId?: string;
       projectId?: string;
       startDate?: string;
       endDate?: string;
+      status?: string;
       isBilled?: boolean;
     },
   ) {

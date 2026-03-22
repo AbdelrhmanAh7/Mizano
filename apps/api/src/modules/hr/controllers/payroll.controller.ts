@@ -22,7 +22,18 @@ export class PayrollController {
   @Get('runs')
   @Permissions('payroll.view')
   @ApiOperation({ summary: 'Get all payroll runs' })
-  getRuns(@CurrentOrg() orgId: string, @Query() query: { status?: string; year?: number }) {
+  getRuns(
+    @CurrentOrg() orgId: string,
+    @Query()
+    query: {
+      status?: string;
+      year?: number;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: string;
+    },
+  ) {
     return this.payrollService.getPayrollRuns(orgId, query);
   }
 
@@ -54,18 +65,18 @@ export class PayrollController {
     return this.payrollService.deletePayrollRun(orgId, id);
   }
 
-  @Get('payslips/:id')
-  @Permissions('payroll.view')
-  @ApiOperation({ summary: 'Get payslip details' })
-  getPayslip(@CurrentOrg() orgId: string, @Param('id') id: string) {
-    return this.payrollService.getPayslip(orgId, id);
-  }
-
   @Get('payslips/employee/:employeeId')
   @Permissions('payroll.view')
   @ApiOperation({ summary: 'Get employee payslips' })
   getEmployeePayslips(@CurrentOrg() orgId: string, @Param('employeeId') employeeId: string) {
     return this.payrollService.getEmployeePayslips(orgId, employeeId);
+  }
+
+  @Get('payslips/:id')
+  @Permissions('payroll.view')
+  @ApiOperation({ summary: 'Get payslip details' })
+  getPayslip(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.payrollService.getPayslip(orgId, id);
   }
 
   // Bulk Operations

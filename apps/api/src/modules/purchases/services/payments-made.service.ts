@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { PaymentMadeQueryDto } from '../dto/payment-made-query.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
@@ -87,9 +87,10 @@ export class PaymentsMadeService {
     return payment;
   }
 
-  async findAll(organizationId: string, query: PaginationDto) {
-    const { page = 1, limit = 20, sortBy = 'date', sortOrder = 'desc' } = query;
-    const where = { organizationId, deletedAt: null };
+  async findAll(organizationId: string, query: PaymentMadeQueryDto) {
+    const { page = 1, limit = 20, sortBy = 'date', sortOrder = 'desc', vendorId } = query;
+    const where: Record<string, unknown> = { organizationId, deletedAt: null };
+    if (vendorId) where.vendorId = vendorId;
     const [payments, total] = await Promise.all([
       this.prisma.paymentMade.findMany({
         where,

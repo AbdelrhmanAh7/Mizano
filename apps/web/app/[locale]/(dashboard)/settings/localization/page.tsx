@@ -25,15 +25,12 @@ const DATE_FORMATS = [
   { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY (US)' },
   { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY (International)' },
   { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD (ISO)' },
-  { value: 'DD.MM.YYYY', label: 'DD.MM.YYYY (European)' },
-  { value: 'D MMM YYYY', label: 'D MMM YYYY (e.g., 9 Feb 2026)' },
 ];
 
 const NUMBER_FORMATS = [
-  { value: '1,234.56', label: '1,234.56 (US/UK)' },
-  { value: '1.234,56', label: '1.234,56 (European)' },
-  { value: '1 234.56', label: '1 234.56 (International)' },
-  { value: '1 234,56', label: '1 234,56 (French)' },
+  { value: '1,000.00', label: '1,000.00 (US/UK)' },
+  { value: '1.000,00', label: '1.000,00 (European)' },
+  { value: '1 000,00', label: '1 000,00 (French/International)' },
 ];
 
 const TIMEZONES = [
@@ -69,7 +66,7 @@ export default function LocalizationSettingsPage() {
   const form = useForm<FormData>({
     defaultValues: {
       dateFormat: 'MM/DD/YYYY',
-      numberFormat: '1,234.56',
+      numberFormat: '1,000.00',
       timezone: 'UTC',
     },
   });
@@ -78,7 +75,7 @@ export default function LocalizationSettingsPage() {
     if (settings?.localization) {
       form.reset({
         dateFormat: settings.localization.dateFormat || 'MM/DD/YYYY',
-        numberFormat: settings.localization.numberFormat || '1,234.56',
+        numberFormat: settings.localization.numberFormat || '1,000.00',
         timezone: settings.localization.timezone || 'UTC',
       });
     }

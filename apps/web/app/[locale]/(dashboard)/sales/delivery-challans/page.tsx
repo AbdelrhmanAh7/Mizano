@@ -54,14 +54,15 @@ import {
 
 export default function DeliveryChallansPage() {
   const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
   const [search, setSearch] = useState('');
   const [importOpen, setImportOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<ChallanStatus | ''>('');
-  const [typeFilter, setTypeFilter] = useState<ChallanType | ''>('');
+  const [statusFilter, setStatusFilter] = useState<ChallanStatus | 'all'>('all');
+  const [typeFilter, setTypeFilter] = useState<ChallanType | 'all'>('all');
 
   const { data, isLoading } = useDeliveryChallans({
-    status: statusFilter || undefined,
-    challanType: typeFilter || undefined,
+    status: (statusFilter === 'all' ? undefined : statusFilter) as ChallanStatus | undefined,
+    challanType: (typeFilter === 'all' ? undefined : typeFilter) as ChallanType | undefined,
     search: search || undefined,
   });
   const deleteChallan = useDeleteDeliveryChallan();
@@ -88,7 +89,7 @@ export default function DeliveryChallansPage() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            Import
+            {t('deliveryChallans.import')}
           </Button>
           <Button asChild>
             <Link href="/sales/delivery-challans/new">
@@ -108,24 +109,24 @@ export default function DeliveryChallansPage() {
         />
         <Select
           value={statusFilter}
-          onValueChange={(v) => setStatusFilter(v as ChallanStatus | '')}
+          onValueChange={(v) => setStatusFilter(v as ChallanStatus | 'all')}
         >
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder={t('deliveryChallans.allStatus')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">{t('deliveryChallans.allStatus')}</SelectItem>
+            <SelectItem value="all">{t('deliveryChallans.allStatus')}</SelectItem>
             <SelectItem value="DRAFT">{t('deliveryChallans.status.draft')}</SelectItem>
             <SelectItem value="ISSUED">{t('deliveryChallans.status.issued')}</SelectItem>
             <SelectItem value="RETURNED">{t('deliveryChallans.status.returned')}</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as ChallanType | '')}>
+        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as ChallanType | 'all')}>
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder={t('deliveryChallans.allTypes')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">{t('deliveryChallans.allTypes')}</SelectItem>
+            <SelectItem value="all">{t('deliveryChallans.allTypes')}</SelectItem>
             <SelectItem value="SUPPLY">{t('deliveryChallans.types.supply')}</SelectItem>
             <SelectItem value="JOB_WORK">{t('deliveryChallans.types.jobWork')}</SelectItem>
             <SelectItem value="SAMPLE">{t('deliveryChallans.types.sample')}</SelectItem>
@@ -168,7 +169,9 @@ export default function DeliveryChallansPage() {
                     <TableCell>{challan.customer?.name || '-'}</TableCell>
                     <TableCell>{getChallanTypeLabel(challan.challanType)}</TableCell>
                     <TableCell>{formatDate(challan.date)}</TableCell>
-                    <TableCell>{getTotalQuantity(challan.lines)} items</TableCell>
+                    <TableCell>
+                      {t('deliveryChallans.itemsCount', { count: getTotalQuantity(challan.lines) })}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={getChallanStatusColor(challan.status)}>
                         {getChallanStatusLabel(challan.status)}
@@ -209,12 +212,12 @@ export default function DeliveryChallansPage() {
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => deleteChallan.mutate(challan.id)}
                                   className="bg-red-600 hover:bg-red-700"
                                 >
-                                  Delete
+                                  {tCommon('buttons.delete')}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>

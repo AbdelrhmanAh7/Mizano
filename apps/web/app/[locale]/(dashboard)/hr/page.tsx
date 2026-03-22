@@ -55,10 +55,8 @@ export default function HRPage() {
     : 0;
   const recentRuns = Array.isArray(payrollRuns) ? payrollRuns.slice(0, 5) : [];
 
-  // Department data
-  const departments: Array<{ department: string; _count: { id: number } }> = Array.isArray(
-    deptSummary,
-  )
+  // Department data — API returns { department, count } (already processed from Prisma groupBy)
+  const departments: Array<{ department: string; count: number }> = Array.isArray(deptSummary)
     ? deptSummary
     : [];
 
@@ -77,7 +75,7 @@ export default function HRPage() {
       icon: Clock,
       href: '/hr/attendance',
       color: 'bg-green-500',
-      stats: 'Track time',
+      stats: t('trackTime'),
     },
     {
       title: t('payroll.title'),
@@ -216,7 +214,7 @@ export default function HRPage() {
               <p className="text-sm text-muted-foreground mb-4">{module.description}</p>
               <Button asChild variant="outline" className="w-full group">
                 <Link href={module.href}>
-                  Open {module.title}
+                  {t('openModule', { title: module.title })}
                   <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>
@@ -279,7 +277,7 @@ export default function HRPage() {
                         </Link>
                         {run.employeeCount && (
                           <p className="text-xs text-muted-foreground">
-                            {run.employeeCount} employees
+                            {t('hub.employeesInDept', { count: run.employeeCount })}
                           </p>
                         )}
                       </div>
@@ -320,16 +318,16 @@ export default function HRPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {departments.map((dept: { department: string; _count: { id: number } }) => {
+                {departments.map((dept: { department: string; count: number }) => {
                   const percentage = employees.length
-                    ? Math.round((dept._count.id / employees.length) * 100)
+                    ? Math.round((dept.count / employees.length) * 100)
                     : 0;
                   return (
                     <div key={dept.department} className="space-y-1">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">{dept.department || 'Unassigned'}</span>
+                        <span className="font-medium">{dept.department || t('unassigned')}</span>
                         <span className="text-muted-foreground">
-                          {t('hub.employeesInDept', { count: dept._count.id })}
+                          {t('hub.employeesInDept', { count: dept.count })}
                         </span>
                       </div>
                       <div className="h-2 bg-muted rounded-full overflow-hidden">

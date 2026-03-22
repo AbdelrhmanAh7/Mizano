@@ -193,5 +193,19 @@
     "retrain": "Retrain",
     "generate": "Generate",
     "samples": "samples"
+  },
+  "pipelineForecast": {
+    "title": "AI Pipeline Forecast",
+    "forecastedRevenue": "Forecasted Revenue",
+    "activeDeals": "{count} active deals",
+    "confidence": "{value}% confidence",
+    "weightedPipeline": "Weighted Pipeline",
+    "confidenceRange": "Confidence Range",
+    "expectedRangeFor": "Expected range for {month}",
+    "avgDaysToClose": "Avg Days to Close",
+    "avgDealSize": "Avg deal size {amount}",
+    "avgWinRate": "Avg Win Rate",
+    "acrossAllStages": "Across all stages",
+    "stageWinRates": "Stage Win Rates"
   }
 }

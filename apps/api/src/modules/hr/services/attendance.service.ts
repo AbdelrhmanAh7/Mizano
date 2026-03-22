@@ -118,6 +118,45 @@ export class AttendanceService {
     return results;
   }
 
+  async findAll(
+    organizationId: string,
+    query: {
+      page?: number | string;
+      limit?: number | string;
+      startDate?: string;
+      endDate?: string;
+      employeeId?: string;
+      status?: string;
+    },
+  ) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+
+    const where: Prisma.AttendanceWhereInput = { organizationId };
+    if (query.employeeId) where.employeeId = query.employeeId;
+    if (query.status) where.status = query.status as AttendanceStatus;
+    if (query.startDate || query.endDate) {
+      where.date = {};
+      if (query.startDate) where.date.gte = new Date(query.startDate);
+      if (query.endDate) where.date.lte = new Date(query.endDate);
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.attendance.findMany({
+        where,
+        include: {
+          employee: { select: { id: true, name: true, employeeId: true } },
+        },
+        orderBy: { date: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.attendance.count({ where }),
+    ]);
+
+    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+  }
+
   async getAttendanceByEmployee(
     organizationId: string,
     employeeId: string,

@@ -341,10 +341,10 @@ export const inventoryMovementsApi = {
 };
 
 export const adjustmentsApi = {
-  ...crud('/adjustments', { hasCursor: false }),
+  ...crud('/inventory-adjustments', { hasCursor: false }),
   getAllCursor: (params?: Record<string, unknown>) =>
     api.get('/inventory-adjustments/cursor', { params }),
-  post: (id: string) => api.patch(`/adjustments/${id}/post`),
+  post: (id: string) => api.patch(`/inventory-adjustments/${id}/post`),
 };
 
 // ===========================================================================
@@ -561,13 +561,12 @@ export const attendanceApi = {
 };
 
 export const payrollApi = {
-  getAll: (params?: Record<string, unknown>) => api.get('/payroll', { params }),
-  getOne: (id: string) => api.get(`/payroll/${id}`),
-  run: (data: { month: number; year: number }) => api.post('/payroll/run', data),
-  confirm: (id: string) => api.post(`/payroll/${id}/confirm`),
-  markPaid: (id: string) => api.post(`/payroll/${id}/mark-paid`),
-  getPayslip: (payrollId: string, payslipId: string) =>
-    api.get(`/payroll/${payrollId}/payslips/${payslipId}`),
+  getAll: (params?: Record<string, unknown>) => api.get('/payroll/runs', { params }),
+  getOne: (id: string) => api.get(`/payroll/runs/${id}`),
+  run: (data: { month: number; year: number }) => api.post('/payroll/runs', data),
+  confirm: (id: string) => api.post(`/payroll/runs/${id}/calculate`),
+  markPaid: (id: string) => api.post(`/payroll/runs/${id}/paid`),
+  getPayslip: (_payrollId: string, payslipId: string) => api.get(`/payroll/payslips/${payslipId}`),
   bulkDelete: (ids: string[]) => api.post('/payroll/runs/bulk-delete', { ids }),
   bulkProcess: (ids: string[]) => api.post('/payroll/runs/bulk-process', { ids }),
   bulkPay: (ids: string[]) => api.post('/payroll/runs/bulk-pay', { ids }),

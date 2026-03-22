@@ -92,9 +92,7 @@ export default function PayslipDetailPage({ params }: { params: { id: string } }
                 {getPayrollStatusLabel(payslip.status)}
               </Badge>
             </div>
-            <p className="text-muted-foreground">
-              {employee.firstName} {employee.lastName}
-            </p>
+            <p className="text-muted-foreground">{employee.name}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -142,9 +140,7 @@ export default function PayslipDetailPage({ params }: { params: { id: string } }
             <div>
               <h4 className="text-sm font-medium text-muted-foreground mb-2">Employee Details</h4>
               <div className="space-y-1">
-                <p className="font-medium">
-                  {employee.firstName} {employee.lastName}
-                </p>
+                <p className="font-medium">{employee.name}</p>
                 <p className="text-sm text-muted-foreground">ID: {employee.employeeNumber}</p>
                 <p className="text-sm text-muted-foreground">{employee.jobTitle}</p>
                 <p className="text-sm text-muted-foreground">{employee.department}</p>
