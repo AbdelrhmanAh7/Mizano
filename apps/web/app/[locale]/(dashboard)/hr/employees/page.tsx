@@ -127,18 +127,18 @@ function EmployeesPageContent() {
       ),
     },
     {
-      accessorKey: 'joiningDate',
+      accessorKey: 'dateOfJoining',
       header: () => (
         <SortableHeader
           label={t('employees.table.joinedDate')}
-          columnId="joiningDate"
+          columnId="dateOfJoining"
           currentSortBy={tableParams.sortBy}
           currentSortOrder={tableParams.sortOrder}
           onSort={tableParams.setSort}
         />
       ),
       cell: ({ row }) =>
-        row.original.joiningDate ? format(new Date(row.original.joiningDate), 'MMM yyyy') : '-',
+        row.original.dateOfJoining ? format(new Date(row.original.dateOfJoining), 'MMM yyyy') : '-',
     },
     {
       accessorKey: 'basicSalary',
