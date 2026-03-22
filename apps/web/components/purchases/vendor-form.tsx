@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { CountrySelect } from '@/components/ui/country-select';
+import { CitySelect } from '@/components/ui/city-select';
 import {
   Select,
   SelectContent,
@@ -41,7 +44,7 @@ type VendorFormData = z.infer<typeof vendorSchema>;
 
 interface VendorFormProps {
   vendor?: Vendor | null;
-  onSubmit: (data: VendorFormData) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -63,12 +66,7 @@ const paymentTermsOptions = [
   { value: 60, label: 'Net 60' },
 ];
 
-export function VendorForm({
-  vendor,
-  onSubmit,
-  onCancel,
-  isSubmitting,
-}: VendorFormProps) {
+export function VendorForm({ vendor, onSubmit, onCancel, isSubmitting }: VendorFormProps) {
   const isEditing = !!vendor;
 
   const form = useForm<VendorFormData>({
@@ -128,7 +126,7 @@ export function VendorForm({
       billingPostalCode: data.billingAddress?.postalCode || null,
       billingCountry: data.billingAddress?.country || null,
     };
-    onSubmit(submitData as any);
+    onSubmit(submitData as Record<string, unknown>);
   };
 
   return (
@@ -142,15 +140,9 @@ export function VendorForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Vendor Name *</Label>
-              <Input
-                id="name"
-                placeholder="Enter vendor name"
-                {...form.register('name')}
-              />
+              <Input id="name" placeholder="Enter vendor name" {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.name.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
 
@@ -174,18 +166,16 @@ export function VendorForm({
                 {...form.register('email')}
               />
               {form.formState.errors.email && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.email.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.email.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
-              <Input
+              <PhoneInput
                 id="phone"
-                placeholder="+1 234 567 8900"
-                {...form.register('phone')}
+                value={form.watch('phone') || ''}
+                onChange={(val) => form.setValue('phone', val)}
               />
             </div>
           </div>
@@ -231,11 +221,7 @@ export function VendorForm({
 
             <div className="space-y-2">
               <Label htmlFor="taxId">Tax ID</Label>
-              <Input
-                id="taxId"
-                placeholder="Tax ID / VAT Number"
-                {...form.register('taxId')}
-              />
+              <Input id="taxId" placeholder="Tax ID / VAT Number" {...form.register('taxId')} />
             </div>
           </div>
         </CardContent>
@@ -259,14 +245,29 @@ export function VendorForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="billingCity">City</Label>
-              <Input
-                id="billingCity"
-                placeholder="City"
-                {...form.register('billingAddress.city')}
+              <Label htmlFor="billingCountry">Country</Label>
+              <CountrySelect
+                id="billingCountry"
+                value={form.watch('billingAddress.country') || ''}
+                onValueChange={(val) => {
+                  form.setValue('billingAddress.country', val);
+                  form.setValue('billingAddress.city', '');
+                }}
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="billingCity">City</Label>
+              <CitySelect
+                id="billingCity"
+                value={form.watch('billingAddress.city') || ''}
+                onValueChange={(val) => form.setValue('billingAddress.city', val)}
+                country={form.watch('billingAddress.country') || ''}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="billingState">State/Province</Label>
               <Input
@@ -275,24 +276,13 @@ export function VendorForm({
                 {...form.register('billingAddress.state')}
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="billingPostalCode">Zip/Postal Code</Label>
               <Input
                 id="billingPostalCode"
                 placeholder="Postal code"
                 {...form.register('billingAddress.postalCode')}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="billingCountry">Country</Label>
-              <Input
-                id="billingCountry"
-                placeholder="Country"
-                {...form.register('billingAddress.country')}
               />
             </div>
           </div>
@@ -305,11 +295,7 @@ export function VendorForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? 'Saving...'
-            : isEditing
-            ? 'Update Vendor'
-            : 'Create Vendor'}
+          {isSubmitting ? 'Saving...' : isEditing ? 'Update Vendor' : 'Create Vendor'}
         </Button>
       </div>
     </form>

@@ -1,10 +1,13 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { expensesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { expensesApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export interface Expense {
   id: string;
   date: string;
@@ -84,6 +87,20 @@ export function useExpenses(params?: ExpenseParams) {
 }
 
 /**
+ * Hook to fetch all expenses with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteExpenses(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Expense, Record<string, unknown>>({
+    queryKey: ['expenses'],
+    fetchFn: async (p) => {
+      const response = await expensesApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
+  });
+}
+
+/**
  * Hook to fetch a single expense by ID
  */
 export function useExpense(id: string | undefined) {
@@ -117,7 +134,7 @@ export function useCreateExpense() {
         description: 'The expense has been recorded successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error recording expense',
@@ -147,7 +164,7 @@ export function useUpdateExpense() {
         description: 'The expense has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating expense',
@@ -176,7 +193,7 @@ export function useDeleteExpense() {
         description: 'The expense has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting expense',

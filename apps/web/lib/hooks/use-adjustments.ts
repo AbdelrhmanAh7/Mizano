@@ -1,8 +1,11 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { adjustmentsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+type ApiError = { response?: { data?: { message?: string } } };
 
 // Types
 export type AdjustmentType = 'INCREASE' | 'DECREASE';
@@ -67,15 +70,6 @@ export interface CreateAdjustmentData {
   }>;
 }
 
-// Adjustments API
-const adjustmentsApi = {
-  getAll: (params?: Record<string, any>) => api.get('/adjustments', { params }),
-  getOne: (id: string) => api.get(`/adjustments/${id}`),
-  create: (data: any) => api.post('/adjustments', data),
-  post: (id: string) => api.patch(`/adjustments/${id}/post`),
-  delete: (id: string) => api.delete(`/adjustments/${id}`),
-};
-
 /**
  * Hook to fetch all adjustments
  */
@@ -86,6 +80,20 @@ export function useAdjustments(params?: AdjustmentParams) {
       const response = await adjustmentsApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all adjustments with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteAdjustments(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Adjustment, Record<string, unknown>>({
+    queryKey: ['adjustments'],
+    fetchFn: async (p) => {
+      const response = await adjustmentsApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 
@@ -125,7 +133,7 @@ export function useCreateAdjustment() {
         description: 'The inventory adjustment has been created.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating adjustment',
@@ -156,7 +164,7 @@ export function usePostAdjustment() {
         description: 'The inventory adjustment has been posted and stock levels updated.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error posting adjustment',
@@ -185,7 +193,7 @@ export function useDeleteAdjustment() {
         description: 'The inventory adjustment has been deleted.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting adjustment',
@@ -235,6 +243,13 @@ export function getReasonText(reason: AdjustmentReason): string {
     OTHER: 'Other',
   };
   return reasons[reason] || reason;
+}
+
+// Alias functions for backward compatibility
+export const getReasonLabel = getReasonText;
+export const getAdjustmentStatusLabel = getStatusText;
+export function getAdjustmentStatusColor(status: AdjustmentStatus): string {
+  return status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
 }
 
 /**

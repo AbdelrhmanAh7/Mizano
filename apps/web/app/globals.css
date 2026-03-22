@@ -59,17 +59,17 @@
 }
 
 /* RTL Support */
-[dir="rtl"] {
-  font-feature-settings: "calt" 1;
+[dir='rtl'] {
+  font-feature-settings: 'calt' 1;
 }
 
 /* Icons that should flip in RTL mode */
-[dir="rtl"] .icon-flip {
+[dir='rtl'] .icon-flip {
   transform: scaleX(-1);
 }
 
 /* RTL-specific sidebar border adjustment */
-[dir="rtl"] .sidebar-border {
+[dir='rtl'] .sidebar-border {
   border-right: none;
   border-left: 1px solid hsl(var(--border));
 }

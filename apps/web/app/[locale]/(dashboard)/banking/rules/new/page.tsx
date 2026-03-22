@@ -9,9 +9,11 @@ import { BankRuleForm } from '@/components/banking/bank-rule-form';
 import { useCreateBankRule } from '@/lib/hooks/use-bank-rules';
 import { useQuery } from '@tanstack/react-query';
 import { accountsApi, customersApi, vendorsApi } from '@/lib/api';
+import { useTranslations } from 'next-intl';
 
 export default function NewBankRulePage() {
   const router = useRouter();
+  const t = useTranslations('banking');
   const createBankRule = useCreateBankRule();
 
   // Fetch accounts
@@ -47,7 +49,7 @@ export default function NewBankRulePage() {
 
   const isLoading = accountsLoading || vendorsLoading || customersLoading;
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createBankRule.mutateAsync(data);
       router.push('/banking/rules');
@@ -75,10 +77,8 @@ export default function NewBankRulePage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Bank Rule</h1>
-          <p className="text-muted-foreground">
-            Create a rule to automate transaction categorization
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('rules.newRuleTitle')}</h1>
+          <p className="text-muted-foreground">{t('rules.newRuleDescription')}</p>
         </div>
       </div>
 

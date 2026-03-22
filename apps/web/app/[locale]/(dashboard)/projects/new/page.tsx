@@ -9,8 +9,10 @@ import { ProjectForm } from '@/components/projects/project-form';
 import { useCreateProject } from '@/lib/hooks/use-projects';
 import { useQuery } from '@tanstack/react-query';
 import { customersApi } from '@/lib/api';
+import { useTranslations } from 'next-intl';
 
 export default function NewProjectPage() {
+  const t = useTranslations('projects');
   const router = useRouter();
   const createProject = useCreateProject();
 
@@ -25,7 +27,7 @@ export default function NewProjectPage() {
 
   const customers = customersData?.data || [];
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await createProject.mutateAsync(data);
       router.push('/projects');
@@ -53,10 +55,8 @@ export default function NewProjectPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Project</h1>
-          <p className="text-muted-foreground">
-            Create a new project to track tasks and time
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('projects.newProject')}</h1>
+          <p className="text-muted-foreground">Create a new project to track tasks and time</p>
         </div>
       </div>
 

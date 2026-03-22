@@ -1,10 +1,13 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { vendorCreditsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { vendorCreditsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type VendorCreditStatus = 'OPEN' | 'APPLIED' | 'REFUNDED';
 export type VendorCreditType = 'CREDIT' | 'REFUND';
 
@@ -35,18 +38,16 @@ export interface VendorCredit {
   creditNumber: string;
   vendorId: string;
   billId: string | null;
+  appliedToBillId?: string | null;
   date: string;
-  type: VendorCreditType;
-  status: VendorCreditStatus;
-  subtotal: string;
-  taxAmount: string;
-  total: string;
-  balanceRemaining: string;
+  /** Actual Prisma field — use this for Total/Balance rendering */
+  amount: string;
+  refundedAt?: string | null;
   reason: string | null;
-  notes: string | null;
   organizationId: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
   vendor?: {
     id: string;
     name: string;
@@ -101,6 +102,20 @@ export function useVendorCredits(params?: VendorCreditParams) {
 }
 
 /**
+ * Hook to fetch all vendor credits with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteVendorCredits(params?: Record<string, unknown>) {
+  return useInfiniteTableData<VendorCredit, Record<string, unknown>>({
+    queryKey: ['vendor-credits'],
+    fetchFn: async (p) => {
+      const response = await vendorCreditsApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
+  });
+}
+
+/**
  * Hook to fetch a single vendor credit by ID
  */
 export function useVendorCredit(id: string | undefined) {
@@ -135,7 +150,7 @@ export function useCreateVendorCredit() {
         description: 'The vendor credit has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating vendor credit',
@@ -166,7 +181,7 @@ export function useApplyVendorCredit() {
         description: 'The vendor credit has been applied to the bill.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error applying credit',
@@ -196,7 +211,7 @@ export function useRefundVendorCredit() {
         description: 'The vendor credit has been refunded.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error processing refund',
@@ -253,12 +268,20 @@ export function getTypeText(type: VendorCreditType): string {
 }
 
 /**
- * Format currency amount
+ * Format currency amount — null/undefined/NaN-safe
  */
-export function formatCurrency(amount: string | number, currency: string = 'USD'): string {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+export function formatCurrency(
+  amount: string | number | null | undefined,
+  currency: string = 'USD',
+): string {
+  const num =
+    amount === null || amount === undefined
+      ? 0
+      : typeof amount === 'string'
+        ? parseFloat(amount)
+        : amount;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-  }).format(num);
+  }).format(isNaN(num) ? 0 : num);
 }

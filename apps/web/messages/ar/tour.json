@@ -1,0 +1,35 @@
+{
+  "common": {
+    "next": "التالي",
+    "previous": "السابق",
+    "done": "إنهاء",
+    "skip": "تخطي الجولة",
+    "progress": "{{current}} من {{total}}"
+  },
+  "header": {
+    "startTour": "بدء الجولة",
+    "helpTooltip": "احصل على مساعدة في هذه الصفحة"
+  },
+  "tours": {
+    "dashboard": {
+      "title": "نظرة عامة على لوحة التحكم",
+      "description": "تعرف على لوحة التحكم المالية الخاصة بك"
+    },
+    "salesInvoices": {
+      "title": "فواتير المبيعات",
+      "description": "تعلم كيفية إنشاء وإدارة الفواتير"
+    },
+    "salesCustomers": {
+      "title": "إدارة العملاء",
+      "description": "إدارة قاعدة بيانات العملاء الخاصة بك"
+    },
+    "inventoryItems": {
+      "title": "عناصر المخزون",
+      "description": "تنظيم وتتبع المخزون الخاص بك"
+    },
+    "accountingJournals": {
+      "title": "القيود اليومية",
+      "description": "تسجيل وإدارة المعاملات المالية"
+    }
+  }
+}

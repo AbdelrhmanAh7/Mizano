@@ -28,6 +28,19 @@
       "cost": "Cost",
       "itemCount": "Items"
     },
+    "produces": "Produces: {code} - {name}",
+    "perProductionRun": "per production run",
+    "rawMaterials": "raw materials",
+    "components": "Components (Raw Materials)",
+    "noComponents": "No components defined",
+    "relatedWorkOrders": "Related Work Orders",
+    "noWorkOrders": "No work orders for this BOM yet.",
+    "createWorkOrder": "Create Work Order",
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "inactive": "Inactive"
+    },
     "empty": {
       "title": "No BOMs yet",
       "description": "Create your first bill of materials"
@@ -45,6 +58,7 @@
       "bomPlaceholder": "Select BOM",
       "quantity": "Quantity",
       "plannedStartDate": "Planned Start Date",
+      "plannedEndDate": "Planned End Date",
       "notes": "Notes",
       "notesPlaceholder": "Enter notes"
     },
@@ -60,6 +74,15 @@
       "quantity": "Quantity",
       "plannedStart": "Planned Start",
       "status": "Status"
+    },
+    "searchPlaceholder": "Search by WO number or BOM...",
+    "filterByStatus": "Filter by status",
+    "allStatuses": "All Statuses",
+    "bulkActions": {
+      "start": "Start",
+      "complete": "Complete",
+      "cancel": "Cancel",
+      "delete": "Delete"
     },
     "empty": {
       "title": "No work orders yet",

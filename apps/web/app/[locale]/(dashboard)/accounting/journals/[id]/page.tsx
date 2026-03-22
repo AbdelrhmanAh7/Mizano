@@ -37,8 +37,10 @@ import {
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { format } from 'date-fns';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 export default function JournalDetailPage() {
+  const t = useTranslations('accounting');
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -105,7 +107,7 @@ export default function JournalDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/accounting/journals">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -130,7 +132,7 @@ export default function JournalDetailPage() {
 
   const lines = journal.lines || [];
   const totals = calculateJournalTotals(
-    lines.map((l) => ({ debit: l.debit || '0', credit: l.credit || '0' }))
+    lines.map((l) => ({ debit: l.debit || '0', credit: l.credit || '0' })),
   );
 
   return (
@@ -138,19 +140,15 @@ export default function JournalDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/accounting/journals">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
-                {journal.journalNumber}
-              </h1>
-              <Badge className={getStatusColor(journal.status)}>
-                {journal.status}
-              </Badge>
+              <h1 className="text-3xl font-bold tracking-tight">{journal.journalNumber}</h1>
+              <Badge className={getStatusColor(journal.status)}>{journal.status}</Badge>
             </div>
             <p className="text-muted-foreground">
               {format(new Date(journal.entryDate), 'MMMM d, yyyy')}
@@ -163,7 +161,7 @@ export default function JournalDetailPage() {
               <Button variant="outline" asChild>
                 <Link href={`/accounting/journals/${journalId}/edit`}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  {t('journals.editJournal')}
                 </Link>
               </Button>
               <Button onClick={handlePost}>
@@ -173,12 +171,9 @@ export default function JournalDetailPage() {
             </>
           )}
           {canDelete && journal.status === 'DRAFT' && (
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
+            <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              {t('journals.deleteJournal')}
             </Button>
           )}
         </div>
@@ -187,36 +182,34 @@ export default function JournalDetailPage() {
       {/* Journal Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Journal Details</CardTitle>
+          <CardTitle>{t('journals.journalDetails')}</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <dt className="text-sm font-medium text-muted-foreground">
-                Journal Number
+                {t('journals.table.journalNumber')}
               </dt>
               <dd className="text-lg font-semibold">{journal.journalNumber}</dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-muted-foreground">
-                Entry Date
+                {t('journals.form.date')}
               </dt>
-              <dd className="text-lg">
-                {format(new Date(journal.entryDate), 'MMMM d, yyyy')}
-              </dd>
+              <dd className="text-lg">{format(new Date(journal.entryDate), 'MMMM d, yyyy')}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Status</dt>
+              <dt className="text-sm font-medium text-muted-foreground">
+                {t('recurring.table.status')}
+              </dt>
               <dd>
-                <Badge className={getStatusColor(journal.status)}>
-                  {journal.status}
-                </Badge>
+                <Badge className={getStatusColor(journal.status)}>{journal.status}</Badge>
               </dd>
             </div>
             {journal.description && (
               <div className="col-span-full">
                 <dt className="text-sm font-medium text-muted-foreground">
-                  Description
+                  {t('journals.form.description')}
                 </dt>
                 <dd className="text-lg">{journal.description}</dd>
               </div>
@@ -224,7 +217,7 @@ export default function JournalDetailPage() {
             {journal.reference && (
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">
-                  Reference
+                  {t('journals.form.reference')}
                 </dt>
                 <dd className="text-lg">{journal.reference}</dd>
               </div>
@@ -236,16 +229,16 @@ export default function JournalDetailPage() {
       {/* Journal Lines */}
       <Card>
         <CardHeader>
-          <CardTitle>Journal Lines</CardTitle>
+          <CardTitle>{t('journals.form.lines')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Account</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Debit</TableHead>
-                <TableHead className="text-right">Credit</TableHead>
+                <TableHead>{t('journals.form.account')}</TableHead>
+                <TableHead>{t('journals.form.description')}</TableHead>
+                <TableHead className="text-right">{t('journals.form.debit')}</TableHead>
+                <TableHead className="text-right">{t('journals.form.credit')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -290,18 +283,14 @@ export default function JournalDetailPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Journal</AlertDialogTitle>
+            <AlertDialogTitle>{t('journals.deleteJournal')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this journal entry? This action
-              cannot be undone.
+              Are you sure you want to delete this journal entry? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

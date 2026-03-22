@@ -1,12 +1,15 @@
 import { Module } from '@nestjs/common';
-import { FinancialReportsService } from './services/financial-reports.service';
+import { CacheModule } from '../../cache/cache.module';
+import { PrismaModule } from '../../prisma/prisma.module';
+import { DocumentsModule } from '../documents/documents.module';
+import { AiModule } from '../ai/ai.module';
+import { ReportsController } from './controllers/reports.controller';
 import { AgingReportsService } from './services/aging-reports.service';
 import { DashboardService } from './services/dashboard.service';
-import { ReportsController } from './controllers/reports.controller';
-import { PrismaModule } from '../../prisma/prisma.module';
+import { FinancialReportsService } from './services/financial-reports.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, DocumentsModule, CacheModule, AiModule],
   controllers: [ReportsController],
   providers: [FinancialReportsService, AgingReportsService, DashboardService],
   exports: [FinancialReportsService, AgingReportsService, DashboardService],

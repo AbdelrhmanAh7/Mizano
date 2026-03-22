@@ -1,13 +1,23 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { BomService } from '../services/bom.service';
+import { BomService, CreateBomData, UpdateBomData } from '../services/bom.service';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 
 @ApiTags('Bill of Materials')
 @ApiBearerAuth()
-@Controller('bom')
+@Controller('manufacturing/bom')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class BomController {
   constructor(private readonly bomService: BomService) {}
@@ -15,14 +25,25 @@ export class BomController {
   @Post()
   @Permissions('manufacturing.create')
   @ApiOperation({ summary: 'Create a new BOM' })
-  create(@CurrentOrg() orgId: string, @Body() dto: any) {
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateBomData) {
     return this.bomService.create(orgId, dto);
   }
 
   @Get()
   @Permissions('manufacturing.view')
   @ApiOperation({ summary: 'Get all BOMs' })
-  findAll(@CurrentOrg() orgId: string, @Query() query: { itemId?: string; isActive?: boolean }) {
+  findAll(
+    @CurrentOrg() orgId: string,
+    @Query()
+    query: {
+      page?: number | string;
+      limit?: number | string;
+      sortBy?: string;
+      sortOrder?: string;
+      itemId?: string;
+      isActive?: boolean;
+    },
+  ) {
     return this.bomService.findAll(orgId, query);
   }
 
@@ -33,10 +54,10 @@ export class BomController {
     return this.bomService.findOne(orgId, id);
   }
 
-  @Put(':id')
+  @Patch(':id')
   @Permissions('manufacturing.edit')
   @ApiOperation({ summary: 'Update BOM' })
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateBomData) {
     return this.bomService.update(orgId, id, dto);
   }
 
@@ -50,7 +71,11 @@ export class BomController {
   @Get(':id/requirements')
   @Permissions('manufacturing.view')
   @ApiOperation({ summary: 'Calculate material requirements' })
-  calculateRequirements(@CurrentOrg() orgId: string, @Param('id') id: string, @Query('quantity') quantity: string) {
+  calculateRequirements(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Query('quantity') quantity: string,
+  ) {
     return this.bomService.calculateMaterialRequirements(orgId, id, parseFloat(quantity || '1'));
   }
 

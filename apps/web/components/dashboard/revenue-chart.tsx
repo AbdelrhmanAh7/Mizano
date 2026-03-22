@@ -1,5 +1,7 @@
 'use client';
 
+import { memo } from 'react';
+import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AreaChart,
@@ -17,19 +19,21 @@ interface RevenueChartProps {
   currency?: string;
 }
 
-export function RevenueChart({ data, currency = 'USD' }: RevenueChartProps) {
+export const RevenueChart = memo(function RevenueChart({
+  data,
+  currency = 'USD',
+}: RevenueChartProps) {
+  const t = useTranslations('common.dashboard.charts');
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Revenue Trend</CardTitle>
+        <CardTitle className="text-lg">{t('revenueTrend')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={data}
-              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-            >
+            <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
@@ -60,7 +64,7 @@ export function RevenueChart({ data, currency = 'USD' }: RevenueChartProps) {
               <Area
                 type="monotone"
                 dataKey="revenue"
-                name="Revenue"
+                name={t('revenue')}
                 stroke="#22c55e"
                 strokeWidth={2}
                 fill="url(#revenueGradient)"
@@ -71,4 +75,4 @@ export function RevenueChart({ data, currency = 'USD' }: RevenueChartProps) {
       </CardContent>
     </Card>
   );
-}
+});

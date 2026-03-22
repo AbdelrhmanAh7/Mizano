@@ -14,12 +14,12 @@ export interface Project {
     id: string;
     name: string;
   };
-  billingMethod: 'FIXED' | 'PROJECT_HOURLY' | 'TASK_HOURLY' | 'STAFF_HOURLY';
+  billingMethod: 'FIXED' | 'HOURLY' | 'PROJECT_HOURLY' | 'TASK_HOURLY' | 'STAFF_HOURLY';
   budgetType: 'COST' | 'HOURS';
-  budgetAmount: string | number;
+  budgetAmount: string | number | null;
   hourlyRate: string | number | null;
-  status: 'ACTIVE' | 'COMPLETED' | 'ON_HOLD' | 'CANCELLED';
-  startDate: string;
+  status: 'PLANNING' | 'ACTIVE' | 'IN_PROGRESS' | 'COMPLETED' | 'ON_HOLD' | 'CANCELLED';
+  startDate: string | null;
   endDate: string | null;
   totalHours: number;
   totalBilled: string | number;
@@ -39,7 +39,7 @@ export interface Task {
   isBillable: boolean;
   estimatedHours: number | null;
   actualHours: number;
-  status: 'TODO' | 'IN_PROGRESS' | 'COMPLETED';
+  status: 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE';
   assigneeId: string | null;
   assignee?: {
     id: string;
@@ -81,6 +81,11 @@ export interface ProjectFilters {
 }
 
 export interface TimesheetFilters {
+  page?: number;
+  limit?: number;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
   projectId?: string;
   employeeId?: string;
   status?: 'UNBILLED' | 'INVOICED';
@@ -88,34 +93,39 @@ export interface TimesheetFilters {
   dateTo?: string;
 }
 
+// Error type for API responses
+type ApiError = { response?: { data?: { message?: string } } };
+
 // API functions
 const projectsApi = {
   getAll: (params?: ProjectFilters) => api.get('/projects', { params }),
   getOne: (id: string) => api.get(`/projects/${id}`),
-  create: (data: any) => api.post('/projects', data),
-  update: (id: string, data: any) => api.patch(`/projects/${id}`, data),
+  create: (data: Record<string, unknown>) => api.post('/projects', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/projects/${id}`, data),
   delete: (id: string) => api.delete(`/projects/${id}`),
   getProfitability: (id: string) => api.get(`/projects/${id}/profitability`),
-  createInvoice: (id: string, data: any) => api.post(`/projects/${id}/create-invoice`, data),
+  createInvoice: (id: string, data: Record<string, unknown>) =>
+    api.post(`/projects/${id}/invoice`, data),
+  getSummary: () => api.get('/projects/summary'),
 };
 
 const tasksApi = {
-  getAll: (projectId: string) => api.get(`/projects/${projectId}/tasks`),
-  create: (projectId: string, data: any) => api.post(`/projects/${projectId}/tasks`, data),
-  update: (projectId: string, taskId: string, data: any) =>
-    api.patch(`/projects/${projectId}/tasks/${taskId}`, data),
-  delete: (projectId: string, taskId: string) =>
-    api.delete(`/projects/${projectId}/tasks/${taskId}`),
+  getAll: (projectId: string) => api.get(`/tasks/project/${projectId}`),
+  getMyTasks: () => api.get('/tasks/my-tasks'),
+  create: (data: Record<string, unknown>) => api.post('/tasks', data),
+  update: (taskId: string, data: Record<string, unknown>) => api.put(`/tasks/${taskId}`, data),
+  delete: (taskId: string) => api.delete(`/tasks/${taskId}`),
 };
 
 const timesheetsApi = {
   getAll: (params?: TimesheetFilters) => api.get('/timesheets', { params }),
-  create: (data: any) => api.post('/timesheets', data),
-  update: (id: string, data: any) => api.patch(`/timesheets/${id}`, data),
+  create: (data: Record<string, unknown>) => api.post('/timesheets', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/timesheets/${id}`, data),
   delete: (id: string) => api.delete(`/timesheets/${id}`),
-  startTimer: (taskId: string) => api.post('/timesheets/timer/start', { taskId }),
-  stopTimer: () => api.post('/timesheets/timer/stop'),
-  getActiveTimer: () => api.get('/timesheets/timer/active'),
+  startTimer: (data: { projectId: string; taskId?: string; description?: string }) =>
+    api.post('/timesheets/timer/start', data),
+  stopTimer: (id: string) => api.post(`/timesheets/timer/stop/${id}`),
+  getActiveTimer: () => api.get('/timesheets/timer/running'),
 };
 
 // Project Hooks
@@ -160,7 +170,7 @@ export function useCreateProject() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Project created successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create project');
     },
   });
@@ -170,12 +180,13 @@ export function useUpdateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => projectsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      projectsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Project updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to update project');
     },
   });
@@ -190,7 +201,7 @@ export function useDeleteProject() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Project deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to delete project');
     },
   });
@@ -200,14 +211,25 @@ export function useCreateProjectInvoice() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => projectsApi.createInvoice(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      projectsApi.createInvoice(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success('Invoice created from project');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create invoice');
+    },
+  });
+}
+
+export function useProjectSummary() {
+  return useQuery({
+    queryKey: ['projects', 'summary'],
+    queryFn: async () => {
+      const response = await projectsApi.getSummary();
+      return response.data?.data || response.data;
     },
   });
 }
@@ -228,14 +250,14 @@ export function useCreateTask() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ projectId, data }: { projectId: string; data: any }) =>
-      tasksApi.create(projectId, data),
+    mutationFn: ({ projectId, data }: { projectId: string; data: Record<string, unknown> }) =>
+      tasksApi.create({ ...data, projectId }),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
       toast.success('Task created successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create task');
     },
   });
@@ -245,14 +267,21 @@ export function useUpdateTask() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ projectId, taskId, data }: { projectId: string; taskId: string; data: any }) =>
-      tasksApi.update(projectId, taskId, data),
+    mutationFn: ({
+      taskId,
+      data,
+    }: {
+      projectId: string;
+      taskId: string;
+      data: Record<string, unknown>;
+    }) => tasksApi.update(taskId, data),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', 'my-tasks'] });
       toast.success('Task updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to update task');
     },
   });
@@ -262,15 +291,25 @@ export function useDeleteTask() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ projectId, taskId }: { projectId: string; taskId: string }) =>
-      tasksApi.delete(projectId, taskId),
+    mutationFn: ({ taskId }: { projectId: string; taskId: string }) => tasksApi.delete(taskId),
     onSuccess: (_, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'tasks'] });
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', 'my-tasks'] });
       toast.success('Task deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to delete task');
+    },
+  });
+}
+
+export function useMyTasks() {
+  return useQuery({
+    queryKey: ['tasks', 'my-tasks'],
+    queryFn: async () => {
+      const response = await tasksApi.getMyTasks();
+      return response.data?.data || response.data;
     },
   });
 }
@@ -296,7 +335,7 @@ export function useCreateTimesheet() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Time entry created successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create time entry');
     },
   });
@@ -312,7 +351,7 @@ export function useDeleteTimesheet() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Time entry deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to delete time entry');
     },
   });
@@ -338,7 +377,7 @@ export function useStartTimer() {
       queryClient.invalidateQueries({ queryKey: ['timesheets', 'timer'] });
       toast.success('Timer started');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to start timer');
     },
   });
@@ -354,7 +393,7 @@ export function useStopTimer() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Timer stopped and time entry created');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to stop timer');
     },
   });
@@ -363,13 +402,16 @@ export function useStopTimer() {
 // Helper functions
 export const billingMethodOptions = [
   { value: 'FIXED', label: 'Fixed Price', description: 'Bill a fixed amount for the project' },
+  { value: 'HOURLY', label: 'Hourly', description: 'Bill hours at a set rate' },
   { value: 'PROJECT_HOURLY', label: 'Project Hourly', description: 'Bill hours at project rate' },
   { value: 'TASK_HOURLY', label: 'Task Hourly', description: 'Bill hours at task-specific rates' },
   { value: 'STAFF_HOURLY', label: 'Staff Hourly', description: 'Bill hours at staff rates' },
 ];
 
 export const projectStatusOptions = [
+  { value: 'PLANNING', label: 'Planning' },
   { value: 'ACTIVE', label: 'Active' },
+  { value: 'IN_PROGRESS', label: 'In Progress' },
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'ON_HOLD', label: 'On Hold' },
   { value: 'CANCELLED', label: 'Cancelled' },
@@ -378,7 +420,8 @@ export const projectStatusOptions = [
 export const taskStatusOptions = [
   { value: 'TODO', label: 'To Do' },
   { value: 'IN_PROGRESS', label: 'In Progress' },
-  { value: 'COMPLETED', label: 'Completed' },
+  { value: 'REVIEW', label: 'In Review' },
+  { value: 'DONE', label: 'Done' },
 ];
 
 export function getBillingMethodLabel(method: BillingMethod): string {
@@ -391,8 +434,10 @@ export function getProjectStatusLabel(status: ProjectStatus): string {
 
 export function getProjectStatusColor(status: ProjectStatus): string {
   const colors: Record<ProjectStatus, string> = {
+    PLANNING: 'bg-purple-100 text-purple-800',
     ACTIVE: 'bg-green-100 text-green-800',
-    COMPLETED: 'bg-blue-100 text-blue-800',
+    IN_PROGRESS: 'bg-blue-100 text-blue-800',
+    COMPLETED: 'bg-sky-100 text-sky-800',
     ON_HOLD: 'bg-yellow-100 text-yellow-800',
     CANCELLED: 'bg-gray-100 text-gray-800',
   };
@@ -407,7 +452,8 @@ export function getTaskStatusColor(status: TaskStatus): string {
   const colors: Record<TaskStatus, string> = {
     TODO: 'bg-gray-100 text-gray-800',
     IN_PROGRESS: 'bg-blue-100 text-blue-800',
-    COMPLETED: 'bg-green-100 text-green-800',
+    REVIEW: 'bg-yellow-100 text-yellow-800',
+    DONE: 'bg-green-100 text-green-800',
   };
   return colors[status] || colors.TODO;
 }

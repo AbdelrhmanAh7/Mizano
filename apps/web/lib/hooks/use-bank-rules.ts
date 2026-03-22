@@ -1,8 +1,10 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { bankRulesApi } from '@/lib/api';
 import { toast } from 'sonner';
+
+type ApiError = { response?: { data?: { message?: string } } };
 
 export interface BankRule {
   id: string;
@@ -37,17 +39,6 @@ export interface BankRuleFilters {
   isActive?: boolean;
 }
 
-// API functions
-const bankRulesApi = {
-  getAll: (params?: BankRuleFilters) => api.get('/bank-rules', { params }),
-  getOne: (id: string) => api.get(`/bank-rules/${id}`),
-  create: (data: any) => api.post('/bank-rules', data),
-  update: (id: string, data: any) => api.patch(`/bank-rules/${id}`, data),
-  delete: (id: string) => api.delete(`/bank-rules/${id}`),
-  test: (data: any) => api.post('/bank-rules/test', data),
-  reorder: (ids: string[]) => api.post('/bank-rules/reorder', { ids }),
-};
-
 // Hooks
 export function useBankRules(params?: BankRuleFilters) {
   return useQuery({
@@ -79,7 +70,7 @@ export function useCreateBankRule() {
       queryClient.invalidateQueries({ queryKey: ['bank-rules'] });
       toast.success('Bank rule created successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create bank rule');
     },
   });
@@ -89,13 +80,13 @@ export function useUpdateBankRule() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
       bankRulesApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-rules'] });
       toast.success('Bank rule updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to update bank rule');
     },
   });
@@ -110,7 +101,7 @@ export function useDeleteBankRule() {
       queryClient.invalidateQueries({ queryKey: ['bank-rules'] });
       toast.success('Bank rule deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to delete bank rule');
     },
   });
@@ -119,7 +110,7 @@ export function useDeleteBankRule() {
 export function useTestBankRule() {
   return useMutation({
     mutationFn: bankRulesApi.test,
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to test bank rule');
     },
   });
@@ -134,7 +125,7 @@ export function useReorderBankRules() {
       queryClient.invalidateQueries({ queryKey: ['bank-rules'] });
       toast.success('Rules reordered successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to reorder rules');
     },
   });

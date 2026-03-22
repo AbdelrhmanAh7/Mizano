@@ -6,13 +6,15 @@
     "quotes": "Quotes",
     "invoices": "Invoices",
     "creditNotes": "Credit Notes",
-    "payments": "Payments"
+    "payments": "Payments",
+    "deliveryChallans": "Delivery Challans"
   },
   "purchases": {
     "title": "Purchases",
     "vendors": "Vendors",
     "expenses": "Expenses",
     "bills": "Bills",
+    "scanBill": "Scan Bill",
     "payments": "Payments",
     "credits": "Credits"
   },
@@ -20,7 +22,9 @@
     "title": "Accounting",
     "chartOfAccounts": "Chart of Accounts",
     "journalEntries": "Journal Entries",
-    "recurring": "Recurring"
+    "recurring": "Recurring",
+    "trialBalance": "Trial Balance",
+    "generalLedger": "General Ledger"
   },
   "inventory": {
     "title": "Inventory",
@@ -32,11 +36,27 @@
     },
     "adjustments": {
       "title": "Adjustments"
+    },
+    "transfers": {
+      "title": "Transfers"
+    },
+    "priceLists": {
+      "title": "Price Lists"
+    },
+    "compositeItems": {
+      "title": "Composite Items"
+    },
+    "movements": {
+      "title": "Movements"
     }
   },
   "banking": {
+    "title": "Banking",
     "accounts": {
       "title": "Bank Accounts"
+    },
+    "transactions": {
+      "title": "Transactions"
     },
     "reconciliation": {
       "title": "Reconciliation"
@@ -50,6 +70,7 @@
     "projects": {
       "title": "All Projects"
     },
+    "myTasks": "My Tasks",
     "timesheets": {
       "title": "Timesheets"
     }
@@ -60,6 +81,7 @@
     "workOrders": "Work Orders"
   },
   "hr": {
+    "title": "HR",
     "employees": {
       "title": "Employees"
     },
@@ -70,9 +92,22 @@
       "title": "Payroll"
     }
   },
-  "crm": "CRM",
+  "tax": {
+    "title": "Tax",
+    "rates": "Tax Rates",
+    "vatReturns": "VAT Returns",
+    "payments": "Payments"
+  },
+  "crm": {
+    "title": "CRM",
+    "leads": "Leads",
+    "deals": "Deals"
+  },
+  "assets": "Fixed Assets",
   "reports": "Reports",
   "aiInsights": "AI Insights",
+  "deepSearch": "Deep Search",
+  "performance": "Performance",
   "settings": "Settings",
   "expandSidebar": "Expand sidebar",
   "collapseSidebar": "Collapse sidebar",

@@ -13,6 +13,11 @@ import reports from './reports.json';
 import crm from './crm.json';
 import settings from './settings.json';
 import validation from './validation.json';
+import tour from './tour.json';
+import onboarding from './onboarding.json';
+import ai from './ai.json';
+import assets from './assets.json';
+import tax from './tax.json';
 
 export default {
   common,
@@ -30,4 +35,9 @@ export default {
   crm,
   settings,
   validation,
+  tour,
+  onboarding,
+  ai,
+  assets,
+  tax,
 } as const;

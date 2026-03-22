@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -9,11 +10,14 @@ import { useCreateVendor } from '@/lib/hooks/use-vendors';
 
 export default function NewVendorPage() {
   const router = useRouter();
+  const t = useTranslations('purchases');
   const createVendor = useCreateVendor();
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
-      await createVendor.mutateAsync(data);
+      await createVendor.mutateAsync(
+        data as unknown as Parameters<typeof createVendor.mutateAsync>[0],
+      );
       router.push('/purchases/vendors');
     } catch (error) {
       // Error is handled in the hook
@@ -24,16 +28,14 @@ export default function NewVendorPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label="Go back">
           <Link href="/purchases/vendors">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Vendor</h1>
-          <p className="text-muted-foreground">
-            Add a new supplier to your organization
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('vendors.newVendor')}</h1>
+          <p className="text-muted-foreground">{t('vendors.empty.description')}</p>
         </div>
       </div>
 

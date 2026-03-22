@@ -28,6 +28,19 @@
       "cost": "التكلفة",
       "itemCount": "المواد"
     },
+    "produces": "ينتج: {code} - {name}",
+    "perProductionRun": "لكل دورة إنتاج",
+    "rawMaterials": "مواد خام",
+    "components": "المكونات (المواد الخام)",
+    "noComponents": "لا توجد مكونات محددة",
+    "relatedWorkOrders": "أوامر العمل المرتبطة",
+    "noWorkOrders": "لا توجد أوامر عمل لقائمة المواد هذه بعد.",
+    "createWorkOrder": "إنشاء أمر عمل",
+    "status": {
+      "draft": "مسودة",
+      "active": "نشط",
+      "inactive": "غير نشط"
+    },
     "empty": {
       "title": "لا توجد قوائم مواد بعد",
       "description": "أنشئ أول قائمة مواد"
@@ -45,6 +58,7 @@
       "bomPlaceholder": "اختر قائمة المواد",
       "quantity": "الكمية",
       "plannedStartDate": "تاريخ البداية المخطط",
+      "plannedEndDate": "تاريخ النهاية المخطط",
       "notes": "ملاحظات",
       "notesPlaceholder": "أدخل الملاحظات"
     },
@@ -60,6 +74,15 @@
       "quantity": "الكمية",
       "plannedStart": "تاريخ البداية",
       "status": "الحالة"
+    },
+    "searchPlaceholder": "البحث برقم أمر العمل أو قائمة المواد...",
+    "filterByStatus": "تصفية حسب الحالة",
+    "allStatuses": "جميع الحالات",
+    "bulkActions": {
+      "start": "بدء",
+      "complete": "إكمال",
+      "cancel": "إلغاء",
+      "delete": "حذف"
     },
     "empty": {
       "title": "لا توجد أوامر عمل بعد",

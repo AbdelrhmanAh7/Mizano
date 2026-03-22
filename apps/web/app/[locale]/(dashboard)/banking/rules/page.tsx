@@ -1,18 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, Zap, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, MoreHorizontal, Pencil, Trash2, Zap, ToggleLeft, ToggleRight } from 'lucide-react';
+import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,7 +22,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
   useBankRules,
   useDeleteBankRule,
@@ -40,16 +33,20 @@ import {
   getActionTypeLabel,
   BankRule,
 } from '@/lib/hooks/use-bank-rules';
+import { useTranslations } from 'next-intl';
 
-export default function BankRulesPage() {
-  const [search, setSearch] = useState('');
+function BankRulesPageContent() {
+  const t = useTranslations('banking');
+  const tc = useTranslations('common');
+  const tableParams = useTableParams({ defaultSortBy: 'name' });
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const { data, isLoading } = useBankRules({ search });
+  const { data, isLoading } = useBankRules({ ...tableParams.queryParams });
   const deleteRule = useDeleteBankRule();
   const updateRule = useUpdateBankRule();
 
   const rules: BankRule[] = data?.data || [];
+  const meta = data?.meta;
 
   const handleDelete = async () => {
     if (deleteId) {
@@ -65,177 +62,176 @@ export default function BankRulesPage() {
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-10 w-32" />
+  const columns: ColumnDef<BankRule>[] = [
+    {
+      accessorKey: 'name',
+      header: () => (
+        <SortableHeader
+          label={t('rules.table.name')}
+          columnId="name"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <Zap className="h-4 w-4 text-yellow-500" />
+          <span className="font-medium">{row.original.name}</span>
         </div>
-        <Skeleton className="h-96" />
-      </div>
-    );
-  }
+      ),
+    },
+    {
+      id: 'conditions',
+      header: t('rules.table.conditions'),
+      cell: ({ row }) => (
+        <div className="space-y-1">
+          {(row.original.conditions ?? []).map((condition, idx) => (
+            <p key={idx} className="text-sm">
+              <span className="text-muted-foreground">
+                {getConditionFieldLabel(condition.field)}
+              </span>{' '}
+              <span className="font-medium">{getConditionOperatorLabel(condition.operator)}</span>{' '}
+              <span className="font-mono bg-muted px-1 rounded">{condition.value}</span>
+            </p>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: 'action',
+      header: t('rules.table.action'),
+      cell: ({ row }) => (
+        <Badge variant="outline">{getActionTypeLabel(row.original.action.type)}</Badge>
+      ),
+    },
+    {
+      accessorKey: 'hitCount',
+      header: t('rules.hits'),
+      meta: { headerClassName: 'text-center', cellClassName: 'text-center font-mono' },
+      cell: ({ row }) => row.original.hitCount,
+    },
+    {
+      accessorKey: 'isActive',
+      header: t('rules.table.status'),
+      meta: { headerClassName: 'text-center', cellClassName: 'text-center' },
+      cell: ({ row }) => {
+        const rule = row.original;
+        return (
+          <button onClick={() => handleToggleActive(rule)} className="inline-flex items-center">
+            {rule.isActive ? (
+              <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
+                <ToggleRight className="mr-1 h-3 w-3" />
+                {t('rules.active')}
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="hover:bg-secondary/80">
+                <ToggleLeft className="mr-1 h-3 w-3" />
+                {t('rules.inactive')}
+              </Badge>
+            )}
+          </button>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      header: '',
+      meta: { cellClassName: 'w-12' },
+      cell: ({ row }) => {
+        const rule = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/banking/rules/${rule.id}/edit`}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  {tc('buttons.edit')}
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(rule.id)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                {tc('buttons.delete')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bank Rules</h1>
-          <p className="text-muted-foreground">
-            Automate transaction categorization with custom rules
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('rules.title')}</h1>
+          <p className="text-muted-foreground">{t('rules.description')}</p>
         </div>
         <Button asChild>
           <Link href="/banking/rules/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Rule
+            {t('rules.newRule')}
           </Link>
         </Button>
       </div>
 
       {/* Filters */}
       <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search rules..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+        <DataTableSearch
+          value={tableParams.search}
+          onChange={tableParams.setSearch}
+          placeholder={t('rules.searchPlaceholder')}
+        />
       </div>
 
       {/* Table */}
-      {rules.length === 0 ? (
-        <div className="text-center py-12">
-          <Zap className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-semibold">No rules yet</h3>
-          <p className="text-muted-foreground">
-            Create your first rule to automate transaction categorization.
-          </p>
-          <Button asChild className="mt-4">
-            <Link href="/banking/rules/new">Create Rule</Link>
+      <DataTable
+        columns={columns}
+        data={rules}
+        page={meta?.page || 1}
+        totalPages={meta?.totalPages || 1}
+        total={meta?.total || 0}
+        limit={tableParams.limit}
+        onPageChange={tableParams.setPage}
+        onLimitChange={tableParams.setLimit}
+        isLoading={isLoading}
+        emptyMessage={t('rules.empty.title')}
+        emptyAction={
+          <Button asChild>
+            <Link href="/banking/rules/new">{t('rules.createRule')}</Link>
           </Button>
-        </div>
-      ) : (
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Conditions</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead className="text-center">Hits</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-                <TableHead className="w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rules.map((rule) => (
-                <TableRow key={rule.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Zap className="h-4 w-4 text-yellow-500" />
-                      <span className="font-medium">{rule.name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      {rule.conditions.map((condition, idx) => (
-                        <p key={idx} className="text-sm">
-                          <span className="text-muted-foreground">
-                            {getConditionFieldLabel(condition.field)}
-                          </span>{' '}
-                          <span className="font-medium">
-                            {getConditionOperatorLabel(condition.operator)}
-                          </span>{' '}
-                          <span className="font-mono bg-muted px-1 rounded">
-                            {condition.value}
-                          </span>
-                        </p>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {getActionTypeLabel(rule.action.type)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <span className="font-mono">{rule.hitCount}</span>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <button
-                      onClick={() => handleToggleActive(rule)}
-                      className="inline-flex items-center"
-                    >
-                      {rule.isActive ? (
-                        <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
-                          <ToggleRight className="mr-1 h-3 w-3" />
-                          Active
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="hover:bg-secondary/80">
-                          <ToggleLeft className="mr-1 h-3 w-3" />
-                          Inactive
-                        </Badge>
-                      )}
-                    </button>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                          <Link href={`/banking/rules/${rule.id}/edit`}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => setDeleteId(rule.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+        }
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Rule</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this rule? This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('rules.confirmDeleteTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('rules.confirmDeleteDescription')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
+            <AlertDialogCancel>{tc('buttons.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+              {tc('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function BankRulesPage() {
+  return (
+    <Suspense>
+      <BankRulesPageContent />
+    </Suspense>
   );
 }

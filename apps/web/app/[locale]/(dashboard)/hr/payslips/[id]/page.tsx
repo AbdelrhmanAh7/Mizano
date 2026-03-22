@@ -1,40 +1,40 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ArrowLeft, Download, Printer, Mail, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import {
   usePayslip,
   getPayrollStatusLabel,
   getPayrollStatusColor,
   formatCurrency,
 } from '@/lib/hooks/use-hr';
+import { useTranslations } from 'next-intl';
 
 const months = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
-export default function PayslipDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = use(params);
+export default function PayslipDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
+  const t = useTranslations('hr');
   const { data: payslip, isLoading } = usePayslip(id);
 
   if (isLoading) {
@@ -49,9 +49,9 @@ export default function PayslipDetailPage({
   if (!payslip) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold">Payslip not found</h2>
+        <h2 className="text-xl font-semibold">{t('payroll.payslip.title')} not found</h2>
         <Button asChild className="mt-4">
-          <Link href="/hr/payroll">Back to Payroll</Link>
+          <Link href="/hr/payroll">{t('payroll.title')}</Link>
         </Button>
       </div>
     );
@@ -86,18 +86,13 @@ export default function PayslipDetailPage({
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">
-                Payslip - {months[payslip.month - 1]} {payslip.year}
+                {t('payroll.payslip.title')} - {months[payslip.month - 1]} {payslip.year}
               </h1>
-              <Badge
-                variant="outline"
-                className={getPayrollStatusColor(payslip.status)}
-              >
+              <Badge variant="outline" className={getPayrollStatusColor(payslip.status)}>
                 {getPayrollStatusLabel(payslip.status)}
               </Badge>
             </div>
-            <p className="text-muted-foreground">
-              {employee.firstName} {employee.lastName}
-            </p>
+            <p className="text-muted-foreground">{employee.name}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -127,13 +122,11 @@ export default function PayslipDetailPage({
               </div>
               <div>
                 <h2 className="text-xl font-bold">Your Company Name</h2>
-                <p className="text-sm text-muted-foreground">
-                  123 Business Street, City, Country
-                </p>
+                <p className="text-sm text-muted-foreground">123 Business Street, City, Country</p>
               </div>
             </div>
             <div className="text-right">
-              <h3 className="text-lg font-semibold">PAYSLIP</h3>
+              <h3 className="text-lg font-semibold">{t('payroll.payslip.title').toUpperCase()}</h3>
               <p className="text-muted-foreground">
                 {months[payslip.month - 1]} {payslip.year}
               </p>
@@ -145,28 +138,16 @@ export default function PayslipDetailPage({
           {/* Employee Details */}
           <div className="grid grid-cols-2 gap-8 mb-8">
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                Employee Details
-              </h4>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2">Employee Details</h4>
               <div className="space-y-1">
-                <p className="font-medium">
-                  {employee.firstName} {employee.lastName}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  ID: {employee.employeeNumber}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {employee.jobTitle}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {employee.department}
-                </p>
+                <p className="font-medium">{employee.name}</p>
+                <p className="text-sm text-muted-foreground">ID: {employee.employeeNumber}</p>
+                <p className="text-sm text-muted-foreground">{employee.jobTitle}</p>
+                <p className="text-sm text-muted-foreground">{employee.department}</p>
               </div>
             </div>
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                Payment Details
-              </h4>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2">Payment Details</h4>
               <div className="space-y-1">
                 <p className="text-sm">
                   <span className="text-muted-foreground">Bank: </span>
@@ -190,13 +171,13 @@ export default function PayslipDetailPage({
           <div className="grid grid-cols-2 gap-8">
             {/* Earnings */}
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-4">
-                EARNINGS
-              </h4>
+              <h4 className="text-sm font-medium text-muted-foreground mb-4">EARNINGS</h4>
               <Table>
                 <TableBody>
                   <TableRow>
-                    <TableCell className="font-medium">Basic Salary</TableCell>
+                    <TableCell className="font-medium">
+                      {t('payroll.payslip.basicSalary')}
+                    </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatCurrency(payslip.basicSalary || 0)}
                     </TableCell>
@@ -221,9 +202,7 @@ export default function PayslipDetailPage({
 
             {/* Deductions */}
             <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-4">
-                DEDUCTIONS
-              </h4>
+              <h4 className="text-sm font-medium text-muted-foreground mb-4">DEDUCTIONS</h4>
               <Table>
                 <TableBody>
                   {payslip.lopDays > 0 && (
@@ -251,8 +230,9 @@ export default function PayslipDetailPage({
                   <TableRow className="font-bold">
                     <TableCell>Total Deductions</TableCell>
                     <TableCell className="text-right font-mono text-red-600">
-                      -{formatCurrency(
-                        totalDeductions + (payslip.taxAmount || 0) + (payslip.lopAmount || 0)
+                      -
+                      {formatCurrency(
+                        totalDeductions + (payslip.taxAmount || 0) + (payslip.lopAmount || 0),
                       )}
                     </TableCell>
                   </TableRow>
@@ -267,23 +247,17 @@ export default function PayslipDetailPage({
           <div className="flex justify-between items-center p-6 bg-primary/5 rounded-lg">
             <div>
               <h4 className="text-sm font-medium text-muted-foreground">
-                NET PAY
+                {t('payroll.payslip.netPay').toUpperCase()}
               </h4>
-              <p className="text-sm text-muted-foreground">
-                Amount payable after all deductions
-              </p>
+              <p className="text-sm text-muted-foreground">Amount payable after all deductions</p>
             </div>
-            <p className="text-4xl font-bold font-mono">
-              {formatCurrency(payslip.netPay || 0)}
-            </p>
+            <p className="text-4xl font-bold font-mono">{formatCurrency(payslip.netPay || 0)}</p>
           </div>
 
           {/* Footer */}
           <div className="mt-8 pt-6 border-t text-center text-sm text-muted-foreground">
             <p>This is a computer-generated payslip. No signature required.</p>
-            <p className="mt-1">
-              Generated on {format(new Date(), 'MMMM d, yyyy')}
-            </p>
+            <p className="mt-1">Generated on {format(new Date(), 'MMMM d, yyyy')}</p>
           </div>
         </CardContent>
       </Card>

@@ -28,8 +28,12 @@ export function usePermissions() {
   const { data: session, status } = useSession();
 
   const permissions: Permission[] = useMemo(() => {
-    return session?.user?.role?.permissions || [];
-  }, [session?.user?.role?.permissions]);
+    const role = session?.user?.role as string | { permissions?: Permission[] } | undefined;
+    if (typeof role === 'object' && role !== null) {
+      return role.permissions || [];
+    }
+    return [];
+  }, [session?.user?.role]);
 
   const isLoading = status === 'loading';
   const isAuthenticated = status === 'authenticated';
@@ -48,7 +52,7 @@ export function usePermissions() {
       const permission = permissions.find((p) => p.module === module);
       return permission?.actions?.includes(action) ?? false;
     },
-    [permissions, isAuthenticated]
+    [permissions, isAuthenticated],
   );
 
   /**
@@ -59,7 +63,7 @@ export function usePermissions() {
     (requiredPermissions: string[]): boolean => {
       return requiredPermissions.some((p) => hasPermission(p));
     },
-    [hasPermission]
+    [hasPermission],
   );
 
   /**
@@ -70,7 +74,7 @@ export function usePermissions() {
     (requiredPermissions: string[]): boolean => {
       return requiredPermissions.every((p) => hasPermission(p));
     },
-    [hasPermission]
+    [hasPermission],
   );
 
   /**
@@ -81,7 +85,7 @@ export function usePermissions() {
     (moduleName: string): boolean => {
       return permissions.some((p) => p.module === moduleName && p.actions.length > 0);
     },
-    [permissions]
+    [permissions],
   );
 
   /**
@@ -93,7 +97,7 @@ export function usePermissions() {
       const permission = permissions.find((p) => p.module === moduleName);
       return permission?.actions || [];
     },
-    [permissions]
+    [permissions],
   );
 
   return {
@@ -135,3 +139,23 @@ export const ACTIONS = ['view', 'create', 'edit', 'delete', 'export'] as const;
 
 export type Module = (typeof MODULES)[number];
 export type Action = (typeof ACTIONS)[number];
+
+/**
+ * Convenience hook that returns boolean flags for common CRUD permissions on a module.
+ *
+ * @example
+ * const { canView, canCreate, canEdit, canDelete } = useModulePermissions('sales');
+ * if (canCreate) { ... }
+ */
+export function useModulePermissions(module: string) {
+  const { hasPermission, isLoading } = usePermissions();
+
+  return {
+    canView: hasPermission(`${module}.view`),
+    canCreate: hasPermission(`${module}.create`),
+    canEdit: hasPermission(`${module}.edit`),
+    canDelete: hasPermission(`${module}.delete`),
+    canExport: hasPermission(`${module}.export`),
+    isLoading,
+  };
+}

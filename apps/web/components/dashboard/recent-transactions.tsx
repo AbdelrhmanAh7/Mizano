@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { format } from 'date-fns';
+import { useTranslations } from 'next-intl';
 import {
   FileText,
   CreditCard,
@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { RecentTransaction, formatCurrency } from '@/lib/hooks/use-dashboard';
+import { Link } from '@/i18n/routing';
 
 interface RecentTransactionsProps {
   transactions: RecentTransaction[];
@@ -55,18 +56,20 @@ function getTransactionColors(type: RecentTransaction['type']) {
 }
 
 export function RecentTransactions({ transactions }: RecentTransactionsProps) {
+  const t = useTranslations('common.dashboard.recentTransactions');
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg">Recent Transactions</CardTitle>
+        <CardTitle className="text-lg">{t('title')}</CardTitle>
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/accounting/journals">View All</Link>
+          <Link href="/accounting/journals">{t('viewAll')}</Link>
         </Button>
       </CardHeader>
       <CardContent>
         {transactions.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            <p>No recent transactions</p>
+            <p>{t('noTransactions')}</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -97,11 +100,11 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
                       {transaction.description}
                     </p>
                   </div>
-                  <div className="text-right shrink-0">
+                  <div className="text-end shrink-0">
                     <div
                       className={cn(
                         'flex items-center gap-1 font-mono font-medium',
-                        isPositive ? 'text-green-600' : 'text-red-600'
+                        isPositive ? 'text-green-600' : 'text-red-600',
                       )}
                     >
                       {isPositive ? (

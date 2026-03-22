@@ -54,7 +54,7 @@ interface BankRuleFormProps {
   accounts: Array<{ id: string; name: string; code: string }>;
   vendors: Array<{ id: string; name: string }>;
   customers: Array<{ id: string; name: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: BankRuleFormData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -116,9 +116,7 @@ export function BankRuleForm({
       <Card>
         <CardHeader>
           <CardTitle>Rule Details</CardTitle>
-          <CardDescription>
-            Give your rule a descriptive name to identify it easily
-          </CardDescription>
+          <CardDescription>Give your rule a descriptive name to identify it easily</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -129,9 +127,7 @@ export function BankRuleForm({
               {...form.register('name')}
             />
             {form.formState.errors.name && (
-              <p className="text-sm text-red-500">
-                {form.formState.errors.name.message}
-              </p>
+              <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
             )}
           </div>
 
@@ -172,7 +168,7 @@ export function BankRuleForm({
               <div className="flex-1 grid grid-cols-3 gap-3">
                 <Select
                   value={form.watch(`conditions.${index}.field`)}
-                  onValueChange={(value: any) =>
+                  onValueChange={(value: BankRuleFormData['conditions'][number]['field']) =>
                     form.setValue(`conditions.${index}.field`, value)
                   }
                 >
@@ -190,7 +186,7 @@ export function BankRuleForm({
 
                 <Select
                   value={form.watch(`conditions.${index}.operator`)}
-                  onValueChange={(value: any) =>
+                  onValueChange={(value: BankRuleFormData['conditions'][number]['operator']) =>
                     form.setValue(`conditions.${index}.operator`, value)
                   }
                 >
@@ -206,10 +202,7 @@ export function BankRuleForm({
                   </SelectContent>
                 </Select>
 
-                <Input
-                  placeholder="Value"
-                  {...form.register(`conditions.${index}.value`)}
-                />
+                <Input placeholder="Value" {...form.register(`conditions.${index}.value`)} />
               </div>
               <Button
                 type="button"
@@ -217,15 +210,14 @@ export function BankRuleForm({
                 size="icon"
                 onClick={() => fields.length > 1 && remove(index)}
                 disabled={fields.length === 1}
+                aria-label="Remove condition"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           ))}
           {form.formState.errors.conditions && (
-            <p className="text-sm text-red-500">
-              {form.formState.errors.conditions.message}
-            </p>
+            <p className="text-sm text-red-500">{form.formState.errors.conditions.message}</p>
           )}
         </CardContent>
       </Card>
@@ -234,16 +226,14 @@ export function BankRuleForm({
       <Card>
         <CardHeader>
           <CardTitle>Action</CardTitle>
-          <CardDescription>
-            What should happen when a transaction matches this rule
-          </CardDescription>
+          <CardDescription>What should happen when a transaction matches this rule</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Action Type *</Label>
             <Select
               value={form.watch('action.type')}
-              onValueChange={(value: any) =>
+              onValueChange={(value: BankRuleFormData['action']['type']) =>
                 form.setValue('action.type', value)
               }
             >

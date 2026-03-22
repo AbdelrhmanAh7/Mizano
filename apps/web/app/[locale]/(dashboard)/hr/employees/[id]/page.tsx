@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -48,13 +47,12 @@ import {
   getEmployeeStatusColor,
   formatCurrency,
 } from '@/lib/hooks/use-hr';
+import { useTranslations } from 'next-intl';
 
-export default function EmployeeDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = use(params);
+export default function EmployeeDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
+  const t = useTranslations('hr');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const { data: employee, isLoading } = useEmployee(id);
   const { data: payslipsData } = useEmployeePayslips(id);
@@ -82,21 +80,28 @@ export default function EmployeeDetailPage({
   if (!employee) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold">Employee not found</h2>
+        <h2 className="text-xl font-semibold">{t('employees.notFound')}</h2>
         <Button asChild className="mt-4">
-          <Link href="/hr/employees">Back to Employees</Link>
+          <Link href="/hr/employees">{t('employees.title')}</Link>
         </Button>
       </div>
     );
   }
 
-  const basicSalary = typeof employee.basicSalary === 'string'
-    ? parseFloat(employee.basicSalary)
-    : employee.basicSalary;
-  const allowances = employee.allowances || [];
-  const deductions = employee.deductions || [];
-  const totalAllowances = allowances.reduce((sum: number, a: any) => sum + (a.amount || 0), 0);
-  const totalDeductions = deductions.reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
+  const basicSalary =
+    typeof employee.basicSalary === 'string'
+      ? parseFloat(employee.basicSalary)
+      : employee.basicSalary;
+  const allowances = Array.isArray(employee.allowances) ? employee.allowances : [];
+  const deductions = Array.isArray(employee.deductions) ? employee.deductions : [];
+  const totalAllowances = allowances.reduce(
+    (sum: number, a: { amount?: number }) => sum + (a.amount || 0),
+    0,
+  );
+  const totalDeductions = deductions.reduce(
+    (sum: number, d: { amount?: number }) => sum + (d.amount || 0),
+    0,
+  );
   const grossSalary = basicSalary + totalAllowances;
   const netSalary = grossSalary - totalDeductions;
 
@@ -113,19 +118,18 @@ export default function EmployeeDetailPage({
           <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16">
               <AvatarFallback className="text-xl bg-primary/10 text-primary">
-                {employee.firstName[0]}
-                {employee.lastName[0]}
+                {(() => {
+                  const parts = (employee.name || '').split(' ');
+                  return parts.length >= 2
+                    ? parts[0][0] + parts[parts.length - 1][0]
+                    : (employee.name || '??').slice(0, 2);
+                })()}
               </AvatarFallback>
             </Avatar>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold tracking-tight">
-                  {employee.firstName} {employee.lastName}
-                </h1>
-                <Badge
-                  variant="outline"
-                  className={getEmployeeStatusColor(employee.status)}
-                >
+                <h1 className="text-3xl font-bold tracking-tight">{employee.name}</h1>
+                <Badge variant="outline" className={getEmployeeStatusColor(employee.status)}>
                   {getEmployeeStatusLabel(employee.status)}
                 </Badge>
               </div>
@@ -139,31 +143,25 @@ export default function EmployeeDetailPage({
           <Button variant="outline" asChild>
             <Link href={`/hr/employees/${id}/edit`}>
               <Pencil className="mr-2 h-4 w-4" />
-              Edit
+              {t('employees.editEmployee')}
             </Link>
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive">
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                {t('employees.deleteEmployee')}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete Employee</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete this employee? This action
-                  cannot be undone.
-                </AlertDialogDescription>
+                <AlertDialogTitle>{t('employees.deleteEmployee')}</AlertDialogTitle>
+                <AlertDialogDescription>{tCommon('confirm.deleteMessage')}</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Delete
+                <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+                  {tCommon('buttons.delete')}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -174,9 +172,9 @@ export default function EmployeeDetailPage({
       {/* Tabs */}
       <Tabs defaultValue="overview">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="salary">Salary Structure</TabsTrigger>
-          <TabsTrigger value="payslips">Payslips</TabsTrigger>
+          <TabsTrigger value="overview">{t('employees.overview')}</TabsTrigger>
+          <TabsTrigger value="salary">{t('employees.salaryStructure')}</TabsTrigger>
+          <TabsTrigger value="payslips">{t('payroll.payslip.title')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -184,7 +182,7 @@ export default function EmployeeDetailPage({
             {/* Contact Info */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Contact Information</CardTitle>
+                <CardTitle className="text-base">{t('employees.contactInfo')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-3">
@@ -206,7 +204,11 @@ export default function EmployeeDetailPage({
                 <div className="flex items-center gap-3">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">
-                    Joined {format(new Date(employee.joiningDate), 'MMMM d, yyyy')}
+                    {t('employees.joined', {
+                      date: employee.joiningDate
+                        ? format(new Date(employee.joiningDate), 'MMMM d, yyyy')
+                        : '-',
+                    })}
                   </span>
                 </div>
               </CardContent>
@@ -215,7 +217,7 @@ export default function EmployeeDetailPage({
             {/* Banking Info */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Banking Details</CardTitle>
+                <CardTitle className="text-base">{t('employees.bankingDetails')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {employee.bankName ? (
@@ -226,19 +228,19 @@ export default function EmployeeDetailPage({
                     </div>
                     {employee.bankAccountNumber && (
                       <div className="text-sm text-muted-foreground">
-                        Account: ****{employee.bankAccountNumber.slice(-4)}
+                        {t('employees.bankAccount', {
+                          last4: employee.bankAccountNumber.slice(-4),
+                        })}
                       </div>
                     )}
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No banking details provided
-                  </p>
+                  <p className="text-sm text-muted-foreground">{t('employees.noBankingDetails')}</p>
                 )}
                 {employee.taxId && (
                   <div className="flex items-center gap-3">
                     <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">Tax ID: {employee.taxId}</span>
+                    <span className="text-sm">{t('employees.taxId', { id: employee.taxId })}</span>
                   </div>
                 )}
               </CardContent>
@@ -247,14 +249,12 @@ export default function EmployeeDetailPage({
             {/* Salary Summary */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Monthly Salary</CardTitle>
+                <CardTitle className="text-base">{t('employees.monthlySalary')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold font-mono">
-                  {formatCurrency(netSalary)}
-                </p>
+                <p className="text-3xl font-bold font-mono">{formatCurrency(netSalary)}</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Net salary after deductions
+                  {t('employees.netSalaryAfterDeductions')}
                 </p>
               </CardContent>
             </Card>
@@ -266,18 +266,18 @@ export default function EmployeeDetailPage({
             {/* Earnings */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Earnings</CardTitle>
+                <CardTitle className="text-base">{t('employees.earnings')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableBody>
                     <TableRow>
-                      <TableCell>Basic Salary</TableCell>
+                      <TableCell>{t('payroll.payslip.basicSalary')}</TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(basicSalary)}
                       </TableCell>
                     </TableRow>
-                    {allowances.map((a: any, i: number) => (
+                    {allowances.map((a: { name: string; amount: number }, i: number) => (
                       <TableRow key={i}>
                         <TableCell>{a.name}</TableCell>
                         <TableCell className="text-right font-mono">
@@ -286,7 +286,7 @@ export default function EmployeeDetailPage({
                       </TableRow>
                     ))}
                     <TableRow className="font-bold">
-                      <TableCell>Gross Salary</TableCell>
+                      <TableCell>{t('payroll.payslip.grossPay')}</TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(grossSalary)}
                       </TableCell>
@@ -299,13 +299,13 @@ export default function EmployeeDetailPage({
             {/* Deductions */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Deductions</CardTitle>
+                <CardTitle className="text-base">{t('payroll.payslip.deductions')}</CardTitle>
               </CardHeader>
               <CardContent>
                 {deductions.length > 0 ? (
                   <Table>
                     <TableBody>
-                      {deductions.map((d: any, i: number) => (
+                      {deductions.map((d: { name: string; amount: number }, i: number) => (
                         <TableRow key={i}>
                           <TableCell>{d.name}</TableCell>
                           <TableCell className="text-right font-mono text-red-600">
@@ -314,7 +314,7 @@ export default function EmployeeDetailPage({
                         </TableRow>
                       ))}
                       <TableRow className="font-bold">
-                        <TableCell>Total Deductions</TableCell>
+                        <TableCell>{t('employees.totalDeductions')}</TableCell>
                         <TableCell className="text-right font-mono text-red-600">
                           -{formatCurrency(totalDeductions)}
                         </TableCell>
@@ -322,7 +322,7 @@ export default function EmployeeDetailPage({
                     </TableBody>
                   </Table>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No deductions</p>
+                  <p className="text-sm text-muted-foreground">{t('payroll.noDeductions')}</p>
                 )}
               </CardContent>
             </Card>
@@ -332,10 +332,8 @@ export default function EmployeeDetailPage({
           <Card className="bg-primary/5">
             <CardContent className="pt-6">
               <div className="flex justify-between items-center">
-                <span className="text-xl font-bold">Net Salary</span>
-                <span className="text-3xl font-bold font-mono">
-                  {formatCurrency(netSalary)}
-                </span>
+                <span className="text-xl font-bold">{t('payroll.payslip.netPay')}</span>
+                <span className="text-3xl font-bold font-mono">{formatCurrency(netSalary)}</span>
               </div>
             </CardContent>
           </Card>
@@ -348,43 +346,53 @@ export default function EmployeeDetailPage({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Period</TableHead>
-                      <TableHead className="text-right">Gross</TableHead>
-                      <TableHead className="text-right">Deductions</TableHead>
-                      <TableHead className="text-right">Net Pay</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>{t('payroll.payslip.period')}</TableHead>
+                      <TableHead className="text-right">{t('payroll.payslip.grossPay')}</TableHead>
+                      <TableHead className="text-right">
+                        {t('payroll.payslip.deductions')}
+                      </TableHead>
+                      <TableHead className="text-right">{t('payroll.payslip.netPay')}</TableHead>
+                      <TableHead>{t('payroll.table.status')}</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {payslips.map((slip: any) => (
-                      <TableRow key={slip.id}>
-                        <TableCell>
-                          {format(new Date(slip.year, slip.month - 1), 'MMMM yyyy')}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(slip.gross)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-red-600">
-                          -{formatCurrency(slip.totalDeductions)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
-                          {formatCurrency(slip.netPay)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {slip.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/hr/payslips/${slip.id}`}>
-                              View
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {payslips.map(
+                      (slip: {
+                        id: string;
+                        year: number;
+                        month: number;
+                        gross: number;
+                        totalDeductions: number;
+                        netPay: number;
+                        status: string;
+                      }) => (
+                        <TableRow key={slip.id}>
+                          <TableCell>
+                            {format(new Date(slip.year, slip.month - 1), 'MMMM yyyy')}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatCurrency(slip.gross)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-red-600">
+                            -{formatCurrency(slip.totalDeductions)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium">
+                            {formatCurrency(slip.netPay)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{slip.status}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="sm" asChild>
+                              <Link href={`/hr/payslips/${slip.id}`}>
+                                {t('payroll.viewPayslip')}
+                              </Link>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -394,10 +402,8 @@ export default function EmployeeDetailPage({
               <CardContent className="pt-6">
                 <div className="text-center py-8">
                   <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-                  <h3 className="mt-4 text-lg font-semibold">No payslips yet</h3>
-                  <p className="text-muted-foreground">
-                    Payslips will appear here after running payroll
-                  </p>
+                  <h3 className="mt-4 text-lg font-semibold">{t('payroll.noPayslips')}</h3>
+                  <p className="text-muted-foreground">{t('payroll.noPayslipsDesc')}</p>
                 </div>
               </CardContent>
             </Card>

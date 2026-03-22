@@ -6,13 +6,15 @@
     "quotes": "عروض الأسعار",
     "invoices": "الفواتير",
     "creditNotes": "إشعارات الائتمان",
-    "payments": "المدفوعات"
+    "payments": "المدفوعات",
+    "deliveryChallans": "إذونات التسليم"
   },
   "purchases": {
     "title": "المشتريات",
     "vendors": "الموردون",
     "expenses": "المصروفات",
     "bills": "الفواتير",
+    "scanBill": "مسح فاتورة",
     "payments": "المدفوعات",
     "credits": "الائتمانات"
   },
@@ -20,7 +22,9 @@
     "title": "المحاسبة",
     "chartOfAccounts": "دليل الحسابات",
     "journalEntries": "قيود اليومية",
-    "recurring": "المتكررة"
+    "recurring": "المتكررة",
+    "trialBalance": "ميزان المراجعة",
+    "generalLedger": "دفتر الأستاذ العام"
   },
   "inventory": {
     "title": "المخزون",
@@ -32,11 +36,27 @@
     },
     "adjustments": {
       "title": "التسويات"
+    },
+    "transfers": {
+      "title": "التحويلات"
+    },
+    "priceLists": {
+      "title": "قوائم الأسعار"
+    },
+    "compositeItems": {
+      "title": "الأصناف المركبة"
+    },
+    "movements": {
+      "title": "الحركات"
     }
   },
   "banking": {
+    "title": "البنوك",
     "accounts": {
       "title": "الحسابات البنكية"
+    },
+    "transactions": {
+      "title": "المعاملات"
     },
     "reconciliation": {
       "title": "المطابقة"
@@ -50,6 +70,7 @@
     "projects": {
       "title": "كل المشاريع"
     },
+    "myTasks": "مهامي",
     "timesheets": {
       "title": "سجلات الوقت"
     }
@@ -60,6 +81,7 @@
     "workOrders": "أوامر العمل"
   },
   "hr": {
+    "title": "الموارد البشرية",
     "employees": {
       "title": "الموظفون"
     },
@@ -70,9 +92,22 @@
       "title": "الرواتب"
     }
   },
-  "crm": "إدارة العلاقات",
+  "tax": {
+    "title": "الضرائب",
+    "rates": "معدلات الضريبة",
+    "vatReturns": "إقرارات الضريبة",
+    "payments": "المدفوعات"
+  },
+  "crm": {
+    "title": "إدارة العلاقات",
+    "leads": "العملاء المحتملون",
+    "deals": "الصفقات"
+  },
+  "assets": "الأصول الثابتة",
   "reports": "التقارير",
   "aiInsights": "رؤى الذكاء الاصطناعي",
+  "deepSearch": "بحث عميق",
+  "performance": "الأداء",
   "settings": "الإعدادات",
   "expandSidebar": "توسيع القائمة",
   "collapseSidebar": "تصغير القائمة",

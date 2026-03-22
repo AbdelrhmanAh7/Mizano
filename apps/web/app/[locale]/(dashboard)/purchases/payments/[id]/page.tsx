@@ -1,6 +1,6 @@
 'use client';
 
-import { use } from 'react';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -36,11 +36,13 @@ import {
 } from '@/lib/hooks/use-payments-made';
 
 interface PaymentDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
-  const { id } = use(params);
+  const { id } = params;
+  const t = useTranslations('purchases');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const { data: payment, isLoading } = usePaymentMade(id);
   const deletePayment = useDeletePaymentMade();
@@ -69,9 +71,9 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
   if (!payment) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Payment not found</p>
+        <p className="text-muted-foreground">{t('payments.paymentNotFound')}</p>
         <Button asChild className="mt-4">
-          <Link href="/purchases/payments">Back to Payments</Link>
+          <Link href="/purchases/payments">{t('payments.backToPayments')}</Link>
         </Button>
       </div>
     );
@@ -82,7 +84,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/purchases/payments">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -92,12 +94,10 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
               <h1 className="text-3xl font-bold tracking-tight font-mono">
                 {payment.paymentNumber}
               </h1>
-              <Badge variant="outline">
-                {formatPaymentMode(payment.paymentMode)}
-              </Badge>
+              <Badge variant="outline">{formatPaymentMode(payment.paymentMode)}</Badge>
             </div>
             <p className="text-muted-foreground">
-              Payment to {payment.vendor?.name}
+              {t('payments.paymentTo', { name: payment.vendor?.name || '' })}
             </p>
           </div>
         </div>
@@ -107,24 +107,18 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
             <AlertDialogTrigger asChild>
               <Button variant="outline" className="text-red-600">
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                {tCommon('buttons.delete')}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete Payment</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete this payment? This will also
-                  update the associated bill balances. This action cannot be undone.
-                </AlertDialogDescription>
+                <AlertDialogTitle>{t('payments.deleteTitle')}</AlertDialogTitle>
+                <AlertDialogDescription>{t('payments.deleteConfirmation')}</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Delete
+                <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+                  {tCommon('buttons.delete')}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -141,7 +135,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
                 <CreditCard className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Amount</p>
+                <p className="text-sm text-muted-foreground">{t('payments.amount')}</p>
                 <p className="text-2xl font-bold font-mono">
                   {formatCurrency(payment.amount, currency)}
                 </p>
@@ -157,7 +151,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
                 <Calendar className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Payment Date</p>
+                <p className="text-sm text-muted-foreground">{t('payments.paymentDate')}</p>
                 <p className="text-2xl font-bold">
                   {format(new Date(payment.date), 'MMM d, yyyy')}
                 </p>
@@ -173,10 +167,8 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
                 <Building2 className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Paid From</p>
-                <p className="text-lg font-semibold">
-                  {payment.paidFromAccount?.name || '-'}
-                </p>
+                <p className="text-sm text-muted-foreground">{t('payments.paidFrom')}</p>
+                <p className="text-lg font-semibold">{payment.paidFromAccount?.name || '-'}</p>
               </div>
             </div>
           </CardContent>
@@ -187,11 +179,11 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Payment Details</CardTitle>
+            <CardTitle>{t('payments.paymentDetails')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Vendor</span>
+              <span className="text-muted-foreground">{t('payments.vendor')}</span>
               <Link
                 href={`/purchases/vendors/${payment.vendorId}`}
                 className="text-blue-600 hover:underline"
@@ -200,16 +192,16 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
               </Link>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Payment Mode</span>
+              <span className="text-muted-foreground">{t('payments.paymentMode')}</span>
               <span>{formatPaymentMode(payment.paymentMode)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Reference</span>
+              <span className="text-muted-foreground">{t('payments.reference')}</span>
               <span className="font-mono">{payment.reference || '-'}</span>
             </div>
             {payment.notes && (
               <div className="pt-2 border-t">
-                <p className="text-sm text-muted-foreground mb-1">Notes</p>
+                <p className="text-sm text-muted-foreground mb-1">{t('payments.notes')}</p>
                 <p className="text-sm">{payment.notes}</p>
               </div>
             )}
@@ -219,16 +211,16 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
         {/* Bill Allocations */}
         <Card>
           <CardHeader>
-            <CardTitle>Bill Allocations</CardTitle>
+            <CardTitle>{t('payments.billAllocations')}</CardTitle>
           </CardHeader>
           <CardContent>
             {payment.allocations && payment.allocations.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Bill #</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Allocated</TableHead>
+                    <TableHead>{t('payments.table.billNumber')}</TableHead>
+                    <TableHead>{t('payments.table.date')}</TableHead>
+                    <TableHead className="text-right">{t('payments.table.allocated')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -256,7 +248,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
               </Table>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-8">
-                No bill allocations
+                {t('payments.noBillAllocations')}
               </p>
             )}
           </CardContent>

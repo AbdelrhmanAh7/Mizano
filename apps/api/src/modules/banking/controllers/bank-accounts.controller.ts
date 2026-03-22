@@ -1,29 +1,90 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { BankAccountsService } from '../services/bank-accounts.service';
-import { CurrentOrg, Permissions } from '../../../common/decorators';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { CurrentOrg, InvalidateCache, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { BankAccountQueryDto } from '../dto/bank-account-query.dto';
+import { BankAccountsService } from '../services/bank-accounts.service';
+import { BankTransactionsService } from '../services/bank-transactions.service';
+import { CreateBankAccountDto } from '../dto/create-bank-account.dto';
+import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
 
 @ApiTags('Bank Accounts')
 @ApiBearerAuth()
 @Controller('bank-accounts')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseInterceptors(CacheInvalidationInterceptor)
 export class BankAccountsController {
-  constructor(private readonly bankAccountsService: BankAccountsService) {}
+  constructor(
+    private readonly bankAccountsService: BankAccountsService,
+    private readonly bankTransactionsService: BankTransactionsService,
+  ) {}
 
-  @Post() @Permissions('banking.create')
-  create(@CurrentOrg() orgId: string, @Body() dto: any) { return this.bankAccountsService.create(orgId, dto); }
+  @Post()
+  @Permissions('banking.create')
+  @InvalidateCache('bank-accounts:*')
+  create(@CurrentOrg() orgId: string, @Body() dto: CreateBankAccountDto) {
+    return this.bankAccountsService.create(orgId, dto);
+  }
 
-  @Get() @Permissions('banking.view')
-  findAll(@CurrentOrg() orgId: string) { return this.bankAccountsService.findAll(orgId); }
+  @Get()
+  @Permissions('banking.view')
+  findAll(@CurrentOrg() orgId: string, @Query() query: BankAccountQueryDto) {
+    return this.bankAccountsService.findAll(orgId, query);
+  }
 
-  @Get(':id') @Permissions('banking.view')
-  findOne(@CurrentOrg() orgId: string, @Param('id') id: string) { return this.bankAccountsService.findOne(orgId, id); }
+  @Get('stats')
+  @Permissions('banking.view')
+  getDashboardStats(@CurrentOrg() orgId: string) {
+    return this.bankAccountsService.getDashboardStats(orgId);
+  }
 
-  @Patch(':id') @Permissions('banking.edit')
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) { return this.bankAccountsService.update(orgId, id, dto); }
+  @Get(':id/balance-history')
+  @Permissions('banking.view')
+  getBalanceHistory(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.bankAccountsService.getBalanceHistory(orgId, id);
+  }
 
-  @Delete(':id') @Permissions('banking.delete')
-  remove(@CurrentOrg() orgId: string, @Param('id') id: string) { return this.bankAccountsService.remove(orgId, id); }
+  @Get(':id/transactions')
+  @Permissions('banking.view')
+  getTransactions(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Query() query: PaginationDto & { status?: string },
+  ) {
+    return this.bankTransactionsService.findAll(orgId, { ...query, bankAccountId: id });
+  }
+
+  @Get(':id')
+  @Permissions('banking.view')
+  findOne(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.bankAccountsService.findOne(orgId, id);
+  }
+
+  @Patch(':id')
+  @Permissions('banking.edit')
+  @InvalidateCache('bank-accounts:*')
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateBankAccountDto) {
+    return this.bankAccountsService.update(orgId, id, dto);
+  }
+
+  @Delete(':id')
+  @Permissions('banking.delete')
+  @InvalidateCache('bank-accounts:*')
+  remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.bankAccountsService.remove(orgId, id);
+  }
 }

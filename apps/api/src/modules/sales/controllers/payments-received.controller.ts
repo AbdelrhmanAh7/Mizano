@@ -1,21 +1,40 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { PaymentsReceivedService } from '../services/payments-received.service';
-import { CreatePaymentReceivedDto } from '../dto/create-payment-received.dto';
-import { CurrentOrg, Permissions } from '../../../common/decorators';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  CacheResponse,
+  CacheTTL,
+  CurrentOrg,
+  InvalidateCache,
+  Permissions,
+} from '../../../common/decorators';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { PaymentReceivedQueryDto } from '../dto/payment-received-query.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { CreatePaymentReceivedDto } from '../dto/create-payment-received.dto';
+import { PaymentsReceivedService } from '../services/payments-received.service';
 
 @ApiTags('Payments Received')
 @ApiBearerAuth()
 @Controller('payments-received')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseInterceptors(CacheInvalidationInterceptor)
 export class PaymentsReceivedController {
   constructor(private readonly paymentsReceivedService: PaymentsReceivedService) {}
 
   @Post()
   @Permissions('sales.create')
+  @InvalidateCache('payments-received:*', 'invoices:*')
   @ApiOperation({ summary: 'Record a payment received' })
   create(@CurrentOrg() orgId: string, @Body() createPaymentReceivedDto: CreatePaymentReceivedDto) {
     return this.paymentsReceivedService.create(orgId, createPaymentReceivedDto);
@@ -23,8 +42,26 @@ export class PaymentsReceivedController {
 
   @Get()
   @Permissions('sales.view')
-  findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto) {
+  @CacheResponse('payments-received:list')
+  @CacheTTL(120)
+  findAll(@CurrentOrg() orgId: string, @Query() query: PaymentReceivedQueryDto) {
     return this.paymentsReceivedService.findAll(orgId, query);
+  }
+
+  @Get('cursor')
+  @Permissions('sales.view')
+  @ApiOperation({ summary: 'List payments received with cursor-based pagination' })
+  findAllCursor(@CurrentOrg() orgId: string, @Query() query: CursorPaginationDto) {
+    return this.paymentsReceivedService.findAllCursor(orgId, query);
+  }
+
+  // Bulk Operations
+  @Post('bulk-delete')
+  @Permissions('sales.delete')
+  @InvalidateCache('payments-received:*')
+  @ApiOperation({ summary: 'Bulk delete payments received' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.paymentsReceivedService.bulkDelete(orgId, dto.ids);
   }
 
   @Get(':id')

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Control, FieldValues, UseFormWatch, UseFormSetValue } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -47,7 +47,7 @@ interface QuoteFormProps {
   quote?: Quote | null;
   customerId?: string;
   taxRates?: { id: string; name: string; rate: number }[];
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -61,7 +61,7 @@ export function QuoteForm({
   isSubmitting,
 }: QuoteFormProps) {
   const isEditing = !!quote;
-  const { data: customersData } = useCustomers({ limit: 1000 });
+  const { data: customersData } = useCustomers({ limit: 100 });
   const customers = customersData?.data || [];
 
   // Default dates
@@ -178,9 +178,7 @@ export function QuoteForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.customerId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
               )}
             </div>
 
@@ -197,29 +195,17 @@ export function QuoteForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="quoteDate">Quote Date *</Label>
-              <Input
-                id="quoteDate"
-                type="date"
-                {...form.register('quoteDate')}
-              />
+              <Input id="quoteDate" type="date" {...form.register('quoteDate')} />
               {form.formState.errors.quoteDate && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.quoteDate.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.quoteDate.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="expiryDate">Expiry Date *</Label>
-              <Input
-                id="expiryDate"
-                type="date"
-                {...form.register('expiryDate')}
-              />
+              <Input id="expiryDate" type="date" {...form.register('expiryDate')} />
               {form.formState.errors.expiryDate && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.expiryDate.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.expiryDate.message}</p>
               )}
             </div>
           </div>
@@ -237,9 +223,9 @@ export function QuoteForm({
 
       {/* Line Items */}
       <LineItemsForm
-        control={form.control}
-        watch={form.watch}
-        setValue={form.setValue}
+        control={form.control as unknown as Control<FieldValues>}
+        watch={form.watch as unknown as UseFormWatch<FieldValues>}
+        setValue={form.setValue as unknown as UseFormSetValue<FieldValues>}
         name="lines"
         taxRates={taxRates}
         currency={selectedCustomer?.currency || 'USD'}
@@ -281,11 +267,7 @@ export function QuoteForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? 'Saving...'
-            : isEditing
-            ? 'Update Quote'
-            : 'Create Quote'}
+          {isSubmitting ? 'Saving...' : isEditing ? 'Update Quote' : 'Create Quote'}
         </Button>
       </div>
     </form>

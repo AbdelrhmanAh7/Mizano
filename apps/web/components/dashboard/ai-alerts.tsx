@@ -1,11 +1,12 @@
 'use client';
 
-import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { AlertCircle, AlertTriangle, Info, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { AIAlert, getAlertStyles } from '@/lib/hooks/use-dashboard';
+import { Link } from '@/i18n/routing';
 
 interface AIAlertsProps {
   alerts: AIAlert[];
@@ -24,6 +25,8 @@ function AlertIcon({ severity }: { severity: AIAlert['severity'] }) {
 }
 
 export function AIAlerts({ alerts }: AIAlertsProps) {
+  const t = useTranslations('common.dashboard.aiAlerts');
+
   if (alerts.length === 0) {
     return (
       <Card>
@@ -33,12 +36,12 @@ export function AIAlerts({ alerts }: AIAlertsProps) {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
             </span>
-            AI Insights
+            {t('title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
-            <p>All systems healthy. No alerts at this time.</p>
+            <p>{t('noAlerts')}</p>
           </div>
         </CardContent>
       </Card>
@@ -53,9 +56,11 @@ export function AIAlerts({ alerts }: AIAlertsProps) {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
           </span>
-          AI Insights
-          <span className="ml-auto text-sm font-normal text-muted-foreground">
-            {alerts.length} alert{alerts.length !== 1 ? 's' : ''}
+          {t('title')}
+          <span className="ms-auto text-sm font-normal text-muted-foreground">
+            {alerts.length === 1
+              ? t('alertCount', { count: alerts.length })
+              : t('alertsCount', { count: alerts.length })}
           </span>
         </CardTitle>
       </CardHeader>
@@ -69,7 +74,7 @@ export function AIAlerts({ alerts }: AIAlertsProps) {
                 className={cn(
                   'flex items-start gap-3 p-3 rounded-lg border',
                   styles.bg,
-                  styles.border
+                  styles.border,
                 )}
               >
                 <div className={styles.color}>
@@ -81,7 +86,7 @@ export function AIAlerts({ alerts }: AIAlertsProps) {
                 {alert.link && (
                   <Button variant="ghost" size="sm" asChild className="shrink-0">
                     <Link href={alert.link}>
-                      <ChevronRight className="h-4 w-4" />
+                      <ChevronRight className="h-4 w-4 rtl:rotate-180" />
                     </Link>
                   </Button>
                 )}

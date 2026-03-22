@@ -1,19 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Plus, Search, RefreshCw, Eye, Filter } from 'lucide-react';
+import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
+import { ImportWizard } from '@/components/import/import-wizard';
+import { PaymentModeBadge } from '@/components/sales/status-badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Select,
   SelectContent,
@@ -21,33 +13,71 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { paymentsReceivedApi } from '@/lib/api';
+import { useBulkAction } from '@/lib/hooks/use-bulk-action';
+import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import {
-  usePaymentsReceived,
-  PaymentReceived,
   PaymentMode,
-  getPaymentModeLabel,
+  PaymentReceived,
   getPaymentModeOptions,
+  useInfinitePaymentsReceived,
 } from '@/lib/hooks/use-payments-received';
-import { PaymentModeBadge } from '@/components/sales/status-badge';
 import { usePermissions } from '@/lib/hooks/use-permissions';
+import { useTableParams } from '@/lib/hooks/use-table-params';
+import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
+import { Eye, Filter, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import Link from 'next/link';
+import { Suspense, useState } from 'react';
 
-export default function PaymentsReceivedPage() {
+function PaymentsReceivedPageContent() {
+  const t = useTranslations('sales');
   const { hasPermission } = usePermissions();
+  const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedMode, setSelectedMode] = useState<string>('all');
+  const [importOpen, setImportOpen] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkSelectedRows, setBulkSelectedRows] = useState<PaymentReceived[]>([]);
 
-  const { data: paymentsData, isLoading, refetch } = usePaymentsReceived({
-    search: searchQuery || undefined,
+  const {
+    data: payments,
+    total,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useInfinitePaymentsReceived({
+    ...tableParams.queryParams,
     paymentMode: selectedMode !== 'all' ? (selectedMode as PaymentMode) : undefined,
   });
 
-  const payments = paymentsData?.data || [];
-
   const canCreate = hasPermission('sales.create');
+  const canDelete = hasPermission('sales.delete');
+
+  const bulkDeleteAction = useBulkAction({
+    mutationFn: (ids) => paymentsReceivedApi.bulkDelete(ids).then((r) => r.data),
+    queryKeys: [['payments-received']],
+    successMessage: '{count} payments deleted',
+  });
+
+  const bulkActions = [
+    ...(canDelete
+      ? [
+          {
+            label: 'Delete',
+            icon: Trash2,
+            variant: 'destructive' as const,
+            onClick: (rows: PaymentReceived[]) => {
+              setBulkSelectedRows(rows);
+              setBulkDeleteOpen(true);
+            },
+          },
+        ]
+      : []),
+  ];
 
   const formatCurrency = (amount: string | number, currency: string = 'USD') => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -59,22 +89,110 @@ export default function PaymentsReceivedPage() {
 
   const paymentModeOptions = getPaymentModeOptions();
 
+  const columns: ColumnDef<PaymentReceived>[] = [
+    {
+      accessorKey: 'paymentNumber',
+      header: () => (
+        <SortableHeader
+          label={t('payments.table.paymentNumber')}
+          columnId="paymentNumber"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <Link href={`/sales/payments/${row.original.id}`} className="font-medium hover:underline">
+          {row.original.paymentNumber}
+        </Link>
+      ),
+    },
+    {
+      accessorKey: 'customer.name',
+      header: t('payments.table.customer'),
+      cell: ({ row }) => {
+        const payment = row.original;
+        return payment.customer ? (
+          <Link href={`/sales/customers/${payment.customer.id}`} className="hover:underline">
+            {payment.customer.name}
+          </Link>
+        ) : (
+          '-'
+        );
+      },
+    },
+    {
+      accessorKey: 'date',
+      header: () => (
+        <SortableHeader
+          label={t('payments.table.date')}
+          columnId="date"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+    },
+    {
+      accessorKey: 'paymentMode',
+      header: t('payments.table.mode'),
+      cell: ({ row }) => <PaymentModeBadge mode={row.original.paymentMode} />,
+    },
+    {
+      accessorKey: 'reference',
+      header: t('payments.form.reference'),
+      cell: ({ row }) => row.original.reference || '-',
+    },
+    {
+      accessorKey: 'amount',
+      header: () => (
+        <SortableHeader
+          label={t('payments.table.amount')}
+          columnId="amount"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      meta: {
+        headerClassName: 'text-right',
+        cellClassName: 'text-right font-mono text-green-600 font-semibold',
+      },
+      cell: ({ row }) => formatCurrency(row.original.amount),
+    },
+    {
+      id: 'actions',
+      header: '',
+      meta: { cellClassName: 'text-right' },
+      cell: ({ row }) => (
+        <Button variant="ghost" size="sm" asChild>
+          <Link href={`/sales/payments/${row.original.id}`}>
+            <Eye className="h-4 w-4" />
+          </Link>
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Payments Received</h1>
-          <p className="text-muted-foreground">
-            Track and manage customer payments
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('payments.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
           {canCreate && (
             <Button asChild>
               <Link href="/sales/payments/new">
                 <Plus className="mr-2 h-4 w-4" />
-                Record Payment
+                {t('invoices.recordPayment')}
               </Link>
             </Button>
           )}
@@ -85,15 +203,11 @@ export default function PaymentsReceivedPage() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by payment number or customer..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+            <DataTableSearch
+              value={tableParams.search}
+              onChange={tableParams.setSearch}
+              placeholder="Search by payment number or customer..."
+            />
             <Select value={selectedMode} onValueChange={setSelectedMode}>
               <SelectTrigger className="w-[180px]">
                 <Filter className="mr-2 h-4 w-4" />
@@ -108,7 +222,12 @@ export default function PaymentsReceivedPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon" onClick={() => refetch()}>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              aria-label="Refresh payments"
+            >
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
@@ -118,87 +237,70 @@ export default function PaymentsReceivedPage() {
       {/* Payments Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Payments</CardTitle>
+          <CardTitle>{t('payments.title')}</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : payments.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No payments found</p>
-              {canCreate && (
+          <DataTable
+            columns={columns}
+            data={payments}
+            total={total}
+            isLoading={isLoading}
+            enableVirtualization
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={() => fetchNextPage()}
+            enableColumnResizing
+            tableId="payments-received"
+            enableSelection
+            bulkActions={bulkActions}
+            emptyMessage={t('payments.empty.title')}
+            emptyAction={
+              canCreate ? (
                 <Button asChild>
                   <Link href="/sales/payments/new">
                     <Plus className="mr-2 h-4 w-4" />
                     Record Your First Payment
                   </Link>
                 </Button>
-              )}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Payment #</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Mode</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {payments.map((payment: PaymentReceived) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>
-                      <Link
-                        href={`/sales/payments/${payment.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {payment.paymentNumber}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {payment.customer ? (
-                        <Link
-                          href={`/sales/customers/${payment.customer.id}`}
-                          className="hover:underline"
-                        >
-                          {payment.customer.name}
-                        </Link>
-                      ) : (
-                        '-'
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(payment.date), 'MMM d, yyyy')}
-                    </TableCell>
-                    <TableCell>
-                      <PaymentModeBadge mode={payment.paymentMode} />
-                    </TableCell>
-                    <TableCell>{payment.reference || '-'}</TableCell>
-                    <TableCell className="text-right font-mono text-green-600 font-semibold">
-                      {formatCurrency(payment.amount)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/sales/payments/${payment.id}`}>
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+              ) : undefined
+            }
+          />
         </CardContent>
       </Card>
+
+      {/* Bulk Action Dialogs */}
+      <BulkActionConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        action="delete"
+        count={bulkSelectedRows.length}
+        itemType="payments"
+        description="Selected payments will be deleted. Payments linked to reconciled transactions will be skipped."
+        destructive
+        isLoading={bulkDeleteAction.isLoading}
+        onConfirm={async () => {
+          await bulkDeleteAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkDeleteOpen(false);
+          refetch();
+        }}
+      />
+
+      {/* Import Wizard */}
+      <ImportWizard
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        entityType={'payments_received' as ImportEntityType}
+        entityLabel="Payments"
+        onComplete={() => refetch()}
+      />
     </div>
+  );
+}
+
+export default function PaymentsReceivedPage() {
+  return (
+    <Suspense>
+      <PaymentsReceivedPageContent />
+    </Suspense>
   );
 }

@@ -1,8 +1,11 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { billsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { billsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+type ApiError = { response?: { data?: { message?: string } } };
 
 // Types
 export type BillStatus = 'DRAFT' | 'OPEN' | 'OVERDUE' | 'PARTIAL' | 'PAID' | 'VOID';
@@ -39,6 +42,8 @@ export interface Bill {
   taxAmount: string;
   grandTotal: string;
   balanceDue: string;
+  reference: string | null;
+  currencyCode: string | null;
   notes: string | null;
   projectId: string | null;
   organizationId: string;
@@ -102,6 +107,20 @@ export function useBills(params?: BillParams) {
 }
 
 /**
+ * Hook to fetch all bills with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteBills(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Bill, Record<string, unknown>>({
+    queryKey: ['bills'],
+    fetchFn: async (p) => {
+      const response = await billsApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
+  });
+}
+
+/**
  * Hook to fetch a single bill by ID
  */
 export function useBill(id: string | undefined) {
@@ -135,7 +154,7 @@ export function useCreateBill() {
         description: 'The bill has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating bill',
@@ -165,7 +184,7 @@ export function useUpdateBill() {
         description: 'The bill has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating bill',
@@ -195,7 +214,7 @@ export function useOpenBill() {
         description: 'The bill is now open and ready for payment.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error opening bill',
@@ -224,7 +243,7 @@ export function useDeleteBill() {
         description: 'The bill has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting bill',
@@ -235,9 +254,40 @@ export function useDeleteBill() {
 }
 
 /**
+ * Hook to clone a bill
+ */
+export function useCloneBill() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await billsApi.clone(id);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bills'] });
+      toast({
+        title: 'Bill duplicated',
+        description: 'A new draft copy has been created.',
+      });
+    },
+    onError: (error: ApiError) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error duplicating bill',
+        description: error.response?.data?.message || 'An error occurred',
+      });
+    },
+  });
+}
+
+/**
  * Get status badge variant
  */
-export function getStatusVariant(status: BillStatus): 'default' | 'secondary' | 'destructive' | 'outline' {
+export function getStatusVariant(
+  status: BillStatus,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (status) {
     case 'DRAFT':
       return 'secondary';

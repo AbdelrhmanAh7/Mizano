@@ -1,0 +1,51 @@
+{
+  "errors": {
+    "notFound": "{resource} not found",
+    "unauthorized": "You are not authorized to perform this action",
+    "forbidden": "Access denied",
+    "badRequest": "Invalid request",
+    "internalError": "An internal server error occurred",
+    "validationFailed": "Validation failed",
+    "duplicateEntry": "{field} already exists",
+    "invalidCredentials": "Invalid email or password",
+    "tokenExpired": "Your session has expired. Please log in again",
+    "invalidToken": "Invalid or expired token"
+  },
+  "success": {
+    "created": "{resource} created successfully",
+    "updated": "{resource} updated successfully",
+    "deleted": "{resource} deleted successfully",
+    "sent": "{resource} sent successfully"
+  },
+  "validation": {
+    "required": "{field} is required",
+    "email": "Please enter a valid email address",
+    "minLength": "{field} must be at least {min} characters",
+    "maxLength": "{field} must not exceed {max} characters",
+    "min": "{field} must be at least {min}",
+    "max": "{field} must not exceed {max}",
+    "positive": "{field} must be a positive number",
+    "date": "Please enter a valid date",
+    "enum": "{field} must be one of: {values}"
+  },
+  "resources": {
+    "user": "User",
+    "organization": "Organization",
+    "account": "Account",
+    "journal": "Journal Entry",
+    "invoice": "Invoice",
+    "quote": "Quote",
+    "customer": "Customer",
+    "vendor": "Vendor",
+    "bill": "Bill",
+    "expense": "Expense",
+    "payment": "Payment",
+    "item": "Item",
+    "warehouse": "Warehouse",
+    "bankAccount": "Bank Account",
+    "transaction": "Transaction",
+    "employee": "Employee",
+    "project": "Project",
+    "timesheet": "Timesheet"
+  }
+}

@@ -1,33 +1,38 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import api, { attendanceApi, departmentsApi, employeesApi, payrollApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+
+// Types
+type ApiError = { response?: { data?: { message?: string } } };
 
 // Employee Types
 export interface Employee {
   id: string;
-  employeeNumber: string;
-  firstName: string;
-  lastName: string;
-  email: string;
+  employeeId: string;
+  employeeNumber: string | null;
+  name: string;
+  email: string | null;
   phone: string | null;
-  joiningDate: string;
-  departmentId: string | null;
-  department?: {
-    id: string;
-    name: string;
-  };
+  department: string | null;
   jobTitle: string | null;
+  position: string | null;
+  dateOfJoining: string;
+  hireDate: string | null;
   basicSalary: string | number;
+  baseSalary: string | number | null;
   allowances: Record<string, number> | null;
   deductions: Record<string, number> | null;
-  bankName: string | null;
-  bankAccountNumber: string | null;
-  taxId: string | null;
-  status: 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
+  bankAccount: string | null;
+  nationalId: string | null;
+  status: string | null;
+  isActive: boolean;
+  organizationId: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
 }
 
 // Attendance Types
@@ -79,44 +84,36 @@ export type EmployeeStatus = Employee['status'];
 export type AttendanceStatus = Attendance['status'];
 export type PayrollStatus = PayrollRun['status'];
 
-// API functions
-const employeesApi = {
-  getAll: (params?: any) => api.get('/employees', { params }),
-  getOne: (id: string) => api.get(`/employees/${id}`),
-  create: (data: any) => api.post('/employees', data),
-  update: (id: string, data: any) => api.patch(`/employees/${id}`, data),
-  delete: (id: string) => api.delete(`/employees/${id}`),
-};
-
-const attendanceApi = {
-  getAll: (params?: any) => api.get('/attendance', { params }),
-  mark: (data: any) => api.post('/attendance', data),
-  markBulk: (data: any) => api.post('/attendance/bulk', data),
-  update: (id: string, data: any) => api.patch(`/attendance/${id}`, data),
-};
-
-const payrollApi = {
-  getAll: (params?: any) => api.get('/payroll', { params }),
-  getOne: (id: string) => api.get(`/payroll/${id}`),
-  run: (data: { month: number; year: number }) => api.post('/payroll/run', data),
-  confirm: (id: string) => api.post(`/payroll/${id}/confirm`),
-  markPaid: (id: string) => api.post(`/payroll/${id}/mark-paid`),
-  getPayslip: (payrollId: string, payslipId: string) =>
-    api.get(`/payroll/${payrollId}/payslips/${payslipId}`),
-};
-
-const departmentsApi = {
-  getAll: () => api.get('/departments'),
-};
+export interface EmployeeParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: EmployeeStatus;
+  isActive?: boolean;
+  departmentId?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
 
 // Employee Hooks
-export function useEmployees(params?: any) {
+export function useEmployees(params?: EmployeeParams) {
   return useQuery({
     queryKey: ['employees', params],
     queryFn: async () => {
       const response = await employeesApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+export function useInfiniteEmployees(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Employee, Record<string, unknown>>({
+    queryKey: ['employees'],
+    fetchFn: async (p) => {
+      const response = await employeesApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 
@@ -140,7 +137,7 @@ export function useCreateEmployee() {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       toast.success('Employee created successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create employee');
     },
   });
@@ -150,12 +147,13 @@ export function useUpdateEmployee() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => employeesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      employeesApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       toast.success('Employee updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to update employee');
     },
   });
@@ -170,14 +168,28 @@ export function useDeleteEmployee() {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       toast.success('Employee deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to delete employee');
     },
   });
 }
 
+export interface AttendanceParams {
+  startDate?: string;
+  endDate?: string;
+  employeeId?: string;
+  status?: AttendanceStatus;
+  [key: string]: unknown;
+}
+
 // Attendance Hooks
-export function useAttendance(params?: any) {
+export function useAttendance(startDateOrParams?: string | AttendanceParams, endDate?: string) {
+  // Support both (params) and (startDate, endDate) call signatures
+  const params =
+    typeof startDateOrParams === 'string'
+      ? { startDate: startDateOrParams, endDate }
+      : startDateOrParams;
+
   return useQuery({
     queryKey: ['attendance', params],
     queryFn: async () => {
@@ -196,7 +208,7 @@ export function useMarkAttendance() {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
       toast.success('Attendance marked');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to mark attendance');
     },
   });
@@ -211,14 +223,26 @@ export function useMarkBulkAttendance() {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
       toast.success('Attendance marked for all employees');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to mark attendance');
     },
   });
 }
 
+// Alias for backward compatibility
+export const useBulkMarkAttendance = useMarkBulkAttendance;
+
+export interface PayrollRunParams {
+  page?: number;
+  limit?: number;
+  status?: PayrollStatus;
+  year?: number;
+  month?: number;
+  [key: string]: unknown;
+}
+
 // Payroll Hooks
-export function usePayrollRuns(params?: any) {
+export function usePayrollRuns(params?: PayrollRunParams) {
   return useQuery({
     queryKey: ['payroll', params],
     queryFn: async () => {
@@ -243,12 +267,15 @@ export function useRunPayroll() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: payrollApi.run,
+    mutationFn: async (data: { month: number; year: number }) => {
+      const response = await payrollApi.run(data);
+      return response.data?.data || response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll'] });
       toast.success('Payroll run created');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to run payroll');
     },
   });
@@ -263,7 +290,7 @@ export function useConfirmPayroll() {
       queryClient.invalidateQueries({ queryKey: ['payroll'] });
       toast.success('Payroll confirmed');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to confirm payroll');
     },
   });
@@ -278,8 +305,63 @@ export function useMarkPayrollPaid() {
       queryClient.invalidateQueries({ queryKey: ['payroll'] });
       toast.success('Payroll marked as paid');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to mark payroll as paid');
+    },
+  });
+}
+
+export function useEmployeePayslips(employeeId: string) {
+  return useQuery({
+    queryKey: ['payslips', 'employee', employeeId],
+    queryFn: async () => {
+      const response = await api.get(`/payroll/payslips/employee/${employeeId}`);
+      return response.data?.data || response.data;
+    },
+    enabled: !!employeeId,
+  });
+}
+
+export function usePayslip(payslipIdOrPayrollId: string, payslipId?: string) {
+  // Support both (payslipId) and (payrollId, payslipId) call signatures
+  const isDirectAccess = !payslipId;
+
+  return useQuery({
+    queryKey: isDirectAccess
+      ? ['payslips', payslipIdOrPayrollId]
+      : ['payslips', payslipIdOrPayrollId, payslipId],
+    queryFn: async () => {
+      if (isDirectAccess) {
+        // Direct access by payslip ID
+        const response = await api.get(`/payroll/payslips/${payslipIdOrPayrollId}`);
+        return response.data?.data || response.data;
+      } else {
+        // Access via payroll run
+        const response = await payrollApi.getPayslip(payslipIdOrPayrollId, payslipId!);
+        return response.data?.data || response.data;
+      }
+    },
+    enabled: !!payslipIdOrPayrollId,
+  });
+}
+
+// Employee Summary Hooks
+export function useEmployeeCount() {
+  return useQuery({
+    queryKey: ['employees', 'count'],
+    queryFn: async () => {
+      const response = await api.get('/employees/count');
+      return response.data?.data || response.data;
+    },
+  });
+}
+
+export function useDepartmentSummary() {
+  return useQuery({
+    queryKey: ['employees', 'department-summary'],
+    queryFn: async () => {
+      const response = await api.get('/employees/summary');
+      return response.data?.data || response.data;
     },
   });
 }
@@ -366,8 +448,18 @@ export function formatCurrency(amount: string | number | null | undefined): stri
 
 export function getMonthName(month: number): string {
   const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   return months[month - 1] || '';
 }

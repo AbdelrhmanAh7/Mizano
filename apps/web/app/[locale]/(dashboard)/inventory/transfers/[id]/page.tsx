@@ -1,8 +1,7 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { ArrowLeft, CheckCircle, XCircle, Truck, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -28,7 +27,6 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 import {
   useTransfer,
   useCompleteTransfer,
@@ -38,12 +36,12 @@ import {
 } from '@/lib/hooks/use-transfers';
 
 interface TransferDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function TransferDetailPage({ params }: TransferDetailPageProps) {
-  const { id } = use(params);
-  const router = useRouter();
+  const t = useTranslations('inventory');
+  const { id } = params;
   const { data: transfer, isLoading } = useTransfer(id);
   const completeTransfer = useCompleteTransfer();
   const cancelTransfer = useCancelTransfer();
@@ -73,21 +71,26 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
   if (!transfer) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Transfer not found</p>
+        <p className="text-muted-foreground">
+          {t('transfers.title')} {t('common.notFound')}
+        </p>
         <Button asChild className="mt-4">
-          <Link href="/inventory/transfers">Back to Transfers</Link>
+          <Link href="/inventory/transfers">
+            {t('common.backTo')} {t('transfers.title')}
+          </Link>
         </Button>
       </div>
     );
   }
 
-  const totalQty = transfer.lines?.reduce(
-    (sum: number, line: any) => sum + (line.quantity || 0),
-    0
-  ) || 0;
+  const totalQty =
+    transfer.lines?.reduce(
+      (sum: number, line: { quantity?: number }) => sum + (line.quantity || 0),
+      0,
+    ) || 0;
 
-  const canComplete = transfer.status === 'DRAFT' || transfer.status === 'IN_TRANSIT';
-  const canCancel = transfer.status === 'DRAFT' || transfer.status === 'IN_TRANSIT';
+  const canComplete = transfer.status === 'PENDING' || transfer.status === 'IN_TRANSIT';
+  const canCancel = transfer.status === 'PENDING' || transfer.status === 'IN_TRANSIT';
 
   return (
     <div className="space-y-6">
@@ -101,13 +104,8 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
-                {transfer.transferNumber}
-              </h1>
-              <Badge
-                variant="outline"
-                className={getTransferStatusColor(transfer.status)}
-              >
+              <h1 className="text-3xl font-bold tracking-tight">{transfer.transferNumber}</h1>
+              <Badge variant="outline" className={getTransferStatusColor(transfer.status)}>
                 {getTransferStatusLabel(transfer.status)}
               </Badge>
             </div>
@@ -123,21 +121,21 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
               <AlertDialogTrigger asChild>
                 <Button>
                   <CheckCircle className="mr-2 h-4 w-4" />
-                  Complete Transfer
+                  {t('transfers.completeTransfer')}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Complete Transfer</AlertDialogTitle>
+                  <AlertDialogTitle>{t('transfers.completeTransfer')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will finalize the transfer and update inventory levels in both
-                    warehouses. This action cannot be undone.
+                    This will finalize the transfer and update inventory levels in both warehouses.
+                    This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
                   <AlertDialogAction onClick={handleComplete}>
-                    Complete Transfer
+                    {t('transfers.completeTransfer')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -148,24 +146,21 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
               <AlertDialogTrigger asChild>
                 <Button variant="outline" className="text-red-600">
                   <XCircle className="mr-2 h-4 w-4" />
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Cancel Transfer</AlertDialogTitle>
+                  <AlertDialogTitle>{t('transfers.cancelTransfer')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to cancel this transfer? If items were
-                    already in transit, no stock changes will be made.
+                    Are you sure you want to cancel this transfer? If items were already in transit,
+                    no stock changes will be made.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Keep Transfer</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleCancel}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
-                    Cancel Transfer
+                  <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleCancel} className="bg-red-600 hover:bg-red-700">
+                    {t('transfers.cancelTransfer')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -182,9 +177,7 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
               <div className="p-4 bg-blue-100 rounded-lg inline-block">
                 <Truck className="h-8 w-8 text-blue-600" />
               </div>
-              <p className="mt-2 font-semibold">
-                {transfer.sourceWarehouse?.name}
-              </p>
+              <p className="mt-2 font-semibold">{transfer.fromWarehouse?.name}</p>
               <p className="text-sm text-muted-foreground">Source</p>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -196,9 +189,7 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
               <div className="p-4 bg-green-100 rounded-lg inline-block">
                 <Truck className="h-8 w-8 text-green-600" />
               </div>
-              <p className="mt-2 font-semibold">
-                {transfer.destinationWarehouse?.name}
-              </p>
+              <p className="mt-2 font-semibold">{transfer.toWarehouse?.name}</p>
               <p className="text-sm text-muted-foreground">Destination</p>
             </div>
           </div>
@@ -210,9 +201,7 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Transfer Number</p>
-            <p className="text-xl font-semibold font-mono">
-              {transfer.transferNumber}
-            </p>
+            <p className="text-xl font-semibold font-mono">{transfer.transferNumber}</p>
           </CardContent>
         </Card>
 
@@ -231,36 +220,22 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
         </Card>
       </div>
 
-      {/* Details */}
-      {(transfer.reference || transfer.reason) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {transfer.reference && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Reference</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="font-mono">{transfer.reference}</p>
-              </CardContent>
-            </Card>
-          )}
-          {transfer.reason && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Reason</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm">{transfer.reason}</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+      {/* Notes */}
+      {transfer.notes && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Notes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm">{transfer.notes}</p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Line Items */}
       <Card>
         <CardHeader>
-          <CardTitle>Transfer Items</CardTitle>
+          <CardTitle>{t('transfers.transferDetails')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -272,19 +247,21 @@ export default function TransferDetailPage({ params }: TransferDetailPageProps) 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transfer.lines?.map((line: any) => (
-                <TableRow key={line.id}>
-                  <TableCell className="font-medium">
-                    {line.item?.name || '-'}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {line.item?.sku || '-'}
-                  </TableCell>
-                  <TableCell className="text-right font-mono font-medium">
-                    {line.quantity}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {transfer.lines?.map(
+                (line: {
+                  id: string;
+                  item?: { name?: string; sku?: string | null };
+                  quantity: number;
+                }) => (
+                  <TableRow key={line.id}>
+                    <TableCell className="font-medium">{line.item?.name || '-'}</TableCell>
+                    <TableCell className="font-mono text-sm">{line.item?.sku || '-'}</TableCell>
+                    <TableCell className="text-right font-mono font-medium">
+                      {line.quantity}
+                    </TableCell>
+                  </TableRow>
+                ),
+              )}
             </TableBody>
           </Table>
         </CardContent>

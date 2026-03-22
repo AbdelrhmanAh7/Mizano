@@ -5,7 +5,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,15 +18,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { Expense } from '@/lib/hooks/use-expenses';
-import { useVendors } from '@/lib/hooks/use-vendors';
-import { cn } from '@/lib/utils';
+import { useVendors, Vendor } from '@/lib/hooks/use-vendors';
 
 const expenseSchema = z.object({
   date: z.string().min(1, 'Date is required'),
@@ -48,7 +40,7 @@ interface ExpenseFormProps {
   expense?: Expense | null;
   accounts?: Array<{ id: string; code: string; name: string; type: string }>;
   projects?: Array<{ id: string; name: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
   defaultVendorId?: string;
@@ -73,12 +65,14 @@ export function ExpenseForm({
 }: ExpenseFormProps) {
   const isEditing = !!expense;
   const { data: vendorsData } = useVendors({ limit: 100 });
-  const vendors = vendorsData?.data || [];
+  const vendors: Vendor[] = vendorsData?.data || [];
 
   // Filter accounts by type
   const expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE');
-  const bankAccounts = accounts.filter((a) =>
-    a.type === 'ASSET' && (a.name.toLowerCase().includes('bank') || a.name.toLowerCase().includes('cash'))
+  const bankAccounts = accounts.filter(
+    (a) =>
+      a.type === 'ASSET' &&
+      (a.name.toLowerCase().includes('bank') || a.name.toLowerCase().includes('cash')),
   );
 
   const form = useForm<ExpenseFormData>({
@@ -99,9 +93,10 @@ export function ExpenseForm({
 
   useEffect(() => {
     if (expense) {
-      const taxRate = expense.taxAmount && parseFloat(expense.amount) > 0
-        ? ((parseFloat(expense.taxAmount) / parseFloat(expense.amount)) * 100).toString()
-        : '0';
+      const taxRate =
+        expense.taxAmount && parseFloat(expense.amount) > 0
+          ? ((parseFloat(expense.taxAmount) / parseFloat(expense.amount)) * 100).toString()
+          : '0';
 
       form.reset({
         date: expense.date.split('T')[0],
@@ -122,8 +117,8 @@ export function ExpenseForm({
     const amount = parseFloat(data.amount);
     const taxRate = parseFloat(data.taxRate || '0');
     const taxAmount = data.taxInclusive
-      ? (amount * taxRate / (100 + taxRate))
-      : (amount * taxRate / 100);
+      ? (amount * taxRate) / (100 + taxRate)
+      : (amount * taxRate) / 100;
 
     const submitData = {
       date: data.date,
@@ -150,7 +145,7 @@ export function ExpenseForm({
     if (watchTaxInclusive) {
       return amount;
     }
-    return amount + (amount * taxRate / 100);
+    return amount + (amount * taxRate) / 100;
   };
 
   return (
@@ -164,15 +159,9 @@ export function ExpenseForm({
             {/* Date */}
             <div className="space-y-2">
               <Label htmlFor="date">Date *</Label>
-              <Input
-                id="date"
-                type="date"
-                {...form.register('date')}
-              />
+              <Input id="date" type="date" {...form.register('date')} />
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.date.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
               )}
             </div>
 
@@ -195,9 +184,7 @@ export function ExpenseForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.accountId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.accountId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.accountId.message}</p>
               )}
             </div>
 
@@ -235,9 +222,7 @@ export function ExpenseForm({
                 {...form.register('amount')}
               />
               {form.formState.errors.amount && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.amount.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.amount.message}</p>
               )}
             </div>
 
@@ -316,7 +301,9 @@ export function ExpenseForm({
                 <Label htmlFor="projectId">Project (Optional)</Label>
                 <Select
                   value={form.watch('projectId') || ''}
-                  onValueChange={(value) => form.setValue('projectId', value === 'none' ? '' : value)}
+                  onValueChange={(value) =>
+                    form.setValue('projectId', value === 'none' ? '' : value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select project" />
@@ -365,11 +352,7 @@ export function ExpenseForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? 'Saving...'
-            : isEditing
-            ? 'Update Expense'
-            : 'Record Expense'}
+          {isSubmitting ? 'Saving...' : isEditing ? 'Update Expense' : 'Record Expense'}
         </Button>
       </div>
     </form>

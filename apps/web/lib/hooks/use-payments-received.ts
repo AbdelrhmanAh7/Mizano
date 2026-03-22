@@ -1,11 +1,21 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { paymentsReceivedApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { paymentsReceivedApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
-export type PaymentMode = 'CASH' | 'BANK_TRANSFER' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'CHEQUE' | 'ONLINE' | 'OTHER';
+type ApiError = { response?: { data?: { message?: string } } };
+
+export type PaymentMode =
+  | 'CASH'
+  | 'BANK_TRANSFER'
+  | 'CREDIT_CARD'
+  | 'DEBIT_CARD'
+  | 'CHEQUE'
+  | 'ONLINE'
+  | 'OTHER';
 
 export interface PaymentAllocation {
   invoiceId: string;
@@ -85,6 +95,20 @@ export function usePaymentsReceived(params?: PaymentReceivedParams) {
 }
 
 /**
+ * Hook to fetch all payments received with cursor-based pagination (virtual scroll)
+ */
+export function useInfinitePaymentsReceived(params?: Record<string, unknown>) {
+  return useInfiniteTableData<PaymentReceived, Record<string, unknown>>({
+    queryKey: ['payments-received'],
+    fetchFn: async (p) => {
+      const response = await paymentsReceivedApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
+  });
+}
+
+/**
  * Hook to fetch a single payment by ID
  */
 export function usePaymentReceived(id: string | undefined) {
@@ -120,7 +144,7 @@ export function useCreatePaymentReceived() {
         description: 'The payment has been recorded successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error recording payment',
@@ -166,7 +190,7 @@ export function getPaymentModeOptions(): Array<{ value: PaymentMode; label: stri
  */
 export function validateAllocations(
   paymentAmount: string,
-  allocations: Array<{ amount: string }>
+  allocations: Array<{ amount: string }>,
 ): { isValid: boolean; difference: number } {
   const total = parseFloat(paymentAmount) || 0;
   const allocated = allocations.reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0);

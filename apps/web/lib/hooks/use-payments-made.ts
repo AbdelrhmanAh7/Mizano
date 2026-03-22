@@ -1,10 +1,13 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { paymentsMadeApi, billsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { billsApi, paymentsMadeApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export interface BillAllocation {
   billId: string;
   amount: string;
@@ -87,6 +90,20 @@ export function usePaymentsMade(params?: PaymentMadeParams) {
 }
 
 /**
+ * Hook to fetch all payments made with cursor-based pagination (virtual scroll)
+ */
+export function useInfinitePaymentsMade(params?: Record<string, unknown>) {
+  return useInfiniteTableData<PaymentMade, Record<string, unknown>>({
+    queryKey: ['payments-made'],
+    fetchFn: async (p) => {
+      const response = await paymentsMadeApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
+  });
+}
+
+/**
  * Hook to fetch a single payment made by ID
  */
 export function usePaymentMade(id: string | undefined) {
@@ -111,8 +128,9 @@ export function useUnpaidBills(vendorId: string | undefined) {
       if (!vendorId) throw new Error('Vendor ID is required');
       const response = await billsApi.getAll({
         vendorId,
-        status: 'OPEN,OVERDUE',
-        hasBalance: true,
+        status: 'OPEN,OVERDUE,PARTIALLY_PAID',
+        hasBalance: 'true',
+        limit: 100,
       });
       return response.data;
     },
@@ -141,7 +159,7 @@ export function useCreatePaymentMade() {
         description: 'The payment has been recorded successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error recording payment',
@@ -172,7 +190,7 @@ export function useDeletePaymentMade() {
         description: 'The payment has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting payment',

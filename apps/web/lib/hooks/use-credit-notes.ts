@@ -1,10 +1,13 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { creditNotesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { creditNotesApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type CreditNoteType = 'REFUND' | 'APPLY_TO_INVOICE';
 
 export interface CreditNote {
@@ -74,6 +77,20 @@ export function useCreditNotes(params?: CreditNoteParams) {
 }
 
 /**
+ * Hook to fetch all credit notes with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteCreditNotes(params?: Record<string, unknown>) {
+  return useInfiniteTableData<CreditNote, Record<string, unknown>>({
+    queryKey: ['credit-notes'],
+    fetchFn: async (p) => {
+      const response = await creditNotesApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
+  });
+}
+
+/**
  * Hook to fetch a single credit note by ID
  */
 export function useCreditNote(id: string | undefined) {
@@ -109,7 +126,7 @@ export function useCreateCreditNote() {
         description: 'The credit note has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating credit note',

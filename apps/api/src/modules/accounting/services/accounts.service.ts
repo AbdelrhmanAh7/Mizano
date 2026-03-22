@@ -1,14 +1,17 @@
 import {
+  BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
-  ConflictException,
-  BadRequestException,
 } from '@nestjs/common';
+import { AccountType, Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateAccountDto } from '../dto/create-account.dto';
 import { UpdateAccountDto } from '../dto/update-account.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
-import { AccountType } from '@prisma/client';
 
 @Injectable()
 export class AccountsService {
@@ -35,6 +38,10 @@ export class AccountsService {
       if (!parent) {
         throw new BadRequestException('Parent account not found');
       }
+
+      if (parent.type !== type) {
+        throw new BadRequestException('Child account type must match parent account type');
+      }
     }
 
     const account = await this.prisma.account.create({
@@ -58,10 +65,12 @@ export class AccountsService {
   }
 
   async findAll(organizationId: string, query: PaginationDto) {
-    const { page = 1, limit = 100, search, sortBy = 'code', sortOrder = 'asc' } = query;
+    const { page = 1, limit = 100, search, sortBy = 'code', sortOrder = 'asc', type } = query;
 
-    const where = {
+    const where: Prisma.AccountWhereInput = {
       organizationId,
+      deletedAt: null,
+      ...(type && { type: type as AccountType }),
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' as const } },
@@ -96,9 +105,30 @@ export class AccountsService {
     };
   }
 
+  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+    const { cursor, take, search, sortBy = 'code', sortOrder = 'asc' } = query;
+    const where: Prisma.AccountWhereInput = { organizationId, deletedAt: null };
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    return cursorPaginate(
+      this.prisma.account,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: { parent: { select: { id: true, code: true, name: true } } },
+      },
+    );
+  }
+
   async getTree(organizationId: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { organizationId, parentId: null },
+      where: { organizationId, parentId: null, deletedAt: null },
       include: {
         children: {
           include: {
@@ -120,7 +150,7 @@ export class AccountsService {
     const accountType = type.toUpperCase() as AccountType;
 
     const accounts = await this.prisma.account.findMany({
-      where: { organizationId, type: accountType, isActive: true },
+      where: { organizationId, type: accountType, isActive: true, deletedAt: null },
       orderBy: { code: 'asc' },
     });
 
@@ -129,7 +159,7 @@ export class AccountsService {
 
   async findOne(organizationId: string, id: string) {
     const account = await this.prisma.account.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: {
         parent: {
           select: { id: true, code: true, name: true },
@@ -186,6 +216,10 @@ export class AccountsService {
       if (!parent) {
         throw new BadRequestException('Parent account not found');
       }
+
+      if (parent.type !== account.type) {
+        throw new BadRequestException('Child account type must match parent account type');
+      }
     }
 
     const updatedAccount = await this.prisma.account.update({
@@ -205,8 +239,7 @@ export class AccountsService {
     const account = await this.prisma.account.findFirst({
       where: { id, organizationId },
       include: {
-        children: true,
-        journalLines: { take: 1 },
+        _count: { select: { children: true, journalLines: true } },
       },
     });
 
@@ -218,17 +251,73 @@ export class AccountsService {
       throw new BadRequestException('System accounts cannot be deleted');
     }
 
-    if (account.children.length > 0) {
+    if (account._count.children > 0) {
       throw new BadRequestException('Cannot delete account with child accounts');
     }
 
-    if (account.journalLines.length > 0) {
+    if (account._count.journalLines > 0) {
       throw new BadRequestException('Cannot delete account with transactions');
     }
 
-    await this.prisma.account.delete({ where: { id } });
+    await this.prisma.account.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
 
     return { message: 'Account deleted successfully' };
+  }
+
+  async getBalance(organizationId: string, accountId: string, asOfDate?: string) {
+    const account = await this.prisma.account.findFirst({
+      where: { id: accountId, organizationId, deletedAt: null },
+    });
+
+    if (!account) {
+      throw new NotFoundException('Account not found');
+    }
+
+    const dateFilter: Prisma.JournalWhereInput = {};
+    if (asOfDate) {
+      dateFilter.date = { lte: new Date(asOfDate) };
+    }
+
+    const aggregation = await this.prisma.journalLine.aggregate({
+      where: {
+        accountId,
+        journal: {
+          organizationId,
+          isPosted: true,
+          deletedAt: null,
+          ...dateFilter,
+        },
+      },
+      _sum: {
+        debit: true,
+        credit: true,
+      },
+    });
+
+    const totalDebits = new Decimal(aggregation._sum.debit?.toString() || '0');
+    const totalCredits = new Decimal(aggregation._sum.credit?.toString() || '0');
+    const openingBalance = new Decimal(account.openingBalance?.toString() || '0');
+
+    // Debit-normal: ASSET, EXPENSE; Credit-normal: LIABILITY, EQUITY, INCOME, REVENUE
+    const debitNormalTypes: string[] = [AccountType.ASSET, AccountType.EXPENSE];
+    const balance = debitNormalTypes.includes(account.type)
+      ? totalDebits.minus(totalCredits).plus(openingBalance)
+      : totalCredits.minus(totalDebits).plus(openingBalance);
+
+    return {
+      accountId,
+      accountCode: account.code,
+      accountName: account.name,
+      accountType: account.type,
+      balance,
+      totalDebits,
+      totalCredits,
+      openingBalance,
+      asOfDate: asOfDate || null,
+    };
   }
 
   async seedDefaultAccounts(organizationId: string) {
@@ -239,7 +328,10 @@ export class AccountsService {
     organizationId: string,
     industry: 'services' | 'retail' | 'construction',
   ) {
-    const templates: Record<string, Array<{ code: string; name: string; type: AccountType; parentId: null }>> = {
+    const templates: Record<
+      string,
+      Array<{ code: string; name: string; type: AccountType; parentId: null }>
+    > = {
       services: this.getServicesCOA(),
       retail: this.getRetailCOA(),
       construction: this.getConstructionCOA(),
@@ -360,8 +452,18 @@ export class AccountsService {
       { code: '4010', name: 'In-Store Sales', type: AccountType.INCOME, parentId: null },
       { code: '4020', name: 'Online Sales', type: AccountType.INCOME, parentId: null },
       { code: '4030', name: 'Wholesale Sales', type: AccountType.INCOME, parentId: null },
-      { code: '4100', name: 'Shipping & Handling Income', type: AccountType.INCOME, parentId: null },
-      { code: '4200', name: 'Sales Returns & Allowances', type: AccountType.INCOME, parentId: null },
+      {
+        code: '4100',
+        name: 'Shipping & Handling Income',
+        type: AccountType.INCOME,
+        parentId: null,
+      },
+      {
+        code: '4200',
+        name: 'Sales Returns & Allowances',
+        type: AccountType.INCOME,
+        parentId: null,
+      },
       { code: '4300', name: 'Sales Discounts', type: AccountType.INCOME, parentId: null },
       { code: '4900', name: 'Other Income', type: AccountType.INCOME, parentId: null },
 
@@ -369,7 +471,12 @@ export class AccountsService {
       { code: '5000', name: 'Cost of Goods Sold', type: AccountType.EXPENSE, parentId: null },
       { code: '5100', name: 'Merchandise Purchases', type: AccountType.EXPENSE, parentId: null },
       { code: '5200', name: 'Freight-In', type: AccountType.EXPENSE, parentId: null },
-      { code: '5300', name: 'Purchase Returns & Allowances', type: AccountType.EXPENSE, parentId: null },
+      {
+        code: '5300',
+        name: 'Purchase Returns & Allowances',
+        type: AccountType.EXPENSE,
+        parentId: null,
+      },
       { code: '5400', name: 'Purchase Discounts', type: AccountType.EXPENSE, parentId: null },
       { code: '5500', name: 'Inventory Shrinkage', type: AccountType.EXPENSE, parentId: null },
 
@@ -381,7 +488,12 @@ export class AccountsService {
       { code: '6110', name: 'Utilities', type: AccountType.EXPENSE, parentId: null },
       { code: '6200', name: 'Marketing & Advertising', type: AccountType.EXPENSE, parentId: null },
       { code: '6210', name: 'Store Displays', type: AccountType.EXPENSE, parentId: null },
-      { code: '6300', name: 'Credit Card Processing Fees', type: AccountType.EXPENSE, parentId: null },
+      {
+        code: '6300',
+        name: 'Credit Card Processing Fees',
+        type: AccountType.EXPENSE,
+        parentId: null,
+      },
       { code: '6400', name: 'Shipping & Delivery', type: AccountType.EXPENSE, parentId: null },
       { code: '6500', name: 'Store Supplies', type: AccountType.EXPENSE, parentId: null },
       { code: '6600', name: 'Depreciation Expense', type: AccountType.EXPENSE, parentId: null },
@@ -409,8 +521,18 @@ export class AccountsService {
       { code: '1420', name: 'Vehicles', type: AccountType.ASSET, parentId: null },
       { code: '1430', name: 'Small Tools & Equipment', type: AccountType.ASSET, parentId: null },
       { code: '1500', name: 'Office Equipment', type: AccountType.ASSET, parentId: null },
-      { code: '1600', name: 'Accumulated Depreciation - Equipment', type: AccountType.ASSET, parentId: null },
-      { code: '1610', name: 'Accumulated Depreciation - Vehicles', type: AccountType.ASSET, parentId: null },
+      {
+        code: '1600',
+        name: 'Accumulated Depreciation - Equipment',
+        type: AccountType.ASSET,
+        parentId: null,
+      },
+      {
+        code: '1610',
+        name: 'Accumulated Depreciation - Vehicles',
+        type: AccountType.ASSET,
+        parentId: null,
+      },
 
       // Liabilities (2xxx)
       { code: '2000', name: 'Accounts Payable', type: AccountType.LIABILITY, parentId: null },
@@ -451,7 +573,12 @@ export class AccountsService {
       { code: '5140', name: 'Plumbing Materials', type: AccountType.EXPENSE, parentId: null },
       { code: '5150', name: 'HVAC Materials', type: AccountType.EXPENSE, parentId: null },
       { code: '5200', name: 'Subcontractor Costs', type: AccountType.EXPENSE, parentId: null },
-      { code: '5210', name: 'Electrical Subcontractors', type: AccountType.EXPENSE, parentId: null },
+      {
+        code: '5210',
+        name: 'Electrical Subcontractors',
+        type: AccountType.EXPENSE,
+        parentId: null,
+      },
       { code: '5220', name: 'Plumbing Subcontractors', type: AccountType.EXPENSE, parentId: null },
       { code: '5230', name: 'HVAC Subcontractors', type: AccountType.EXPENSE, parentId: null },
       { code: '5240', name: 'Roofing Subcontractors', type: AccountType.EXPENSE, parentId: null },
@@ -460,16 +587,31 @@ export class AccountsService {
       { code: '5500', name: 'Job Site Expenses', type: AccountType.EXPENSE, parentId: null },
 
       // Operating Expenses (6xxx)
-      { code: '6000', name: 'Salaries - Office & Admin', type: AccountType.EXPENSE, parentId: null },
+      {
+        code: '6000',
+        name: 'Salaries - Office & Admin',
+        type: AccountType.EXPENSE,
+        parentId: null,
+      },
       { code: '6010', name: 'Employee Benefits', type: AccountType.EXPENSE, parentId: null },
       { code: '6020', name: 'Payroll Taxes', type: AccountType.EXPENSE, parentId: null },
       { code: '6100', name: 'Office Rent', type: AccountType.EXPENSE, parentId: null },
       { code: '6110', name: 'Utilities', type: AccountType.EXPENSE, parentId: null },
       { code: '6200', name: 'Vehicle Expense', type: AccountType.EXPENSE, parentId: null },
       { code: '6210', name: 'Fuel', type: AccountType.EXPENSE, parentId: null },
-      { code: '6220', name: 'Vehicle Repairs & Maintenance', type: AccountType.EXPENSE, parentId: null },
+      {
+        code: '6220',
+        name: 'Vehicle Repairs & Maintenance',
+        type: AccountType.EXPENSE,
+        parentId: null,
+      },
       { code: '6300', name: 'Equipment Maintenance', type: AccountType.EXPENSE, parentId: null },
-      { code: '6400', name: 'Insurance - General Liability', type: AccountType.EXPENSE, parentId: null },
+      {
+        code: '6400',
+        name: 'Insurance - General Liability',
+        type: AccountType.EXPENSE,
+        parentId: null,
+      },
       { code: '6410', name: 'Insurance - Workers Comp', type: AccountType.EXPENSE, parentId: null },
       { code: '6420', name: 'Insurance - Vehicle', type: AccountType.EXPENSE, parentId: null },
       { code: '6500', name: 'Bonding Expense', type: AccountType.EXPENSE, parentId: null },

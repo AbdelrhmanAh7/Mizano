@@ -1,17 +1,54 @@
 {
   "title": "HR",
   "description": "Manage employees, attendance, and payroll",
+  "hub": {
+    "quickActions": "Quick Actions",
+    "addEmployee": "Add Employee",
+    "markAttendance": "Mark Attendance",
+    "runPayroll": "Run Payroll",
+    "stats": {
+      "totalEmployees": "Total Employees",
+      "totalEmployeesDesc": "{active} active, {inactive} inactive",
+      "monthlyPayroll": "Monthly Payroll",
+      "monthlyPayrollDesc": "From {count} payslips",
+      "attendanceRate": "Attendance Rate",
+      "attendanceRateDesc": "This month average",
+      "pendingPayroll": "Pending Payroll",
+      "pendingPayrollDesc": "{count} runs need processing"
+    },
+    "recentPayroll": "Recent Payroll Runs",
+    "noRecentPayroll": "No payroll runs yet",
+    "viewAllPayroll": "View All Runs",
+    "departmentBreakdown": "Department Breakdown",
+    "noDepartments": "No department data available",
+    "employeesInDept": "{count} employees"
+  },
+  "openModule": "Open {title}",
+  "trackTime": "Track time",
+  "unassigned": "Unassigned",
   "employees": {
     "title": "Employees",
+    "description": "Manage your workforce",
     "newEmployee": "New Employee",
     "editEmployee": "Edit Employee",
     "deleteEmployee": "Delete Employee",
     "employeeDetails": "Employee Details",
+    "activeEmployees": "Active Employees",
+    "totalPayroll": "Total Monthly Payroll",
+    "overview": "Overview",
+    "salaryStructure": "Salary Structure",
+    "payslips": "Payslips",
+    "attendanceHistory": "Attendance",
+    "personalInfo": "Personal Information",
+    "employmentInfo": "Employment Information",
+    "bankingInfo": "Banking & Tax",
     "form": {
       "employeeId": "Employee ID",
       "employeeIdPlaceholder": "Enter employee ID",
       "name": "Full Name",
       "namePlaceholder": "Enter full name",
+      "firstName": "First Name",
+      "lastName": "Last Name",
       "email": "Email",
       "emailPlaceholder": "Enter email address",
       "phone": "Phone",
@@ -26,26 +63,68 @@
       "deductions": "Deductions",
       "bankAccount": "Bank Account",
       "bankAccountPlaceholder": "Enter bank account",
-      "isActive": "Active"
+      "bankName": "Bank Name",
+      "taxId": "Tax ID",
+      "isActive": "Active",
+      "status": "Status",
+      "salary": "Salary",
+      "grossSalary": "Gross Salary",
+      "netSalary": "Net Salary",
+      "totalAllowances": "Total Allowances",
+      "totalDeductions": "Total Deductions"
     },
     "table": {
       "employeeId": "Employee ID",
       "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
       "department": "Department",
       "jobTitle": "Job Title",
       "salary": "Salary",
+      "joinedDate": "Joined",
       "status": "Status"
     },
+    "searchPlaceholder": "Search employees...",
+    "allStatus": "All Status",
+    "notFound": "Employee not found",
+    "contactInfo": "Contact Information",
+    "bankingDetails": "Banking Details",
+    "monthlySalary": "Monthly Salary",
+    "netSalaryAfterDeductions": "Net salary after deductions",
+    "joined": "Joined {date}",
+    "noBankingDetails": "No banking details provided",
+    "bankAccount": "Account: ****{last4}",
+    "taxId": "Tax ID: {id}",
+    "overview": "Overview",
+    "salaryStructure": "Salary Structure",
+    "earnings": "Earnings",
+    "totalDeductions": "Total Deductions",
     "empty": {
       "title": "No employees yet",
-      "description": "Add your first employee"
+      "description": "Add your first employee to get started"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "terminated": "Terminated"
     }
   },
   "attendance": {
     "title": "Attendance",
+    "description": "Track employee attendance and time",
     "newAttendance": "Record Attendance",
     "editAttendance": "Edit Attendance",
     "attendanceDetails": "Attendance Details",
+    "markForToday": "Mark for Today",
+    "bulkMark": "Bulk Mark",
+    "monthlyOverview": "Monthly Overview",
+    "dailyView": "Daily View",
+    "summary": {
+      "presentToday": "Present Today",
+      "absentToday": "Absent Today",
+      "onLeave": "On Leave",
+      "attendanceRate": "Attendance Rate"
+    },
     "form": {
       "employee": "Employee",
       "employeePlaceholder": "Select employee",
@@ -68,6 +147,17 @@
       "checkOut": "Check Out",
       "status": "Status"
     },
+    "searchPlaceholder": "Search attendance...",
+    "allStatus": "All Status",
+    "calendar": "Attendance Calendar",
+    "today": "Today",
+    "totalEmployees": "Total Employees",
+    "presentOn": "Present ({date})",
+    "absentOn": "Absent ({date})",
+    "onLeaveOn": "On Leave ({date})",
+    "notMarked": "Not marked",
+    "mark": "Mark",
+    "action": "Action",
     "empty": {
       "title": "No attendance records yet",
       "description": "Start recording employee attendance"
@@ -75,23 +165,38 @@
   },
   "payroll": {
     "title": "Payroll",
+    "description": "Process and manage payroll runs",
     "newRun": "New Payroll Run",
     "runDetails": "Payroll Run Details",
     "process": "Process Payroll",
     "markAsPaid": "Mark as Paid",
+    "totalPaid": "Total Paid (YTD)",
+    "pendingRuns": "Pending Runs",
+    "confirmedRuns": "Confirmed Runs",
+    "summary": {
+      "totalGross": "Total Gross",
+      "totalDeductions": "Total Deductions",
+      "totalNet": "Total Net Pay",
+      "employeeCount": "Employees Processed"
+    },
     "form": {
       "month": "Month",
-      "year": "Year"
+      "year": "Year",
+      "selectPeriod": "Select Period",
+      "preview": "Preview",
+      "confirm": "Confirm & Post"
     },
     "status": {
       "draft": "Draft",
       "processed": "Processed",
+      "confirmed": "Confirmed",
       "paid": "Paid"
     },
     "table": {
       "period": "Period",
       "employeeCount": "Employees",
       "grossAmount": "Gross Amount",
+      "deductions": "Deductions",
       "netAmount": "Net Amount",
       "status": "Status"
     },
@@ -103,11 +208,72 @@
       "allowances": "Allowances",
       "deductions": "Deductions",
       "grossPay": "Gross Pay",
+      "netPay": "Net Pay",
+      "taxAmount": "Tax Amount",
+      "lopDays": "LOP Days",
+      "lopAmount": "LOP Amount",
+      "viewPayslip": "View Payslip",
+      "print": "Print",
+      "download": "Download",
+      "earnings": "Earnings",
+      "deductionsSection": "Deductions"
+    },
+    "selectPeriod": {
+      "title": "Select Pay Period",
+      "description": "Choose the month and year for this payroll run",
+      "processingFor": "Processing payroll for {month} {year}",
+      "employeesIncluded": "{count} active employees will be included",
+      "generatePreview": "Generate Preview"
+    },
+    "preview": {
+      "title": "Payroll Preview - {month} {year}",
+      "description": "Review the calculated salaries before processing",
+      "employees": "Employees",
+      "totalGross": "Total Gross",
+      "totalDeductions": "Total Deductions",
+      "totalNetPay": "Total Net Pay"
+    },
+    "previewTable": {
+      "employee": "Employee",
+      "basic": "Basic",
+      "allowances": "Allowances",
+      "gross": "Gross",
+      "lop": "LOP",
+      "deductions": "Deductions",
+      "tax": "Tax",
       "netPay": "Net Pay"
     },
+    "steps": {
+      "selectPeriod": "Select Period",
+      "preview": "Preview",
+      "confirm": "Confirm"
+    },
+    "actions": {
+      "back": "Back",
+      "runPayroll": "Run Payroll",
+      "processing": "Processing...",
+      "viewDetails": "View Details",
+      "confirmPost": "Confirm & Post",
+      "confirming": "Confirming...",
+      "confirmPayroll": "Confirm Payroll"
+    },
+    "success": {
+      "title": "Payroll Generated Successfully",
+      "description": "Payslips for {month} {year} have been created for {count} employees.",
+      "totalNetPay": "Total Net Pay: {amount}"
+    },
+    "confirmDialog": {
+      "title": "Confirm Payroll",
+      "description": "This will finalize the payroll and create accounting entries. This action cannot be undone. Make sure all details are correct."
+    },
+    "lopDays": "{days} days",
+    "noDeductions": "No deductions",
+    "noPayslips": "No payslips yet",
+    "noPayslipsDesc": "Payslips will appear here after running payroll",
+    "viewPayslip": "View",
     "empty": {
       "title": "No payroll runs yet",
-      "description": "Create your first payroll run"
+      "description": "Create your first payroll run to get started"
     }
   }
 }

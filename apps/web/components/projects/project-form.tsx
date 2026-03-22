@@ -17,11 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -45,7 +41,7 @@ type ProjectFormData = z.infer<typeof projectSchema>;
 interface ProjectFormProps {
   project?: Project | null;
   customers: Array<{ id: string; name: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -115,15 +111,9 @@ export function ProjectForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Project Name *</Label>
-              <Input
-                id="name"
-                placeholder="Enter project name"
-                {...form.register('name')}
-              />
+              <Input id="name" placeholder="Enter project name" {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.name.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
 
@@ -145,9 +135,7 @@ export function ProjectForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.customerId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
               )}
             </div>
           </div>
@@ -167,7 +155,7 @@ export function ProjectForm({
               <Label htmlFor="status">Status</Label>
               <Select
                 value={form.watch('status')}
-                onValueChange={(value: any) => form.setValue('status', value)}
+                onValueChange={(value: ProjectFormData['status']) => form.setValue('status', value)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -190,7 +178,7 @@ export function ProjectForm({
                     variant="outline"
                     className={cn(
                       'w-full justify-start text-left font-normal',
-                      !form.watch('startDate') && 'text-muted-foreground'
+                      !form.watch('startDate') && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -218,12 +206,12 @@ export function ProjectForm({
                     variant="outline"
                     className={cn(
                       'w-full justify-start text-left font-normal',
-                      !form.watch('endDate') && 'text-muted-foreground'
+                      !form.watch('endDate') && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {form.watch('endDate')
-                      ? format(form.watch('endDate'), 'PPP')
+                      ? format(form.watch('endDate') as Date, 'PPP')
                       : 'No end date'}
                   </Button>
                 </PopoverTrigger>
@@ -252,7 +240,9 @@ export function ProjectForm({
             <Label>Billing Method *</Label>
             <Select
               value={form.watch('billingMethod')}
-              onValueChange={(value: any) => form.setValue('billingMethod', value)}
+              onValueChange={(value: ProjectFormData['billingMethod']) =>
+                form.setValue('billingMethod', value)
+              }
             >
               <SelectTrigger>
                 <SelectValue />
@@ -262,9 +252,7 @@ export function ProjectForm({
                   <SelectItem key={option.value} value={option.value}>
                     <div>
                       <div className="font-medium">{option.label}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {option.description}
-                      </div>
+                      <div className="text-xs text-muted-foreground">{option.description}</div>
                     </div>
                   </SelectItem>
                 ))}
@@ -293,7 +281,9 @@ export function ProjectForm({
               <Label>Budget Type</Label>
               <Select
                 value={form.watch('budgetType')}
-                onValueChange={(value: any) => form.setValue('budgetType', value)}
+                onValueChange={(value: ProjectFormData['budgetType']) =>
+                  form.setValue('budgetType', value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue />

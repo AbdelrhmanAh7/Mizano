@@ -1,13 +1,18 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { CreateEmployeeDto } from '../dto/create-employee.dto';
+import { UpdateEmployeeDto } from '../dto/update-employee.dto';
+import { EmployeeCursorQueryDto } from '../dto/employee-cursor-query.dto';
 
 @Injectable()
 export class EmployeesService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateEmployeeDto) {
     // Check for duplicate employee ID
     if (dto.employeeId) {
       const existing = await this.prisma.employee.findFirst({
@@ -24,12 +29,12 @@ export class EmployeesService {
         name: dto.name,
         email: dto.email,
         phone: dto.phone,
-        dateOfJoining: new Date(dto.dateOfJoining || dto.hireDate),
+        dateOfJoining: new Date(dto.dateOfJoining || dto.hireDate || new Date()),
         department: dto.department,
         jobTitle: dto.jobTitle || dto.position,
         basicSalary: new Decimal(dto.basicSalary || dto.baseSalary || '0'),
-        allowances: dto.allowances || {},
-        deductions: dto.deductions || {},
+        allowances: (dto.allowances as Prisma.InputJsonValue) ?? {},
+        deductions: (dto.deductions as Prisma.InputJsonValue) ?? {},
         bankAccount: dto.bankAccount || dto.bankAccountNumber,
         isActive: dto.isActive !== false,
         organizationId,
@@ -37,10 +42,25 @@ export class EmployeesService {
     });
   }
 
-  async findAll(organizationId: string, query: PaginationDto & { isActive?: boolean; department?: string }) {
-    const { page = 1, limit = 50, sortBy = 'name', sortOrder = 'asc', isActive, department } = query;
-    const where: any = { organizationId };
-    if (isActive !== undefined) where.isActive = isActive;
+  async findAll(
+    organizationId: string,
+    query: PaginationDto & { isActive?: boolean | string; status?: string; department?: string },
+  ) {
+    const {
+      page = 1,
+      limit = 50,
+      sortBy = 'name',
+      sortOrder = 'asc',
+      isActive,
+      status,
+      department,
+    } = query;
+    const where: Prisma.EmployeeWhereInput = { organizationId, deletedAt: null };
+    if (isActive !== undefined) {
+      where.isActive = typeof isActive === 'string' ? isActive === 'true' : isActive;
+    }
+    if (status === 'ACTIVE') where.isActive = true;
+    if (status === 'INACTIVE' || status === 'TERMINATED') where.isActive = false;
     if (department) where.department = department;
 
     const [employees, total] = await Promise.all([
@@ -59,9 +79,27 @@ export class EmployeesService {
     };
   }
 
+  async findAllCursor(organizationId: string, query: EmployeeCursorQueryDto) {
+    const {
+      cursor,
+      take,
+      sortBy = 'name',
+      sortOrder = 'asc',
+      isActive,
+      department,
+      status,
+    } = query;
+    const where: Prisma.EmployeeWhereInput = { organizationId, deletedAt: null };
+    if (status === 'ACTIVE') where.isActive = true;
+    else if (status === 'INACTIVE' || status === 'TERMINATED') where.isActive = false;
+    else if (isActive !== undefined) where.isActive = isActive;
+    if (department) where.department = department;
+    return cursorPaginate(this.prisma.employee, where, { [sortBy]: sortOrder }, { cursor, take });
+  }
+
   async findOne(organizationId: string, id: string) {
     const employee = await this.prisma.employee.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: {
         attendances: { take: 10, orderBy: { date: 'desc' } },
         payslips: { take: 10, orderBy: { payrollRunId: 'desc' } },
@@ -71,10 +109,10 @@ export class EmployeesService {
     return employee;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateEmployeeDto) {
     await this.findOne(organizationId, id);
 
-    const data: any = { ...dto };
+    const data: Record<string, unknown> = { ...dto };
     if (dto.dateOfJoining) data.dateOfJoining = new Date(dto.dateOfJoining);
     if (dto.basicSalary) data.basicSalary = new Decimal(dto.basicSalary);
 
@@ -84,14 +122,17 @@ export class EmployeesService {
   async remove(organizationId: string, id: string) {
     const employee = await this.prisma.employee.findFirst({
       where: { id, organizationId },
-      include: { payslips: { take: 1 } },
+      include: { _count: { select: { payslips: true } } },
     });
     if (!employee) throw new NotFoundException('Employee not found');
-    if (employee.payslips.length > 0) {
+    if (employee._count.payslips > 0) {
       throw new BadRequestException('Cannot delete employee with payroll history');
     }
 
-    await this.prisma.employee.delete({ where: { id } });
+    await this.prisma.employee.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return { message: 'Employee deleted' };
   }
 

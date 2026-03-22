@@ -18,16 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useCreateTimesheet, useProjects, useTasks } from '@/lib/hooks/use-projects';
+import { useTranslations } from 'next-intl';
 
 const timesheetSchema = z.object({
   projectId: z.string().min(1, 'Project is required'),
@@ -41,6 +38,8 @@ type TimesheetFormData = z.infer<typeof timesheetSchema>;
 
 export default function NewTimesheetPage() {
   const router = useRouter();
+  const t = useTranslations('projects');
+  const tc = useTranslations('common');
   const searchParams = useSearchParams();
   const initialProjectId = searchParams.get('projectId') || '';
 
@@ -95,10 +94,8 @@ export default function NewTimesheetPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Log Time</h1>
-          <p className="text-muted-foreground">
-            Record time spent on a project task
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('timesheets.logTime')}</h1>
+          <p className="text-muted-foreground">{t('timesheets.logTimeDescription')}</p>
         </div>
       </div>
 
@@ -106,12 +103,12 @@ export default function NewTimesheetPage() {
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Time Entry</CardTitle>
+            <CardTitle>{t('timesheets.timeEntry')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Project *</Label>
+                <Label>{t('timesheets.form.projectRequired')}</Label>
                 <Select
                   value={form.watch('projectId') || ''}
                   onValueChange={(value) => {
@@ -120,10 +117,10 @@ export default function NewTimesheetPage() {
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select project" />
+                    <SelectValue placeholder={t('timesheets.form.projectPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
-                    {projects.map((project: any) => (
+                    {projects.map((project: { id: string; name: string }) => (
                       <SelectItem key={project.id} value={project.id}>
                         {project.name}
                       </SelectItem>
@@ -131,24 +128,28 @@ export default function NewTimesheetPage() {
                   </SelectContent>
                 </Select>
                 {form.formState.errors.projectId && (
-                  <p className="text-sm text-red-500">
-                    {form.formState.errors.projectId.message}
-                  </p>
+                  <p className="text-sm text-red-500">{form.formState.errors.projectId.message}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label>Task *</Label>
+                <Label>{t('timesheets.form.taskRequired')}</Label>
                 <Select
                   value={form.watch('taskId') || ''}
                   onValueChange={(value) => form.setValue('taskId', value)}
                   disabled={!selectedProjectId || tasksLoading}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={tasksLoading ? 'Loading...' : 'Select task'} />
+                    <SelectValue
+                      placeholder={
+                        tasksLoading
+                          ? t('timesheets.loading')
+                          : t('timesheets.form.taskPlaceholder')
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {tasks.map((task: any) => (
+                    {tasks.map((task: { id: string; name: string }) => (
                       <SelectItem key={task.id} value={task.id}>
                         {task.name}
                       </SelectItem>
@@ -156,29 +157,27 @@ export default function NewTimesheetPage() {
                   </SelectContent>
                 </Select>
                 {form.formState.errors.taskId && (
-                  <p className="text-sm text-red-500">
-                    {form.formState.errors.taskId.message}
-                  </p>
+                  <p className="text-sm text-red-500">{form.formState.errors.taskId.message}</p>
                 )}
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Date *</Label>
+                <Label>{t('timesheets.form.dateRequired')}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
                         'w-full justify-start text-left font-normal',
-                        !form.watch('date') && 'text-muted-foreground'
+                        !form.watch('date') && 'text-muted-foreground',
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {form.watch('date')
                         ? format(form.watch('date'), 'PPP')
-                        : 'Pick a date'}
+                        : t('timesheets.pickDate')}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -193,7 +192,7 @@ export default function NewTimesheetPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="hours">Hours *</Label>
+                <Label htmlFor="hours">{t('timesheets.form.hoursRequired')}</Label>
                 <Input
                   id="hours"
                   type="number"
@@ -203,18 +202,16 @@ export default function NewTimesheetPage() {
                   {...form.register('hours', { valueAsNumber: true })}
                 />
                 {form.formState.errors.hours && (
-                  <p className="text-sm text-red-500">
-                    {form.formState.errors.hours.message}
-                  </p>
+                  <p className="text-sm text-red-500">{form.formState.errors.hours.message}</p>
                 )}
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t('timesheets.form.description')}</Label>
               <Textarea
                 id="description"
-                placeholder="What did you work on?"
+                placeholder={t('timesheets.form.descriptionPlaceholder')}
                 {...form.register('description')}
                 rows={3}
               />
@@ -225,10 +222,10 @@ export default function NewTimesheetPage() {
         {/* Actions */}
         <div className="flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={() => router.back()}>
-            Cancel
+            {tc('buttons.cancel')}
           </Button>
           <Button type="submit" disabled={createTimesheet.isPending}>
-            {createTimesheet.isPending ? 'Saving...' : 'Log Time'}
+            {createTimesheet.isPending ? t('timesheets.saving') : t('timesheets.logTime')}
           </Button>
         </div>
       </form>

@@ -1,32 +1,44 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { CustomersService } from '../services/customers.service';
-import { CreateCustomerDto } from '../dto/create-customer.dto';
-import { UpdateCustomerDto } from '../dto/update-customer.dto';
-import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  CacheResponse,
+  CacheTTL,
+  CurrentOrg,
+  HttpCache,
+  InvalidateCache,
+  Permissions,
+} from '../../../common/decorators';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { CreateCustomerDto } from '../dto/create-customer.dto';
+import { UpdateCustomerDto } from '../dto/update-customer.dto';
+import { CustomersService } from '../services/customers.service';
 
 @ApiTags('Customers')
 @ApiBearerAuth()
 @Controller('customers')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseInterceptors(CacheInvalidationInterceptor)
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
   @Post()
   @Permissions('sales.create')
+  @InvalidateCache('customers:*')
   @ApiOperation({ summary: 'Create a new customer' })
   create(@CurrentOrg() orgId: string, @Body() createCustomerDto: CreateCustomerDto) {
     return this.customersService.create(orgId, createCustomerDto);
@@ -34,9 +46,28 @@ export class CustomersController {
 
   @Get()
   @Permissions('sales.view')
+  @CacheResponse('customers:list')
+  @CacheTTL(120)
+  @HttpCache('short')
   @ApiOperation({ summary: 'Get all customers' })
   findAll(@CurrentOrg() orgId: string, @Query() query: PaginationDto) {
     return this.customersService.findAll(orgId, query);
+  }
+
+  @Get('cursor')
+  @Permissions('sales.view')
+  @ApiOperation({ summary: 'List customers with cursor-based pagination' })
+  findAllCursor(@CurrentOrg() orgId: string, @Query() query: CursorPaginationDto) {
+    return this.customersService.findAllCursor(orgId, query);
+  }
+
+  // Bulk Operations
+  @Post('bulk-delete')
+  @Permissions('sales.delete')
+  @InvalidateCache('customers:*')
+  @ApiOperation({ summary: 'Bulk delete customers' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+    return this.customersService.bulkDelete(orgId, dto.ids);
   }
 
   @Get(':id')
@@ -55,6 +86,7 @@ export class CustomersController {
 
   @Patch(':id')
   @Permissions('sales.edit')
+  @InvalidateCache('customers:*')
   @ApiOperation({ summary: 'Update customer' })
   update(
     @CurrentOrg() orgId: string,
@@ -66,6 +98,7 @@ export class CustomersController {
 
   @Delete(':id')
   @Permissions('sales.delete')
+  @InvalidateCache('customers:*')
   @ApiOperation({ summary: 'Delete customer' })
   remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.customersService.remove(orgId, id);

@@ -1,14 +1,13 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateJournalDto } from '../dto/create-journal.dto';
-import { UpdateJournalDto } from '../dto/update-journal.dto';
-import { JournalQueryDto } from '../dto/journal-query.dto';
-import { OrganizationsService } from '../../organizations/organizations.service';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { OrganizationsService } from '../../organizations/organizations.service';
+import { CreateJournalDto } from '../dto/create-journal.dto';
+import { JournalCursorQueryDto } from '../dto/journal-cursor-query.dto';
+import { JournalQueryDto } from '../dto/journal-query.dto';
+import { UpdateJournalDto } from '../dto/update-journal.dto';
 
 @Injectable()
 export class JournalsService {
@@ -24,14 +23,8 @@ export class JournalsService {
     await this.checkLockDate(organizationId, new Date(date));
 
     // Validate debits = credits
-    const totalDebit = lines.reduce(
-      (sum, line) => sum + parseFloat(line.debit || '0'),
-      0,
-    );
-    const totalCredit = lines.reduce(
-      (sum, line) => sum + parseFloat(line.credit || '0'),
-      0,
-    );
+    const totalDebit = lines.reduce((sum, line) => sum + parseFloat(line.debit || '0'), 0);
+    const totalCredit = lines.reduce((sum, line) => sum + parseFloat(line.credit || '0'), 0);
 
     if (Math.abs(totalDebit - totalCredit) > 0.0001) {
       throw new BadRequestException('Total debits must equal total credits');
@@ -47,38 +40,24 @@ export class JournalsService {
       throw new BadRequestException('One or more accounts not found');
     }
 
-    // Generate journal number
-    const journalNumber = await this.generateJournalNumber(organizationId);
-
-    const journal = await this.prisma.journal.create({
-      data: {
-        journalNumber,
-        date: new Date(date),
-        reference,
-        notes,
-        organizationId,
-        lines: {
-          create: lines.map((line) => ({
-            accountId: line.accountId,
-            debit: new Decimal(line.debit || '0'),
-            credit: new Decimal(line.credit || '0'),
-            description: line.description,
-          })),
-        },
-      },
-      include: {
-        lines: {
-          include: {
-            account: {
-              select: { id: true, code: true, name: true, type: true },
-            },
-          },
-        },
+    // Generate journal number and create in a transaction with retry for race conditions
+    const journal = await this.createJournalWithRetry(organizationId, {
+      date: new Date(date),
+      reference,
+      notes,
+      organizationId,
+      lines: {
+        create: lines.map((line) => ({
+          accountId: line.accountId,
+          debit: new Decimal(line.debit || '0'),
+          credit: new Decimal(line.credit || '0'),
+          description: line.description,
+        })),
       },
     });
 
     return {
-      ...journal,
+      ...(journal as Record<string, unknown>),
       totalDebit: totalDebit.toFixed(4),
       totalCredit: totalCredit.toFixed(4),
     };
@@ -95,7 +74,7 @@ export class JournalsService {
       dateTo,
     } = query;
 
-    const where: any = {
+    const where: Prisma.JournalWhereInput = {
       organizationId,
       deletedAt: null,
     };
@@ -160,6 +139,49 @@ export class JournalsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  private static readonly ALLOWED_SORT_FIELDS = [
+    'id',
+    'journalNumber',
+    'date',
+    'createdAt',
+    'updatedAt',
+    'isPosted',
+  ];
+
+  async findAllCursor(organizationId: string, query: JournalCursorQueryDto) {
+    const { cursor, take, search, sortOrder = 'desc', dateFrom, dateTo } = query;
+    const sortBy = JournalsService.ALLOWED_SORT_FIELDS.includes(query.sortBy || '')
+      ? query.sortBy!
+      : 'date';
+    const where: Prisma.JournalWhereInput = { organizationId, deletedAt: null };
+    if (search) {
+      where.OR = [
+        { journalNumber: { contains: search, mode: 'insensitive' } },
+        { reference: { contains: search, mode: 'insensitive' } },
+        { notes: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (dateFrom || dateTo) {
+      where.date = {};
+      if (dateFrom) where.date.gte = new Date(dateFrom);
+      if (dateTo) where.date.lte = new Date(dateTo);
+    }
+    return cursorPaginate(
+      this.prisma.journal,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: {
+          lines: {
+            include: { account: { select: { id: true, code: true, name: true, type: true } } },
+          },
+        },
+      },
+    );
   }
 
   async findOne(organizationId: string, id: string) {
@@ -289,8 +311,75 @@ export class JournalsService {
     return { message: 'Journal deleted successfully' };
   }
 
-  private async generateJournalNumber(organizationId: string): Promise<string> {
-    const lastJournal = await this.prisma.journal.findFirst({
+  async reverse(organizationId: string, id: string, dto?: { date?: string }) {
+    const journal = await this.prisma.journal.findFirst({
+      where: { id, organizationId, deletedAt: null },
+      include: {
+        lines: true,
+        reversedBy: true,
+      },
+    });
+
+    if (!journal) {
+      throw new NotFoundException('Journal not found');
+    }
+
+    if (journal.reversedBy) {
+      throw new BadRequestException('This journal has already been reversed');
+    }
+
+    if (journal.reversalOfId) {
+      throw new BadRequestException('Cannot reverse a reversal journal');
+    }
+
+    const reversalDate = dto?.date ? new Date(dto.date) : new Date();
+
+    // Check lock date for both original and reversal dates
+    await this.checkLockDate(organizationId, journal.date);
+    await this.checkLockDate(organizationId, reversalDate);
+
+    const reversalJournal = await this.createJournalWithRetry(organizationId, {
+      date: reversalDate,
+      reference: `REV-${journal.journalNumber}`,
+      notes: `Reversal of ${journal.journalNumber}`,
+      isPosted: true,
+      reversalOfId: journal.id,
+      organizationId,
+      lines: {
+        create: journal.lines.map((line) => ({
+          accountId: line.accountId,
+          debit: line.credit,
+          credit: line.debit,
+          description: `Reversal: ${line.description || ''}`.trim(),
+        })),
+      },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const reversalData = reversalJournal as any;
+    const totalDebit = reversalData.lines.reduce(
+      (sum: number, line: { debit: { toString(): string }; credit: { toString(): string } }) =>
+        sum + parseFloat(line.debit.toString()),
+      0,
+    );
+    const totalCredit = reversalData.lines.reduce(
+      (sum: number, line: { debit: { toString(): string }; credit: { toString(): string } }) =>
+        sum + parseFloat(line.credit.toString()),
+      0,
+    );
+
+    return {
+      ...reversalData,
+      totalDebit: totalDebit.toFixed(4),
+      totalCredit: totalCredit.toFixed(4),
+    };
+  }
+
+  private async generateJournalNumberTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<string> {
+    const lastJournal = await tx.journal.findFirst({
       where: { organizationId },
       orderBy: { createdAt: 'desc' },
       select: { journalNumber: true },
@@ -304,6 +393,46 @@ export class JournalsService {
     return `JRN-${String(lastNumber + 1).padStart(3, '0')}`;
   }
 
+  /**
+   * Create a journal with retry logic for unique constraint conflicts on journalNumber.
+   */
+  private async createJournalWithRetry(
+    organizationId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data: any,
+    maxRetries: number = 3,
+  ): Promise<unknown> {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const journalNumber = await this.generateJournalNumberTx(tx, organizationId);
+          return tx.journal.create({
+            data: { ...data, journalNumber },
+
+            include: {
+              lines: {
+                include: {
+                  account: {
+                    select: { id: true, code: true, name: true, type: true },
+                  },
+                },
+              },
+            },
+          });
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002' &&
+          attempt < maxRetries - 1
+        ) {
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
   private async checkLockDate(organizationId: string, transactionDate: Date) {
     const lockDate = await this.organizationsService.getLockDate(organizationId);
 
@@ -312,5 +441,76 @@ export class JournalsService {
         `This period is locked. Transactions before ${lockDate.toISOString().split('T')[0]} cannot be modified.`,
       );
     }
+  }
+
+  async post(organizationId: string, id: string) {
+    const journal = await this.prisma.journal.findFirst({
+      where: { id, organizationId, deletedAt: null },
+      include: {
+        lines: {
+          include: {
+            account: {
+              select: { id: true, code: true, name: true, type: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!journal) {
+      throw new NotFoundException('Journal not found');
+    }
+
+    if (journal.isPosted) {
+      throw new BadRequestException('Journal is already posted');
+    }
+
+    // Check lock date
+    await this.checkLockDate(organizationId, journal.date);
+
+    const updatedJournal = await this.prisma.journal.update({
+      where: { id },
+      data: { isPosted: true },
+      include: {
+        lines: {
+          include: {
+            account: {
+              select: { id: true, code: true, name: true, type: true },
+            },
+          },
+        },
+      },
+    });
+
+    return updatedJournal;
+  }
+
+  // === Bulk Operations ===
+
+  async bulkDelete(organizationId: string, ids: string[]) {
+    // Only unposted journals can be deleted
+    const result = await this.prisma.journal.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        isPosted: false,
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
+  async bulkPost(organizationId: string, ids: string[]) {
+    const result = await this.prisma.journal.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+        isPosted: false,
+      },
+      data: { isPosted: true },
+    });
+    return { posted: result.count, total: ids.length };
   }
 }

@@ -1,17 +1,8 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Download,
-  FileText,
-  Printer,
-  Mail,
-} from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Download, FileText, Printer, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -48,19 +39,26 @@ import {
   getPayrollStatusColor,
   formatCurrency,
 } from '@/lib/hooks/use-hr';
+import { useTranslations } from 'next-intl';
 
 const months = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
-export default function PayrollDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = use(params);
-  const router = useRouter();
+export default function PayrollDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
+  const t = useTranslations('hr');
   const { data: payrollRun, isLoading } = usePayrollRun(id);
   const confirmPayroll = useConfirmPayroll();
 
@@ -88,16 +86,26 @@ export default function PayrollDetailPage({
       <div className="text-center py-12">
         <h2 className="text-xl font-semibold">Payroll run not found</h2>
         <Button asChild className="mt-4">
-          <Link href="/hr/payroll">Back to Payroll</Link>
+          <Link href="/hr/payroll">{t('payroll.title')}</Link>
         </Button>
       </div>
     );
   }
 
   const payslips = payrollRun.payslips || [];
-  const totalGross = payslips.reduce((sum: number, p: any) => sum + (p.gross || 0), 0);
-  const totalDeductions = payslips.reduce((sum: number, p: any) => sum + (p.totalDeductions || 0) + (p.taxAmount || 0), 0);
-  const totalNetPay = payslips.reduce((sum: number, p: any) => sum + (p.netPay || 0), 0);
+  const totalGross = payslips.reduce(
+    (sum: number, p: { gross?: number }) => sum + (p.gross || 0),
+    0,
+  );
+  const totalDeductions = payslips.reduce(
+    (sum: number, p: { totalDeductions?: number; taxAmount?: number }) =>
+      sum + (p.totalDeductions || 0) + (p.taxAmount || 0),
+    0,
+  );
+  const totalNetPay = payslips.reduce(
+    (sum: number, p: { netPay?: number }) => sum + (p.netPay || 0),
+    0,
+  );
 
   return (
     <div className="space-y-6">
@@ -114,10 +122,7 @@ export default function PayrollDetailPage({
               <h1 className="text-3xl font-bold tracking-tight">
                 Payroll - {months[payrollRun.month - 1]} {payrollRun.year}
               </h1>
-              <Badge
-                variant="outline"
-                className={getPayrollStatusColor(payrollRun.status)}
-              >
+              <Badge variant="outline" className={getPayrollStatusColor(payrollRun.status)}>
                 {getPayrollStatusLabel(payrollRun.status)}
               </Badge>
             </div>
@@ -139,15 +144,13 @@ export default function PayrollDetailPage({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Confirm Payroll</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will finalize the payroll and create accounting entries.
-                    This action cannot be undone.
+                    This will finalize the payroll and create accounting entries. This action cannot
+                    be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleConfirm}>
-                    Confirm
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={handleConfirm}>Confirm</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -192,9 +195,7 @@ export default function PayrollDetailPage({
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Gross</p>
-            <p className="text-2xl font-bold font-mono">
-              {formatCurrency(totalGross)}
-            </p>
+            <p className="text-2xl font-bold font-mono">{formatCurrency(totalGross)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -208,9 +209,7 @@ export default function PayrollDetailPage({
         <Card className="bg-primary/5">
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Net Pay</p>
-            <p className="text-2xl font-bold font-mono">
-              {formatCurrency(totalNetPay)}
-            </p>
+            <p className="text-2xl font-bold font-mono">{formatCurrency(totalNetPay)}</p>
           </CardContent>
         </Card>
       </div>
@@ -218,7 +217,7 @@ export default function PayrollDetailPage({
       {/* Payslips Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Payslips</CardTitle>
+          <CardTitle>{t('payroll.payslip.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -236,57 +235,66 @@ export default function PayrollDetailPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payslips.map((slip: any) => (
-                <TableRow key={slip.id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">
-                        {slip.employee?.firstName} {slip.employee?.lastName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {slip.employee?.employeeNumber}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatCurrency(slip.basicSalary || 0)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-green-600">
-                    +{formatCurrency(
-                      Object.values(slip.allowances || {}).reduce(
-                        (sum: number, a: any) => sum + (a || 0),
-                        0
-                      )
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatCurrency(slip.gross || 0)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {slip.lopDays > 0 ? (
-                      <span className="text-red-600">{slip.lopDays} days</span>
-                    ) : (
-                      '-'
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-red-600">
-                    -{formatCurrency(slip.totalDeductions || 0)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-red-600">
-                    -{formatCurrency(slip.taxAmount || 0)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono font-medium">
-                    {formatCurrency(slip.netPay || 0)}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/hr/payslips/${slip.id}`}>
-                        View
-                      </Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {payslips.map(
+                (slip: {
+                  id: string;
+                  employee?: { name?: string; employeeNumber?: string };
+                  basicSalary?: number;
+                  allowances?: Record<string, number>;
+                  gross?: number;
+                  lopDays?: number;
+                  totalDeductions?: number;
+                  taxAmount?: number;
+                  netPay?: number;
+                }) => (
+                  <TableRow key={slip.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{slip.employee?.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {slip.employee?.employeeNumber}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(slip.basicSalary || 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-green-600">
+                      +
+                      {formatCurrency(
+                        Object.values(slip.allowances || {}).reduce(
+                          (sum: number, a: number) => sum + (a || 0),
+                          0,
+                        ),
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(slip.gross || 0)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {(slip.lopDays ?? 0) > 0 ? (
+                        <span className="text-red-600">{slip.lopDays} days</span>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-red-600">
+                      -{formatCurrency(slip.totalDeductions || 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-red-600">
+                      -{formatCurrency(slip.taxAmount || 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono font-medium">
+                      {formatCurrency(slip.netPay || 0)}
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/hr/payslips/${slip.id}`}>View</Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ),
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -310,9 +318,7 @@ export default function PayrollDetailPage({
                 </div>
               </div>
               <Button variant="outline" size="sm" asChild>
-                <Link href={`/accounting/journals/${payrollRun.journalId}`}>
-                  View Journal
-                </Link>
+                <Link href={`/accounting/journals/${payrollRun.journalId}`}>View Journal</Link>
               </Button>
             </div>
           </CardContent>

@@ -1,8 +1,8 @@
 'use client';
 
-import { use, useState } from 'react';
+import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ArrowLeft, Building2, CreditCard, Calendar, Receipt, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -38,21 +38,18 @@ import {
   useVendorCredit,
   useApplyVendorCredit,
   useRefundVendorCredit,
-  getStatusVariant,
-  getStatusText,
-  getTypeText,
   formatCurrency,
 } from '@/lib/hooks/use-vendor-credits';
 import { useQuery } from '@tanstack/react-query';
 import { billsApi, accountsApi } from '@/lib/api';
 
 interface VendorCreditDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function VendorCreditDetailPage({ params }: VendorCreditDetailPageProps) {
-  const { id } = use(params);
-  const router = useRouter();
+  const { id } = params;
+  const t = useTranslations('purchases');
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState<string>('');
@@ -76,7 +73,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
       });
       return response.data;
     },
-    enabled: !!credit?.vendorId && credit?.status === 'OPEN',
+    enabled: !!credit?.vendorId && !credit?.appliedToBillId,
   });
 
   // Fetch bank accounts for refund
@@ -86,12 +83,12 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
       const response = await accountsApi.getAll();
       return response.data;
     },
-    enabled: credit?.status === 'OPEN',
+    enabled: !!credit && !credit.appliedToBillId && !credit.refundedAt,
   });
 
   const unpaidBills = billsData?.data || [];
   const bankAccounts = (accountsData?.data || []).filter(
-    (a: any) => a.code.startsWith('1') // Asset accounts
+    (a: { code: string }) => a.code.startsWith('1'), // Asset accounts
   );
 
   const handleApplyToBill = async () => {
@@ -125,9 +122,9 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
   if (!credit) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Vendor credit not found</p>
+        <p className="text-muted-foreground">{t('credits.creditNotFound')}</p>
         <Button asChild className="mt-4">
-          <Link href="/purchases/credits">Back to Credits</Link>
+          <Link href="/purchases/credits">{t('credits.backToCredits')}</Link>
         </Button>
       </div>
     );
@@ -138,62 +135,63 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
             <Link href="/purchases/credits">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight font-mono">
-                {credit.creditNumber}
-              </h1>
-              <Badge variant={getStatusVariant(credit.status)}>
-                {getStatusText(credit.status)}
+              <h1 className="text-3xl font-bold tracking-tight font-mono">{credit.creditNumber}</h1>
+              <Badge variant={credit.appliedToBillId ? 'secondary' : 'default'}>
+                {credit.appliedToBillId ? 'Applied' : credit.refundedAt ? 'Refunded' : 'Open'}
               </Badge>
-              <Badge variant="outline">{getTypeText(credit.type)}</Badge>
             </div>
             <p className="text-muted-foreground">
-              Credit from {credit.vendor?.name}
+              {t('credits.creditFrom', { name: credit.vendor?.name || '' })}
             </p>
           </div>
         </div>
 
         {/* Actions */}
-        {credit.status === 'OPEN' && parseFloat(credit.balanceRemaining) > 0 && (
+        {!credit.appliedToBillId && !credit.refundedAt && (
           <div className="flex items-center gap-2">
             <Dialog open={applyDialogOpen} onOpenChange={setApplyDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">
                   <Receipt className="mr-2 h-4 w-4" />
-                  Apply to Bill
+                  {t('credits.applyToBill')}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Apply Credit to Bill</DialogTitle>
-                  <DialogDescription>
-                    Select a bill to apply this credit against.
-                  </DialogDescription>
+                  <DialogTitle>{t('credits.applyCreditToBill')}</DialogTitle>
+                  <DialogDescription>{t('credits.applyCreditDescription')}</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label>Select Bill</Label>
+                    <Label>{t('credits.selectBill')}</Label>
                     <Select value={selectedBillId} onValueChange={setSelectedBillId}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a bill" />
+                        <SelectValue placeholder={t('credits.selectBillPlaceholder')} />
                       </SelectTrigger>
                       <SelectContent>
                         {unpaidBills.length === 0 ? (
                           <SelectItem value="" disabled>
-                            No unpaid bills found
+                            {t('credits.noUnpaidBills')}
                           </SelectItem>
                         ) : (
-                          unpaidBills.map((bill: any) => (
-                            <SelectItem key={bill.id} value={bill.id}>
-                              {bill.billNumber} - {formatCurrency(bill.balanceDue, currency)}
-                            </SelectItem>
-                          ))
+                          unpaidBills.map(
+                            (bill: {
+                              id: string;
+                              billNumber: string;
+                              balanceDue: string | number;
+                            }) => (
+                              <SelectItem key={bill.id} value={bill.id}>
+                                {bill.billNumber} - {formatCurrency(bill.balanceDue, currency)}
+                              </SelectItem>
+                            ),
+                          )
                         )}
                       </SelectContent>
                     </Select>
@@ -207,7 +205,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                     onClick={handleApplyToBill}
                     disabled={!selectedBillId || applyCredit.isPending}
                   >
-                    {applyCredit.isPending ? 'Applying...' : 'Apply Credit'}
+                    {applyCredit.isPending ? t('credits.applying') : t('credits.applyCredit')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -217,25 +215,23 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
               <DialogTrigger asChild>
                 <Button>
                   <Banknote className="mr-2 h-4 w-4" />
-                  Record Refund
+                  {t('credits.recordRefund')}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Record Refund</DialogTitle>
-                  <DialogDescription>
-                    Record a refund received from the vendor.
-                  </DialogDescription>
+                  <DialogTitle>{t('credits.recordRefund')}</DialogTitle>
+                  <DialogDescription>{t('credits.recordRefundDescription')}</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label>Deposit to Account</Label>
+                    <Label>{t('credits.depositToAccount')}</Label>
                     <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select account" />
+                        <SelectValue placeholder={t('credits.selectAccount')} />
                       </SelectTrigger>
                       <SelectContent>
-                        {bankAccounts.map((account: any) => (
+                        {bankAccounts.map((account: { id: string; code: string; name: string }) => (
                           <SelectItem key={account.id} value={account.id}>
                             {account.code} - {account.name}
                           </SelectItem>
@@ -244,9 +240,9 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                     </Select>
                   </div>
                   <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm text-muted-foreground">Refund Amount</p>
+                    <p className="text-sm text-muted-foreground">{t('credits.refundAmount')}</p>
                     <p className="text-2xl font-bold font-mono">
-                      {formatCurrency(credit.balanceRemaining, currency)}
+                      {formatCurrency(credit.appliedToBillId ? '0' : credit.amount, currency)}
                     </p>
                   </div>
                 </div>
@@ -258,7 +254,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                     onClick={handleRefund}
                     disabled={!selectedAccountId || refundCredit.isPending}
                   >
-                    {refundCredit.isPending ? 'Processing...' : 'Record Refund'}
+                    {refundCredit.isPending ? t('credits.processing') : t('credits.recordRefund')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -276,9 +272,9 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                 <CreditCard className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-sm text-muted-foreground">{t('credits.total')}</p>
                 <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(credit.total, currency)}
+                  {formatCurrency(credit.amount, currency)}
                 </p>
               </div>
             </div>
@@ -292,10 +288,8 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                 <Calendar className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Date</p>
-                <p className="text-2xl font-bold">
-                  {format(new Date(credit.date), 'MMM d, yyyy')}
-                </p>
+                <p className="text-sm text-muted-foreground">{t('credits.date')}</p>
+                <p className="text-2xl font-bold">{format(new Date(credit.date), 'MMM d, yyyy')}</p>
               </div>
             </div>
           </CardContent>
@@ -308,9 +302,9 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                 <Building2 className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Balance Remaining</p>
+                <p className="text-sm text-muted-foreground">{t('credits.balanceRemaining')}</p>
                 <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(credit.balanceRemaining, currency)}
+                  {formatCurrency(credit.appliedToBillId ? '0' : credit.amount, currency)}
                 </p>
               </div>
             </div>
@@ -322,11 +316,11 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Credit Details</CardTitle>
+            <CardTitle>{t('credits.creditDetails')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Vendor</span>
+              <span className="text-muted-foreground">{t('credits.vendor')}</span>
               <Link
                 href={`/purchases/vendors/${credit.vendorId}`}
                 className="text-blue-600 hover:underline"
@@ -335,18 +329,14 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
               </Link>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Type</span>
-              <span>{getTypeText(credit.type)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Status</span>
-              <Badge variant={getStatusVariant(credit.status)}>
-                {getStatusText(credit.status)}
+              <span className="text-muted-foreground">{t('credits.status')}</span>
+              <Badge variant={credit.appliedToBillId ? 'secondary' : 'default'}>
+                {credit.appliedToBillId ? 'Applied' : credit.refundedAt ? 'Refunded' : 'Open'}
               </Badge>
             </div>
             {credit.bill && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Applied to Bill</span>
+                <span className="text-muted-foreground">{t('credits.appliedToBill')}</span>
                 <Link
                   href={`/purchases/bills/${credit.billId}`}
                   className="font-mono text-blue-600 hover:underline"
@@ -357,14 +347,8 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
             )}
             {credit.reason && (
               <div className="pt-2 border-t">
-                <p className="text-sm text-muted-foreground mb-1">Reason</p>
+                <p className="text-sm text-muted-foreground mb-1">{t('credits.reason')}</p>
                 <p className="text-sm">{credit.reason}</p>
-              </div>
-            )}
-            {credit.notes && (
-              <div className="pt-2 border-t">
-                <p className="text-sm text-muted-foreground mb-1">Notes</p>
-                <p className="text-sm">{credit.notes}</p>
               </div>
             )}
           </CardContent>
@@ -373,32 +357,18 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
         {/* Totals */}
         <Card>
           <CardHeader>
-            <CardTitle>Summary</CardTitle>
+            <CardTitle>{t('credits.summary')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-mono">
-                  {formatCurrency(credit.subtotal, currency)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Tax</span>
-                <span className="font-mono">
-                  {formatCurrency(credit.taxAmount, currency)}
-                </span>
-              </div>
               <div className="flex justify-between text-lg font-semibold border-t pt-3">
-                <span>Total</span>
-                <span className="font-mono">
-                  {formatCurrency(credit.total, currency)}
-                </span>
+                <span>{t('credits.total')}</span>
+                <span className="font-mono">{formatCurrency(credit.amount, currency)}</span>
               </div>
               <div className="flex justify-between text-lg border-t pt-3">
-                <span className="text-muted-foreground">Balance Remaining</span>
+                <span className="text-muted-foreground">{t('credits.balanceRemaining')}</span>
                 <span className="font-mono font-bold text-green-600">
-                  {formatCurrency(credit.balanceRemaining, currency)}
+                  {formatCurrency(credit.appliedToBillId ? '0' : credit.amount, currency)}
                 </span>
               </div>
             </div>
@@ -410,36 +380,30 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
       {credit.lines && credit.lines.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Line Items</CardTitle>
+            <CardTitle>{t('lineItems.title')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Item/Account</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right">Rate</TableHead>
-                  <TableHead className="text-right">Tax %</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>{t('credits.table.itemAccount')}</TableHead>
+                  <TableHead>{t('credits.table.description')}</TableHead>
+                  <TableHead className="text-right">{t('credits.table.qty')}</TableHead>
+                  <TableHead className="text-right">{t('credits.table.rate')}</TableHead>
+                  <TableHead className="text-right">{t('credits.table.taxPercent')}</TableHead>
+                  <TableHead className="text-right">{t('credits.table.amount')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {credit.lines.map((line) => (
                   <TableRow key={line.id}>
-                    <TableCell>
-                      {line.item?.name || line.account?.name || '-'}
-                    </TableCell>
+                    <TableCell>{line.item?.name || line.account?.name || '-'}</TableCell>
                     <TableCell>{line.description || '-'}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {line.quantity}
-                    </TableCell>
+                    <TableCell className="text-right font-mono">{line.quantity}</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatCurrency(line.rate, currency)}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {line.taxRate}%
-                    </TableCell>
+                    <TableCell className="text-right font-mono">{line.taxRate}%</TableCell>
                     <TableCell className="text-right font-mono font-medium">
                       {formatCurrency(line.amount, currency)}
                     </TableCell>

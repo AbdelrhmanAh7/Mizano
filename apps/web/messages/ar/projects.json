@@ -93,18 +93,33 @@
   },
   "timesheets": {
     "title": "سجلات الوقت",
+    "description": "تتبع الوقت المستغرق في المشاريع والمهام",
     "newEntry": "إدخال وقت جديد",
     "editEntry": "تعديل إدخال الوقت",
     "deleteEntry": "حذف إدخال الوقت",
     "entryDetails": "تفاصيل إدخال الوقت",
+    "logTime": "تسجيل الوقت",
+    "logTimeDescription": "تسجيل الوقت المستغرق في مهمة مشروع",
+    "timeEntry": "إدخال الوقت",
+    "timeEntries": "إدخالات الوقت",
+    "searchPlaceholder": "البحث في الإدخالات...",
+    "allStatus": "جميع الحالات",
+    "saving": "جاري الحفظ...",
+    "pickDate": "اختر تاريخًا",
+    "loading": "جاري التحميل...",
     "form": {
       "project": "المشروع",
       "projectPlaceholder": "اختر المشروع",
+      "projectRequired": "المشروع *",
       "task": "المهمة",
-      "taskPlaceholder": "اختر المهمة (اختياري)",
+      "taskPlaceholder": "اختر المهمة",
+      "taskRequired": "المهمة *",
       "date": "التاريخ",
+      "dateRequired": "التاريخ *",
       "startTime": "وقت البداية",
       "endTime": "وقت النهاية",
+      "hours": "الساعات",
+      "hoursRequired": "الساعات *",
       "duration": "المدة",
       "description": "الوصف",
       "descriptionPlaceholder": "ماذا عملت؟",
@@ -118,16 +133,24 @@
       "date": "التاريخ",
       "project": "المشروع",
       "task": "المهمة",
+      "description": "الوصف",
+      "hours": "الساعات",
       "duration": "المدة",
       "status": "الحالة"
     },
     "summary": {
       "totalHours": "إجمالي الساعات",
+      "unbilledHours": "الساعات غير المفوترة",
       "billableHours": "الساعات القابلة للفوترة",
       "nonBillableHours": "الساعات غير القابلة للفوترة"
     },
+    "confirmDelete": {
+      "title": "حذف إدخال الوقت",
+      "description": "هل أنت متأكد من حذف إدخال الوقت هذا؟ لا يمكن التراجع عن هذا الإجراء."
+    },
     "empty": {
       "title": "لا توجد إدخالات وقت بعد",
+      "noResults": "لم يتم العثور على إدخالات وقت",
       "description": "ابدأ تتبع وقتك"
     }
   }

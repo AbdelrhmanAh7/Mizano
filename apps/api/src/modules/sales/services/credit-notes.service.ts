@@ -1,10 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Decimal } from '@prisma/client/runtime/library';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { CreditNoteQueryDto } from '../dto/credit-note-query.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
 import { CreateCreditNoteDto } from '../dto/create-credit-note.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { InvoicesService } from './invoices.service';
-import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class CreditNotesService {
@@ -15,13 +18,15 @@ export class CreditNotesService {
   ) {}
 
   async create(organizationId: string, createCreditNoteDto: CreateCreditNoteDto) {
-    const { customerId, invoiceId, date, reason, amount, type, appliedToInvoiceId } = createCreditNoteDto;
+    const { customerId, invoiceId, date, reason, amount, type, appliedToInvoiceId } =
+      createCreditNoteDto;
 
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, organizationId, deletedAt: null },
     });
     if (!invoice) throw new BadRequestException('Invoice not found');
-    if (invoice.customerId !== customerId) throw new BadRequestException('Invoice does not belong to this customer');
+    if (invoice.customerId !== customerId)
+      throw new BadRequestException('Invoice does not belong to this customer');
 
     // Get organization settings for default accounts
     const org = await this.prisma.organization.findUnique({
@@ -62,7 +67,12 @@ export class CreditNotesService {
 
     // Create accounting entry: Dr Sales Returns / Cr AR
     // If there's VAT involved, we also need to Dr VAT Payable
-    const journalLines: Array<{ accountId: string; debit: string; credit: string; description?: string }> = [
+    const journalLines: Array<{
+      accountId: string;
+      debit: string;
+      credit: string;
+      description?: string;
+    }> = [
       {
         accountId: org.defaultSalesReturnsAccountId,
         debit: creditAmount.toFixed(4),
@@ -93,9 +103,10 @@ export class CreditNotesService {
     return creditNote;
   }
 
-  async findAll(organizationId: string, query: PaginationDto) {
-    const { page = 1, limit = 20, sortBy = 'date', sortOrder = 'desc' } = query;
-    const where = { organizationId, deletedAt: null };
+  async findAll(organizationId: string, query: CreditNoteQueryDto) {
+    const { page = 1, limit = 20, sortBy = 'date', sortOrder = 'desc', customerId } = query;
+    const where: Record<string, unknown> = { organizationId, deletedAt: null };
+    if (customerId) where.customerId = customerId;
 
     const [creditNotes, total] = await Promise.all([
       this.prisma.creditNote.findMany({
@@ -111,7 +122,30 @@ export class CreditNotesService {
       this.prisma.creditNote.count({ where }),
     ]);
 
-    return { data: creditNotes, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return {
+      data: creditNotes,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+    const { cursor, take = 50, sortBy = 'date', sortOrder = 'desc' } = query;
+
+    const where: Prisma.CreditNoteWhereInput = { organizationId, deletedAt: null };
+
+    return cursorPaginate(
+      this.prisma.creditNote,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: {
+          customer: { select: { id: true, name: true } },
+          invoice: { select: { id: true, invoiceNumber: true } },
+        },
+      },
+    );
   }
 
   async findOne(organizationId: string, id: string) {
@@ -121,6 +155,72 @@ export class CreditNotesService {
     });
     if (!creditNote) throw new NotFoundException('Credit note not found');
     return creditNote;
+  }
+
+  async update(organizationId: string, id: string, dto: Record<string, unknown>) {
+    await this.findOne(organizationId, id);
+    const data: Prisma.CreditNoteUpdateInput = {};
+    if (dto.reason !== undefined) data.reason = dto.reason as string;
+    if (dto.date !== undefined) data.date = new Date(dto.date as string);
+
+    return this.prisma.creditNote.update({
+      where: { id },
+      data,
+      include: {
+        customer: { select: { id: true, name: true } },
+        invoice: { select: { id: true, invoiceNumber: true } },
+      },
+    });
+  }
+
+  async remove(organizationId: string, id: string) {
+    await this.findOne(organizationId, id);
+    await this.prisma.creditNote.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+    return { message: 'Credit note deleted' };
+  }
+
+  async apply(organizationId: string, id: string, invoiceId: string) {
+    const creditNote = await this.findOne(organizationId, id);
+    if (creditNote.appliedToInvoiceId) {
+      throw new BadRequestException('Credit note is already applied to an invoice');
+    }
+
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, organizationId, deletedAt: null },
+    });
+    if (!invoice) throw new BadRequestException('Invoice not found');
+
+    const updated = await this.prisma.creditNote.update({
+      where: { id },
+      data: { appliedToInvoiceId: invoiceId },
+      include: {
+        customer: { select: { id: true, name: true } },
+        invoice: { select: { id: true, invoiceNumber: true } },
+      },
+    });
+
+    await this.invoicesService.updateBalanceDue(invoiceId);
+    return updated;
+  }
+
+  // === Bulk Operations ===
+
+  async bulkDelete(
+    organizationId: string,
+    ids: string[],
+  ): Promise<{ deleted: number; total: number }> {
+    const result = await this.prisma.creditNote.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
   }
 
   private async generateCreditNoteNumber(organizationId: string): Promise<string> {

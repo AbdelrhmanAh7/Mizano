@@ -1,12 +1,48 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Item, Prisma, WorkOrderStatus } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { WorkOrderStatus } from '@prisma/client';
+
+export interface CreateWorkOrderData {
+  bomId: string;
+  quantity: number;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
+  notes?: string;
+}
+
+export interface UpdateWorkOrderData {
+  quantity?: number;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
+  notes?: string;
+  bomId?: string;
+}
+
+interface WorkOrderWithBom {
+  id: string;
+  workOrderNumber: string;
+  quantity: number;
+  notes: string | null;
+  bom: {
+    outputItemId: string;
+    outputQuantity: number;
+    operationsCost: Decimal;
+    items: Array<{
+      itemId: string;
+      quantity: Decimal;
+      item: {
+        costPrice: Decimal;
+      };
+    }>;
+  };
+}
 
 @Injectable()
 export class WorkOrdersService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateWorkOrderData) {
     const bom = await this.prisma.bOM.findFirst({
       where: { id: dto.bomId, organizationId },
       include: { items: { include: { item: true } } },
@@ -21,10 +57,11 @@ export class WorkOrdersService {
         bomId: dto.bomId,
         quantity: dto.quantity,
         plannedStartDate: dto.plannedStartDate ? new Date(dto.plannedStartDate) : null,
+        plannedEndDate: dto.plannedEndDate ? new Date(dto.plannedEndDate) : null,
         status: WorkOrderStatus.DRAFT,
         notes: dto.notes,
         organizationId,
-      },
+      } as Prisma.WorkOrderUncheckedCreateInput,
       include: {
         bom: {
           include: {
@@ -36,25 +73,47 @@ export class WorkOrdersService {
     });
   }
 
-  async findAll(organizationId: string, query: { status?: string; bomId?: string }) {
-    const where: any = { organizationId };
-    if (query.status) where.status = query.status;
+  async findAll(
+    organizationId: string,
+    query: {
+      page?: number | string;
+      limit?: number | string;
+      sortBy?: string;
+      sortOrder?: string;
+      status?: string;
+      bomId?: string;
+    },
+  ) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const sortBy = query.sortBy || 'plannedStartDate';
+    const sortOrder = query.sortOrder || 'asc';
+
+    const where: Prisma.WorkOrderWhereInput = { organizationId, deletedAt: null };
+    if (query.status) where.status = query.status as WorkOrderStatus;
     if (query.bomId) where.bomId = query.bomId;
 
-    return this.prisma.workOrder.findMany({
-      where,
-      include: {
-        bom: {
-          include: { outputItem: { select: { id: true, name: true, sku: true } } },
+    const [data, total] = await Promise.all([
+      this.prisma.workOrder.findMany({
+        where,
+        include: {
+          bom: {
+            include: { outputItem: { select: { id: true, name: true, sku: true } } },
+          },
         },
-      },
-      orderBy: { plannedStartDate: 'asc' },
-    });
+        orderBy: { [sortBy]: sortOrder },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.workOrder.count({ where }),
+    ]);
+
+    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async findOne(organizationId: string, id: string) {
     const workOrder = await this.prisma.workOrder.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: {
         bom: {
           include: {
@@ -68,18 +127,22 @@ export class WorkOrdersService {
     return workOrder;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateWorkOrderData) {
     const workOrder = await this.findOne(organizationId, id);
-    if (workOrder.status === WorkOrderStatus.COMPLETED || workOrder.status === WorkOrderStatus.CANCELLED) {
+    if (
+      workOrder.status === WorkOrderStatus.COMPLETED ||
+      workOrder.status === WorkOrderStatus.CANCELLED
+    ) {
       throw new BadRequestException('Cannot update completed or cancelled work order');
     }
 
-    const data: any = { ...dto };
+    const data: Record<string, unknown> = { ...dto };
     if (dto.plannedStartDate) data.plannedStartDate = new Date(dto.plannedStartDate);
+    if (dto.plannedEndDate) data.plannedEndDate = new Date(dto.plannedEndDate);
 
     return this.prisma.workOrder.update({
       where: { id },
-      data,
+      data: data as Prisma.WorkOrderUncheckedUpdateInput,
       include: {
         bom: {
           include: { outputItem: { select: { id: true, name: true, sku: true } } },
@@ -117,7 +180,7 @@ export class WorkOrdersService {
     const multiplier = plannedQty / outputQty;
 
     const materials: Array<{
-      item: any;
+      item: Item;
       required: number;
       available: number;
       shortfall: number;
@@ -135,7 +198,10 @@ export class WorkOrdersService {
           organizationId,
         },
       });
-      const currentStock = movements.reduce((sum: number, m: { quantity: number }) => sum + m.quantity, 0);
+      const currentStock = movements.reduce(
+        (sum: number, m) => sum + parseFloat(m.quantity.toString()),
+        0,
+      );
 
       const shortfall = Math.max(0, requiredQty - currentStock);
       if (shortfall > 0) isAvailable = false;
@@ -151,7 +217,11 @@ export class WorkOrdersService {
     return { isAvailable, materials };
   }
 
-  async completeWorkOrder(organizationId: string, id: string, dto: { quantityProduced: number; notes?: string }) {
+  async completeWorkOrder(
+    organizationId: string,
+    id: string,
+    dto: { quantityProduced: number; notes?: string },
+  ) {
     const workOrder = await this.findOne(organizationId, id);
     if (workOrder.status !== WorkOrderStatus.IN_PROCESS) {
       throw new BadRequestException('Work order is not in process');
@@ -165,6 +235,9 @@ export class WorkOrdersService {
     // Add finished goods to inventory
     await this.addFinishedGoods(organizationId, workOrder, quantityProduced);
 
+    // Create COGM journal entry
+    const journalId = await this.createCOGMJournal(organizationId, workOrder, quantityProduced);
+
     // Update work order as completed
     return this.prisma.workOrder.update({
       where: { id },
@@ -172,11 +245,174 @@ export class WorkOrdersService {
         status: WorkOrderStatus.COMPLETED,
         completedDate: new Date(),
         notes: dto.notes || workOrder.notes,
+        journalId,
       },
     });
   }
 
-  private async consumeMaterials(organizationId: string, workOrder: any, quantityProduced: number) {
+  private async createCOGMJournal(
+    organizationId: string,
+    workOrder: WorkOrderWithBom,
+    quantityProduced: number,
+  ): Promise<string | null> {
+    const bom = workOrder.bom;
+    const outputQty = bom.outputQuantity;
+    const multiplier = quantityProduced / outputQty;
+
+    // Calculate total material cost
+    let totalMaterialCost = new Decimal(0);
+    for (const bomItem of bom.items) {
+      const baseQty = parseFloat(bomItem.quantity.toString());
+      const consumeQty = Math.round(baseQty * multiplier);
+      const costPrice = bomItem.item?.costPrice
+        ? new Decimal(bomItem.item.costPrice.toString())
+        : new Decimal(0);
+      totalMaterialCost = totalMaterialCost.add(costPrice.mul(consumeQty));
+    }
+
+    // Add operations cost from BOM
+    const operationsCost = bom.operationsCost
+      ? new Decimal(bom.operationsCost.toString())
+      : new Decimal(0);
+    const totalCOGM = totalMaterialCost.add(operationsCost);
+
+    // If total COGM is zero, skip journal creation
+    if (totalCOGM.equals(0)) {
+      return null;
+    }
+
+    // Find inventory accounts
+    // Finished goods account (from output item or default ASSET inventory account)
+    const outputItem = await this.prisma.item.findFirst({
+      where: { id: bom.outputItemId, organizationId },
+      select: { inventoryAccountId: true },
+    });
+
+    const finishedGoodsAccount = outputItem?.inventoryAccountId
+      ? await this.prisma.account.findFirst({
+          where: { id: outputItem.inventoryAccountId, organizationId },
+        })
+      : await this.prisma.account.findFirst({
+          where: {
+            organizationId,
+            type: 'ASSET',
+            isActive: true,
+            name: { contains: 'Inventory', mode: 'insensitive' },
+          },
+        });
+
+    // Raw materials account (find a second inventory/asset account or use same)
+    const rawMaterialsAccount = await this.prisma.account.findFirst({
+      where: {
+        organizationId,
+        type: 'ASSET',
+        isActive: true,
+        OR: [
+          { name: { contains: 'Raw Material', mode: 'insensitive' } },
+          { name: { contains: 'Inventory', mode: 'insensitive' } },
+        ],
+      },
+    });
+
+    if (!finishedGoodsAccount || !rawMaterialsAccount) {
+      // Skip journal creation if accounts not configured
+      return null;
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const journalNumber = await this.generateJournalNumberTx(tx, organizationId);
+
+      const journalLines: Array<{
+        accountId: string;
+        debit: Decimal;
+        credit: Decimal;
+        description: string;
+      }> = [];
+
+      // Debit: Finished Goods Inventory (total COGM)
+      journalLines.push({
+        accountId: finishedGoodsAccount.id,
+        debit: totalCOGM,
+        credit: new Decimal(0),
+        description: `Finished goods - WO ${workOrder.workOrderNumber}`,
+      });
+
+      // Credit: Raw Materials Inventory (material cost)
+      if (totalMaterialCost.greaterThan(0)) {
+        journalLines.push({
+          accountId: rawMaterialsAccount.id,
+          debit: new Decimal(0),
+          credit: totalMaterialCost,
+          description: `Materials consumed - WO ${workOrder.workOrderNumber}`,
+        });
+      }
+
+      // Credit: Manufacturing Overhead (operations cost) if > 0
+      if (operationsCost.greaterThan(0)) {
+        const overheadAccount = await tx.account.findFirst({
+          where: {
+            organizationId,
+            type: 'EXPENSE',
+            isActive: true,
+            OR: [
+              { name: { contains: 'Manufacturing', mode: 'insensitive' } },
+              { name: { contains: 'Overhead', mode: 'insensitive' } },
+            ],
+          },
+        });
+
+        if (overheadAccount) {
+          journalLines.push({
+            accountId: overheadAccount.id,
+            debit: new Decimal(0),
+            credit: operationsCost,
+            description: `Manufacturing overhead - WO ${workOrder.workOrderNumber}`,
+          });
+        } else {
+          // Credit operations cost to raw materials account as fallback
+          journalLines[1].credit = journalLines[1].credit.add(operationsCost);
+        }
+      }
+
+      const journal = await tx.journal.create({
+        data: {
+          journalNumber,
+          date: new Date(),
+          reference: `COGM-${workOrder.workOrderNumber}`,
+          notes: `Cost of Goods Manufactured - Work Order ${workOrder.workOrderNumber}`,
+          isPosted: true,
+          organizationId,
+          lines: { create: journalLines },
+        },
+      });
+
+      return journal.id;
+    });
+  }
+
+  private async generateJournalNumberTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<string> {
+    const lastJournal = await tx.journal.findFirst({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      select: { journalNumber: true },
+    });
+
+    if (!lastJournal?.journalNumber) {
+      return 'JRN-001';
+    }
+
+    const lastNumber = parseInt(lastJournal.journalNumber.split('-')[1], 10);
+    return `JRN-${String(lastNumber + 1).padStart(3, '0')}`;
+  }
+
+  private async consumeMaterials(
+    organizationId: string,
+    workOrder: WorkOrderWithBom,
+    quantityProduced: number,
+  ) {
     const bom = workOrder.bom;
     const outputQty = bom.outputQuantity;
     const multiplier = quantityProduced / outputQty;
@@ -210,7 +446,11 @@ export class WorkOrdersService {
     }
   }
 
-  private async addFinishedGoods(organizationId: string, workOrder: any, quantityProduced: number) {
+  private async addFinishedGoods(
+    organizationId: string,
+    workOrder: WorkOrderWithBom,
+    quantityProduced: number,
+  ) {
     // Get default warehouse
     const defaultWarehouse = await this.prisma.warehouse.findFirst({
       where: { organizationId, isDefault: true },
@@ -249,7 +489,17 @@ export class WorkOrdersService {
     });
   }
 
-  async recordProduction(organizationId: string, id: string, dto: { quantityProduced: number; notes?: string }) {
+  async recordProduction(
+    organizationId: string,
+    id: string,
+    dto: {
+      quantityProduced: number;
+      quantityRejected?: number;
+      wastageQuantity?: number;
+      notes?: string;
+      date?: string;
+    },
+  ) {
     const workOrder = await this.findOne(organizationId, id);
     if (workOrder.status !== WorkOrderStatus.IN_PROCESS) {
       throw new BadRequestException('Work order is not in process');
@@ -257,67 +507,142 @@ export class WorkOrdersService {
 
     const quantityProduced = dto.quantityProduced;
 
+    // Create ProductionEntry record
+    const entry = await this.prisma.productionEntry.create({
+      data: {
+        workOrderId: id,
+        date: dto.date ? new Date(dto.date) : new Date(),
+        quantityProduced: Math.round(quantityProduced),
+        quantityRejected: dto.quantityRejected ? Math.round(dto.quantityRejected) : 0,
+        wastageQuantity: dto.wastageQuantity ? Math.round(dto.wastageQuantity) : 0,
+        notes: dto.notes,
+        organizationId,
+      },
+    });
+
     // Consume materials proportionally
     await this.consumeMaterials(organizationId, workOrder, quantityProduced);
 
     // Add finished goods to inventory
     await this.addFinishedGoods(organizationId, workOrder, quantityProduced);
 
-    // Update work order notes with production entry
-    const timestamp = new Date().toISOString();
-    const productionNote = `[${timestamp}] Produced: ${quantityProduced} units${dto.notes ? ' - ' + dto.notes : ''}`;
-
-    return this.prisma.workOrder.update({
-      where: { id },
-      data: {
-        notes: workOrder.notes ? `${workOrder.notes}\n${productionNote}` : productionNote,
-      },
-      include: {
-        bom: {
-          include: { outputItem: { select: { id: true, name: true, sku: true } } },
-        },
-      },
-    });
+    return entry;
   }
 
   async getProductionHistory(organizationId: string, id: string) {
-    const workOrder = await this.findOne(organizationId, id);
+    await this.findOne(organizationId, id);
 
-    // Get all inventory movements related to this work order
-    const movements = await this.prisma.inventoryMovement.findMany({
-      where: {
-        organizationId,
-        referenceType: 'workOrder',
-        referenceId: id,
-      },
-      include: {
-        item: { select: { id: true, name: true, sku: true } },
-        warehouse: { select: { id: true, name: true } },
-      },
+    const entries = await this.prisma.productionEntry.findMany({
+      where: { workOrderId: id, organizationId },
       orderBy: { createdAt: 'desc' },
     });
 
-    // Separate consumed materials and produced goods
-    const consumed = movements.filter((m) => m.quantity < 0);
-    const produced = movements.filter((m) => m.quantity > 0);
+    return entries.map((e) => ({
+      id: e.id,
+      date: e.date,
+      quantityProduced: parseFloat(e.quantityProduced.toString()),
+      quantityRejected: parseFloat(e.quantityRejected.toString()),
+      wastageQuantity: parseFloat(e.wastageQuantity.toString()),
+      notes: e.notes,
+      createdAt: e.createdAt,
+    }));
+  }
+
+  async remove(organizationId: string, id: string) {
+    const workOrder = await this.prisma.workOrder.findFirst({
+      where: { id, organizationId },
+    });
+    if (!workOrder) throw new NotFoundException('Work order not found');
+    if (workOrder.status !== WorkOrderStatus.DRAFT) {
+      throw new BadRequestException('Only draft work orders can be deleted');
+    }
+    await this.prisma.workOrder.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+    return { message: 'Work order deleted' };
+  }
+
+  // === Bulk Operations ===
+
+  async bulkDelete(organizationId: string, ids: string[]) {
+    const result = await this.prisma.workOrder.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        status: WorkOrderStatus.DRAFT,
+        deletedAt: null,
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
+  async bulkStart(organizationId: string, ids: string[]) {
+    const result = await this.prisma.workOrder.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        status: WorkOrderStatus.DRAFT,
+      },
+      data: { status: WorkOrderStatus.IN_PROCESS, actualStartDate: new Date() },
+    });
+    return { started: result.count, total: ids.length };
+  }
+
+  async bulkComplete(organizationId: string, ids: string[]) {
+    const result = await this.prisma.workOrder.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        status: WorkOrderStatus.IN_PROCESS,
+      },
+      data: { status: WorkOrderStatus.COMPLETED, completedDate: new Date() },
+    });
+    return { completed: result.count, total: ids.length };
+  }
+
+  async bulkCancel(organizationId: string, ids: string[]) {
+    const result = await this.prisma.workOrder.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        status: { in: [WorkOrderStatus.DRAFT, WorkOrderStatus.IN_PROCESS] },
+      },
+      data: { status: WorkOrderStatus.CANCELLED },
+    });
+    return { cancelled: result.count, total: ids.length };
+  }
+
+  async getStats(organizationId: string) {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [statusCounts, activeBoms, completedThisMonth] = await Promise.all([
+      this.prisma.workOrder.groupBy({
+        by: ['status'],
+        where: { organizationId, deletedAt: null },
+        _count: { id: true },
+      }),
+      this.prisma.bOM.count({
+        where: { organizationId, isActive: true, deletedAt: null },
+      }),
+      this.prisma.workOrder.count({
+        where: {
+          organizationId,
+          status: WorkOrderStatus.COMPLETED,
+          completedDate: { gte: startOfMonth },
+        },
+      }),
+    ]);
+
+    const counts = Object.fromEntries(statusCounts.map((s) => [s.status, s._count.id]));
 
     return {
-      workOrderId: id,
-      workOrderNumber: workOrder.workOrderNumber,
-      status: workOrder.status,
-      consumed: consumed.map((m) => ({
-        item: m.item,
-        warehouse: m.warehouse,
-        quantity: Math.abs(m.quantity),
-        date: m.createdAt,
-      })),
-      produced: produced.map((m) => ({
-        item: m.item,
-        warehouse: m.warehouse,
-        quantity: m.quantity,
-        date: m.createdAt,
-      })),
-      totalProduced: produced.reduce((sum, m) => sum + m.quantity, 0),
+      active: counts['IN_PROCESS'] || 0,
+      draft: counts['DRAFT'] || 0,
+      activeBoms,
+      completedThisMonth,
     };
   }
 

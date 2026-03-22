@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # PostgreSQL 16 - Primary database (exposed on port 5435)
   postgres:
     image: postgres:16-alpine
     container_name: mizano-postgres
@@ -10,25 +11,41 @@ services:
       POSTGRES_PASSWORD: mizano_secret
       POSTGRES_DB: mizano_db
     ports:
-      - "5434:5432"
+      - '5435:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c effective_cache_size=512MB
+      -c work_mem=16MB
+      -c maintenance_work_mem=128MB
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mizano -d mizano_db"]
+      test: ['CMD-SHELL', 'pg_isready -U mizano -d mizano_db']
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # Redis 7 - Cache and BullMQ queue backend (exposed on port 6380)
   redis:
     image: redis:7-alpine
     container_name: mizano-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - '6380:6379'
     volumes:
       - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    command: redis-server --maxmemory 200mb --maxmemory-policy allkeys-lru
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5

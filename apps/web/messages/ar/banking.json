@@ -37,6 +37,17 @@
   },
   "transactions": {
     "title": "المعاملات البنكية",
+    "description": "عرض وإدارة المعاملات البنكية المستوردة",
+    "importStatement": "استيراد كشف الحساب",
+    "allStatus": "جميع الحالات",
+    "filters": {
+      "title": "الفلاتر",
+      "dateFrom": "من تاريخ",
+      "dateTo": "إلى تاريخ",
+      "minAmount": "الحد الأدنى للمبلغ",
+      "maxAmount": "الحد الأقصى للمبلغ",
+      "clearFilters": "مسح الفلاتر"
+    },
     "newTransaction": "معاملة جديدة",
     "editTransaction": "تعديل المعاملة",
     "deleteTransaction": "حذف المعاملة",
@@ -80,10 +91,22 @@
   },
   "rules": {
     "title": "قواعد البنك",
+    "description": "أتمتة تصنيف المعاملات بقواعد مخصصة",
     "newRule": "قاعدة جديدة",
+    "newRuleTitle": "قاعدة بنكية جديدة",
+    "newRuleDescription": "أنشئ قاعدة لأتمتة تصنيف المعاملات",
+    "editRuleTitle": "تعديل القاعدة البنكية",
+    "editRuleDescription": "تحديث شروط وإجراءات هذه القاعدة",
     "editRule": "تعديل القاعدة",
     "deleteRule": "حذف القاعدة",
     "ruleDetails": "تفاصيل القاعدة",
+    "createRule": "إنشاء قاعدة",
+    "searchPlaceholder": "البحث في القواعد...",
+    "hits": "التطبيقات",
+    "active": "نشط",
+    "inactive": "غير نشط",
+    "confirmDeleteTitle": "حذف القاعدة",
+    "confirmDeleteDescription": "هل أنت متأكد من حذف هذه القاعدة؟ لا يمكن التراجع عن هذا الإجراء.",
     "form": {
       "name": "اسم القاعدة",
       "namePlaceholder": "أدخل اسم القاعدة",
@@ -130,8 +153,35 @@
   },
   "reconciliation": {
     "title": "التسوية",
+    "pageTitle": "التسوية البنكية",
+    "pageDescription": "اختر حسابًا بنكيًا لتسوية المعاملات",
     "newReconciliation": "تسوية جديدة",
     "reconciliationDetails": "تفاصيل التسوية",
+    "reconcile": "تسوية",
+    "reconcileAccount": "تسوية {name}",
+    "matchDescription": "مطابقة المعاملات البنكية مع سجلاتك",
+    "unmatched": "{count} غير مطابق",
+    "bookBalance": "الرصيد الدفتري",
+    "bankBalance": "الرصيد البنكي",
+    "toReconcile": "للتسوية",
+    "transactionsCount": "{count} معاملة",
+    "needsReview": "يحتاج مراجعة",
+    "allCaughtUp": "تم الانتهاء!",
+    "allMatched": "تمت مطابقة جميع المعاملات البنكية.",
+    "viewAccountDetails": "عرض تفاصيل الحساب",
+    "bankTransactions": "المعاملات البنكية",
+    "suggestedMatches": "المطابقات المقترحة",
+    "selectTransaction": "اختر معاملة",
+    "selectTransactionHint": "اختر معاملة لرؤية المطابقات المقترحة",
+    "noSuggestedMatches": "لم يتم العثور على مطابقات مقترحة",
+    "confidence": "ثقة",
+    "match": "مطابقة",
+    "matchPercent": "{value}% مطابقة",
+    "balanceDue": "الرصيد المستحق: {amount}",
+    "createExpense": "إنشاء مصروف",
+    "excludeTransaction": "استبعاد المعاملة",
+    "accountNotFound": "الحساب البنكي غير موجود",
+    "backToReconciliation": "العودة إلى التسوية",
     "form": {
       "bankAccount": "الحساب البنكي",
       "reconciliationDate": "تاريخ التسوية",
@@ -155,7 +205,10 @@
     },
     "empty": {
       "title": "لا توجد تسويات بعد",
-      "description": "ابدأ تسوية حساباتك البنكية"
+      "description": "ابدأ تسوية حساباتك البنكية",
+      "noAccounts": "لا توجد حسابات بنكية",
+      "noAccountsDescription": "أضف حسابًا بنكيًا أولًا لبدء التسوية.",
+      "addBankAccount": "إضافة حساب بنكي"
     }
   }
 }

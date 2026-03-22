@@ -1,9 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isWeekend } from 'date-fns';
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameDay,
+  isWeekend,
+} from 'date-fns';
 import { ChevronLeft, ChevronRight, UserCheck, Clock, CalendarOff } from 'lucide-react';
+import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -15,7 +23,6 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -24,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { DataTable } from '@/components/data-table';
 import { cn } from '@/lib/utils';
 import {
   useEmployees,
@@ -33,17 +41,19 @@ import {
   getAttendanceStatusColor,
   AttendanceStatus,
 } from '@/lib/hooks/use-hr';
+import { useTranslations } from 'next-intl';
 
 const attendanceStatuses: AttendanceStatus[] = ['PRESENT', 'ABSENT', 'LEAVE', 'HALF_DAY'];
 
-export default function AttendancePage() {
+function AttendancePageContent() {
+  const t = useTranslations('hr');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const { data: employeesData, isLoading: employeesLoading } = useEmployees({ status: 'ACTIVE' });
   const { data: attendanceData, isLoading: attendanceLoading } = useAttendance(
     format(startOfMonth(currentMonth), 'yyyy-MM-dd'),
-    format(endOfMonth(currentMonth), 'yyyy-MM-dd')
+    format(endOfMonth(currentMonth), 'yyyy-MM-dd'),
   );
   const bulkMark = useBulkMarkAttendance();
 
@@ -57,7 +67,8 @@ export default function AttendancePage() {
 
   const getAttendanceForDay = (employeeId: string, date: Date) => {
     return attendance.find(
-      (a: any) => a.employeeId === employeeId && isSameDay(new Date(a.date), date)
+      (a: { employeeId: string; date: string }) =>
+        a.employeeId === employeeId && isSameDay(new Date(a.date), date),
     );
   };
 
@@ -77,43 +88,130 @@ export default function AttendancePage() {
   };
 
   // Calculate summary for selected date
-  const selectedDateAttendance = attendance.filter((a: any) =>
-    isSameDay(new Date(a.date), selectedDate)
+  const selectedDateAttendance = attendance.filter((a: { date: string; status: string }) =>
+    isSameDay(new Date(a.date), selectedDate),
   );
-  const presentCount = selectedDateAttendance.filter((a: any) => a.status === 'PRESENT').length;
-  const absentCount = selectedDateAttendance.filter((a: any) => a.status === 'ABSENT').length;
-  const leaveCount = selectedDateAttendance.filter((a: any) => a.status === 'LEAVE').length;
+  const presentCount = selectedDateAttendance.filter(
+    (a: { status: string }) => a.status === 'PRESENT',
+  ).length;
+  const absentCount = selectedDateAttendance.filter(
+    (a: { status: string }) => a.status === 'ABSENT',
+  ).length;
+  const leaveCount = selectedDateAttendance.filter(
+    (a: { status: string }) => a.status === 'LEAVE',
+  ).length;
 
   const isLoading = employeesLoading || attendanceLoading;
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
-        <div className="grid grid-cols-3 gap-4">
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-        </div>
-        <Skeleton className="h-96" />
-      </div>
-    );
-  }
+  // Columns for the selected date details table
+  const detailColumns: ColumnDef<{
+    id: string;
+    name: string;
+    jobTitle?: string;
+  }>[] = [
+    {
+      accessorKey: 'name',
+      header: t('attendance.table.employee'),
+      cell: ({ row }) => {
+        const employee = row.original;
+        const nameParts = (employee.name || '').split(' ');
+        const initials =
+          nameParts.length >= 2
+            ? nameParts[0][0] + nameParts[nameParts.length - 1][0]
+            : (employee.name || '??').slice(0, 2);
+        return (
+          <div className="flex items-center gap-2">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-medium">{employee.name}</p>
+              <p className="text-xs text-muted-foreground">{employee.jobTitle}</p>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'status',
+      header: t('attendance.table.status'),
+      cell: ({ row }) => {
+        const att = getAttendanceForDay(row.original.id, selectedDate);
+        return att ? (
+          <Badge variant="outline" className={getAttendanceStatusColor(att.status)}>
+            {getAttendanceStatusLabel(att.status)}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">{t('attendance.notMarked')}</span>
+        );
+      },
+    },
+    {
+      id: 'checkIn',
+      header: t('attendance.table.checkIn'),
+      cell: ({ row }) => {
+        const att = getAttendanceForDay(row.original.id, selectedDate);
+        return att?.checkIn ? format(new Date(att.checkIn), 'HH:mm') : '-';
+      },
+    },
+    {
+      id: 'checkOut',
+      header: t('attendance.table.checkOut'),
+      cell: ({ row }) => {
+        const att = getAttendanceForDay(row.original.id, selectedDate);
+        return att?.checkOut ? format(new Date(att.checkOut), 'HH:mm') : '-';
+      },
+    },
+    {
+      id: 'notes',
+      header: t('attendance.form.notes'),
+      cell: ({ row }) => {
+        const att = getAttendanceForDay(row.original.id, selectedDate);
+        return att?.notes || '-';
+      },
+    },
+    {
+      id: 'action',
+      header: t('attendance.action'),
+      cell: ({ row }) => {
+        const att = getAttendanceForDay(row.original.id, selectedDate);
+        return (
+          <Select
+            value={att?.status ?? '__none__'}
+            onValueChange={(value) => {
+              if (value === '__none__') return;
+              void handleStatusChange(row.original.id, selectedDate, value as AttendanceStatus);
+            }}
+          >
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder={t('attendance.mark')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">{t('attendance.mark')}</SelectItem>
+              {attendanceStatuses.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {getAttendanceStatusLabel(status)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Attendance</h1>
-          <p className="text-muted-foreground">
-            Track employee attendance and working hours
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('attendance.title')}</h1>
+          <p className="text-muted-foreground">{t('attendance.description')}</p>
         </div>
         <Button asChild>
           <Link href="/hr/attendance/mark">
             <UserCheck className="mr-2 h-4 w-4" />
-            Mark Attendance
+            {t('attendance.newAttendance')}
           </Link>
         </Button>
       </div>
@@ -138,7 +236,7 @@ export default function AttendancePage() {
             setSelectedDate(new Date());
           }}
         >
-          Today
+          {t('attendance.today')}
         </Button>
       </div>
 
@@ -151,7 +249,7 @@ export default function AttendancePage() {
                 <UserCheck className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Employees</p>
+                <p className="text-sm text-muted-foreground">{t('attendance.totalEmployees')}</p>
                 <p className="text-2xl font-bold">{employees.length}</p>
               </div>
             </div>
@@ -165,7 +263,7 @@ export default function AttendancePage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Present ({format(selectedDate, 'MMM d')})
+                  {t('attendance.presentOn', { date: format(selectedDate, 'MMM d') })}
                 </p>
                 <p className="text-2xl font-bold text-green-600">{presentCount}</p>
               </div>
@@ -180,7 +278,7 @@ export default function AttendancePage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Absent ({format(selectedDate, 'MMM d')})
+                  {t('attendance.absentOn', { date: format(selectedDate, 'MMM d') })}
                 </p>
                 <p className="text-2xl font-bold text-red-600">{absentCount}</p>
               </div>
@@ -195,7 +293,7 @@ export default function AttendancePage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  On Leave ({format(selectedDate, 'MMM d')})
+                  {t('attendance.onLeaveOn', { date: format(selectedDate, 'MMM d') })}
                 </p>
                 <p className="text-2xl font-bold text-yellow-600">{leaveCount}</p>
               </div>
@@ -204,10 +302,10 @@ export default function AttendancePage() {
         </Card>
       </div>
 
-      {/* Calendar View */}
+      {/* Calendar View - kept as manual Table due to dynamic date columns */}
       <Card>
         <CardHeader>
-          <CardTitle>Attendance Calendar</CardTitle>
+          <CardTitle>{t('attendance.calendar')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -215,7 +313,7 @@ export default function AttendancePage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="sticky left-0 bg-background min-w-[200px]">
-                    Employee
+                    {t('attendance.table.employee')}
                   </TableHead>
                   {daysInMonth.map((day) => (
                     <TableHead
@@ -223,18 +321,19 @@ export default function AttendancePage() {
                       className={cn(
                         'text-center min-w-[40px] cursor-pointer hover:bg-muted',
                         isWeekend(day) && 'bg-muted/50',
-                        isSameDay(day, selectedDate) && 'bg-primary/10'
+                        isSameDay(day, selectedDate) && 'bg-primary/10',
                       )}
                       onClick={() => setSelectedDate(day)}
                     >
                       <div className="flex flex-col items-center">
-                        <span className="text-xs text-muted-foreground">
-                          {format(day, 'EEE')}
-                        </span>
-                        <span className={cn(
-                          'text-sm',
-                          isSameDay(day, new Date()) && 'bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center'
-                        )}>
+                        <span className="text-xs text-muted-foreground">{format(day, 'EEE')}</span>
+                        <span
+                          className={cn(
+                            'text-sm',
+                            isSameDay(day, new Date()) &&
+                              'bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center',
+                          )}
+                        >
                           {format(day, 'd')}
                         </span>
                       </div>
@@ -243,56 +342,55 @@ export default function AttendancePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {employees.map((employee: any) => (
-                  <TableRow key={employee.id}>
-                    <TableCell className="sticky left-0 bg-background">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs">
-                            {employee.firstName[0]}
-                            {employee.lastName[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm font-medium">
-                          {employee.firstName} {employee.lastName}
-                        </span>
-                      </div>
-                    </TableCell>
-                    {daysInMonth.map((day) => {
-                      const att = getAttendanceForDay(employee.id, day);
-                      const isSelected = isSameDay(day, selectedDate);
-                      return (
-                        <TableCell
-                          key={day.toISOString()}
-                          className={cn(
-                            'text-center p-1',
-                            isWeekend(day) && 'bg-muted/50',
-                            isSelected && 'bg-primary/10'
-                          )}
-                        >
-                          {att ? (
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                'text-xs px-1',
-                                getAttendanceStatusColor(att.status)
-                              )}
-                            >
-                              {att.status === 'PRESENT' && 'P'}
-                              {att.status === 'ABSENT' && 'A'}
-                              {att.status === 'LEAVE' && 'L'}
-                              {att.status === 'HALF_DAY' && 'H'}
-                            </Badge>
-                          ) : isWeekend(day) ? (
-                            <span className="text-xs text-muted-foreground">-</span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))}
+                {employees.map((employee: { id: string; name: string }) => {
+                  const nameParts = (employee.name || '').split(' ');
+                  const initials =
+                    nameParts.length >= 2
+                      ? nameParts[0][0] + nameParts[nameParts.length - 1][0]
+                      : (employee.name || '??').slice(0, 2);
+                  return (
+                    <TableRow key={employee.id}>
+                      <TableCell className="sticky left-0 bg-background">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm font-medium">{employee.name}</span>
+                        </div>
+                      </TableCell>
+                      {daysInMonth.map((day) => {
+                        const att = getAttendanceForDay(employee.id, day);
+                        const isSelected = isSameDay(day, selectedDate);
+                        return (
+                          <TableCell
+                            key={day.toISOString()}
+                            className={cn(
+                              'text-center p-1',
+                              isWeekend(day) && 'bg-muted/50',
+                              isSelected && 'bg-primary/10',
+                            )}
+                          >
+                            {att ? (
+                              <Badge
+                                variant="outline"
+                                className={cn('text-xs px-1', getAttendanceStatusColor(att.status))}
+                              >
+                                {att.status === 'PRESENT' && 'P'}
+                                {att.status === 'ABSENT' && 'A'}
+                                {att.status === 'LEAVE' && 'L'}
+                                {att.status === 'HALF_DAY' && 'H'}
+                              </Badge>
+                            ) : isWeekend(day) ? (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -302,112 +400,53 @@ export default function AttendancePage() {
       {/* Selected Date Details */}
       <Card>
         <CardHeader>
-          <CardTitle>
-            {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-          </CardTitle>
+          <CardTitle>{format(selectedDate, 'EEEE, MMMM d, yyyy')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Employee</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Check In</TableHead>
-                <TableHead>Check Out</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead>Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {employees.map((employee: any) => {
-                const att = getAttendanceForDay(employee.id, selectedDate);
-                return (
-                  <TableRow key={employee.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs">
-                            {employee.firstName[0]}
-                            {employee.lastName[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">
-                            {employee.firstName} {employee.lastName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {employee.jobTitle}
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {att ? (
-                        <Badge
-                          variant="outline"
-                          className={getAttendanceStatusColor(att.status)}
-                        >
-                          {getAttendanceStatusLabel(att.status)}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">Not marked</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {att?.checkIn ? format(new Date(att.checkIn), 'HH:mm') : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {att?.checkOut ? format(new Date(att.checkOut), 'HH:mm') : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {att?.notes || '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={att?.status || ''}
-                        onValueChange={(value: AttendanceStatus) =>
-                          handleStatusChange(employee.id, selectedDate, value)
-                        }
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue placeholder="Mark" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {attendanceStatuses.map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {getAttendanceStatusLabel(status)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={detailColumns}
+            data={employees}
+            isLoading={isLoading}
+            emptyMessage={t('employees.empty.title')}
+          />
         </CardContent>
       </Card>
 
       {/* Legend */}
       <div className="flex items-center gap-6 text-sm">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-green-100 text-green-800">P</Badge>
-          <span>Present</span>
+          <Badge variant="outline" className="bg-green-100 text-green-800">
+            P
+          </Badge>
+          <span>{t('attendance.status.present')}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-red-100 text-red-800">A</Badge>
-          <span>Absent</span>
+          <Badge variant="outline" className="bg-red-100 text-red-800">
+            A
+          </Badge>
+          <span>{t('attendance.status.absent')}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-yellow-100 text-yellow-800">L</Badge>
-          <span>Leave</span>
+          <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
+            L
+          </Badge>
+          <span>{t('attendance.status.leave')}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-orange-100 text-orange-800">H</Badge>
-          <span>Half Day</span>
+          <Badge variant="outline" className="bg-orange-100 text-orange-800">
+            H
+          </Badge>
+          <span>{t('attendance.status.halfDay')}</span>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AttendancePage() {
+  return (
+    <Suspense>
+      <AttendancePageContent />
+    </Suspense>
   );
 }

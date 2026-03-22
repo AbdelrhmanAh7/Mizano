@@ -1,14 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Plus, Trash2, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -16,11 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
 import { Account, flattenAccountsTree } from '@/lib/hooks/use-accounts';
-import { RecurringProfile, RecurringFrequency, getFrequencyLabel } from '@/lib/hooks/use-recurring-profiles';
 import { calculateJournalTotals, formatJournalAmount } from '@/lib/hooks/use-journals';
+import { RecurringFrequency, RecurringProfile } from '@/lib/hooks/use-recurring-profiles';
+import { cn } from '@/lib/utils';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Check, Plus, Trash2, X } from 'lucide-react';
+import { useEffect } from 'react';
+import { useFieldArray, useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 const profileLineSchema = z.object({
   accountId: z.string().min(1, 'Account is required'),
@@ -84,7 +84,7 @@ export function RecurringProfileForm({
         name: profile.name,
         description: profile.description || '',
         frequency: profile.frequency,
-        startDate: profile.nextExecutionDate.split('T')[0],
+        startDate: profile.nextRunDate.split('T')[0],
         autoPost: profile.autoPost,
         lines: profile.lines.map((line) => ({
           accountId: line.accountId,
@@ -153,11 +153,7 @@ export function RecurringProfileForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Profile Name *</Label>
-              <Input
-                id="name"
-                placeholder="e.g., Monthly Rent"
-                {...form.register('name')}
-              />
+              <Input id="name" placeholder="e.g., Monthly Rent" {...form.register('name')} />
               {form.formState.errors.name && (
                 <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
@@ -186,11 +182,7 @@ export function RecurringProfileForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="startDate">Start Date *</Label>
-              <Input
-                id="startDate"
-                type="date"
-                {...form.register('startDate')}
-              />
+              <Input id="startDate" type="date" {...form.register('startDate')} />
               {form.formState.errors.startDate && (
                 <p className="text-sm text-red-500">{form.formState.errors.startDate.message}</p>
               )}
@@ -303,6 +295,7 @@ export function RecurringProfileForm({
                     onClick={() => removeLine(index)}
                     disabled={fields.length <= 2}
                     className="h-8 w-8"
+                    aria-label="Remove journal line"
                   >
                     <Trash2 className="h-4 w-4 text-muted-foreground hover:text-red-500" />
                   </Button>
@@ -336,9 +329,7 @@ export function RecurringProfileForm({
               <div
                 className={cn(
                   'flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium',
-                  isBalanced
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-red-100 text-red-800'
+                  isBalanced ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800',
                 )}
               >
                 {isBalanced ? (
@@ -349,7 +340,8 @@ export function RecurringProfileForm({
                 ) : (
                   <>
                     <X className="h-4 w-4" />
-                    Unbalanced (Difference: {formatJournalAmount(Math.abs(totalDebit - totalCredit))})
+                    Unbalanced (Difference:{' '}
+                    {formatJournalAmount(Math.abs(totalDebit - totalCredit))})
                   </>
                 )}
               </div>

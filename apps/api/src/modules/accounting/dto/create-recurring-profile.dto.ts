@@ -36,12 +36,22 @@ export class CreateRecurringProfileDto {
   @IsOptional()
   autoPost?: boolean;
 
+  @ApiProperty({ required: false, default: false })
+  @IsBoolean()
+  @IsOptional()
+  autoSend?: boolean;
+
   @ApiProperty({ description: 'Template data for creating the entity' })
   @IsObject()
-  templateData: Record<string, any>;
+  templateData: Record<string, unknown>;
 
   @ApiProperty({ example: 'journal', description: 'Entity type: journal, invoice, bill, expense' })
   @IsString()
   @IsNotEmpty()
   entityType: string;
+
+  @ApiProperty({ required: false, description: 'Recurring type (overrides entityType mapping)' })
+  @IsString()
+  @IsOptional()
+  type?: string;
 }

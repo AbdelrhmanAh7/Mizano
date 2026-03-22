@@ -1,16 +1,76 @@
 {
   "title": "Settings",
-  "description": "Configure your organization and application settings",
+  "description": "Manage your organization settings and preferences",
+  "groups": {
+    "general": "General",
+    "financial": "Financial",
+    "system": "System"
+  },
+  "hub": {
+    "organization": {
+      "title": "Organization",
+      "description": "Company name, address, contact info, and currency"
+    },
+    "localization": {
+      "title": "Localization",
+      "description": "Date format, number format, and timezone"
+    },
+    "branding": {
+      "title": "Branding",
+      "description": "Logo, colors, and invoice footer text"
+    },
+    "financial": {
+      "title": "Financial Settings",
+      "description": "Fiscal year, lock date, and payment terms"
+    },
+    "accounts": {
+      "title": "Default Accounts",
+      "description": "Default GL accounts for AR, AP, revenue, and more"
+    },
+    "invoicing": {
+      "title": "Invoice & Document",
+      "description": "Prefixes, numbering, default notes, and terms"
+    },
+    "ai": {
+      "title": "AI Features",
+      "description": "Toggle AI categorization, OCR, forecasting, and anomaly detection"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "description": "Configure notification preferences"
+    },
+    "team": {
+      "title": "Team & Roles",
+      "description": "Manage team members and role permissions"
+    },
+    "performance": {
+      "title": "Performance",
+      "description": "Monitor database performance and query optimization"
+    },
+    "cache": {
+      "title": "Cache Management",
+      "description": "Monitor and manage API response caching"
+    },
+    "auditLogs": {
+      "title": "Audit Logs",
+      "description": "Track all user actions and changes across the system"
+    }
+  },
   "organization": {
     "title": "Organization",
-    "description": "Manage your organization settings",
+    "description": "Company information and general settings",
+    "companyInfo": "Company Information",
+    "companyInfoDescription": "Basic information about your organization",
     "form": {
       "name": "Organization Name",
       "namePlaceholder": "Enter organization name",
+      "nameRequired": "Organization Name *",
       "email": "Email",
       "emailPlaceholder": "Enter email address",
       "phone": "Phone",
       "phonePlaceholder": "Enter phone number",
+      "website": "Website",
+      "websitePlaceholder": "Enter website URL",
       "address": "Address",
       "addressPlaceholder": "Enter address",
       "currency": "Default Currency",
@@ -18,7 +78,367 @@
       "taxIdPlaceholder": "Enter tax ID",
       "lockDate": "Lock Date",
       "lockDateDescription": "Prevent changes to transactions before this date"
+    },
+    "taxCurrency": "Tax & Currency",
+    "taxCurrencyDescription": "Tax registration and base currency settings",
+    "taxRegistrationNumber": "Tax Registration Number",
+    "baseCurrency": "Base Currency",
+    "selectCurrency": "Select currency",
+    "industry": "Industry",
+    "selectIndustry": "Select industry"
+  },
+  "localization": {
+    "title": "Localization",
+    "description": "Date, number, and timezone display preferences",
+    "displayFormat": "Display Format",
+    "displayFormatDescription": "Configure how dates, numbers, and times are displayed",
+    "dateFormat": "Date Format",
+    "numberFormat": "Number Format",
+    "timezone": "Timezone"
+  },
+  "branding": {
+    "title": "Branding",
+    "description": "Customize your organization's visual identity",
+    "brandSettings": "Brand Settings",
+    "brandSettingsDescription": "Colors and text that appear on your documents and invoices",
+    "primaryColor": "Primary Color",
+    "primaryColorHint": "Used as accent color on invoices, quotes, and emails",
+    "preview": "Preview",
+    "logoNote": "Logo upload:",
+    "logoNoteDescription": "Logo can be uploaded via the Organization settings page or the onboarding wizard. Supported formats: JPEG, PNG, GIF, WebP (max 2MB).",
+    "footerText": "Invoice Footer Text",
+    "footerTextPlaceholder": "Thank you for your business! Please contact us with any questions.",
+    "footerTextHint": "Displayed at the bottom of all generated invoices and documents"
+  },
+  "financial": {
+    "title": "Financial Settings",
+    "description": "Fiscal year, payment terms, and transaction lock date",
+    "fiscalYearDefaults": "Fiscal Year & Defaults",
+    "fiscalYearDefaultsDescription": "Configure your financial year and default payment terms",
+    "fiscalYearStartMonth": "Fiscal Year Start Month",
+    "fiscalYearStartMonthHint": "The month your fiscal year begins (e.g., January for calendar year)",
+    "paymentTerms": "Default Payment Terms (days)",
+    "paymentTermsHint": "Default due date offset for new invoices and bills",
+    "lockDate": "Transaction Lock Date",
+    "lockDateDescription": "Prevent modifications to transactions before this date",
+    "lockedThrough": "Locked through {date}",
+    "noLockDate": "No lock date set — all transactions can be edited",
+    "removeLock": "Remove Lock",
+    "lockPreviousMonth": "Lock Previous Month",
+    "lockDateExplanation": "When set, users cannot create or edit transactions dated before the lock date. This is commonly used after month-end close."
+  },
+  "accountSettings": {
+    "title": "Account Settings",
+    "description": "Configure default accounts for automatic accounting entries",
+    "salesAccounts": "Sales Accounts",
+    "salesAccountsDescription": "These accounts are used when creating invoices and recording customer payments",
+    "accountsReceivable": "Accounts Receivable",
+    "accountsReceivableHint": "Debit when invoices are sent, credit when payments are received",
+    "salesRevenue": "Sales Revenue",
+    "salesRevenueHint": "Credit when invoices are sent",
+    "vatPayable": "VAT Payable (Sales)",
+    "vatPayableHint": "Credit when invoices with tax are sent",
+    "salesReturns": "Sales Returns / Credit Notes",
+    "salesReturnsHint": "Debit when credit notes are issued",
+    "purchasesAccounts": "Purchases Accounts",
+    "purchasesAccountsDescription": "These accounts are used when creating bills and recording vendor payments",
+    "accountsPayable": "Accounts Payable",
+    "accountsPayableHint": "Credit when bills are received, debit when payments are made",
+    "vatReceivable": "VAT Receivable (Purchases)",
+    "vatReceivableHint": "Debit when bills with tax are received",
+    "bankCashAccounts": "Bank & Cash Accounts",
+    "bankCashAccountsDescription": "Default accounts for deposits and withdrawals",
+    "defaultBankAccount": "Default Bank Account",
+    "defaultBankAccountHint": "Used for bank transfer payments",
+    "defaultCashAccount": "Default Cash Account",
+    "defaultCashAccountHint": "Used for cash payments",
+    "selectAccount": "Select account",
+    "notSet": "-- Not Set --",
+    "saveSettings": "Save Settings"
+  },
+  "invoicing": {
+    "title": "Invoice & Document Settings",
+    "description": "Configure document numbering, defaults, and auto-send behavior",
+    "documentNumbering": "Document Numbering",
+    "documentNumberingDescription": "Set prefixes and next number for invoices, quotes, and bills",
+    "invoices": "Invoices",
+    "prefix": "Prefix",
+    "nextNumber": "Next Number",
+    "preview": "Preview:",
+    "quotesEstimates": "Quotes / Estimates",
+    "bills": "Bills",
+    "invoiceDefaults": "Invoice Defaults",
+    "invoiceDefaultsDescription": "Default text applied to new invoices",
+    "defaultNotes": "Default Notes",
+    "defaultNotesPlaceholder": "Thank you for your business!",
+    "defaultTerms": "Default Terms & Conditions",
+    "defaultTermsPlaceholder": "Payment is due within the specified terms...",
+    "bankDetails": "Bank Details (shown on invoices)",
+    "bankDetailsPlaceholder": "Bank: Example Bank\nAccount: 1234567890\nRouting: 987654321",
+    "autoSend": "Auto-send Invoices",
+    "autoSendDescription": "Automatically email invoices when they are marked as sent"
+  },
+  "ai": {
+    "title": "AI Features",
+    "description": "Toggle AI-powered features and configure model parameters",
+    "featureToggles": "AI Feature Toggles",
+    "featureTogglesDescription": "Enable or disable individual AI capabilities",
+    "features": {
+      "categorization": "Auto-Categorization",
+      "categorizationDescription": "Automatically categorize expenses and transactions using ML",
+      "reconciliation": "Smart Reconciliation",
+      "reconciliationDescription": "AI-powered matching of bank transactions to invoices/bills",
+      "ocr": "OCR Document Scanning",
+      "ocrDescription": "Extract data from receipts and invoices using computer vision",
+      "forecasting": "Cash Flow Forecasting",
+      "forecastingDescription": "Predict future cash flows using historical data patterns",
+      "anomaly": "Anomaly Detection",
+      "anomalyDescription": "Flag unusual transactions or patterns for review",
+      "leadScoring": "Lead Scoring",
+      "leadScoringDescription": "Score CRM leads based on engagement and conversion likelihood"
+    },
+    "modelParameters": "Model Parameters",
+    "modelParametersDescription": "Configure how AI models learn and detect anomalies",
+    "anomalySensitivity": "Anomaly Detection Sensitivity",
+    "anomalySensitivityHint": "Z-score threshold (2–4). Lower values flag more transactions, higher values only flag the most unusual ones."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "description": "Choose how and when you receive notifications",
+    "preferences": "Notification Preferences",
+    "preferencesDescription": "Configure which events trigger notifications and how they are delivered",
+    "event": "Event",
+    "inApp": "In-App",
+    "emailChannel": "Email",
+    "items": {
+      "invoiceOverdue": "Invoice Overdue",
+      "invoiceOverdueDescription": "When a customer invoice becomes overdue",
+      "billDue": "Bill Due Soon",
+      "billDueDescription": "When a vendor bill is approaching its due date",
+      "paymentReceived": "Payment Received",
+      "paymentReceivedDescription": "When a payment is received from a customer",
+      "lowStock": "Low Stock Alert",
+      "lowStockDescription": "When an item falls below its reorder point",
+      "aiInsight": "AI Insights",
+      "aiInsightDescription": "When AI detects anomalies or generates recommendations",
+      "bankReconciliation": "Bank Reconciliation",
+      "bankReconciliationDescription": "When new bank transactions are ready to be matched",
+      "payrollReminder": "Payroll Reminder",
+      "payrollReminderDescription": "When a payroll run is scheduled or pending approval",
+      "vatReturn": "VAT Return Due",
+      "vatReturnDescription": "When a VAT return period is approaching"
+    },
+    "preferencesSaved": "Preferences saved",
+    "preferencesSavedDescription": "Notification preferences have been updated.",
+    "savePreferences": "Save Preferences"
+  },
+  "team": {
+    "title": "Team & Roles",
+    "description": "Manage team members and their permissions",
+    "addMember": "Add Member",
+    "roles": "Roles",
+    "rolesDescription": "Roles defined for this organization",
+    "addRole": "Add Role",
+    "editRole": "Edit Role",
+    "deleteRole": "Delete Role",
+    "deleteRoleTitle": "Delete Role",
+    "deleteRoleConfirm": "Are you sure you want to delete this role? Users assigned to it will need a new role.",
+    "seedDefaults": "Seed Defaults",
+    "noRoles": "No roles found. Seed default roles or create a custom one.",
+    "permissions": "{count} modules",
+    "defaultRole": "Default",
+    "addRoleTitle": "Create Role",
+    "addRoleDescription": "Define a new role with module-level permissions",
+    "editRoleTitle": "Edit Role",
+    "editRoleDescription": "Update role name, description, and permissions",
+    "roleName": "Role Name",
+    "roleNamePlaceholder": "e.g. Sales Manager",
+    "roleDescription": "Description",
+    "roleDescriptionPlaceholder": "Brief description of this role",
+    "permissionsMatrix": "Permissions",
+    "module": "Module",
+    "view": "View",
+    "create": "Create",
+    "edit": "Edit",
+    "delete": "Delete",
+    "export": "Export",
+    "selectAll": "All",
+    "teamMembers": "Team Members",
+    "teamMembersDescription": "People with access to this organization",
+    "noMembers": "No team members yet. Add a member to get started.",
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "status": "Status",
+    "actions": "Actions",
+    "active": "Active",
+    "inactive": "Inactive",
+    "suspended": "Suspended",
+    "editMember": "Edit Member",
+    "deleteMember": "Delete Member",
+    "deleteConfirm": "Are you sure you want to remove this member? This action cannot be undone.",
+    "deleteConfirmTitle": "Remove Team Member",
+    "cancel": "Cancel",
+    "confirm": "Remove",
+    "addMemberTitle": "Add Team Member",
+    "addMemberDescription": "Create a new user account for this organization",
+    "editMemberTitle": "Edit Team Member",
+    "editMemberDescription": "Update member details and role assignment",
+    "namePlaceholder": "Full name",
+    "emailPlaceholder": "email@example.com",
+    "password": "Password",
+    "passwordPlaceholder": "Min 8 chars, uppercase, lowercase, number",
+    "selectRole": "Select a role",
+    "save": "Save",
+    "saving": "Saving..."
+  },
+  "performance": {
+    "title": "Database Performance",
+    "description": "Monitor query performance, connection health, and optimization opportunities",
+    "resetMetrics": "Reset Metrics",
+    "health": {
+      "dbStatus": "Database Status",
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "latency": "Latency: {ms}ms",
+      "readReplica": "Read Replica",
+      "active": "Active",
+      "down": "Down",
+      "notConfigured": "Not configured",
+      "usingPrimary": "Using primary for reads",
+      "replicaLatency": "Latency: {ms}ms",
+      "connectionPool": "Connection Pool",
+      "maxConnections": "Max connections",
+      "uptime": "Uptime",
+      "sinceRestart": "Since last restart"
+    },
+    "stats": {
+      "totalQueries": "Total Queries",
+      "buffer": "Buffer: {count} entries",
+      "avgResponse": "Avg Response",
+      "p95Latency": "P95 Latency",
+      "slowQueries": "Slow Queries",
+      "percentOfTotal": "{percent}% of total",
+      "noQueriesYet": "No queries yet"
+    },
+    "distribution": {
+      "title": "Query Distribution by Model",
+      "description": "Number of queries per database model",
+      "noData": "No query data collected yet"
+    },
+    "trend": {
+      "title": "Response Time Trend",
+      "description": "Average query duration over time",
+      "noData": "No trend data available yet"
+    },
+    "slowQueries": {
+      "title": "Slow Queries",
+      "description": "Queries exceeding duration threshold",
+      "timestamp": "Timestamp",
+      "model": "Model",
+      "action": "Action",
+      "duration": "Duration",
+      "noQueries": "No queries above {threshold}ms threshold",
+      "tryLowering": "Try lowering the threshold or wait for more queries"
+    },
+    "recommendations": {
+      "title": "Index Recommendations",
+      "description": "AI-powered suggestions based on query patterns",
+      "noRecommendations": "No recommendations yet",
+      "noRecommendationsHint": "Recommendations appear after sufficient query data is collected",
+      "impact": "Impact: {value}"
+    },
+    "empty": {
+      "title": "No query metrics collected yet",
+      "description": "Metrics will appear as database queries are executed"
     }
+  },
+  "cache": {
+    "title": "Cache Management",
+    "description": "Monitor and manage the API response cache",
+    "storeType": "Store Type",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "uptime": "Uptime: {value}",
+    "totalKeys": "Total Keys",
+    "acrossAllOrgs": "Across all organizations",
+    "memoryUsage": "Memory Usage",
+    "redisMemory": "Redis memory consumption",
+    "hitRate": "Hit Rate",
+    "good": "Good",
+    "fair": "Fair",
+    "low": "Low",
+    "cacheEfficiency": "Cache efficiency since server start",
+    "cachedKeys": "Cached Keys",
+    "cachedKeysDescription": "Cache entries for your organization",
+    "keyColumn": "Key",
+    "ttlColumn": "TTL",
+    "actionsColumn": "Actions",
+    "filterKeys": "Filter keys...",
+    "noKeys": "No cached keys",
+    "noKeysDescription": "There are no cache entries for your organization. Cache entries are automatically created when you access dashboards, reports, and list views.",
+    "refresh": "Refresh",
+    "flushAll": "Flush All",
+    "flushConfirmTitle": "Flush all cache?",
+    "flushConfirmDescription": "This will remove all cached responses for your organization. Subsequent requests will be slower until the cache rebuilds. This action cannot be undone.",
+    "cancel": "Cancel",
+    "flushCache": "Flush Cache",
+    "failedToLoad": "Failed to load cache statistics. The cache service may be unavailable.",
+    "failedToLoadKeys": "Failed to load cache keys.",
+    "retry": "Retry",
+    "howItWorks": "How Caching Works",
+    "dashboardReports": "Dashboard & Reports",
+    "dashboardReportsDescription": "Cached for 5–10 minutes. Automatically invalidated when accounting entries, invoices, bills, or bank transactions are modified.",
+    "accountLists": "Account Lists & Trees",
+    "accountListsDescription": "Cached for 10 minutes. Chart of Accounts rarely changes, so longer TTL provides significant performance improvement.",
+    "salesPurchases": "Sales & Purchases Lists",
+    "salesPurchasesDescription": "Cached for 2 minutes. Short TTL ensures data freshness for frequently-changing transactional data."
+  },
+  "auditLogs": {
+    "title": "Audit Logs",
+    "description": "Track all user actions and changes across the system",
+    "stats": {
+      "totalActions": "Total Actions",
+      "creates": "Creates",
+      "updates": "Updates",
+      "deletes": "Deletes"
+    },
+    "filters": {
+      "searchPlaceholder": "Search by entity or user...",
+      "entityType": "Entity Type",
+      "allEntities": "All Entities",
+      "action": "Action",
+      "allActions": "All Actions"
+    },
+    "actions": {
+      "create": "Create",
+      "update": "Update",
+      "delete": "Delete"
+    },
+    "table": {
+      "title": "Activity Log",
+      "description": "All recorded actions in the last 30 days"
+    },
+    "columns": {
+      "timestamp": "Timestamp",
+      "user": "User",
+      "action": "Action",
+      "entityType": "Entity Type",
+      "entityId": "Entity ID",
+      "ip": "IP Address"
+    },
+    "pagination": {
+      "page": "Page"
+    },
+    "empty": {
+      "title": "No audit logs found",
+      "description": "Actions will appear here as users make changes"
+    }
+  },
+  "common": {
+    "saveChanges": "Save Changes",
+    "saving": "Saving...",
+    "goBack": "Go back"
   },
   "users": {
     "title": "Users",

@@ -58,7 +58,14 @@ export const creditNoteTypeLabels: Record<CreditNoteType, string> = {
 };
 
 // Payment mode types
-export type PaymentMode = 'CASH' | 'BANK_TRANSFER' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'CHEQUE' | 'ONLINE' | 'OTHER';
+export type PaymentMode =
+  | 'CASH'
+  | 'BANK_TRANSFER'
+  | 'CREDIT_CARD'
+  | 'DEBIT_CARD'
+  | 'CHEQUE'
+  | 'ONLINE'
+  | 'OTHER';
 
 export const paymentModeColors: Record<PaymentMode, string> = {
   CASH: 'bg-green-100 text-green-800 border-green-200',
@@ -105,7 +112,7 @@ export function StatusBadge({
         'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
         color,
         strikethrough && 'line-through',
-        className
+        className,
       )}
     >
       {label}

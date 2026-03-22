@@ -1,19 +1,16 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmployeeForm } from '@/components/hr/employee-form';
 import { useEmployee } from '@/lib/hooks/use-hr';
+import { useTranslations } from 'next-intl';
 
-export default function EditEmployeePage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = use(params);
+export default function EditEmployeePage({ params }: { params: { id: string } }) {
+  const { id } = params;
+  const t = useTranslations('hr');
   const { data: employee, isLoading } = useEmployee(id);
 
   if (isLoading) {
@@ -46,10 +43,8 @@ export default function EditEmployeePage({
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Edit Employee</h1>
-          <p className="text-muted-foreground">
-            Update employee information for {employee.firstName} {employee.lastName}
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('employees.editEmployee')}</h1>
+          <p className="text-muted-foreground">Update employee information for {employee.name}</p>
         </div>
       </div>
 

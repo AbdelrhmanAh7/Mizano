@@ -1,8 +1,7 @@
 'use client';
 
-import { use } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { ArrowLeft, CheckCircle, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -38,12 +37,12 @@ import {
 } from '@/lib/hooks/use-adjustments';
 
 interface AdjustmentDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function AdjustmentDetailPage({ params }: AdjustmentDetailPageProps) {
-  const { id } = use(params);
-  const router = useRouter();
+  const t = useTranslations('inventory');
+  const { id } = params;
   const { data: adjustment, isLoading } = useAdjustment(id);
   const postAdjustment = usePostAdjustment();
 
@@ -68,18 +67,23 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
   if (!adjustment) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Adjustment not found</p>
+        <p className="text-muted-foreground">
+          {t('adjustments.title')} {t('common.notFound')}
+        </p>
         <Button asChild className="mt-4">
-          <Link href="/inventory/adjustments">Back to Adjustments</Link>
+          <Link href="/inventory/adjustments">
+            {t('common.backTo')} {t('adjustments.title')}
+          </Link>
         </Button>
       </div>
     );
   }
 
-  const totalQty = adjustment.lines?.reduce(
-    (sum: number, line: any) => sum + (line.quantityAdjusted || 0),
-    0
-  ) || 0;
+  const totalQty =
+    adjustment.lines?.reduce(
+      (sum: number, line: { quantityAdjusted?: number }) => sum + (line.quantityAdjusted || 0),
+      0,
+    ) || 0;
 
   return (
     <div className="space-y-6">
@@ -93,13 +97,8 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
-                {adjustment.adjustmentNumber}
-              </h1>
-              <Badge
-                variant="outline"
-                className={getAdjustmentStatusColor(adjustment.status)}
-              >
+              <h1 className="text-3xl font-bold tracking-tight">{adjustment.adjustmentNumber}</h1>
+              <Badge variant="outline" className={getAdjustmentStatusColor(adjustment.status)}>
                 {getAdjustmentStatusLabel(adjustment.status)}
               </Badge>
             </div>
@@ -122,15 +121,13 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
                 <AlertDialogHeader>
                   <AlertDialogTitle>Post Adjustment</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will update the stock levels for all items in this adjustment.
-                    This action cannot be undone.
+                    This will update the stock levels for all items in this adjustment. This action
+                    cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handlePost}>
-                    Post Adjustment
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={handlePost}>Post Adjustment</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -146,7 +143,7 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
               <div
                 className={cn(
                   'p-2 rounded-lg',
-                  adjustment.type === 'INCREASE' ? 'bg-green-100' : 'bg-red-100'
+                  adjustment.type === 'INCREASE' ? 'bg-green-100' : 'bg-red-100',
                 )}
               >
                 {adjustment.type === 'INCREASE' ? (
@@ -160,7 +157,7 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
                 <p
                   className={cn(
                     'text-lg font-semibold',
-                    adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600'
+                    adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
                   )}
                 >
                   {adjustment.type === 'INCREASE' ? 'Increase Stock' : 'Decrease Stock'}
@@ -190,7 +187,7 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
             <p
               className={cn(
                 'text-2xl font-bold font-mono',
-                adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600'
+                adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
               )}
             >
               {adjustment.type === 'INCREASE' ? '+' : '-'}
@@ -204,7 +201,7 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Adjustment Details</CardTitle>
+            <CardTitle>{t('adjustments.adjustmentDetails')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between">
@@ -223,10 +220,7 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
             )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Status</span>
-              <Badge
-                variant="outline"
-                className={getAdjustmentStatusColor(adjustment.status)}
-              >
+              <Badge variant="outline" className={getAdjustmentStatusColor(adjustment.status)}>
                 {getAdjustmentStatusLabel(adjustment.status)}
               </Badge>
             </div>
@@ -261,22 +255,23 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
               </TableRow>
             </TableHeader>
             <TableBody>
-              {adjustment.lines?.map((line: any) => (
+              {(
+                adjustment.lines as {
+                  id: string;
+                  item?: { name?: string; sku?: string };
+                  warehouse?: { name?: string };
+                  quantityAdjusted: number;
+                }[]
+              )?.map((line) => (
                 <TableRow key={line.id}>
-                  <TableCell className="font-medium">
-                    {line.item?.name || '-'}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {line.item?.sku || '-'}
-                  </TableCell>
+                  <TableCell className="font-medium">{line.item?.name || '-'}</TableCell>
+                  <TableCell className="font-mono text-sm">{line.item?.sku || '-'}</TableCell>
                   <TableCell>{line.warehouse?.name || '-'}</TableCell>
                   <TableCell className="text-right">
                     <span
                       className={cn(
                         'font-mono font-medium',
-                        adjustment.type === 'INCREASE'
-                          ? 'text-green-600'
-                          : 'text-red-600'
+                        adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
                       )}
                     >
                       {adjustment.type === 'INCREASE' ? '+' : '-'}

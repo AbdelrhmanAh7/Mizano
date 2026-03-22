@@ -10,7 +10,9 @@ import { z } from 'zod';
 
 // Decimal string validation (for money fields)
 export const decimalSchema = z.string().regex(/^-?\d+(\.\d{1,4})?$/, 'Invalid decimal format');
-export const positiveDecimalSchema = z.string().regex(/^\d+(\.\d{1,4})?$/, 'Must be a positive number');
+export const positiveDecimalSchema = z
+  .string()
+  .regex(/^\d+(\.\d{1,4})?$/, 'Must be a positive number');
 
 // Date validation
 export const dateSchema = z.coerce.date();
@@ -42,28 +44,83 @@ export const addressSchema = z.object({
 
 export const accountTypeSchema = z.enum(['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE']);
 export const userStatusSchema = z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']);
-export const quoteStatusSchema = z.enum(['DRAFT', 'SENT', 'ACCEPTED', 'INVOICED', 'DECLINED', 'EXPIRED']);
-export const invoiceStatusSchema = z.enum(['DRAFT', 'SENT', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'VOID']);
-export const billStatusSchema = z.enum(['DRAFT', 'OPEN', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'VOID']);
-export const paymentModeSchema = z.enum(['CASH', 'BANK_TRANSFER', 'CREDIT_CARD', 'DEBIT_CARD', 'CHEQUE', 'ONLINE', 'OTHER']);
+export const quoteStatusSchema = z.enum([
+  'DRAFT',
+  'SENT',
+  'ACCEPTED',
+  'INVOICED',
+  'DECLINED',
+  'EXPIRED',
+]);
+export const invoiceStatusSchema = z.enum([
+  'DRAFT',
+  'SENT',
+  'PARTIALLY_PAID',
+  'PAID',
+  'OVERDUE',
+  'VOID',
+]);
+export const billStatusSchema = z.enum([
+  'DRAFT',
+  'OPEN',
+  'PARTIALLY_PAID',
+  'PAID',
+  'OVERDUE',
+  'VOID',
+]);
+export const paymentModeSchema = z.enum([
+  'CASH',
+  'BANK_TRANSFER',
+  'CREDIT_CARD',
+  'DEBIT_CARD',
+  'CHEQUE',
+  'ONLINE',
+  'OTHER',
+]);
 export const itemTypeSchema = z.enum(['GOODS', 'SERVICE', 'DIGITAL']);
 export const adjustmentTypeSchema = z.enum(['INCREASE', 'DECREASE']);
-export const adjustmentReasonSchema = z.enum(['DAMAGED', 'STOLEN', 'STOCKTAKE', 'RETURNED', 'EXPIRED', 'OTHER']);
+export const adjustmentReasonSchema = z.enum([
+  'DAMAGED',
+  'STOLEN',
+  'STOCKTAKE',
+  'RETURNED',
+  'EXPIRED',
+  'OTHER',
+]);
 export const bankAccountTypeSchema = z.enum(['BANK', 'CREDIT_CARD', 'PETTY_CASH']);
 export const bankTransactionTypeSchema = z.enum(['DEPOSIT', 'WITHDRAWAL']);
 export const reconciliationStatusSchema = z.enum(['PENDING', 'MATCHED', 'CREATED', 'RECONCILED']);
 export const attendanceStatusSchema = z.enum(['PRESENT', 'ABSENT', 'LEAVE', 'HALF_DAY']);
 export const payrollStatusSchema = z.enum(['DRAFT', 'PROCESSED', 'PAID']);
 export const workOrderStatusSchema = z.enum(['DRAFT', 'IN_PROCESS', 'COMPLETED', 'CANCELLED']);
-export const billingMethodSchema = z.enum(['FIXED', 'PROJECT_HOURLY', 'TASK_HOURLY', 'STAFF_HOURLY']);
+export const billingMethodSchema = z.enum([
+  'FIXED',
+  'PROJECT_HOURLY',
+  'TASK_HOURLY',
+  'STAFF_HOURLY',
+]);
 export const projectStatusSchema = z.enum(['ACTIVE', 'ON_HOLD', 'COMPLETED', 'CANCELLED']);
 export const timesheetStatusSchema = z.enum(['UNBILLED', 'INVOICED']);
 export const vatReturnStatusSchema = z.enum(['DRAFT', 'GENERATED', 'FILED']);
 export const taxTypeSchema = z.enum(['SALES', 'PURCHASES', 'BOTH']);
 export const recurringFrequencySchema = z.enum(['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY']);
 export const leadStatusSchema = z.enum(['NEW', 'CONTACTED', 'QUALIFIED', 'JUNK']);
-export const leadSourceSchema = z.enum(['WEBSITE', 'FACEBOOK_ADS', 'GOOGLE_ADS', 'REFERRAL', 'COLD_CALL', 'OTHER']);
-export const dealStageSchema = z.enum(['NEW', 'MEETING_SCHEDULED', 'PROPOSAL_SENT', 'NEGOTIATION', 'WON', 'LOST']);
+export const leadSourceSchema = z.enum([
+  'WEBSITE',
+  'FACEBOOK_ADS',
+  'GOOGLE_ADS',
+  'REFERRAL',
+  'COLD_CALL',
+  'OTHER',
+]);
+export const dealStageSchema = z.enum([
+  'NEW',
+  'MEETING_SCHEDULED',
+  'PROPOSAL_SENT',
+  'NEGOTIATION',
+  'WON',
+  'LOST',
+]);
 export const depreciationMethodSchema = z.enum(['STRAIGHT_LINE', 'DECLINING_BALANCE']);
 export const assetStatusSchema = z.enum(['ACTIVE', 'DISPOSED', 'SOLD']);
 export const creditNoteTypeSchema = z.enum(['REFUND', 'APPLY_TO_INVOICE']);
@@ -83,7 +140,8 @@ export const loginSchema = z.object({
 
 export const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string()
+  password: z
+    .string()
     .min(8, 'Password must be at least 8 characters')
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
@@ -116,7 +174,8 @@ export const updateOrganizationSchema = z.object({
 
 export const createUserSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string()
+  password: z
+    .string()
     .min(8, 'Password must be at least 8 characters')
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
@@ -180,19 +239,21 @@ export const createJournalLineSchema = z.object({
   description: z.string().max(500).optional(),
 });
 
-export const createJournalSchema = z.object({
-  date: dateSchema,
-  reference: z.string().max(100).optional(),
-  notes: z.string().max(1000).optional(),
-  lines: z.array(createJournalLineSchema).min(2, 'Journal must have at least 2 lines'),
-}).refine(
-  (data) => {
-    const totalDebit = data.lines.reduce((sum, line) => sum + parseFloat(line.debit || '0'), 0);
-    const totalCredit = data.lines.reduce((sum, line) => sum + parseFloat(line.credit || '0'), 0);
-    return Math.abs(totalDebit - totalCredit) < 0.0001;
-  },
-  { message: 'Total debits must equal total credits', path: ['lines'] }
-);
+export const createJournalSchema = z
+  .object({
+    date: dateSchema,
+    reference: z.string().max(100).optional(),
+    notes: z.string().max(1000).optional(),
+    lines: z.array(createJournalLineSchema).min(2, 'Journal must have at least 2 lines'),
+  })
+  .refine(
+    (data) => {
+      const totalDebit = data.lines.reduce((sum, line) => sum + parseFloat(line.debit || '0'), 0);
+      const totalCredit = data.lines.reduce((sum, line) => sum + parseFloat(line.credit || '0'), 0);
+      return Math.abs(totalDebit - totalCredit) < 0.0001;
+    },
+    { message: 'Total debits must equal total credits', path: ['lines'] },
+  );
 
 // ============================================
 // RECURRING PROFILE SCHEMAS
@@ -309,7 +370,9 @@ export const createPaymentReceivedSchema = z.object({
   depositToAccountId: cuidSchema,
   reference: z.string().max(100).optional(),
   notes: z.string().max(1000).optional(),
-  allocations: z.array(createPaymentAllocationSchema).min(1, 'Payment must be allocated to at least 1 invoice'),
+  allocations: z
+    .array(createPaymentAllocationSchema)
+    .min(1, 'Payment must be allocated to at least 1 invoice'),
 });
 
 // ============================================
@@ -401,7 +464,9 @@ export const createPaymentMadeSchema = z.object({
   paidFromAccountId: cuidSchema,
   reference: z.string().max(100).optional(),
   notes: z.string().max(1000).optional(),
-  allocations: z.array(createBillAllocationSchema).min(1, 'Payment must be allocated to at least 1 bill'),
+  allocations: z
+    .array(createBillAllocationSchema)
+    .min(1, 'Payment must be allocated to at least 1 bill'),
 });
 
 // ============================================
@@ -441,7 +506,9 @@ export const createCompositeItemSchema = z.object({
   sku: z.string().min(1).max(50),
   sellingPrice: positiveDecimalSchema,
   description: z.string().max(1000).optional(),
-  components: z.array(createCompositeItemComponentSchema).min(1, 'Bundle must have at least 1 component'),
+  components: z
+    .array(createCompositeItemComponentSchema)
+    .min(1, 'Bundle must have at least 1 component'),
 });
 
 // ============================================
@@ -846,3 +913,38 @@ export type UpdateLeadInput = z.infer<typeof updateLeadSchema>;
 export type CreateDealInput = z.infer<typeof createDealSchema>;
 export type UpdateDealInput = z.infer<typeof updateDealSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
+
+// ============================================
+// GLOBAL SEARCH
+// ============================================
+
+export const searchEntityTypes = [
+  'customer',
+  'vendor',
+  'invoice',
+  'bill',
+  'item',
+  'employee',
+  'project',
+  'lead',
+  'deal',
+  'quote',
+  'expense',
+] as const;
+
+export const globalSearchSchema = z.object({
+  q: z.string().min(2, 'Search query must be at least 2 characters'),
+  limit: z.coerce.number().int().min(1).max(50).optional().default(25),
+  types: z.array(z.enum(searchEntityTypes)).optional(),
+  fuzzyThreshold: z.coerce.number().min(0).max(1).optional().default(0.3),
+});
+
+export const recordSearchHistorySchema = z.object({
+  query: z.string().min(1),
+  resultType: z.string().optional(),
+  resultId: z.string().optional(),
+  resultTitle: z.string().optional(),
+});
+
+export type GlobalSearchInput = z.infer<typeof globalSearchSchema>;
+export type RecordSearchHistoryInput = z.infer<typeof recordSearchHistorySchema>;

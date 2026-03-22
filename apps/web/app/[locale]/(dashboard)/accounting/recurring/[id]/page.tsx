@@ -31,13 +31,17 @@ import {
   useRecurringProfile,
   useDeleteRecurringProfile,
   useToggleRecurringProfile,
+  useExecuteRecurringProfile,
+  useRecurringProfileExecutions,
   getFrequencyLabel,
 } from '@/lib/hooks/use-recurring-profiles';
 import { formatJournalAmount } from '@/lib/hooks/use-journals';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { format } from 'date-fns';
+import { useTranslations } from 'next-intl';
 
 export default function RecurringProfileDetailPage() {
+  const t = useTranslations('accounting');
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -49,9 +53,23 @@ export default function RecurringProfileDetailPage() {
   const { data: profile, isLoading } = useRecurringProfile(profileId);
   const deleteProfile = useDeleteRecurringProfile();
   const toggleProfile = useToggleRecurringProfile();
+  const executeProfile = useExecuteRecurringProfile();
+  const { data: executions } = useRecurringProfileExecutions(profileId, 10);
 
   const canEdit = hasPermission('accounting.edit');
   const canDelete = hasPermission('accounting.delete');
+
+  const handleExecute = async () => {
+    try {
+      await executeProfile.mutateAsync(profileId);
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to execute recurring profile.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleToggle = async () => {
     try {
@@ -104,7 +122,7 @@ export default function RecurringProfileDetailPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/accounting/recurring">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -136,7 +154,7 @@ export default function RecurringProfileDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/accounting/recurring">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -146,22 +164,22 @@ export default function RecurringProfileDetailPage() {
               <h1 className="text-3xl font-bold tracking-tight">{profile.name}</h1>
               <Badge
                 className={
-                  profile.isActive
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-gray-100 text-gray-800'
+                  profile.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                 }
               >
                 {profile.isActive ? 'Active' : 'Inactive'}
               </Badge>
             </div>
-            <p className="text-muted-foreground">
-              {profile.description || 'No description'}
-            </p>
+            <p className="text-muted-foreground">{profile.description || 'No description'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {canEdit && (
             <>
+              <Button variant="outline" onClick={handleExecute}>
+                <Play className="mr-2 h-4 w-4" />
+                Execute Now
+              </Button>
               <Button variant="outline" onClick={handleToggle}>
                 {profile.isActive ? (
                   <>
@@ -178,18 +196,15 @@ export default function RecurringProfileDetailPage() {
               <Button variant="outline" asChild>
                 <Link href={`/accounting/recurring/${profileId}/edit`}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit
+                  {t('recurring.editProfile')}
                 </Link>
               </Button>
             </>
           )}
           {canDelete && (
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
+            <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              {t('recurring.deleteProfile')}
             </Button>
           )}
         </div>
@@ -198,29 +213,31 @@ export default function RecurringProfileDetailPage() {
       {/* Profile Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Profile Details</CardTitle>
+          <CardTitle>{t('recurring.profileDetails')}</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Frequency</dt>
+              <dt className="text-sm font-medium text-muted-foreground">
+                {t('recurring.form.frequency')}
+              </dt>
               <dd className="mt-1">
-                <Badge variant="outline">
-                  {getFrequencyLabel(profile.frequency)}
-                </Badge>
+                <Badge variant="outline">{getFrequencyLabel(profile.frequency)}</Badge>
               </dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-muted-foreground">
-                Next Execution
+                {t('recurring.table.nextRun')}
               </dt>
               <dd className="mt-1 flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                {format(new Date(profile.nextExecutionDate), 'MMMM d, yyyy')}
+                {format(new Date(profile.nextRunDate), 'MMMM d, yyyy')}
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Auto Post</dt>
+              <dt className="text-sm font-medium text-muted-foreground">
+                {t('recurring.form.autoPost')}
+              </dt>
               <dd className="mt-1">
                 <Badge variant={profile.autoPost ? 'default' : 'secondary'}>
                   {profile.autoPost ? 'Yes - Auto Post' : 'No - Save as Draft'}
@@ -228,13 +245,13 @@ export default function RecurringProfileDetailPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Status</dt>
+              <dt className="text-sm font-medium text-muted-foreground">
+                {t('recurring.table.status')}
+              </dt>
               <dd className="mt-1">
                 <Badge
                   className={
-                    profile.isActive
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
+                    profile.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                   }
                 >
                   {profile.isActive ? 'Active' : 'Inactive'}
@@ -243,17 +260,11 @@ export default function RecurringProfileDetailPage() {
             </div>
             <div>
               <dt className="text-sm font-medium text-muted-foreground">Created</dt>
-              <dd className="mt-1">
-                {format(new Date(profile.createdAt), 'MMM d, yyyy')}
-              </dd>
+              <dd className="mt-1">{format(new Date(profile.createdAt), 'MMM d, yyyy')}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">
-                Last Modified
-              </dt>
-              <dd className="mt-1">
-                {format(new Date(profile.updatedAt), 'MMM d, yyyy')}
-              </dd>
+              <dt className="text-sm font-medium text-muted-foreground">Last Modified</dt>
+              <dd className="mt-1">{format(new Date(profile.updatedAt), 'MMM d, yyyy')}</dd>
             </div>
           </dl>
         </CardContent>
@@ -268,10 +279,10 @@ export default function RecurringProfileDetailPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Account</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Debit</TableHead>
-                <TableHead className="text-right">Credit</TableHead>
+                <TableHead>{t('journals.form.account')}</TableHead>
+                <TableHead>{t('journals.form.description')}</TableHead>
+                <TableHead className="text-right">{t('journals.form.debit')}</TableHead>
+                <TableHead className="text-right">{t('journals.form.credit')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -310,22 +321,64 @@ export default function RecurringProfileDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Execution History */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Execution History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {executions && Array.isArray(executions) && executions.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Journal</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {executions.map(
+                  (
+                    exec: {
+                      id: string;
+                      executedAt: string;
+                      journalNumber?: string;
+                      status?: string;
+                    },
+                    index: number,
+                  ) => (
+                    <TableRow key={exec.id || index}>
+                      <TableCell>
+                        {format(new Date(exec.executedAt), 'MMM d, yyyy HH:mm')}
+                      </TableCell>
+                      <TableCell>{exec.journalNumber || '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{exec.status || 'Completed'}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ),
+                )}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-muted-foreground">No executions yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Recurring Profile</AlertDialogTitle>
+            <AlertDialogTitle>{t('recurring.deleteProfile')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this recurring profile? This action
-              cannot be undone. Previously created journals will not be affected.
+              Are you sure you want to delete this recurring profile? This action cannot be undone.
+              Previously created journals will not be affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

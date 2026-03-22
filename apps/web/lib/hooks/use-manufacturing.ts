@@ -57,6 +57,8 @@ export interface WorkOrder {
   };
   quantity: number;
   startDate: string;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
   dueDate?: string;
   completedQuantity?: number;
   completedAt?: string;
@@ -66,6 +68,23 @@ export interface WorkOrder {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProductionEntry {
+  id: string;
+  date: string;
+  quantityProduced: number;
+  quantityRejected: number;
+  wastageQuantity: number;
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface ManufacturingStats {
+  active: number;
+  draft: number;
+  activeBoms: number;
+  completedThisMonth: number;
 }
 
 // ============ API Functions ============
@@ -100,12 +119,16 @@ const bomApi = {
 };
 
 const workOrderApi = {
-  list: async (params?: { status?: string; search?: string }) => {
+  list: async (params?: { status?: string; search?: string; bomId?: string }) => {
     const response = await api.get('/manufacturing/work-orders', { params });
     return response.data;
   },
   get: async (id: string) => {
     const response = await api.get(`/manufacturing/work-orders/${id}`);
+    return response.data;
+  },
+  getStats: async () => {
+    const response = await api.get('/manufacturing/work-orders/stats');
     return response.data;
   },
   create: async (data: Partial<WorkOrder>) => {
@@ -134,6 +157,23 @@ const workOrderApi = {
     const response = await api.post(`/manufacturing/work-orders/${id}/cancel`);
     return response.data;
   },
+  recordProduction: async (
+    id: string,
+    data: {
+      quantityProduced: number;
+      quantityRejected?: number;
+      wastageQuantity?: number;
+      notes?: string;
+      date?: string;
+    },
+  ) => {
+    const response = await api.post(`/manufacturing/work-orders/${id}/production`, data);
+    return response.data;
+  },
+  getProductionHistory: async (id: string) => {
+    const response = await api.get(`/manufacturing/work-orders/${id}/history`);
+    return response.data;
+  },
 };
 
 // ============ Hooks - BOMs ============
@@ -145,11 +185,44 @@ export function useBOMs(params?: { status?: string; search?: string }) {
   });
 }
 
+type RawBOMItem = {
+  id: string;
+  itemId: string;
+  quantity: string | number;
+  item?: { name: string; sku: string };
+};
+
+type RawBOM = Omit<BOM, 'components' | 'outputItem'> & {
+  items?: RawBOMItem[];
+  outputItem?: { id: string; name: string; sku?: string; code?: string };
+};
+
+function normalizeBOM(raw: RawBOM): BOM {
+  return {
+    ...(raw as unknown as BOM),
+    components: (raw.items || []).map((bomItem) => ({
+      id: bomItem.id,
+      itemId: bomItem.itemId,
+      itemName: bomItem.item?.name,
+      itemCode: bomItem.item?.sku,
+      quantity: parseFloat(bomItem.quantity.toString()),
+    })),
+    outputItem: raw.outputItem
+      ? {
+          id: raw.outputItem.id,
+          name: raw.outputItem.name,
+          code: raw.outputItem.code ?? raw.outputItem.sku ?? '',
+        }
+      : undefined,
+  };
+}
+
 export function useBOM(id: string) {
   return useQuery({
     queryKey: ['boms', id],
-    queryFn: () => bomApi.get(id),
+    queryFn: () => bomApi.get(id) as Promise<RawBOM>,
     enabled: !!id,
+    select: normalizeBOM,
   });
 }
 
@@ -194,10 +267,25 @@ export function useBOMRequirements(id: string, quantity: number) {
 
 // ============ Hooks - Work Orders ============
 
-export function useWorkOrders(params?: { status?: string; search?: string }) {
+export function useWorkOrders(params?: { status?: string; search?: string; bomId?: string }) {
   return useQuery({
     queryKey: ['work-orders', params],
     queryFn: () => workOrderApi.list(params),
+  });
+}
+
+export function useWorkOrdersByBom(bomId: string) {
+  return useQuery({
+    queryKey: ['work-orders', { bomId }],
+    queryFn: () => workOrderApi.list({ bomId }),
+    enabled: !!bomId,
+  });
+}
+
+export function useManufacturingStats() {
+  return useQuery({
+    queryKey: ['work-orders', 'stats'],
+    queryFn: () => workOrderApi.getStats(),
   });
 }
 
@@ -272,6 +360,32 @@ export function useCancelWorkOrder() {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-orders', id] });
     },
+  });
+}
+
+export function useRecordProduction(workOrderId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      quantityProduced: number;
+      quantityRejected?: number;
+      wastageQuantity?: number;
+      notes?: string;
+      date?: string;
+    }) => workOrderApi.recordProduction(workOrderId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['work-orders', workOrderId] });
+      queryClient.invalidateQueries({ queryKey: ['production-history', workOrderId] });
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+    },
+  });
+}
+
+export function useProductionHistory(workOrderId: string) {
+  return useQuery({
+    queryKey: ['production-history', workOrderId],
+    queryFn: () => workOrderApi.getProductionHistory(workOrderId),
+    enabled: !!workOrderId,
   });
 }
 

@@ -1,10 +1,13 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { journalsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { journalsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type JournalStatus = 'DRAFT' | 'POSTED' | 'VOIDED';
 
 export interface JournalLine {
@@ -76,10 +79,12 @@ interface UpdateJournalData {
   }>;
 }
 
+type RawJournal = Omit<Journal, 'entryDate' | 'description' | 'status'>;
+
 /**
  * Transform raw journal data to include computed fields
  */
-function transformJournal(journal: any): Journal {
+function transformJournal(journal: RawJournal): Journal {
   const status: JournalStatus = journal.deletedAt
     ? 'VOIDED'
     : journal.isPosted
@@ -125,6 +130,24 @@ export function useJournals(params?: JournalParams) {
 }
 
 /**
+ * Hook to fetch all journals with cursor-based infinite scrolling
+ */
+export function useInfiniteJournals(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Journal, Record<string, unknown>>({
+    queryKey: ['journals'],
+    fetchFn: async (p) => {
+      const response = await journalsApi.getAllCursor(p);
+      const page = response.data;
+      if (page.data) {
+        page.data = page.data.map(transformJournal);
+      }
+      return page;
+    },
+    params: params || {},
+  });
+}
+
+/**
  * Hook to fetch a single journal by ID
  */
 export function useJournal(id: string | undefined) {
@@ -158,7 +181,7 @@ export function useCreateJournal() {
         description: 'The journal entry has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating journal',
@@ -188,7 +211,7 @@ export function useUpdateJournal() {
         description: 'The journal entry has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating journal',
@@ -217,7 +240,7 @@ export function useDeleteJournal() {
         description: 'The journal entry has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting journal',
@@ -247,7 +270,7 @@ export function usePostJournal() {
         description: 'The journal entry has been posted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error posting journal',

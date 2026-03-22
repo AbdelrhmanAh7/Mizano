@@ -1,0 +1,93 @@
+{
+  "hero": {
+    "title": "AI-Powered Autonomous Accounting",
+    "subtitle": "Zero-touch accounting platform with 33 AI models. No accounting knowledge required.",
+    "getStarted": "Get Started",
+    "login": "Login"
+  },
+  "stats": {
+    "aiModels": "AI Models",
+    "aiCategories": "AI Categories",
+    "businessModules": "Business Modules",
+    "localAi": "100% Local AI"
+  },
+  "features": {
+    "sectionTitle": "Everything You Need",
+    "sectionSubtitle": "A complete platform for modern businesses",
+    "zeroTouch": {
+      "title": "Zero-Touch Accounting",
+      "description": "Auto-categorization, bank reconciliation, and OCR document intake. Let AI handle the bookkeeping."
+    },
+    "aiIntelligence": {
+      "title": "AI Intelligence",
+      "description": "33 models for forecasting, anomaly detection, fraud prevention, and predictive analytics."
+    },
+    "financial": {
+      "title": "Financial Management",
+      "description": "Invoicing, bills, journals, multi-currency support, and tax compliance in one place."
+    },
+    "operations": {
+      "title": "Business Operations",
+      "description": "Inventory, manufacturing, HR, payroll, and project management fully integrated."
+    },
+    "security": {
+      "title": "Security & Compliance",
+      "description": "Fraud detection, audit risk scoring, and compliance monitoring to protect your business."
+    },
+    "analytics": {
+      "title": "Analytics & Reporting",
+      "description": "P&L, balance sheet, cash flow forecast, customer insights, and real-time dashboards."
+    }
+  },
+  "aiShowcase": {
+    "sectionTitle": "33 AI Models, 7 Categories",
+    "sectionSubtitle": "All running locally on your infrastructure",
+    "coreFinancial": {
+      "title": "Core Financial",
+      "description": "Transaction categorization, bank reconciliation, anomaly detection, and cash flow forecasting",
+      "count": "10 models"
+    },
+    "salesCrm": {
+      "title": "Sales & CRM",
+      "description": "Lead scoring, churn prediction, customer lifetime value, and pipeline forecasting",
+      "count": "5 models"
+    },
+    "security": {
+      "title": "Security & Compliance",
+      "description": "Fraud detection, compliance monitoring, and audit risk scoring",
+      "count": "3 models"
+    },
+    "nlp": {
+      "title": "NLP & Documents",
+      "description": "Document classification, sentiment analysis, entity extraction, and contract analysis",
+      "count": "4 models"
+    },
+    "hr": {
+      "title": "HR & Workforce",
+      "description": "Employee attrition prediction, compensation benchmarking, and skills gap analysis",
+      "count": "3 models"
+    },
+    "operations": {
+      "title": "Operations",
+      "description": "Quality prediction, predictive maintenance, workforce scheduling, and route optimization",
+      "count": "5 models"
+    },
+    "chat": {
+      "title": "Chat & Voice",
+      "description": "AI chatbot, knowledge assistant, and voice command processing",
+      "count": "3 models"
+    }
+  },
+  "technology": {
+    "sectionTitle": "Built for Privacy & Performance",
+    "localAi": "100% Local AI - Your data never leaves your servers",
+    "offline": "No external API dependencies - runs completely offline",
+    "techStack": "Modern tech stack for enterprise reliability"
+  },
+  "cta": {
+    "title": "Ready to automate your accounting?",
+    "subtitle": "Join the future of autonomous financial management",
+    "getStarted": "Create Account",
+    "login": "Sign In"
+  }
+}

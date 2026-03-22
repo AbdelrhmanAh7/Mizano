@@ -1,0 +1,1 @@
+NODE_OPTIONS="--max-old-space-size=8192" node "$(git rev-parse --show-toplevel)/_lint_staged.js"

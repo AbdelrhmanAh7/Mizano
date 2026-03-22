@@ -43,7 +43,7 @@ interface ItemFormProps {
   item?: Item | null;
   accounts: Array<{ id: string; name: string; code: string; type: string }>;
   taxRates?: Array<{ id: string; name: string; rate: number }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: ItemFormData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -94,11 +94,11 @@ export function ItemForm({
         purchasePrice: item.purchasePrice ? parseFloat(item.purchasePrice) : 0,
         taxRateId: item.taxRateId || '',
         trackInventory: item.trackInventory ?? true,
-        openingStock: item.stockLevel || 0,
+        openingStock: item.currentStock || 0,
         reorderPoint: item.reorderPoint || 10,
-        reorderQuantity: item.reorderQuantity || 20,
-        incomeAccountId: item.incomeAccountId || '',
-        expenseAccountId: item.expenseAccountId || '',
+        reorderQuantity: item.reorderLevel || 20,
+        incomeAccountId: item.salesAccountId || '',
+        expenseAccountId: item.purchaseAccountId || '',
         inventoryAccountId: item.inventoryAccountId || '',
       });
     }
@@ -131,25 +131,15 @@ export function ItemForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Item Name *</Label>
-              <Input
-                id="name"
-                placeholder="Enter item name"
-                {...form.register('name')}
-              />
+              <Input id="name" placeholder="Enter item name" {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.name.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="sku">SKU</Label>
-              <Input
-                id="sku"
-                placeholder="Stock Keeping Unit"
-                {...form.register('sku')}
-              />
+              <Input id="sku" placeholder="Stock Keeping Unit" {...form.register('sku')} />
             </div>
           </div>
 
@@ -170,9 +160,7 @@ export function ItemForm({
                     <SelectItem key={option.value} value={option.value}>
                       <div>
                         <div className="font-medium">{option.label}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {option.description}
-                        </div>
+                        <div className="text-xs text-muted-foreground">{option.description}</div>
                       </div>
                     </SelectItem>
                   ))}
@@ -246,14 +234,14 @@ export function ItemForm({
             <div className="space-y-2">
               <Label htmlFor="taxRateId">Tax Rate</Label>
               <Select
-                value={form.watch('taxRateId') || ''}
-                onValueChange={(value) => form.setValue('taxRateId', value)}
+                value={form.watch('taxRateId') || 'none'}
+                onValueChange={(value) => form.setValue('taxRateId', value === 'none' ? '' : value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select tax rate" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No tax</SelectItem>
+                  <SelectItem value="none">No tax</SelectItem>
                   {taxRates.map((rate) => (
                     <SelectItem key={rate.id} value={rate.id}>
                       {rate.name} ({rate.rate}%)
@@ -275,9 +263,7 @@ export function ItemForm({
               <div className="flex items-center gap-2">
                 <Switch
                   checked={watchTrackInventory}
-                  onCheckedChange={(checked) =>
-                    form.setValue('trackInventory', checked)
-                  }
+                  onCheckedChange={(checked) => form.setValue('trackInventory', checked)}
                 />
                 <Label>Track Inventory</Label>
               </div>
@@ -322,9 +308,7 @@ export function ItemForm({
                     placeholder="20"
                     {...form.register('reorderQuantity', { valueAsNumber: true })}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Suggested quantity to reorder
-                  </p>
+                  <p className="text-xs text-muted-foreground">Suggested quantity to reorder</p>
                 </div>
               </div>
             </CardContent>
@@ -342,13 +326,16 @@ export function ItemForm({
             <div className="space-y-2">
               <Label htmlFor="incomeAccountId">Income Account</Label>
               <Select
-                value={form.watch('incomeAccountId') || ''}
-                onValueChange={(value) => form.setValue('incomeAccountId', value)}
+                value={form.watch('incomeAccountId') || 'none'}
+                onValueChange={(value) =>
+                  form.setValue('incomeAccountId', value === 'none' ? '' : value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
                   {incomeAccounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.code} - {account.name}
@@ -356,21 +343,22 @@ export function ItemForm({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Used when selling this item
-              </p>
+              <p className="text-xs text-muted-foreground">Used when selling this item</p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="expenseAccountId">Expense Account</Label>
               <Select
-                value={form.watch('expenseAccountId') || ''}
-                onValueChange={(value) => form.setValue('expenseAccountId', value)}
+                value={form.watch('expenseAccountId') || 'none'}
+                onValueChange={(value) =>
+                  form.setValue('expenseAccountId', value === 'none' ? '' : value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
                   {expenseAccounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.code} - {account.name}
@@ -378,24 +366,23 @@ export function ItemForm({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Used when purchasing this item
-              </p>
+              <p className="text-xs text-muted-foreground">Used when purchasing this item</p>
             </div>
 
             {watchTrackInventory && (
               <div className="space-y-2">
                 <Label htmlFor="inventoryAccountId">Inventory Account</Label>
                 <Select
-                  value={form.watch('inventoryAccountId') || ''}
+                  value={form.watch('inventoryAccountId') || 'none'}
                   onValueChange={(value) =>
-                    form.setValue('inventoryAccountId', value)
+                    form.setValue('inventoryAccountId', value === 'none' ? '' : value)
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select account" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
                     {assetAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
                         {account.code} - {account.name}
@@ -403,9 +390,7 @@ export function ItemForm({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Used for inventory valuation
-                </p>
+                <p className="text-xs text-muted-foreground">Used for inventory valuation</p>
               </div>
             )}
           </div>
@@ -418,11 +403,7 @@ export function ItemForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? 'Saving...'
-            : isEditing
-            ? 'Update Item'
-            : 'Create Item'}
+          {isSubmitting ? 'Saving...' : isEditing ? 'Update Item' : 'Create Item'}
         </Button>
       </div>
     </form>

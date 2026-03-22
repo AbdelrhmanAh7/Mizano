@@ -1,15 +1,11 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { format } from 'date-fns';
-import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -18,13 +14,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
   Table,
   TableBody,
   TableCell,
@@ -32,8 +21,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency } from '@/lib/hooks/use-vendor-credits';
+import { cn } from '@/lib/utils';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { format } from 'date-fns';
+import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
+import { useMemo } from 'react';
+import { useFieldArray, useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 const lineSchema = z.object({
   itemId: z.string().optional(),
@@ -60,7 +56,7 @@ interface VendorCreditFormProps {
   vendors: Array<{ id: string; name: string; currency: string }>;
   accounts: Array<{ id: string; name: string; code: string; type: string }>;
   items: Array<{ id: string; name: string; sku: string | null; purchasePrice: string | null }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
   preselectedVendorId?: string;
@@ -110,9 +106,7 @@ export function VendorCreditForm({
   const currency = selectedVendor?.currency || 'USD';
 
   // Filter accounts to show expense/inventory accounts
-  const expenseAccounts = accounts.filter(
-    (a) => a.type === 'EXPENSE' || a.type === 'ASSET'
-  );
+  const expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -192,9 +186,7 @@ export function VendorCreditForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.vendorId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.vendorId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.vendorId.message}</p>
               )}
             </div>
 
@@ -206,13 +198,11 @@ export function VendorCreditForm({
                     variant="outline"
                     className={cn(
                       'w-full justify-start text-left font-normal',
-                      !form.watch('date') && 'text-muted-foreground'
+                      !form.watch('date') && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {form.watch('date')
-                      ? format(form.watch('date'), 'PPP')
-                      : 'Pick a date'}
+                    {form.watch('date') ? format(form.watch('date'), 'PPP') : 'Pick a date'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -225,9 +215,7 @@ export function VendorCreditForm({
                 </PopoverContent>
               </Popover>
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.date.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
               )}
             </div>
 
@@ -235,9 +223,7 @@ export function VendorCreditForm({
               <Label htmlFor="type">Type *</Label>
               <Select
                 value={form.watch('type')}
-                onValueChange={(value: 'CREDIT' | 'REFUND') =>
-                  form.setValue('type', value)
-                }
+                onValueChange={(value: 'CREDIT' | 'REFUND') => form.setValue('type', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
@@ -324,9 +310,7 @@ export function VendorCreditForm({
                     <TableCell>
                       <Select
                         value={form.watch(`lines.${index}.accountId`) || ''}
-                        onValueChange={(value) =>
-                          form.setValue(`lines.${index}.accountId`, value)
-                        }
+                        onValueChange={(value) => form.setValue(`lines.${index}.accountId`, value)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select account" />
@@ -387,6 +371,7 @@ export function VendorCreditForm({
                         size="icon"
                         onClick={() => fields.length > 1 && remove(index)}
                         disabled={fields.length === 1}
+                        aria-label="Remove line item"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -398,9 +383,7 @@ export function VendorCreditForm({
           </Table>
 
           {form.formState.errors.lines && (
-            <p className="text-sm text-red-500 mt-2">
-              {form.formState.errors.lines.message}
-            </p>
+            <p className="text-sm text-red-500 mt-2">{form.formState.errors.lines.message}</p>
           )}
 
           {/* Totals */}
@@ -408,21 +391,15 @@ export function VendorCreditForm({
             <div className="w-64 space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Subtotal:</span>
-                <span className="font-mono">
-                  {formatCurrency(totals.subtotal, currency)}
-                </span>
+                <span className="font-mono">{formatCurrency(totals.subtotal, currency)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span>Tax:</span>
-                <span className="font-mono">
-                  {formatCurrency(totals.taxAmount, currency)}
-                </span>
+                <span className="font-mono">{formatCurrency(totals.taxAmount, currency)}</span>
               </div>
               <div className="flex justify-between text-lg font-semibold border-t pt-2">
                 <span>Total:</span>
-                <span className="font-mono">
-                  {formatCurrency(totals.total, currency)}
-                </span>
+                <span className="font-mono">{formatCurrency(totals.total, currency)}</span>
               </div>
             </div>
           </div>

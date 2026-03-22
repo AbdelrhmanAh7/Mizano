@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Plus, Search, Clock, Calendar, Trash2 } from 'lucide-react';
+import { Plus, Clock, Calendar, Trash2 } from 'lucide-react';
+import { type ColumnDef } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -14,14 +14,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,27 +25,33 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
   useTimesheets,
   useDeleteTimesheet,
-  formatCurrency,
   formatHours,
   TimesheetEntry,
 } from '@/lib/hooks/use-projects';
+import { useTranslations } from 'next-intl';
 
-export default function TimesheetsPage() {
-  const [search, setSearch] = useState('');
+function TimesheetsPageContent() {
+  const t = useTranslations('projects');
+  const tc = useTranslations('common');
+  const tableParams = useTableParams({ defaultSortBy: 'date' });
+
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data, isLoading } = useTimesheets({
+    ...tableParams.queryParams,
     status: statusFilter !== 'all' ? (statusFilter as 'UNBILLED' | 'INVOICED') : undefined,
   });
 
   const deleteTimesheet = useDeleteTimesheet();
 
   const entries: TimesheetEntry[] = data?.data || [];
+  const meta = data?.meta;
 
   const handleDelete = async () => {
     if (deleteId) {
@@ -62,7 +60,7 @@ export default function TimesheetsPage() {
     }
   };
 
-  // Calculate totals
+  // Calculate totals from current page data
   const totalHours = entries.reduce((sum, e) => {
     const hours = typeof e.hours === 'string' ? parseFloat(e.hours) : e.hours;
     return sum + (hours || 0);
@@ -75,36 +73,100 @@ export default function TimesheetsPage() {
       return sum + (hours || 0);
     }, 0);
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-        </div>
-        <Skeleton className="h-96" />
-      </div>
-    );
-  }
+  const columns: ColumnDef<TimesheetEntry>[] = [
+    {
+      accessorKey: 'date',
+      header: () => (
+        <SortableHeader
+          label={t('timesheets.table.date')}
+          columnId="date"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => format(new Date(row.original.date), 'MMM d, yyyy'),
+    },
+    {
+      accessorKey: 'task.project.name',
+      header: t('timesheets.table.project'),
+      cell: ({ row }) => row.original.task?.project?.name || '-',
+    },
+    {
+      accessorKey: 'task.name',
+      header: t('timesheets.table.task'),
+      cell: ({ row }) => <span className="font-medium">{row.original.task?.name || '-'}</span>,
+    },
+    {
+      accessorKey: 'description',
+      header: t('timesheets.table.description'),
+      meta: { cellClassName: 'max-w-[200px] truncate' },
+      cell: ({ row }) => row.original.description || '-',
+    },
+    {
+      accessorKey: 'hours',
+      header: () => (
+        <SortableHeader
+          label={t('timesheets.table.hours')}
+          columnId="hours"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
+      cell: ({ row }) => formatHours(row.original.hours),
+    },
+    {
+      accessorKey: 'status',
+      header: t('timesheets.table.status'),
+      cell: ({ row }) => (
+        <Badge
+          variant="outline"
+          className={
+            row.original.status === 'UNBILLED'
+              ? 'bg-yellow-100 text-yellow-800'
+              : 'bg-green-100 text-green-800'
+          }
+        >
+          {row.original.status === 'UNBILLED'
+            ? t('timesheets.status.unbilled')
+            : t('timesheets.status.invoiced')}
+        </Badge>
+      ),
+    },
+    {
+      id: 'actions',
+      header: '',
+      meta: { cellClassName: 'w-12' },
+      cell: ({ row }) => {
+        const entry = row.original;
+        return entry.status === 'UNBILLED' ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-red-600"
+            onClick={() => setDeleteId(entry.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        ) : null;
+      },
+    },
+  ];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Timesheets</h1>
-          <p className="text-muted-foreground">
-            Track time spent on projects and tasks
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('timesheets.title')}</h1>
+          <p className="text-muted-foreground">{t('timesheets.description')}</p>
         </div>
         <Button asChild>
           <Link href="/projects/timesheets/new">
             <Plus className="mr-2 h-4 w-4" />
-            Log Time
+            {t('timesheets.logTime')}
           </Link>
         </Button>
       </div>
@@ -118,7 +180,9 @@ export default function TimesheetsPage() {
                 <Clock className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Hours</p>
+                <p className="text-sm text-muted-foreground">
+                  {t('timesheets.summary.totalHours')}
+                </p>
                 <p className="text-2xl font-bold font-mono">{formatHours(totalHours)}</p>
               </div>
             </div>
@@ -131,7 +195,9 @@ export default function TimesheetsPage() {
                 <Calendar className="h-5 w-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Unbilled Hours</p>
+                <p className="text-sm text-muted-foreground">
+                  {t('timesheets.summary.unbilledHours')}
+                </p>
                 <p className="text-2xl font-bold font-mono">{formatHours(unbilledHours)}</p>
               </div>
             </div>
@@ -140,126 +206,79 @@ export default function TimesheetsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search entries..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="UNBILLED">Unbilled</SelectItem>
-            <SelectItem value="INVOICED">Invoiced</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <DataTableSearch
+              value={tableParams.search}
+              onChange={tableParams.setSearch}
+              placeholder={t('timesheets.searchPlaceholder')}
+            />
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder={t('timesheets.table.status')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('timesheets.allStatus')}</SelectItem>
+                <SelectItem value="UNBILLED">{t('timesheets.status.unbilled')}</SelectItem>
+                <SelectItem value="INVOICED">{t('timesheets.status.invoiced')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Table */}
-      {entries.length === 0 ? (
-        <div className="text-center py-12">
-          <Clock className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-semibold">No time entries</h3>
-          <p className="text-muted-foreground">
-            Start logging time on your projects and tasks.
-          </p>
-          <Button asChild className="mt-4">
-            <Link href="/projects/timesheets/new">Log Time</Link>
-          </Button>
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Task</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Hours</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {entries.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell>
-                      {format(new Date(entry.date), 'MMM d, yyyy')}
-                    </TableCell>
-                    <TableCell>
-                      {entry.task?.project?.name || '-'}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {entry.task?.name || '-'}
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate">
-                      {entry.description || '-'}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatHours(entry.hours)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={
-                          entry.status === 'UNBILLED'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-green-100 text-green-800'
-                        }
-                      >
-                        {entry.status === 'UNBILLED' ? 'Unbilled' : 'Invoiced'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {entry.status === 'UNBILLED' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-red-600"
-                          onClick={() => setDeleteId(entry.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('timesheets.timeEntries')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DataTable
+            columns={columns}
+            data={entries}
+            page={meta?.page || 1}
+            totalPages={meta?.totalPages || 1}
+            total={meta?.total || 0}
+            limit={tableParams.limit}
+            onPageChange={tableParams.setPage}
+            onLimitChange={tableParams.setLimit}
+            isLoading={isLoading}
+            emptyMessage={t('timesheets.empty.noResults')}
+            emptyAction={
+              <Button asChild>
+                <Link href="/projects/timesheets/new">{t('timesheets.logTime')}</Link>
+              </Button>
+            }
+          />
+        </CardContent>
+      </Card>
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Time Entry</AlertDialogTitle>
+            <AlertDialogTitle>{t('timesheets.confirmDelete.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this time entry? This action cannot
-              be undone.
+              {t('timesheets.confirmDelete.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
+            <AlertDialogCancel>{tc('buttons.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+              {tc('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function TimesheetsPage() {
+  return (
+    <Suspense>
+      <TimesheetsPageContent />
+    </Suspense>
   );
 }

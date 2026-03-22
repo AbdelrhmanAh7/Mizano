@@ -1,9 +1,33 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { ReadReplicaService } from '../../../prisma/read-replica.service';
+
+export interface AgingItem {
+  invoiceId?: string;
+  invoiceNumber?: string;
+  billId?: string;
+  billNumber?: string;
+  customerId?: string;
+  customerName?: string;
+  vendorId?: string;
+  vendorName?: string;
+  issueDate?: Date | null;
+  billDate?: Date | null;
+  dueDate: Date;
+  daysOverdue: number;
+  balanceDue: number;
+}
+
+export interface StatementTransaction {
+  date: Date | null;
+  type: string;
+  reference: string;
+  debit: number;
+  credit: number;
+}
 
 @Injectable()
 export class AgingReportsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: ReadReplicaService) {}
 
   async getReceivablesAging(organizationId: string, asOfDate?: string) {
     const date = asOfDate ? new Date(asOfDate) : new Date();
@@ -22,11 +46,11 @@ export class AgingReportsService {
     });
 
     const buckets = {
-      current: [] as any[],
-      days1_30: [] as any[],
-      days31_60: [] as any[],
-      days61_90: [] as any[],
-      over90: [] as any[],
+      current: [] as AgingItem[],
+      days1_30: [] as AgingItem[],
+      days31_60: [] as AgingItem[],
+      days61_90: [] as AgingItem[],
+      over90: [] as AgingItem[],
     };
 
     for (const invoice of invoices) {
@@ -34,7 +58,7 @@ export class AgingReportsService {
       const daysOverdue = Math.floor((date.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
       const balanceDue = parseFloat(invoice.balanceDue.toString());
 
-      const item = {
+      const item: AgingItem = {
         invoiceId: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
         customerId: invoice.customer.id,
@@ -60,7 +84,8 @@ export class AgingReportsService {
       over90: buckets.over90.reduce((sum, i) => sum + i.balanceDue, 0),
       total: 0,
     };
-    summary.total = summary.current + summary.days1_30 + summary.days31_60 + summary.days61_90 + summary.over90;
+    summary.total =
+      summary.current + summary.days1_30 + summary.days31_60 + summary.days61_90 + summary.over90;
 
     return {
       asOfDate: date,
@@ -88,11 +113,11 @@ export class AgingReportsService {
     });
 
     const buckets = {
-      current: [] as any[],
-      days1_30: [] as any[],
-      days31_60: [] as any[],
-      days61_90: [] as any[],
-      over90: [] as any[],
+      current: [] as AgingItem[],
+      days1_30: [] as AgingItem[],
+      days31_60: [] as AgingItem[],
+      days61_90: [] as AgingItem[],
+      over90: [] as AgingItem[],
     };
 
     for (const bill of bills) {
@@ -100,7 +125,7 @@ export class AgingReportsService {
       const daysOverdue = Math.floor((date.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
       const balanceDue = parseFloat(bill.balanceDue.toString());
 
-      const item = {
+      const item: AgingItem = {
         billId: bill.id,
         billNumber: bill.billNumber,
         vendorId: bill.vendor.id,
@@ -126,7 +151,8 @@ export class AgingReportsService {
       over90: buckets.over90.reduce((sum, i) => sum + i.balanceDue, 0),
       total: 0,
     };
-    summary.total = summary.current + summary.days1_30 + summary.days31_60 + summary.days61_90 + summary.over90;
+    summary.total =
+      summary.current + summary.days1_30 + summary.days31_60 + summary.days61_90 + summary.over90;
 
     return {
       asOfDate: date,
@@ -137,7 +163,12 @@ export class AgingReportsService {
     };
   }
 
-  async getCustomerStatement(organizationId: string, customerId: string, startDate: string, endDate: string) {
+  async getCustomerStatement(
+    organizationId: string,
+    customerId: string,
+    startDate: string,
+    endDate: string,
+  ) {
     const customer = await this.prisma.customer.findFirst({
       where: { id: customerId, organizationId },
     });
@@ -154,8 +185,14 @@ export class AgingReportsService {
       where: { customerId, organizationId, date: { lt: start } },
     });
 
-    const openingInvoiceTotal = openingInvoices.reduce((sum, i) => sum + parseFloat((i.total ?? i.grandTotal).toString()), 0);
-    const openingPaymentTotal = openingPayments.reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0);
+    const openingInvoiceTotal = openingInvoices.reduce(
+      (sum, i) => sum + parseFloat((i.total ?? i.grandTotal).toString()),
+      0,
+    );
+    const openingPaymentTotal = openingPayments.reduce(
+      (sum, p) => sum + parseFloat(p.amount.toString()),
+      0,
+    );
     const openingBalance = openingInvoiceTotal - openingPaymentTotal;
 
     // Get transactions in period
@@ -175,29 +212,29 @@ export class AgingReportsService {
     });
 
     // Combine and sort by date
-    const transactions: any[] = [
+    const transactions: StatementTransaction[] = [
       ...invoices.map((i) => ({
         date: i.issueDate ?? i.date,
-        type: 'Invoice',
+        type: 'Invoice' as const,
         reference: i.invoiceNumber,
         debit: parseFloat((i.total ?? i.grandTotal).toString()),
         credit: 0,
       })),
       ...payments.map((p) => ({
         date: p.date,
-        type: 'Payment',
+        type: 'Payment' as const,
         reference: p.paymentNumber,
         debit: 0,
         credit: parseFloat(p.amount.toString()),
       })),
       ...creditNotes.map((cn) => ({
         date: cn.issueDate ?? cn.date,
-        type: 'Credit Note',
+        type: 'Credit Note' as const,
         reference: cn.creditNoteNumber,
         debit: 0,
         credit: parseFloat((cn.total ?? cn.amount).toString()),
       })),
-    ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    ].sort((a, b) => new Date(a.date as Date).getTime() - new Date(b.date as Date).getTime());
 
     // Add running balance
     let runningBalance = openingBalance;
@@ -217,7 +254,12 @@ export class AgingReportsService {
     };
   }
 
-  async getVendorStatement(organizationId: string, vendorId: string, startDate: string, endDate: string) {
+  async getVendorStatement(
+    organizationId: string,
+    vendorId: string,
+    startDate: string,
+    endDate: string,
+  ) {
     const vendor = await this.prisma.vendor.findFirst({
       where: { id: vendorId, organizationId },
     });
@@ -234,8 +276,14 @@ export class AgingReportsService {
       where: { vendorId, organizationId, date: { lt: start } },
     });
 
-    const openingBillTotal = openingBills.reduce((sum, b) => sum + parseFloat((b.total ?? b.grandTotal).toString()), 0);
-    const openingPaymentTotal = openingPayments.reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0);
+    const openingBillTotal = openingBills.reduce(
+      (sum, b) => sum + parseFloat((b.total ?? b.grandTotal).toString()),
+      0,
+    );
+    const openingPaymentTotal = openingPayments.reduce(
+      (sum, p) => sum + parseFloat(p.amount.toString()),
+      0,
+    );
     const openingBalance = openingBillTotal - openingPaymentTotal;
 
     // Period transactions
@@ -249,22 +297,22 @@ export class AgingReportsService {
       orderBy: { date: 'asc' },
     });
 
-    const transactions: any[] = [
+    const transactions: StatementTransaction[] = [
       ...bills.map((b) => ({
         date: b.billDate ?? b.date,
-        type: 'Bill',
+        type: 'Bill' as const,
         reference: b.billNumber,
         debit: parseFloat((b.total ?? b.grandTotal).toString()),
         credit: 0,
       })),
       ...payments.map((p) => ({
         date: p.date,
-        type: 'Payment',
+        type: 'Payment' as const,
         reference: p.paymentNumber,
         debit: 0,
         credit: parseFloat(p.amount.toString()),
       })),
-    ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    ].sort((a, b) => new Date(a.date as Date).getTime() - new Date(b.date as Date).getTime());
 
     let runningBalance = openingBalance;
     const entries = transactions.map((t) => {

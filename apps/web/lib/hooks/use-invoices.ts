@@ -1,10 +1,13 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { invoicesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { invoicesApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type InvoiceStatus = 'DRAFT' | 'SENT' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'VOID';
 
 export interface InvoiceLine {
@@ -104,6 +107,20 @@ export function useInvoices(params?: InvoiceParams) {
 }
 
 /**
+ * Hook to fetch all invoices with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteInvoices(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Invoice, Record<string, unknown>>({
+    queryKey: ['invoices'],
+    fetchFn: async (p) => {
+      const response = await invoicesApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
+  });
+}
+
+/**
  * Hook to fetch a single invoice by ID
  */
 export function useInvoice(id: string | undefined) {
@@ -138,7 +155,7 @@ export function useCreateInvoice() {
         description: 'The invoice has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating invoice',
@@ -168,7 +185,7 @@ export function useUpdateInvoice() {
         description: 'The invoice has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating invoice',
@@ -198,7 +215,7 @@ export function useDeleteInvoice() {
         description: 'The invoice has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting invoice',
@@ -229,7 +246,7 @@ export function useSendInvoice() {
         description: 'The invoice has been sent successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error sending invoice',
@@ -260,10 +277,39 @@ export function useVoidInvoice() {
         description: 'The invoice has been voided successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error voiding invoice',
+        description: error.response?.data?.message || 'An error occurred',
+      });
+    },
+  });
+}
+
+/**
+ * Hook to clone/duplicate an invoice
+ */
+export function useCloneInvoice() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await invoicesApi.clone(id);
+      return response.data as Invoice;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast({
+        title: 'Invoice duplicated',
+        description: 'A new draft copy has been created.',
+      });
+    },
+    onError: (error: ApiError) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error duplicating invoice',
         description: error.response?.data?.message || 'An error occurred',
       });
     },
@@ -303,7 +349,11 @@ export function getInvoiceStatusLabel(status: InvoiceStatus): string {
 /**
  * Calculate line amount
  */
-export function calculateLineAmount(quantity: string, rate: string, discountPercent: string = '0'): string {
+export function calculateLineAmount(
+  quantity: string,
+  rate: string,
+  discountPercent: string = '0',
+): string {
   const qty = parseFloat(quantity) || 0;
   const r = parseFloat(rate) || 0;
   const discount = parseFloat(discountPercent) || 0;
@@ -316,13 +366,13 @@ export function calculateLineAmount(quantity: string, rate: string, discountPerc
 export function calculateInvoiceTotals(
   lines: Array<{ amount: string; taxRateId?: string }>,
   taxRates: Array<{ id: string; rate: number }>,
-  shippingAmount: string = '0'
+  shippingAmount: string = '0',
 ): { subtotal: number; taxAmount: number; grandTotal: number } {
   const subtotal = lines.reduce((sum, line) => sum + (parseFloat(line.amount) || 0), 0);
 
   const taxAmount = lines.reduce((sum, line) => {
-    const taxRate = taxRates.find(t => t.id === line.taxRateId);
-    return sum + ((parseFloat(line.amount) || 0) * ((taxRate?.rate || 0) / 100));
+    const taxRate = taxRates.find((t) => t.id === line.taxRateId);
+    return sum + (parseFloat(line.amount) || 0) * ((taxRate?.rate || 0) / 100);
   }, 0);
 
   const shipping = parseFloat(shippingAmount) || 0;

@@ -1,17 +1,54 @@
 {
   "title": "الموارد البشرية",
   "description": "إدارة الموظفين والحضور والرواتب",
+  "hub": {
+    "quickActions": "إجراءات سريعة",
+    "addEmployee": "إضافة موظف",
+    "markAttendance": "تسجيل الحضور",
+    "runPayroll": "تشغيل الرواتب",
+    "stats": {
+      "totalEmployees": "إجمالي الموظفين",
+      "totalEmployeesDesc": "{active} نشط، {inactive} غير نشط",
+      "monthlyPayroll": "الرواتب الشهرية",
+      "monthlyPayrollDesc": "من {count} كشف راتب",
+      "attendanceRate": "معدل الحضور",
+      "attendanceRateDesc": "متوسط هذا الشهر",
+      "pendingPayroll": "رواتب معلقة",
+      "pendingPayrollDesc": "{count} تحتاج معالجة"
+    },
+    "recentPayroll": "مسيرات الرواتب الأخيرة",
+    "noRecentPayroll": "لا توجد مسيرات رواتب بعد",
+    "viewAllPayroll": "عرض جميع المسيرات",
+    "departmentBreakdown": "توزيع الأقسام",
+    "noDepartments": "لا تتوفر بيانات الأقسام",
+    "employeesInDept": "{count} موظف"
+  },
+  "openModule": "فتح {title}",
+  "trackTime": "تتبع الوقت",
+  "unassigned": "غير محدد",
   "employees": {
     "title": "الموظفون",
+    "description": "إدارة القوى العاملة",
     "newEmployee": "موظف جديد",
     "editEmployee": "تعديل الموظف",
     "deleteEmployee": "حذف الموظف",
     "employeeDetails": "تفاصيل الموظف",
+    "activeEmployees": "الموظفون النشطون",
+    "totalPayroll": "إجمالي الرواتب الشهرية",
+    "overview": "نظرة عامة",
+    "salaryStructure": "هيكل الراتب",
+    "payslips": "كشوف الرواتب",
+    "attendanceHistory": "الحضور",
+    "personalInfo": "المعلومات الشخصية",
+    "employmentInfo": "معلومات التوظيف",
+    "bankingInfo": "البنك والضرائب",
     "form": {
       "employeeId": "رقم الموظف",
       "employeeIdPlaceholder": "أدخل رقم الموظف",
       "name": "الاسم الكامل",
       "namePlaceholder": "أدخل الاسم الكامل",
+      "firstName": "الاسم الأول",
+      "lastName": "اسم العائلة",
       "email": "البريد الإلكتروني",
       "emailPlaceholder": "أدخل البريد الإلكتروني",
       "phone": "الهاتف",
@@ -26,26 +63,68 @@
       "deductions": "الاستقطاعات",
       "bankAccount": "الحساب البنكي",
       "bankAccountPlaceholder": "أدخل الحساب البنكي",
-      "isActive": "نشط"
+      "bankName": "اسم البنك",
+      "taxId": "الرقم الضريبي",
+      "isActive": "نشط",
+      "status": "الحالة",
+      "salary": "الراتب",
+      "grossSalary": "إجمالي الراتب",
+      "netSalary": "صافي الراتب",
+      "totalAllowances": "إجمالي البدلات",
+      "totalDeductions": "إجمالي الاستقطاعات"
     },
     "table": {
       "employeeId": "رقم الموظف",
       "name": "الاسم",
+      "email": "البريد الإلكتروني",
+      "phone": "الهاتف",
       "department": "القسم",
       "jobTitle": "المسمى الوظيفي",
       "salary": "الراتب",
+      "joinedDate": "تاريخ الانضمام",
       "status": "الحالة"
     },
+    "searchPlaceholder": "البحث عن موظفين...",
+    "allStatus": "جميع الحالات",
+    "notFound": "الموظف غير موجود",
+    "contactInfo": "معلومات الاتصال",
+    "bankingDetails": "تفاصيل الحساب البنكي",
+    "monthlySalary": "الراتب الشهري",
+    "netSalaryAfterDeductions": "صافي الراتب بعد الاستقطاعات",
+    "joined": "انضم {date}",
+    "noBankingDetails": "لا توجد تفاصيل بنكية",
+    "bankAccount": "الحساب: ****{last4}",
+    "taxId": "الرقم الضريبي: {id}",
+    "overview": "نظرة عامة",
+    "salaryStructure": "هيكل الراتب",
+    "earnings": "المكتسبات",
+    "totalDeductions": "إجمالي الاستقطاعات",
     "empty": {
       "title": "لا يوجد موظفون بعد",
-      "description": "أضف أول موظف"
+      "description": "أضف أول موظف للبدء"
+    },
+    "status": {
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "terminated": "منتهي الخدمة"
     }
   },
   "attendance": {
     "title": "الحضور",
+    "description": "تتبع حضور الموظفين والوقت",
     "newAttendance": "تسجيل الحضور",
     "editAttendance": "تعديل الحضور",
     "attendanceDetails": "تفاصيل الحضور",
+    "markForToday": "تسجيل اليوم",
+    "bulkMark": "تسجيل جماعي",
+    "monthlyOverview": "نظرة شهرية",
+    "dailyView": "عرض يومي",
+    "summary": {
+      "presentToday": "حاضرون اليوم",
+      "absentToday": "غائبون اليوم",
+      "onLeave": "في إجازة",
+      "attendanceRate": "معدل الحضور"
+    },
     "form": {
       "employee": "الموظف",
       "employeePlaceholder": "اختر الموظف",
@@ -68,6 +147,17 @@
       "checkOut": "الانصراف",
       "status": "الحالة"
     },
+    "searchPlaceholder": "البحث في الحضور...",
+    "allStatus": "جميع الحالات",
+    "calendar": "تقويم الحضور",
+    "today": "اليوم",
+    "totalEmployees": "إجمالي الموظفين",
+    "presentOn": "حاضرون ({date})",
+    "absentOn": "غائبون ({date})",
+    "onLeaveOn": "في إجازة ({date})",
+    "notMarked": "لم يُسجَّل",
+    "mark": "تسجيل",
+    "action": "إجراء",
     "empty": {
       "title": "لا توجد سجلات حضور بعد",
       "description": "ابدأ تسجيل حضور الموظفين"
@@ -75,23 +165,38 @@
   },
   "payroll": {
     "title": "الرواتب",
+    "description": "معالجة وإدارة مسيرات الرواتب",
     "newRun": "مسير رواتب جديد",
     "runDetails": "تفاصيل مسير الرواتب",
     "process": "معالجة الرواتب",
     "markAsPaid": "تحديد كمدفوع",
+    "totalPaid": "إجمالي المدفوع (سنوي)",
+    "pendingRuns": "مسيرات معلقة",
+    "confirmedRuns": "مسيرات مؤكدة",
+    "summary": {
+      "totalGross": "إجمالي الراتب",
+      "totalDeductions": "إجمالي الاستقطاعات",
+      "totalNet": "صافي الراتب الإجمالي",
+      "employeeCount": "الموظفون المعالجون"
+    },
     "form": {
       "month": "الشهر",
-      "year": "السنة"
+      "year": "السنة",
+      "selectPeriod": "اختر الفترة",
+      "preview": "معاينة",
+      "confirm": "تأكيد وترحيل"
     },
     "status": {
       "draft": "مسودة",
       "processed": "تمت المعالجة",
+      "confirmed": "مؤكد",
       "paid": "مدفوع"
     },
     "table": {
       "period": "الفترة",
       "employeeCount": "الموظفون",
       "grossAmount": "الإجمالي",
+      "deductions": "الاستقطاعات",
       "netAmount": "الصافي",
       "status": "الحالة"
     },
@@ -103,11 +208,72 @@
       "allowances": "البدلات",
       "deductions": "الاستقطاعات",
       "grossPay": "إجمالي الراتب",
-      "netPay": "صافي الراتب"
+      "netPay": "صافي الراتب",
+      "taxAmount": "مبلغ الضريبة",
+      "lopDays": "أيام الخصم",
+      "lopAmount": "مبلغ الخصم",
+      "viewPayslip": "عرض كشف الراتب",
+      "print": "طباعة",
+      "download": "تحميل",
+      "earnings": "المكتسبات",
+      "deductionsSection": "الاستقطاعات"
     },
+    "selectPeriod": {
+      "title": "اختر فترة الراتب",
+      "description": "اختر الشهر والسنة لمسير الرواتب هذا",
+      "processingFor": "معالجة رواتب {month} {year}",
+      "employeesIncluded": "سيتم تضمين {count} موظف نشط",
+      "generatePreview": "إنشاء معاينة"
+    },
+    "preview": {
+      "title": "معاينة الرواتب - {month} {year}",
+      "description": "مراجعة الرواتب المحسوبة قبل المعالجة",
+      "employees": "الموظفون",
+      "totalGross": "إجمالي الراتب",
+      "totalDeductions": "إجمالي الاستقطاعات",
+      "totalNetPay": "صافي الراتب الإجمالي"
+    },
+    "previewTable": {
+      "employee": "الموظف",
+      "basic": "الأساسي",
+      "allowances": "البدلات",
+      "gross": "الإجمالي",
+      "lop": "الخصم",
+      "deductions": "الاستقطاعات",
+      "tax": "الضريبة",
+      "netPay": "الصافي"
+    },
+    "steps": {
+      "selectPeriod": "اختر الفترة",
+      "preview": "معاينة",
+      "confirm": "تأكيد"
+    },
+    "actions": {
+      "back": "رجوع",
+      "runPayroll": "تشغيل الرواتب",
+      "processing": "جارٍ المعالجة...",
+      "viewDetails": "عرض التفاصيل",
+      "confirmPost": "تأكيد وترحيل",
+      "confirming": "جارٍ التأكيد...",
+      "confirmPayroll": "تأكيد الرواتب"
+    },
+    "success": {
+      "title": "تم إنشاء الرواتب بنجاح",
+      "description": "تم إنشاء كشوف رواتب {month} {year} لـ {count} موظف.",
+      "totalNetPay": "صافي الراتب الإجمالي: {amount}"
+    },
+    "confirmDialog": {
+      "title": "تأكيد الرواتب",
+      "description": "سيؤدي هذا إلى إنهاء الرواتب وإنشاء قيود محاسبية. لا يمكن التراجع عن هذا الإجراء. تأكد من صحة جميع التفاصيل."
+    },
+    "lopDays": "{days} أيام",
+    "noDeductions": "لا توجد استقطاعات",
+    "noPayslips": "لا توجد كشوف رواتب بعد",
+    "noPayslipsDesc": "ستظهر كشوف الرواتب هنا بعد تشغيل الرواتب",
+    "viewPayslip": "عرض",
     "empty": {
       "title": "لا توجد مسيرات رواتب بعد",
-      "description": "أنشئ أول مسير رواتب"
+      "description": "أنشئ أول مسير رواتب للبدء"
     }
   }
 }

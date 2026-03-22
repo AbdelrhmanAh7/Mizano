@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -46,7 +46,15 @@ const paymentReceivedSchema = z.object({
   customerId: z.string().min(1, 'Customer is required'),
   date: z.string().min(1, 'Date is required'),
   amount: z.string().min(1, 'Amount is required'),
-  paymentMode: z.enum(['CASH', 'BANK_TRANSFER', 'CREDIT_CARD', 'DEBIT_CARD', 'CHEQUE', 'ONLINE', 'OTHER']),
+  paymentMode: z.enum([
+    'CASH',
+    'BANK_TRANSFER',
+    'CREDIT_CARD',
+    'DEBIT_CARD',
+    'CHEQUE',
+    'ONLINE',
+    'OTHER',
+  ]),
   depositToAccountId: z.string().min(1, 'Deposit account is required'),
   reference: z.string().optional(),
   notes: z.string().optional(),
@@ -58,7 +66,7 @@ export type PaymentReceivedFormData = z.infer<typeof paymentReceivedSchema>;
 interface PaymentReceivedFormProps {
   defaultCustomerId?: string;
   defaultInvoiceId?: string;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -70,7 +78,7 @@ export function PaymentReceivedForm({
   onCancel,
   isSubmitting,
 }: PaymentReceivedFormProps) {
-  const { data: customersData } = useCustomers({ limit: 1000 });
+  const { data: customersData } = useCustomers({ limit: 100 });
   const customers = customersData?.data || [];
 
   const { data: assetAccounts } = useAccountsByType('ASSET');
@@ -85,7 +93,7 @@ export function PaymentReceivedForm({
           acc.name.toLowerCase().includes('cash') ||
           acc.code.startsWith('1000') ||
           acc.code.startsWith('1001') ||
-          acc.code.startsWith('1002'))
+          acc.code.startsWith('1002')),
     );
   }, [assetAccounts]);
 
@@ -115,7 +123,7 @@ export function PaymentReceivedForm({
   // Fetch invoices for selected customer
   const { data: invoicesData } = useInvoices({
     customerId: selectedCustomerId || undefined,
-    limit: 1000,
+    limit: 100,
   });
 
   // Filter for open invoices (not paid, not void, not draft, with balance due)
@@ -126,7 +134,7 @@ export function PaymentReceivedForm({
         inv.status !== 'VOID' &&
         inv.status !== 'DRAFT' &&
         inv.status !== 'PAID' &&
-        parseFloat(inv.balanceDue || '0') > 0
+        parseFloat(inv.balanceDue || '0') > 0,
     );
   }, [invoicesData]);
 
@@ -143,7 +151,9 @@ export function PaymentReceivedForm({
       if (defaultInvoiceId) {
         const defaultInv = openInvoices.find((inv: Invoice) => inv.id === defaultInvoiceId);
         if (defaultInv) {
-          const idx = newAllocations.findIndex((a: { invoiceId: string; amount: string }) => a.invoiceId === defaultInvoiceId);
+          const idx = newAllocations.findIndex(
+            (a: { invoiceId: string; amount: string }) => a.invoiceId === defaultInvoiceId,
+          );
           if (idx >= 0) {
             newAllocations[idx].amount = defaultInv.balanceDue;
             form.setValue('amount', defaultInv.balanceDue);
@@ -174,7 +184,7 @@ export function PaymentReceivedForm({
 
   const { isValid: isBalanced, difference } = validateAllocations(
     paymentAmount || '0',
-    allocations.filter((a) => a.selected)
+    allocations.filter((a) => a.selected),
   );
 
   const paymentModeOptions = getPaymentModeOptions();
@@ -266,9 +276,7 @@ export function PaymentReceivedForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.customerId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
               )}
             </div>
 
@@ -389,9 +397,7 @@ export function PaymentReceivedForm({
                 </TableHeader>
                 <TableBody>
                   {fields.map((field, index) => {
-                    const invoice = openInvoices.find(
-                      (inv: Invoice) => inv.id === field.invoiceId
-                    );
+                    const invoice = openInvoices.find((inv: Invoice) => inv.id === field.invoiceId);
                     if (!invoice) return null;
 
                     return (
@@ -404,15 +410,9 @@ export function PaymentReceivedForm({
                             }
                           />
                         </TableCell>
-                        <TableCell className="font-medium">
-                          {invoice.invoiceNumber}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(invoice.date).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(invoice.dueDate).toLocaleDateString()}
-                        </TableCell>
+                        <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                        <TableCell>{new Date(invoice.date).toLocaleDateString()}</TableCell>
+                        <TableCell>{new Date(invoice.dueDate).toLocaleDateString()}</TableCell>
                         <TableCell className="text-right font-mono">
                           {formatCurrency(invoice.grandTotal)}
                         </TableCell>
@@ -453,9 +453,7 @@ export function PaymentReceivedForm({
                   <div
                     className={cn(
                       'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium',
-                      isBalanced
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+                      isBalanced ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800',
                     )}
                   >
                     {isBalanced ? (
@@ -496,10 +494,7 @@ export function PaymentReceivedForm({
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button
-          type="submit"
-          disabled={isSubmitting || !isBalanced || totalAllocated === 0}
-        >
+        <Button type="submit" disabled={isSubmitting || !isBalanced || totalAllocated === 0}>
           {isSubmitting ? 'Recording...' : 'Record Payment'}
         </Button>
       </div>

@@ -10,15 +10,31 @@ export class AiForecastingService {
     const historicalData = await this.getMonthlyRevenue(organizationId, 12);
 
     // Simple moving average forecast
-    const forecast = this.simpleMovingAverageForecast(historicalData, months);
+    const forecastData = this.simpleMovingAverageForecast(historicalData, months);
 
     // Calculate confidence based on variance
     const variance = this.calculateVariance(historicalData);
     const confidence = this.calculateConfidence(variance);
 
+    // Combine historical + forecast into the shape the frontend expects:
+    // { date: ISO string, actualRevenue?: number, predictedRevenue: number, variance?: number }
+    const combined = [
+      ...historicalData.map((h) => ({
+        date: h.isoDate,
+        actualRevenue: h.value,
+        predictedRevenue: h.value,
+        variance: 0,
+      })),
+      ...forecastData.map((f) => ({
+        date: f.isoDate,
+        predictedRevenue: f.value,
+        actualRevenue: undefined,
+        variance: undefined,
+      })),
+    ];
+
     return {
-      historical: historicalData,
-      forecast,
+      data: combined,
       confidence,
       methodology: 'Simple Moving Average (3-month)',
       generatedAt: new Date(),
@@ -33,7 +49,8 @@ export class AiForecastingService {
     });
     let currentBalance = parseFloat(bankAccounts._sum.systemBalance?.toString() || '0');
 
-    const forecast = [];
+    const weeklyRecurring = await this.estimateWeeklyRecurring(organizationId);
+    const rawForecast = [];
     const today = new Date();
 
     for (let i = 1; i <= weeks; i++) {
@@ -51,7 +68,10 @@ export class AiForecastingService {
           dueDate: { gte: weekStart, lt: weekEnd },
         },
       });
-      const inflowAmount = expectedInflows.reduce((sum, inv) => sum + parseFloat(inv.balanceDue.toString()), 0);
+      const inflowAmount = expectedInflows.reduce(
+        (sum, inv) => sum + parseFloat(inv.balanceDue.toString()),
+        0,
+      );
 
       // Expected outflows - bills due this week
       const expectedOutflows = await this.prisma.bill.findMany({
@@ -62,31 +82,39 @@ export class AiForecastingService {
           dueDate: { gte: weekStart, lt: weekEnd },
         },
       });
-      const outflowAmount = expectedOutflows.reduce((sum, bill) => sum + parseFloat(bill.balanceDue.toString()), 0);
+      const outflowAmount = expectedOutflows.reduce(
+        (sum, bill) => sum + parseFloat(bill.balanceDue.toString()),
+        0,
+      );
 
-      // Estimated recurring expenses (payroll, rent, etc.) - simplified
-      const weeklyRecurring = await this.estimateWeeklyRecurring(organizationId);
-
-      const netCashFlow = inflowAmount - outflowAmount - weeklyRecurring;
+      const totalOutflow = outflowAmount + weeklyRecurring;
+      const netCashFlow = inflowAmount - totalOutflow;
       currentBalance += netCashFlow;
 
-      forecast.push({
+      rawForecast.push({
         week: i,
         startDate: weekStart.toISOString().split('T')[0],
-        endDate: weekEnd.toISOString().split('T')[0],
-        expectedInflows: inflowAmount,
-        expectedOutflows: outflowAmount + weeklyRecurring,
-        netCashFlow,
         projectedBalance: currentBalance,
-        invoicesDue: expectedInflows.length,
-        billsDue: expectedOutflows.length,
+        expectedInflows: inflowAmount,
+        expectedOutflows: totalOutflow,
       });
     }
 
+    // Map to the shape the frontend expects:
+    // { date, predictedInflow, predictedOutflow, predictedBalance, lowerBound, upperBound }
+    const data = rawForecast.map((w) => ({
+      date: w.startDate,
+      predictedInflow: w.expectedInflows,
+      predictedOutflow: w.expectedOutflows,
+      predictedBalance: w.projectedBalance,
+      lowerBound: Math.round(w.projectedBalance * 0.85 * 100) / 100,
+      upperBound: Math.round(w.projectedBalance * 1.15 * 100) / 100,
+    }));
+
     return {
+      data,
       currentBalance: parseFloat(bankAccounts._sum.systemBalance?.toString() || '0'),
-      forecast,
-      warnings: this.generateCashFlowWarnings(forecast),
+      warnings: this.generateCashFlowWarnings(rawForecast),
       generatedAt: new Date(),
     };
   }
@@ -96,33 +124,36 @@ export class AiForecastingService {
     const historicalData = await this.getMonthlyExpenses(organizationId, 12);
 
     // Group by category and forecast each
-    const categoryForecasts: Record<string, any> = {};
+    const categoryForecasts: Record<string, unknown> = {};
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const typedForecasts: Record<string, any> = categoryForecasts;
     for (const month of historicalData) {
       for (const [category, amount] of Object.entries(month.byCategory)) {
-        if (!categoryForecasts[category]) {
-          categoryForecasts[category] = { historical: [], forecast: [] };
+        if (!typedForecasts[category]) {
+          typedForecasts[category] = { historical: [], forecast: [] };
         }
-        categoryForecasts[category].historical.push(amount);
+        typedForecasts[category].historical.push(amount);
       }
     }
 
     // Forecast each category
-    for (const category in categoryForecasts) {
-      const data = categoryForecasts[category];
+    for (const category in typedForecasts) {
+      const data = typedForecasts[category];
       data.forecast = this.simpleMovingAverageForecast(
         data.historical.map((amount: number, i: number) => ({ month: i, value: amount })),
         months,
       );
-      data.averageMonthly = data.historical.reduce((sum: number, v: number) => sum + v, 0) / data.historical.length;
+      data.averageMonthly =
+        data.historical.reduce((sum: number, v: number) => sum + v, 0) / data.historical.length;
     }
 
     // Calculate total forecast
     const totalForecast = [];
     for (let i = 0; i < months; i++) {
       let total = 0;
-      for (const category in categoryForecasts) {
-        total += categoryForecasts[category].forecast[i]?.value || 0;
+      for (const category in typedForecasts) {
+        total += typedForecasts[category].forecast[i]?.value || 0;
       }
       const futureMonth = new Date();
       futureMonth.setMonth(futureMonth.getMonth() + i + 1);
@@ -171,11 +202,13 @@ export class AiForecastingService {
     for (const customer of customers) {
       const lastInvoiceDate = customer.invoices[0]?.date;
       const invoiceCount = customer.invoices.length;
-      const recentInvoices = customer.invoices.filter((inv: { date: Date }) => inv.date >= threeMonthsAgo).length;
+      const recentInvoices = customer.invoices.filter(
+        (inv: { date: Date }) => inv.date >= threeMonthsAgo,
+      ).length;
 
       // Calculate churn risk score
       let riskScore = 0;
-      let riskFactors: string[] = [];
+      const riskFactors: string[] = [];
 
       // No invoices in 3 months
       if (lastInvoiceDate && lastInvoiceDate < threeMonthsAgo) {
@@ -193,7 +226,11 @@ export class AiForecastingService {
       }
 
       // Low lifetime value
-      const totalRevenue = customer.invoices.reduce((sum: number, inv: { grandTotal: { toString: () => string } }) => sum + parseFloat(inv.grandTotal.toString()), 0);
+      const totalRevenue = customer.invoices.reduce(
+        (sum: number, inv: { grandTotal: { toString: () => string } }) =>
+          sum + parseFloat(inv.grandTotal.toString()),
+        0,
+      );
       if (invoiceCount > 0 && totalRevenue / invoiceCount < 100) {
         riskScore += 20;
         riskFactors.push('Low average order value');
@@ -239,6 +276,7 @@ export class AiForecastingService {
 
       data.push({
         month: start.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        isoDate: start.toISOString().split('T')[0],
         value: parseFloat(invoices._sum.grandTotal?.toString() || '0'),
       });
     }
@@ -289,9 +327,11 @@ export class AiForecastingService {
 
       const futureMonth = new Date();
       futureMonth.setMonth(futureMonth.getMonth() + i + 1);
+      futureMonth.setDate(1);
 
       forecast.push({
         month: futureMonth.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        isoDate: futureMonth.toISOString().split('T')[0],
         value: Math.round(avg * 100) / 100,
       });
 
@@ -327,7 +367,7 @@ export class AiForecastingService {
     return parseFloat(expenses._sum.amount?.toString() || '0') / 4;
   }
 
-  private generateCashFlowWarnings(forecast: any[]) {
+  private generateCashFlowWarnings(forecast: { week: number; projectedBalance: number }[]) {
     const warnings = [];
 
     for (const week of forecast) {

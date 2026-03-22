@@ -1,10 +1,13 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { quotesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { quotesApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type QuoteStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'INVOICED' | 'DECLINED' | 'EXPIRED';
 
 export interface QuoteLine {
@@ -96,6 +99,20 @@ export function useQuotes(params?: QuoteParams) {
 }
 
 /**
+ * Hook to fetch all quotes with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteQuotes(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Quote, Record<string, unknown>>({
+    queryKey: ['quotes'],
+    fetchFn: async (p) => {
+      const response = await quotesApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
+  });
+}
+
+/**
  * Hook to fetch a single quote by ID
  */
 export function useQuote(id: string | undefined) {
@@ -129,7 +146,7 @@ export function useCreateQuote() {
         description: 'The quote has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating quote',
@@ -159,7 +176,7 @@ export function useUpdateQuote() {
         description: 'The quote has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating quote',
@@ -188,7 +205,7 @@ export function useDeleteQuote() {
         description: 'The quote has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting quote',
@@ -218,7 +235,7 @@ export function useSendQuote() {
         description: 'The quote has been sent successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error sending quote',
@@ -248,7 +265,7 @@ export function useAcceptQuote() {
         description: 'The quote has been marked as accepted.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error accepting quote',
@@ -278,7 +295,7 @@ export function useDeclineQuote() {
         description: 'The quote has been marked as declined.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error declining quote',
@@ -309,10 +326,39 @@ export function useConvertToInvoice() {
         description: 'The quote has been converted to an invoice.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error converting quote',
+        description: error.response?.data?.message || 'An error occurred',
+      });
+    },
+  });
+}
+
+/**
+ * Hook to clone/duplicate a quote
+ */
+export function useCloneQuote() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await quotesApi.clone(id);
+      return response.data as Quote;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      toast({
+        title: 'Quote duplicated',
+        description: 'A new draft copy has been created.',
+      });
+    },
+    onError: (error: ApiError) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error duplicating quote',
         description: error.response?.data?.message || 'An error occurred',
       });
     },
@@ -352,7 +398,11 @@ export function getQuoteStatusLabel(status: QuoteStatus): string {
 /**
  * Calculate line amount
  */
-export function calculateLineAmount(quantity: string, rate: string, discountPercent: string = '0'): string {
+export function calculateLineAmount(
+  quantity: string,
+  rate: string,
+  discountPercent: string = '0',
+): string {
   const qty = parseFloat(quantity) || 0;
   const r = parseFloat(rate) || 0;
   const discount = parseFloat(discountPercent) || 0;

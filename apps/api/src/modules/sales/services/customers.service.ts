@@ -1,12 +1,11 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateCustomerDto } from '../dto/create-customer.dto';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 @Injectable()
 export class CustomersService {
@@ -58,13 +57,29 @@ export class CustomersService {
       this.prisma.customer.count({ where }),
     ]);
 
-    // Calculate outstanding balance for each customer
-    const customersWithBalance = await Promise.all(
-      customers.map(async (customer) => {
-        const outstandingBalance = await this.calculateOutstandingBalance(customer.id);
-        return { ...customer, outstandingBalance };
-      }),
+    // Batch balance calculation: single groupBy query instead of N+1
+    const customerIds = customers.map((c) => c.id);
+    const balances =
+      customerIds.length > 0
+        ? await this.prisma.invoice.groupBy({
+            by: ['customerId'],
+            where: {
+              customerId: { in: customerIds },
+              deletedAt: null,
+              status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] },
+            },
+            _sum: { balanceDue: true },
+          })
+        : [];
+
+    const balanceMap = new Map(
+      balances.map((b) => [b.customerId, b._sum.balanceDue?.toFixed(4) ?? '0.0000']),
     );
+
+    const customersWithBalance = customers.map((customer) => ({
+      ...customer,
+      outstandingBalance: balanceMap.get(customer.id) ?? '0.0000',
+    }));
 
     return {
       data: customersWithBalance,
@@ -75,6 +90,30 @@ export class CustomersService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async findAllCursor(organizationId: string, query: CursorPaginationDto) {
+    const { cursor, take = 50, search, sortBy = 'name', sortOrder = 'asc' } = query;
+
+    const where: Prisma.CustomerWhereInput = { organizationId, deletedAt: null };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' as const } },
+        { email: { contains: search, mode: 'insensitive' as const } },
+        { phone: { contains: search, mode: 'insensitive' as const } },
+      ];
+    }
+
+    return cursorPaginate(
+      this.prisma.customer,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+      },
+    );
   }
 
   async findOne(organizationId: string, id: string) {
@@ -192,6 +231,23 @@ export class CustomersService {
     });
 
     return { message: 'Customer deleted successfully' };
+  }
+
+  // === Bulk Operations ===
+
+  async bulkDelete(
+    organizationId: string,
+    ids: string[],
+  ): Promise<{ deleted: number; total: number }> {
+    const result = await this.prisma.customer.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        deletedAt: null,
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
   }
 
   private async calculateOutstandingBalance(customerId: string): Promise<string> {

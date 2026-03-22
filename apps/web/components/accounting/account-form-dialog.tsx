@@ -127,8 +127,8 @@ export function AccountFormDialog({
             {isEditing
               ? 'Update the account details below.'
               : parentAccount
-              ? `Creating a child account under "${parentAccount.name}"`
-              : 'Add a new account to your chart of accounts.'}
+                ? `Creating a child account under "${parentAccount.name}"`
+                : 'Add a new account to your chart of accounts.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -136,11 +136,7 @@ export function AccountFormDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="code">Account Code *</Label>
-              <Input
-                id="code"
-                placeholder="e.g., 1000"
-                {...form.register('code')}
-              />
+              <Input id="code" placeholder="e.g., 1000" {...form.register('code')} />
               {form.formState.errors.code && (
                 <p className="text-sm text-red-500">{form.formState.errors.code.message}</p>
               )}
@@ -171,11 +167,7 @@ export function AccountFormDialog({
 
           <div className="space-y-2">
             <Label htmlFor="name">Account Name *</Label>
-            <Input
-              id="name"
-              placeholder="e.g., Cash on Hand"
-              {...form.register('name')}
-            />
+            <Input id="name" placeholder="e.g., Cash on Hand" {...form.register('name')} />
             {form.formState.errors.name && (
               <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
             )}
@@ -186,7 +178,9 @@ export function AccountFormDialog({
               <Label htmlFor="parentId">Parent Account</Label>
               <Select
                 value={form.watch('parentId') || 'none'}
-                onValueChange={(value) => form.setValue('parentId', value === 'none' ? undefined : value)}
+                onValueChange={(value) =>
+                  form.setValue('parentId', value === 'none' ? undefined : value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="None (Top Level)" />

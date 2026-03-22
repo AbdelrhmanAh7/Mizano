@@ -5,6 +5,8 @@ import api from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export interface AccountSettings {
   defaultArAccountId: string | null;
   defaultRevenueAccountId: string | null;
@@ -34,7 +36,7 @@ export function useAccountSettings() {
   return useQuery({
     queryKey: ['organization', 'account-settings'],
     queryFn: async () => {
-      const response = await api.get('/organizations/account-settings');
+      const response = await api.get('/organization/account-settings');
       return response.data as AccountSettings;
     },
   });
@@ -49,7 +51,7 @@ export function useUpdateAccountSettings() {
 
   return useMutation({
     mutationFn: async (data: UpdateAccountSettingsData) => {
-      const response = await api.patch('/organizations/account-settings', data);
+      const response = await api.patch('/organization/account-settings', data);
       return response.data;
     },
     onSuccess: () => {
@@ -59,7 +61,7 @@ export function useUpdateAccountSettings() {
         description: 'Account settings have been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error saving settings',

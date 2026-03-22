@@ -1,11 +1,60 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
+import { PredictionMethod } from '../types/prediction-method.type';
 
 @Injectable()
 export class AiCategorizationService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(AiCategorizationService.name);
+  constructor(
+    private prisma: PrismaService,
+    private gateway: OllamaInferenceGateway,
+  ) {}
 
-  async categorizeTransaction(organizationId: string, description: string, amount: number, type: 'expense' | 'income') {
+  async categorizeTransaction(
+    organizationId: string,
+    description: string,
+    amount: number,
+    type: 'expense' | 'income',
+  ) {
+    // --- Ollama-first path ---
+    try {
+      const ollamaPrompt = [
+        'Categorize the following financial transaction and return JSON:',
+        `Description: "${description}"`,
+        `Amount: ${amount}`,
+        `Type: ${type}`,
+        '',
+        'Return JSON with: { "account_name": "string", "account_code": "string", "confidence": 0-100, "reason": "string" }',
+      ].join('\n');
+
+      const ollamaResult = await this.gateway.infer<{
+        account_name: string;
+        account_code: string;
+        confidence: number;
+        reason: string;
+      }>(ollamaPrompt);
+
+      if (ollamaResult && ollamaResult.data.account_name) {
+        const ollamaConfidence = ollamaResult.data.confidence ?? 75;
+
+        return {
+          suggestedAccountId: null as string | null,
+          suggestedAccountName: ollamaResult.data.account_name,
+          confidence: ollamaConfidence,
+          reason: ollamaResult.data.reason || 'Categorized by AI',
+          alternatives: [],
+          predictionMethod: 'OLLAMA' as PredictionMethod,
+        };
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ollama categorization failed, falling back to rule-based: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // --- Existing rule-based fallback ---
+
     // Get historical categorizations for learning
     const historicalData = await this.getHistoricalCategorizations(organizationId, type);
 
@@ -19,6 +68,7 @@ export class AiCategorizationService {
         confidence: match.confidence,
         reason: match.reason,
         alternatives: match.alternatives,
+        predictionMethod: 'RULE_BASED' as PredictionMethod,
       };
     }
 
@@ -31,6 +81,7 @@ export class AiCategorizationService {
       confidence: keywordMatch.confidence,
       reason: keywordMatch.reason,
       alternatives: [],
+      predictionMethod: 'RULE_BASED' as PredictionMethod,
     };
   }
 
@@ -46,7 +97,7 @@ export class AiCategorizationService {
     const normalizedPattern = this.normalizeDescription(description);
 
     // Log the categorization for debugging/analytics purposes
-    console.log(`Categorization learned: ${normalizedPattern} -> ${accountId} (${type})`);
+    this.logger.log(`Categorization learned: ${normalizedPattern} -> ${accountId} (${type})`);
 
     return { success: true, pattern: normalizedPattern };
   }
@@ -91,7 +142,12 @@ export class AiCategorizationService {
       const type = transaction.type === 'DEPOSIT' ? 'income' : 'expense';
       const description = transaction.description || transaction.payee || '';
 
-      const categorization = await this.categorizeTransaction(organizationId, description, parseFloat(transaction.amount.toString()), type);
+      const categorization = await this.categorizeTransaction(
+        organizationId,
+        description,
+        parseFloat(transaction.amount.toString()),
+        type,
+      );
 
       results.push({
         transactionId: transaction.id,
@@ -155,7 +211,10 @@ export class AiCategorizationService {
       });
 
       // Build pattern map to count occurrences
-      const patternMap = new Map<string, { accountId: string; accountName: string; matchCount: number }>();
+      const patternMap = new Map<
+        string,
+        { accountId: string; accountName: string; matchCount: number }
+      >();
 
       for (const expense of expenses) {
         const pattern = this.normalizeDescription(expense.description || '');
@@ -186,14 +245,19 @@ export class AiCategorizationService {
 
   private findBestMatch(
     description: string,
-    historicalData: { pattern: string; accountId: string; accountName: string; matchCount: number }[],
+    historicalData: {
+      pattern: string;
+      accountId: string;
+      accountName: string;
+      matchCount: number;
+    }[],
   ) {
     const normalizedDesc = this.normalizeDescription(description);
     const descWords = normalizedDesc.split(/\s+/);
 
     let bestMatch = null;
     let bestScore = 0;
-    const alternatives: any[] = [];
+    const alternatives: { accountId: string; accountName: string; confidence: number }[] = [];
 
     for (const data of historicalData) {
       const patternWords = data.pattern.split(/\s+/);
@@ -250,7 +314,10 @@ export class AiCategorizationService {
       'meal|food|restaurant|lunch|dinner|coffee': { name: 'Meals & Entertainment', code: '6300' },
       'rent|lease|office space': { name: 'Rent Expense', code: '6100' },
       'utility|electric|water|gas|internet': { name: 'Utilities', code: '6110' },
-      'marketing|advertising|ads|google|facebook': { name: 'Marketing & Advertising', code: '6500' },
+      'marketing|advertising|ads|google|facebook': {
+        name: 'Marketing & Advertising',
+        code: '6500',
+      },
       'insurance|coverage|premium': { name: 'Insurance', code: '6800' },
       'legal|attorney|lawyer': { name: 'Professional Services', code: '6400' },
       'accounting|bookkeeping|tax prep': { name: 'Professional Services', code: '6400' },

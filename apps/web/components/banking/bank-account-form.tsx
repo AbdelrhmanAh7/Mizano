@@ -19,13 +19,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BankAccount, accountTypeOptions } from '@/lib/hooks/use-bank-accounts';
 
 const bankAccountSchema = z.object({
-  accountName: z.string().min(1, 'Account name is required'),
+  name: z.string().min(1, 'Account name is required').max(100),
   accountNumber: z.string().optional(),
-  bankName: z.string().optional(),
-  accountType: z.enum(['CHECKING', 'SAVINGS', 'CREDIT_CARD', 'CASH', 'OTHER']),
+  type: z.enum(['BANK', 'CREDIT_CARD', 'PETTY_CASH']),
   currency: z.string().default('USD'),
   openingBalance: z.number().optional(),
-  glAccountId: z.string().optional(),
+  linkedAccountId: z.string().min(1, 'GL Account is required'),
   isActive: z.boolean().default(true),
 });
 
@@ -34,7 +33,7 @@ type BankAccountFormData = z.infer<typeof bankAccountSchema>;
 interface BankAccountFormProps {
   account?: BankAccount | null;
   glAccounts: Array<{ id: string; name: string; code: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: BankAccountFormData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -51,13 +50,12 @@ export function BankAccountForm({
   const form = useForm<BankAccountFormData>({
     resolver: zodResolver(bankAccountSchema),
     defaultValues: {
-      accountName: '',
+      name: '',
       accountNumber: '',
-      bankName: '',
-      accountType: 'CHECKING',
+      type: 'BANK',
       currency: 'USD',
       openingBalance: 0,
-      glAccountId: '',
+      linkedAccountId: '',
       isActive: true,
     },
   });
@@ -65,12 +63,11 @@ export function BankAccountForm({
   useEffect(() => {
     if (account) {
       form.reset({
-        accountName: account.accountName || '',
+        name: account.name || '',
         accountNumber: account.accountNumber || '',
-        bankName: account.bankName || '',
-        accountType: account.accountType || 'CHECKING',
+        type: account.type || 'BANK',
         currency: account.currency || 'USD',
-        glAccountId: account.glAccountId || '',
+        linkedAccountId: account.linkedAccountId || '',
         isActive: account.isActive ?? true,
       });
     }
@@ -90,24 +87,22 @@ export function BankAccountForm({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="accountName">Account Name *</Label>
+              <Label htmlFor="name">Account Name *</Label>
               <Input
-                id="accountName"
+                id="name"
                 placeholder="e.g., Main Operating Account"
-                {...form.register('accountName')}
+                {...form.register('name')}
               />
-              {form.formState.errors.accountName && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.accountName.message}
-                </p>
+              {form.formState.errors.name && (
+                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="accountType">Account Type *</Label>
+              <Label htmlFor="type">Account Type *</Label>
               <Select
-                value={form.watch('accountType')}
-                onValueChange={(value: any) => form.setValue('accountType', value)}
+                value={form.watch('type')}
+                onValueChange={(value: BankAccountFormData['type']) => form.setValue('type', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
@@ -125,15 +120,6 @@ export function BankAccountForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="bankName">Bank Name</Label>
-              <Input
-                id="bankName"
-                placeholder="e.g., Chase Bank"
-                {...form.register('bankName')}
-              />
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="accountNumber">Account Number</Label>
               <Input
                 id="accountNumber"
@@ -141,9 +127,7 @@ export function BankAccountForm({
                 {...form.register('accountNumber')}
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="currency">Currency</Label>
               <Select
@@ -163,20 +147,20 @@ export function BankAccountForm({
                 </SelectContent>
               </Select>
             </div>
-
-            {!isEditing && (
-              <div className="space-y-2">
-                <Label htmlFor="openingBalance">Opening Balance</Label>
-                <Input
-                  id="openingBalance"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  {...form.register('openingBalance', { valueAsNumber: true })}
-                />
-              </div>
-            )}
           </div>
+
+          {!isEditing && (
+            <div className="space-y-2">
+              <Label htmlFor="openingBalance">Opening Balance</Label>
+              <Input
+                id="openingBalance"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                {...form.register('openingBalance', { valueAsNumber: true })}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -187,23 +171,34 @@ export function BankAccountForm({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="glAccountId">GL Account</Label>
+            <Label htmlFor="linkedAccountId">GL Account *</Label>
             <Select
-              value={form.watch('glAccountId') || ''}
-              onValueChange={(value) => form.setValue('glAccountId', value)}
+              value={form.watch('linkedAccountId') || '__none__'}
+              onValueChange={(value) =>
+                form.setValue('linkedAccountId', value === '__none__' ? '' : value, {
+                  shouldValidate: true,
+                })
+              }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Link to GL account" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
-                {glAccounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.code} - {account.name}
+                <SelectItem value="__none__" disabled>
+                  Select a GL account
+                </SelectItem>
+                {glAccounts.map((glAccount) => (
+                  <SelectItem key={glAccount.id} value={glAccount.id}>
+                    {glAccount.code} - {glAccount.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {form.formState.errors.linkedAccountId && (
+              <p className="text-sm text-red-500">
+                {form.formState.errors.linkedAccountId.message}
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
               Link this bank account to a general ledger account for accurate financial reporting
             </p>
@@ -213,7 +208,7 @@ export function BankAccountForm({
             <div>
               <Label>Active</Label>
               <p className="text-sm text-muted-foreground">
-                Inactive accounts won't appear in selections
+                Inactive accounts won&apos;t appear in selections
               </p>
             </div>
             <Switch

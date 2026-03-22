@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import {
@@ -31,17 +31,20 @@ import {
   getConfidenceColor,
   getConfidenceLabel,
 } from '@/lib/hooks/use-bank-transactions';
+import { useTranslations } from 'next-intl';
 
 interface ReconcileAccountPageProps {
-  params: Promise<{ accountId: string }>;
+  params: { accountId: string };
 }
 
 export default function ReconcileAccountPage({ params }: ReconcileAccountPageProps) {
-  const { accountId } = use(params);
+  const { accountId } = params;
+  const t = useTranslations('banking');
   const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
 
   const { data: account, isLoading: accountLoading } = useBankAccount(accountId);
-  const { data: transactionsData, isLoading: transactionsLoading } = useUnmatchedTransactions(accountId);
+  const { data: transactionsData, isLoading: transactionsLoading } =
+    useUnmatchedTransactions(accountId);
   const { data: suggestedData } = useSuggestedMatches(selectedTransaction || '');
 
   const matchTransaction = useMatchTransaction();
@@ -81,9 +84,9 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
   if (!account) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">Bank account not found</p>
+        <p className="text-muted-foreground">{t('reconciliation.accountNotFound')}</p>
         <Button asChild className="mt-4">
-          <Link href="/banking/reconcile">Back to Reconciliation</Link>
+          <Link href="/banking/reconcile">{t('reconciliation.backToReconciliation')}</Link>
         </Button>
       </div>
     );
@@ -103,15 +106,13 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              Reconcile {account.accountName}
+              {t('reconciliation.reconcileAccount', { name: account.name })}
             </h1>
-            <p className="text-muted-foreground">
-              Match bank transactions with your records
-            </p>
+            <p className="text-muted-foreground">{t('reconciliation.matchDescription')}</p>
           </div>
         </div>
         <Badge variant="outline" className="text-lg px-4 py-2">
-          {transactions.length} Unmatched
+          {t('reconciliation.unmatched', { count: transactions.length })}
         </Badge>
       </div>
 
@@ -119,15 +120,13 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Book Balance</p>
-            <p className="text-2xl font-bold font-mono">
-              {formatCurrency(account.currentBalance)}
-            </p>
+            <p className="text-sm text-muted-foreground">{t('reconciliation.bookBalance')}</p>
+            <p className="text-2xl font-bold font-mono">{formatCurrency(account.systemBalance)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Bank Balance</p>
+            <p className="text-sm text-muted-foreground">{t('reconciliation.bankBalance')}</p>
             <p className="text-2xl font-bold font-mono">
               {formatCurrency(account.bankBalance || 0)}
             </p>
@@ -135,8 +134,10 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">To Reconcile</p>
-            <p className="text-2xl font-bold">{transactions.length} transactions</p>
+            <p className="text-sm text-muted-foreground">{t('reconciliation.toReconcile')}</p>
+            <p className="text-2xl font-bold">
+              {t('reconciliation.transactionsCount', { count: transactions.length })}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -146,13 +147,13 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
         <Card>
           <CardContent className="py-12 text-center">
             <Check className="mx-auto h-12 w-12 text-green-600" />
-            <h3 className="mt-4 text-lg font-semibold text-green-600">All Caught Up!</h3>
-            <p className="text-muted-foreground">
-              All bank transactions have been matched.
-            </p>
+            <h3 className="mt-4 text-lg font-semibold text-green-600">
+              {t('reconciliation.allCaughtUp')}
+            </h3>
+            <p className="text-muted-foreground">{t('reconciliation.allMatched')}</p>
             <Button asChild className="mt-4">
               <Link href={`/banking/accounts/${accountId}`}>
-                View Account Details
+                {t('reconciliation.viewAccountDetails')}
               </Link>
             </Button>
           </CardContent>
@@ -162,7 +163,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
           {/* Left Panel - Bank Transactions */}
           <Card>
             <CardHeader>
-              <CardTitle>Bank Transactions</CardTitle>
+              <CardTitle>{t('reconciliation.bankTransactions')}</CardTitle>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[500px]">
@@ -175,7 +176,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                         'p-4 border rounded-lg cursor-pointer transition-colors',
                         selectedTransaction === tx.id
                           ? 'border-primary bg-primary/5'
-                          : 'hover:border-primary/50'
+                          : 'hover:border-primary/50',
                       )}
                     >
                       <div className="flex items-start justify-between">
@@ -197,7 +198,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                           <p
                             className={cn(
                               'font-mono font-medium',
-                              tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600'
+                              tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600',
                             )}
                           >
                             {tx.type === 'DEPOSIT' ? '+' : '-'}
@@ -205,7 +206,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                           </p>
                           {tx.confidence !== null && (
                             <p className={cn('text-xs', getConfidenceColor(tx.confidence))}>
-                              {getConfidenceLabel(tx.confidence)} confidence
+                              {getConfidenceLabel(tx.confidence)} {t('reconciliation.confidence')}
                             </p>
                           )}
                         </div>
@@ -221,7 +222,9 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
           <Card>
             <CardHeader>
               <CardTitle>
-                {selectedTransaction ? 'Suggested Matches' : 'Select a Transaction'}
+                {selectedTransaction
+                  ? t('reconciliation.suggestedMatches')
+                  : t('reconciliation.selectTransaction')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -229,7 +232,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                 <div className="h-[500px] flex items-center justify-center text-muted-foreground">
                   <div className="text-center">
                     <Zap className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                    <p className="mt-4">Select a transaction to see suggested matches</p>
+                    <p className="mt-4">{t('reconciliation.selectTransactionHint')}</p>
                   </div>
                 </div>
               ) : (
@@ -244,9 +247,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                           <span
                             className={cn(
                               'font-mono',
-                              selectedTx.type === 'DEPOSIT'
-                                ? 'text-green-600'
-                                : 'text-red-600'
+                              selectedTx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600',
                             )}
                           >
                             {selectedTx.type === 'DEPOSIT' ? '+' : '-'}
@@ -277,7 +278,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                                     variant="outline"
                                     className={getConfidenceColor(match.confidence)}
                                   >
-                                    {match.confidence}% match
+                                    {t('reconciliation.matchPercent', { value: match.confidence })}
                                   </Badge>
                                 </div>
                                 <p className="text-sm text-muted-foreground mt-1">
@@ -285,7 +286,9 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                                   {format(new Date(match.date), 'MMM d, yyyy')}
                                 </p>
                                 <p className="text-sm font-mono mt-1">
-                                  Balance due: {formatCurrency(match.balanceDue)}
+                                  {t('reconciliation.balanceDue', {
+                                    amount: formatCurrency(match.balanceDue),
+                                  })}
                                 </p>
                               </div>
                               <Button
@@ -293,7 +296,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                                 onClick={() => handleMatch(selectedTransaction, match)}
                               >
                                 <Check className="mr-1 h-3 w-3" />
-                                Match
+                                {t('reconciliation.match')}
                               </Button>
                             </div>
                           </div>
@@ -301,16 +304,18 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                       </div>
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
-                        <p>No suggested matches found</p>
+                        <p>{t('reconciliation.noSuggestedMatches')}</p>
                       </div>
                     )}
 
                     {/* Actions */}
                     <div className="border-t pt-4 space-y-2">
                       <Button variant="outline" className="w-full" asChild>
-                        <Link href={`/purchases/expenses/new?bankTransactionId=${selectedTransaction}`}>
+                        <Link
+                          href={`/purchases/expenses/new?bankTransactionId=${selectedTransaction}`}
+                        >
                           <Plus className="mr-2 h-4 w-4" />
-                          Create Expense
+                          {t('reconciliation.createExpense')}
                         </Link>
                       </Button>
                       <Button
@@ -319,7 +324,7 @@ export default function ReconcileAccountPage({ params }: ReconcileAccountPagePro
                         onClick={() => handleExclude(selectedTransaction)}
                       >
                         <X className="mr-2 h-4 w-4" />
-                        Exclude Transaction
+                        {t('reconciliation.excludeTransaction')}
                       </Button>
                     </div>
                   </div>

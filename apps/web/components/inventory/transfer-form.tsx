@@ -17,11 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -39,24 +35,26 @@ const lineSchema = z.object({
   quantity: z.number().min(1, 'Quantity must be at least 1'),
 });
 
-const transferSchema = z.object({
-  date: z.date({ required_error: 'Date is required' }),
-  sourceWarehouseId: z.string().min(1, 'Source warehouse is required'),
-  destinationWarehouseId: z.string().min(1, 'Destination warehouse is required'),
-  reason: z.string().optional(),
-  reference: z.string().optional(),
-  lines: z.array(lineSchema).min(1, 'At least one item is required'),
-}).refine((data) => data.sourceWarehouseId !== data.destinationWarehouseId, {
-  message: "Source and destination warehouses must be different",
-  path: ["destinationWarehouseId"],
-});
+const transferSchema = z
+  .object({
+    date: z.date({ required_error: 'Date is required' }),
+    sourceWarehouseId: z.string().min(1, 'Source warehouse is required'),
+    destinationWarehouseId: z.string().min(1, 'Destination warehouse is required'),
+    reason: z.string().optional(),
+    reference: z.string().optional(),
+    lines: z.array(lineSchema).min(1, 'At least one item is required'),
+  })
+  .refine((data) => data.sourceWarehouseId !== data.destinationWarehouseId, {
+    message: 'Source and destination warehouses must be different',
+    path: ['destinationWarehouseId'],
+  });
 
 type TransferFormData = z.infer<typeof transferSchema>;
 
 interface TransferFormProps {
-  items: Array<{ id: string; name: string; sku: string | null; stockLevel: number }>;
+  items: Array<{ id: string; name: string; sku: string | null; currentStock: number }>;
   warehouses: Array<{ id: string; name: string; code: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -93,10 +91,10 @@ export function TransferForm({
   const watchSourceWarehouse = form.watch('sourceWarehouseId');
 
   // Calculate total items being transferred
+  const watchedLines = form.watch('lines');
   const totalQuantity = useMemo(() => {
-    const lines = form.watch('lines');
-    return lines.reduce((sum, line) => sum + (line.quantity || 0), 0);
-  }, [form.watch('lines')]);
+    return watchedLines.reduce((sum, line) => sum + (line.quantity || 0), 0);
+  }, [watchedLines]);
 
   const handleSubmit = (data: TransferFormData) => {
     onSubmit({
@@ -129,13 +127,11 @@ export function TransferForm({
                     variant="outline"
                     className={cn(
                       'w-full justify-start text-left font-normal',
-                      !form.watch('date') && 'text-muted-foreground'
+                      !form.watch('date') && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {form.watch('date')
-                      ? format(form.watch('date'), 'PPP')
-                      : 'Pick a date'}
+                    {form.watch('date') ? format(form.watch('date'), 'PPP') : 'Pick a date'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -148,9 +144,7 @@ export function TransferForm({
                 </PopoverContent>
               </Popover>
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.date.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
               )}
             </div>
 
@@ -253,7 +247,7 @@ export function TransferForm({
               {fields.map((field, index) => {
                 const selectedItemId = form.watch(`lines.${index}.itemId`);
                 const selectedItem = items.find((i) => i.id === selectedItemId);
-                const availableStock = selectedItem?.stockLevel || 0;
+                const availableStock = selectedItem?.currentStock || 0;
                 const transferQty = form.watch(`lines.${index}.quantity`) || 0;
 
                 return (
@@ -261,9 +255,7 @@ export function TransferForm({
                     <TableCell>
                       <Select
                         value={form.watch(`lines.${index}.itemId`) || ''}
-                        onValueChange={(value) =>
-                          form.setValue(`lines.${index}.itemId`, value)
-                        }
+                        onValueChange={(value) => form.setValue(`lines.${index}.itemId`, value)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select item" />
@@ -285,18 +277,13 @@ export function TransferForm({
                         type="number"
                         min="1"
                         max={availableStock}
-                        className={cn(
-                          'w-24',
-                          transferQty > availableStock && 'border-red-500'
-                        )}
+                        className={cn('w-24', transferQty > availableStock && 'border-red-500')}
                         {...form.register(`lines.${index}.quantity`, {
                           valueAsNumber: true,
                         })}
                       />
                       {transferQty > availableStock && selectedItemId && (
-                        <p className="text-xs text-red-500 mt-1">
-                          Exceeds available stock
-                        </p>
+                        <p className="text-xs text-red-500 mt-1">Exceeds available stock</p>
                       )}
                     </TableCell>
                     <TableCell>
@@ -306,6 +293,7 @@ export function TransferForm({
                         size="icon"
                         onClick={() => fields.length > 1 && remove(index)}
                         disabled={fields.length === 1}
+                        aria-label="Remove item"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -317,9 +305,7 @@ export function TransferForm({
           </Table>
 
           {form.formState.errors.lines && (
-            <p className="text-sm text-red-500 mt-2">
-              {form.formState.errors.lines.message}
-            </p>
+            <p className="text-sm text-red-500 mt-2">{form.formState.errors.lines.message}</p>
           )}
 
           {/* Summary */}

@@ -1,22 +1,33 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PayrollStatus } from '@prisma/client';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, PayrollStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class PayrollService {
   constructor(private prisma: PrismaService) {}
 
   async createPayrollRun(organizationId: string, dto: { month: number; year: number }) {
-    // Check for existing payroll run for this month/year
+    // Check for existing confirmed/paid payroll run for this month/year
     const existing = await this.prisma.payrollRun.findFirst({
       where: {
         organizationId,
         month: dto.month,
         year: dto.year,
+        status: { in: [PayrollStatus.PROCESSED, PayrollStatus.PAID] },
       },
     });
     if (existing) throw new BadRequestException('Payroll run already exists for this period');
+
+    // Delete any existing DRAFT run for this period before creating a new one
+    await this.prisma.payrollRun.deleteMany({
+      where: {
+        organizationId,
+        month: dto.month,
+        year: dto.year,
+        status: PayrollStatus.DRAFT,
+      },
+    });
 
     return this.prisma.payrollRun.create({
       data: {
@@ -71,12 +82,18 @@ export class PayrollService {
       const basicSalary = parseFloat(employee.basicSalary.toString());
 
       // Get allowances from employee profile (JSON field)
-      const allowancesJson = employee.allowances as Record<string, number> || {};
-      const totalAllowances = Object.values(allowancesJson).reduce((sum: number, val: number) => sum + (val || 0), 0);
+      const allowancesJson = (employee.allowances as Record<string, number>) || {};
+      const totalAllowances = Object.values(allowancesJson).reduce(
+        (sum: number, val: number) => sum + (val || 0),
+        0,
+      );
 
       // Get deductions from employee profile (JSON field)
-      const deductionsJson = employee.deductions as Record<string, number> || {};
-      const totalEmployeeDeductions = Object.values(deductionsJson).reduce((sum: number, val: number) => sum + (val || 0), 0);
+      const deductionsJson = (employee.deductions as Record<string, number>) || {};
+      const totalEmployeeDeductions = Object.values(deductionsJson).reduce(
+        (sum: number, val: number) => sum + (val || 0),
+        0,
+      );
 
       // Prorate based on days worked
       const workingDaysInMonth = 22;
@@ -142,32 +159,188 @@ export class PayrollService {
       throw new BadRequestException('Payroll must be processed before marking as paid');
     }
 
-    return this.prisma.payrollRun.update({
-      where: { id: payrollRunId },
-      data: {
-        status: PayrollStatus.PAID,
-        paidAt: new Date(),
-      },
+    const totalGross = payrollRun.totalGross;
+    const totalNet = payrollRun.totalNet;
+    const totalDeductions = payrollRun.totalDeductions;
+
+    return this.prisma.$transaction(async (tx) => {
+      // Find salary expense account (EXPENSE type, name containing "Salary" or "Wages")
+      const salaryAccount = await tx.account.findFirst({
+        where: {
+          organizationId,
+          type: 'EXPENSE',
+          isActive: true,
+          OR: [
+            { name: { contains: 'Salary', mode: 'insensitive' } },
+            { name: { contains: 'Wages', mode: 'insensitive' } },
+            { code: { startsWith: '5' } },
+          ],
+        },
+      });
+
+      // Find cash/bank account (ASSET type)
+      const cashAccount = await tx.account.findFirst({
+        where: {
+          organizationId,
+          type: 'ASSET',
+          isActive: true,
+          OR: [
+            { name: { contains: 'Cash', mode: 'insensitive' } },
+            { name: { contains: 'Bank', mode: 'insensitive' } },
+            { code: { startsWith: '1' } },
+          ],
+        },
+      });
+
+      if (!salaryAccount || !cashAccount) {
+        throw new BadRequestException(
+          'Salary expense and cash/bank accounts must be configured before marking payroll as paid',
+        );
+      }
+
+      // Create payroll journal entry
+      const journalNumber = await this.generateJournalNumber(tx, organizationId);
+
+      const journalLines: Array<{
+        accountId: string;
+        debit: Decimal;
+        credit: Decimal;
+        description: string;
+      }> = [];
+
+      // Debit: Salary Expense (gross amount)
+      journalLines.push({
+        accountId: salaryAccount.id,
+        debit: totalGross,
+        credit: new Decimal(0),
+        description: `Salary expense - ${payrollRun.month}/${payrollRun.year}`,
+      });
+
+      // Credit: Cash/Bank (net amount paid to employees)
+      journalLines.push({
+        accountId: cashAccount.id,
+        debit: new Decimal(0),
+        credit: totalNet,
+        description: `Salary payment - ${payrollRun.month}/${payrollRun.year}`,
+      });
+
+      // Credit: Tax/Deductions payable (if deductions > 0)
+      if (totalDeductions.greaterThan(0)) {
+        // Try to find a tax payable / liability account
+        const liabilityAccount = await tx.account.findFirst({
+          where: {
+            organizationId,
+            type: 'LIABILITY',
+            isActive: true,
+            OR: [
+              { name: { contains: 'Tax', mode: 'insensitive' } },
+              { name: { contains: 'Payable', mode: 'insensitive' } },
+              { code: { startsWith: '2' } },
+            ],
+          },
+        });
+
+        if (liabilityAccount) {
+          journalLines.push({
+            accountId: liabilityAccount.id,
+            debit: new Decimal(0),
+            credit: totalDeductions,
+            description: `Payroll deductions/taxes - ${payrollRun.month}/${payrollRun.year}`,
+          });
+        } else {
+          // If no liability account, credit the full gross to cash
+          journalLines[1].credit = totalGross;
+          journalLines.splice(2); // Remove the deductions line
+        }
+      }
+
+      const journal = await tx.journal.create({
+        data: {
+          journalNumber,
+          date: new Date(),
+          reference: `PAY-${String(payrollRun.month).padStart(2, '0')}-${payrollRun.year}`,
+          notes: `Payroll for ${payrollRun.month}/${payrollRun.year}`,
+          isPosted: true,
+          organizationId,
+          lines: { create: journalLines },
+        },
+      });
+
+      // Update payroll run
+      return tx.payrollRun.update({
+        where: { id: payrollRunId },
+        data: {
+          status: PayrollStatus.PAID,
+          paidAt: new Date(),
+          journalId: journal.id,
+        },
+      });
     });
   }
 
-  async getPayrollRuns(organizationId: string, query: { status?: string; year?: number }) {
-    const where: any = { organizationId };
-    if (query.status) where.status = query.status;
-    if (query.year) where.year = query.year;
-
-    return this.prisma.payrollRun.findMany({
-      where,
-      orderBy: [{ year: 'desc' }, { month: 'desc' }],
-      include: {
-        _count: { select: { payslips: true } },
-      },
+  private async generateJournalNumber(
+    tx: {
+      journal: {
+        findFirst: (args: {
+          where: { organizationId: string };
+          orderBy: { createdAt: 'desc' };
+          select: { journalNumber: true };
+        }) => Promise<{ journalNumber: string } | null>;
+      };
+    },
+    organizationId: string,
+  ): Promise<string> {
+    const lastJournal = await tx.journal.findFirst({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      select: { journalNumber: true },
     });
+
+    if (!lastJournal?.journalNumber) {
+      return 'JRN-001';
+    }
+
+    const lastNumber = parseInt(lastJournal.journalNumber.split('-')[1], 10);
+    return `JRN-${String(lastNumber + 1).padStart(3, '0')}`;
+  }
+
+  async getPayrollRuns(
+    organizationId: string,
+    query: {
+      status?: string;
+      year?: number;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: string;
+    },
+  ) {
+    const where: Prisma.PayrollRunWhereInput = { organizationId, deletedAt: null };
+    if (query.status) where.status = query.status as PayrollStatus;
+    if (query.year) where.year = Number(query.year);
+
+    const page = Number(query.page ?? 1);
+    const limit = Number(query.limit ?? 20);
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortOrder = (query.sortOrder ?? 'desc') as 'asc' | 'desc';
+
+    const [data, total] = await Promise.all([
+      this.prisma.payrollRun.findMany({
+        where,
+        orderBy: { [sortBy]: sortOrder },
+        include: { _count: { select: { payslips: true } } },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.payrollRun.count({ where }),
+    ]);
+
+    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async getPayrollRun(organizationId: string, id: string) {
     const payrollRun = await this.prisma.payrollRun.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: {
         payslips: {
           include: {
@@ -214,7 +387,57 @@ export class PayrollService {
     }
 
     await this.prisma.payslip.deleteMany({ where: { payrollRunId: id } });
-    await this.prisma.payrollRun.delete({ where: { id } });
+    await this.prisma.payrollRun.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return { message: 'Payroll run deleted' };
+  }
+
+  // === Bulk Operations ===
+
+  async bulkDelete(organizationId: string, ids: string[]) {
+    // Delete payslips first, then soft-delete runs
+    await this.prisma.payslip.deleteMany({
+      where: {
+        payrollRun: { id: { in: ids }, organizationId, status: { not: PayrollStatus.PAID } },
+      },
+    });
+    const result = await this.prisma.payrollRun.updateMany({
+      where: {
+        id: { in: ids },
+        organizationId,
+        status: { not: PayrollStatus.PAID },
+        deletedAt: null,
+      },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
+  async bulkProcess(organizationId: string, ids: string[]) {
+    let processed = 0;
+    for (const id of ids) {
+      try {
+        await this.calculatePayroll(organizationId, id);
+        processed++;
+      } catch {
+        // Skip runs that can't be processed
+      }
+    }
+    return { processed, total: ids.length };
+  }
+
+  async bulkMarkPaid(organizationId: string, ids: string[]) {
+    let paid = 0;
+    for (const id of ids) {
+      try {
+        await this.markAsPaid(organizationId, id);
+        paid++;
+      } catch {
+        // Skip runs that can't be marked as paid
+      }
+    }
+    return { paid, total: ids.length };
   }
 }

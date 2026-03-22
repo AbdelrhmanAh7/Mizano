@@ -1,10 +1,13 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { vendorsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { vendorsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export interface VendorAddress {
   street: string | null;
   city: string | null;
@@ -96,6 +99,20 @@ export function useVendors(params?: VendorParams) {
 }
 
 /**
+ * Hook to fetch all vendors with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteVendors(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Vendor, Record<string, unknown>>({
+    queryKey: ['vendors'],
+    fetchFn: async (p) => {
+      const response = await vendorsApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
+  });
+}
+
+/**
  * Hook to fetch a single vendor by ID
  */
 export function useVendor(id: string | undefined) {
@@ -140,7 +157,7 @@ export function useCreateVendor() {
         description: 'The vendor has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating vendor',
@@ -185,7 +202,7 @@ export function useUpdateVendor() {
         description: 'The vendor has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating vendor',
@@ -214,7 +231,7 @@ export function useDeleteVendor() {
         description: 'The vendor has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting vendor',

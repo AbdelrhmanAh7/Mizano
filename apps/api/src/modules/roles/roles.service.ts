@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import {
   Injectable,
   NotFoundException,
@@ -61,17 +62,11 @@ export class RolesService {
    * Find all roles in an organization with pagination
    */
   async findAll(organizationId: string, params: PaginationParams = {}) {
-    const {
-      page = 1,
-      limit = 20,
-      search,
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
-    } = params;
+    const { page = 1, limit = 20, search, sortBy = 'createdAt', sortOrder = 'desc' } = params;
 
     const skip = (page - 1) * limit;
 
-    const where: any = { organizationId };
+    const where: Prisma.RoleWhereInput = { organizationId };
 
     if (search) {
       where.OR = [
@@ -127,11 +122,7 @@ export class RolesService {
   /**
    * Update a role
    */
-  async update(
-    organizationId: string,
-    id: string,
-    updateRoleDto: UpdateRoleDto,
-  ) {
+  async update(organizationId: string, id: string, updateRoleDto: UpdateRoleDto) {
     // Verify role exists and belongs to organization
     const existingRole = await this.prisma.role.findFirst({
       where: { id, organizationId },
@@ -228,7 +219,7 @@ export class RolesService {
    * Seed default roles for an organization
    */
   async seedDefaultRoles(organizationId: string) {
-    const createdRoles: any[] = [];
+    const createdRoles: Record<string, unknown>[] = [];
 
     for (const roleData of DEFAULT_ROLES) {
       // Check if role already exists

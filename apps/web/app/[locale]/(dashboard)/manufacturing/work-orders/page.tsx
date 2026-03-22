@@ -1,0 +1,455 @@
+'use client';
+
+import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useToast } from '@/components/ui/use-toast';
+import { workOrdersApi } from '@/lib/api';
+import { useBulkAction } from '@/lib/hooks/use-bulk-action';
+import {
+  getWorkOrderStatusColor,
+  getWorkOrderStatusLabel,
+  useDeleteWorkOrder,
+  useWorkOrders,
+  WorkOrder,
+} from '@/lib/hooks/use-manufacturing';
+import { usePermissions } from '@/lib/hooks/use-permissions';
+import { useTableParams } from '@/lib/hooks/use-table-params';
+import { type ColumnDef } from '@tanstack/react-table';
+import { format } from 'date-fns';
+import { CheckCircle, Eye, Filter, Play, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { Suspense, useState } from 'react';
+
+function WorkOrdersPageContent() {
+  const t = useTranslations('manufacturing');
+  const tCommon = useTranslations('common');
+  const { toast } = useToast();
+  const { hasPermission } = usePermissions();
+  const tableParams = useTableParams({ defaultSortBy: 'createdAt' });
+
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedWO, setSelectedWO] = useState<WorkOrder | null>(null);
+
+  const {
+    data: workOrdersData,
+    isLoading,
+    refetch,
+  } = useWorkOrders({
+    search: tableParams.search || undefined,
+    status: selectedStatus !== 'all' ? selectedStatus : undefined,
+  });
+  const deleteWorkOrder = useDeleteWorkOrder();
+
+  const workOrders = workOrdersData?.data || [];
+  const meta = workOrdersData?.meta;
+
+  const canCreate = hasPermission('manufacturing.create');
+  const canEdit = hasPermission('manufacturing.edit');
+  const canDelete = hasPermission('manufacturing.delete');
+
+  // Bulk action state
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkStartOpen, setBulkStartOpen] = useState(false);
+  const [bulkCompleteOpen, setBulkCompleteOpen] = useState(false);
+  const [bulkCancelOpen, setBulkCancelOpen] = useState(false);
+  const [bulkSelectedRows, setBulkSelectedRows] = useState<WorkOrder[]>([]);
+
+  const bulkDeleteAction = useBulkAction({
+    mutationFn: (ids) => workOrdersApi.bulkDelete(ids).then((r) => r.data),
+    queryKeys: [['work-orders']],
+    successMessage: '{count} work orders deleted',
+  });
+
+  const bulkStartAction = useBulkAction({
+    mutationFn: (ids) => workOrdersApi.bulkStart(ids).then((r) => r.data),
+    queryKeys: [['work-orders']],
+    successMessage: '{count} work orders started',
+  });
+
+  const bulkCompleteAction = useBulkAction({
+    mutationFn: (ids) => workOrdersApi.bulkComplete(ids).then((r) => r.data),
+    queryKeys: [['work-orders']],
+    successMessage: '{count} work orders completed',
+  });
+
+  const bulkCancelAction = useBulkAction({
+    mutationFn: (ids) => workOrdersApi.bulkCancel(ids).then((r) => r.data),
+    queryKeys: [['work-orders']],
+    successMessage: '{count} work orders cancelled',
+  });
+
+  const bulkActions = [
+    ...(canEdit
+      ? [
+          {
+            label: t('workOrders.bulkActions.start'),
+            icon: Play,
+            onClick: (rows: WorkOrder[]) => {
+              setBulkSelectedRows(rows);
+              setBulkStartOpen(true);
+            },
+          },
+          {
+            label: t('workOrders.bulkActions.complete'),
+            icon: CheckCircle,
+            onClick: (rows: WorkOrder[]) => {
+              setBulkSelectedRows(rows);
+              setBulkCompleteOpen(true);
+            },
+          },
+          {
+            label: t('workOrders.bulkActions.cancel'),
+            icon: XCircle,
+            variant: 'destructive' as const,
+            onClick: (rows: WorkOrder[]) => {
+              setBulkSelectedRows(rows);
+              setBulkCancelOpen(true);
+            },
+          },
+        ]
+      : []),
+    ...(canDelete
+      ? [
+          {
+            label: t('workOrders.bulkActions.delete'),
+            icon: Trash2,
+            variant: 'destructive' as const,
+            onClick: (rows: WorkOrder[]) => {
+              setBulkSelectedRows(rows);
+              setBulkDeleteOpen(true);
+            },
+          },
+        ]
+      : []),
+  ];
+
+  const handleDelete = (wo: WorkOrder) => {
+    setSelectedWO(wo);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (selectedWO) {
+      try {
+        await deleteWorkOrder.mutateAsync(selectedWO.id);
+        toast({ title: t('workOrders.deleteWorkOrder') });
+      } catch (error: unknown) {
+        toast({
+          title: tCommon('errors.generic'),
+          description:
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+            tCommon('errors.generic'),
+          variant: 'destructive',
+        });
+      }
+      setDeleteDialogOpen(false);
+      setSelectedWO(null);
+    }
+  };
+
+  const columns: ColumnDef<WorkOrder>[] = [
+    {
+      accessorKey: 'workOrderNumber',
+      header: () => (
+        <SortableHeader
+          label={t('workOrders.table.workOrderNumber')}
+          columnId="workOrderNumber"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => (
+        <Link
+          href={`/manufacturing/work-orders/${row.original.id}`}
+          className="font-medium hover:underline"
+        >
+          {row.original.workOrderNumber}
+        </Link>
+      ),
+    },
+    {
+      id: 'outputItem',
+      header: t('bom.table.outputItem'),
+      cell: ({ row }) => {
+        const wo = row.original;
+        return wo.outputItem ? (
+          <span>
+            <span className="text-xs text-muted-foreground">{wo.outputItem.code}</span>{' '}
+            {wo.outputItem.name}
+          </span>
+        ) : (
+          wo.bom?.name || '-'
+        );
+      },
+    },
+    {
+      accessorKey: 'quantity',
+      header: t('workOrders.table.quantity'),
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      cell: ({ row }) => <span className="font-mono">{row.original.quantity}</span>,
+    },
+    {
+      accessorKey: 'plannedStartDate',
+      header: () => (
+        <SortableHeader
+          label={t('workOrders.table.plannedStart')}
+          columnId="plannedStartDate"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) =>
+        row.original.plannedStartDate
+          ? format(new Date(row.original.plannedStartDate), 'MMM d, yyyy')
+          : '-',
+    },
+    {
+      accessorKey: 'dueDate',
+      header: tCommon('date'),
+      cell: ({ row }) =>
+        row.original.dueDate ? format(new Date(row.original.dueDate), 'MMM d, yyyy') : '-',
+    },
+    {
+      accessorKey: 'status',
+      header: t('workOrders.table.status'),
+      cell: ({ row }) => (
+        <Badge className={getWorkOrderStatusColor(row.original.status)}>
+          {getWorkOrderStatusLabel(row.original.status)}
+        </Badge>
+      ),
+    },
+    {
+      id: 'actions',
+      header: '',
+      meta: { cellClassName: 'text-right' },
+      cell: ({ row }) => {
+        const wo = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                ...
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/manufacturing/work-orders/${wo.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  {tCommon('buttons.view')}
+                </Link>
+              </DropdownMenuItem>
+              {canDelete && wo.status === 'DRAFT' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleDelete(wo)} className="text-red-600">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {tCommon('buttons.delete')}
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">{t('workOrders.title')}</h1>
+          <p className="text-muted-foreground">{t('workOrders.empty.description')}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {canCreate && (
+            <Button asChild>
+              <Link href="/manufacturing/work-orders/new">
+                <Plus className="mr-2 h-4 w-4" />
+                {t('workOrders.newWorkOrder')}
+              </Link>
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <DataTableSearch
+              value={tableParams.search}
+              onChange={tableParams.setSearch}
+              placeholder={t('workOrders.searchPlaceholder')}
+            />
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder={t('workOrders.filterByStatus')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('workOrders.allStatuses')}</SelectItem>
+                <SelectItem value="DRAFT">{t('workOrders.status.draft')}</SelectItem>
+                <SelectItem value="IN_PROCESS">{t('workOrders.status.inProcess')}</SelectItem>
+                <SelectItem value="COMPLETED">{t('workOrders.status.completed')}</SelectItem>
+                <SelectItem value="CANCELLED">{t('workOrders.status.cancelled')}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="icon" onClick={() => refetch()}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Work Orders Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('workOrders.title')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DataTable
+            columns={columns}
+            data={workOrders}
+            page={meta?.page || 1}
+            totalPages={meta?.totalPages || 1}
+            total={meta?.total || 0}
+            limit={tableParams.limit}
+            onPageChange={tableParams.setPage}
+            onLimitChange={tableParams.setLimit}
+            isLoading={isLoading}
+            enableSelection
+            bulkActions={bulkActions}
+            emptyMessage={t('workOrders.empty.title')}
+            emptyAction={
+              canCreate ? (
+                <Button asChild>
+                  <Link href="/manufacturing/work-orders/new">
+                    <Plus className="mr-2 h-4 w-4" />
+                    {t('workOrders.newWorkOrder')}
+                  </Link>
+                </Button>
+              ) : undefined
+            }
+          />
+        </CardContent>
+      </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('workOrders.deleteWorkOrder')}</AlertDialogTitle>
+            <AlertDialogDescription>{tCommon('confirm.deleteMessage')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+              {tCommon('buttons.delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Action Dialogs */}
+      <BulkActionConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        action="delete"
+        count={bulkSelectedRows.length}
+        itemType="work orders"
+        description="Only draft work orders will be deleted."
+        destructive
+        isLoading={bulkDeleteAction.isLoading}
+        onConfirm={async () => {
+          await bulkDeleteAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkDeleteOpen(false);
+          refetch();
+        }}
+      />
+      <BulkActionConfirmDialog
+        open={bulkStartOpen}
+        onOpenChange={setBulkStartOpen}
+        action="start"
+        count={bulkSelectedRows.length}
+        itemType="work orders"
+        description="Draft work orders will be started."
+        isLoading={bulkStartAction.isLoading}
+        onConfirm={async () => {
+          await bulkStartAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkStartOpen(false);
+          refetch();
+        }}
+      />
+      <BulkActionConfirmDialog
+        open={bulkCompleteOpen}
+        onOpenChange={setBulkCompleteOpen}
+        action="complete"
+        count={bulkSelectedRows.length}
+        itemType="work orders"
+        description="In-process work orders will be marked as completed."
+        isLoading={bulkCompleteAction.isLoading}
+        onConfirm={async () => {
+          await bulkCompleteAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkCompleteOpen(false);
+          refetch();
+        }}
+      />
+      <BulkActionConfirmDialog
+        open={bulkCancelOpen}
+        onOpenChange={setBulkCancelOpen}
+        action="cancel"
+        count={bulkSelectedRows.length}
+        itemType="work orders"
+        description="Selected work orders will be cancelled."
+        destructive
+        isLoading={bulkCancelAction.isLoading}
+        onConfirm={async () => {
+          await bulkCancelAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkCancelOpen(false);
+          refetch();
+        }}
+      />
+    </div>
+  );
+}
+
+export default function WorkOrdersPage() {
+  return (
+    <Suspense>
+      <WorkOrdersPageContent />
+    </Suspense>
+  );
+}

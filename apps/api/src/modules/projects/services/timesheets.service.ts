@@ -1,12 +1,29 @@
+import { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
+
+export interface CreateTimesheetDto {
+  projectId: string;
+  taskId?: string;
+  date: string;
+  hours: string | number;
+  description?: string;
+  isBillable?: boolean;
+}
+
+export interface UpdateTimesheetDto {
+  hours?: string | number;
+  date?: string;
+  description?: string;
+  isBillable?: boolean;
+}
 
 @Injectable()
 export class TimesheetsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, userId: string, dto: any) {
+  async create(organizationId: string, userId: string, dto: CreateTimesheetDto) {
     // Verify project
     const project = await this.prisma.project.findFirst({
       where: { id: dto.projectId, organizationId },
@@ -42,7 +59,11 @@ export class TimesheetsService {
     });
   }
 
-  async startTimer(organizationId: string, userId: string, dto: { projectId: string; taskId?: string; description?: string }) {
+  async startTimer(
+    organizationId: string,
+    userId: string,
+    dto: { projectId: string; taskId?: string; description?: string },
+  ) {
     // Check for existing running timer
     const existing = await this.prisma.timesheetEntry.findFirst({
       where: { userId, organizationId, timerStartedAt: { not: null }, timerEndedAt: null },
@@ -74,7 +95,13 @@ export class TimesheetsService {
 
   async stopTimer(organizationId: string, userId: string, entryId: string) {
     const entry = await this.prisma.timesheetEntry.findFirst({
-      where: { id: entryId, userId, organizationId, timerStartedAt: { not: null }, timerEndedAt: null },
+      where: {
+        id: entryId,
+        userId,
+        organizationId,
+        timerStartedAt: { not: null },
+        timerEndedAt: null,
+      },
     });
     if (!entry) throw new NotFoundException('Running timer not found');
 
@@ -104,26 +131,63 @@ export class TimesheetsService {
     });
   }
 
-  async findAll(organizationId: string, query: { userId?: string; projectId?: string; startDate?: string; endDate?: string; isBilled?: boolean }) {
-    const where: any = { organizationId };
+  async findAll(
+    organizationId: string,
+    query: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
+      userId?: string;
+      projectId?: string;
+      startDate?: string;
+      endDate?: string;
+      status?: string;
+      isBilled?: boolean;
+    },
+  ) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const sortBy = query.sortBy || 'date';
+    const sortOrder = query.sortOrder || 'desc';
+    const where: Prisma.TimesheetEntryWhereInput = { organizationId };
     if (query.userId) where.userId = query.userId;
     if (query.projectId) where.projectId = query.projectId;
     if (query.isBilled !== undefined) where.isBilled = query.isBilled;
+    if (query.status === 'UNBILLED') where.isBilled = false;
+    if (query.status === 'INVOICED') where.isBilled = true;
     if (query.startDate || query.endDate) {
       where.date = {};
-      if (query.startDate) where.date.gte = new Date(query.startDate);
-      if (query.endDate) where.date.lte = new Date(query.endDate);
+      if (query.startDate) (where.date as Prisma.DateTimeFilter).gte = new Date(query.startDate);
+      if (query.endDate) (where.date as Prisma.DateTimeFilter).lte = new Date(query.endDate);
+    }
+    if (query.search) {
+      where.OR = [
+        { description: { contains: query.search, mode: 'insensitive' } },
+        { project: { name: { contains: query.search, mode: 'insensitive' } } },
+        { task: { name: { contains: query.search, mode: 'insensitive' } } },
+        { user: { firstName: { contains: query.search, mode: 'insensitive' } } },
+        { user: { lastName: { contains: query.search, mode: 'insensitive' } } },
+      ];
     }
 
-    return this.prisma.timesheetEntry.findMany({
-      where,
-      include: {
-        user: { select: { id: true, firstName: true, lastName: true } },
-        project: { select: { id: true, name: true, color: true } },
-        task: { select: { id: true, name: true } },
-      },
-      orderBy: { date: 'desc' },
-    });
+    const [data, total] = await Promise.all([
+      this.prisma.timesheetEntry.findMany({
+        where,
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true } },
+          project: { select: { id: true, name: true, color: true } },
+          task: { select: { id: true, name: true } },
+        },
+        orderBy: { [sortBy]: sortOrder },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.timesheetEntry.count({ where }),
+    ]);
+
+    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async findOne(organizationId: string, id: string) {
@@ -139,14 +203,16 @@ export class TimesheetsService {
     return entry;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateTimesheetDto) {
     const entry = await this.findOne(organizationId, id);
     if (entry.isBilled) {
       throw new BadRequestException('Cannot update billed timesheet entry');
     }
 
-    const data: any = { ...dto };
-    if (dto.hours) data.hours = new Decimal(dto.hours);
+    const data: Prisma.TimesheetEntryUpdateInput = {};
+    if (dto.description !== undefined) data.description = dto.description;
+    if (dto.isBillable !== undefined) data.isBillable = dto.isBillable;
+    if (dto.hours) data.hours = new Decimal(dto.hours as string | number);
     if (dto.date) data.date = new Date(dto.date);
 
     return this.prisma.timesheetEntry.update({
@@ -188,7 +254,7 @@ export class TimesheetsService {
     });
 
     // Group by day
-    const byDay: Record<string, any[]> = {};
+    const byDay: Record<string, unknown[]> = {};
     for (let i = 0; i < 7; i++) {
       const day = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
       byDay[day.toISOString().split('T')[0]] = [];
@@ -200,14 +266,20 @@ export class TimesheetsService {
     }
 
     // Calculate totals
-    const totalHours = entries.reduce((sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()), 0);
-    const billableHours = entries.filter((e) => e.isBillable).reduce((sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()), 0);
+    const totalHours = entries.reduce(
+      (sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()),
+      0,
+    );
+    const billableHours = entries
+      .filter((e) => e.isBillable)
+      .reduce((sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()), 0);
 
     // Group by project
     const byProject: Record<string, number> = {};
     for (const entry of entries) {
       const key = entry.project.name;
-      byProject[key] = (byProject[key] || 0) + parseFloat((entry.hours ?? entry.duration).toString());
+      byProject[key] =
+        (byProject[key] || 0) + parseFloat((entry.hours ?? entry.duration).toString());
     }
 
     return {
@@ -221,7 +293,12 @@ export class TimesheetsService {
     };
   }
 
-  async getTimesheetReport(organizationId: string, startDate: string, endDate: string, groupBy: 'user' | 'project') {
+  async getTimesheetReport(
+    organizationId: string,
+    startDate: string,
+    endDate: string,
+    groupBy: 'user' | 'project',
+  ) {
     const entries = await this.prisma.timesheetEntry.findMany({
       where: {
         organizationId,
@@ -233,13 +310,19 @@ export class TimesheetsService {
       },
     });
 
-    const grouped: Record<string, { name: string; totalHours: number; billableHours: number; billableAmount: number }> = {};
+    const grouped: Record<
+      string,
+      { name: string; totalHours: number; billableHours: number; billableAmount: number }
+    > = {};
 
     for (const entry of entries) {
       const key = groupBy === 'user' ? entry.userId : entry.projectId;
-      const name = groupBy === 'user' ? `${entry.user.firstName} ${entry.user.lastName}` : entry.project.name;
+      const name =
+        groupBy === 'user' ? `${entry.user.firstName} ${entry.user.lastName}` : entry.project.name;
       const hours = parseFloat((entry.hours ?? entry.duration).toString());
-      const hourlyRate = entry.project.hourlyRate ? parseFloat(entry.project.hourlyRate.toString()) : 0;
+      const hourlyRate = entry.project.hourlyRate
+        ? parseFloat(entry.project.hourlyRate.toString())
+        : 0;
 
       if (!grouped[key]) {
         grouped[key] = { name, totalHours: 0, billableHours: 0, billableAmount: 0 };

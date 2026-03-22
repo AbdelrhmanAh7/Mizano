@@ -1,10 +1,13 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { customersApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { customersApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export interface CustomerAddress {
   street: string | null;
   city: string | null;
@@ -105,6 +108,20 @@ export function useCustomers(params?: CustomerParams) {
 }
 
 /**
+ * Hook to fetch all customers with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteCustomers(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Customer, Record<string, unknown>>({
+    queryKey: ['customers'],
+    fetchFn: async (p) => {
+      const response = await customersApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
+  });
+}
+
+/**
  * Hook to fetch a single customer by ID
  */
 export function useCustomer(id: string | undefined) {
@@ -153,7 +170,7 @@ export function useCreateCustomer() {
         description: 'The customer has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating customer',
@@ -183,7 +200,7 @@ export function useUpdateCustomer() {
         description: 'The customer has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating customer',
@@ -212,7 +229,7 @@ export function useDeleteCustomer() {
         description: 'The customer has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting customer',
@@ -231,7 +248,7 @@ export function formatAddress(
   typeOrCity?: 'billing' | 'shipping' | string | null,
   state?: string | null,
   postalCode?: string | null,
-  country?: string | null
+  country?: string | null,
 ): string {
   // If first argument is a Customer object
   if (customerOrStreet && typeof customerOrStreet === 'object' && 'id' in customerOrStreet) {

@@ -10,8 +10,10 @@ import { JournalForm } from '@/components/accounting/journal-form';
 import { useAccountsTree } from '@/lib/hooks/use-accounts';
 import { useJournal, useUpdateJournal } from '@/lib/hooks/use-journals';
 import { Card, CardContent } from '@/components/ui/card';
+import { useTranslations } from 'next-intl';
 
 export default function EditJournalPage() {
+  const t = useTranslations('accounting');
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -23,7 +25,7 @@ export default function EditJournalPage() {
 
   const isLoading = accountsLoading || journalLoading;
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       await updateJournal.mutateAsync({ id: journalId, data });
       toast({
@@ -31,10 +33,12 @@ export default function EditJournalPage() {
         description: 'The journal entry has been updated successfully.',
       });
       router.push(`/accounting/journals/${journalId}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to update journal entry.',
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          'Failed to update journal entry.',
         variant: 'destructive',
       });
     }
@@ -60,7 +64,7 @@ export default function EditJournalPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href="/accounting/journals">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -87,7 +91,7 @@ export default function EditJournalPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild aria-label="Go back">
             <Link href={`/accounting/journals/${journalId}`}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -114,18 +118,16 @@ export default function EditJournalPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label="Go back">
           <Link href={`/accounting/journals/${journalId}`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Edit {journal.journalNumber}
+            {t('journals.editJournal')} - {journal.journalNumber}
           </h1>
-          <p className="text-muted-foreground">
-            Update the journal entry details
-          </p>
+          <p className="text-muted-foreground">Update the journal entry details</p>
         </div>
       </div>
 

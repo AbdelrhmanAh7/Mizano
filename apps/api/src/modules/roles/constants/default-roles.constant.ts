@@ -117,13 +117,7 @@ export const AVAILABLE_MODULES = [
 /**
  * All available actions
  */
-export const AVAILABLE_ACTIONS = [
-  'view',
-  'create',
-  'edit',
-  'delete',
-  'export',
-] as const;
+export const AVAILABLE_ACTIONS = ['view', 'create', 'edit', 'delete', 'export'] as const;
 
 export type AvailableModule = (typeof AVAILABLE_MODULES)[number];
 export type AvailableAction = (typeof AVAILABLE_ACTIONS)[number];

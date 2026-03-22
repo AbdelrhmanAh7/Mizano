@@ -20,6 +20,12 @@ import { Switch } from '@/components/ui/switch';
 import { useCreateBOM, useUpdateBOM, BOM } from '@/lib/hooks/use-manufacturing';
 import { useItems } from '@/lib/hooks/use-items';
 
+interface BOMItem {
+  id: string;
+  name: string;
+  code: string;
+}
+
 const componentSchema = z.object({
   itemId: z.string().min(1, 'Item is required'),
   quantity: z.number().min(0.01, 'Quantity must be greater than 0'),
@@ -46,7 +52,7 @@ export function BOMForm({ bom }: BOMFormProps) {
   const updateBOM = useUpdateBOM();
 
   const { data: itemsData, isLoading: itemsLoading } = useItems({ type: 'GOODS' });
-  const items = itemsData?.data || [];
+  const items: BOMItem[] = itemsData?.data || [];
 
   const form = useForm<BOMFormData>({
     resolver: zodResolver(bomSchema),
@@ -59,9 +65,10 @@ export function BOMForm({ bom }: BOMFormProps) {
             itemId: c.itemId,
             quantity: c.quantity,
           })),
-          operationsCost: typeof bom.operationsCost === 'string'
-            ? parseFloat(bom.operationsCost)
-            : bom.operationsCost,
+          operationsCost:
+            typeof bom.operationsCost === 'string'
+              ? parseFloat(bom.operationsCost)
+              : bom.operationsCost,
           isActive: bom.isActive,
         }
       : {
@@ -82,9 +89,9 @@ export function BOMForm({ bom }: BOMFormProps) {
   const handleSubmit = async (data: BOMFormData) => {
     try {
       if (bom) {
-        await updateBOM.mutateAsync({ id: bom.id, data });
+        await updateBOM.mutateAsync({ id: bom.id, data: data as unknown as Partial<BOM> });
       } else {
-        await createBOM.mutateAsync(data);
+        await createBOM.mutateAsync(data as unknown as Partial<BOM>);
       }
       router.push('/manufacturing/bom');
     } catch (error) {
@@ -96,7 +103,7 @@ export function BOMForm({ bom }: BOMFormProps) {
 
   // Filter out selected output item from components
   const outputItemId = form.watch('outputItemId');
-  const availableItems = items.filter((item: any) => item.id !== outputItemId);
+  const availableItems = items.filter((item) => item.id !== outputItemId);
 
   return (
     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -110,15 +117,9 @@ export function BOMForm({ bom }: BOMFormProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">BOM Name *</Label>
-              <Input
-                id="name"
-                placeholder="Wooden Chair Assembly"
-                {...form.register('name')}
-              />
+              <Input id="name" placeholder="Wooden Chair Assembly" {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.name.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
 
@@ -133,7 +134,7 @@ export function BOMForm({ bom }: BOMFormProps) {
                   <SelectValue placeholder="Select output item" />
                 </SelectTrigger>
                 <SelectContent>
-                  {items.map((item: any) => (
+                  {items.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.code} - {item.name}
                     </SelectItem>
@@ -141,9 +142,7 @@ export function BOMForm({ bom }: BOMFormProps) {
                 </SelectContent>
               </Select>
               {form.formState.errors.outputItemId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.outputItemId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.outputItemId.message}</p>
               )}
             </div>
           </div>
@@ -159,9 +158,7 @@ export function BOMForm({ bom }: BOMFormProps) {
                 placeholder="1"
                 {...form.register('outputQuantity', { valueAsNumber: true })}
               />
-              <p className="text-xs text-muted-foreground">
-                Quantity produced per production run
-              </p>
+              <p className="text-xs text-muted-foreground">Quantity produced per production run</p>
               {form.formState.errors.outputQuantity && (
                 <p className="text-sm text-red-500">
                   {form.formState.errors.outputQuantity.message}
@@ -202,9 +199,7 @@ export function BOMForm({ bom }: BOMFormProps) {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Components (Raw Materials)</CardTitle>
-              <CardDescription>
-                Add the items required to produce this product
-              </CardDescription>
+              <CardDescription>Add the items required to produce this product</CardDescription>
             </div>
             <Button
               type="button"
@@ -234,16 +229,14 @@ export function BOMForm({ bom }: BOMFormProps) {
                   <div className="col-span-7">
                     <Select
                       value={form.watch(`components.${index}.itemId`) || ''}
-                      onValueChange={(value) =>
-                        form.setValue(`components.${index}.itemId`, value)
-                      }
+                      onValueChange={(value) => form.setValue(`components.${index}.itemId`, value)}
                       disabled={itemsLoading}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select item" />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableItems.map((item: any) => (
+                        {availableItems.map((item) => (
                           <SelectItem key={item.id} value={item.id}>
                             {item.code} - {item.name}
                           </SelectItem>
@@ -269,6 +262,7 @@ export function BOMForm({ bom }: BOMFormProps) {
                       size="icon"
                       onClick={() => remove(index)}
                       disabled={fields.length === 1}
+                      aria-label="Remove component"
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
@@ -278,9 +272,7 @@ export function BOMForm({ bom }: BOMFormProps) {
             </div>
           )}
           {form.formState.errors.components && (
-            <p className="text-sm text-red-500 mt-2">
-              {form.formState.errors.components.message}
-            </p>
+            <p className="text-sm text-red-500 mt-2">{form.formState.errors.components.message}</p>
           )}
         </CardContent>
       </Card>

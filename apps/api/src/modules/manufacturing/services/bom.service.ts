@@ -1,12 +1,35 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma, Item } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
+
+interface BomComponentData {
+  itemId: string;
+  quantity: string | number;
+}
+
+export interface CreateBomData {
+  name: string;
+  outputItemId: string;
+  outputQuantity?: number;
+  operationsCost?: string | number;
+  isActive?: boolean;
+  components?: BomComponentData[];
+}
+
+export interface UpdateBomData {
+  name?: string;
+  outputQuantity?: number;
+  operationsCost?: string | number;
+  isActive?: boolean;
+  components?: BomComponentData[];
+}
 
 @Injectable()
 export class BomService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateBomData) {
     // Verify output item exists
     const outputItem = await this.prisma.item.findFirst({
       where: { id: dto.outputItemId, organizationId },
@@ -43,7 +66,7 @@ export class BomService {
         isActive: dto.isActive ?? true,
         organizationId,
         items: {
-          create: (dto.components || []).map((c: any) => ({
+          create: (dto.components || []).map((c: BomComponentData) => ({
             itemId: c.itemId,
             quantity: new Decimal(c.quantity),
           })),
@@ -56,24 +79,46 @@ export class BomService {
     });
   }
 
-  async findAll(organizationId: string, query: { itemId?: string; isActive?: boolean }) {
-    const where: any = { organizationId };
+  async findAll(
+    organizationId: string,
+    query: {
+      page?: number | string;
+      limit?: number | string;
+      sortBy?: string;
+      sortOrder?: string;
+      itemId?: string;
+      isActive?: boolean;
+    },
+  ) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const sortBy = query.sortBy || 'createdAt';
+    const sortOrder = query.sortOrder || 'desc';
+
+    const where: Prisma.BOMWhereInput = { organizationId, deletedAt: null };
     if (query.itemId) where.outputItemId = query.itemId;
     if (query.isActive !== undefined) where.isActive = query.isActive;
 
-    return this.prisma.bOM.findMany({
-      where,
-      include: {
-        outputItem: { select: { id: true, name: true, sku: true } },
-        _count: { select: { items: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [data, total] = await Promise.all([
+      this.prisma.bOM.findMany({
+        where,
+        include: {
+          outputItem: { select: { id: true, name: true, sku: true } },
+          _count: { select: { items: true } },
+        },
+        orderBy: { [sortBy]: sortOrder },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.bOM.count({ where }),
+    ]);
+
+    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async findOne(organizationId: string, id: string) {
     const bom = await this.prisma.bOM.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: {
         outputItem: true,
         items: {
@@ -85,26 +130,31 @@ export class BomService {
     return bom;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateBomData) {
     const existing = await this.findOne(organizationId, id);
 
     // If setting as active, deactivate other BOMs for same item
     if (dto.isActive) {
       await this.prisma.bOM.updateMany({
-        where: { outputItemId: existing.outputItemId, organizationId, isActive: true, id: { not: id } },
+        where: {
+          outputItemId: existing.outputItemId,
+          organizationId,
+          isActive: true,
+          id: { not: id },
+        },
         data: { isActive: false },
       });
     }
 
-    const data: any = { ...dto };
-    delete data.components;
+    const { components: _components, ...restDto } = dto;
+    const data: Prisma.BOMUncheckedUpdateInput = { ...restDto };
     if (dto.operationsCost !== undefined) data.operationsCost = new Decimal(dto.operationsCost);
 
     // Update components if provided
     if (dto.components) {
       await this.prisma.bOMItem.deleteMany({ where: { bomId: id } });
       await this.prisma.bOMItem.createMany({
-        data: dto.components.map((c: any) => ({
+        data: dto.components.map((c: BomComponentData) => ({
           bomId: id,
           itemId: c.itemId,
           quantity: new Decimal(c.quantity),
@@ -125,15 +175,18 @@ export class BomService {
   async remove(organizationId: string, id: string) {
     const bom = await this.prisma.bOM.findFirst({
       where: { id, organizationId },
-      include: { workOrders: { take: 1 } },
+      include: { _count: { select: { workOrders: true } } },
     });
     if (!bom) throw new NotFoundException('BOM not found');
-    if (bom.workOrders.length > 0) {
+    if (bom._count.workOrders > 0) {
       throw new BadRequestException('Cannot delete BOM with existing work orders');
     }
 
     await this.prisma.bOMItem.deleteMany({ where: { bomId: id } });
-    await this.prisma.bOM.delete({ where: { id } });
+    await this.prisma.bOM.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return { message: 'BOM deleted' };
   }
 
@@ -143,7 +196,7 @@ export class BomService {
     const multiplier = quantity / outputQty;
 
     const requirements: Array<{
-      item: any;
+      item: Item;
       requiredQuantity: number;
       currentStock: number;
       shortfall: number;
@@ -157,7 +210,10 @@ export class BomService {
       const stockMovements = await this.prisma.inventoryMovement.findMany({
         where: { itemId: bomItem.itemId, organizationId },
       });
-      const currentStock = stockMovements.reduce((sum: number, m: { quantity: number }) => sum + m.quantity, 0);
+      const currentStock = stockMovements.reduce(
+        (sum: number, m) => sum + parseFloat(m.quantity.toString()),
+        0,
+      );
 
       requirements.push({
         item: bomItem.item,

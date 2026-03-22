@@ -4,11 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PhoneInput } from '@/components/ui/phone-input';
 import {
   Select,
   SelectContent,
@@ -16,19 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import {
-  useCreateEmployee,
-  useUpdateEmployee,
-  Employee,
-} from '@/lib/hooks/use-hr';
+import { useCreateEmployee, useUpdateEmployee, Employee } from '@/lib/hooks/use-hr';
 
 const allowanceSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -42,8 +35,7 @@ const deductionSchema = z.object({
 
 const employeeSchema = z.object({
   employeeNumber: z.string().min(1, 'Employee number is required'),
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
+  name: z.string().min(1, 'Name is required'),
   email: z.string().email('Invalid email'),
   phone: z.string().optional(),
   joiningDate: z.date({ required_error: 'Joining date is required' }),
@@ -69,22 +61,42 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
   const createEmployee = useCreateEmployee();
   const updateEmployee = useUpdateEmployee();
 
+  // Convert Record<string, number> to array format
+  const allowancesToArray = (allowances: Record<string, number> | null | undefined) => {
+    if (!allowances || Array.isArray(allowances)) return allowances || [];
+    return Object.entries(allowances).map(([name, amount]) => ({ name, amount }));
+  };
+
+  const deductionsToArray = (deductions: Record<string, number> | null | undefined) => {
+    if (!deductions || Array.isArray(deductions)) return deductions || [];
+    return Object.entries(deductions).map(([name, amount]) => ({ name, amount }));
+  };
+
   const form = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
     defaultValues: employee
       ? {
-          ...employee,
-          joiningDate: new Date(employee.joiningDate),
-          basicSalary: typeof employee.basicSalary === 'string'
-            ? parseFloat(employee.basicSalary)
-            : employee.basicSalary,
-          allowances: employee.allowances || [],
-          deductions: employee.deductions || [],
+          employeeNumber: employee.employeeNumber,
+          name: employee.name,
+          email: employee.email,
+          phone: employee.phone || '',
+          joiningDate: employee.joiningDate ? new Date(employee.joiningDate) : new Date(),
+          department: employee.departmentId || '',
+          jobTitle: employee.jobTitle || '',
+          basicSalary:
+            typeof employee.basicSalary === 'string'
+              ? parseFloat(employee.basicSalary)
+              : employee.basicSalary,
+          allowances: allowancesToArray(employee.allowances as Record<string, number> | null),
+          deductions: deductionsToArray(employee.deductions as Record<string, number> | null),
+          bankName: employee.bankName || '',
+          bankAccountNumber: employee.bankAccountNumber || '',
+          taxId: employee.taxId || '',
+          status: employee.status,
         }
       : {
           employeeNumber: '',
-          firstName: '',
-          lastName: '',
+          name: '',
           email: '',
           phone: '',
           joiningDate: new Date(),
@@ -154,7 +166,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
           <CardDescription>Basic employee details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="employeeNumber">Employee Number *</Label>
               <Input
@@ -170,30 +182,10 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="firstName">First Name *</Label>
-              <Input
-                id="firstName"
-                placeholder="John"
-                {...form.register('firstName')}
-              />
-              {form.formState.errors.firstName && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.firstName.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name *</Label>
-              <Input
-                id="lastName"
-                placeholder="Doe"
-                {...form.register('lastName')}
-              />
-              {form.formState.errors.lastName && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.lastName.message}
-                </p>
+              <Label htmlFor="name">Full Name *</Label>
+              <Input id="name" placeholder="John Doe" {...form.register('name')} />
+              {form.formState.errors.name && (
+                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
           </div>
@@ -208,18 +200,16 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                 {...form.register('email')}
               />
               {form.formState.errors.email && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.email.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.email.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
-              <Input
+              <PhoneInput
                 id="phone"
-                placeholder="+1 234 567 8900"
-                {...form.register('phone')}
+                value={form.watch('phone') || ''}
+                onChange={(val) => form.setValue('phone', val)}
               />
             </div>
           </div>
@@ -233,11 +223,11 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                     variant="outline"
                     className={cn(
                       'w-full justify-start text-left font-normal',
-                      !form.watch('joiningDate') && 'text-muted-foreground'
+                      !form.watch('joiningDate') && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {form.watch('joiningDate')
+                    {form.watch('joiningDate') && isValid(form.watch('joiningDate'))
                       ? format(form.watch('joiningDate'), 'PPP')
                       : 'Pick a date'}
                   </Button>
@@ -255,20 +245,12 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
 
             <div className="space-y-2">
               <Label htmlFor="department">Department</Label>
-              <Input
-                id="department"
-                placeholder="Engineering"
-                {...form.register('department')}
-              />
+              <Input id="department" placeholder="Engineering" {...form.register('department')} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="jobTitle">Job Title</Label>
-              <Input
-                id="jobTitle"
-                placeholder="Software Engineer"
-                {...form.register('jobTitle')}
-              />
+              <Input id="jobTitle" placeholder="Software Engineer" {...form.register('jobTitle')} />
             </div>
           </div>
 
@@ -311,9 +293,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
               {...form.register('basicSalary', { valueAsNumber: true })}
             />
             {form.formState.errors.basicSalary && (
-              <p className="text-sm text-red-500">
-                {form.formState.errors.basicSalary.message}
-              </p>
+              <p className="text-sm text-red-500">{form.formState.errors.basicSalary.message}</p>
             )}
           </div>
 
@@ -353,6 +333,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                       variant="ghost"
                       size="icon"
                       onClick={() => removeAllowance(index)}
+                      aria-label="Remove allowance"
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
@@ -400,6 +381,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
                       variant="ghost"
                       size="icon"
                       onClick={() => removeDeduction(index)}
+                      aria-label="Remove deduction"
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
@@ -447,11 +429,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="bankName">Bank Name</Label>
-              <Input
-                id="bankName"
-                placeholder="National Bank"
-                {...form.register('bankName')}
-              />
+              <Input id="bankName" placeholder="National Bank" {...form.register('bankName')} />
             </div>
 
             <div className="space-y-2">
@@ -465,11 +443,7 @@ export function EmployeeForm({ employee }: EmployeeFormProps) {
 
             <div className="space-y-2">
               <Label htmlFor="taxId">Tax ID</Label>
-              <Input
-                id="taxId"
-                placeholder="TAX-123456"
-                {...form.register('taxId')}
-              />
+              <Input id="taxId" placeholder="TAX-123456" {...form.register('taxId')} />
             </div>
           </div>
         </CardContent>

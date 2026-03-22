@@ -1,14 +1,9 @@
 'use client';
 
+import { memo } from 'react';
+import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Legend,
-  Tooltip,
-} from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { ExpenseCategory, formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 
 interface ExpensesPieProps {
@@ -18,11 +13,13 @@ interface ExpensesPieProps {
 
 const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-export function ExpensesPie({ data, currency = 'USD' }: ExpensesPieProps) {
+export const ExpensesPie = memo(function ExpensesPie({ data, currency = 'USD' }: ExpensesPieProps) {
+  const t = useTranslations('common.dashboard.charts');
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Top Expenses</CardTitle>
+        <CardTitle className="text-lg">{t('topExpenses')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">
@@ -39,10 +36,7 @@ export function ExpensesPie({ data, currency = 'USD' }: ExpensesPieProps) {
                 nameKey="name"
               >
                 {data.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
-                  />
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip
@@ -57,9 +51,10 @@ export function ExpensesPie({ data, currency = 'USD' }: ExpensesPieProps) {
                 layout="vertical"
                 align="right"
                 verticalAlign="middle"
-                formatter={(value, entry: any) => (
+                formatter={(value, entry) => (
                   <span className="text-sm">
-                    {value} ({entry.payload.percentage}%)
+                    {value} ({(entry as { payload?: { percentage?: number } }).payload?.percentage}
+                    %)
                   </span>
                 )}
               />
@@ -69,4 +64,4 @@ export function ExpensesPie({ data, currency = 'USD' }: ExpensesPieProps) {
       </CardContent>
     </Card>
   );
-}
+});

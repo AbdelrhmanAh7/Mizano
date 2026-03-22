@@ -1,6 +1,5 @@
 'use client';
 
-import { use, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -8,11 +7,11 @@ import {
   ArrowLeft,
   Pencil,
   Trash2,
-  Upload,
   ArrowUpRight,
   ArrowDownRight,
   RefreshCw,
   Landmark,
+  TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,25 +40,43 @@ import { cn } from '@/lib/utils';
 import {
   useBankAccount,
   useBankAccountTransactions,
+  useBankAccountBalanceHistory,
   useDeleteBankAccount,
   getAccountTypeLabel,
   getAccountTypeColor,
   formatCurrency,
 } from '@/lib/hooks/use-bank-accounts';
-import { getStatusLabel, getStatusColor } from '@/lib/hooks/use-bank-transactions';
+import {
+  getStatusLabel,
+  getStatusColor,
+  type TransactionStatus,
+} from '@/lib/hooks/use-bank-transactions';
+import { useTranslations } from 'next-intl';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 
 interface BankAccountDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default function BankAccountDetailPage({ params }: BankAccountDetailPageProps) {
-  const { id } = use(params);
+  const t = useTranslations('banking');
+  const { id } = params;
   const router = useRouter();
   const { data: account, isLoading } = useBankAccount(id);
   const { data: transactionsData } = useBankAccountTransactions(id);
+  const { data: historyData } = useBankAccountBalanceHistory(id);
   const deleteBankAccount = useDeleteBankAccount();
 
   const transactions = transactionsData?.data || [];
+  const balanceHistory: { date: string; runningBalance: number }[] = historyData?.history || [];
 
   const handleDelete = async () => {
     await deleteBankAccount.mutateAsync(id);
@@ -91,15 +108,17 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
     );
   }
 
-  const currentBalance = typeof account.currentBalance === 'string'
-    ? parseFloat(account.currentBalance)
-    : account.currentBalance;
+  const currentBalance =
+    typeof account.systemBalance === 'string'
+      ? parseFloat(account.systemBalance)
+      : (account.systemBalance as number) || 0;
 
-  const bankBalance = typeof account.bankBalance === 'string'
-    ? parseFloat(account.bankBalance)
-    : account.bankBalance;
+  const bankBalance =
+    typeof account.bankBalance === 'string'
+      ? parseFloat(account.bankBalance)
+      : (account.bankBalance as number) || 0;
 
-  const difference = (bankBalance || 0) - (currentBalance || 0);
+  const difference = bankBalance - currentBalance;
 
   return (
     <div className="space-y-6">
@@ -113,17 +132,16 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">{account.accountName}</h1>
-              <Badge variant="outline" className={getAccountTypeColor(account.accountType)}>
-                {getAccountTypeLabel(account.accountType)}
+              <h1 className="text-3xl font-bold tracking-tight">{account.name}</h1>
+              <Badge variant="outline" className={getAccountTypeColor(account.type)}>
+                {getAccountTypeLabel(account.type)}
               </Badge>
               {!account.isActive && (
-                <Badge variant="outline" className="text-gray-500">Inactive</Badge>
+                <Badge variant="outline" className="text-gray-500">
+                  Inactive
+                </Badge>
               )}
             </div>
-            {account.bankName && (
-              <p className="text-muted-foreground">{account.bankName}</p>
-            )}
           </div>
         </div>
 
@@ -137,30 +155,26 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
           <Button variant="outline" asChild>
             <Link href={`/banking/accounts/${id}/edit`}>
               <Pencil className="mr-2 h-4 w-4" />
-              Edit
+              {t('accounts.editAccount')}
             </Link>
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" className="text-red-600">
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                {t('accounts.deleteAccount')}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete Bank Account</AlertDialogTitle>
+                <AlertDialogTitle>{t('accounts.deleteAccount')}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to delete this bank account? This action cannot
-                  be undone. All associated transactions will also be deleted.
+                  Are you sure you want to delete this bank account? This action cannot be undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  className="bg-red-600 hover:bg-red-700"
-                >
+                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
                   Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -178,11 +192,13 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
                 <Landmark className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Current Balance</p>
-                <p className={cn(
-                  'text-2xl font-bold font-mono',
-                  currentBalance < 0 ? 'text-red-600' : 'text-green-600'
-                )}>
+                <p className="text-sm text-muted-foreground">System Balance</p>
+                <p
+                  className={cn(
+                    'text-2xl font-bold font-mono',
+                    currentBalance < 0 ? 'text-red-600' : 'text-green-600',
+                  )}
+                >
                   {formatCurrency(currentBalance)}
                 </p>
               </div>
@@ -193,19 +209,19 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Bank Balance</p>
-            <p className="text-2xl font-bold font-mono">
-              {formatCurrency(bankBalance || 0)}
-            </p>
+            <p className="text-2xl font-bold font-mono">{formatCurrency(bankBalance)}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Difference</p>
-            <p className={cn(
-              'text-2xl font-bold font-mono',
-              Math.abs(difference) > 0.01 ? 'text-yellow-600' : 'text-green-600'
-            )}>
+            <p
+              className={cn(
+                'text-2xl font-bold font-mono',
+                Math.abs(difference) > 0.01 ? 'text-yellow-600' : 'text-green-600',
+              )}
+            >
               {formatCurrency(difference)}
             </p>
           </CardContent>
@@ -223,23 +239,58 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
         </Card>
       </div>
 
+      {/* 30-day Balance Chart */}
+      {balanceHistory.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              30-Day Balance History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={balanceHistory}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis
+                  dataKey="date"
+                  tickFormatter={(v: string) => format(new Date(v), 'MMM d')}
+                  tick={{ fontSize: 11 }}
+                />
+                <YAxis
+                  tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                  tick={{ fontSize: 11 }}
+                />
+                <Tooltip
+                  formatter={(value: number) => [formatCurrency(value), 'Balance']}
+                  labelFormatter={(label: string) => format(new Date(label), 'MMM d, yyyy')}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="runningBalance"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Account Details */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Account Details</CardTitle>
+            <CardTitle>{t('accounts.accountDetails')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Account Number</span>
+              <span className="text-muted-foreground">{t('accounts.form.accountNumber')}</span>
               <span className="font-mono">{account.accountNumber || '-'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Bank Name</span>
-              <span>{account.bankName || '-'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Currency</span>
+              <span className="text-muted-foreground">{t('accounts.form.currency')}</span>
               <span>{account.currency}</span>
             </div>
             <div className="flex justify-between">
@@ -251,14 +302,14 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
           </CardContent>
         </Card>
 
-        {account.glAccount && (
+        {account.linkedAccount && (
           <Card>
             <CardHeader>
-              <CardTitle>Linked GL Account</CardTitle>
+              <CardTitle>{t('accounts.form.linkedAccount')}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="font-mono">
-                {account.glAccount.code} - {account.glAccount.name}
+                {account.linkedAccount.code} - {account.linkedAccount.name}
               </p>
             </CardContent>
           </Card>
@@ -270,9 +321,8 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Recent Transactions</CardTitle>
-            <Button variant="outline" size="sm">
-              <Upload className="mr-2 h-4 w-4" />
-              Import Transactions
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/banking/transactions`}>View All</Link>
             </Button>
           </div>
         </CardHeader>
@@ -285,49 +335,64 @@ export default function BankAccountDetailPage({ params }: BankAccountDetailPageP
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>{t('transactions.table.date')}</TableHead>
+                  <TableHead>{t('transactions.table.description')}</TableHead>
+                  <TableHead>{t('transactions.table.status')}</TableHead>
+                  <TableHead className="text-right">{t('transactions.table.amount')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.slice(0, 10).map((tx: any) => (
-                  <TableRow key={tx.id}>
-                    <TableCell>
-                      {format(new Date(tx.date), 'MMM d, yyyy')}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{tx.description}</p>
-                        {tx.payee && (
-                          <p className="text-sm text-muted-foreground">{tx.payee}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={getStatusColor(tx.status)}>
-                        {getStatusLabel(tx.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {tx.type === 'DEPOSIT' ? (
-                          <ArrowDownRight className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <ArrowUpRight className="h-4 w-4 text-red-600" />
-                        )}
-                        <span className={cn(
-                          'font-mono font-medium',
-                          tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600'
-                        )}>
-                          {tx.type === 'DEPOSIT' ? '+' : '-'}
-                          {formatCurrency(Math.abs(parseFloat(tx.amount)))}
-                        </span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {transactions
+                  .slice(0, 10)
+                  .map(
+                    (tx: {
+                      id: string;
+                      date: string;
+                      description: string;
+                      payee?: string;
+                      status: string;
+                      type: string;
+                      amount: string | number;
+                    }) => (
+                      <TableRow key={tx.id}>
+                        <TableCell>{format(new Date(tx.date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{tx.description}</p>
+                            {tx.payee && (
+                              <p className="text-sm text-muted-foreground">{tx.payee}</p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={getStatusColor(tx.status as TransactionStatus)}
+                          >
+                            {getStatusLabel(tx.status as TransactionStatus)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {tx.type === 'DEPOSIT' ? (
+                              <ArrowDownRight className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <ArrowUpRight className="h-4 w-4 text-red-600" />
+                            )}
+                            <span
+                              className={cn(
+                                'font-mono font-medium',
+                                tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600',
+                              )}
+                            >
+                              {tx.type === 'DEPOSIT' ? '+' : '-'}
+                              {formatCurrency(Math.abs(parseFloat(String(tx.amount))))}
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ),
+                  )}
               </TableBody>
             </Table>
           )}

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { auditLogsApi } from '@/lib/api';
 
 interface AuditLogParams {
+  [key: string]: unknown;
   page?: number;
   limit?: number;
   entityType?: string;
@@ -51,7 +52,7 @@ export function useAuditLog(id: string | undefined) {
 export function useEntityAuditLogs(
   entityType: string | undefined,
   entityId: string | undefined,
-  params?: Pick<AuditLogParams, 'page' | 'limit' | 'sortOrder'>
+  params?: Pick<AuditLogParams, 'page' | 'limit' | 'sortOrder'>,
 ) {
   return useQuery({
     queryKey: ['audit-logs', 'entity', entityType, entityId, params],

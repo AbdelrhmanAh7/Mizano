@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Control, FieldValues, UseFormWatch, UseFormSetValue } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -48,7 +48,7 @@ interface InvoiceFormProps {
   invoice?: Invoice | null;
   customerId?: string;
   taxRates?: { id: string; name: string; rate: number }[];
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -70,7 +70,7 @@ export function InvoiceForm({
   isSubmitting,
 }: InvoiceFormProps) {
   const isEditing = !!invoice;
-  const { data: customersData } = useCustomers({ limit: 1000 });
+  const { data: customersData } = useCustomers({ limit: 100 });
   const customers = customersData?.data || [];
 
   // Default dates
@@ -174,6 +174,7 @@ export function InvoiceForm({
         form.setValue('dueDate', invoiceDate.toISOString().split('T')[0]);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCustomer]);
 
   const handleSubmit = (data: InvoiceFormData) => {
@@ -239,9 +240,7 @@ export function InvoiceForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.customerId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.customerId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.customerId.message}</p>
               )}
             </div>
 
@@ -258,15 +257,9 @@ export function InvoiceForm({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="invoiceDate">Invoice Date *</Label>
-              <Input
-                id="invoiceDate"
-                type="date"
-                {...form.register('invoiceDate')}
-              />
+              <Input id="invoiceDate" type="date" {...form.register('invoiceDate')} />
               {form.formState.errors.invoiceDate && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.invoiceDate.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.invoiceDate.message}</p>
               )}
             </div>
 
@@ -291,15 +284,9 @@ export function InvoiceForm({
 
             <div className="space-y-2">
               <Label htmlFor="dueDate">Due Date *</Label>
-              <Input
-                id="dueDate"
-                type="date"
-                {...form.register('dueDate')}
-              />
+              <Input id="dueDate" type="date" {...form.register('dueDate')} />
               {form.formState.errors.dueDate && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.dueDate.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.dueDate.message}</p>
               )}
             </div>
           </div>
@@ -308,9 +295,9 @@ export function InvoiceForm({
 
       {/* Line Items */}
       <LineItemsForm
-        control={form.control}
-        watch={form.watch}
-        setValue={form.setValue}
+        control={form.control as unknown as Control<FieldValues>}
+        watch={form.watch as unknown as UseFormWatch<FieldValues>}
+        setValue={form.setValue as unknown as UseFormSetValue<FieldValues>}
         name="lines"
         taxRates={taxRates}
         currency={selectedCustomer?.currency || 'USD'}
@@ -388,11 +375,7 @@ export function InvoiceForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? 'Saving...'
-            : isEditing
-            ? 'Update Invoice'
-            : 'Create Invoice'}
+          {isSubmitting ? 'Saving...' : isEditing ? 'Update Invoice' : 'Create Invoice'}
         </Button>
       </div>
     </form>

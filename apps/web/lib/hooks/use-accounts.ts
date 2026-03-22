@@ -1,8 +1,11 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { accountsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { accountsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+type ApiError = { response?: { data?: { message?: string } } };
 
 // Types
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'INCOME' | 'EXPENSE';
@@ -62,6 +65,20 @@ export function useAccounts(params?: AccountParams) {
       const response = await accountsApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+/**
+ * Hook to fetch all accounts with cursor-based infinite scrolling
+ */
+export function useInfiniteAccounts(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Account, Record<string, unknown>>({
+    queryKey: ['accounts'],
+    fetchFn: async (p) => {
+      const response = await accountsApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 
@@ -127,7 +144,7 @@ export function useCreateAccount() {
         description: 'The account has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating account',
@@ -157,7 +174,7 @@ export function useUpdateAccount() {
         description: 'The account has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating account',
@@ -186,13 +203,28 @@ export function useDeleteAccount() {
         description: 'The account has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting account',
         description: error.response?.data?.message || 'An error occurred',
       });
     },
+  });
+}
+
+/**
+ * Hook to fetch account balance
+ */
+export function useAccountBalance(id: string | undefined, asOfDate?: string) {
+  return useQuery({
+    queryKey: ['accounts', id, 'balance', asOfDate],
+    queryFn: async () => {
+      if (!id) throw new Error('Account ID is required');
+      const response = await accountsApi.getBalance(id, asOfDate ? { asOfDate } : undefined);
+      return response.data;
+    },
+    enabled: !!id,
   });
 }
 
@@ -217,7 +249,7 @@ export function useSeedAccounts() {
         description: 'Default accounts have been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error seeding accounts',
@@ -260,7 +292,10 @@ export function getAccountTypeLabel(type: AccountType): string {
 /**
  * Flatten accounts tree for select dropdown
  */
-export function flattenAccountsTree(accounts: Account[], level = 0): Array<Account & { level: number }> {
+export function flattenAccountsTree(
+  accounts: Account[],
+  level = 0,
+): Array<Account & { level: number }> {
   const result: Array<Account & { level: number }> = [];
 
   for (const account of accounts) {

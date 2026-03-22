@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -7,21 +8,28 @@ import { UserStatus } from '@prisma/client';
 export class NotificationsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: Record<string, unknown>) {
     return this.prisma.notification.create({
       data: {
-        type: dto.type,
-        title: dto.title,
-        message: dto.message,
-        entityType: dto.entityType,
-        entityId: dto.entityId,
-        userId: dto.userId,
+        type: dto.type as string,
+        title: dto.title as string,
+        message: dto.message as string,
+        entityType: (dto.entityType as string) ?? undefined,
+        entityId: (dto.entityId as string) ?? undefined,
+        userId: dto.userId as string,
         organizationId,
       },
     });
   }
 
-  async createForUser(userId: string, organizationId: string, type: string, title: string, message: string, entityInfo?: { entityType?: string; entityId?: string }) {
+  async createForUser(
+    userId: string,
+    organizationId: string,
+    type: string,
+    title: string,
+    message: string,
+    entityInfo?: { entityType?: string; entityId?: string },
+  ) {
     return this.prisma.notification.create({
       data: {
         type,
@@ -35,7 +43,13 @@ export class NotificationsService {
     });
   }
 
-  async createForAllUsers(organizationId: string, type: string, title: string, message: string, entityInfo?: { entityType?: string; entityId?: string }) {
+  async createForAllUsers(
+    organizationId: string,
+    type: string,
+    title: string,
+    message: string,
+    entityInfo?: { entityType?: string; entityId?: string },
+  ) {
     const users = await this.prisma.user.findMany({
       where: { organizationId, status: UserStatus.ACTIVE },
       select: { id: true },
@@ -56,8 +70,12 @@ export class NotificationsService {
     return { created: notifications.count };
   }
 
-  async findAllForUser(organizationId: string, userId: string, query: { isRead?: boolean; type?: string }) {
-    const where: any = { organizationId, userId };
+  async findAllForUser(
+    organizationId: string,
+    userId: string,
+    query: { isRead?: boolean; type?: string },
+  ) {
+    const where: Prisma.NotificationWhereInput = { organizationId, userId };
     if (query.isRead !== undefined) where.isRead = query.isRead;
     if (query.type) where.type = query.type;
 
@@ -122,7 +140,9 @@ export class NotificationsService {
         balanceDue: { gt: 0 },
         status: { not: 'OVERDUE' },
       },
-      include: { organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } } },
+      include: {
+        organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
+      },
     });
 
     for (const invoice of overdueInvoices) {
@@ -151,7 +171,9 @@ export class NotificationsService {
         dueDate: { gte: new Date(), lte: threeDaysFromNow },
         balanceDue: { gt: 0 },
       },
-      include: { organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } } },
+      include: {
+        organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
+      },
     });
 
     for (const bill of upcomingBills) {
@@ -173,14 +195,16 @@ export class NotificationsService {
   async checkLowInventory() {
     const items = await this.prisma.item.findMany({
       where: { type: 'GOODS' },
-      include: { organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } } },
+      include: {
+        organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
+      },
     });
 
     for (const item of items) {
       const movements = await this.prisma.inventoryMovement.findMany({
         where: { itemId: item.id },
       });
-      const currentStock = movements.reduce((sum: number, m: { quantity: number }) => sum + m.quantity, 0);
+      const currentStock = movements.reduce((sum, m) => sum + parseFloat(m.quantity.toString()), 0);
       const reorderPoint = item.reorderPoint || 10;
 
       if (currentStock <= reorderPoint) {

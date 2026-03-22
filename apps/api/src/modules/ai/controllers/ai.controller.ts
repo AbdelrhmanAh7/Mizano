@@ -1,11 +1,11 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { AiInsightsService } from '../services/ai-insights.service';
-import { AiForecastingService } from '../services/ai-forecasting.service';
-import { AiCategorizationService } from '../services/ai-categorization.service';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { AiCategorizationService } from '../services/ai-categorization.service';
+import { AiForecastingService } from '../services/ai-forecasting.service';
+import { AiInsightsService } from '../services/ai-insights.service';
 
 @ApiTags('AI')
 @ApiBearerAuth()
@@ -21,9 +21,43 @@ export class AiController {
   // Insights
   @Get('insights')
   @Permissions('reports.view')
-  @ApiOperation({ summary: 'Get AI-generated business insights' })
-  getInsights(@CurrentOrg() orgId: string) {
-    return this.aiInsightsService.generateInsights(orgId);
+  @ApiOperation({ summary: 'Get AI-generated business insights with optional filters' })
+  getInsights(
+    @CurrentOrg() orgId: string,
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.aiInsightsService.getInsights(orgId, {
+      type,
+      status,
+      limit: limit ? parseInt(limit) : undefined,
+    });
+  }
+
+  @Get('insights/:id')
+  @Permissions('reports.view')
+  @ApiOperation({ summary: 'Get a specific insight by ID' })
+  getInsight(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.aiInsightsService.getInsightById(orgId, id);
+  }
+
+  @Post('insights/:id/dismiss')
+  @Permissions('reports.view')
+  @ApiOperation({ summary: 'Dismiss an insight' })
+  dismissInsight(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.aiInsightsService.dismissInsight(orgId, id);
+  }
+
+  @Post('insights/:id/action')
+  @Permissions('reports.view')
+  @ApiOperation({ summary: 'Record an action taken on an insight' })
+  actionInsight(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: { action: string },
+  ) {
+    return this.aiInsightsService.actionInsight(orgId, id, dto.action);
   }
 
   // Forecasting
@@ -63,7 +97,12 @@ export class AiController {
     @CurrentOrg() orgId: string,
     @Body() dto: { description: string; amount: number; type: 'expense' | 'income' },
   ) {
-    return this.aiCategorizationService.categorizeTransaction(orgId, dto.description, dto.amount, dto.type);
+    return this.aiCategorizationService.categorizeTransaction(
+      orgId,
+      dto.description,
+      dto.amount,
+      dto.type,
+    );
   }
 
   @Post('categorize/learn')
@@ -73,7 +112,12 @@ export class AiController {
     @CurrentOrg() orgId: string,
     @Body() dto: { description: string; accountId: string; type: 'expense' | 'income' },
   ) {
-    return this.aiCategorizationService.learnFromCategorization(orgId, dto.description, dto.accountId, dto.type);
+    return this.aiCategorizationService.learnFromCategorization(
+      orgId,
+      dto.description,
+      dto.accountId,
+      dto.type,
+    );
   }
 
   @Get('categorize/bank-transactions')

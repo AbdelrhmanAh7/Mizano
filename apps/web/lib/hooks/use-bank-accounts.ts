@@ -1,51 +1,50 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { bankAccountsApi } from '@/lib/api';
+
+export interface BankingDashboardStats {
+  totalAccounts: number;
+  totalSystemBalance: number;
+  pendingTransactionCount: number;
+  monthlyTransactionCount: number;
+}
+
+export interface BalanceHistoryPoint {
+  date: string;
+  runningBalance: number;
+}
 import { toast } from 'sonner';
+
+type ApiError = { response?: { data?: { message?: string } } };
 
 export interface BankAccount {
   id: string;
-  accountName: string;
-  accountNumber: string;
-  bankName: string;
-  accountType: 'CHECKING' | 'SAVINGS' | 'CREDIT_CARD' | 'CASH' | 'OTHER';
+  name: string;
+  accountNumber: string | null;
+  type: 'BANK' | 'CREDIT_CARD' | 'PETTY_CASH';
   currency: string;
-  currentBalance: string | number;
+  systemBalance: string | number;
   bankBalance: string | number;
-  lastReconciled: string | null;
-  isActive: boolean;
-  glAccountId: string | null;
-  glAccount?: {
+  linkedAccountId: string;
+  linkedAccount?: {
     id: string;
     name: string;
     code: string;
   };
+  isActive: boolean;
+  lastReconciled?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export type BankAccountType = BankAccount['accountType'];
+export type BankAccountType = BankAccount['type'];
 
 export interface BankAccountFilters {
   search?: string;
   type?: BankAccountType;
   isActive?: boolean;
 }
-
-// API functions
-const bankAccountsApi = {
-  getAll: (params?: BankAccountFilters) =>
-    api.get('/bank-accounts', { params }),
-  getOne: (id: string) => api.get(`/bank-accounts/${id}`),
-  create: (data: any) => api.post('/bank-accounts', data),
-  update: (id: string, data: any) => api.patch(`/bank-accounts/${id}`, data),
-  delete: (id: string) => api.delete(`/bank-accounts/${id}`),
-  getTransactions: (id: string, params?: any) =>
-    api.get(`/bank-accounts/${id}/transactions`, { params }),
-  getReconciliation: (id: string) =>
-    api.get(`/bank-accounts/${id}/reconciliation`),
-};
 
 // Hooks
 export function useBankAccounts(params?: BankAccountFilters) {
@@ -69,7 +68,7 @@ export function useBankAccount(id: string) {
   });
 }
 
-export function useBankAccountTransactions(id: string, params?: any) {
+export function useBankAccountTransactions(id: string, params?: Record<string, unknown>) {
   return useQuery({
     queryKey: ['bank-accounts', id, 'transactions', params],
     queryFn: async () => {
@@ -89,7 +88,7 @@ export function useCreateBankAccount() {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       toast.success('Bank account created successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create bank account');
     },
   });
@@ -99,13 +98,13 @@ export function useUpdateBankAccount() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
       bankAccountsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       toast.success('Bank account updated successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to update bank account');
     },
   });
@@ -120,19 +119,38 @@ export function useDeleteBankAccount() {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       toast.success('Bank account deleted successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to delete bank account');
     },
   });
 }
 
+export function useBankingStats() {
+  return useQuery({
+    queryKey: ['bank-accounts', 'stats'],
+    queryFn: async () => {
+      const response = await bankAccountsApi.getStats();
+      return response.data?.data || response.data;
+    },
+  });
+}
+
+export function useBankAccountBalanceHistory(id: string) {
+  return useQuery({
+    queryKey: ['bank-accounts', id, 'balance-history'],
+    queryFn: async () => {
+      const response = await bankAccountsApi.getBalanceHistory(id);
+      return response.data?.data || response.data;
+    },
+    enabled: !!id,
+  });
+}
+
 // Helper functions
 export const accountTypeOptions = [
-  { value: 'CHECKING', label: 'Checking Account' },
-  { value: 'SAVINGS', label: 'Savings Account' },
+  { value: 'BANK', label: 'Bank Account' },
   { value: 'CREDIT_CARD', label: 'Credit Card' },
-  { value: 'CASH', label: 'Cash' },
-  { value: 'OTHER', label: 'Other' },
+  { value: 'PETTY_CASH', label: 'Petty Cash' },
 ];
 
 export function getAccountTypeLabel(type: BankAccountType): string {
@@ -141,13 +159,11 @@ export function getAccountTypeLabel(type: BankAccountType): string {
 
 export function getAccountTypeColor(type: BankAccountType): string {
   const colors: Record<BankAccountType, string> = {
-    CHECKING: 'bg-blue-100 text-blue-800',
-    SAVINGS: 'bg-green-100 text-green-800',
+    BANK: 'bg-blue-100 text-blue-800',
     CREDIT_CARD: 'bg-purple-100 text-purple-800',
-    CASH: 'bg-yellow-100 text-yellow-800',
-    OTHER: 'bg-gray-100 text-gray-800',
+    PETTY_CASH: 'bg-yellow-100 text-yellow-800',
   };
-  return colors[type] || colors.OTHER;
+  return colors[type] || 'bg-gray-100 text-gray-800';
 }
 
 export function formatCurrency(amount: string | number | null | undefined): string {

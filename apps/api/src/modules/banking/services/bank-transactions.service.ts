@@ -1,13 +1,37 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { BankTransactionCursorQueryDto } from '../dto/bank-transaction-cursor-query.dto';
+
+import { BankTransactionType } from '@prisma/client';
+
+export interface CreateBankTransactionDto {
+  bankAccountId: string;
+  date: string;
+  type: BankTransactionType;
+  amount: string | number;
+  description?: string;
+  reference?: string;
+  payee?: string;
+}
+
+export interface BulkImportTransactionDto {
+  date: string;
+  type: BankTransactionType;
+  amount: string | number;
+  description?: string;
+  reference?: string;
+  payee?: string;
+}
 
 @Injectable()
 export class BankTransactionsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateBankTransactionDto) {
     return this.prisma.bankTransaction.create({
       data: {
         bankAccountId: dto.bankAccountId,
@@ -22,7 +46,11 @@ export class BankTransactionsService {
     });
   }
 
-  async bulkImport(organizationId: string, bankAccountId: string, transactions: any[]) {
+  async bulkImport(
+    organizationId: string,
+    bankAccountId: string,
+    transactions: BulkImportTransactionDto[],
+  ) {
     const created = await this.prisma.bankTransaction.createMany({
       data: transactions.map((t) => ({
         bankAccountId,
@@ -38,11 +66,50 @@ export class BankTransactionsService {
     return { imported: created.count };
   }
 
-  async findAll(organizationId: string, query: PaginationDto & { bankAccountId?: string; status?: string }) {
-    const { page = 1, limit = 50, sortBy = 'date', sortOrder = 'desc', bankAccountId, status } = query;
-    const where: any = { organizationId };
-    if (bankAccountId) where.bankAccountId = bankAccountId;
-    if (status) where.status = status;
+  async findAll(
+    organizationId: string,
+    query: PaginationDto & {
+      bankAccountId?: string;
+      status?: Prisma.EnumReconciliationStatusFilter | string;
+      dateFrom?: string;
+      dateTo?: string;
+      amountMin?: string;
+      amountMax?: string;
+    },
+  ) {
+    const {
+      page = 1,
+      limit = 50,
+      sortBy = 'date',
+      sortOrder = 'desc',
+      bankAccountId,
+      status,
+      dateFrom,
+      dateTo,
+      amountMin,
+      amountMax,
+    } = query;
+    const where: Prisma.BankTransactionWhereInput = {
+      organizationId,
+      ...(bankAccountId ? { bankAccountId } : {}),
+      ...(status ? { status: status as Prisma.EnumReconciliationStatusFilter } : {}),
+      ...(dateFrom || dateTo
+        ? {
+            date: {
+              ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+              ...(dateTo ? { lte: new Date(dateTo) } : {}),
+            },
+          }
+        : {}),
+      ...(amountMin || amountMax
+        ? {
+            amount: {
+              ...(amountMin ? { gte: new Decimal(amountMin) } : {}),
+              ...(amountMax ? { lte: new Decimal(amountMax) } : {}),
+            },
+          }
+        : {}),
+    };
 
     const [transactions, total] = await Promise.all([
       this.prisma.bankTransaction.findMany({
@@ -54,7 +121,56 @@ export class BankTransactionsService {
       }),
       this.prisma.bankTransaction.count({ where }),
     ]);
-    return { data: transactions, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    return {
+      data: transactions,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async findAllCursor(organizationId: string, query: BankTransactionCursorQueryDto) {
+    const {
+      cursor,
+      take,
+      sortBy = 'date',
+      sortOrder = 'desc',
+      bankAccountId,
+      status,
+      dateFrom,
+      dateTo,
+      amountMin,
+      amountMax,
+    } = query;
+    const where: Prisma.BankTransactionWhereInput = {
+      organizationId,
+      ...(bankAccountId ? { bankAccountId } : {}),
+      ...(status ? { status: status as Prisma.EnumReconciliationStatusFilter } : {}),
+      ...(dateFrom || dateTo
+        ? {
+            date: {
+              ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+              ...(dateTo ? { lte: new Date(dateTo) } : {}),
+            },
+          }
+        : {}),
+      ...(amountMin || amountMax
+        ? {
+            amount: {
+              ...(amountMin ? { gte: new Decimal(amountMin) } : {}),
+              ...(amountMax ? { lte: new Decimal(amountMax) } : {}),
+            },
+          }
+        : {}),
+    };
+    return cursorPaginate(
+      this.prisma.bankTransaction,
+      where,
+      { [sortBy]: sortOrder },
+      {
+        cursor,
+        take,
+        include: { bankAccount: { select: { id: true, name: true } } },
+      },
+    );
   }
 
   async findOne(organizationId: string, id: string) {

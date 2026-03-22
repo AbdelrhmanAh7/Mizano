@@ -15,15 +15,18 @@ import { useToast } from '@/components/ui/use-toast';
 import { authApi } from '@/lib/api';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
 
-const registerSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  password: z.string().min(8),
-  confirmPassword: z.string(),
-  organizationName: z.string().min(2),
-}).refine((data) => data.password === data.confirmPassword, {
-  path: ['confirmPassword'],
-});
+const registerSchema = z
+  .object({
+    firstName: z.string().min(2),
+    lastName: z.string().min(2),
+    email: z.string().email(),
+    password: z.string().min(8),
+    confirmPassword: z.string(),
+    organizationName: z.string().min(2),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    path: ['confirmPassword'],
+  });
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
@@ -31,13 +34,16 @@ export default function RegisterPage() {
   const router = useRouter();
   const locale = useLocale();
   const t = useTranslations('auth.register');
-  const tCommon = useTranslations('common');
   const tErrors = useTranslations('auth.errors');
   const tValidation = useTranslations('validation');
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<RegisterForm>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
   });
 
@@ -45,7 +51,8 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       await authApi.register({
-        name: data.name,
+        firstName: data.firstName,
+        lastName: data.lastName,
         email: data.email,
         password: data.password,
         organizationName: data.organizationName,
@@ -57,11 +64,13 @@ export default function RegisterPage() {
       });
 
       router.push(`/${locale}/login`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         variant: 'destructive',
         title: tErrors('generic'),
-        description: error.response?.data?.message || tErrors('generic'),
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          tErrors('generic'),
       });
     } finally {
       setIsLoading(false);
@@ -80,12 +89,29 @@ export default function RegisterPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">{t('name')}</Label>
-              <Input id="name" placeholder={t('namePlaceholder')} {...register('name')} />
-              {errors.name && (
-                <p className="text-sm text-red-500">{tValidation('nameMin')}</p>
-              )}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">{t('firstName')}</Label>
+                <Input
+                  id="firstName"
+                  placeholder={t('firstNamePlaceholder')}
+                  {...register('firstName')}
+                />
+                {errors.firstName && (
+                  <p className="text-sm text-red-500">{tValidation('nameMin')}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">{t('lastName')}</Label>
+                <Input
+                  id="lastName"
+                  placeholder={t('lastNamePlaceholder')}
+                  {...register('lastName')}
+                />
+                {errors.lastName && (
+                  <p className="text-sm text-red-500">{tValidation('nameMin')}</p>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="organizationName">{t('organizationName')}</Label>
@@ -106,9 +132,7 @@ export default function RegisterPage() {
                 placeholder={t('emailPlaceholder')}
                 {...register('email')}
               />
-              {errors.email && (
-                <p className="text-sm text-red-500">{tValidation('email')}</p>
-              )}
+              {errors.email && <p className="text-sm text-red-500">{tValidation('email')}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">{t('password')}</Label>

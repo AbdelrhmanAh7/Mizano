@@ -146,7 +146,7 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
             <div
               className={cn(
                 'text-2xl font-bold font-mono',
-                totals.balance > 0 ? 'text-red-600' : totals.balance < 0 ? 'text-green-600' : ''
+                totals.balance > 0 ? 'text-red-600' : totals.balance < 0 ? 'text-green-600' : '',
               )}
             >
               {formatCurrency(totals.balance, currency)}
@@ -182,16 +182,14 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
                 {/* Transaction Rows */}
                 {statementWithBalance.map((line) => (
                   <TableRow key={line.id}>
-                    <TableCell>
-                      {format(new Date(line.date), 'MMM d, yyyy')}
-                    </TableCell>
+                    <TableCell>{format(new Date(line.date), 'MMM d, yyyy')}</TableCell>
                     <TableCell>
                       <span
                         className={cn(
                           'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                           line.type === 'INVOICE' && 'bg-blue-100 text-blue-800',
                           line.type === 'PAYMENT' && 'bg-green-100 text-green-800',
-                          line.type === 'CREDIT_NOTE' && 'bg-yellow-100 text-yellow-800'
+                          line.type === 'CREDIT_NOTE' && 'bg-yellow-100 text-yellow-800',
                         )}
                       >
                         {line.type.replace('_', ' ')}
@@ -235,7 +233,11 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
                   <TableCell
                     className={cn(
                       'text-right font-mono font-bold',
-                      totals.balance > 0 ? 'text-red-600' : totals.balance < 0 ? 'text-green-600' : ''
+                      totals.balance > 0
+                        ? 'text-red-600'
+                        : totals.balance < 0
+                          ? 'text-green-600'
+                          : '',
                     )}
                   >
                     {formatCurrency(totals.balance, currency)}

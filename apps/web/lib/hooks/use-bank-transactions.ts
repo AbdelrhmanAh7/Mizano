@@ -1,8 +1,11 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { bankTransactionsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+
+type ApiError = { response?: { data?: { message?: string } } };
 
 export interface BankTransaction {
   id: string;
@@ -13,7 +16,7 @@ export interface BankTransaction {
   reference: string | null;
   amount: string | number;
   type: 'DEPOSIT' | 'WITHDRAWAL';
-  status: 'UNMATCHED' | 'MATCHED' | 'RECONCILED' | 'EXCLUDED';
+  status: 'PENDING' | 'MATCHED' | 'CREATED' | 'RECONCILED';
   matchedDocumentId: string | null;
   matchedDocumentType: 'INVOICE' | 'BILL' | 'EXPENSE' | 'JOURNAL' | null;
   confidence: number | null;
@@ -45,31 +48,10 @@ export interface TransactionFilters {
   status?: TransactionStatus;
   dateFrom?: string;
   dateTo?: string;
+  amountMin?: string;
+  amountMax?: string;
   search?: string;
 }
-
-// API functions
-const bankTransactionsApi = {
-  getAll: (params?: TransactionFilters) =>
-    api.get('/bank-transactions', { params }),
-  getOne: (id: string) => api.get(`/bank-transactions/${id}`),
-  getUnmatched: (bankAccountId: string) =>
-    api.get(`/bank-transactions/unmatched`, { params: { bankAccountId } }),
-  getSuggestedMatches: (id: string) =>
-    api.get(`/bank-transactions/${id}/suggested-matches`),
-  match: (id: string, data: { documentId: string; documentType: string }) =>
-    api.post(`/bank-transactions/${id}/match`, data),
-  unmatch: (id: string) => api.post(`/bank-transactions/${id}/unmatch`),
-  exclude: (id: string) => api.post(`/bank-transactions/${id}/exclude`),
-  createExpense: (id: string, data: any) =>
-    api.post(`/bank-transactions/${id}/create-expense`, data),
-  createTransfer: (id: string, data: any) =>
-    api.post(`/bank-transactions/${id}/create-transfer`, data),
-  import: (bankAccountId: string, data: FormData) =>
-    api.post(`/bank-transactions/import/${bankAccountId}`, data, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
-};
 
 // Hooks
 export function useBankTransactions(params?: TransactionFilters) {
@@ -79,6 +61,17 @@ export function useBankTransactions(params?: TransactionFilters) {
       const response = await bankTransactionsApi.getAll(params);
       return response.data;
     },
+  });
+}
+
+export function useInfiniteBankTransactions(params?: Record<string, unknown>) {
+  return useInfiniteTableData<BankTransaction, Record<string, unknown>>({
+    queryKey: ['bank-transactions'],
+    fetchFn: async (p) => {
+      const response = await bankTransactionsApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
   });
 }
 
@@ -119,14 +112,21 @@ export function useMatchTransaction() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, documentId, documentType }: { id: string; documentId: string; documentType: string }) =>
-      bankTransactionsApi.match(id, { documentId, documentType }),
+    mutationFn: ({
+      id,
+      documentId,
+      documentType,
+    }: {
+      id: string;
+      documentId: string;
+      documentType: string;
+    }) => bankTransactionsApi.match(id, { documentId, documentType }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       toast.success('Transaction matched successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to match transaction');
     },
   });
@@ -142,7 +142,7 @@ export function useUnmatchTransaction() {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       toast.success('Transaction unmatched successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to unmatch transaction');
     },
   });
@@ -157,7 +157,7 @@ export function useExcludeTransaction() {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       toast.success('Transaction excluded');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to exclude transaction');
     },
   });
@@ -167,14 +167,14 @@ export function useCreateExpenseFromTransaction() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
       bankTransactionsApi.createExpense(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bank-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       toast.success('Expense created and matched');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to create expense');
     },
   });
@@ -194,7 +194,7 @@ export function useImportTransactions() {
       queryClient.invalidateQueries({ queryKey: ['bank-accounts'] });
       toast.success('Transactions imported successfully');
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast.error(error.response?.data?.message || 'Failed to import transactions');
     },
   });
@@ -203,26 +203,26 @@ export function useImportTransactions() {
 // Helper functions
 export function getStatusLabel(status: TransactionStatus): string {
   const labels: Record<TransactionStatus, string> = {
-    UNMATCHED: 'Unmatched',
+    PENDING: 'Pending',
     MATCHED: 'Matched',
+    CREATED: 'Created',
     RECONCILED: 'Reconciled',
-    EXCLUDED: 'Excluded',
   };
   return labels[status] || status;
 }
 
 export function getStatusColor(status: TransactionStatus): string {
   const colors: Record<TransactionStatus, string> = {
-    UNMATCHED: 'bg-yellow-100 text-yellow-800',
+    PENDING: 'bg-yellow-100 text-yellow-800',
     MATCHED: 'bg-blue-100 text-blue-800',
+    CREATED: 'bg-purple-100 text-purple-800',
     RECONCILED: 'bg-green-100 text-green-800',
-    EXCLUDED: 'bg-gray-100 text-gray-800',
   };
-  return colors[status] || colors.UNMATCHED;
+  return colors[status] || colors.PENDING;
 }
 
 export function getConfidenceColor(confidence: number | null): string {
-  if (confidence === null) return 'text-gray-400';
+  if (confidence === null) return 'text-muted-foreground';
   if (confidence >= 80) return 'text-green-600';
   if (confidence >= 50) return 'text-yellow-600';
   return 'text-red-600';

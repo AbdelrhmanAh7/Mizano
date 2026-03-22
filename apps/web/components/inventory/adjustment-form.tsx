@@ -17,11 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -53,9 +49,9 @@ const adjustmentSchema = z.object({
 type AdjustmentFormData = z.infer<typeof adjustmentSchema>;
 
 interface AdjustmentFormProps {
-  items: Array<{ id: string; name: string; sku: string | null; stockLevel: number }>;
+  items: Array<{ id: string; name: string; sku: string | null; currentStock: number }>;
   warehouses: Array<{ id: string; name: string; code: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -93,10 +89,10 @@ export function AdjustmentForm({
   const watchType = form.watch('type');
 
   // Calculate total adjustment
+  const watchedLines = form.watch('lines');
   const totalAdjustment = useMemo(() => {
-    const lines = form.watch('lines');
-    return lines.reduce((sum, line) => sum + (line.quantityAdjusted || 0), 0);
-  }, [form.watch('lines')]);
+    return watchedLines.reduce((sum, line) => sum + (line.quantityAdjusted || 0), 0);
+  }, [watchedLines]);
 
   const handleSubmit = (data: AdjustmentFormData) => {
     onSubmit({
@@ -130,13 +126,11 @@ export function AdjustmentForm({
                     variant="outline"
                     className={cn(
                       'w-full justify-start text-left font-normal',
-                      !form.watch('date') && 'text-muted-foreground'
+                      !form.watch('date') && 'text-muted-foreground',
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {form.watch('date')
-                      ? format(form.watch('date'), 'PPP')
-                      : 'Pick a date'}
+                    {form.watch('date') ? format(form.watch('date'), 'PPP') : 'Pick a date'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -149,9 +143,7 @@ export function AdjustmentForm({
                 </PopoverContent>
               </Popover>
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.date.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
               )}
             </div>
 
@@ -159,9 +151,7 @@ export function AdjustmentForm({
               <Label htmlFor="type">Type *</Label>
               <Select
                 value={form.watch('type')}
-                onValueChange={(value: 'INCREASE' | 'DECREASE') =>
-                  form.setValue('type', value)
-                }
+                onValueChange={(value: 'INCREASE' | 'DECREASE') => form.setValue('type', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
@@ -181,7 +171,9 @@ export function AdjustmentForm({
               <Label htmlFor="reason">Reason *</Label>
               <Select
                 value={form.watch('reason')}
-                onValueChange={(value: any) => form.setValue('reason', value)}
+                onValueChange={(value: AdjustmentFormData['reason']) =>
+                  form.setValue('reason', value)
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select reason" />
@@ -247,21 +239,17 @@ export function AdjustmentForm({
               {fields.map((field, index) => {
                 const selectedItemId = form.watch(`lines.${index}.itemId`);
                 const selectedItem = items.find((i) => i.id === selectedItemId);
-                const currentStock = selectedItem?.stockLevel || 0;
+                const currentStock = selectedItem?.currentStock || 0;
                 const adjustment = form.watch(`lines.${index}.quantityAdjusted`) || 0;
                 const newStock =
-                  watchType === 'INCREASE'
-                    ? currentStock + adjustment
-                    : currentStock - adjustment;
+                  watchType === 'INCREASE' ? currentStock + adjustment : currentStock - adjustment;
 
                 return (
                   <TableRow key={field.id}>
                     <TableCell>
                       <Select
                         value={form.watch(`lines.${index}.itemId`) || ''}
-                        onValueChange={(value) =>
-                          form.setValue(`lines.${index}.itemId`, value)
-                        }
+                        onValueChange={(value) => form.setValue(`lines.${index}.itemId`, value)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select item" />
@@ -302,9 +290,7 @@ export function AdjustmentForm({
                         <span
                           className={cn(
                             'text-sm',
-                            watchType === 'INCREASE'
-                              ? 'text-green-600'
-                              : 'text-red-600'
+                            watchType === 'INCREASE' ? 'text-green-600' : 'text-red-600',
                           )}
                         >
                           {watchType === 'INCREASE' ? '+' : '-'}
@@ -322,7 +308,7 @@ export function AdjustmentForm({
                     <TableCell
                       className={cn(
                         'text-center font-mono font-medium',
-                        newStock < 0 && 'text-red-600'
+                        newStock < 0 && 'text-red-600',
                       )}
                     >
                       {selectedItemId ? newStock : '-'}
@@ -334,6 +320,7 @@ export function AdjustmentForm({
                         size="icon"
                         onClick={() => fields.length > 1 && remove(index)}
                         disabled={fields.length === 1}
+                        aria-label="Remove item"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -345,9 +332,7 @@ export function AdjustmentForm({
           </Table>
 
           {form.formState.errors.lines && (
-            <p className="text-sm text-red-500 mt-2">
-              {form.formState.errors.lines.message}
-            </p>
+            <p className="text-sm text-red-500 mt-2">{form.formState.errors.lines.message}</p>
           )}
 
           {/* Summary */}
@@ -357,7 +342,7 @@ export function AdjustmentForm({
               <span
                 className={cn(
                   'font-mono font-medium',
-                  watchType === 'INCREASE' ? 'text-green-600' : 'text-red-600'
+                  watchType === 'INCREASE' ? 'text-green-600' : 'text-red-600',
                 )}
               >
                 {watchType === 'INCREASE' ? '+' : '-'}

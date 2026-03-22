@@ -1,19 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Plus, Search, RefreshCw, Eye, Edit, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
+import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
+import { ImportWizard } from '@/components/import/import-wizard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,42 +13,87 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
+import { vendorsApi } from '@/lib/api';
+import { useBulkAction } from '@/lib/hooks/use-bulk-action';
+import { useExportAll } from '@/lib/hooks/use-export-all';
+import type { ImportEntityType } from '@/lib/hooks/use-import-export';
+import { usePermissions } from '@/lib/hooks/use-permissions';
+import { useTableParams } from '@/lib/hooks/use-table-params';
 import {
-  useVendors,
-  useDeleteVendor,
-  Vendor,
   formatCurrency,
   getBalanceColor,
+  useDeleteVendor,
+  useInfiniteVendors,
+  Vendor,
 } from '@/lib/hooks/use-vendors';
-import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
+import { type ColumnDef } from '@tanstack/react-table';
+import { useTranslations } from 'next-intl';
+import { Edit, Eye, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
+import Link from 'next/link';
+import { Suspense, useState } from 'react';
 
-export default function VendorsPage() {
+function VendorsPageContent() {
+  const t = useTranslations('purchases');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
+  const { onExportAll } = useExportAll('vendors', 'vendors');
+  const tableParams = useTableParams({ defaultSortBy: 'createdAt', mode: 'virtual' });
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [vendorToDelete, setVendorToDelete] = useState<Vendor | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkSelectedRows, setBulkSelectedRows] = useState<Vendor[]>([]);
 
-  const { data: vendorsData, isLoading, refetch } = useVendors({
-    search: searchQuery || undefined,
+  const {
+    data: vendors,
+    total,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useInfiniteVendors({
+    ...tableParams.queryParams,
   });
   const deleteVendor = useDeleteVendor();
-
-  const vendors = vendorsData?.data || [];
 
   const canCreate = hasPermission('purchases.create');
   const canEdit = hasPermission('purchases.edit');
   const canDelete = hasPermission('purchases.delete');
+
+  const bulkDeleteAction = useBulkAction({
+    mutationFn: (ids) => vendorsApi.bulkDelete(ids).then((r) => r.data),
+    queryKeys: [['vendors']],
+    successMessage: '{count} vendors deleted',
+  });
+
+  const bulkActions = [
+    ...(canDelete
+      ? [
+          {
+            label: 'Delete',
+            icon: Trash2,
+            variant: 'destructive' as const,
+            onClick: (rows: Vendor[]) => {
+              setBulkSelectedRows(rows);
+              setBulkDeleteOpen(true);
+            },
+          },
+        ]
+      : []),
+  ];
 
   const handleDelete = (vendor: Vendor) => {
     setVendorToDelete(vendor);
@@ -71,15 +105,15 @@ export default function VendorsPage() {
       try {
         await deleteVendor.mutateAsync(vendorToDelete.id);
         toast({
-          title: 'Vendor deleted',
-          description: `${vendorToDelete.name} has been deleted.`,
+          title: t('vendors.toast.deleted'),
+          description: t('vendors.toast.deletedDescription', { name: vendorToDelete.name }),
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
-          title: 'Error',
+          title: tCommon('errors.generic'),
           description:
-            error.response?.data?.message ||
-            'Failed to delete vendor. They may have associated transactions.',
+            (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+            t('vendors.toast.deleteError'),
           variant: 'destructive',
         });
       }
@@ -88,22 +122,126 @@ export default function VendorsPage() {
     }
   };
 
+  const columns: ColumnDef<Vendor>[] = [
+    {
+      accessorKey: 'name',
+      header: () => (
+        <SortableHeader
+          label={t('vendors.table.name')}
+          columnId="name"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      cell: ({ row }) => {
+        const vendor = row.original;
+        return (
+          <div>
+            <Link href={`/purchases/vendors/${vendor.id}`} className="font-medium hover:underline">
+              {vendor.displayName || vendor.name}
+            </Link>
+            {vendor.displayName && vendor.displayName !== vendor.name && (
+              <p className="text-sm text-muted-foreground">{vendor.name}</p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'email',
+      header: t('vendors.table.email'),
+      cell: ({ row }) => row.original.email || '-',
+    },
+    {
+      accessorKey: 'phone',
+      header: t('vendors.table.phone'),
+      cell: ({ row }) => row.original.phone || '-',
+    },
+    {
+      accessorKey: 'currency',
+      header: tCommon('currency'),
+    },
+    {
+      accessorKey: 'outstandingBalance',
+      header: () => (
+        <SortableHeader
+          label={t('vendors.table.payable')}
+          columnId="outstandingBalance"
+          currentSortBy={tableParams.sortBy}
+          currentSortOrder={tableParams.sortOrder}
+          onSort={tableParams.setSort}
+        />
+      ),
+      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      cell: ({ row }) => {
+        const balance = parseFloat(row.original.outstandingBalance || '0');
+        return (
+          <span className={cn('font-mono font-medium', getBalanceColor(balance))}>
+            {formatCurrency(balance, row.original.currency)}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      header: '',
+      meta: { cellClassName: 'text-right' },
+      cell: ({ row }) => {
+        const vendor = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                ...
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/purchases/vendors/${vendor.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  {tCommon('buttons.view')}
+                </Link>
+              </DropdownMenuItem>
+              {canEdit && (
+                <DropdownMenuItem asChild>
+                  <Link href={`/purchases/vendors/${vendor.id}/edit`}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    {tCommon('buttons.edit')}
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {canDelete && (
+                <DropdownMenuItem onClick={() => handleDelete(vendor)} className="text-red-600">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {tCommon('buttons.delete')}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Vendors</h1>
-          <p className="text-muted-foreground">
-            Manage your supplier accounts and track balances
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('vendors.title')}</h1>
+          <p className="text-muted-foreground">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
           {canCreate && (
             <Button asChild>
               <Link href="/purchases/vendors/new">
                 <Plus className="mr-2 h-4 w-4" />
-                New Vendor
+                {t('vendors.newVendor')}
               </Link>
             </Button>
           )}
@@ -114,16 +252,17 @@ export default function VendorsPage() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, email, or phone..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Button variant="outline" size="icon" onClick={() => refetch()}>
+            <DataTableSearch
+              value={tableParams.search}
+              onChange={tableParams.setSearch}
+              placeholder={t('vendors.searchPlaceholder')}
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              aria-label={t('vendors.refreshVendors')}
+            >
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
@@ -133,135 +272,90 @@ export default function VendorsPage() {
       {/* Vendors Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Vendors</CardTitle>
+          <CardTitle>{t('vendors.title')}</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : vendors.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No vendors found</p>
-              {canCreate && (
+          <DataTable
+            columns={columns}
+            data={vendors}
+            total={total}
+            isLoading={isLoading}
+            enableVirtualization
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={() => fetchNextPage()}
+            enableColumnResizing
+            tableId="vendors"
+            enableSelection
+            enableExport
+            enableColumnVisibility
+            exportFilename="vendors"
+            onExportAll={onExportAll}
+            bulkActions={bulkActions}
+            emptyMessage={t('vendors.empty.title')}
+            emptyAction={
+              canCreate ? (
                 <Button asChild>
                   <Link href="/purchases/vendors/new">
                     <Plus className="mr-2 h-4 w-4" />
-                    Add Your First Vendor
+                    {t('vendors.newVendor')}
                   </Link>
                 </Button>
-              )}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Currency</TableHead>
-                  <TableHead className="text-right">Outstanding Balance</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {vendors.map((vendor: Vendor) => {
-                  const balance = parseFloat(vendor.outstandingBalance || '0');
-
-                  return (
-                    <TableRow key={vendor.id}>
-                      <TableCell>
-                        <Link
-                          href={`/purchases/vendors/${vendor.id}`}
-                          className="font-medium hover:underline"
-                        >
-                          {vendor.displayName || vendor.name}
-                        </Link>
-                        {vendor.displayName && vendor.displayName !== vendor.name && (
-                          <p className="text-sm text-muted-foreground">
-                            {vendor.name}
-                          </p>
-                        )}
-                      </TableCell>
-                      <TableCell>{vendor.email || '-'}</TableCell>
-                      <TableCell>{vendor.phone || '-'}</TableCell>
-                      <TableCell>{vendor.currency}</TableCell>
-                      <TableCell className="text-right">
-                        <span
-                          className={cn(
-                            'font-mono font-medium',
-                            getBalanceColor(balance)
-                          )}
-                        >
-                          {formatCurrency(balance, vendor.currency)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              •••
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/purchases/vendors/${vendor.id}`}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View
-                              </Link>
-                            </DropdownMenuItem>
-                            {canEdit && (
-                              <DropdownMenuItem asChild>
-                                <Link href={`/purchases/vendors/${vendor.id}/edit`}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
-                                </Link>
-                              </DropdownMenuItem>
-                            )}
-                            {canDelete && (
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(vendor)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+              ) : undefined
+            }
+          />
         </CardContent>
       </Card>
+
+      {/* Bulk Action Dialogs */}
+      <BulkActionConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        action="delete"
+        count={bulkSelectedRows.length}
+        itemType="vendors"
+        description="Selected vendors will be deleted. Vendors with transactions will be skipped."
+        destructive
+        isLoading={bulkDeleteAction.isLoading}
+        onConfirm={async () => {
+          await bulkDeleteAction.execute(bulkSelectedRows.map((r) => r.id));
+          setBulkDeleteOpen(false);
+          refetch();
+        }}
+      />
+
+      {/* Import Wizard */}
+      <ImportWizard
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        entityType={'vendors' as ImportEntityType}
+        entityLabel="Vendors"
+        onComplete={() => refetch()}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete &quot;{vendorToDelete?.name}&quot;? This
-              action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('vendors.deleteVendor')}</AlertDialogTitle>
+            <AlertDialogDescription>{tCommon('confirm.deleteMessage')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+              {tCommon('buttons.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function VendorsPage() {
+  return (
+    <Suspense>
+      <VendorsPageContent />
+    </Suspense>
   );
 }

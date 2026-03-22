@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { CountrySelect } from '@/components/ui/country-select';
+import { CitySelect } from '@/components/ui/city-select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Warehouse } from '@/lib/hooks/use-warehouses';
 
@@ -27,17 +29,12 @@ type WarehouseFormData = z.infer<typeof warehouseSchema>;
 
 interface WarehouseFormProps {
   warehouse?: Warehouse | null;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: WarehouseFormData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
 
-export function WarehouseForm({
-  warehouse,
-  onSubmit,
-  onCancel,
-  isSubmitting,
-}: WarehouseFormProps) {
+export function WarehouseForm({ warehouse, onSubmit, onCancel, isSubmitting }: WarehouseFormProps) {
   const isEditing = !!warehouse;
 
   const form = useForm<WarehouseFormData>({
@@ -84,25 +81,15 @@ export function WarehouseForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Warehouse Name *</Label>
-              <Input
-                id="name"
-                placeholder="Enter warehouse name"
-                {...form.register('name')}
-              />
+              <Input id="name" placeholder="Enter warehouse name" {...form.register('name')} />
               {form.formState.errors.name && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.name.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="code">Code</Label>
-              <Input
-                id="code"
-                placeholder="e.g., WH-001"
-                {...form.register('code')}
-              />
+              <Input id="code" placeholder="e.g., WH-001" {...form.register('code')} />
             </div>
           </div>
 
@@ -134,41 +121,37 @@ export function WarehouseForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
-              <Input
-                id="city"
-                placeholder="City"
-                {...form.register('city')}
+              <Label htmlFor="country">Country</Label>
+              <CountrySelect
+                id="country"
+                value={form.watch('country') || ''}
+                onValueChange={(val) => {
+                  form.setValue('country', val);
+                  form.setValue('city', '');
+                }}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="state">State/Province</Label>
-              <Input
-                id="state"
-                placeholder="State"
-                {...form.register('state')}
+              <Label htmlFor="city">City</Label>
+              <CitySelect
+                id="city"
+                value={form.watch('city') || ''}
+                onValueChange={(val) => form.setValue('city', val)}
+                country={form.watch('country') || ''}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="postalCode">Zip/Postal Code</Label>
-              <Input
-                id="postalCode"
-                placeholder="Postal code"
-                {...form.register('postalCode')}
-              />
+              <Label htmlFor="state">State/Province</Label>
+              <Input id="state" placeholder="State" {...form.register('state')} />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="country">Country</Label>
-              <Input
-                id="country"
-                placeholder="Country"
-                {...form.register('country')}
-              />
+              <Label htmlFor="postalCode">Zip/Postal Code</Label>
+              <Input id="postalCode" placeholder="Postal code" {...form.register('postalCode')} />
             </div>
           </div>
         </CardContent>
@@ -180,11 +163,7 @@ export function WarehouseForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? 'Saving...'
-            : isEditing
-            ? 'Update Warehouse'
-            : 'Create Warehouse'}
+          {isSubmitting ? 'Saving...' : isEditing ? 'Update Warehouse' : 'Create Warehouse'}
         </Button>
       </div>
     </form>

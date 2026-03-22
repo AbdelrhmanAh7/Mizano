@@ -1,134 +1,40 @@
-'use client';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { QueryClient, dehydrate, HydrationBoundary } from '@tanstack/react-query';
+import { DashboardClient } from '@/components/dashboard/dashboard-client';
+import { transformDashboardOverview } from '@/lib/hooks/use-dashboard';
 
-import {
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  Wallet,
-  RefreshCw,
-} from 'lucide-react';
-import { useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { StatCard } from '@/components/dashboard/stat-card';
-import { ARAPChart } from '@/components/dashboard/ar-ap-chart';
-import { CashFlowChart } from '@/components/dashboard/cash-flow-chart';
-import { ExpensesPie } from '@/components/dashboard/expenses-pie';
-import { RevenueChart } from '@/components/dashboard/revenue-chart';
-import { AIAlerts } from '@/components/dashboard/ai-alerts';
-import { RecentTransactions } from '@/components/dashboard/recent-transactions';
-import { useDashboard } from '@/lib/hooks/use-dashboard';
-import { useQueryClient } from '@tanstack/react-query';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6001/api';
 
-export default function DashboardPage() {
-  const { data, isLoading, isRefetching } = useDashboard();
-  const queryClient = useQueryClient();
-  const t = useTranslations('common.dashboard');
+export default async function DashboardPage() {
+  const session = await getServerSession(authOptions);
+  const queryClient = new QueryClient();
 
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
   };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-10 w-24" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Skeleton className="h-96" />
-          <Skeleton className="h-96" />
-        </div>
-      </div>
-    );
+  if (session?.accessToken) {
+    headers['Authorization'] = `Bearer ${session.accessToken}`;
   }
 
-  if (!data) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">{t('failedToLoad')}</p>
-        <Button onClick={handleRefresh} className="mt-4">
-          {t('tryAgain')}
-        </Button>
-      </div>
-    );
+  // Prefetch critical KPI stats on the server — drives LCP element
+  try {
+    await queryClient.prefetchQuery({
+      queryKey: ['dashboard', 'stats', undefined, undefined],
+      queryFn: async () => {
+        const res = await fetch(`${API_BASE_URL}/reports/dashboard`, { headers });
+        if (!res.ok) return null;
+        const json = await res.json();
+        return transformDashboardOverview(json.data ?? json);
+      },
+    });
+  } catch {
+    // Silently fail — client will refetch
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
-          <p className="text-muted-foreground">
-            {t('subtitle')}
-          </p>
-        </div>
-        <Button variant="outline" onClick={handleRefresh} disabled={isRefetching}>
-          <RefreshCw className={`me-2 h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
-          {t('refresh')}
-        </Button>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title={t('stats.revenue')}
-          value={data.stats.revenue}
-          icon={TrendingUp}
-          iconColor="text-green-600"
-          iconBgColor="bg-green-100"
-          trend={{ value: 12, isPositive: true }}
-        />
-        <StatCard
-          title={t('stats.expenses')}
-          value={data.stats.expenses}
-          icon={TrendingDown}
-          iconColor="text-red-600"
-          iconBgColor="bg-red-100"
-          trend={{ value: 5, isPositive: false }}
-        />
-        <StatCard
-          title={t('stats.netProfit')}
-          value={data.stats.netProfit}
-          icon={DollarSign}
-          iconColor="text-blue-600"
-          iconBgColor="bg-blue-100"
-          trend={{ value: 18, isPositive: true }}
-        />
-        <StatCard
-          title={t('stats.bankBalance')}
-          value={data.stats.bankBalance}
-          icon={Wallet}
-          iconColor="text-purple-600"
-          iconBgColor="bg-purple-100"
-        />
-      </div>
-
-      {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CashFlowChart data={data.cashFlowTrend} />
-        <RevenueChart data={data.revenueTrend} />
-      </div>
-
-      {/* Charts Row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ARAPChart data={data.receivablesVsPayables} />
-        <ExpensesPie data={data.topExpenses} />
-      </div>
-
-      {/* AI Alerts & Recent Transactions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <AIAlerts alerts={data.alerts} />
-        <RecentTransactions transactions={data.recentTransactions} />
-      </div>
-    </div>
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <DashboardClient />
+    </HydrationBoundary>
   );
 }

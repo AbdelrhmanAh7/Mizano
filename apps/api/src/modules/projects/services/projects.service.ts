@@ -1,13 +1,16 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { ProjectStatus, BillingMethod } from '@prisma/client';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BillingMethod, Prisma, ProjectStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { CreateProjectDto } from '../dto/create-project.dto';
+import { UpdateProjectDto } from '../dto/update-project.dto';
+import { ProjectQueryDto } from '../dto/project-query.dto';
 
 @Injectable()
 export class ProjectsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: any) {
+  async create(organizationId: string, dto: CreateProjectDto) {
     const projectNumber = await this.generateProjectNumber(organizationId);
 
     // Verify customer if provided
@@ -41,24 +44,66 @@ export class ProjectsService {
     });
   }
 
-  async findAll(organizationId: string, query: { status?: string; customerId?: string }) {
-    const where: any = { organizationId };
+  async findAll(organizationId: string, query: ProjectQueryDto) {
+    const where: Prisma.ProjectWhereInput = { organizationId, deletedAt: null };
     if (query.status) where.status = query.status;
     if (query.customerId) where.customerId = query.customerId;
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { description: { contains: query.search, mode: 'insensitive' } },
+        { projectNumber: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
 
-    return this.prisma.project.findMany({
-      where,
-      include: {
-        customer: { select: { id: true, name: true } },
-        _count: { select: { tasks: true, timesheetEntries: true } },
-      },
-      orderBy: { createdAt: 'desc' },
+    const [projects, total] = await Promise.all([
+      this.prisma.project.findMany({
+        where,
+        include: {
+          customer: { select: { id: true, name: true } },
+          _count: { select: { tasks: true, timesheetEntries: true } },
+          timesheetEntries: { select: { hours: true, duration: true } },
+          invoices: { select: { total: true, grandTotal: true, balanceDue: true } },
+          expenses: { select: { amount: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.project.count({ where }),
+    ]);
+
+    const data = projects.map((p) => {
+      const totalHours = p.timesheetEntries.reduce(
+        (sum, e) => sum + parseFloat((e.hours ?? e.duration ?? 0).toString()),
+        0,
+      );
+      const totalBilled = p.invoices.reduce((sum, inv) => {
+        const invTotal = parseFloat((inv.total ?? inv.grandTotal).toString());
+        return sum + invTotal - parseFloat(inv.balanceDue.toString());
+      }, 0);
+      const totalExpenses = p.expenses.reduce((sum, e) => sum + parseFloat(e.amount.toString()), 0);
+      const budgetAmount = p.budgetAmount ?? p.budget;
+      const budgetType: 'HOURS' | 'COST' = p.budgetHours ? 'HOURS' : 'COST';
+      const budgetNum = budgetAmount ? parseFloat(budgetAmount.toString()) : 0;
+      const profitMargin =
+        budgetNum > 0 ? Math.round(((totalBilled - totalExpenses) / budgetNum) * 100) : null;
+      const { timesheetEntries: _te, invoices: _inv, expenses: _exp, ...rest } = p;
+      return {
+        ...rest,
+        budgetAmount,
+        budgetType,
+        totalHours,
+        totalBilled,
+        totalExpenses,
+        profitMargin,
+      };
     });
+
+    return { data, meta: { page: 1, limit: total, total, totalPages: 1 } };
   }
 
   async findOne(organizationId: string, id: string) {
     const project = await this.prisma.project.findFirst({
-      where: { id, organizationId },
+      where: { id, organizationId, deletedAt: null },
       include: {
         customer: true,
         tasks: { orderBy: { sortOrder: 'asc' } },
@@ -73,10 +118,10 @@ export class ProjectsService {
     return project;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: UpdateProjectDto) {
     await this.findOne(organizationId, id);
 
-    const data: any = { ...dto };
+    const data: Record<string, unknown> = { ...dto };
     if (dto.hourlyRate) data.hourlyRate = new Decimal(dto.hourlyRate);
     if (dto.fixedPrice) data.fixedPrice = new Decimal(dto.fixedPrice);
     if (dto.budget) data.budget = new Decimal(dto.budget);
@@ -94,18 +139,53 @@ export class ProjectsService {
     const project = await this.prisma.project.findFirst({
       where: { id, organizationId },
       include: {
-        timesheetEntries: { take: 1 },
-        invoices: { take: 1 },
+        _count: { select: { timesheetEntries: true, invoices: true } },
       },
     });
     if (!project) throw new NotFoundException('Project not found');
-    if (project.timesheetEntries.length > 0 || project.invoices.length > 0) {
+    if (project._count.timesheetEntries > 0 || project._count.invoices > 0) {
       throw new BadRequestException('Cannot delete project with timesheet entries or invoices');
     }
 
-    await this.prisma.task.deleteMany({ where: { projectId: id } });
-    await this.prisma.project.delete({ where: { id } });
+    await this.prisma.task.updateMany({
+      where: { projectId: id },
+      data: { deletedAt: new Date() },
+    });
+    await this.prisma.project.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return { message: 'Project deleted' };
+  }
+
+  // === Bulk Operations ===
+
+  async bulkDelete(organizationId: string, ids: string[]) {
+    // Only delete projects without timesheet entries or invoices
+    const projects = await this.prisma.project.findMany({
+      where: { id: { in: ids }, organizationId },
+      include: { _count: { select: { timesheetEntries: true, invoices: true } } },
+    });
+    const deletableIds = projects
+      .filter((p) => p._count.timesheetEntries === 0 && p._count.invoices === 0)
+      .map((p) => p.id);
+    await this.prisma.task.updateMany({
+      where: { projectId: { in: deletableIds } },
+      data: { deletedAt: new Date() },
+    });
+    const result = await this.prisma.project.updateMany({
+      where: { id: { in: deletableIds }, organizationId },
+      data: { deletedAt: new Date() },
+    });
+    return { deleted: result.count, total: ids.length };
+  }
+
+  async bulkUpdateStatus(organizationId: string, ids: string[], status: ProjectStatus) {
+    const result = await this.prisma.project.updateMany({
+      where: { id: { in: ids }, organizationId },
+      data: { status },
+    });
+    return { updated: result.count, total: ids.length };
   }
 
   async getProjectProfitability(organizationId: string, id: string) {
@@ -115,7 +195,10 @@ export class ProjectsService {
     const timesheetEntries = await this.prisma.timesheetEntry.findMany({
       where: { projectId: id, organizationId },
     });
-    const totalHours = timesheetEntries.reduce((sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()), 0);
+    const totalHours = timesheetEntries.reduce(
+      (sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()),
+      0,
+    );
 
     // Calculate revenue based on billing method
     let revenue = 0;
@@ -129,9 +212,14 @@ export class ProjectsService {
     const invoices = await this.prisma.invoice.findMany({
       where: { projectId: id, organizationId },
     });
-    const invoicedAmount = invoices.reduce((sum, inv) => sum + parseFloat((inv.total ?? inv.grandTotal).toString()), 0);
+    const invoicedAmount = invoices.reduce(
+      (sum, inv) => sum + parseFloat((inv.total ?? inv.grandTotal).toString()),
+      0,
+    );
     const paidAmount = invoices.reduce((sum, inv) => {
-      const paid = parseFloat((inv.total ?? inv.grandTotal).toString()) - parseFloat(inv.balanceDue.toString());
+      const paid =
+        parseFloat((inv.total ?? inv.grandTotal).toString()) -
+        parseFloat(inv.balanceDue.toString());
       return sum + paid;
     }, 0);
 
@@ -166,12 +254,12 @@ export class ProjectsService {
   async getProjectSummary(organizationId: string) {
     const projects = await this.prisma.project.groupBy({
       by: ['status'],
-      where: { organizationId },
+      where: { organizationId, deletedAt: null },
       _count: { id: true },
     });
 
     const totalBudget = await this.prisma.project.aggregate({
-      where: { organizationId },
+      where: { organizationId, deletedAt: null },
       _sum: { budget: true },
     });
 
@@ -181,7 +269,11 @@ export class ProjectsService {
     };
   }
 
-  async createInvoiceFromProject(organizationId: string, projectId: string, dto: { startDate: string; endDate: string }) {
+  async createInvoiceFromProject(
+    organizationId: string,
+    projectId: string,
+    dto: { startDate: string; endDate: string },
+  ) {
     const project = await this.findOne(organizationId, projectId);
     if (!project.customerId) {
       throw new BadRequestException('Project has no customer assigned');
@@ -201,7 +293,10 @@ export class ProjectsService {
       throw new BadRequestException('No unbilled entries found for this period');
     }
 
-    const totalHours = entries.reduce((sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()), 0);
+    const totalHours = entries.reduce(
+      (sum, e) => sum + parseFloat((e.hours ?? e.duration).toString()),
+      0,
+    );
     const hourlyRate = project.hourlyRate ? parseFloat(project.hourlyRate.toString()) : 0;
 
     // Generate invoice number

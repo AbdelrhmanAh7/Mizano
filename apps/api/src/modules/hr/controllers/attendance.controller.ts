@@ -29,15 +29,33 @@ export class AttendanceController {
   @Post()
   @Permissions('hr.create')
   @ApiOperation({ summary: 'Record attendance manually' })
-  record(@CurrentOrg() orgId: string, @Body() dto: any) {
+  record(@CurrentOrg() orgId: string, @Body() dto: Record<string, unknown>) {
     return this.attendanceService.recordAttendance(orgId, dto);
   }
 
   @Post('bulk')
   @Permissions('hr.create')
   @ApiOperation({ summary: 'Bulk record attendance' })
-  bulkRecord(@CurrentOrg() orgId: string, @Body() dto: { records: any[] }) {
+  bulkRecord(@CurrentOrg() orgId: string, @Body() dto: { records: Record<string, unknown>[] }) {
     return this.attendanceService.bulkRecordAttendance(orgId, dto.records);
+  }
+
+  @Get()
+  @Permissions('hr.view')
+  @ApiOperation({ summary: 'Get all attendance records with optional filters' })
+  findAll(
+    @CurrentOrg() orgId: string,
+    @Query()
+    query: {
+      page?: number | string;
+      limit?: number | string;
+      startDate?: string;
+      endDate?: string;
+      employeeId?: string;
+      status?: string;
+    },
+  ) {
+    return this.attendanceService.findAll(orgId, query);
   }
 
   @Get('by-employee/:employeeId')
@@ -68,13 +86,22 @@ export class AttendanceController {
     @Query('month') month: string,
     @Query('year') year: string,
   ) {
-    return this.attendanceService.getAttendanceSummary(orgId, employeeId, parseInt(month), parseInt(year));
+    return this.attendanceService.getAttendanceSummary(
+      orgId,
+      employeeId,
+      parseInt(month),
+      parseInt(year),
+    );
   }
 
   @Put(':id')
   @Permissions('hr.edit')
   @ApiOperation({ summary: 'Update attendance record' })
-  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: any) {
+  update(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: Record<string, unknown>,
+  ) {
     return this.attendanceService.update(orgId, id, dto);
   }
 

@@ -1,10 +1,13 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { itemsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { itemsApi } from '@/lib/api';
+import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export type ItemType = 'GOODS' | 'SERVICE' | 'DIGITAL';
 
 export interface Item {
@@ -18,30 +21,25 @@ export interface Item {
   salesPrice: string | null;
   purchasePrice: string | null;
   costPrice: string | null;
-  taxRateId: string | null;
-  taxRate?: {
-    id: string;
-    name: string;
-    rate: number;
-  };
+  taxRate: string | null;
   trackInventory: boolean;
-  stockLevel: number;
+  currentStock: number;
   reorderPoint: number | null;
-  reorderQuantity: number | null;
-  incomeAccountId: string | null;
-  expenseAccountId: string | null;
+  reorderLevel: number | null;
+  salesAccountId: string | null;
+  purchaseAccountId: string | null;
   inventoryAccountId: string | null;
   isActive: boolean;
   organizationId: string;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
-  incomeAccount?: {
+  salesAccount?: {
     id: string;
     name: string;
     code: string;
   };
-  expenseAccount?: {
+  purchaseAccount?: {
     id: string;
     name: string;
     code: string;
@@ -98,6 +96,20 @@ export function useItems(params?: ItemParams) {
 }
 
 /**
+ * Hook to fetch all items with cursor-based pagination (virtual scroll)
+ */
+export function useInfiniteItems(params?: Record<string, unknown>) {
+  return useInfiniteTableData<Item, Record<string, unknown>>({
+    queryKey: ['items'],
+    fetchFn: async (p) => {
+      const response = await itemsApi.getAllCursor(p);
+      return response.data;
+    },
+    params: params || {},
+  });
+}
+
+/**
  * Hook to fetch a single item by ID
  */
 export function useItem(id: string | undefined) {
@@ -119,7 +131,7 @@ export function useActiveItems() {
   return useQuery({
     queryKey: ['items', 'active'],
     queryFn: async () => {
-      const response = await itemsApi.getAll({ isActive: true, limit: 1000 });
+      const response = await itemsApi.getAll({ limit: 100 });
       return (response.data.data || response.data) as Item[];
     },
   });
@@ -144,7 +156,7 @@ export function useCreateItem() {
         description: 'The item has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating item',
@@ -174,7 +186,7 @@ export function useUpdateItem() {
         description: 'The item has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating item',
@@ -203,7 +215,7 @@ export function useDeleteItem() {
         description: 'The item has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting item',
@@ -256,14 +268,18 @@ export function getTypeVariant(type: ItemType): 'default' | 'secondary' | 'outli
 /**
  * Get stock status
  */
-export function getStockStatus(item: Item): { status: 'ok' | 'low' | 'out'; label: string; color: string } {
+export function getStockStatus(item: Item): {
+  status: 'ok' | 'low' | 'out';
+  label: string;
+  color: string;
+} {
   if (!item.trackInventory) {
     return { status: 'ok', label: 'N/A', color: 'text-gray-500' };
   }
-  if (item.stockLevel <= 0) {
+  if (item.currentStock <= 0) {
     return { status: 'out', label: 'Out of Stock', color: 'text-red-600' };
   }
-  if (item.reorderPoint && item.stockLevel <= item.reorderPoint) {
+  if (item.reorderPoint && item.currentStock <= item.reorderPoint) {
     return { status: 'low', label: 'Low Stock', color: 'text-yellow-600' };
   }
   return { status: 'ok', label: 'In Stock', color: 'text-green-600' };

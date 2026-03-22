@@ -1,50 +1,57 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
-import { cn } from '@/lib/utils';
-import { usePermissions } from '@/lib/hooks/use-permissions';
-import { localeDirections, type Locale } from '@/i18n/config';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import { localeDirections, type Locale } from '@/i18n/config';
+import { usePermissions } from '@/lib/hooks/use-permissions';
+import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard,
-  Users,
-  FileText,
-  Package,
+  Activity,
+  ArrowRightLeft,
+  Banknote,
+  BarChart3,
+  Brain,
+  Briefcase,
+  Building,
   Building2,
   Calculator,
-  Briefcase,
-  Clock,
-  BarChart3,
-  Settings,
-  Brain,
-  DollarSign,
-  Factory,
-  Receipt,
-  Menu,
   ChevronLeft,
   ChevronRight,
-  UserCircle,
-  Target,
-  CreditCard,
-  Banknote,
-  ShoppingCart,
-  Warehouse,
-  ArrowRightLeft,
   ClipboardList,
+  Clock,
+  CreditCard,
+  DollarSign,
+  Factory,
+  FileText,
   Landmark,
   Layers,
+  LayoutDashboard,
+  Menu,
+  Package,
+  Percent,
+  Receipt,
+  Search,
+  Settings,
+  ShoppingCart,
+  Target,
+  Truck,
+  UserCircle,
+  Users,
+  Warehouse,
   Wrench,
 } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
+import Image from 'next/image';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useCallback, useMemo, useState } from 'react';
 
 interface NavItem {
   nameKey: string;
@@ -67,6 +74,7 @@ const navigationConfig: NavItem[] = [
       { nameKey: 'sales.invoices', href: '/sales/invoices', icon: Receipt },
       { nameKey: 'sales.creditNotes', href: '/sales/credit-notes', icon: CreditCard },
       { nameKey: 'sales.payments', href: '/sales/payments', icon: Banknote },
+      { nameKey: 'sales.deliveryChallans', href: '/sales/delivery-challans', icon: Truck },
     ],
   },
   {
@@ -91,6 +99,8 @@ const navigationConfig: NavItem[] = [
       { nameKey: 'accounting.chartOfAccounts', href: '/accounting/accounts', icon: BarChart3 },
       { nameKey: 'accounting.journalEntries', href: '/accounting/journals', icon: FileText },
       { nameKey: 'accounting.recurring', href: '/accounting/recurring', icon: Clock },
+      { nameKey: 'accounting.trialBalance', href: '/accounting/trial-balance', icon: BarChart3 },
+      { nameKey: 'accounting.generalLedger', href: '/accounting/general-ledger', icon: FileText },
     ],
   },
   {
@@ -101,11 +111,35 @@ const navigationConfig: NavItem[] = [
     children: [
       { nameKey: 'inventory.items.title', href: '/inventory/items', icon: Package },
       { nameKey: 'inventory.warehouses.title', href: '/inventory/warehouses', icon: Warehouse },
-      { nameKey: 'inventory.adjustments.title', href: '/inventory/adjustments', icon: ClipboardList },
+      {
+        nameKey: 'inventory.adjustments.title',
+        href: '/inventory/adjustments',
+        icon: ClipboardList,
+      },
+      {
+        nameKey: 'inventory.transfers.title',
+        href: '/inventory/transfers',
+        icon: ArrowRightLeft,
+      },
+      {
+        nameKey: 'inventory.priceLists.title',
+        href: '/inventory/price-lists',
+        icon: DollarSign,
+      },
+      {
+        nameKey: 'inventory.compositeItems.title',
+        href: '/inventory/composite-items',
+        icon: Layers,
+      },
+      {
+        nameKey: 'inventory.movements.title',
+        href: '/inventory/movements',
+        icon: Activity,
+      },
     ],
   },
   {
-    nameKey: 'banking',
+    nameKey: 'banking.title',
     href: '/banking',
     icon: Landmark,
     permission: 'banking.view',
@@ -122,6 +156,7 @@ const navigationConfig: NavItem[] = [
     permission: 'projects.view',
     children: [
       { nameKey: 'projects.projects.title', href: '/projects', icon: Briefcase },
+      { nameKey: 'projects.myTasks', href: '/projects/my-tasks', icon: Clock },
       { nameKey: 'projects.timesheets.title', href: '/projects/timesheets', icon: Clock },
     ],
   },
@@ -136,7 +171,7 @@ const navigationConfig: NavItem[] = [
     ],
   },
   {
-    nameKey: 'hr',
+    nameKey: 'hr.title',
     href: '/hr',
     icon: UserCircle,
     permission: 'hr.view',
@@ -146,9 +181,42 @@ const navigationConfig: NavItem[] = [
       { nameKey: 'hr.payroll.title', href: '/hr/payroll', icon: DollarSign },
     ],
   },
-  { nameKey: 'crm', href: '/crm', icon: Target, permission: 'crm.view' },
+  {
+    nameKey: 'tax.title',
+    href: '/tax',
+    icon: Percent,
+    permission: 'tax.view',
+    children: [
+      { nameKey: 'tax.rates', href: '/tax/rates', icon: Percent },
+      { nameKey: 'tax.vatReturns', href: '/tax/returns', icon: FileText },
+      { nameKey: 'tax.payments', href: '/tax/payments', icon: DollarSign },
+    ],
+  },
+  {
+    nameKey: 'assets',
+    href: '/assets',
+    icon: Building,
+    permission: 'assets.view',
+  },
+  {
+    nameKey: 'crm.title',
+    href: '/crm',
+    icon: Target,
+    permission: 'crm.view',
+    children: [
+      { nameKey: 'crm.leads', href: '/crm/leads', icon: Users },
+      { nameKey: 'crm.deals', href: '/crm/deals', icon: DollarSign },
+    ],
+  },
   { nameKey: 'reports', href: '/reports', icon: BarChart3, permission: 'reports.view' },
   { nameKey: 'aiInsights', href: '/ai-insights', icon: Brain },
+  { nameKey: 'deepSearch', href: '/deep-search', icon: Search },
+  {
+    nameKey: 'performance',
+    href: '/settings/performance',
+    icon: Activity,
+    permission: 'settings.view',
+  },
   { nameKey: 'settings', href: '/settings', icon: Settings, permission: 'settings.view' },
 ];
 
@@ -162,15 +230,14 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
   const locale = useLocale();
   const t = useTranslations('navigation');
   const { hasPermission, isLoading } = usePermissions();
-  const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const direction = localeDirections[locale as Locale];
   const isRtl = direction === 'rtl';
 
   // Remove locale prefix from pathname for matching
   const pathnameWithoutLocale = pathname.replace(`/${locale}`, '') || '/';
 
-  // Auto-expand parent items based on current path
-  const getExpandedFromPath = () => {
+  // Initialize expanded items based on current path (lazy initializer, not a side effect)
+  const [expandedItems, setExpandedItems] = useState<string[]>(() => {
     const expanded: string[] = [];
     navigationConfig.forEach((item) => {
       if (item.children && pathnameWithoutLocale.startsWith(item.href)) {
@@ -178,35 +245,33 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
       }
     });
     return expanded;
-  };
-
-  // Initialize expanded items based on current path
-  useState(() => {
-    setExpandedItems(getExpandedFromPath());
   });
 
-  const toggleExpanded = (href: string) => {
+  const toggleExpanded = useCallback((href: string) => {
     setExpandedItems((prev) =>
-      prev.includes(href) ? prev.filter((h) => h !== href) : [...prev, href]
+      prev.includes(href) ? prev.filter((h) => h !== href) : [...prev, href],
     );
-  };
+  }, []);
 
   // Filter navigation based on permissions
-  const filteredNavigation = navigationConfig.filter((item) => {
-    if (!item.permission) return true;
-    if (isLoading) return false;
-    return hasPermission(item.permission);
-  });
-
-  const getTranslatedName = (nameKey: string): string => {
-    return t(nameKey);
-  };
+  const filteredNavigation = useMemo(
+    () =>
+      navigationConfig.filter((item) => {
+        if (!item.permission) return true;
+        if (isLoading) return false;
+        return hasPermission(item.permission);
+      }),
+    [hasPermission, isLoading],
+  );
 
   const renderNavItem = (item: NavItem, isChild = false) => {
-    const isActive = pathnameWithoutLocale === item.href || pathnameWithoutLocale.startsWith(item.href + '/');
     const hasChildren = item.children && item.children.length > 0;
-    const isExpanded = expandedItems.includes(item.href) || pathnameWithoutLocale.startsWith(item.href);
-    const translatedName = getTranslatedName(item.nameKey);
+    const isActive =
+      pathnameWithoutLocale === item.href ||
+      (hasChildren && pathnameWithoutLocale.startsWith(item.href + '/'));
+    const isExpanded =
+      expandedItems.includes(item.href) || pathnameWithoutLocale.startsWith(item.href);
+    const translatedName = t(item.nameKey);
 
     // Build locale-aware href
     const localizedHref = `/${locale}${item.href}`;
@@ -220,14 +285,16 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
               'w-full group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors',
               isActive || isExpanded
                 ? 'bg-muted text-foreground'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >
             <div className="flex items-center">
               <item.icon
                 className={cn(
                   'h-5 w-5 flex-shrink-0 me-3',
-                  isActive || isExpanded ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'
+                  isActive || isExpanded
+                    ? 'text-foreground'
+                    : 'text-muted-foreground group-hover:text-foreground',
                 )}
               />
               {translatedName}
@@ -236,7 +303,7 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
               className={cn(
                 'h-4 w-4 transition-transform',
                 isExpanded && 'rotate-90',
-                isRtl && !isExpanded && 'rotate-180'
+                isRtl && !isExpanded && 'rotate-180',
               )}
             />
           </button>
@@ -259,7 +326,7 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
           isChild && 'ps-6',
           isActive
             ? 'bg-primary text-primary-foreground'
-            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
         )}
         title={collapsed ? translatedName : undefined}
       >
@@ -267,7 +334,9 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
           className={cn(
             'h-5 w-5 flex-shrink-0',
             collapsed ? '' : 'me-3',
-            isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'
+            isActive
+              ? 'text-primary-foreground'
+              : 'text-muted-foreground group-hover:text-foreground',
           )}
         />
         {!collapsed && translatedName}
@@ -276,7 +345,7 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
   };
 
   return (
-    <nav className="flex-1 px-2 pb-4 space-y-1">
+    <nav aria-label="Main navigation" className="flex-1 px-2 pb-4 space-y-1">
       {filteredNavigation.map((item) => renderNavItem(item))}
     </nav>
   );
@@ -300,10 +369,7 @@ export function Sidebar() {
             <Button
               variant="ghost"
               size="icon"
-              className={cn(
-                'fixed top-4 z-40',
-                isRtl ? 'end-4' : 'start-4'
-              )}
+              className={cn('fixed top-4 z-40', isRtl ? 'end-4' : 'start-4')}
               aria-label={t('openMenu')}
             >
               <Menu className="h-6 w-6" />
@@ -311,9 +377,23 @@ export function Sidebar() {
           </SheetTrigger>
           <SheetContent side={isRtl ? 'right' : 'left'} className="w-64 p-0">
             <SheetHeader className="px-4 py-5 border-b">
-              <SheetTitle className="text-2xl font-bold text-primary">
-                {tCommon('appName')}
+              <SheetTitle>
+                <Image
+                  src="/svg/logo-full.svg"
+                  alt={tCommon('appName')}
+                  width={120}
+                  height={32}
+                  className="dark:hidden"
+                />
+                <Image
+                  src="/svg/logo-full-dark.svg"
+                  alt={tCommon('appName')}
+                  width={120}
+                  height={32}
+                  className="hidden dark:block"
+                />
               </SheetTitle>
+              <SheetDescription className="sr-only">Main navigation menu</SheetDescription>
             </SheetHeader>
             <div className="flex flex-col h-[calc(100%-73px)] overflow-y-auto pt-4">
               <SidebarNav onItemClick={() => setMobileOpen(false)} />
@@ -325,18 +405,34 @@ export function Sidebar() {
       {/* Desktop sidebar */}
       <div className="hidden lg:flex lg:flex-shrink-0">
         <div
-          className={cn(
-            'flex flex-col transition-all duration-300',
-            collapsed ? 'w-16' : 'w-64'
-          )}
+          className={cn('flex flex-col transition-all duration-300', collapsed ? 'w-16' : 'w-64')}
         >
-          <div className={cn(
-            'flex flex-col flex-grow bg-card border-border overflow-y-auto',
-            isRtl ? 'border-s' : 'border-e'
-          )}>
+          <div
+            className={cn(
+              'flex flex-col flex-grow bg-card border-border overflow-y-auto',
+              isRtl ? 'border-s' : 'border-e',
+            )}
+          >
             <div className="flex items-center justify-between flex-shrink-0 px-4 py-5">
-              {!collapsed && (
-                <span className="text-2xl font-bold text-primary">{tCommon('appName')}</span>
+              {collapsed ? (
+                <Image src="/svg/logo-icon.svg" alt={tCommon('appName')} width={28} height={28} />
+              ) : (
+                <>
+                  <Image
+                    src="/svg/logo-full.svg"
+                    alt={tCommon('appName')}
+                    width={120}
+                    height={32}
+                    className="dark:hidden"
+                  />
+                  <Image
+                    src="/svg/logo-full-dark.svg"
+                    alt={tCommon('appName')}
+                    width={120}
+                    height={32}
+                    className="hidden dark:block"
+                  />
+                </>
               )}
               <Button
                 variant="ghost"
@@ -346,9 +442,15 @@ export function Sidebar() {
                 aria-label={collapsed ? t('expandSidebar') : t('collapseSidebar')}
               >
                 {collapsed ? (
-                  isRtl ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+                  isRtl ? (
+                    <ChevronLeft className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )
+                ) : isRtl ? (
+                  <ChevronRight className="h-4 w-4" />
                 ) : (
-                  isRtl ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-4 w-4" />
                 )}
               </Button>
             </div>

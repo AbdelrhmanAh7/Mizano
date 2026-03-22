@@ -1,0 +1,114 @@
+{
+  "title": "Fixed Assets",
+  "description": "Manage fixed assets and depreciation",
+  "newAsset": "New Asset",
+  "newAssetTitle": "New Fixed Asset",
+  "newAssetDescription": "Add a new fixed asset to your register",
+  "editAsset": "Edit Asset",
+  "deleteAsset": "Delete Asset",
+  "assetDetails": "Asset Details",
+  "assetNotFound": "Asset not found",
+  "assetNotFoundTitle": "Asset Not Found",
+  "backToAssets": "Back to Assets",
+  "summary": {
+    "totalAssets": "Total Assets",
+    "totalValue": "Total Value",
+    "accumulatedDepreciation": "Accumulated Depreciation",
+    "netBookValue": "Net Book Value"
+  },
+  "filters": {
+    "allStatus": "All Status",
+    "allTypes": "All Types"
+  },
+  "form": {
+    "name": "Asset Name",
+    "namePlaceholder": "Enter asset name",
+    "category": "Category",
+    "purchaseDate": "Purchase Date",
+    "purchaseCost": "Purchase Cost",
+    "residualValue": "Residual Value",
+    "usefulLife": "Useful Life (months)",
+    "depreciationMethod": "Depreciation Method",
+    "account": "Asset Account",
+    "depreciationAccount": "Depreciation Account",
+    "expenseAccount": "Expense Account",
+    "serialNumber": "Serial Number",
+    "location": "Location",
+    "notes": "Notes"
+  },
+  "table": {
+    "assetNumber": "Asset #",
+    "name": "Name",
+    "category": "Category",
+    "type": "Type",
+    "method": "Method",
+    "purchaseDate": "Purchase Date",
+    "purchasePrice": "Purchase Price",
+    "purchaseCost": "Cost",
+    "bookValue": "Book Value",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "status": {
+    "active": "Active",
+    "disposed": "Disposed",
+    "fullyDepreciated": "Fully Deprecated"
+  },
+  "types": {
+    "electronics": "Electronics",
+    "furniture": "Furniture",
+    "vehicles": "Vehicles",
+    "machinery": "Machinery",
+    "buildings": "Buildings",
+    "other": "Other"
+  },
+  "depreciation": {
+    "straightLine": "Straight Line",
+    "decliningBalance": "Declining Balance"
+  },
+  "detail": {
+    "purchasePrice": "Purchase Price",
+    "currentBookValue": "Current Book Value",
+    "depreciation": "Depreciation",
+    "remainingLife": "Remaining Life",
+    "months": "{count} months",
+    "years": "{count} years",
+    "purchaseDate": "Purchase Date",
+    "usefulLife": "Useful Life",
+    "depreciationMethod": "Depreciation Method",
+    "salvageValue": "Salvage Value",
+    "monthlyDepreciation": "Monthly Depreciation",
+    "description": "Description",
+    "financialSummary": "Financial Summary",
+    "accumulatedDepreciation": "Accumulated Depreciation",
+    "netBookValue": "Net Book Value",
+    "disposalDate": "Disposal Date",
+    "disposalAmount": "Disposal Amount",
+    "gainLoss": "Gain/Loss",
+    "disposeAsset": "Dispose Asset",
+    "disposeDescription": "Record the disposal of this asset. This will create a journal entry for any gain or loss.",
+    "currentBookValueLabel": "Current book value: {value}",
+    "processing": "Processing...",
+    "dispose": "Dispose"
+  },
+  "schedule": {
+    "title": "Depreciation Schedule",
+    "period": "Period",
+    "amount": "Amount",
+    "accumulated": "Accumulated",
+    "bookValue": "Book Value",
+    "status": "Status",
+    "posted": "Posted",
+    "pending": "Pending"
+  },
+  "confirmDelete": {
+    "title": "Delete Asset",
+    "description": "Are you sure? This can only be done if no depreciation has been posted.",
+    "descriptionDetail": "This can only be done if no depreciation entries have been posted."
+  },
+  "empty": {
+    "title": "No assets yet",
+    "description": "Track your fixed assets and depreciation schedules",
+    "noResults": "No assets found. Add your first fixed asset to get started."
+  }
+}

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AttendanceStatus } from '@prisma/client';
+import { AttendanceStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class AttendanceService {
@@ -63,19 +63,20 @@ export class AttendanceService {
     });
   }
 
-  async recordAttendance(organizationId: string, dto: any) {
+  async recordAttendance(organizationId: string, dto: Record<string, unknown>) {
+    const employeeId = dto.employeeId as string;
     const employee = await this.prisma.employee.findFirst({
-      where: { id: dto.employeeId, organizationId },
+      where: { id: employeeId, organizationId },
     });
     if (!employee) throw new NotFoundException('Employee not found');
 
-    const date = new Date(dto.date);
+    const date = new Date(dto.date as string);
     date.setHours(0, 0, 0, 0);
 
     // Check for existing record
     const existing = await this.prisma.attendance.findFirst({
       where: {
-        employeeId: dto.employeeId,
+        employeeId,
         organizationId,
         date,
       },
@@ -84,31 +85,84 @@ export class AttendanceService {
 
     return this.prisma.attendance.create({
       data: {
-        employeeId: dto.employeeId,
+        employeeId,
         date,
-        checkIn: dto.checkIn ? new Date(dto.checkIn) : null,
-        checkOut: dto.checkOut ? new Date(dto.checkOut) : null,
-        status: dto.status || AttendanceStatus.PRESENT,
-        notes: dto.notes,
+        checkIn: dto.checkIn ? new Date(dto.checkIn as string) : null,
+        checkOut: dto.checkOut ? new Date(dto.checkOut as string) : null,
+        status: (dto.status as AttendanceStatus) || AttendanceStatus.PRESENT,
+        notes: dto.notes as string | undefined,
         organizationId,
       },
     });
   }
 
-  async bulkRecordAttendance(organizationId: string, records: any[]) {
-    const results: Array<{ success: boolean; record?: any; employeeId?: string; error?: string }> = [];
+  async bulkRecordAttendance(organizationId: string, records: Record<string, unknown>[]) {
+    const results: Array<{
+      success: boolean;
+      record?: Record<string, unknown>;
+      employeeId?: string;
+      error?: string;
+    }> = [];
     for (const record of records) {
       try {
         const result = await this.recordAttendance(organizationId, record);
-        results.push({ success: true, record: result });
-      } catch (error: any) {
-        results.push({ success: false, employeeId: record.employeeId, error: error.message });
+        results.push({ success: true, record: result as unknown as Record<string, unknown> });
+      } catch (error: unknown) {
+        results.push({
+          success: false,
+          employeeId: record.employeeId as string,
+          error: (error as Error).message,
+        });
       }
     }
     return results;
   }
 
-  async getAttendanceByEmployee(organizationId: string, employeeId: string, startDate: string, endDate: string) {
+  async findAll(
+    organizationId: string,
+    query: {
+      page?: number | string;
+      limit?: number | string;
+      startDate?: string;
+      endDate?: string;
+      employeeId?: string;
+      status?: string;
+    },
+  ) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+
+    const where: Prisma.AttendanceWhereInput = { organizationId };
+    if (query.employeeId) where.employeeId = query.employeeId;
+    if (query.status) where.status = query.status as AttendanceStatus;
+    if (query.startDate || query.endDate) {
+      where.date = {};
+      if (query.startDate) where.date.gte = new Date(query.startDate);
+      if (query.endDate) where.date.lte = new Date(query.endDate);
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.attendance.findMany({
+        where,
+        include: {
+          employee: { select: { id: true, name: true, employeeId: true } },
+        },
+        orderBy: { date: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.attendance.count({ where }),
+    ]);
+
+    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async getAttendanceByEmployee(
+    organizationId: string,
+    employeeId: string,
+    startDate: string,
+    endDate: string,
+  ) {
     return this.prisma.attendance.findMany({
       where: {
         employeeId,
@@ -136,7 +190,12 @@ export class AttendanceService {
     });
   }
 
-  async getAttendanceSummary(organizationId: string, employeeId: string, month: number, year: number) {
+  async getAttendanceSummary(
+    organizationId: string,
+    employeeId: string,
+    month: number,
+    year: number,
+  ) {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
 
@@ -166,16 +225,18 @@ export class AttendanceService {
     return summary;
   }
 
-  async update(organizationId: string, id: string, dto: any) {
+  async update(organizationId: string, id: string, dto: Record<string, unknown>) {
     const attendance = await this.prisma.attendance.findFirst({
       where: { id, organizationId },
     });
     if (!attendance) throw new NotFoundException('Attendance record not found');
 
-    const data: any = { ...dto };
-    if (dto.date) data.date = new Date(dto.date);
-    if (dto.checkIn) data.checkIn = new Date(dto.checkIn);
-    if (dto.checkOut) data.checkOut = new Date(dto.checkOut);
+    const data: Prisma.AttendanceUpdateInput = {
+      ...(dto as unknown as Prisma.AttendanceUpdateInput),
+    };
+    if (dto.date) data.date = new Date(dto.date as string);
+    if (dto.checkIn) data.checkIn = new Date(dto.checkIn as string);
+    if (dto.checkOut) data.checkOut = new Date(dto.checkOut as string);
 
     return this.prisma.attendance.update({ where: { id }, data });
   }

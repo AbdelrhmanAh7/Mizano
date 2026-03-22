@@ -14,11 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -39,6 +35,7 @@ import {
   getAttendanceStatusLabel,
   AttendanceStatus,
 } from '@/lib/hooks/use-hr';
+import { useTranslations } from 'next-intl';
 
 const attendanceStatuses: AttendanceStatus[] = ['PRESENT', 'ABSENT', 'LEAVE', 'HALF_DAY'];
 
@@ -51,13 +48,14 @@ interface AttendanceEntry {
 }
 
 export default function MarkAttendancePage() {
+  const t = useTranslations('hr');
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [entries, setEntries] = useState<Map<string, AttendanceEntry>>(new Map());
   const [selectAll, setSelectAll] = useState(false);
   const [defaultStatus, setDefaultStatus] = useState<AttendanceStatus>('PRESENT');
 
-  const { data: employeesData, isLoading } = useEmployees({ status: 'ACTIVE' });
+  const { data: employeesData, isLoading } = useEmployees({ isActive: true });
   const bulkMark = useBulkMarkAttendance();
 
   const employees = employeesData?.data || [];
@@ -78,7 +76,7 @@ export default function MarkAttendancePage() {
     setSelectAll(checked);
     if (checked) {
       const newEntries = new Map<string, AttendanceEntry>();
-      employees.forEach((emp: any) => {
+      employees.forEach((emp: { id: string }) => {
         newEntries.set(emp.id, {
           employeeId: emp.id,
           status: defaultStatus,
@@ -94,7 +92,7 @@ export default function MarkAttendancePage() {
     setDefaultStatus(status);
     if (selectAll) {
       const newEntries = new Map<string, AttendanceEntry>();
-      employees.forEach((emp: any) => {
+      employees.forEach((emp: { id: string }) => {
         const existing = entries.get(emp.id);
         newEntries.set(emp.id, {
           employeeId: emp.id,
@@ -138,10 +136,8 @@ export default function MarkAttendancePage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Mark Attendance</h1>
-          <p className="text-muted-foreground">
-            Record attendance for multiple employees
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('attendance.newAttendance')}</h1>
+          <p className="text-muted-foreground">Record attendance for multiple employees</p>
         </div>
       </div>
 
@@ -149,9 +145,7 @@ export default function MarkAttendancePage() {
       <Card>
         <CardHeader>
           <CardTitle>Select Date</CardTitle>
-          <CardDescription>
-            Choose the date for which you want to mark attendance
-          </CardDescription>
+          <CardDescription>Choose the date for which you want to mark attendance</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center gap-4">
           <Popover>
@@ -160,7 +154,7 @@ export default function MarkAttendancePage() {
                 variant="outline"
                 className={cn(
                   'w-64 justify-start text-left font-normal',
-                  !selectedDate && 'text-muted-foreground'
+                  !selectedDate && 'text-muted-foreground',
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -186,21 +180,14 @@ export default function MarkAttendancePage() {
         </CardHeader>
         <CardContent className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <Checkbox
-              id="selectAll"
-              checked={selectAll}
-              onCheckedChange={handleSelectAll}
-            />
+            <Checkbox id="selectAll" checked={selectAll} onCheckedChange={handleSelectAll} />
             <label htmlFor="selectAll" className="text-sm">
               Select all employees
             </label>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Default status:</span>
-            <Select
-              value={defaultStatus}
-              onValueChange={handleDefaultStatusChange}
-            >
+            <Select value={defaultStatus} onValueChange={handleDefaultStatusChange}>
               <SelectTrigger className="w-32">
                 <SelectValue />
               </SelectTrigger>
@@ -229,17 +216,22 @@ export default function MarkAttendancePage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12"></TableHead>
-                <TableHead>Employee</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Check In</TableHead>
-                <TableHead>Check Out</TableHead>
-                <TableHead>Notes</TableHead>
+                <TableHead>{t('attendance.table.employee')}</TableHead>
+                <TableHead>{t('attendance.table.status')}</TableHead>
+                <TableHead>{t('attendance.table.checkIn')}</TableHead>
+                <TableHead>{t('attendance.table.checkOut')}</TableHead>
+                <TableHead>{t('attendance.form.notes')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {employees.map((employee: any) => {
+              {employees.map((employee: { id: string; name: string; jobTitle?: string }) => {
                 const entry = entries.get(employee.id);
                 const isSelected = !!entry;
+                const nameParts = employee.name.split(' ');
+                const initials =
+                  nameParts.length >= 2
+                    ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`
+                    : employee.name.slice(0, 2);
                 return (
                   <TableRow key={employee.id}>
                     <TableCell>
@@ -263,14 +255,11 @@ export default function MarkAttendancePage() {
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="text-xs">
-                            {employee.firstName[0]}
-                            {employee.lastName[0]}
+                            {initials.toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-medium">
-                            {employee.firstName} {employee.lastName}
-                          </p>
+                          <p className="font-medium">{employee.name}</p>
                           <p className="text-xs text-muted-foreground">
                             {employee.jobTitle || 'No title'}
                           </p>
@@ -301,9 +290,7 @@ export default function MarkAttendancePage() {
                       <Input
                         type="time"
                         value={entry?.checkIn || ''}
-                        onChange={(e) =>
-                          updateEntry(employee.id, { checkIn: e.target.value })
-                        }
+                        onChange={(e) => updateEntry(employee.id, { checkIn: e.target.value })}
                         disabled={!isSelected}
                         className="w-28"
                       />
@@ -312,9 +299,7 @@ export default function MarkAttendancePage() {
                       <Input
                         type="time"
                         value={entry?.checkOut || ''}
-                        onChange={(e) =>
-                          updateEntry(employee.id, { checkOut: e.target.value })
-                        }
+                        onChange={(e) => updateEntry(employee.id, { checkOut: e.target.value })}
                         disabled={!isSelected}
                         className="w-28"
                       />
@@ -323,9 +308,7 @@ export default function MarkAttendancePage() {
                       <Input
                         placeholder="Notes"
                         value={entry?.notes || ''}
-                        onChange={(e) =>
-                          updateEntry(employee.id, { notes: e.target.value })
-                        }
+                        onChange={(e) => updateEntry(employee.id, { notes: e.target.value })}
                         disabled={!isSelected}
                         className="w-40"
                       />
@@ -343,14 +326,9 @@ export default function MarkAttendancePage() {
         <Button variant="outline" onClick={() => router.back()}>
           Cancel
         </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={entries.size === 0 || bulkMark.isPending}
-        >
+        <Button onClick={handleSubmit} disabled={entries.size === 0 || bulkMark.isPending}>
           <UserCheck className="mr-2 h-4 w-4" />
-          {bulkMark.isPending
-            ? 'Saving...'
-            : `Mark Attendance (${entries.size})`}
+          {bulkMark.isPending ? 'Saving...' : `Mark Attendance (${entries.size})`}
         </Button>
       </div>
     </div>

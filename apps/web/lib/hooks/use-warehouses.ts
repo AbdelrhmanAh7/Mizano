@@ -1,10 +1,12 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { warehousesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
 // Types
+type ApiError = { response?: { data?: { message?: string } } };
+
 export interface Warehouse {
   id: string;
   name: string;
@@ -55,16 +57,6 @@ export interface CreateWarehouseData {
 }
 
 export interface UpdateWarehouseData extends Partial<CreateWarehouseData> {}
-
-// Warehouses API
-const warehousesApi = {
-  getAll: (params?: Record<string, any>) => api.get('/warehouses', { params }),
-  getOne: (id: string) => api.get(`/warehouses/${id}`),
-  getStock: (id: string) => api.get(`/warehouses/${id}/stock`),
-  create: (data: any) => api.post('/warehouses', data),
-  update: (id: string, data: any) => api.patch(`/warehouses/${id}`, data),
-  delete: (id: string) => api.delete(`/warehouses/${id}`),
-};
 
 /**
  * Hook to fetch all warehouses
@@ -128,7 +120,7 @@ export function useCreateWarehouse() {
         description: 'The warehouse has been created successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error creating warehouse',
@@ -158,7 +150,7 @@ export function useUpdateWarehouse() {
         description: 'The warehouse has been updated successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error updating warehouse',
@@ -187,7 +179,7 @@ export function useDeleteWarehouse() {
         description: 'The warehouse has been deleted successfully.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
         title: 'Error deleting warehouse',

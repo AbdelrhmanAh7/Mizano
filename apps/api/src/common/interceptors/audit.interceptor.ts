@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-} from '@nestjs/common';
+import { Injectable, Logger, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -11,9 +6,11 @@ import { AuditAction } from '@prisma/client';
 
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(AuditInterceptor.name);
+
   constructor(private prisma: PrismaService) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
     const method = request.method;
     const user = request.user;
@@ -23,35 +20,36 @@ export class AuditInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    const startTime = Date.now();
     const oldData = request.body?._oldData; // Can be set by service before update
 
     return next.handle().pipe(
-      tap(async (response) => {
-        try {
-          const action = this.getAction(method);
-          const entityType = this.getEntityType(request.path);
-          const entityId = response?.id || request.params?.id || 'unknown';
+      tap((response) => {
+        void (async () => {
+          try {
+            const action = this.getAction(method);
+            const entityType = this.getEntityType(request.path);
+            const entityId = response?.id || request.params?.id || 'unknown';
 
-          if (entityType && user.organizationId) {
-            await this.prisma.auditLog.create({
-              data: {
-                userId: user.id,
-                action,
-                entityType,
-                entityId,
-                oldValues: oldData || null,
-                newValues: method !== 'DELETE' ? response : null,
-                ipAddress: request.ip,
-                userAgent: request.headers['user-agent'],
-                organizationId: user.organizationId,
-              },
-            });
+            if (entityType && user.organizationId) {
+              await this.prisma.auditLog.create({
+                data: {
+                  userId: user.id,
+                  action,
+                  entityType,
+                  entityId,
+                  oldValues: oldData || null,
+                  newValues: method !== 'DELETE' ? response : null,
+                  ipAddress: request.ip,
+                  userAgent: request.headers['user-agent'],
+                  organizationId: user.organizationId,
+                },
+              });
+            }
+          } catch (error) {
+            // Don't fail the request if audit logging fails
+            this.logger.error('Audit logging failed:', error);
           }
-        } catch (error) {
-          // Don't fail the request if audit logging fails
-          console.error('Audit logging failed:', error);
-        }
+        })();
       }),
     );
   }

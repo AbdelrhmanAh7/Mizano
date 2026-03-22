@@ -1,15 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { format, addDays } from 'date-fns';
-import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -17,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -26,9 +19,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Bill, BillLine } from '@/lib/hooks/use-bills';
+import { Textarea } from '@/components/ui/textarea';
+import { Bill } from '@/lib/hooks/use-bills';
 import { useVendors, Vendor } from '@/lib/hooks/use-vendors';
-import { cn } from '@/lib/utils';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { addDays, format } from 'date-fns';
+import { Plus, Trash2 } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
+import { useFieldArray, useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 const lineSchema = z.object({
   itemId: z.string().optional(),
@@ -43,6 +42,8 @@ const billSchema = z.object({
   vendorId: z.string().min(1, 'Vendor is required'),
   date: z.string().min(1, 'Date is required'),
   dueDate: z.string().min(1, 'Due date is required'),
+  reference: z.string().optional(),
+  currencyCode: z.string().optional(),
   notes: z.string().optional(),
   projectId: z.string().optional(),
   lines: z.array(lineSchema).min(1, 'At least one line item is required'),
@@ -50,24 +51,34 @@ const billSchema = z.object({
 
 type BillFormData = z.infer<typeof billSchema>;
 
+export interface BillFormDefaultValues {
+  vendorId?: string;
+  date?: string;
+  dueDate?: string;
+  reference?: string;
+  currencyCode?: string;
+  notes?: string;
+  projectId?: string;
+  lines?: Array<{
+    description: string;
+    quantity: string;
+    rate: string;
+    taxRate?: string;
+  }>;
+}
+
 interface BillFormProps {
   bill?: Bill | null;
   accounts?: Array<{ id: string; code: string; name: string; type: string }>;
   items?: Array<{ id: string; name: string; sku: string; costPrice: string }>;
   projects?: Array<{ id: string; name: string }>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
   defaultVendorId?: string;
+  /** Pre-fill form from AI document scan */
+  scanDefaults?: BillFormDefaultValues;
 }
-
-const taxRates = [
-  { value: '0', label: 'No Tax (0%)' },
-  { value: '5', label: '5%' },
-  { value: '10', label: '10%' },
-  { value: '14', label: 'VAT 14%' },
-  { value: '15', label: '15%' },
-];
 
 export function BillForm({
   bill,
@@ -78,23 +89,33 @@ export function BillForm({
   onCancel,
   isSubmitting,
   defaultVendorId,
+  scanDefaults,
 }: BillFormProps) {
   const isEditing = !!bill;
   const { data: vendorsData } = useVendors({ limit: 100 });
-  const vendors = vendorsData?.data || [];
+  const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
   // Filter accounts
-  const expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
+  const _expenseAccounts = accounts.filter((a) => a.type === 'EXPENSE' || a.type === 'ASSET');
 
   const form = useForm<BillFormData>({
     resolver: zodResolver(billSchema),
     defaultValues: {
-      vendorId: defaultVendorId || '',
-      date: format(new Date(), 'yyyy-MM-dd'),
-      dueDate: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
-      notes: '',
-      projectId: '',
-      lines: [{ description: '', quantity: '1', rate: '', taxRate: '0' }],
+      vendorId: scanDefaults?.vendorId || defaultVendorId || '',
+      date: scanDefaults?.date || format(new Date(), 'yyyy-MM-dd'),
+      dueDate: scanDefaults?.dueDate || format(addDays(new Date(), 30), 'yyyy-MM-dd'),
+      reference: scanDefaults?.reference || '',
+      currencyCode: scanDefaults?.currencyCode || '',
+      notes: scanDefaults?.notes || '',
+      projectId: scanDefaults?.projectId || '',
+      lines: scanDefaults?.lines?.length
+        ? scanDefaults.lines.map((l) => ({
+            description: l.description,
+            quantity: l.quantity,
+            rate: l.rate,
+            taxRate: l.taxRate || '0',
+          }))
+        : [{ description: '', quantity: '1', rate: '', taxRate: '0' }],
     },
   });
 
@@ -109,6 +130,8 @@ export function BillForm({
         vendorId: bill.vendorId,
         date: bill.date.split('T')[0],
         dueDate: bill.dueDate.split('T')[0],
+        reference: bill.reference || '',
+        currencyCode: bill.currencyCode || '',
         notes: bill.notes || '',
         projectId: bill.projectId || '',
         lines: bill.lines?.map((line) => ({
@@ -152,6 +175,8 @@ export function BillForm({
       vendorId: data.vendorId,
       date: data.date,
       dueDate: data.dueDate,
+      reference: data.reference || null,
+      currencyCode: data.currencyCode || null,
       notes: data.notes || null,
       projectId: data.projectId || null,
       lines,
@@ -169,9 +194,8 @@ export function BillForm({
       const qty = parseFloat(line.quantity || '0');
       const rate = parseFloat(line.rate || '0');
       const lineAmount = qty * rate;
-      const lineTax = lineAmount * (parseFloat(line.taxRate || '0') / 100);
       subtotal += lineAmount;
-      taxAmount += lineTax;
+      taxAmount += parseFloat(line.taxRate || '0');
     });
 
     return { subtotal, taxAmount, grandTotal: subtotal + taxAmount };
@@ -220,51 +244,70 @@ export function BillForm({
                 </SelectContent>
               </Select>
               {form.formState.errors.vendorId && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.vendorId.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.vendorId.message}</p>
               )}
             </div>
 
             {/* Date */}
             <div className="space-y-2">
               <Label htmlFor="date">Bill Date *</Label>
-              <Input
-                id="date"
-                type="date"
-                {...form.register('date')}
-              />
+              <Input id="date" type="date" {...form.register('date')} />
               {form.formState.errors.date && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.date.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
               )}
             </div>
 
             {/* Due Date */}
             <div className="space-y-2">
               <Label htmlFor="dueDate">Due Date *</Label>
-              <Input
-                id="dueDate"
-                type="date"
-                {...form.register('dueDate')}
-              />
+              <Input id="dueDate" type="date" {...form.register('dueDate')} />
               {form.formState.errors.dueDate && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.dueDate.message}
-                </p>
+                <p className="text-sm text-red-500">{form.formState.errors.dueDate.message}</p>
               )}
             </div>
           </div>
 
-          {/* Project */}
-          {projects.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Reference, Currency, Project */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Reference */}
+            <div className="space-y-2">
+              <Label htmlFor="reference">Reference (Vendor Doc #)</Label>
+              <Input id="reference" {...form.register('reference')} placeholder="e.g. INV-001" />
+            </div>
+
+            {/* Currency */}
+            <div className="space-y-2">
+              <Label htmlFor="currencyCode">Currency</Label>
+              <Select
+                value={form.watch('currencyCode') || ''}
+                onValueChange={(value) =>
+                  form.setValue('currencyCode', value === 'default' ? '' : value)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Default</SelectItem>
+                  <SelectItem value="USD">USD — US Dollar</SelectItem>
+                  <SelectItem value="EUR">EUR — Euro</SelectItem>
+                  <SelectItem value="EGP">EGP — Egyptian Pound</SelectItem>
+                  <SelectItem value="GBP">GBP — British Pound</SelectItem>
+                  <SelectItem value="AED">AED — UAE Dirham</SelectItem>
+                  <SelectItem value="SAR">SAR — Saudi Riyal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Project */}
+            {projects.length > 0 && (
               <div className="space-y-2">
                 <Label htmlFor="projectId">Project (Optional)</Label>
                 <Select
                   value={form.watch('projectId') || ''}
-                  onValueChange={(value) => form.setValue('projectId', value === 'none' ? '' : value)}
+                  onValueChange={(value) =>
+                    form.setValue('projectId', value === 'none' ? '' : value)
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select project" />
@@ -279,8 +322,8 @@ export function BillForm({
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -352,25 +395,16 @@ export function BillForm({
                       />
                     </TableCell>
                     <TableCell>
-                      <Select
-                        value={form.watch(`lines.${index}.taxRate`) || '0'}
-                        onValueChange={(value) => form.setValue(`lines.${index}.taxRate`, value)}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {taxRates.map((rate) => (
-                            <SelectItem key={rate.value} value={rate.value}>
-                              {rate.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Input
+                        {...form.register(`lines.${index}.taxRate`)}
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        placeholder="0.00"
+                        className="h-8 w-24"
+                      />
                     </TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${lineAmount.toFixed(2)}
-                    </TableCell>
+                    <TableCell className="text-right font-mono">${lineAmount.toFixed(2)}</TableCell>
                     <TableCell>
                       {fields.length > 1 && (
                         <Button
@@ -379,6 +413,7 @@ export function BillForm({
                           size="icon"
                           className="h-8 w-8"
                           onClick={() => remove(index)}
+                          aria-label="Delete line item"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -427,11 +462,7 @@ export function BillForm({
           <CardTitle>Notes</CardTitle>
         </CardHeader>
         <CardContent>
-          <Textarea
-            {...form.register('notes')}
-            placeholder="Add notes or terms..."
-            rows={3}
-          />
+          <Textarea {...form.register('notes')} placeholder="Add notes or terms..." rows={3} />
         </CardContent>
       </Card>
 
@@ -441,11 +472,7 @@ export function BillForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? 'Saving...'
-            : isEditing
-            ? 'Update Bill'
-            : 'Create Bill'}
+          {isSubmitting ? 'Saving...' : isEditing ? 'Update Bill' : 'Create Bill'}
         </Button>
       </div>
     </form>

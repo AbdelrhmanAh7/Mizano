@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import { useCreateCreditNote } from '@/lib/hooks/use-credit-notes';
 
 export default function NewCreditNotePage() {
   const router = useRouter();
+  const t = useTranslations('sales');
   const searchParams = useSearchParams();
   const customerId = searchParams.get('customerId') || undefined;
   const invoiceId = searchParams.get('invoiceId') || undefined;
@@ -40,16 +42,14 @@ export default function NewCreditNotePage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
           <Link href="/sales/credit-notes">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Credit Note</h1>
-          <p className="text-muted-foreground">
-            Create a credit note for a customer
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('creditNotes.newCreditNote')}</h1>
+          <p className="text-muted-foreground">{t('creditNotes.newDescription')}</p>
         </div>
       </div>
 
