@@ -105,7 +105,7 @@ jobs:
           host: ${{ secrets.ORACLE_HOST }}
           username: ${{ secrets.ORACLE_USER }}
           key: ${{ secrets.ORACLE_SSH_KEY }}
-          port: ${{ secrets.ORACLE_SSH_PORT || 22 }}
+          port: 22
           source: "docker-compose.production.yml,nginx/nginx.conf,scripts/deploy.sh,apps/api/prisma/"
           target: /opt/mizano
           overwrite: true
@@ -116,7 +116,7 @@ jobs:
           host: ${{ secrets.ORACLE_HOST }}
           username: ${{ secrets.ORACLE_USER }}
           key: ${{ secrets.ORACLE_SSH_KEY }}
-          port: ${{ secrets.ORACLE_SSH_PORT || 22 }}
+          port: 22
           script: |
             set -e
 
