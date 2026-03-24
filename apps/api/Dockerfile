@@ -13,18 +13,13 @@ ENV PORT=6001
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+# Copy package files + .npmrc (includes supportedArchitectures for linux binaries)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/validators/package.json ./packages/validators/
 
-# Install build tools for native modules (bcrypt, sharp, etc.)
-# vips-dev is required by sharp for image processing
-RUN apk add --no-cache python3 py3-setuptools make g++ vips-dev openssl-dev
-
-# Install all dependencies (including dev for build tools)
-# HUSKY=0 disables the husky prepare hook so we don't need --ignore-scripts
+# Install dependencies (HUSKY=0 disables the husky prepare hook)
 ENV HUSKY=0
 RUN pnpm install --frozen-lockfile
 
