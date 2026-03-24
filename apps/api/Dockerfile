@@ -21,7 +21,7 @@ COPY packages/validators/package.json ./packages/validators/
 
 # Install build tools for native modules (bcrypt, sharp, etc.)
 # vips-dev is required by sharp for image processing
-RUN apk add --no-cache python3 make g++ vips-dev
+RUN apk add --no-cache python3 py3-setuptools make g++ vips-dev openssl-dev
 
 # Install all dependencies (including dev for build tools)
 # HUSKY=0 disables the husky prepare hook so we don't need --ignore-scripts
