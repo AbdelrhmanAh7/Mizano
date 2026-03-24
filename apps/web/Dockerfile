@@ -26,6 +26,8 @@ COPY packages ./packages
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+ARG NEXT_PUBLIC_API_URL=http://localhost:6001/api
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 # Build shared packages first
 RUN pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/validators build
