@@ -7,8 +7,8 @@
 #   DEPLOY_HOST       - Server IP or hostname (185.247.117.157)
 #   DEPLOY_USER       - SSH username (deploy)
 #   DEPLOY_SSH_KEY    - Private SSH key for the deploy user
-#   PRODUCTION_URL    - Public URL (http://185-247-117-157.eu-cloud-xip.com)
-#   API_URL           - Public API URL (http://185-247-117-157.eu-cloud-xip.com/api)
+#   PRODUCTION_URL    - Public URL (http://185.247.117.157:5001)
+#   API_URL           - Public API URL (http://185.247.117.157:6001/api)
 
 name: Deploy to Production
 
@@ -101,7 +101,7 @@ jobs:
     needs: build-and-push
     environment:
       name: production
-      url: ${{ secrets.PRODUCTION_URL }}
+      url: ${{ vars.PRODUCTION_URL }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -113,7 +113,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          source: "docker-compose.production.yml,nginx/nginx.conf,scripts/deploy.sh,apps/api/prisma/"
+          source: "docker-compose.production.yml,apps/api/prisma/"
           target: /opt/mizano
           overwrite: true
 
@@ -141,16 +141,13 @@ jobs:
             docker tag ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:${TAG} mizano-api:latest
             docker tag ${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}:${TAG} mizano-web:latest
 
-            # Run database migrations
-            docker compose -f docker-compose.production.yml run --rm api npx prisma migrate deploy
-
-            # Rolling restart
-            docker compose -f docker-compose.production.yml up -d --no-deps --build api
+            # Rolling restart (images are pre-built from GHCR)
+            docker compose -f docker-compose.production.yml up -d --no-deps api
             sleep 10
-            docker compose -f docker-compose.production.yml up -d --no-deps --build web
+            docker compose -f docker-compose.production.yml up -d --no-deps web
 
-            # Start nginx
-            docker compose -f docker-compose.production.yml --profile with-nginx up -d nginx
+            # Run database migrations
+            docker exec mizano-api npx prisma migrate deploy --schema /app/apps/api/prisma/schema.prisma || true
 
             # Cleanup old images
             docker image prune -f
@@ -172,7 +169,7 @@ jobs:
       - name: Verify API health
         run: |
           for i in 1 2 3; do
-            status=$(curl -sf -o /dev/null -w "%{http_code}" "${{ secrets.PRODUCTION_URL }}/api/health" || true)
+            status=$(curl -sf -o /dev/null -w "%{http_code}" "http://${{ secrets.DEPLOY_HOST }}:6001/api/health" || true)
             if [ "$status" = "200" ]; then
               echo "API is healthy (attempt $i)"
               exit 0
