@@ -6,6 +6,9 @@
 # Single-stage build (avoids pnpm symlink issues across stages)
 FROM node:20-alpine
 
+# OpenSSL is required by Prisma engine (Alpine ships OpenSSL 3.x)
+RUN apk add --no-cache openssl
+
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
