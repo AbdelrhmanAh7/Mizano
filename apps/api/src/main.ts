@@ -48,13 +48,16 @@ async function bootstrap() {
     }),
   );
 
-  // Configure CORS; origin is required in production, defaults to localhost:5001 in dev
-  const corsOrigin = configService.get<string>('CORS_ORIGIN');
-  if (!corsOrigin && isProduction) {
+  // Configure CORS; supports comma-separated origins (e.g. "http://ip:5001,http://domain.com")
+  const corsOriginRaw = configService.get<string>('CORS_ORIGIN');
+  if (!corsOriginRaw && isProduction) {
     throw new Error('CORS_ORIGIN environment variable must be set in production');
   }
+  const corsOrigins = corsOriginRaw
+    ? corsOriginRaw.split(',').map((o) => o.trim())
+    : ['http://localhost:5001'];
   app.enableCors({
-    origin: corsOrigin || 'http://localhost:5001',
+    origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
     credentials: true,
   });
 
