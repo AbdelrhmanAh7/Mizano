@@ -255,11 +255,21 @@ jobs:
               sleep 5
             done
 
-            # Verify database credentials before starting API
-            if ! docker exec mizano-postgres psql -U "${POSTGRES_USER:-mizano}" -d "${POSTGRES_DB:-mizano_db}" -c "SELECT 1" >/dev/null 2>&1; then
-              echo "WARNING: DB credentials check failed, showing postgres logs:"
-              docker logs mizano-postgres --tail 20 2>&1 || true
+            # Always sync the DB password to handle stale volume scenario
+            # (PostgreSQL only reads POSTGRES_PASSWORD on first init, not on subsequent starts)
+            echo "Syncing DB password to ensure credentials match..."
+            docker exec mizano-postgres psql -U "${POSTGRES_USER:-mizano}" -d "${POSTGRES_DB:-mizano_db}" \
+              -c "ALTER USER ${POSTGRES_USER:-mizano} WITH PASSWORD '${POSTGRES_PASSWORD}';" >/dev/null 2>&1 \
+              || { echo "ERROR: Could not sync DB password"; docker logs mizano-postgres --tail 30 2>&1 || true; exit 1; }
+
+            # Verify credentials via TCP with password (same auth path the API uses)
+            if ! docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" mizano-postgres \
+              psql -h localhost -U "${POSTGRES_USER:-mizano}" -d "${POSTGRES_DB:-mizano_db}" -c "SELECT 1" >/dev/null 2>&1; then
+              echo "ERROR: DB TCP auth still failing after password sync"
+              docker logs mizano-postgres --tail 30 2>&1 || true
+              exit 1
             fi
+            echo "DB credentials verified (TCP)"
 
             # Rolling restart app services
             docker compose -f docker-compose.production.yml up -d --no-deps api
