@@ -106,6 +106,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Prepare server directory
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            sudo mkdir -p /opt/mizano/apps/api/prisma
+            sudo chown -R $USER:$USER /opt/mizano
+
       - name: Copy deployment files to server
         uses: appleboy/scp-action@v0.1.7
         with:

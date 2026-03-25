@@ -17,9 +17,10 @@ const NUMBER_RULES = `- CRITICAL number validation:
   - subtotal, tax, and total are explicitly printed on the document — find and copy them exactly
   - unitPrice is the PRE-TAX price per unit, NOT the total including tax
   - For each line: (unitPrice × quantity) + taxAmount = line total
-  - Look for column headers like "Qty/QYT", "Price/Rate", "Total", "VAT/Tax" to identify which number is which
+  - Words like "ItemName", "UNIT", "PRICE", "QYT", "TOTAL", "Rate", "Amount" are COLUMN HEADERS, not item descriptions — do NOT use them as lineItem descriptions
   - If you see "PRIC+VAT" that means price INCLUDING tax — the unitPrice should be the column BEFORE it
-  - The sum of all line totals must equal the document total`;
+  - Look at the last few numbers in the document for subtotal, tax%, and total (usually at the bottom)
+  - quantity is usually a small number (1-100). If it seems too large, you may have confused it with a price`;
 
 export const OLLAMA_EXTRACTION_SYSTEM_PROMPT =
   'You are a document data extraction assistant. Extract structured data from invoices, bills, and receipts. Return ONLY valid JSON. No thinking, no explanation.';

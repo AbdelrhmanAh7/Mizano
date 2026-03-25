@@ -289,8 +289,10 @@ export class OllamaService {
   }
 
   /**
-   * Validate and auto-fix numbers with obvious decimal errors.
-   * If total = 135.45 but subtotal = 12800, tries dividing by 100 → 128.00.
+   * Validate and auto-fix numbers.
+   *
+   * ALWAYS runs the math-based triplet finder to find correct total/subtotal/tax,
+   * regardless of what the LLM returned (it often picks address codes as amounts).
    */
   private validateAndFixNumbers(
     total: number | null,
@@ -304,71 +306,121 @@ export class OllamaService {
     tax: number | null;
     lineItems: ExtractedLineItem[];
   } {
-    if (total == null || total <= 0) return { total, subtotal, tax, lineItems };
-
     const disc = discount ?? 0;
 
-    // Check if subtotal + tax ≈ total (within 2%)
-    if (subtotal != null && tax != null) {
+    // Quick check: if LLM numbers are already consistent, accept them
+    if (total != null && total > 0 && subtotal != null && subtotal > 0 && tax != null && tax > 0) {
       const sum = subtotal + tax - disc;
-      const diff = Math.abs(sum - total);
-      if (diff / total < 0.02) {
-        // Numbers are already consistent
-        return { total, subtotal, tax, lineItems };
+      if (Math.abs(sum - total) / total < 0.02) {
+        const fixedItems = this.fixLineItems(lineItems, subtotal, tax, total);
+        return { total, subtotal, tax, lineItems: fixedItems };
       }
+    }
 
-      this.logger.warn(
-        `[NumberFix] Mismatch: subtotal(${subtotal}) + tax(${tax}) - discount(${disc}) = ${sum} ≠ total(${total})`,
-      );
+    this.logger.warn(
+      `[NumberFix] LLM numbers inconsistent or missing: total=${total}, subtotal=${subtotal}, tax=${tax}`,
+    );
 
-      // Strategy 1: Try decimal corrections (12800 → 128.00)
-      let fixed = false;
-      for (const divisor of [10, 100, 1000]) {
-        const fixedSub = subtotal / divisor;
-        const fixedTax = tax / divisor;
-        const fixedSum = fixedSub + fixedTax - disc;
-        if (Math.abs(fixedSum - total) / total < 0.02) {
-          this.logger.warn(
-            `[NumberFix] Fixed by ÷${divisor}: subtotal ${subtotal}→${fixedSub}, tax ${tax}→${fixedTax}`,
-          );
-          subtotal = fixedSub;
-          tax = fixedTax;
-          fixed = true;
-          break;
-        }
-      }
+    // Collect ALL numbers from the extraction (LLM output + line items)
+    const allNums: number[] = [];
+    if (total != null && total > 0) allNums.push(total);
+    if (subtotal != null && subtotal > 0) allNums.push(subtotal);
+    if (tax != null && tax > 0) allNums.push(tax);
+    for (const li of lineItems) {
+      if (li.unitPrice > 0) allNums.push(li.unitPrice);
+      if (li.total > 0) allNums.push(li.total);
+      if (li.taxAmount > 0) allNums.push(li.taxAmount);
+    }
+    const unique = [...new Set(allNums)].sort((a, b) => b - a); // largest first
 
-      // Strategy 2: If sum is wildly off (>2x), the LLM computed wrong totals.
-      // Try to derive correct values from total: if we know the tax rate pattern
-      if (!fixed && sum > total * 1.5) {
-        // Try common tax rates to see if total = subtotal × (1 + rate)
-        for (const rate of [0.15, 0.05, 0.1, 0.14, 0.07]) {
-          const derivedSub = Math.round((total / (1 + rate)) * 100) / 100;
-          const derivedTax = Math.round((total - derivedSub) * 100) / 100;
-          if (Math.abs(derivedSub + derivedTax - total) < 0.02) {
+    // Strategy 1: Find triplet where A + B = C and B/A is a valid tax rate (3-25%)
+    let fixed = false;
+    for (const c of unique) {
+      for (const a of unique) {
+        if (a >= c) continue;
+        const b = Math.round((c - a) * 100) / 100;
+        const bMatch = unique.find((n) => n > 0 && Math.abs(n - b) / c < 0.015);
+        if (bMatch && a !== bMatch) {
+          const smaller = Math.min(a, bMatch);
+          const larger = Math.max(a, bMatch);
+          const impliedRate = smaller / larger;
+          if (impliedRate >= 0.03 && impliedRate <= 0.25) {
             this.logger.warn(
-              `[NumberFix] Derived from total(${total}) at ${rate * 100}% rate: subtotal ${subtotal}→${derivedSub}, tax ${tax}→${derivedTax}`,
+              `[NumberFix] Math triplet: ${larger} + ${smaller} = ${c} (rate=${(impliedRate * 100).toFixed(1)}%)`,
             );
-            subtotal = derivedSub;
-            tax = derivedTax;
+            total = c;
+            subtotal = larger;
+            tax = smaller;
             fixed = true;
             break;
           }
         }
       }
+      if (fixed) break;
     }
 
-    // Fix line items using document-level totals as reference
+    // Strategy 2: If no triplet found but we have a plausible total, derive with common rates
+    if (!fixed) {
+      // Pick the most likely total: a number with decimals, or the line item total
+      const candidates = unique.filter((n) => n > 0 && n < 100000);
+      for (const candidate of candidates) {
+        for (const rate of [0.15, 0.05, 0.1, 0.14, 0.07]) {
+          const derivedSub = Math.round((candidate / (1 + rate)) * 100) / 100;
+          const derivedTax = Math.round((candidate - derivedSub) * 100) / 100;
+          if (derivedTax > 0 && Math.abs(derivedSub + derivedTax - candidate) < 0.02) {
+            // Check if derivedSub or derivedTax exists among our numbers
+            const subExists = unique.some((n) => Math.abs(n - derivedSub) < 0.02);
+            const taxExists = unique.some((n) => Math.abs(n - derivedTax) < 0.02);
+            if (subExists || taxExists) {
+              this.logger.warn(
+                `[NumberFix] Derived: total=${candidate}, subtotal=${derivedSub}, tax=${derivedTax} (${rate * 100}%)`,
+              );
+              total = candidate;
+              subtotal = derivedSub;
+              tax = derivedTax;
+              fixed = true;
+              break;
+            }
+          }
+        }
+        if (fixed) break;
+      }
+    }
+
+    // Fix line items using corrected totals
     const fixedItems = this.fixLineItems(lineItems, subtotal, tax, total);
 
     return { total, subtotal, tax, lineItems: fixedItems };
   }
 
+  /** Column header words that the LLM might mistake for item descriptions. */
+  private static readonly COLUMN_HEADERS = new Set([
+    'itemname',
+    'item',
+    'unit',
+    'price',
+    'qty',
+    'qyt',
+    'quantity',
+    'rate',
+    'total',
+    'amount',
+    'description',
+    'vat',
+    'tax',
+    'discount',
+    'net',
+    'pric+vat',
+    't.pric+v',
+    'supply',
+    'narration',
+    'sl',
+    'sno',
+    'sr',
+  ]);
+
   /**
-   * Fix line item unitPrice/taxAmount using document-level subtotal and tax.
-   *
-   * Common LLM error: unitPrice = total (including tax) instead of pre-tax amount.
-   * Fix: if sum(unitPrice) ≈ total but subtotal is different, derive tax rate and split.
+   * Fix line items: remove fake items, fix quantities, fix tax split.
    */
   private fixLineItems(
     lineItems: ExtractedLineItem[],
@@ -376,53 +428,95 @@ export class OllamaService {
     tax: number | null,
     total: number | null,
   ): ExtractedLineItem[] {
-    if (!subtotal || !total || lineItems.length === 0) return lineItems;
+    if (!total || lineItems.length === 0) return lineItems;
 
-    // Check if line items already have correct tax split
-    const sumUnitPrices = lineItems.reduce((s, li) => s + li.unitPrice * li.quantity, 0);
-    const sumTaxAmounts = lineItems.reduce((s, li) => s + li.taxAmount, 0);
+    // Step 1: Remove fake line items (column headers used as descriptions)
+    let cleaned = lineItems.filter((li) => {
+      const desc = (li.description || '').toLowerCase().trim();
+      if (OllamaService.COLUMN_HEADERS.has(desc)) {
+        this.logger.warn(`[LineFix] Removing fake line item: "${li.description}" (column header)`);
+        return false;
+      }
+      // Remove items with no meaningful description (1-2 chars)
+      if (desc.length < 3 && li.unitPrice <= 0) {
+        return false;
+      }
+      return true;
+    });
 
-    // If unitPrices already match subtotal, items are correct
-    if (subtotal > 0 && Math.abs(sumUnitPrices - subtotal) / subtotal < 0.02) {
-      return lineItems;
-    }
-
-    // If unitPrices match total (not subtotal), the LLM used gross amounts as unitPrice
-    // Derive tax rate from document totals and split each line item
-    if (tax && tax > 0 && subtotal > 0) {
-      const taxRate = tax / subtotal; // e.g. 0.05 for 5% VAT
-
-      // Check if sum of line totals ≈ document total
-      const sumLineTotals = lineItems.reduce((s, li) => s + li.total, 0);
-      const useTotals = Math.abs(sumLineTotals - total) / total < 0.05;
-
-      if (useTotals || Math.abs(sumUnitPrices - total) / total < 0.05) {
-        this.logger.warn(
-          `[NumberFix] Line items have gross amounts as unitPrice. Splitting with tax rate ${(taxRate * 100).toFixed(1)}%`,
-        );
-
-        return lineItems.map((li) => {
-          const lineTotal = li.total > 0 ? li.total : li.unitPrice * li.quantity;
-          const preTax = Math.round((lineTotal / (1 + taxRate)) * 100) / 100;
-          const lineTax = Math.round((lineTotal - preTax) * 100) / 100;
-
-          if (Math.abs(li.unitPrice - preTax) > 0.01 || Math.abs(li.taxAmount - lineTax) > 0.01) {
-            this.logger.warn(
-              `[NumberFix] Line "${li.description}": unitPrice ${li.unitPrice}→${preTax}, tax ${li.taxAmount}→${lineTax}`,
-            );
+    // Step 2: Fix quantities — if qty*unitPrice is way off from total, try smaller qty
+    cleaned = cleaned.map((li) => {
+      if (li.quantity > 1 && li.unitPrice > 0 && li.total > 0) {
+        const computed = li.quantity * li.unitPrice;
+        // If computed is way off (e.g. 20 * 34.78 = 695.6 vs total=40), try dividing qty by 10
+        if (computed > li.total * 3) {
+          for (const div of [10, 100]) {
+            const fixedQty = li.quantity / div;
+            if (fixedQty >= 1 && Math.abs(fixedQty * li.unitPrice - li.total) / li.total < 0.1) {
+              this.logger.warn(`[LineFix] qty ${li.quantity}→${fixedQty} for "${li.description}"`);
+              return { ...li, quantity: fixedQty };
+            }
           }
+          // Also try: maybe unitPrice is actually the line total, and we need to find real unitPrice
+          if (subtotal && Math.abs(li.unitPrice - subtotal) < 0.01) {
+            const realQty = Math.round(li.quantity / 10) || 1;
+            const realUnitPrice = Math.round((li.total / realQty) * 10000) / 10000;
+            if (realQty >= 1 && Math.abs(realQty * realUnitPrice - (subtotal || li.total)) < 0.1) {
+              this.logger.warn(
+                `[LineFix] Reconstructed: qty=${realQty}, unitPrice=${realUnitPrice}`,
+              );
+              return { ...li, quantity: realQty, unitPrice: realUnitPrice };
+            }
+          }
+        }
+      }
+      return li;
+    });
 
+    // Step 3: If we have corrected subtotal/tax, fix tax split on line items
+    if (subtotal && subtotal > 0 && tax && tax > 0) {
+      const taxRate = tax / subtotal;
+      const sumLineTotals = cleaned.reduce((s, li) => s + li.total, 0);
+
+      // If line totals match document total (with tax), split into pre-tax
+      if (total > 0 && Math.abs(sumLineTotals - total) / total < 0.05) {
+        cleaned = cleaned.map((li) => {
+          const preTax = Math.round((li.total / (1 + taxRate)) * 100) / 100;
+          const lineTax = Math.round((li.total - preTax) * 100) / 100;
+          this.logger.warn(
+            `[LineFix] Tax split "${li.description}": unitPrice→${preTax / (li.quantity || 1)}, tax→${lineTax}`,
+          );
           return {
             ...li,
-            unitPrice: preTax / (li.quantity || 1),
+            unitPrice: Math.round((preTax / (li.quantity || 1)) * 10000) / 10000,
             taxAmount: lineTax,
-            total: lineTotal,
           };
+        });
+      }
+      // If line totals match subtotal (pre-tax), just add tax
+      else if (Math.abs(sumLineTotals - subtotal) / subtotal < 0.05) {
+        cleaned = cleaned.map((li) => {
+          const lineTax = Math.round(li.total * taxRate * 100) / 100;
+          return { ...li, taxAmount: lineTax, total: li.total + lineTax };
         });
       }
     }
 
-    return lineItems;
+    // Step 4: If no valid line items left but we have subtotal, create one from document totals
+    if (cleaned.length === 0 && subtotal && subtotal > 0) {
+      this.logger.warn(`[LineFix] No valid line items — creating one from document totals`);
+      cleaned = [
+        {
+          description: 'Item',
+          quantity: 1,
+          unitPrice: subtotal,
+          taxAmount: tax ?? 0,
+          total: total,
+        },
+      ];
+    }
+
+    return cleaned;
   }
 
   /**
