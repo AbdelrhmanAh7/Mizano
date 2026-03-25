@@ -114,8 +114,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           script: |
-            sudo mkdir -p /opt/mizano/apps/api/prisma
-            sudo chown -R $USER:$USER /opt/mizano
+            mkdir -p ~/mizano/apps/api/prisma
 
       - name: Copy deployment files to server
         uses: appleboy/scp-action@v0.1.7
@@ -125,7 +124,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           source: "docker-compose.production.yml,apps/api/prisma/"
-          target: /opt/mizano
+          target: ~/mizano
           overwrite: true
 
       - name: Write .env on server
@@ -147,12 +146,12 @@ jobs:
           envs: PG_USER,PG_PASS,PG_DB,JWT_S,JWT_RS,NA_SECRET,PROD_URL,API_U
           script: |
             set -e
-            mkdir -p /opt/mizano
+            mkdir -p ~/mizano
 
             # URL-encode password for DATABASE_URL (handle special chars like / = +)
             PG_PASS_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${PG_PASS}', safe=''))" 2>/dev/null || echo "${PG_PASS}")
 
-            cat > /opt/mizano/.env << EOF
+            cat > ~/mizano/.env << EOF
             APP_ENV=prod
             NODE_ENV=production
             POSTGRES_USER=${PG_USER:-mizano}
@@ -184,13 +183,13 @@ jobs:
             OLLAMA_NUM_CTX=8192
             EXTRACTION_STRATEGY=ocr
             PADDLE_OCR_LANG=ar
-            PADDLE_OCR_PKG_PATH=/opt/paddleocr_pkg
+            PADDLE_OCR_PKG_PATH=~/paddleocr_pkg
             EOF
 
             # Remove leading whitespace
-            sed -i 's/^[[:space:]]*//' /opt/mizano/.env
+            sed -i 's/^[[:space:]]*//' ~/mizano/.env
             echo ".env written successfully"
-            grep -c "=" /opt/mizano/.env | xargs -I{} echo "{} variables written"
+            grep -c "=" ~/mizano/.env | xargs -I{} echo "{} variables written"
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -202,7 +201,7 @@ jobs:
           script: |
             set -e
 
-            cd /opt/mizano
+            cd ~/mizano
             export TAG=${{ needs.build-and-push.outputs.api_tag }}
 
             # Login to GHCR
@@ -255,7 +254,7 @@ jobs:
             # Ensure Ollama is running
             if ! ollama list &> /dev/null 2>&1; then
               echo "Starting Ollama..."
-              systemctl start ollama || ollama serve &
+              ollama serve &
               sleep 5
             fi
 
@@ -267,7 +266,7 @@ jobs:
             # Install RapidOCR for PaddleOCR
             if ! python3 -c "from rapidocr_onnxruntime import RapidOCR" 2>/dev/null; then
               echo "Installing RapidOCR..."
-              pip3 install rapidocr-onnxruntime --target /opt/paddleocr_pkg || true
+              pip3 install rapidocr-onnxruntime --target ~/paddleocr_pkg || true
             fi
 
             echo "AI models ready"

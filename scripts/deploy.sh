@@ -62,7 +62,7 @@ if command -v ollama &> /dev/null; then
     ollama pull minicpm-v:latest || echo "WARNING: Failed to pull minicpm-v"
     # Install RapidOCR if not present
     if ! python3 -c "from rapidocr_onnxruntime import RapidOCR" 2>/dev/null; then
-        pip3 install rapidocr-onnxruntime --target /opt/paddleocr_pkg || true
+        pip3 install rapidocr-onnxruntime --target ~/paddleocr_pkg || true
     fi
 else
     echo "WARNING: Ollama not installed. AI features will be disabled."

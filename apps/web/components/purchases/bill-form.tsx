@@ -338,10 +338,11 @@ export function BillForm({
               <TableRow>
                 <TableHead className="w-[200px]">Item/Account</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead className="w-[100px]">Qty</TableHead>
-                <TableHead className="w-[120px]">Rate</TableHead>
+                <TableHead className="w-[80px]">Qty</TableHead>
+                <TableHead className="w-[110px]">Unit Price</TableHead>
+                <TableHead className="w-[110px] text-right">Amount</TableHead>
                 <TableHead className="w-[100px]">Tax</TableHead>
-                <TableHead className="w-[120px] text-right">Amount</TableHead>
+                <TableHead className="w-[110px] text-right">Total</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -349,7 +350,9 @@ export function BillForm({
               {fields.map((field, index) => {
                 const qty = parseFloat(form.watch(`lines.${index}.quantity`) || '0');
                 const rate = parseFloat(form.watch(`lines.${index}.rate`) || '0');
+                const lineTax = parseFloat(form.watch(`lines.${index}.taxRate`) || '0');
                 const lineAmount = qty * rate;
+                const lineTotal = lineAmount + lineTax;
 
                 return (
                   <TableRow key={field.id}>
@@ -394,6 +397,7 @@ export function BillForm({
                         className="h-8"
                       />
                     </TableCell>
+                    <TableCell className="text-right font-mono">{lineAmount.toFixed(2)}</TableCell>
                     <TableCell>
                       <Input
                         {...form.register(`lines.${index}.taxRate`)}
@@ -404,7 +408,9 @@ export function BillForm({
                         className="h-8 w-24"
                       />
                     </TableCell>
-                    <TableCell className="text-right font-mono">${lineAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-mono font-semibold">
+                      {lineTotal.toFixed(2)}
+                    </TableCell>
                     <TableCell>
                       {fields.length > 1 && (
                         <Button
