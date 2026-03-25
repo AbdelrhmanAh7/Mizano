@@ -29,7 +29,7 @@ export function wrapJsonPrompt(
   if (jsonSchema === undefined) {
     // 2-arg form: body + schema
     return [
-      '/no_think',
+      'Respond with ONLY valid JSON.',
       taskOrBody,
       '',
       'RULES:',

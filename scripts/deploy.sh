@@ -36,20 +36,37 @@ else
 fi
 
 # Run database migrations
-echo "[2/5] Running database migrations..."
+echo "[2/7] Running database migrations..."
 docker compose -f "${COMPOSE_FILE}" run --rm api npx prisma migrate deploy
 
+# Seed database (idempotent)
+echo "[3/7] Seeding database..."
+docker compose -f "${COMPOSE_FILE}" run --rm api npx prisma db seed || true
+
 # Rolling restart
-echo "[3/5] Restarting API..."
+echo "[4/7] Restarting API..."
 docker compose -f "${COMPOSE_FILE}" up -d --no-deps api
 sleep 10
 
-echo "[4/5] Restarting Web..."
+echo "[5/7] Restarting Web..."
 docker compose -f "${COMPOSE_FILE}" up -d --no-deps web
 
 # Ensure nginx is up
-echo "[5/5] Ensuring nginx is running..."
+echo "[6/7] Ensuring nginx is running..."
 docker compose -f "${COMPOSE_FILE}" --profile with-nginx up -d nginx
+
+# Pull Ollama models
+echo "[7/7] Pulling AI models..."
+if command -v ollama &> /dev/null; then
+    ollama pull gemma3:12b || echo "WARNING: Failed to pull gemma3:12b"
+    ollama pull minicpm-v:latest || echo "WARNING: Failed to pull minicpm-v"
+    # Install RapidOCR if not present
+    if ! python3 -c "from rapidocr_onnxruntime import RapidOCR" 2>/dev/null; then
+        pip3 install rapidocr-onnxruntime --target /opt/paddleocr_pkg || true
+    fi
+else
+    echo "WARNING: Ollama not installed. AI features will be disabled."
+fi
 
 # Cleanup
 docker image prune -f

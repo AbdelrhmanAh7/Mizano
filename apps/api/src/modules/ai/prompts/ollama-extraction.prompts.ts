@@ -1,11 +1,11 @@
 /**
  * Prompts for Ollama-based document extraction (invoice/bill/receipt).
  *
- * Optimized for small models (3B–7B) on CPU:
+ * Optimized for small/medium models (7B–12B) on CPU:
  *  - Concrete few-shot example instead of abstract schema
- *  - Minimal rules (5 max)
+ *  - Number validation rules
  *  - No confidence/accountingEntry (computed in code)
- *  - /no_think directive to skip reasoning
+ *  - Model-agnostic (no Qwen-specific /no_think)
  */
 
 /** Number validation rules — appended to all extraction prompts. */
@@ -13,8 +13,13 @@ const NUMBER_RULES = `- CRITICAL number validation:
   - total MUST equal subtotal + tax - discount. Cross-check your math before returning.
   - If a number seems too large (e.g. 12800 when total is 135.45), it has a missing decimal point: 12800 → 128.00
   - All monetary values must have proper decimal places (129.00 not 12900, 6.45 not 645)
-  - unitPrice × quantity must approximately equal each line item total
-  - Look at the total first, then work backwards to validate subtotal and tax`;
+  - READ numbers directly from the text. NEVER compute or estimate monetary values.
+  - subtotal, tax, and total are explicitly printed on the document — find and copy them exactly
+  - unitPrice is the PRE-TAX price per unit, NOT the total including tax
+  - For each line: (unitPrice × quantity) + taxAmount = line total
+  - Look for column headers like "Qty/QYT", "Price/Rate", "Total", "VAT/Tax" to identify which number is which
+  - If you see "PRIC+VAT" that means price INCLUDING tax — the unitPrice should be the column BEFORE it
+  - The sum of all line totals must equal the document total`;
 
 export const OLLAMA_EXTRACTION_SYSTEM_PROMPT =
   'You are a document data extraction assistant. Extract structured data from invoices, bills, and receipts. Return ONLY valid JSON. No thinking, no explanation.';
@@ -63,8 +68,7 @@ const EXTRACTION_EXAMPLE = JSON.stringify(
   0,
 );
 
-export const OLLAMA_VISION_PROMPT = `/no_think
-Extract all data from this document image into JSON.
+export const OLLAMA_VISION_PROMPT = `Extract all data from this document image into JSON. Respond with ONLY the JSON object.
 
 Example output:
 ${EXTRACTION_EXAMPLE}
@@ -82,8 +86,7 @@ ${NUMBER_RULES}`;
  * Build a prompt for extracting data from raw text (PDF text extraction).
  */
 export function buildTextExtractionPrompt(rawText: string): string {
-  return `/no_think
-Extract structured data from this document text into JSON.
+  return `Extract structured data from this document text into JSON. Respond with ONLY the JSON object.
 
 Example output:
 ${EXTRACTION_EXAMPLE}
@@ -106,8 +109,7 @@ ${rawText}`;
  * Instructs the model to handle OCR recognition errors (misread characters, merged words).
  */
 export function buildOcrTextExtractionPrompt(ocrText: string, ocrConfidence: number): string {
-  return `/no_think
-Extract structured data from this OCR-scanned document text into JSON.
+  return `Extract structured data from this OCR-scanned document text into JSON. Respond with ONLY the JSON object.
 This text was extracted via OCR (confidence: ${ocrConfidence.toFixed(0)}%). It may contain recognition errors, merged words, or misread characters. Use context to correct obvious mistakes.
 
 Example output:

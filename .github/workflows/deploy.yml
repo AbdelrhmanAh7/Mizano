@@ -117,6 +117,56 @@ jobs:
           target: /opt/mizano
           overwrite: true
 
+      - name: Write .env on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+            mkdir -p /opt/mizano
+
+            cat > /opt/mizano/.env << 'ENVEOF'
+            APP_ENV=prod
+            NODE_ENV=production
+            POSTGRES_USER=${{ secrets.POSTGRES_USER || 'mizano' }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ secrets.POSTGRES_DB || 'mizano_db' }}
+            DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER || 'mizano' }}:${{ secrets.POSTGRES_PASSWORD }}@postgres:5432/${{ secrets.POSTGRES_DB || 'mizano_db' }}?schema=public
+            REDIS_URL=redis://redis:6379
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+            JWT_EXPIRATION=15m
+            JWT_REFRESH_EXPIRATION=7d
+            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+            NEXTAUTH_URL=${{ secrets.PRODUCTION_URL }}
+            API_PORT=6001
+            CORS_ORIGIN=${{ secrets.PRODUCTION_URL }}
+            NEXT_PUBLIC_API_URL=${{ secrets.API_URL }}
+            NEXT_PUBLIC_APP_NAME=Mizano
+            RATE_LIMIT_TTL=1000
+            RATE_LIMIT_MAX=30
+            RATE_LIMIT_AUTH_MAX=10
+            LOG_LEVEL=warn
+            OLLAMA_BASE_URL=http://host.docker.internal:11434
+            OLLAMA_ENABLED=true
+            OLLAMA_TEXT_MODEL=gemma3:12b
+            OLLAMA_VISION_MODEL=minicpm-v:latest
+            OLLAMA_TIMEOUT_MS=300000
+            OLLAMA_MAX_CONCURRENT=1
+            OLLAMA_NUM_THREAD=4
+            OLLAMA_NUM_CTX=8192
+            EXTRACTION_STRATEGY=ocr
+            PADDLE_OCR_LANG=ar
+            PADDLE_OCR_PKG_PATH=/opt/paddleocr_pkg
+            ENVEOF
+
+            # Remove leading whitespace from heredoc
+            sed -i 's/^            //' /opt/mizano/.env
+            echo ".env written to /opt/mizano/.env"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -141,7 +191,11 @@ jobs:
             docker tag ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:${TAG} mizano-api:latest
             docker tag ${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}:${TAG} mizano-web:latest
 
-            # Rolling restart (images are pre-built from GHCR)
+            # Start infra first (postgres, redis)
+            docker compose -f docker-compose.production.yml up -d postgres redis
+            sleep 10
+
+            # Rolling restart app services
             docker compose -f docker-compose.production.yml up -d --no-deps api
             sleep 10
             docker compose -f docker-compose.production.yml up -d --no-deps web
@@ -149,10 +203,50 @@ jobs:
             # Run database migrations
             docker exec mizano-api npx prisma migrate deploy --schema /app/apps/api/prisma/schema.prisma || true
 
+            # Seed database (idempotent — only creates data if missing)
+            docker exec mizano-api npx prisma db seed --schema /app/apps/api/prisma/schema.prisma || true
+
             # Cleanup old images
             docker image prune -f
 
             echo "Deployment completed: tag=${TAG}"
+
+      - name: Pull Ollama models on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+
+            # Check if Ollama is installed
+            if ! command -v ollama &> /dev/null; then
+              echo "Installing Ollama..."
+              curl -fsSL https://ollama.com/install.sh | sh
+            fi
+
+            # Ensure Ollama is running
+            if ! ollama list &> /dev/null 2>&1; then
+              echo "Starting Ollama..."
+              systemctl start ollama || ollama serve &
+              sleep 5
+            fi
+
+            # Pull required models
+            echo "Pulling AI models..."
+            ollama pull gemma3:12b || echo "WARNING: Failed to pull gemma3:12b"
+            ollama pull minicpm-v:latest || echo "WARNING: Failed to pull minicpm-v:latest"
+
+            # Install RapidOCR for PaddleOCR
+            if ! python3 -c "from rapidocr_onnxruntime import RapidOCR" 2>/dev/null; then
+              echo "Installing RapidOCR..."
+              pip3 install rapidocr-onnxruntime --target /opt/paddleocr_pkg || true
+            fi
+
+            echo "AI models ready"
+            ollama list
 
   # ==========================================
   # Health check
