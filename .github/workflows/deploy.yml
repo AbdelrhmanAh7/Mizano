@@ -106,7 +106,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Prepare server directory
+      - name: Clean up server disk and prepare directory
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -114,6 +114,23 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           script: |
+            echo "=== Disk before cleanup ==="
+            df -h / | tail -1
+
+            # Remove all unused Docker resources (images, containers, volumes, networks)
+            docker system prune -af --volumes 2>/dev/null || true
+
+            # Clean apt cache
+            apt-get clean 2>/dev/null || true
+            rm -rf /tmp/* 2>/dev/null || true
+
+            # Clean old logs
+            find /var/log -type f -name "*.gz" -delete 2>/dev/null || true
+            journalctl --vacuum-size=50M 2>/dev/null || true
+
+            echo "=== Disk after cleanup ==="
+            df -h / | tail -1
+
             mkdir -p ~/mizano/apps/api/prisma
 
       - name: Copy deployment files to server
