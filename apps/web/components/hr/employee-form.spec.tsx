@@ -2,12 +2,12 @@
  * Regression tests for EmployeeForm.
  *
  * Errors 5-7: "Invalid time value" from date-fns format()
- *   Root cause: when employee.joiningDate is null/undefined/empty-string,
+ *   Root cause: when employee.dateOfJoining is null/undefined/empty-string,
  *   `new Date(null)` returns the epoch (Jan 1 1970) and `new Date(undefined)` /
  *   `new Date('')` return Invalid Date. An Invalid Date object is truthy, so the
- *   guard `form.watch('joiningDate') ? format(...) : 'Pick a date'` evaluates the
+ *   guard `form.watch('dateOfJoining') ? format(...) : 'Pick a date'` evaluates the
  *   format() branch, which throws RangeError: Invalid time value.
- *   Fix: guard defaultValues with `employee.joiningDate ? new Date(...) : new Date()`
+ *   Fix: guard defaultValues with `employee.dateOfJoining ? new Date(...) : new Date()`
  *        and use `isValid()` before calling format() in JSX.
  */
 
@@ -62,23 +62,28 @@ const defaultMutation = { mutateAsync: jest.fn(), isPending: false };
 
 const makeEmployee = (overrides?: Partial<Employee>): Employee => ({
   id: 'emp-001',
+  employeeId: 'emp-001',
   employeeNumber: 'EMP-001',
-  firstName: 'John',
-  lastName: 'Doe',
+  name: 'John Doe',
   email: 'john@example.com',
   phone: null,
-  joiningDate: '2024-01-15T00:00:00Z',
-  departmentId: null,
+  dateOfJoining: '2024-01-15T00:00:00Z',
+  hireDate: null,
+  department: null,
   jobTitle: 'Engineer',
+  position: null,
   basicSalary: '5000',
+  baseSalary: null,
   allowances: null,
   deductions: null,
-  bankName: null,
-  bankAccountNumber: null,
-  taxId: null,
+  bankAccount: null,
+  nationalId: null,
   status: 'ACTIVE',
+  isActive: true,
+  organizationId: 'org-001',
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
+  deletedAt: null,
   ...overrides,
 });
 
@@ -99,38 +104,38 @@ describe('EmployeeForm', () => {
     expect(() => render(<EmployeeForm employee={makeEmployee()} />)).not.toThrow();
   });
 
-  // ── joiningDate Invalid time value regressions ──────────────────────────
+  // ── dateOfJoining Invalid time value regressions ──────────────────────────
 
-  it('does not crash when joiningDate is null (regression: Invalid time value)', () => {
+  it('does not crash when dateOfJoining is null (regression: Invalid time value)', () => {
     expect(() =>
-      render(<EmployeeForm employee={makeEmployee({ joiningDate: null as unknown as string })} />),
+      render(<EmployeeForm employee={makeEmployee({ dateOfJoining: null as unknown as string })} />),
     ).not.toThrow();
   });
 
-  it('does not crash when joiningDate is undefined', () => {
+  it('does not crash when dateOfJoining is undefined', () => {
     expect(() =>
       render(
-        <EmployeeForm employee={makeEmployee({ joiningDate: undefined as unknown as string })} />,
+        <EmployeeForm employee={makeEmployee({ dateOfJoining: undefined as unknown as string })} />,
       ),
     ).not.toThrow();
   });
 
-  it('does not crash when joiningDate is an empty string', () => {
+  it('does not crash when dateOfJoining is an empty string', () => {
     expect(() =>
-      render(<EmployeeForm employee={makeEmployee({ joiningDate: '' })} />),
+      render(<EmployeeForm employee={makeEmployee({ dateOfJoining: '' })} />),
     ).not.toThrow();
   });
 
-  it('shows the formatted joining date when joiningDate is valid', () => {
-    render(<EmployeeForm employee={makeEmployee({ joiningDate: '2024-06-01T00:00:00Z' })} />);
+  it('shows the formatted joining date when dateOfJoining is valid', () => {
+    render(<EmployeeForm employee={makeEmployee({ dateOfJoining: '2024-06-01T00:00:00Z' })} />);
     // The calendar button should show a formatted date, not 'Pick a date'
     const button = screen.getByRole('button', { name: /june/i });
     expect(button).toBeInTheDocument();
   });
 
-  it('shows a formatted date (not "Pick a date") when joiningDate is null — defaults to today', () => {
-    render(<EmployeeForm employee={makeEmployee({ joiningDate: null as unknown as string })} />);
-    // When joiningDate is null the form defaults to new Date() (today) — a valid date is shown
+  it('shows a formatted date (not "Pick a date") when dateOfJoining is null — defaults to today', () => {
+    render(<EmployeeForm employee={makeEmployee({ dateOfJoining: null as unknown as string })} />);
+    // When dateOfJoining is null the form defaults to new Date() (today) — a valid date is shown
     expect(screen.queryByText('Pick a date')).not.toBeInTheDocument();
   });
 

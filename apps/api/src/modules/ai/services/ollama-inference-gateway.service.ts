@@ -49,8 +49,8 @@ export class OllamaInferenceGateway implements OnModuleInit {
     private httpService: HttpService,
   ) {
     this.baseUrl = this.configService.get('OLLAMA_BASE_URL', 'http://localhost:11434');
-    this.defaultTextModel = this.configService.get('OLLAMA_TEXT_MODEL', 'qwen2.5:7b');
-    this.defaultVisionModel = this.configService.get('OLLAMA_VISION_MODEL', 'minicpm-v:8b');
+    this.defaultTextModel = this.configService.get('OLLAMA_TEXT_MODEL', 'qwen2.5:3b');
+    this.defaultVisionModel = this.configService.get('OLLAMA_VISION_MODEL', 'minicpm-v:latest');
     this.defaultTimeoutMs = parseInt(this.configService.get('OLLAMA_TIMEOUT_MS', '120000'), 10);
     this.enabled = this.configService.get('OLLAMA_ENABLED', 'true') !== 'false';
     this.maxConcurrent = parseInt(this.configService.get('OLLAMA_MAX_CONCURRENT', '3'), 10);

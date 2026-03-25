@@ -46,7 +46,7 @@ jobs:
         run: pnpm lint
 
       - name: Run TypeScript type check
-        run: pnpm turbo run typecheck
+        run: pnpm turbo run type-check
 
   # ==========================================
   # Unit Tests
