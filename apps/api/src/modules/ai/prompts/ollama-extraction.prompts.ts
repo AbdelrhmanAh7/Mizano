@@ -18,9 +18,15 @@ const NUMBER_RULES = `- CRITICAL number validation:
   - unitPrice is the PRE-TAX price per unit, NOT the total including tax
   - For each line: (unitPrice × quantity) + taxAmount = line total
   - Words like "ItemName", "UNIT", "PRICE", "QYT", "TOTAL", "Rate", "Amount" are COLUMN HEADERS, not item descriptions — do NOT use them as lineItem descriptions
+  - Account/reference numbers (like "XXXXXXX199998") are NOT item descriptions — use the narration/description from the same row instead
   - If you see "PRIC+VAT" that means price INCLUDING tax — the unitPrice should be the column BEFORE it
   - Look at the last few numbers in the document for subtotal, tax%, and total (usually at the bottom)
-  - quantity is usually a small number (1-100). If it seems too large, you may have confused it with a price`;
+  - quantity is usually a small number (1-100). If it seems too large, you may have confused it with a price
+  - CRITICAL vendor identification:
+    - The vendorName is the company ISSUING the invoice (at the top/header of the document, often with a logo)
+    - "Bill To" / "Ship To" / "Customer" sections contain the CUSTOMER, not the vendor
+    - For bank invoices: the bank name (e.g. RAKBANK, Emirates NBD) is the vendor
+    - vendorTaxId is labeled "TRN", "Tax Registration No", "VAT No", or "الرقم الضريبي"`;
 
 export const OLLAMA_EXTRACTION_SYSTEM_PROMPT =
   'You are a document data extraction assistant. Extract structured data from invoices, bills, and receipts. Return ONLY valid JSON. No thinking, no explanation.';
