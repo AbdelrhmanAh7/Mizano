@@ -1679,7 +1679,6 @@ async function main() {
       const isWeekend = date.getDay() === 5 || date.getDay() === 6;
       if (!isWeekend) {
         attRecords.push({
-          id: `att-${empId}-${day}`,
           employeeId: empMap[empId],
           date,
           status: AttendanceStatus.PRESENT,
