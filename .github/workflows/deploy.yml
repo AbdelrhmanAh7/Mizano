@@ -119,32 +119,45 @@ jobs:
 
       - name: Write .env on server
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          PG_USER: ${{ secrets.POSTGRES_USER || 'mizano' }}
+          PG_PASS: ${{ secrets.POSTGRES_PASSWORD }}
+          PG_DB: ${{ secrets.POSTGRES_DB || 'mizano_db' }}
+          JWT_S: ${{ secrets.JWT_SECRET }}
+          JWT_RS: ${{ secrets.JWT_REFRESH_SECRET }}
+          NA_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          PROD_URL: ${{ secrets.PRODUCTION_URL }}
+          API_U: ${{ secrets.API_URL }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
+          envs: PG_USER,PG_PASS,PG_DB,JWT_S,JWT_RS,NA_SECRET,PROD_URL,API_U
           script: |
             set -e
             mkdir -p /opt/mizano
 
-            cat > /opt/mizano/.env << 'ENVEOF'
+            # URL-encode password for DATABASE_URL (handle special chars like / = +)
+            PG_PASS_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${PG_PASS}', safe=''))" 2>/dev/null || echo "${PG_PASS}")
+
+            cat > /opt/mizano/.env << EOF
             APP_ENV=prod
             NODE_ENV=production
-            POSTGRES_USER=${{ secrets.POSTGRES_USER || 'mizano' }}
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            POSTGRES_DB=${{ secrets.POSTGRES_DB || 'mizano_db' }}
-            DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER || 'mizano' }}:${{ secrets.POSTGRES_PASSWORD }}@postgres:5432/${{ secrets.POSTGRES_DB || 'mizano_db' }}?schema=public
+            POSTGRES_USER=${PG_USER:-mizano}
+            POSTGRES_PASSWORD=${PG_PASS}
+            POSTGRES_DB=${PG_DB:-mizano_db}
+            DATABASE_URL=postgresql://${PG_USER:-mizano}:${PG_PASS_ENCODED}@postgres:5432/${PG_DB:-mizano_db}?schema=public
             REDIS_URL=redis://redis:6379
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
+            JWT_SECRET=${JWT_S}
+            JWT_REFRESH_SECRET=${JWT_RS}
             JWT_EXPIRATION=15m
             JWT_REFRESH_EXPIRATION=7d
-            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
-            NEXTAUTH_URL=${{ secrets.PRODUCTION_URL }}
+            NEXTAUTH_SECRET=${NA_SECRET}
+            NEXTAUTH_URL=${PROD_URL}
             API_PORT=6001
-            CORS_ORIGIN=${{ secrets.PRODUCTION_URL }}
-            NEXT_PUBLIC_API_URL=${{ secrets.API_URL }}
+            CORS_ORIGIN=${PROD_URL}
+            NEXT_PUBLIC_API_URL=${API_U}
             NEXT_PUBLIC_APP_NAME=Mizano
             RATE_LIMIT_TTL=1000
             RATE_LIMIT_MAX=30
@@ -161,11 +174,12 @@ jobs:
             EXTRACTION_STRATEGY=ocr
             PADDLE_OCR_LANG=ar
             PADDLE_OCR_PKG_PATH=/opt/paddleocr_pkg
-            ENVEOF
+            EOF
 
-            # Remove leading whitespace from heredoc
-            sed -i 's/^            //' /opt/mizano/.env
-            echo ".env written to /opt/mizano/.env"
+            # Remove leading whitespace
+            sed -i 's/^[[:space:]]*//' /opt/mizano/.env
+            echo ".env written successfully"
+            grep -c "=" /opt/mizano/.env | xargs -I{} echo "{} variables written"
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
