@@ -74,6 +74,7 @@ services:
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:5001}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:6001/api}
+      - API_INTERNAL_URL=http://api:6001/api
     deploy:
       resources:
         limits:
