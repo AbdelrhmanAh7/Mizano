@@ -100,7 +100,11 @@
       "Bash(ls -la \"/mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/app/[locale]/\\(dashboard\\)/purchases/bills/scan\")",
       "Bash(npx turbo:*)",
       "Bash(docker-compose --profile ocr up -d ocr-service 2>&1)",
-      "Bash(cd \"C:\\\\Users\\\\Abdelrahman\\\\Desktop\\\\Personal_Project\\\\Mizano\" && docker compose --profile vlm build vlm-service 2>&1)"
+      "Bash(cd \"C:\\\\Users\\\\Abdelrahman\\\\Desktop\\\\Personal_Project\\\\Mizano\" && docker compose --profile vlm build vlm-service 2>&1)",
+      "WebSearch",
+      "Bash(pip install:*)",
+      "Bash(PYTHONPATH=C:/paddleocr_pkg python -c \"from paddleocr import PaddleOCR; print\\('PaddleOCR OK'\\)\" 2>&1)",
+      "Bash(openssl rand:*)"
     ]
   }
 }
