@@ -290,7 +290,7 @@ jobs:
             ollama list
 
   # ==========================================
-  # Health check
+  # Health check (runs on server via SSH)
   # ==========================================
   health-check:
     name: Health Check
@@ -301,19 +301,31 @@ jobs:
       - name: Wait for services to stabilize
         run: sleep 30
 
-      - name: Verify API health
-        run: |
-          for i in 1 2 3; do
-            status=$(curl -sf -o /dev/null -w "%{http_code}" "http://${{ secrets.DEPLOY_HOST }}:6001/api/health" || true)
-            if [ "$status" = "200" ]; then
-              echo "API is healthy (attempt $i)"
-              exit 0
-            fi
-            echo "Attempt $i failed (status: $status), retrying in 10s..."
-            sleep 10
-          done
-          echo "API health check failed after 3 attempts"
-          exit 1
+      - name: Verify API health via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            for i in 1 2 3 4 5; do
+              status=$(curl -sf -o /dev/null -w "%{http_code}" "http://localhost:6001/api/health" || true)
+              if [ "$status" = "200" ]; then
+                echo "API is healthy (attempt $i)"
+                # Also show full health response
+                curl -s "http://localhost:6001/api/health" | python3 -m json.tool 2>/dev/null || true
+                exit 0
+              fi
+              echo "Attempt $i failed (status: $status), retrying in 15s..."
+              # Show container status for debugging
+              docker ps --format "table {{.Names}}\t{{.Status}}" | grep mizano || true
+              sleep 15
+            done
+            echo "API health check failed after 5 attempts"
+            echo "=== Container logs ==="
+            docker logs mizano-api --tail 50 2>&1 || true
+            exit 1
 
       - name: Notify success
         if: success()
