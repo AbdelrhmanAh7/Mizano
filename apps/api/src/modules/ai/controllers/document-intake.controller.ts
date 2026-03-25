@@ -84,6 +84,11 @@ export class DocumentIntakeController {
           enum: ['BILL', 'INVOICE'],
           description: 'Force document type instead of auto-classification',
         },
+        strategy: {
+          type: 'string',
+          enum: ['ocr', 'hybrid', 'vlm', 'auto'],
+          description: 'Extraction strategy (default: from env EXTRACTION_STRATEGY)',
+        },
       },
       required: ['file'],
     },
@@ -108,6 +113,7 @@ export class DocumentIntakeController {
       file.mimetype,
       file.originalname,
       dto.language,
+      dto.strategy,
     );
 
     // Store forceType on the job for later result retrieval

@@ -1,15 +1,16 @@
 /**
  * Prompt builders for the 7 NLP services powered by Ollama.
  *
- * Each function returns a fully-formed prompt string that instructs the LLM
- * to return structured JSON.  All prompts support Arabic and English input
- * via the shared COMMON_RULES in base.prompts.ts.
+ * Optimized for small models (3B–7B) on CPU:
+ *  - Concrete few-shot examples instead of abstract schemas
+ *  - Shorter prompts (fewer tokens = faster inference)
+ *  - /no_think directive via wrapJsonPrompt
  */
 
 import { wrapJsonPrompt, buildSystemPrompt } from './base.prompts';
 
 /* ------------------------------------------------------------------ */
-/*  Shared JSON-schema snippets (kept close to the consumers)         */
+/*  Shared constants                                                   */
 /* ------------------------------------------------------------------ */
 
 const CHATBOT_INTENTS = [
@@ -52,18 +53,12 @@ export interface OrgContext {
   [key: string]: unknown;
 }
 
-/**
- * Build a prompt for the conversational chatbot.
- *
- * The model is asked to detect the user's intent, extract relevant entities,
- * generate a natural-language response, and suggest follow-up actions.
- */
 export function buildChatbotPrompt(
   message: string,
   history: ChatbotHistory[],
   orgContext: OrgContext,
 ): string {
-  const systemPrompt = buildSystemPrompt('conversational business assistance and accounting');
+  const systemPrompt = buildSystemPrompt('conversational business assistance');
 
   const conversationBlock = history.length
     ? history.map((h) => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`).join('\n')
@@ -72,38 +67,36 @@ export function buildChatbotPrompt(
   const context = [
     systemPrompt,
     '',
-    'ORGANIZATION CONTEXT:',
-    JSON.stringify(orgContext, null, 2),
+    'ORG:',
+    JSON.stringify(orgContext),
     '',
-    'CONVERSATION HISTORY:',
+    'HISTORY:',
     conversationBlock,
     '',
-    'CURRENT USER MESSAGE:',
+    'USER:',
     message,
   ].join('\n');
 
   const task = [
-    'Analyze the user message within the conversation context.',
-    'Detect the user intent, extract entities, generate a helpful response, and suggest follow-up actions.',
-    `Allowed intents: ${CHATBOT_INTENTS.join(', ')}.`,
-    'The response field must be in the same language the user used (Arabic or English).',
-    'Provide 1-3 short suggestion strings the user can click to continue the conversation.',
+    'Detect intent, extract entities, respond helpfully.',
+    `Intents: ${CHATBOT_INTENTS.join(', ')}.`,
+    'Respond in the same language the user used.',
   ].join(' ');
 
   const schema = JSON.stringify(
     {
-      intent: 'one of: ' + CHATBOT_INTENTS.join(' | '),
+      intent:
+        'invoice_status|payment_reminder|account_balance|create_invoice|report_request|help|greeting|unknown',
       entities: {
-        customer_name: 'string | null',
-        invoice_number: 'string | null',
-        amount: 'number | null',
-        date: 'string (ISO 8601) | null',
-        currency: 'string | null',
-        report_type: 'string | null',
+        customer_name: 'string|null',
+        invoice_number: 'string|null',
+        amount: 'number|null',
+        date: 'YYYY-MM-DD|null',
+        currency: 'string|null',
       },
-      response: 'string — natural-language answer',
-      suggestions: ['string — follow-up suggestion'],
-      confidence: 'number 0-1',
+      response: 'natural language answer',
+      suggestions: ['follow-up suggestion'],
+      confidence: 0.85,
     },
     null,
     2,
@@ -116,31 +109,36 @@ export function buildChatbotPrompt(
 /*  2. Named Entity Recognition (NER)                                 */
 /* ------------------------------------------------------------------ */
 
-/**
- * Build a prompt for extracting named entities from arbitrary text.
- */
 export function buildEntityExtractionPrompt(text: string): string {
-  const systemPrompt = buildSystemPrompt('named entity recognition (NER)');
+  const systemPrompt = buildSystemPrompt('named entity recognition');
 
-  const task = [
-    'Extract all named entities from the input text.',
-    'Identify people, organizations, dates, places, monetary amounts, emails, and phone numbers.',
-    'Return every occurrence — do not deduplicate.',
-    'For monetary amounts, always separate the numeric value and the currency code.',
-    'Handle both Arabic and English text seamlessly.',
-  ].join(' ');
+  const task = 'Extract all named entities from the text. Support Arabic and English.';
 
-  const context = [systemPrompt, '', 'TEXT TO ANALYZE:', text].join('\n');
+  const example = JSON.stringify(
+    {
+      people: ['Ahmed Al-Rashid', 'محمد علي'],
+      organizations: ['Acme Corp', 'شركة الأمل'],
+      dates: ['2024-03-15'],
+      places: ['Riyadh', 'Dubai'],
+      money: [{ amount: 1500.0, currency: 'SAR' }],
+      emails: ['info@acme.com'],
+      phones: ['+966501234567'],
+    },
+    null,
+    2,
+  );
+
+  const context = [systemPrompt, '', 'Example output:', example, '', 'TEXT:', text].join('\n');
 
   const schema = JSON.stringify(
     {
-      people: ['string — person names'],
-      organizations: ['string — company / org names'],
-      dates: ['string — ISO 8601 dates'],
-      places: ['string — locations / addresses'],
-      money: [{ amount: 'number', currency: 'string (ISO 4217 code)' }],
-      emails: ['string — email addresses'],
-      phones: ['string — phone numbers'],
+      people: ['person names'],
+      organizations: ['company names'],
+      dates: ['YYYY-MM-DD'],
+      places: ['locations'],
+      money: [{ amount: 0, currency: 'USD' }],
+      emails: ['email addresses'],
+      phones: ['phone numbers'],
     },
     null,
     2,
@@ -153,30 +151,23 @@ export function buildEntityExtractionPrompt(text: string): string {
 /*  3. Sentiment Analysis                                             */
 /* ------------------------------------------------------------------ */
 
-/**
- * Build a prompt for sentiment analysis of the given text.
- */
 export function buildSentimentPrompt(text: string): string {
   const systemPrompt = buildSystemPrompt('sentiment analysis');
 
   const task = [
-    'Perform sentiment analysis on the input text.',
-    'Return an overall sentiment score from -1 (most negative) to 1 (most positive), rounded to 2 decimal places.',
-    'The comparative score is the sentiment score normalized by word count (score / total words), rounded to 4 decimal places.',
-    'Classify the overall sentiment as "positive", "negative", or "neutral".',
-    'List individual positive and negative words/phrases found in the text.',
-    'Handle both Arabic and English text. Translate sentiment-bearing Arabic words when listing them.',
+    'Analyze sentiment. Score from -1 (negative) to 1 (positive).',
+    'Comparative = score / word count. List positive and negative words.',
   ].join(' ');
 
-  const context = [systemPrompt, '', 'TEXT TO ANALYZE:', text].join('\n');
+  const context = [systemPrompt, '', 'TEXT:', text].join('\n');
 
   const schema = JSON.stringify(
     {
-      score: 'number — overall sentiment from -1 to 1',
-      comparative: 'number — score / total words',
-      sentiment: '"positive" | "negative" | "neutral"',
-      positive_words: ['string'],
-      negative_words: ['string'],
+      score: 0.6,
+      comparative: 0.05,
+      sentiment: 'positive|negative|neutral',
+      positive_words: ['good', 'excellent'],
+      negative_words: ['late'],
     },
     null,
     2,
@@ -189,21 +180,31 @@ export function buildSentimentPrompt(text: string): string {
 /*  4. Document Classification                                        */
 /* ------------------------------------------------------------------ */
 
-/**
- * Build a prompt for classifying a document into one of the predefined categories.
- */
 export function buildDocumentClassificationPrompt(text: string, filename?: string): string {
   const systemPrompt = buildSystemPrompt('document classification');
 
-  const task = [
-    'Classify the document into exactly one of the following categories:',
-    DOCUMENT_CATEGORIES.join(', ') + '.',
-    'Analyze the text content and, if provided, the filename for classification clues.',
-    'Return the single best category, a confidence score (0-1), and a scores object mapping every category to its probability (all scores must sum to 1).',
-    'Handle both Arabic and English documents.',
-  ].join(' ');
+  const task = `Classify the document into exactly one category: ${DOCUMENT_CATEGORIES.join(', ')}. Return the category with confidence and per-category scores (must sum to 1).`;
 
-  const contextParts = [systemPrompt, ''];
+  const example = JSON.stringify(
+    {
+      category: 'INVOICE',
+      confidence: 0.92,
+      scores: {
+        INVOICE: 0.92,
+        RECEIPT: 0.03,
+        PURCHASE_ORDER: 0.02,
+        CONTRACT: 0.01,
+        TAX_DOCUMENT: 0.01,
+        BANK_STATEMENT: 0.0,
+        PAYSLIP: 0.0,
+        OTHER: 0.01,
+      },
+    },
+    null,
+    2,
+  );
+
+  const contextParts = [systemPrompt, '', 'Example output:', example, ''];
   if (filename) {
     contextParts.push(`FILENAME: ${filename}`, '');
   }
@@ -211,9 +212,9 @@ export function buildDocumentClassificationPrompt(text: string, filename?: strin
 
   const schema = JSON.stringify(
     {
-      category: 'one of: ' + DOCUMENT_CATEGORIES.join(' | '),
-      confidence: 'number 0-1',
-      scores: Object.fromEntries(DOCUMENT_CATEGORIES.map((c) => [c, 'number 0-1'])),
+      category: DOCUMENT_CATEGORIES.join('|'),
+      confidence: 0.85,
+      scores: Object.fromEntries(DOCUMENT_CATEGORIES.map((c) => [c, 0.0])),
     },
     null,
     2,
@@ -226,44 +227,25 @@ export function buildDocumentClassificationPrompt(text: string, filename?: strin
 /*  5. Contract / Legal Document Analysis                             */
 /* ------------------------------------------------------------------ */
 
-/**
- * Build a prompt for analyzing a contract or legal document.
- */
 export function buildContractAnalysisPrompt(text: string): string {
   const systemPrompt = buildSystemPrompt('contract and legal document analysis');
 
   const task = [
-    'Analyze the contract / legal document and extract structured information.',
-    'Identify all parties involved and their roles (e.g., buyer, seller, landlord, tenant).',
-    'Extract all significant dates with descriptive labels (e.g., "effective_date", "expiry_date", "renewal_date").',
-    'Identify key clauses and classify their type (e.g., "termination", "liability", "confidentiality", "payment_terms", "indemnification", "governing_law").',
-    'Assess each clause\'s risk level as "low", "medium", or "high".',
-    'List potential risks with a severity of "low", "medium", "high", or "critical" and a recommended action.',
-    'Provide a concise summary of the contract (2-4 sentences) in the same language as the document.',
-    'Handle both Arabic and English contracts.',
+    'Analyze the contract. Extract parties, dates, key clauses with risk levels, and risks with severity.',
+    'Provide a 2-4 sentence summary in the document language.',
   ].join(' ');
 
   const context = [systemPrompt, '', 'CONTRACT TEXT:', text].join('\n');
 
   const schema = JSON.stringify(
     {
-      parties: [{ name: 'string', role: 'string' }],
-      dates: [{ label: 'string', value: 'string (ISO 8601)' }],
-      clauses: [
-        {
-          type: 'string — clause category',
-          text: 'string — key excerpt from clause',
-          risk_level: '"low" | "medium" | "high"',
-        },
-      ],
+      parties: [{ name: 'Company A', role: 'seller' }],
+      dates: [{ label: 'effective_date', value: '2024-01-01' }],
+      clauses: [{ type: 'payment_terms', text: 'Net 30 days', risk_level: 'low' }],
       risks: [
-        {
-          description: 'string',
-          severity: '"low" | "medium" | "high" | "critical"',
-          recommendation: 'string',
-        },
+        { description: 'No liability cap', severity: 'high', recommendation: 'Add cap clause' },
       ],
-      summary: 'string — 2-4 sentence summary',
+      summary: '2-4 sentence summary',
     },
     null,
     2,
@@ -276,35 +258,22 @@ export function buildContractAnalysisPrompt(text: string): string {
 /*  6. Knowledge / Business Assistant                                 */
 /* ------------------------------------------------------------------ */
 
-/**
- * Build a prompt for answering a user query using provided business context.
- */
 export function buildKnowledgeAssistantPrompt(query: string, context: string): string {
-  const systemPrompt = buildSystemPrompt('business knowledge and accounting advisory');
+  const systemPrompt = buildSystemPrompt('business knowledge advisory');
 
   const task = [
-    'Answer the user query based ONLY on the provided business context.',
-    'If the context does not contain enough information, say so clearly and set confidence below 0.3.',
-    'Never fabricate information. Cite which parts of the context support your answer.',
-    'Return a list of source references (brief descriptions of the context sections used).',
-    'Respond in the same language the user used for their query (Arabic or English).',
+    'Answer the query using ONLY the provided context.',
+    'If insufficient info, say so and set confidence below 0.3.',
+    'Respond in the same language as the query.',
   ].join(' ');
 
-  const combinedContext = [
-    systemPrompt,
-    '',
-    'BUSINESS CONTEXT:',
-    context,
-    '',
-    'USER QUERY:',
-    query,
-  ].join('\n');
+  const combinedContext = [systemPrompt, '', 'CONTEXT:', context, '', 'QUERY:', query].join('\n');
 
   const schema = JSON.stringify(
     {
-      answer: 'string — comprehensive answer to the query',
-      sources: ['string — brief reference to context section used'],
-      confidence: 'number 0-1',
+      answer: 'comprehensive answer',
+      sources: ['reference to context section used'],
+      confidence: 0.85,
     },
     null,
     2,
@@ -317,31 +286,42 @@ export function buildKnowledgeAssistantPrompt(query: string, context: string): s
 /*  7. Voice Command Parser                                           */
 /* ------------------------------------------------------------------ */
 
-/**
- * Build a prompt for parsing a voice-command transcript into a structured action.
- */
 export function buildVoiceCommandPrompt(transcript: string): string {
-  const systemPrompt = buildSystemPrompt('voice command parsing for business ERP operations');
+  const systemPrompt = buildSystemPrompt('voice command parsing for ERP');
 
   const task = [
-    'Parse the voice command transcript into a structured action.',
-    `Determine the CRUD action: ${VOICE_ACTIONS.join(', ')}.`,
-    'Identify the target entity (e.g., "invoice", "customer", "payment", "report", "bill", "expense").',
-    'Extract all relevant parameters such as customer name, amount, date, invoice number, item descriptions, etc.',
-    'If the transcript is ambiguous, pick the most likely interpretation and reflect uncertainty in the confidence score.',
-    'Handle both Arabic and English voice transcripts. Arabic commands should be mapped to the same English action/entity names.',
+    `Parse the voice command into a structured action: ${VOICE_ACTIONS.join(', ')}.`,
+    'Identify target entity and extract parameters.',
+    'Map Arabic commands to English action/entity names.',
   ].join(' ');
 
-  const context = [systemPrompt, '', 'VOICE TRANSCRIPT:', transcript].join('\n');
+  const example = JSON.stringify(
+    {
+      action: 'CREATE',
+      entity: 'invoice',
+      parameters: { customer_name: 'Acme Corp', amount: 5000, currency: 'SAR' },
+      confidence: 0.9,
+    },
+    null,
+    2,
+  );
+
+  const context = [
+    systemPrompt,
+    '',
+    'Example output:',
+    example,
+    '',
+    'TRANSCRIPT:',
+    transcript,
+  ].join('\n');
 
   const schema = JSON.stringify(
     {
-      action: 'one of: ' + VOICE_ACTIONS.join(' | '),
-      entity: 'string — target business entity (lowercase)',
-      parameters: {
-        '(dynamic keys)': 'Values extracted from transcript — strings, numbers, or nested objects',
-      },
-      confidence: 'number 0-1',
+      action: 'CREATE|READ|UPDATE|DELETE',
+      entity: 'target entity (lowercase)',
+      parameters: {},
+      confidence: 0.85,
     },
     null,
     2,

@@ -28,6 +28,15 @@ export class ProcessDocumentDto {
   @IsIn(['BILL', 'INVOICE'])
   @IsOptional()
   forceType?: 'BILL' | 'INVOICE';
+
+  @ApiPropertyOptional({
+    description: 'Extraction strategy override (default: from EXTRACTION_STRATEGY env)',
+    enum: ['ocr', 'hybrid', 'vlm', 'auto'],
+    example: 'ocr',
+  })
+  @IsIn(['ocr', 'hybrid', 'vlm', 'auto'])
+  @IsOptional()
+  strategy?: 'ocr' | 'hybrid' | 'vlm' | 'auto';
 }
 
 export class ConfirmIntakeLineDto {

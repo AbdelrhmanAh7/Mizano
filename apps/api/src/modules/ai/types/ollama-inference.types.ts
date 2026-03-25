@@ -19,8 +19,10 @@ export interface OllamaInferenceOptions {
   model?: string;
   /** Sampling temperature (default 0.1) */
   temperature?: number;
-  /** Maximum tokens to generate (default 4096) */
+  /** Maximum tokens to generate (default 8192) */
   maxTokens?: number;
+  /** Override context window size (default from OLLAMA_NUM_CTX env) */
+  numCtx?: number;
   /** Override default timeout in milliseconds */
   timeoutMs?: number;
   /** Optional system message prepended to the conversation */

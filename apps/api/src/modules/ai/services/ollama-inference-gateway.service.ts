@@ -31,6 +31,8 @@ export class OllamaInferenceGateway implements OnModuleInit {
   private readonly defaultTimeoutMs: number;
   private readonly enabled: boolean;
   private readonly maxConcurrent: number;
+  private readonly numThread: number;
+  private readonly numCtx: number;
 
   // Health cache (60s TTL)
   private lastHealthCheck: { available: boolean; timestamp: number } | null = null;
@@ -49,11 +51,13 @@ export class OllamaInferenceGateway implements OnModuleInit {
     private httpService: HttpService,
   ) {
     this.baseUrl = this.configService.get('OLLAMA_BASE_URL', 'http://localhost:11434');
-    this.defaultTextModel = this.configService.get('OLLAMA_TEXT_MODEL', 'qwen2.5:3b');
+    this.defaultTextModel = this.configService.get('OLLAMA_TEXT_MODEL', 'qwen2.5:7b');
     this.defaultVisionModel = this.configService.get('OLLAMA_VISION_MODEL', 'minicpm-v:latest');
-    this.defaultTimeoutMs = parseInt(this.configService.get('OLLAMA_TIMEOUT_MS', '120000'), 10);
+    this.defaultTimeoutMs = parseInt(this.configService.get('OLLAMA_TIMEOUT_MS', '300000'), 10);
     this.enabled = this.configService.get('OLLAMA_ENABLED', 'true') !== 'false';
-    this.maxConcurrent = parseInt(this.configService.get('OLLAMA_MAX_CONCURRENT', '3'), 10);
+    this.maxConcurrent = parseInt(this.configService.get('OLLAMA_MAX_CONCURRENT', '1'), 10);
+    this.numThread = parseInt(this.configService.get('OLLAMA_NUM_THREAD', '4'), 10);
+    this.numCtx = parseInt(this.configService.get('OLLAMA_NUM_CTX', '4096'), 10);
   }
 
   // ---------------------------------------------------------------------------
@@ -324,11 +328,11 @@ export class OllamaInferenceGateway implements OnModuleInit {
       }
       messages.push(userMessage);
 
-      // On retry, significantly increase token budget (thinking models need much more room)
+      // On retry, increase token budget (thinking models need more room)
       const maxTokens =
         attempt > 1
-          ? Math.max((options?.maxTokens ?? 4096) * 4, 32768)
-          : (options?.maxTokens ?? 4096);
+          ? Math.max((options?.maxTokens ?? 8192) * 2, 16384)
+          : (options?.maxTokens ?? 8192);
       const temperature = attempt > 1 ? 0 : (options?.temperature ?? 0.1);
 
       const body: Record<string, unknown> = {
@@ -339,6 +343,8 @@ export class OllamaInferenceGateway implements OnModuleInit {
         options: {
           temperature,
           num_predict: maxTokens,
+          num_thread: this.numThread,
+          num_ctx: options?.numCtx ?? this.numCtx,
         },
       };
 
@@ -458,7 +464,9 @@ export class OllamaInferenceGateway implements OnModuleInit {
             think: false,
             options: {
               temperature: options?.temperature ?? 0.3,
-              num_predict: options?.maxTokens ?? 4096,
+              num_predict: options?.maxTokens ?? 8192,
+              num_thread: this.numThread,
+              num_ctx: options?.numCtx ?? this.numCtx,
             },
           },
           { timeout: timeoutMs, responseType: 'stream' },

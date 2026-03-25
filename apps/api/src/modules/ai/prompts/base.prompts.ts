@@ -1,14 +1,15 @@
 /**
  * Shared prompt utilities used across all Ollama-powered AI services.
+ *
+ * Optimized for small models (3B–7B): shorter rules, concise format.
  */
 
 /** Common rules appended to every prompt. */
 export const COMMON_RULES = [
   'Return ONLY valid JSON. No markdown, no explanations, no code fences.',
-  'Support both Arabic (عربي) and English text.',
-  'Use null for any field you cannot determine — never guess.',
-  'All monetary values must be numbers with up to 4 decimal places.',
-  'Dates must use ISO 8601 format (YYYY-MM-DD).',
+  'Support both Arabic and English text.',
+  'Use null for unknown fields. Never guess.',
+  'Numbers: up to 4 decimal places. Dates: YYYY-MM-DD.',
 ].join('\n');
 
 /**
@@ -28,19 +29,19 @@ export function wrapJsonPrompt(
   if (jsonSchema === undefined) {
     // 2-arg form: body + schema
     return [
+      '/no_think',
       taskOrBody,
       '',
       'RULES:',
       COMMON_RULES,
       '',
-      'EXPECTED JSON OUTPUT SCHEMA:',
+      'Return a JSON object matching this schema:',
       contextOrSchema,
-      '',
-      'Respond with ONLY the JSON object, nothing else.',
     ].join('\n');
   }
   // 3-arg form: task + context + schema
   return [
+    '/no_think',
     `TASK: ${taskOrBody}`,
     '',
     'RULES:',
@@ -49,10 +50,8 @@ export function wrapJsonPrompt(
     'INPUT:',
     contextOrSchema,
     '',
-    'EXPECTED JSON OUTPUT SCHEMA:',
+    'Return a JSON object matching this schema:',
     jsonSchema,
-    '',
-    'Respond with ONLY the JSON object, nothing else.',
   ].join('\n');
 }
 
@@ -63,6 +62,6 @@ export function wrapJsonPrompt(
  * @param details – optional extended description of capabilities and constraints
  */
 export function buildSystemPrompt(domain: string, details?: string): string {
-  const base = `You are an AI assistant specializing in ${domain} for a business ERP system. You analyze data and return structured JSON responses. You support both Arabic and English. Be precise and factual. Never fabricate data.`;
+  const base = `You are an AI assistant for ${domain} in a business ERP. Return structured JSON. Support Arabic and English. Be precise. Never fabricate data.`;
   return details ? `${base}\n\n${details}` : base;
 }

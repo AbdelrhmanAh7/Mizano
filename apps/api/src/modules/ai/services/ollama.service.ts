@@ -4,7 +4,9 @@ import {
   OLLAMA_EXTRACTION_SYSTEM_PROMPT,
   OLLAMA_VISION_PROMPT,
   buildTextExtractionPrompt,
+  buildOcrTextExtractionPrompt,
 } from '../prompts/ollama-extraction.prompts';
+import { preprocessForVlm } from '../utils/image-preprocessor.util';
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -99,21 +101,10 @@ export class OllamaService {
 
   constructor(private readonly gateway: OllamaInferenceGateway) {}
 
-  /** Max file size in bytes for processed images sent to Ollama (100KB). */
-  private static readonly MAX_IMAGE_BYTES = 100 * 1024;
-  /** Starting max dimension — will be reduced if image exceeds MAX_IMAGE_BYTES. */
-  private static readonly INITIAL_MAX_DIM = 1536;
-  /** Starting JPEG quality — will be reduced if image exceeds MAX_IMAGE_BYTES. */
-  private static readonly INITIAL_JPEG_QUALITY = 85;
-
   /**
    * Extract document data from an image using Ollama's vision model.
    *
-   * Preprocessing pipeline:
-   *  1. HEIC/HEIF → JPEG (via sharp or heic-convert fallback)
-   *  2. Progressively resize + reduce quality until ≤ 100KB
-   *  3. Sharpen + normalize contrast for text readability
-   *
+   * Uses shared ImagePreprocessor for VLM-optimized preprocessing.
    * Returns null if Ollama is unavailable or extraction fails.
    */
   async extractFromImageVision(
@@ -122,7 +113,7 @@ export class OllamaService {
   ): Promise<DocumentExtractionResult | null> {
     let processed: Buffer;
     try {
-      processed = await this.preprocessImage(fileBuffer, mimeType);
+      processed = await preprocessForVlm(fileBuffer, mimeType);
     } catch (err) {
       this.logger.error(`Image preprocessing failed: ${err instanceof Error ? err.message : err}`);
       return null;
@@ -153,132 +144,6 @@ export class OllamaService {
   }
 
   /**
-   * Preprocess an image for Ollama Vision:
-   *  1. Convert HEIC/HEIF → JPEG (via sharp or heic-convert fallback)
-   *  2. Progressively resize + reduce quality until ≤ 100KB
-   *  3. Apply sharpening + contrast normalization for text readability
-   */
-  private async preprocessImage(buffer: Buffer, mimeType: string): Promise<Buffer> {
-    const isHeic = mimeType === 'image/heic' || mimeType === 'image/heif';
-
-    // Step 1: Convert HEIC → JPEG first (if needed) so all later steps work on JPEG
-    let jpegBuffer = buffer;
-    if (isHeic) {
-      jpegBuffer = await this.convertHeicToJpeg(buffer);
-    }
-
-    // Step 2: Resize + compress to fit under MAX_IMAGE_BYTES using sharp
-    const compressed = await this.compressToTarget(jpegBuffer, mimeType);
-    if (compressed) return compressed;
-
-    // Step 3: If sharp unavailable, return the JPEG as-is (heic-convert result or original)
-    return jpegBuffer;
-  }
-
-  /** Convert HEIC buffer to JPEG. Tries sharp first, falls back to heic-convert. */
-  private async convertHeicToJpeg(buffer: Buffer): Promise<Buffer> {
-    // Try sharp HEIC decode
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const sharp = require('sharp');
-      const result = await sharp(buffer).jpeg({ quality: 90 }).toBuffer();
-      this.logger.log(
-        `HEIC → JPEG (sharp): ${(buffer.length / 1024).toFixed(0)}KB → ${(result.length / 1024).toFixed(0)}KB`,
-      );
-      return result;
-    } catch {
-      // sharp unavailable or can't decode HEIC
-    }
-
-    // Fall back to heic-convert (pure JS)
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const convert = require('heic-convert');
-      const result = await convert({ buffer, format: 'JPEG', quality: 0.9 });
-      const converted = Buffer.from(result);
-      this.logger.log(
-        `HEIC → JPEG (heic-convert): ${(buffer.length / 1024).toFixed(0)}KB → ${(converted.length / 1024).toFixed(0)}KB`,
-      );
-      return converted;
-    } catch (err) {
-      throw new Error(
-        `HEIC conversion failed: ${err instanceof Error ? err.message : err}. Please convert to JPEG before uploading.`,
-      );
-    }
-  }
-
-  /**
-   * Progressively resize and reduce JPEG quality until the image is ≤ MAX_IMAGE_BYTES.
-   * Returns null if sharp is unavailable.
-   */
-  private async compressToTarget(buffer: Buffer, originalMimeType: string): Promise<Buffer | null> {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    let sharp: ReturnType<typeof require>;
-    try {
-      sharp = require('sharp');
-    } catch {
-      this.logger.warn('sharp not available for compression');
-      return null;
-    }
-
-    try {
-      const meta = await sharp(buffer).metadata();
-      const origW = meta.width ?? 0;
-      const origH = meta.height ?? 0;
-      const origDim = Math.max(origW, origH);
-
-      this.logger.log(
-        `compressToTarget: input ${origW}x${origH} (${(buffer.length / 1024).toFixed(0)}KB), target ≤${(OllamaService.MAX_IMAGE_BYTES / 1024).toFixed(0)}KB`,
-      );
-
-      // If already under target, return as-is
-      if (buffer.length <= OllamaService.MAX_IMAGE_BYTES) {
-        this.logger.log('compressToTarget: already under target, skipping');
-        return buffer;
-      }
-
-      let maxDim = Math.min(origDim, OllamaService.INITIAL_MAX_DIM);
-      let quality = OllamaService.INITIAL_JPEG_QUALITY;
-      let result: Buffer;
-      let iteration = 0;
-
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        iteration++;
-        result = await sharp(buffer)
-          .resize(maxDim, maxDim, { fit: 'inside', withoutEnlargement: true })
-          .jpeg({ quality })
-          .toBuffer();
-
-        this.logger.debug(
-          `compressToTarget iteration ${iteration}: ${maxDim}px q${quality} → ${(result.length / 1024).toFixed(0)}KB`,
-        );
-
-        if (result.length <= OllamaService.MAX_IMAGE_BYTES) break;
-
-        // Reduce quality first, then shrink dimensions
-        if (quality > 30) {
-          quality -= 10;
-        } else if (maxDim > 400) {
-          maxDim = Math.round(maxDim * 0.7);
-          quality = OllamaService.INITIAL_JPEG_QUALITY;
-        } else {
-          break; // smallest possible
-        }
-      }
-
-      this.logger.log(
-        `Compressed: ${origW}x${origH} (${originalMimeType}) → JPEG ${maxDim}px q${quality} ` +
-          `(${(buffer.length / 1024).toFixed(0)}KB → ${(result.length / 1024).toFixed(0)}KB)`,
-      );
-      return result;
-    } catch (err) {
-      this.logger.warn(`sharp compression failed: ${err instanceof Error ? err.message : err}`);
-      return null;
-    }
-  }
-
-  /**
    * Extract document data from raw text using Ollama's text model.
    * Returns null if Ollama is unavailable or extraction fails.
    */
@@ -297,6 +162,36 @@ export class OllamaService {
     }
 
     return this.toDocumentExtractionResult(result.data, rawText, result.processingTimeMs);
+  }
+
+  /**
+   * Extract document data from OCR-produced text.
+   * Uses an OCR-aware prompt that handles recognition errors.
+   */
+  async extractFromOcrText(
+    ocrText: string,
+    ocrConfidence: number,
+  ): Promise<DocumentExtractionResult | null> {
+    this.logger.log(
+      `[LLM INPUT] OCR text (${ocrText.length} chars, conf=${ocrConfidence}%) → sending to ${this.gateway.textModel}`,
+    );
+
+    const prompt = buildOcrTextExtractionPrompt(ocrText, ocrConfidence);
+
+    const result = await this.gateway.infer<OllamaExtractionRaw>(prompt, {
+      systemPrompt: OLLAMA_EXTRACTION_SYSTEM_PROMPT,
+    });
+
+    if (!result) {
+      this.logger.warn('[LLM OUTPUT] Ollama returned null');
+      return null;
+    }
+
+    // Log the raw LLM JSON response
+    this.logger.log(`[LLM OUTPUT] Raw JSON from ${result.model} (${result.processingTimeMs}ms):`);
+    this.logger.log(JSON.stringify(result.data, null, 2));
+
+    return this.toDocumentExtractionResult(result.data, ocrText, result.processingTimeMs);
   }
 
   /**
@@ -346,13 +241,26 @@ export class OllamaService {
       total: item.total || 0,
     }));
 
-    const confidence = raw.confidence || {};
-    const fieldConfidence: Record<string, number> = {};
-    for (const [key, value] of Object.entries(confidence)) {
-      if (key !== 'overall' && typeof value === 'number') {
-        fieldConfidence[key] = value;
-      }
-    }
+    // Compute confidence from field presence (more reliable than model self-assessment)
+    const fieldConfidence = this.computeFieldConfidence(raw, lineItems);
+    const confidenceValues = Object.values(fieldConfidence);
+    const overallConfidence =
+      confidenceValues.length > 0
+        ? confidenceValues.reduce((sum, v) => sum + v, 0) / confidenceValues.length
+        : 0;
+
+    // Derive accounting entry from document category (no model guessing)
+    const accountingEntry = this.deriveAccountingEntry(raw.documentCategory ?? null);
+
+    // Validate and auto-fix numbers (decimal point corrections)
+    let total = raw.total ?? null;
+    let subtotal = raw.subtotal ?? null;
+    let tax = raw.tax ?? null;
+    const discount = raw.discount ?? null;
+    const fixedLineItems = this.validateAndFixNumbers(total, subtotal, tax, discount, lineItems);
+    total = fixedLineItems.total;
+    subtotal = fixedLineItems.subtotal;
+    tax = fixedLineItems.tax;
 
     return {
       vendorName: raw.vendorName ?? null,
@@ -363,26 +271,173 @@ export class OllamaService {
       invoiceNumber: raw.invoiceNumber ?? null,
       date: raw.date ?? null,
       dueDate: raw.dueDate ?? null,
-      total: raw.total ?? null,
-      subtotal: raw.subtotal ?? null,
-      tax: raw.tax ?? null,
-      discount: raw.discount ?? null,
+      total,
+      subtotal,
+      tax,
+      discount,
       currency: raw.currency ?? null,
       paymentTerms: raw.paymentTerms ?? null,
       notes: raw.notes ?? null,
-      lineItems,
+      lineItems: fixedLineItems.lineItems,
       rawText,
-      ocrConfidence: confidence.overall ?? 0,
+      ocrConfidence: overallConfidence,
       fieldConfidence,
       documentCategory: raw.documentCategory ?? null,
-      accountingEntry: raw.accountingEntry
-        ? {
-            debitAccount: raw.accountingEntry.debitAccount ?? null,
-            creditAccount: raw.accountingEntry.creditAccount ?? null,
-            taxAccount: raw.accountingEntry.taxAccount ?? null,
-          }
-        : null,
+      accountingEntry,
       processingTimeMs,
     };
+  }
+
+  /**
+   * Validate and auto-fix numbers with obvious decimal errors.
+   * If total = 135.45 but subtotal = 12800, tries dividing by 100 → 128.00.
+   */
+  private validateAndFixNumbers(
+    total: number | null,
+    subtotal: number | null,
+    tax: number | null,
+    discount: number | null,
+    lineItems: ExtractedLineItem[],
+  ): {
+    total: number | null;
+    subtotal: number | null;
+    tax: number | null;
+    lineItems: ExtractedLineItem[];
+  } {
+    if (total == null || total <= 0) return { total, subtotal, tax, lineItems };
+
+    const disc = discount ?? 0;
+
+    // Check if subtotal + tax ≈ total (within 2%)
+    if (subtotal != null && tax != null) {
+      const sum = subtotal + tax - disc;
+      const diff = Math.abs(sum - total);
+      if (diff / total < 0.02) {
+        // Numbers are already consistent
+        return { total, subtotal, tax, lineItems };
+      }
+
+      this.logger.warn(
+        `[NumberFix] Mismatch: subtotal(${subtotal}) + tax(${tax}) - discount(${disc}) = ${sum} ≠ total(${total})`,
+      );
+
+      // Try decimal corrections: divide each by 10, 100, 1000
+      for (const divisor of [10, 100, 1000]) {
+        const fixedSub = subtotal / divisor;
+        const fixedTax = tax / divisor;
+        const fixedSum = fixedSub + fixedTax - disc;
+        if (Math.abs(fixedSum - total) / total < 0.02) {
+          this.logger.warn(
+            `[NumberFix] Fixed by ÷${divisor}: subtotal ${subtotal}→${fixedSub}, tax ${tax}→${fixedTax}`,
+          );
+          subtotal = fixedSub;
+          tax = fixedTax;
+          break;
+        }
+        // Try fixing only subtotal
+        const sumWithFixedSub = fixedSub + tax - disc;
+        if (Math.abs(sumWithFixedSub - total) / total < 0.02) {
+          this.logger.warn(`[NumberFix] Fixed subtotal by ÷${divisor}: ${subtotal}→${fixedSub}`);
+          subtotal = fixedSub;
+          break;
+        }
+        // Try fixing only tax
+        const sumWithFixedTax = subtotal + fixedTax - disc;
+        if (Math.abs(sumWithFixedTax - total) / total < 0.02) {
+          this.logger.warn(`[NumberFix] Fixed tax by ÷${divisor}: ${tax}→${fixedTax}`);
+          tax = fixedTax;
+          break;
+        }
+      }
+    }
+
+    // Fix line items: if unitPrice × qty is way off from lineTotal
+    const fixedItems = lineItems.map((li) => {
+      if (li.quantity > 0 && li.unitPrice > 0 && li.total > 0) {
+        const expected = li.quantity * li.unitPrice;
+        if (expected > li.total * 50) {
+          // unitPrice is probably missing a decimal
+          for (const div of [10, 100, 1000]) {
+            const fixed = li.unitPrice / div;
+            if (Math.abs(li.quantity * fixed - li.total) / li.total < 0.1) {
+              this.logger.warn(
+                `[NumberFix] Line "${li.description}": unitPrice ${li.unitPrice}→${fixed}`,
+              );
+              return { ...li, unitPrice: fixed };
+            }
+          }
+        }
+      }
+      return li;
+    });
+
+    return { total, subtotal, tax, lineItems: fixedItems };
+  }
+
+  /**
+   * Compute field-level confidence from presence and validity of extracted values.
+   * More reliable than asking a small model to self-assess.
+   */
+  private computeFieldConfidence(
+    raw: OllamaExtractionRaw,
+    lineItems: ExtractedLineItem[],
+  ): Record<string, number> {
+    const conf: Record<string, number> = {};
+
+    // Key fields — present and non-empty = high confidence
+    conf.vendorName = raw.vendorName ? 0.85 : 0;
+    conf.invoiceNumber = raw.invoiceNumber ? 0.85 : 0;
+    conf.date = raw.date && /^\d{4}-\d{2}-\d{2}$/.test(raw.date) ? 0.9 : raw.date ? 0.5 : 0;
+    conf.total = raw.total != null && raw.total > 0 ? 0.9 : raw.total != null ? 0.5 : 0;
+
+    // Line items — confidence based on completeness
+    if (lineItems.length > 0) {
+      const completeItems = lineItems.filter(
+        (li) => li.description && li.quantity > 0 && li.total > 0,
+      );
+      conf.lineItems = completeItems.length / lineItems.length;
+    } else {
+      conf.lineItems = 0;
+    }
+
+    return conf;
+  }
+
+  /**
+   * Derive standard accounting entry from document category.
+   * Deterministic and correct — no model guessing.
+   */
+  private deriveAccountingEntry(
+    category: string | null,
+  ): DocumentExtractionResult['accountingEntry'] {
+    switch (category) {
+      case 'INVOICE':
+        return {
+          debitAccount: 'Accounts Receivable',
+          creditAccount: 'Revenue',
+          taxAccount: 'Tax Payable',
+        };
+      case 'RECEIPT':
+        return {
+          debitAccount: 'Cash / Bank',
+          creditAccount: 'Accounts Receivable',
+          taxAccount: null,
+        };
+      case 'PURCHASE_ORDER':
+      case 'BANK_STATEMENT':
+        return {
+          debitAccount: 'Expense',
+          creditAccount: 'Accounts Payable',
+          taxAccount: 'Input Tax',
+        };
+      case 'PAYSLIP':
+        return {
+          debitAccount: 'Salary Expense',
+          creditAccount: 'Cash / Bank',
+          taxAccount: null,
+        };
+      default:
+        return null;
+    }
   }
 }

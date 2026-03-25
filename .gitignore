@@ -60,6 +60,8 @@ storage/
 
 # ML Models (large files, download separately)
 apps/api/ml-models/
+apps/api/src/modules/ai/models/*.onnx
+apps/api/src/modules/ai/models/*_dict.txt
 *.onnx
 *.tar
 

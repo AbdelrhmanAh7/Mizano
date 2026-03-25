@@ -8,6 +8,11 @@ import { OllamaService, DocumentExtractionResult } from './ollama.service';
 import { DocumentClassificationService, DocumentCategory } from './document-classification.service';
 import { EntityExtractionService } from './entity-extraction.service';
 import { AiFeedbackService } from './ai-feedback.service';
+import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-resolver.service';
+import {
+  ExtractionContext,
+  StrategyExtractionResult,
+} from '../extraction/extraction-strategy.interface';
 import { extractTextFromPdf } from '../utils/pdf-extractor.util';
 import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.util';
 import { BoundedCache } from '../utils/bounded-cache.util';
@@ -104,7 +109,7 @@ export interface DocumentIntakeResult {
   } | null;
 
   /** Which AI engine extracted the data */
-  extractionMethod: 'ollama-vision' | 'ollama-text';
+  extractionMethod: 'ollama-vision' | 'ollama-text' | 'ocr-llm' | 'hybrid-ocr' | 'hybrid-vlm';
 }
 
 export interface ConfirmIntakeLineDto {
@@ -178,6 +183,7 @@ export class DocumentIntakeService {
   constructor(
     private prisma: PrismaService,
     private ollamaService: OllamaService,
+    private strategyResolver: ExtractionStrategyResolver,
     private classificationService: DocumentClassificationService,
     private entityExtractionService: EntityExtractionService,
     private feedbackService: AiFeedbackService,
@@ -199,6 +205,7 @@ export class DocumentIntakeService {
     mimeType: string,
     filename?: string,
     language: string = 'eng+ara',
+    strategy?: string,
   ): string {
     const jobId = `intake_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
@@ -216,7 +223,15 @@ export class DocumentIntakeService {
     this.emitProgress(jobId, { stage: 'received', progress: 5, message: 'File accepted' });
 
     // Fire off the pipeline in the background (non-blocking)
-    void this.runAsyncPipeline(jobId, organizationId, fileBuffer, mimeType, filename, language);
+    void this.runAsyncPipeline(
+      jobId,
+      organizationId,
+      fileBuffer,
+      mimeType,
+      filename,
+      language,
+      strategy,
+    );
 
     return jobId;
   }
@@ -246,6 +261,7 @@ export class DocumentIntakeService {
     mimeType: string,
     filename?: string,
     language?: string,
+    strategy?: string,
   ): Promise<void> {
     try {
       this.emitProgress(jobId, {
@@ -261,6 +277,7 @@ export class DocumentIntakeService {
         filename,
         language,
         (stage, progress, message) => this.emitProgress(jobId, { stage, progress, message }),
+        strategy,
       );
 
       this.emitProgress(jobId, {
@@ -296,61 +313,66 @@ export class DocumentIntakeService {
     filename?: string,
     _language: string = 'eng+ara',
     onProgress?: (stage: IntakeStage, progress: number, message: string) => void,
+    strategy?: string,
   ): Promise<DocumentIntakeResult> {
     this.logger.log(
-      `Processing document intake: mime=${mimeType}, size=${fileBuffer.length}, file=${filename || 'unknown'}`,
+      `Processing document intake: mime=${mimeType}, size=${fileBuffer.length}, file=${filename || 'unknown'}, strategy=${strategy || 'default'}`,
     );
 
     let rawText = '';
     let extraction: DocumentExtractionResult | null = null;
-    let extractionMethod: DocumentIntakeResult['extractionMethod'] = 'ollama-vision';
+    let extractionMethod: DocumentIntakeResult['extractionMethod'] = 'ocr-llm';
     const isPdf = mimeType === 'application/pdf';
 
-    // Step 1a: For images, use Ollama vision model
+    // Step 1: Build extraction context
     onProgress?.('extracting', 20, 'AI is reading your document...');
-    if (!isPdf) {
-      extraction = await this.ollamaService.extractFromImageVision(fileBuffer, mimeType);
-      if (extraction) {
-        rawText = extraction.rawText;
-        extractionMethod = 'ollama-vision';
-        this.logger.log(
-          `Ollama vision extraction succeeded: confidence=${extraction.ocrConfidence}, time=${extraction.processingTimeMs}ms`,
-        );
-      }
-    }
 
-    // Step 1b: For PDFs, extract text first then use Ollama text model
-    if (!extraction && isPdf) {
+    const context: ExtractionContext = {
+      fileBuffer,
+      mimeType,
+      filename,
+      language: _language,
+      isPdf,
+    };
+
+    // For PDFs, extract text first (used by all strategies)
+    if (isPdf) {
       try {
         const pdfResult = await extractTextFromPdf(fileBuffer);
         this.logger.log(
           `PDF extraction: pages=${pdfResult.pageCount}, native=${pdfResult.isNativeText}, textLen=${pdfResult.text.length}`,
         );
+        context.pdfText = pdfResult.text;
+        context.pdfIsNativeText = pdfResult.isNativeText;
+        context.pdfPageCount = pdfResult.pageCount;
         if (pdfResult.text.length > 20) {
           rawText = pdfResult.text;
+          if (rawText.length > PDF_TEXT_TRUNCATION_LIMIT) {
+            rawText = rawText.slice(0, PDF_TEXT_TRUNCATION_LIMIT);
+            context.pdfText = rawText;
+          }
         }
       } catch (error) {
         this.logger.warn(`PDF text extraction failed: ${error}`);
       }
-
-      if (rawText) {
-        if (rawText.length > PDF_TEXT_TRUNCATION_LIMIT) {
-          rawText = rawText.slice(0, PDF_TEXT_TRUNCATION_LIMIT);
-        }
-        extraction = await this.ollamaService.extractFromText(rawText);
-        if (extraction) {
-          rawText = extraction.rawText || rawText;
-          extractionMethod = 'ollama-text';
-          this.logger.log(
-            `Ollama text extraction from PDF succeeded: confidence=${extraction.ocrConfidence}`,
-          );
-        }
-      }
     }
 
-    // Step 1c: Fallback — empty result if Ollama unavailable
+    // Step 2: Resolve and execute extraction strategy
+    const strategyResult = await this.strategyResolver.resolve(context, strategy);
+
+    if (strategyResult) {
+      extraction = strategyResult.extraction;
+      rawText = extraction.rawText || rawText;
+      extractionMethod = this.mapStrategyToMethod(strategyResult);
+      this.logger.log(
+        `Strategy ${strategyResult.strategyUsed} (${strategyResult.subPathUsed || 'direct'}) succeeded: ` +
+          `confidence=${extraction.ocrConfidence.toFixed(2)}, time=${strategyResult.totalTimeMs}ms`,
+      );
+    }
+
+    // Step 2b: Fallback — empty result if all strategies failed
     if (!extraction) {
-      this.logger.warn('Ollama extraction unavailable — returning empty result');
+      this.logger.warn('All extraction strategies failed — returning empty result');
       extraction = this.ollamaService.buildEmptyResult(rawText);
     }
 
@@ -645,6 +667,17 @@ export class DocumentIntakeService {
     );
 
     return { type: 'invoice', id: invoice.id, number: invoiceNumber };
+  }
+
+  private mapStrategyToMethod(
+    result: StrategyExtractionResult,
+  ): DocumentIntakeResult['extractionMethod'] {
+    if (result.strategyUsed === 'hybrid') {
+      return result.subPathUsed === 'vlm-fallback' ? 'hybrid-vlm' : 'hybrid-ocr';
+    }
+    if (result.strategyUsed === 'vlm') return 'ollama-vision';
+    if (result.strategyUsed === 'ocr-llm') return 'ocr-llm';
+    return 'ocr-llm';
   }
 
   private mapRawCategoryToDocumentCategory(raw: string): DocumentCategory {
