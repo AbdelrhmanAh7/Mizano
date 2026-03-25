@@ -1,7 +1,7 @@
 # Mizano ERP - Kamatera VPS Deployment Pipeline
 # ==============================================
 # Builds Docker images, pushes to GHCR, and deploys to Kamatera VPS via SSH.
-# Triggered on release publish or manual workflow dispatch.
+# Triggered on push/merge to master, release publish, or manual dispatch.
 #
 # Required GitHub Secrets:
 #   DEPLOY_HOST       - Server IP or hostname (185.247.117.157)
@@ -13,6 +13,8 @@
 name: Deploy to Production
 
 on:
+  push:
+    branches: [master]
   release:
     types: [published]
   workflow_dispatch:
