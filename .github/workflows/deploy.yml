@@ -8,7 +8,6 @@
 #   DEPLOY_USER       - SSH username (deploy)
 #   DEPLOY_SSH_KEY    - Private SSH key for the deploy user
 #   PRODUCTION_URL    - Public URL (http://185.247.117.157:5001)
-#   API_URL           - Public API URL (http://185.247.117.157:6001/api)
 
 name: Deploy to Production
 
@@ -92,7 +91,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            NEXT_PUBLIC_API_URL=${{ secrets.API_URL }}
+            NEXT_PUBLIC_API_URL=http://${{ secrets.DEPLOY_HOST }}:6001/api
 
   # ==========================================
   # Deploy to Kamatera VPS via SSH
@@ -157,13 +156,13 @@ jobs:
           JWT_RS: ${{ secrets.JWT_REFRESH_SECRET }}
           NA_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           PROD_URL: ${{ secrets.PRODUCTION_URL }}
-          API_U: ${{ secrets.API_URL }}
+          DH: ${{ secrets.DEPLOY_HOST }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          envs: PG_USER,PG_PASS,PG_DB,JWT_S,JWT_RS,NA_SECRET,PROD_URL,API_U
+          envs: PG_USER,PG_PASS,PG_DB,JWT_S,JWT_RS,NA_SECRET,PROD_URL,DH
           script: |
             set -e
             mkdir -p ~/mizano
@@ -187,8 +186,8 @@ jobs:
               printf 'NEXTAUTH_SECRET=%s\n' "${NA_SECRET}"
               echo "NEXTAUTH_URL=${PROD_URL}"
               echo "API_PORT=6001"
-              echo "CORS_ORIGIN=${PROD_URL},http://185-247-117-157.eu-cloud-xip.com"
-              echo "NEXT_PUBLIC_API_URL=${API_U}"
+              echo "CORS_ORIGIN=${PROD_URL}"
+              echo "NEXT_PUBLIC_API_URL=http://${DH}:6001/api"
               echo "NEXT_PUBLIC_APP_NAME=Mizano"
               echo "RATE_LIMIT_TTL=1000"
               echo "RATE_LIMIT_MAX=30"
