@@ -195,15 +195,13 @@ jobs:
               echo "LOG_LEVEL=warn"
               echo "OLLAMA_BASE_URL=http://host.docker.internal:11434"
               echo "OLLAMA_ENABLED=true"
-              echo "OLLAMA_TEXT_MODEL=gemma3:12b"
-              echo "OLLAMA_VISION_MODEL=minicpm-v:latest"
+              echo "OLLAMA_TEXT_MODEL=qwen3-vl:8b"
+              echo "OLLAMA_VISION_MODEL=qwen3-vl:8b"
               echo "OLLAMA_TIMEOUT_MS=300000"
               echo "OLLAMA_MAX_CONCURRENT=1"
               echo "OLLAMA_NUM_THREAD=4"
               echo "OLLAMA_NUM_CTX=8192"
-              echo "EXTRACTION_STRATEGY=ocr"
-              echo "PADDLE_OCR_LANG=ar"
-              echo "PADDLE_OCR_PKG_PATH=~/paddleocr_pkg"
+              echo "EXTRACTION_STRATEGY=vlm"
             } > ~/mizano/.env
 
             echo ".env written successfully"
@@ -314,14 +312,7 @@ jobs:
 
             # Pull required models
             echo "Pulling AI models..."
-            ollama pull gemma3:12b || echo "WARNING: Failed to pull gemma3:12b"
-            ollama pull minicpm-v:latest || echo "WARNING: Failed to pull minicpm-v:latest"
-
-            # Install RapidOCR for PaddleOCR
-            if ! python3 -c "from rapidocr_onnxruntime import RapidOCR" 2>/dev/null; then
-              echo "Installing RapidOCR..."
-              pip3 install rapidocr-onnxruntime --target ~/paddleocr_pkg || true
-            fi
+            ollama pull qwen3-vl:8b || echo "WARNING: Failed to pull qwen3-vl:8b"
 
             echo "AI models ready"
             ollama list
