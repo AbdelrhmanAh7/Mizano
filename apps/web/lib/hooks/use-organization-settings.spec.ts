@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
@@ -71,8 +71,9 @@ describe('useAccountSettings', () => {
     const { result } = renderHook(() => useAccountSettings(), {
       wrapper: createWrapper(),
     });
-    await flush();
-    expect(result.current.data).toEqual(mockData);
+    await waitFor(() => {
+      expect(result.current.data).toEqual(mockData);
+    });
   });
 });
 
