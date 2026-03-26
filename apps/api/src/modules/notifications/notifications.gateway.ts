@@ -18,10 +18,14 @@ export interface EntityEvent {
   timestamp: string;
 }
 
+// Parse comma-separated CORS origins (same logic as main.ts bootstrap)
+const wsOriginRaw = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5001';
+const wsOrigins = wsOriginRaw.split(',').map((o) => o.trim());
+
 @WebSocketGateway({
   namespace: '/events',
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5001',
+    origin: wsOrigins.length === 1 ? wsOrigins[0] : wsOrigins,
     credentials: true,
   },
 })

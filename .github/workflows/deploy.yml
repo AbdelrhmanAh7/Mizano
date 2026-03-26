@@ -143,7 +143,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          source: "docker-compose.production.yml,apps/api/prisma/"
+          source: "docker-compose.production.yml,apps/api/prisma/,nginx/"
           target: ~/mizano
           overwrite: true
 
@@ -187,7 +187,7 @@ jobs:
               printf 'NEXTAUTH_SECRET=%s\n' "${NA_SECRET}"
               echo "NEXTAUTH_URL=${PROD_URL}"
               echo "API_PORT=6001"
-              echo "CORS_ORIGIN=${PROD_URL},http://185-247-117-157.eu-cloud-xip.com:5001"
+              echo "CORS_ORIGIN=${PROD_URL},http://185-247-117-157.eu-cloud-xip.com"
               echo "NEXT_PUBLIC_API_URL=${API_U}"
               echo "NEXT_PUBLIC_APP_NAME=Mizano"
               echo "RATE_LIMIT_TTL=1000"
@@ -277,6 +277,7 @@ jobs:
             docker compose -f docker-compose.production.yml up -d --no-deps api
             sleep 15
             docker compose -f docker-compose.production.yml up -d --no-deps web
+            docker compose -f docker-compose.production.yml up -d --no-deps nginx
 
             # Run database migrations
             docker exec mizano-api npx prisma migrate deploy --schema /app/apps/api/prisma/schema.prisma || true

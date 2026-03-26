@@ -8,10 +8,15 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { LogEntry } from '@mizano/shared-types';
 
+// Parse comma-separated CORS origins (same logic as main.ts bootstrap)
+const loggerWsOriginRaw =
+  process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:5001';
+const loggerWsOrigins = loggerWsOriginRaw.split(',').map((o) => o.trim());
+
 @WebSocketGateway({
   namespace: '/logger',
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5001',
+    origin: loggerWsOrigins.length === 1 ? loggerWsOrigins[0] : loggerWsOrigins,
     credentials: true,
   },
 })

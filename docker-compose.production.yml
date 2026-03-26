@@ -177,8 +177,6 @@ services:
       - api
     networks:
       - mizano-network
-    profiles:
-      - with-nginx
 
   # ============================================
   # Certbot — SSL certificate management
