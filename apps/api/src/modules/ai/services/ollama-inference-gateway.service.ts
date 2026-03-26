@@ -58,6 +58,9 @@ export class OllamaInferenceGateway implements OnModuleInit {
     this.maxConcurrent = parseInt(this.configService.get('OLLAMA_MAX_CONCURRENT', '1'), 10);
     this.numThread = parseInt(this.configService.get('OLLAMA_NUM_THREAD', '4'), 10);
     this.numCtx = parseInt(this.configService.get('OLLAMA_NUM_CTX', '4096'), 10);
+
+    // Bypass ngrok free-tier browser interstitial for tunnel proxies
+    this.httpService.axiosRef.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
   }
 
   // ---------------------------------------------------------------------------
