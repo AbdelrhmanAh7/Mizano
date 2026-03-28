@@ -157,13 +157,12 @@ jobs:
           NA_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           PROD_URL: ${{ secrets.PRODUCTION_URL }}
           DH: ${{ secrets.DEPLOY_HOST }}
-          OLLAMA_WH_SECRET: ${{ secrets.OLLAMA_WEBHOOK_SECRET }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          envs: PG_USER,PG_PASS,PG_DB,JWT_S,JWT_RS,NA_SECRET,PROD_URL,DH,OLLAMA_WH_SECRET
+          envs: PG_USER,PG_PASS,PG_DB,JWT_S,JWT_RS,NA_SECRET,PROD_URL,DH
           script: |
             set -e
             mkdir -p ~/mizano
@@ -202,7 +201,8 @@ jobs:
               echo "OLLAMA_MAX_CONCURRENT=1"
               echo "OLLAMA_NUM_CTX=8192"
               echo "EXTRACTION_STRATEGY=vlm"
-              printf 'OLLAMA_WEBHOOK_SECRET=%s\n' "${OLLAMA_WH_SECRET}"
+              echo "OLLAMA_WEBHOOK_SECRET=pick-a-strong-secret-here"
+              echo "OLLAMA_MODEL=qwen3-vl:8b"
             } > ~/mizano/.env
 
             echo ".env written successfully"
