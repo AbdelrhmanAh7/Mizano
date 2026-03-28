@@ -237,6 +237,10 @@ jobs:
             docker tag ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:${TAG} mizano-api:latest
             docker tag ${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}:${TAG} mizano-web:latest
 
+            # Stop local Ollama if running (port 11434 needed by ollama-proxy)
+            sudo systemctl stop ollama 2>/dev/null || true
+            sudo systemctl disable ollama 2>/dev/null || true
+
             # Build ollama-proxy from source (services/ollama-proxy/)
             docker compose -f docker-compose.production.yml build ollama-proxy
 
