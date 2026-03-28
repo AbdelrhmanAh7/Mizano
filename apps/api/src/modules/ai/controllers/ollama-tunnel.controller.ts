@@ -62,7 +62,7 @@ export class OllamaTunnelController {
           secret: body.secret,
         }),
       });
-      const data = await response.json();
+      await response.json();
       this.logger.log(`Tunnel URL updated: ${body.tunnel_url}`);
       return { status: 'ok', tunnel_url: body.tunnel_url };
     } catch (error) {
