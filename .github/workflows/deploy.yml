@@ -133,7 +133,7 @@ jobs:
             echo "=== Disk after cleanup ==="
             df -h / | tail -1
 
-            mkdir -p ~/mizano/apps/api/prisma
+            mkdir -p ~/mizano/apps/api/prisma ~/mizano/services
 
       - name: Copy deployment files to server
         uses: appleboy/scp-action@v0.1.7
@@ -142,7 +142,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          source: "docker-compose.production.yml,apps/api/prisma/,nginx/"
+          source: "docker-compose.production.yml,apps/api/prisma/,nginx/,services/"
           target: ~/mizano
           overwrite: true
 
@@ -237,6 +237,9 @@ jobs:
             docker tag ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:${TAG} mizano-api:latest
             docker tag ${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}:${TAG} mizano-web:latest
 
+            # Build ollama-proxy from source (services/ollama-proxy/)
+            docker compose -f docker-compose.production.yml build ollama-proxy
+
             # Start infra first (postgres, redis, ollama-proxy)
             docker compose -f docker-compose.production.yml up -d postgres redis ollama-proxy
 
@@ -287,23 +290,6 @@ jobs:
             docker image prune -f
 
             echo "Deployment completed: tag=${TAG}"
-
-      - name: Build and start ollama-proxy
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          script: |
-            set -e
-            cd ~/mizano
-
-            # Build and start the ollama-proxy container
-            docker compose -f docker-compose.production.yml build ollama-proxy
-            docker compose -f docker-compose.production.yml up -d ollama-proxy
-
-            echo "Ollama proxy started — waiting for Colab tunnel URL via webhook"
 
   # ==========================================
   # Health check (runs on server via SSH)
