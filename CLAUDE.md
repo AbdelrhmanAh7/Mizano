@@ -223,6 +223,49 @@ All workflows are in `.agents/workflows/`. Use these commands for full project c
 | `/add-component` | Add shadcn/ui components                            |
 | `/debug-api`     | Debug API (Docker/ports/DB/logs/endpoints)          |
 
+## AI Infrastructure — Ollama via Google Colab
+
+Ollama does NOT run locally in production. It runs on a Google Colab notebook
+(T4 GPU, free tier) and is accessed through a reverse proxy.
+
+There is NO external AI API fallback. No Gemini, no OpenAI, no cloud AI.
+When Colab is down, AI features return 503 until the notebook is restarted.
+
+### Architecture
+
+```
+services (Docker) → ollama-proxy:11434 → Cloudflare tunnel → Colab (Ollama + GPU)
+                         ↓ (if Colab down)
+                    503 "AI temporarily unavailable"
+```
+
+### How it works
+
+- `ollama-proxy` service listens on port 11434 (same as real Ollama)
+- Reads tunnel URL from `/data/ollama_tunnel_url` in its container volume
+- All services use `OLLAMA_BASE_URL=http://ollama-proxy:11434` — no code changes
+- When Colab disconnects, all AI features return 503
+- Colab notebook pushes new tunnel URLs via `POST /api/internal/tunnel-update`
+- Telegram bot alerts admin when Ollama goes down
+
+### Key env vars
+
+- `OLLAMA_WEBHOOK_SECRET` — shared secret for tunnel URL updates
+- `OLLAMA_MODEL` — model name on Colab (default: qwen3-vl:8b)
+
+### Endpoints
+
+- `GET http://ollama-proxy:11434/health` — proxy + Ollama status
+- `GET /api/internal/ollama-status` — same, via NestJS (admin only)
+- `POST /api/internal/tunnel-update` — webhook from Colab (secret required)
+
+### Never
+
+- Add local Ollama or GPU config to docker-compose.yml
+- Add any external AI API (Gemini, OpenAI, etc.) as fallback
+- Assume Ollama is always available — always handle 503 gracefully
+- Hardcode tunnel URLs — they change every Colab restart
+
 ## Docs Reference
 
 | File                        | Contents                            |
