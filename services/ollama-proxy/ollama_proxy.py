@@ -185,33 +185,47 @@ async def proxy(request: Request, path: str):
     # Add ngrok skip header in case tunnel is ngrok
     fwd_headers["ngrok-skip-browser-warning"] = "true"
 
-    try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            if is_streaming:
-                # Stream the response back chunk by chunk
-                req = client.build_request(
-                    method=request.method,
-                    url=target,
-                    headers=fwd_headers,
-                    content=body,
-                )
-                upstream = await client.send(req, stream=True)
+    if is_streaming:
+        # Streaming: keep client alive for the duration of the response.
+        # Do NOT use `async with` — the client must outlive this function
+        # so FastAPI can consume the generator after we return.
+        try:
+            client = httpx.AsyncClient(timeout=timeout)
+            req = client.build_request(
+                method=request.method,
+                url=target,
+                headers=fwd_headers,
+                content=body,
+            )
+            upstream = await client.send(req, stream=True)
+        except httpx.ConnectError:
+            return _unavailable()
+        except httpx.TimeoutException:
+            return JSONResponse(
+                status_code=504,
+                content={"error": "Ollama request timed out. The GPU server may be overloaded."},
+            )
+        except Exception:
+            return _unavailable()
 
-                async def stream_body():
-                    try:
-                        async for chunk in upstream.aiter_bytes():
-                            yield chunk
-                    finally:
-                        await upstream.aclose()
+        async def stream_body():
+            try:
+                async for chunk in upstream.aiter_bytes():
+                    yield chunk
+            finally:
+                await upstream.aclose()
+                await client.aclose()
 
-                return StreamingResponse(
-                    content=stream_body(),
-                    status_code=upstream.status_code,
-                    headers=_filtered_headers(upstream.headers),
-                    media_type=upstream.headers.get("content-type", "application/x-ndjson"),
-                )
-            else:
-                # Non-streaming: simple forward
+        return StreamingResponse(
+            content=stream_body(),
+            status_code=upstream.status_code,
+            headers=_filtered_headers(upstream.headers),
+            media_type=upstream.headers.get("content-type", "application/x-ndjson"),
+        )
+    else:
+        # Non-streaming: simple forward
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 resp = await client.request(
                     method=request.method,
                     url=target,
@@ -224,15 +238,15 @@ async def proxy(request: Request, path: str):
                     headers=_filtered_headers(resp.headers),
                     media_type=resp.headers.get("content-type", "application/json"),
                 )
-    except httpx.ConnectError:
-        return _unavailable()
-    except httpx.TimeoutException:
-        return JSONResponse(
-            status_code=504,
-            content={"error": "Ollama request timed out. The GPU server may be overloaded."},
-        )
-    except Exception:
-        return _unavailable()
+        except httpx.ConnectError:
+            return _unavailable()
+        except httpx.TimeoutException:
+            return JSONResponse(
+                status_code=504,
+                content={"error": "Ollama request timed out. The GPU server may be overloaded."},
+            )
+        except Exception:
+            return _unavailable()
 
 
 # ---------------------------------------------------------------------------
