@@ -26,6 +26,7 @@ import { ReorderPointsController } from '../controllers/reorder-points.controlle
 import { PatternDetectionController } from '../controllers/pattern-detection.controller';
 import { AnomalyDetectionController } from '../controllers/anomaly-detection.controller';
 import { ReconciliationAiController } from '../controllers/reconciliation-ai.controller';
+import { OllamaTunnelController } from '../controllers/ollama-tunnel.controller';
 
 @Module({
   imports: [PrismaModule, AiCoreModule, AiNlpModule, HttpModule, ConfigModule],
@@ -35,6 +36,7 @@ import { ReconciliationAiController } from '../controllers/reconciliation-ai.con
     PatternDetectionController,
     AnomalyDetectionController,
     ReconciliationAiController,
+    OllamaTunnelController,
   ],
   providers: [
     OllamaService,
