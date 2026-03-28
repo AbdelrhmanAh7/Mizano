@@ -157,12 +157,13 @@ jobs:
           NA_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           PROD_URL: ${{ secrets.PRODUCTION_URL }}
           DH: ${{ secrets.DEPLOY_HOST }}
+          OLLAMA_WH_SECRET: ${{ secrets.OLLAMA_WEBHOOK_SECRET }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          envs: PG_USER,PG_PASS,PG_DB,JWT_S,JWT_RS,NA_SECRET,PROD_URL,DH
+          envs: PG_USER,PG_PASS,PG_DB,JWT_S,JWT_RS,NA_SECRET,PROD_URL,DH,OLLAMA_WH_SECRET
           script: |
             set -e
             mkdir -p ~/mizano
@@ -193,15 +194,15 @@ jobs:
               echo "RATE_LIMIT_MAX=30"
               echo "RATE_LIMIT_AUTH_MAX=10"
               echo "LOG_LEVEL=warn"
-              echo "OLLAMA_BASE_URL=http://host.docker.internal:11434"
+              echo "OLLAMA_BASE_URL=http://ollama-proxy:11434"
               echo "OLLAMA_ENABLED=true"
               echo "OLLAMA_TEXT_MODEL=qwen3-vl:8b"
               echo "OLLAMA_VISION_MODEL=qwen3-vl:8b"
               echo "OLLAMA_TIMEOUT_MS=300000"
               echo "OLLAMA_MAX_CONCURRENT=1"
-              echo "OLLAMA_NUM_THREAD=4"
               echo "OLLAMA_NUM_CTX=8192"
               echo "EXTRACTION_STRATEGY=vlm"
+              printf 'OLLAMA_WEBHOOK_SECRET=%s\n' "${OLLAMA_WH_SECRET}"
             } > ~/mizano/.env
 
             echo ".env written successfully"
@@ -236,8 +237,8 @@ jobs:
             docker tag ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:${TAG} mizano-api:latest
             docker tag ${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}:${TAG} mizano-web:latest
 
-            # Start infra first (postgres, redis)
-            docker compose -f docker-compose.production.yml up -d postgres redis
+            # Start infra first (postgres, redis, ollama-proxy)
+            docker compose -f docker-compose.production.yml up -d postgres redis ollama-proxy
 
             # Wait for postgres to be healthy (up to 60s)
             echo "Waiting for PostgreSQL to be ready..."
@@ -287,7 +288,7 @@ jobs:
 
             echo "Deployment completed: tag=${TAG}"
 
-      - name: Pull Ollama models on server
+      - name: Build and start ollama-proxy
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -296,26 +297,13 @@ jobs:
           port: 22
           script: |
             set -e
+            cd ~/mizano
 
-            # Check if Ollama is installed
-            if ! command -v ollama &> /dev/null; then
-              echo "Installing Ollama..."
-              curl -fsSL https://ollama.com/install.sh | sh
-            fi
+            # Build and start the ollama-proxy container
+            docker compose -f docker-compose.production.yml build ollama-proxy
+            docker compose -f docker-compose.production.yml up -d ollama-proxy
 
-            # Ensure Ollama is running
-            if ! ollama list &> /dev/null 2>&1; then
-              echo "Starting Ollama..."
-              ollama serve &
-              sleep 5
-            fi
-
-            # Pull required models
-            echo "Pulling AI models..."
-            ollama pull qwen3-vl:8b || echo "WARNING: Failed to pull qwen3-vl:8b"
-
-            echo "AI models ready"
-            ollama list
+            echo "Ollama proxy started — waiting for Colab tunnel URL via webhook"
 
   # ==========================================
   # Health check (runs on server via SSH)
