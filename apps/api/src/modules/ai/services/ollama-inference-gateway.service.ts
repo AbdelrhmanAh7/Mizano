@@ -341,7 +341,10 @@ export class OllamaInferenceGateway implements OnModuleInit {
       const body: Record<string, unknown> = {
         model,
         messages,
-        stream: false,
+        // Use streaming to keep Cloudflare tunnel alive (100s idle timeout).
+        // Tokens stream back continuously, preventing tunnel 524 errors.
+        // We accumulate the full response below.
+        stream: true,
         think: false,
         options: {
           temperature,
@@ -357,27 +360,35 @@ export class OllamaInferenceGateway implements OnModuleInit {
       }
 
       const response = await lastValueFrom(
-        this.httpService.post(`${this.baseUrl}/api/chat`, body, { timeout: timeoutMs }),
+        this.httpService.post(`${this.baseUrl}/api/chat`, body, {
+          timeout: timeoutMs,
+          responseType: 'stream',
+        }),
       );
+
+      // Accumulate streamed NDJSON chunks into a single response
+      const {
+        content: rawContent,
+        thinking: rawThinking,
+        doneReason,
+      } = await this.accumulateStream(response.data as NodeJS.ReadableStream);
 
       const processingTimeMs = Date.now() - startTime;
 
       // Successful HTTP call proves Ollama is healthy — refresh cache
       this.lastHealthCheck = { available: true, timestamp: Date.now() };
 
-      const rawContent: string = response.data?.message?.content ?? '';
       // Qwen3 models wrap internal reasoning in <think>...</think> — strip it
       let content = this.stripThinkTags(rawContent);
 
       // Qwen3 models may put reasoning in a separate `thinking` field,
       // leaving `content` empty.  Fall back to extracting JSON from thinking.
       if (!content) {
-        content = this.salvageFromThinking(response.data?.message?.thinking, model) ?? '';
+        content = this.salvageFromThinking(rawThinking, model) ?? '';
       }
 
       if (!content) {
-        const thinkLen = (response.data?.message?.thinking ?? '').length;
-        const doneReason = response.data?.done_reason ?? 'unknown';
+        const thinkLen = rawThinking.length;
         this.logger.warn(
           `Ollama returned empty content (model=${model}, attempt=${attempt}, rawLen=${rawContent.length}, ` +
             `thinkingLen=${thinkLen}, done_reason=${doneReason}, time=${processingTimeMs}ms)`,
@@ -385,10 +396,7 @@ export class OllamaInferenceGateway implements OnModuleInit {
 
         // On done_reason=length with thinking content, try to build partial JSON from thinking
         if (doneReason === 'length' && thinkLen > 0 && !options?.rawText) {
-          const partialJson = this.salvagePartialJsonFromThinking(
-            response.data?.message?.thinking ?? '',
-            model,
-          );
+          const partialJson = this.salvagePartialJsonFromThinking(rawThinking, model);
           if (partialJson) {
             content = partialJson;
           }
@@ -428,6 +436,66 @@ export class OllamaInferenceGateway implements OnModuleInit {
     } finally {
       this.releaseSemaphore();
     }
+  }
+
+  /**
+   * Accumulate a streaming NDJSON response from Ollama into a single result.
+   * Each line is a JSON object with `message.content` and optionally `message.thinking`.
+   * This keeps the Cloudflare tunnel alive by consuming tokens as they arrive.
+   */
+  private accumulateStream(
+    stream: NodeJS.ReadableStream,
+  ): Promise<{ content: string; thinking: string; doneReason: string }> {
+    return new Promise((resolve, reject) => {
+      let content = '';
+      let thinking = '';
+      let doneReason = 'unknown';
+      let buffer = '';
+
+      stream.on('data', (chunk: Buffer) => {
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line) as {
+              message?: { content?: string; thinking?: string };
+              done?: boolean;
+              done_reason?: string;
+            };
+            content += parsed.message?.content ?? '';
+            thinking += parsed.message?.thinking ?? '';
+            if (parsed.done) {
+              doneReason = parsed.done_reason ?? 'stop';
+            }
+          } catch {
+            // Skip malformed NDJSON lines
+          }
+        }
+      });
+
+      stream.on('end', () => {
+        // Process any remaining buffer
+        if (buffer.trim()) {
+          try {
+            const parsed = JSON.parse(buffer) as {
+              message?: { content?: string; thinking?: string };
+              done_reason?: string;
+            };
+            content += parsed.message?.content ?? '';
+            thinking += parsed.message?.thinking ?? '';
+            if (parsed.done_reason) doneReason = parsed.done_reason;
+          } catch {
+            // ignore
+          }
+        }
+        resolve({ content, thinking, doneReason });
+      });
+
+      stream.on('error', (err: Error) => reject(err));
+    });
   }
 
   // ---------------------------------------------------------------------------
