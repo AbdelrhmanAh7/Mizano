@@ -102,8 +102,6 @@ services:
       dockerfile: Dockerfile
     container_name: mizano-ollama-proxy
     restart: unless-stopped
-    ports:
-      - "11434:11434"
     volumes:
       - ollama-proxy-data:/data
     environment:

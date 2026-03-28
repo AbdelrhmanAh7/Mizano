@@ -237,20 +237,6 @@ jobs:
             docker tag ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:${TAG} mizano-api:latest
             docker tag ${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}:${TAG} mizano-web:latest
 
-            # Free port 11434 — stop local Ollama however it's running
-            sudo systemctl stop ollama 2>/dev/null || true
-            sudo systemctl disable ollama 2>/dev/null || true
-            # Kill any process still holding the port
-            sudo fuser -k 11434/tcp 2>/dev/null || true
-            sleep 2
-            # Verify port is free
-            if sudo ss -tlnp | grep -q ':11434 '; then
-              echo "ERROR: port 11434 still in use after cleanup"
-              sudo ss -tlnp | grep ':11434 '
-              sudo fuser -k -9 11434/tcp 2>/dev/null || true
-              sleep 2
-            fi
-
             # Build ollama-proxy from source (services/ollama-proxy/)
             docker compose -f docker-compose.production.yml build ollama-proxy
 
