@@ -334,8 +334,8 @@ export class OllamaInferenceGateway implements OnModuleInit {
       // On retry, increase token budget (thinking models need more room)
       const maxTokens =
         attempt > 1
-          ? Math.max((options?.maxTokens ?? 8192) * 2, 16384)
-          : (options?.maxTokens ?? 8192);
+          ? Math.max((options?.maxTokens ?? 4096) * 2, 8192)
+          : (options?.maxTokens ?? 4096);
       const temperature = attempt > 1 ? 0 : (options?.temperature ?? 0.1);
 
       const body: Record<string, unknown> = {

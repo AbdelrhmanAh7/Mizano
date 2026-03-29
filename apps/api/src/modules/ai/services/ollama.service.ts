@@ -131,7 +131,7 @@ export class OllamaService {
       {
         systemPrompt: OLLAMA_EXTRACTION_SYSTEM_PROMPT,
         timeoutMs: 300_000,
-        maxTokens: 16384,
+        maxTokens: 4096,
       },
     );
 
