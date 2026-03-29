@@ -86,8 +86,8 @@ export class DocumentIntakeController {
         },
         strategy: {
           type: 'string',
-          enum: ['ocr', 'hybrid', 'vlm', 'auto'],
-          description: 'Extraction strategy (default: from env EXTRACTION_STRATEGY)',
+          enum: ['fast', 'slow', 'ocr', 'hybrid', 'vlm', 'auto'],
+          description: 'Scan mode: "fast" (PaddleOCR + text model) or "slow" (qwen3-vl:8b vision)',
         },
       },
       required: ['file'],

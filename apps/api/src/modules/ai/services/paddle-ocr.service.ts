@@ -1,10 +1,13 @@
 /**
- * PaddleOCR service — calls the Python `paddleocr` package via subprocess.
+ * PaddleOCR service — calls RapidOCR (ONNX runtime) via Python subprocess.
  *
- * This gives identical results to https://aistudio.baidu.com/paddleocr
- * because it uses the exact same models and preprocessing code.
+ * Features:
+ *  - Arabic-optimized recognition model (PP-OCRv3 Arabic, auto-downloaded)
+ *  - PDF → image conversion via PyMuPDF for scanned PDFs
+ *  - RTL text reordering for Arabic output
  *
- * Setup: pip install paddleocr
+ * Setup:
+ *   pip install rapidocr-onnxruntime PyMuPDF arabic-reshaper python-bidi --target C:/paddleocr_pkg
  */
 
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
@@ -32,42 +35,189 @@ export interface OcrResult {
 }
 
 // ---------------------------------------------------------------------------
-// Python script that runs PaddleOCR and outputs JSON
+// Python script — Arabic OCR with PDF support
 // ---------------------------------------------------------------------------
 
-const PYTHON_SCRIPT = `
-import sys, json
-from rapidocr_onnxruntime import RapidOCR
+const PYTHON_OCR_SCRIPT = `
+import sys, json, os, tempfile
+from pathlib import Path
 
-img_path = sys.argv[1]
-engine = RapidOCR()
-result, elapse = engine(img_path)
+# ── Arabic model setup ───────────────────────────────────────────────────────
+MODELS_DIR = os.environ.get("PADDLE_OCR_MODELS_DIR",
+    os.path.join(tempfile.gettempdir(), "mizano_ocr_models"))
 
-output = {"regions": [], "text": "", "confidence": 0}
+def ensure_arabic_models():
+    rec_path = os.path.join(MODELS_DIR, "arabic_rec.onnx")
+    dict_path = os.path.join(MODELS_DIR, "arabic_dict.txt")
+    if os.path.exists(rec_path) and os.path.exists(dict_path):
+        return rec_path, dict_path
+    os.makedirs(MODELS_DIR, exist_ok=True)
+    import urllib.request
+    base = "https://huggingface.co/monkt/paddleocr-onnx/resolve/main"
+    try:
+        if not os.path.exists(rec_path):
+            sys.stderr.write(f"Downloading Arabic rec model to {rec_path}...\\n")
+            urllib.request.urlretrieve(f"{base}/languages/arabic/rec.onnx", rec_path)
+        if not os.path.exists(dict_path):
+            sys.stderr.write(f"Downloading Arabic dict to {dict_path}...\\n")
+            urllib.request.urlretrieve(f"{base}/languages/arabic/dict.txt", dict_path)
+        return rec_path, dict_path
+    except Exception as e:
+        sys.stderr.write(f"Arabic model download failed: {e}\\n")
+        return None, None
 
-if result:
-    lines = []
-    total_conf = 0
-    count = 0
-    for item in result:
-        bbox_pts, text, score = item
-        conf = float(score) if score else 0.0
-        x_coords = [p[0] for p in bbox_pts]
-        y_coords = [p[1] for p in bbox_pts]
-        bbox = [int(min(x_coords)), int(min(y_coords)),
-                int(max(x_coords) - min(x_coords)), int(max(y_coords) - min(y_coords))]
-        output["regions"].append({
-            "text": text,
-            "bbox": bbox,
-            "confidence": round(conf * 100, 1)
-        })
-        lines.append(text)
-        total_conf += conf
-        count += 1
-    output["text"] = "\\n".join(lines)
-    output["confidence"] = round((total_conf / count) * 100, 1) if count > 0 else 0
+def create_arabic_engine(rec_path, dict_path):
+    """Create RapidOCR engine with Arabic recognition model via config patching."""
+    from rapidocr_onnxruntime.rapid_ocr_api import RapidOCR, LoadImage
+    from rapidocr_onnxruntime.utils import read_yaml, concat_model_path
+
+    # Find the rapidocr_onnxruntime package root
+    import rapidocr_onnxruntime
+    root = Path(rapidocr_onnxruntime.__file__).parent
+    config = read_yaml(str(root / "config.yaml"))
+    config = concat_model_path(config)
+
+    # Patch recognition model + dictionary for Arabic
+    config["Rec"]["model_path"] = rec_path
+    config["Rec"]["keys_path"] = dict_path
+
+    # Build engine manually with patched config
+    engine = RapidOCR.__new__(RapidOCR)
+    g = config["Global"]
+    engine.print_verbose = g["print_verbose"]
+    engine.text_score = g["text_score"]
+    engine.min_height = g["min_height"]
+    engine.width_height_ratio = g["width_height_ratio"]
+    engine.use_text_det = g["use_text_det"]
+    engine.use_angle_cls = g["use_angle_cls"]
+
+    # Detection (language-agnostic, works for Arabic)
+    Det = engine.init_module(config["Det"]["module_name"], config["Det"]["class_name"])
+    engine.text_detector = Det(config["Det"])
+
+    # Recognition (Arabic model)
+    Rec = engine.init_module(config["Rec"]["module_name"], config["Rec"]["class_name"])
+    engine.text_recognizer = Rec(config["Rec"])
+
+    # Classifier (optional)
+    if g["use_angle_cls"]:
+        Cls = engine.init_module(config["Cls"]["module_name"], config["Cls"]["class_name"])
+        engine.text_cls = Cls(config["Cls"])
+
+    engine.load_img = LoadImage()
+    return engine
+
+# ── RTL text fixing ──────────────────────────────────────────────────────────
+try:
+    import arabic_reshaper
+    from bidi.algorithm import get_display
+    def fix_arabic(text):
+        try:
+            reshaped = arabic_reshaper.reshape(text)
+            return get_display(reshaped)
+        except Exception:
+            return text
+except ImportError:
+    def fix_arabic(text):
+        return text
+
+# ── PDF to images ────────────────────────────────────────────────────────────
+def pdf_to_images(pdf_path, dpi=300):
+    try:
+        import fitz
+    except ImportError:
+        sys.stderr.write("PyMuPDF (fitz) not installed\\n")
+        return []
+    doc = fitz.open(pdf_path)
+    images = []
+    for i in range(len(doc)):
+        pix = doc[i].get_pixmap(dpi=dpi)
+        img_path = os.path.join(tempfile.gettempdir(), f"mizano_page_{os.getpid()}_{i}.png")
+        pix.save(img_path)
+        images.append(img_path)
+    doc.close()
+    return images
+
+# ── Main ─────────────────────────────────────────────────────────────────────
+file_path = sys.argv[1]
+
+# Load Arabic models (auto-download on first run)
+rec_path, dict_path = ensure_arabic_models()
+use_arabic = rec_path is not None and dict_path is not None
+
+if use_arabic:
+    engine = create_arabic_engine(rec_path, dict_path)
+    sys.stderr.write(f"Using Arabic recognition model: {rec_path}\\n")
+else:
+    from rapidocr_onnxruntime import RapidOCR
+    engine = RapidOCR()
+    sys.stderr.write("Arabic models unavailable — using default (Chinese+English)\\n")
+
+# Handle PDF or image input
+is_pdf = file_path.lower().endswith('.pdf')
+if is_pdf:
+    image_paths = pdf_to_images(file_path)
+    if not image_paths:
+        print(json.dumps({"regions": [], "text": "", "confidence": 0}))
+        sys.exit(0)
+else:
+    image_paths = [file_path]
+
+# OCR each page/image
+all_regions = []
+all_lines = []
+total_conf = 0.0
+total_count = 0
+
+for page_path in image_paths:
+    result, elapse = engine(page_path)
+    if result:
+        for item in result:
+            bbox_pts, text, score = item
+            if use_arabic:
+                text = fix_arabic(text)
+            conf = float(score) if score else 0.0
+            x_coords = [p[0] for p in bbox_pts]
+            y_coords = [p[1] for p in bbox_pts]
+            bbox = [int(min(x_coords)), int(min(y_coords)),
+                    int(max(x_coords) - min(x_coords)), int(max(y_coords) - min(y_coords))]
+            all_regions.append({"text": text, "bbox": bbox, "confidence": round(conf * 100, 1)})
+            all_lines.append(text)
+            total_conf += conf
+            total_count += 1
+
+# Cleanup temp images from PDF conversion
+if is_pdf:
+    for p in image_paths:
+        try: os.unlink(p)
+        except: pass
+
+output = {
+    "regions": all_regions,
+    "text": "\\n".join(all_lines),
+    "confidence": round((total_conf / total_count) * 100, 1) if total_count > 0 else 0
+}
 
 print(json.dumps(output, ensure_ascii=False))
+`;
+
+// ---------------------------------------------------------------------------
+// Python script — PDF page to PNG image (for VLM strategy)
+// ---------------------------------------------------------------------------
+
+const PYTHON_PDF_TO_IMAGE_SCRIPT = `
+import sys, fitz
+pdf_path = sys.argv[1]
+out_path = sys.argv[2]
+page_num = int(sys.argv[3]) if len(sys.argv) > 3 else 0
+dpi = int(sys.argv[4]) if len(sys.argv) > 4 else 300
+doc = fitz.open(pdf_path)
+if page_num >= len(doc):
+    page_num = 0
+pix = doc[page_num].get_pixmap(dpi=dpi)
+pix.save(out_path)
+doc.close()
+print("ok")
 `;
 
 // ---------------------------------------------------------------------------
@@ -81,14 +231,21 @@ export class PaddleOcrService implements OnModuleInit {
   private readonly pythonPath: string;
   private readonly defaultLang: string;
   private readonly timeoutMs: number;
-  private scriptPath: string = '';
-  private available = false;
-
   private readonly pythonPkgPath: string;
+  private readonly modelsDir: string;
+
+  private ocrScriptPath: string = '';
+  private pdfScriptPath: string = '';
+  private ocrAvailable = false;
+  private pdfRenderAvailable = false;
 
   constructor(private configService: ConfigService) {
     this.pythonPath = this.configService.get<string>('PYTHON_PATH', 'python');
     this.pythonPkgPath = this.configService.get<string>('PADDLE_OCR_PKG_PATH', 'C:/paddleocr_pkg');
+    this.modelsDir = this.configService.get<string>(
+      'PADDLE_OCR_MODELS_DIR',
+      path.join(os.tmpdir(), 'mizano_ocr_models'),
+    );
     this.defaultLang = this.configService.get<string>('PADDLE_OCR_LANG', 'ar');
     this.timeoutMs = parseInt(
       this.configService.get<string>('PADDLE_OCR_TIMEOUT_MS', '120000'),
@@ -97,59 +254,94 @@ export class PaddleOcrService implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    // Write the Python script to a temp file
-    this.scriptPath = path.join(os.tmpdir(), 'mizano_paddleocr.py');
-    fs.writeFileSync(this.scriptPath, PYTHON_SCRIPT, 'utf-8');
+    // Write Python scripts to temp files
+    this.ocrScriptPath = path.join(os.tmpdir(), 'mizano_paddleocr.py');
+    this.pdfScriptPath = path.join(os.tmpdir(), 'mizano_pdf_to_image.py');
+    fs.writeFileSync(this.ocrScriptPath, PYTHON_OCR_SCRIPT, 'utf-8');
+    fs.writeFileSync(this.pdfScriptPath, PYTHON_PDF_TO_IMAGE_SCRIPT, 'utf-8');
 
-    // Check if rapidocr-onnxruntime is installed
+    // Check RapidOCR
     try {
       await this.execPython(
         ['-c', 'from rapidocr_onnxruntime import RapidOCR; print("ok")'],
         15000,
       );
-      this.available = true;
-      this.logger.log(`RapidOCR (PaddleOCR ONNX) is available (pkg: ${this.pythonPkgPath})`);
+      this.ocrAvailable = true;
+      this.logger.log('RapidOCR (PaddleOCR ONNX) is available');
     } catch (err) {
-      this.available = false;
+      this.ocrAvailable = false;
       this.logger.warn(
-        `RapidOCR not available. Install: pip install rapidocr-onnxruntime --target C:/paddleocr_pkg. ` +
+        `RapidOCR not available. Install: pip install rapidocr-onnxruntime --target ${this.pythonPkgPath}. ` +
           `Error: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+
+    // Check PyMuPDF (for PDF rendering)
+    try {
+      await this.execPython(['-c', 'import fitz; print("ok")'], 10000);
+      this.pdfRenderAvailable = true;
+      this.logger.log('PyMuPDF (fitz) is available — PDF page rendering enabled');
+    } catch {
+      this.pdfRenderAvailable = false;
+      this.logger.warn(
+        `PyMuPDF not available — PDF page rendering disabled. Install: pip install PyMuPDF --target ${this.pythonPkgPath}`,
+      );
+    }
+
+    // Check Arabic text deps (informational only)
+    try {
+      await this.execPython(
+        ['-c', 'import arabic_reshaper; from bidi.algorithm import get_display; print("ok")'],
+        10000,
+      );
+      this.logger.log('Arabic text reshaping (arabic-reshaper + python-bidi) available');
+    } catch {
+      this.logger.warn(
+        `Arabic RTL text fixing not available. Install: pip install arabic-reshaper python-bidi --target ${this.pythonPkgPath}`,
       );
     }
   }
 
   /** Check if PaddleOCR Python package is installed and working. */
   async isAvailable(): Promise<boolean> {
-    return this.available;
+    return this.ocrAvailable;
+  }
+
+  /** Check if PDF page → image rendering is available (PyMuPDF). */
+  canRenderPdf(): boolean {
+    return this.pdfRenderAvailable;
   }
 
   /**
-   * Recognize text from an image buffer.
-   * Writes the image to a temp file, calls Python PaddleOCR, parses JSON output.
+   * Recognize text from an image or PDF buffer.
+   * For PDFs: converts pages to images via PyMuPDF, then OCR each page.
+   * Uses Arabic recognition model (auto-downloaded on first run).
    */
-  async recognize(imageBuffer: Buffer): Promise<OcrResult> {
+  async recognize(fileBuffer: Buffer, isPdf: boolean = false): Promise<OcrResult> {
     const startTime = Date.now();
 
-    if (!this.available) {
+    if (!this.ocrAvailable) {
       return { text: '', confidence: 0, regions: [], processingTimeMs: 0 };
     }
 
-    // Write image to temp file
-    const tmpImage = path.join(os.tmpdir(), `mizano_ocr_${Date.now()}.jpg`);
+    if (isPdf && !this.pdfRenderAvailable) {
+      this.logger.warn('[OCR] PDF input but PyMuPDF not available — cannot render pages');
+      return { text: '', confidence: 0, regions: [], processingTimeMs: 0 };
+    }
+
+    const ext = isPdf ? '.pdf' : '.jpg';
+    const tmpFile = path.join(os.tmpdir(), `mizano_ocr_${Date.now()}${ext}`);
 
     try {
-      fs.writeFileSync(tmpImage, imageBuffer);
+      fs.writeFileSync(tmpFile, fileBuffer);
 
-      this.logger.log(`[OCR] Running PaddleOCR (lang=${this.defaultLang})...`);
+      this.logger.log(`[OCR] Running PaddleOCR (lang=${this.defaultLang}, pdf=${isPdf})...`);
 
-      const output = await this.execPython(
-        [this.scriptPath, tmpImage, this.defaultLang],
-        this.timeoutMs,
-      );
+      const output = await this.execPython([this.ocrScriptPath, tmpFile], this.timeoutMs);
 
       const processingTimeMs = Date.now() - startTime;
 
-      // Parse JSON output
+      // Parse JSON output (last line of stdout)
       const jsonStr = output.trim().split('\n').pop() || '{}';
       const result = JSON.parse(jsonStr) as {
         text: string;
@@ -158,10 +350,10 @@ export class PaddleOcrService implements OnModuleInit {
       };
 
       this.logger.log(
-        `[OCR] PaddleOCR result: regions=${result.regions.length}, confidence=${result.confidence}%, textLen=${result.text.length}, time=${processingTimeMs}ms`,
+        `[OCR] PaddleOCR result: regions=${result.regions.length}, confidence=${result.confidence}%, ` +
+          `textLen=${result.text.length}, time=${processingTimeMs}ms`,
       );
 
-      // Log each region for debugging
       for (const region of result.regions) {
         this.logger.debug(
           `  [${region.bbox.join(',')}] conf=${region.confidence}%: "${region.text}"`,
@@ -181,11 +373,61 @@ export class PaddleOcrService implements OnModuleInit {
       );
       return { text: '', confidence: 0, regions: [], processingTimeMs };
     } finally {
-      // Clean up temp image
       try {
-        if (fs.existsSync(tmpImage)) fs.unlinkSync(tmpImage);
+        if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
       } catch {
         // ignore
+      }
+    }
+  }
+
+  /**
+   * Convert a single PDF page to a PNG image buffer.
+   * Used by VLM strategy to send PDF pages as images to the vision model.
+   *
+   * @returns PNG image buffer, or null if conversion fails
+   */
+  async pdfPageToImage(
+    pdfBuffer: Buffer,
+    page: number = 0,
+    dpi: number = 300,
+  ): Promise<Buffer | null> {
+    if (!this.pdfRenderAvailable) {
+      this.logger.warn('pdfPageToImage: PyMuPDF not available');
+      return null;
+    }
+
+    const tmpPdf = path.join(os.tmpdir(), `mizano_pdf_render_${Date.now()}.pdf`);
+    const tmpImg = path.join(os.tmpdir(), `mizano_pdf_render_${Date.now()}.png`);
+
+    try {
+      fs.writeFileSync(tmpPdf, pdfBuffer);
+
+      await this.execPython([this.pdfScriptPath, tmpPdf, tmpImg, String(page), String(dpi)], 30000);
+
+      if (!fs.existsSync(tmpImg)) {
+        this.logger.warn('pdfPageToImage: output image not created');
+        return null;
+      }
+
+      const imageBuffer = fs.readFileSync(tmpImg);
+      this.logger.log(
+        `pdfPageToImage: page=${page}, dpi=${dpi}, size=${(imageBuffer.length / 1024).toFixed(0)}KB`,
+      );
+      return imageBuffer;
+    } catch (err) {
+      this.logger.error(`pdfPageToImage failed: ${err instanceof Error ? err.message : err}`);
+      return null;
+    } finally {
+      try {
+        if (fs.existsSync(tmpPdf)) fs.unlinkSync(tmpPdf);
+      } catch {
+        /* ignore */
+      }
+      try {
+        if (fs.existsSync(tmpImg)) fs.unlinkSync(tmpImg);
+      } catch {
+        /* ignore */
       }
     }
   }
@@ -207,9 +449,16 @@ export class PaddleOcrService implements OnModuleInit {
             PYTHONIOENCODING: 'utf-8',
             PYTHONPATH: this.pythonPkgPath,
             PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: 'True',
+            PADDLE_OCR_MODELS_DIR: this.modelsDir,
           },
         },
         (error, stdout, stderr) => {
+          if (stderr) {
+            // Log Python stderr as debug (model download progress, warnings)
+            for (const line of stderr.split('\n').filter(Boolean)) {
+              this.logger.debug(`[Python] ${line}`);
+            }
+          }
           if (error) {
             const msg = stderr || error.message;
             reject(new Error(msg.slice(0, 500)));

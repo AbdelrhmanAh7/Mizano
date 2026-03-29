@@ -30,13 +30,15 @@ export class ProcessDocumentDto {
   forceType?: 'BILL' | 'INVOICE';
 
   @ApiPropertyOptional({
-    description: 'Extraction strategy override (default: from EXTRACTION_STRATEGY env)',
-    enum: ['ocr', 'hybrid', 'vlm', 'auto'],
-    example: 'ocr',
+    description:
+      'Scan mode: "fast" (PaddleOCR + text model), "slow" (qwen3-vl:8b vision). ' +
+      'Or advanced: "ocr", "hybrid", "vlm", "auto".',
+    enum: ['fast', 'slow', 'ocr', 'hybrid', 'vlm', 'auto'],
+    example: 'fast',
   })
-  @IsIn(['ocr', 'hybrid', 'vlm', 'auto'])
+  @IsIn(['fast', 'slow', 'ocr', 'hybrid', 'vlm', 'auto'])
   @IsOptional()
-  strategy?: 'ocr' | 'hybrid' | 'vlm' | 'auto';
+  strategy?: 'fast' | 'slow' | 'ocr' | 'hybrid' | 'vlm' | 'auto';
 }
 
 export class ConfirmIntakeLineDto {

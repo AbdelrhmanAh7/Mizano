@@ -3,8 +3,8 @@ import { DocumentExtractionResult } from '../services/ollama.service';
 /** Strategy names for document extraction. */
 export type ExtractionStrategyName = 'vlm' | 'ocr-llm' | 'hybrid';
 
-/** Configurable strategy selection (includes auto mode). */
-export type ExtractionStrategyOption = ExtractionStrategyName | 'auto';
+/** Configurable strategy selection (includes auto mode and scan-speed presets). */
+export type ExtractionStrategyOption = ExtractionStrategyName | 'auto' | 'fast' | 'slow';
 
 /** Context passed to every extraction strategy. */
 export interface ExtractionContext {
@@ -19,6 +19,8 @@ export interface ExtractionContext {
   /** true if PDF has native embedded text (not a scanned image) */
   pdfIsNativeText?: boolean;
   pdfPageCount?: number;
+  /** Override the Ollama model used for extraction (set by fast/slow mode). */
+  modelOverride?: string;
 }
 
 /** Sub-path taken within a composite strategy. */

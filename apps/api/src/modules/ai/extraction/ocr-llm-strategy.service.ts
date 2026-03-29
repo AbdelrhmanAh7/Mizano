@@ -42,13 +42,33 @@ export class OcrLlmStrategy implements ExtractionStrategy {
       ocrText = context.pdfText;
       ocrConfidence = 95; // Native text is highly reliable
     } else if (context.isPdf && !context.pdfIsNativeText) {
-      // Scanned PDF — need to convert pages to images and OCR
-      // For now, if we have any PDF text, use it; otherwise return null
-      if (context.pdfText && context.pdfText.length > 20) {
+      // Scanned PDF — convert pages to images and OCR via PaddleOCR
+      this.logger.log('[STEP 2] Scanned PDF detected — running PaddleOCR on PDF pages...');
+      const paddleAvailable = await this.paddleOcrService.isAvailable();
+
+      if (paddleAvailable && this.paddleOcrService.canRenderPdf()) {
+        const ocrResult = await this.paddleOcrService.recognize(context.fileBuffer, true);
+        ocrText = ocrResult.text;
+        ocrConfidence = ocrResult.confidence;
+        this.logger.log(
+          `[STEP 2] PaddleOCR PDF result: regions=${ocrResult.regions.length}, ` +
+            `confidence=${ocrConfidence}%, time=${ocrResult.processingTimeMs}ms`,
+        );
+      }
+
+      // Fallback: use whatever sparse text pdf-parse extracted
+      if (
+        (!ocrText || ocrText.trim().length < 10) &&
+        context.pdfText &&
+        context.pdfText.length > 20
+      ) {
+        this.logger.warn('[STEP 2] PaddleOCR PDF failed — using sparse pdf-parse text');
         ocrText = context.pdfText;
-        ocrConfidence = 50; // Low confidence for sparse PDF text
-      } else {
-        this.logger.warn('Scanned PDF with no text — OCR of PDF pages not yet supported');
+        ocrConfidence = 30;
+      }
+
+      if (!ocrText || ocrText.trim().length < 10) {
+        this.logger.warn('[STEP 2] Scanned PDF — no text could be extracted');
         return null;
       }
     } else {
@@ -109,8 +129,13 @@ export class OcrLlmStrategy implements ExtractionStrategy {
     }
 
     // Pass OCR text to Ollama text model for structured extraction
-    this.logger.log(`[STEP 4] Sending OCR text to Ollama (qwen2.5:7b) for JSON extraction...`);
-    const extraction = await this.ollamaService.extractFromOcrText(ocrText, ocrConfidence);
+    const modelLabel = context.modelOverride || 'default';
+    this.logger.log(`[STEP 4] Sending OCR text to Ollama (${modelLabel}) for JSON extraction...`);
+    const extraction = await this.ollamaService.extractFromOcrText(
+      ocrText,
+      ocrConfidence,
+      context.modelOverride,
+    );
 
     if (!extraction) {
       this.logger.warn('[STEP 4] Ollama text extraction returned null');

@@ -110,6 +110,7 @@ export class OllamaService {
   async extractFromImageVision(
     fileBuffer: Buffer,
     mimeType: string,
+    modelOverride?: string,
   ): Promise<DocumentExtractionResult | null> {
     let processed: Buffer;
     try {
@@ -132,6 +133,7 @@ export class OllamaService {
         systemPrompt: OLLAMA_EXTRACTION_SYSTEM_PROMPT,
         timeoutMs: 300_000,
         maxTokens: 4096,
+        model: modelOverride,
       },
     );
 
@@ -171,15 +173,18 @@ export class OllamaService {
   async extractFromOcrText(
     ocrText: string,
     ocrConfidence: number,
+    modelOverride?: string,
   ): Promise<DocumentExtractionResult | null> {
+    const model = modelOverride || this.gateway.textModel;
     this.logger.log(
-      `[LLM INPUT] OCR text (${ocrText.length} chars, conf=${ocrConfidence}%) → sending to ${this.gateway.textModel}`,
+      `[LLM INPUT] OCR text (${ocrText.length} chars, conf=${ocrConfidence}%) → sending to ${model}`,
     );
 
     const prompt = buildOcrTextExtractionPrompt(ocrText, ocrConfidence);
 
     const result = await this.gateway.infer<OllamaExtractionRaw>(prompt, {
       systemPrompt: OLLAMA_EXTRACTION_SYSTEM_PROMPT,
+      model: modelOverride,
     });
 
     if (!result) {

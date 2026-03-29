@@ -56,14 +56,14 @@ const EXTRACTION_EXAMPLE = JSON.stringify(
     documentCategory: 'INVOICE',
     lineItems: [
       {
-        description: 'Office Supplies',
+        description: 'مستلزمات مكتبية',
         quantity: 10,
         unitPrice: 100.0,
         taxAmount: 150.0,
         total: 1150.0,
       },
       {
-        description: 'Printer Paper A4',
+        description: 'ورق طباعة A4',
         quantity: 5,
         unitPrice: 80.0,
         taxAmount: 75.0,
@@ -86,7 +86,7 @@ Rules:
 - Dates must be YYYY-MM-DD
 - Extract ALL visible line items
 - documentCategory must be one of: INVOICE, RECEIPT, PURCHASE_ORDER, CONTRACT, TAX_DOCUMENT, BANK_STATEMENT, PAYSLIP, OTHER
-- Support both Arabic and English documents
+- CRITICAL: Keep text in the SAME LANGUAGE as the original document. If the document is in Arabic, return Arabic text for vendorName, vendorAddress, line item descriptions, notes, etc. Do NOT translate Arabic to English. Copy the text exactly as it appears on the document.
 ${NUMBER_RULES}`;
 
 /**
@@ -104,7 +104,7 @@ Rules:
 - Dates must be YYYY-MM-DD
 - Extract ALL line items found in the text
 - documentCategory must be one of: INVOICE, RECEIPT, PURCHASE_ORDER, CONTRACT, TAX_DOCUMENT, BANK_STATEMENT, PAYSLIP, OTHER
-- Support both Arabic and English
+- CRITICAL: Keep text in the SAME LANGUAGE as the original document. If Arabic, return Arabic text for vendorName, vendorAddress, line item descriptions, notes, etc. Do NOT translate. Copy text exactly as it appears.
 ${NUMBER_RULES}
 
 --- DOCUMENT TEXT ---
@@ -129,7 +129,7 @@ Rules:
 - Correct obvious OCR errors (e.g. "lnvoice" → "Invoice", "0" vs "O", "rn" vs "m")
 - Extract ALL line items found in the text
 - documentCategory must be one of: INVOICE, RECEIPT, PURCHASE_ORDER, CONTRACT, TAX_DOCUMENT, BANK_STATEMENT, PAYSLIP, OTHER
-- Support both Arabic and English
+- CRITICAL: Keep text in the SAME LANGUAGE as the original document. If Arabic, return Arabic text for vendorName, vendorAddress, line item descriptions, notes, etc. Do NOT translate. Copy text exactly as it appears.
 ${NUMBER_RULES}
 
 --- OCR TEXT ---

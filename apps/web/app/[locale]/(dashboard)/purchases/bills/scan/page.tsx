@@ -13,6 +13,8 @@ import {
   Sparkles,
   X,
   UserPlus,
+  Zap,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -42,6 +44,7 @@ export default function ScanBillPage() {
   const [localResult, setLocalResult] = useState<DocumentIntakeResult | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [scanDefaults, setScanDefaults] = useState<BillFormDefaultValues | null>(null);
+  const [scanMode, setScanMode] = useState<'fast' | 'slow'>('fast');
 
   // SSE-based document intake
   const intake = useDocumentIntakeStream();
@@ -147,6 +150,7 @@ export default function ScanBillPage() {
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('forceType', 'BILL');
+    formData.append('strategy', scanMode);
 
     await intake.processDocument(formData);
   };
@@ -375,12 +379,49 @@ export default function ScanBillPage() {
               )}
             </div>
 
-            <div className="flex justify-end">
+            {/* Scan Mode Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground">Scan Mode:</span>
+                <div className="flex rounded-lg border p-1 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setScanMode('fast')}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                      scanMode === 'fast'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                    )}
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    Fast
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScanMode('slow')}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                      scanMode === 'slow'
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                    )}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    Accurate
+                  </button>
+                </div>
+              </div>
               <Button onClick={handleProcess} disabled={!selectedFile || converting} size="lg">
                 <Sparkles className="mr-2 h-4 w-4" />
                 Process with AI
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              {scanMode === 'fast'
+                ? 'Fast: PaddleOCR + text model — quick extraction, works best with clear printed documents.'
+                : 'Accurate: qwen3-vl:8b vision model — slower but handles handwriting, poor scans, and complex layouts better.'}
+            </p>
           </CardContent>
         </Card>
       )}

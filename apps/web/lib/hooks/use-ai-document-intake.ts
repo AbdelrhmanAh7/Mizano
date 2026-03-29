@@ -74,7 +74,7 @@ export interface DocumentIntakeResult {
   } | null;
 
   /** Which AI engine was used */
-  extractionMethod?: 'ollama-vision' | 'ollama-text';
+  extractionMethod?: 'ollama-vision' | 'ollama-text' | 'ocr-llm' | 'hybrid-ocr' | 'hybrid-vlm';
 
   /** Suggested vendor creation when no existing vendor matched */
   suggestCreateVendor?: {

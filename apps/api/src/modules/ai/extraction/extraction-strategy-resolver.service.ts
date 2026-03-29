@@ -22,6 +22,8 @@ import { HybridStrategy } from './hybrid-strategy.service';
 export class ExtractionStrategyResolver {
   private readonly logger = new Logger(ExtractionStrategyResolver.name);
   private readonly defaultStrategy: ExtractionStrategyOption;
+  private readonly fastModel: string;
+  private readonly slowModel: string;
 
   constructor(
     private configService: ConfigService,
@@ -33,6 +35,8 @@ export class ExtractionStrategyResolver {
       'EXTRACTION_STRATEGY',
       'ocr',
     ) as ExtractionStrategyOption;
+    this.fastModel = this.configService.get<string>('OLLAMA_FAST_MODEL', 'qwen2.5:7b');
+    this.slowModel = this.configService.get<string>('OLLAMA_SLOW_MODEL', 'qwen3-vl:8b');
   }
 
   /**
@@ -53,6 +57,23 @@ export class ExtractionStrategyResolver {
 
     if (strategyName === 'auto') {
       return this.autoSelect(context);
+    }
+
+    // User-facing scan speed presets
+    if (strategyName === 'fast') {
+      this.logger.log(`Fast mode: PaddleOCR + ${this.fastModel}`);
+      context.modelOverride = this.fastModel;
+      return this.ocrLlmStrategy.extract(context);
+    }
+    if (strategyName === 'slow') {
+      this.logger.log(`Slow mode: ${this.slowModel} vision model`);
+      context.modelOverride = this.slowModel;
+      if (this.vlmStrategy.canHandle(context)) {
+        return this.vlmStrategy.extract(context);
+      }
+      // VLM can't handle PDFs — fall back to hybrid (OCR + VLM fallback)
+      this.logger.warn('Slow mode: VLM cannot handle PDF, using hybrid');
+      return this.hybridStrategy.extract(context);
     }
 
     const strategy = this.getStrategy(strategyName);
