@@ -11,6 +11,8 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: mizano-api
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "6001:6001"
     environment:
@@ -22,15 +24,13 @@ services:
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5001}
       - FRONTEND_URL=${CORS_ORIGIN:-http://localhost:5001}
-      - OLLAMA_BASE_URL=http://ollama-proxy:11434
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_ENABLED=${OLLAMA_ENABLED:-true}
       - OLLAMA_TEXT_MODEL=${OLLAMA_TEXT_MODEL:-qwen3-vl:8b}
       - OLLAMA_VISION_MODEL=${OLLAMA_VISION_MODEL:-qwen3-vl:8b}
       - OLLAMA_TIMEOUT_MS=${OLLAMA_TIMEOUT_MS:-300000}
       - OLLAMA_MAX_CONCURRENT=${OLLAMA_MAX_CONCURRENT:-1}
       - OLLAMA_NUM_CTX=${OLLAMA_NUM_CTX:-8192}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3-vl:8b}
-      - OLLAMA_WEBHOOK_SECRET=${OLLAMA_WEBHOOK_SECRET:-mizano-ollama-change-me}
       - EXTRACTION_STRATEGY=${EXTRACTION_STRATEGY:-vlm}
     deploy:
       resources:
@@ -42,8 +42,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      ollama-proxy:
         condition: service_healthy
     networks:
       - mizano-network
@@ -92,30 +90,6 @@ services:
       retries: 3
       start_period: 15s
 
-
-  # ============================================
-  # Ollama Tunnel Proxy (Colab GPU)
-  # ============================================
-  ollama-proxy:
-    build:
-      context: ./services/ollama-proxy
-      dockerfile: Dockerfile
-    container_name: mizano-ollama-proxy
-    restart: unless-stopped
-    volumes:
-      - ollama-proxy-data:/data
-    environment:
-      - TUNNEL_URL_FILE=/data/ollama_tunnel_url
-      - WEBHOOK_SECRET=${OLLAMA_WEBHOOK_SECRET:-mizano-ollama-change-me}
-      - LISTEN_PORT=11434
-    networks:
-      - mizano-network
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:11434/health')"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
   # ============================================
   # PostgreSQL Database
@@ -221,8 +195,6 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
-    driver: local
-  ollama-proxy-data:
     driver: local
   certbot_certs:
     driver: local

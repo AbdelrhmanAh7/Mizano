@@ -133,7 +133,7 @@ jobs:
             echo "=== Disk after cleanup ==="
             df -h / | tail -1
 
-            mkdir -p ~/mizano/apps/api/prisma ~/mizano/services
+            mkdir -p ~/mizano/apps/api/prisma
 
       - name: Copy deployment files to server
         uses: appleboy/scp-action@v0.1.7
@@ -142,7 +142,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          source: "docker-compose.production.yml,apps/api/prisma/,nginx/,services/"
+          source: "docker-compose.production.yml,apps/api/prisma/,nginx/"
           target: ~/mizano
           overwrite: true
 
@@ -193,7 +193,7 @@ jobs:
               echo "RATE_LIMIT_MAX=30"
               echo "RATE_LIMIT_AUTH_MAX=10"
               echo "LOG_LEVEL=warn"
-              echo "OLLAMA_BASE_URL=http://ollama-proxy:11434"
+              echo "OLLAMA_BASE_URL=http://host.docker.internal:11434"
               echo "OLLAMA_ENABLED=true"
               echo "OLLAMA_TEXT_MODEL=qwen3-vl:8b"
               echo "OLLAMA_VISION_MODEL=qwen3-vl:8b"
@@ -201,8 +201,6 @@ jobs:
               echo "OLLAMA_MAX_CONCURRENT=1"
               echo "OLLAMA_NUM_CTX=8192"
               echo "EXTRACTION_STRATEGY=vlm"
-              echo "OLLAMA_WEBHOOK_SECRET=pick-a-strong-secret-here"
-              echo "OLLAMA_MODEL=qwen3-vl:8b"
             } > ~/mizano/.env
 
             echo ".env written successfully"
@@ -237,11 +235,8 @@ jobs:
             docker tag ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:${TAG} mizano-api:latest
             docker tag ${{ env.REGISTRY }}/${{ env.WEB_IMAGE_NAME }}:${TAG} mizano-web:latest
 
-            # Build ollama-proxy from source (services/ollama-proxy/)
-            docker compose -f docker-compose.production.yml build ollama-proxy
-
-            # Start infra first (postgres, redis, ollama-proxy)
-            docker compose -f docker-compose.production.yml up -d postgres redis ollama-proxy
+            # Start infra first (postgres, redis)
+            docker compose -f docker-compose.production.yml up -d postgres redis
 
             # Wait for postgres to be healthy (up to 60s)
             echo "Waiting for PostgreSQL to be ready..."
@@ -290,6 +285,27 @@ jobs:
             docker image prune -f
 
             echo "Deployment completed: tag=${TAG}"
+
+      - name: Ensure Ollama models are available
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            # Ensure Ollama is running
+            if ! ollama list &> /dev/null 2>&1; then
+              echo "Starting Ollama..."
+              ollama serve &
+              sleep 5
+            fi
+
+            # Pull models (skips if already present)
+            ollama pull qwen3-vl:8b || echo "WARNING: Failed to pull qwen3-vl:8b"
+
+            echo "Ollama models ready:"
+            ollama list
 
   # ==========================================
   # Health check (runs on server via SSH)
