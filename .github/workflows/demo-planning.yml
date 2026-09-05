@@ -32,6 +32,7 @@ jobs:
       - name: Verify planning code and manifest offline
         run: |
           python -m unittest discover -s scripts -p 'test_sync_demo_planning.py'
+          python -m unittest discover -s scripts -p 'test_demo_rollout_scope.py'
           python scripts/sync-demo-planning.py --validate
       - name: Reconcile labels, milestones, issues and optional Project
         env:

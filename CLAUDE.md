@@ -1,6 +1,6 @@
 # CLAUDE.md — Mizano ERP
 
-AI-powered ERP (Autonomous Accounting Platform). Zero-touch accounting — AI handles 95% of work. Key concepts: Zero-Day Close, Perpetual General Ledger, Human-in-the-Loop.
+Accountant-first accounting ERP for Egypt, Saudi Arabia and the UAE. Current goal: the ten-day CPU invoice demo. Read [AGENTS.md](AGENTS.md) and [agent operations](docs/agents/README.md) first; these supersede historical product/deployment assumptions below.
 
 ## Tech Stack
 
@@ -154,7 +154,7 @@ if (!totalDebits.equals(totalCredits)) throw new BadRequestException('Journal en
 
 ## CI Zero-Tolerance Policy
 
-`pnpm ci:full` MUST pass with **ZERO warnings and ZERO errors**. Runs: lint → type-check → test → e2e.
+`pnpm ci:full` MUST pass with **ZERO warnings and ZERO errors**. The current script runs lint → type-check → unit tests; it does not run E2E. Run seeded E2E/browser acceptance separately and complete the SMOKE issue.
 
 ### Lint rules
 
@@ -223,7 +223,9 @@ All workflows are in `.agents/workflows/`. Use these commands for full project c
 | `/add-component` | Add shadcn/ui components                            |
 | `/debug-api`     | Debug API (Docker/ports/DB/logs/endpoints)          |
 
-## AI Infrastructure — Ollama via Google Colab
+## Historical AI Infrastructure — Ollama via Google Colab
+
+> Current runtime description only, not the target architecture. The CPU-only demo mandate in AGENTS.md supersedes the old Colab-only constraints in this section. Replace this dependency through the CPU runtime/extraction issues; paid cloud AI remains disabled in the demo. Do not mistake this documented migration plan for an implemented change.
 
 Ollama does NOT run locally in production. It runs on a Google Colab notebook
 (T4 GPU, free tier) and is accessed through a reverse proxy.
@@ -275,3 +277,4 @@ services (Docker) → ollama-proxy:11434 → Cloudflare tunnel → Colab (Ollama
 | `docs/environment-guide.md` | 4-env system setup                  |
 | `docs/testing-strategy.md`  | Test plan, pyramid, coverage goals  |
 | `docs/roadmap.md`           | 5-phase product roadmap             |
+

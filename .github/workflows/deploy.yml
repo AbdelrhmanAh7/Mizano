@@ -44,8 +44,47 @@ jobs:
     name: Verify CI Passed
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'release' || github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      should_deploy: ${{ steps.scope.outputs.should_deploy }}
+    permissions:
+      contents: read
     steps:
-      - run: echo "CI passed — proceeding with deployment"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Skip application rollout for documentation and planning changes
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        shell: bash
+        run: |
+          python - <<'PYTHON'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          deploy = True
+          if os.environ['EVENT_NAME'] == 'workflow_run':
+              try:
+                  exemption = json.loads(Path('docs/planning/rollout-exemption.json').read_text())
+                  # Every changed path in the complete history, including reverted runtime changes.
+                  baseline = 'f8bf699319a37198b585cb67b650069da4c6cd4d'
+                  subprocess.run(['git', 'merge-base', '--is-ancestor', baseline, 'HEAD'], check=True)
+                  files = subprocess.check_output(['git', 'log', '--format=', '--name-only', '--full-history', '-m', baseline + '..HEAD'], text=True).splitlines()
+                  files = [name for name in files if name]
+                  workflow = Path('.github/workflows/deploy.yml').read_bytes()
+                  expected = exemption['deployment_workflow_sha256']
+                  deploy = not (
+                      bool(files)
+                      and set(files).issubset(set(exemption['planning_paths']))
+                      and hashlib.sha256(workflow).hexdigest() == expected
+                  )
+              except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError):
+                  deploy = True  # Unknown scope never suppresses a rollout.
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('should_deploy=' + str(deploy).lower() + '\n')
+          print('Application deployment required:', deploy)
+          PYTHON
 
   # ==========================================
   # Build and Push Docker Images to GHCR
@@ -54,6 +93,7 @@ jobs:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
     needs: check-ci
+    if: needs.check-ci.outputs.should_deploy == 'true'
     permissions:
       contents: read
       packages: write
@@ -353,3 +393,4 @@ jobs:
       - name: Notify failure
         if: failure()
         run: echo "Deployment verification FAILED at $(date)"
+
