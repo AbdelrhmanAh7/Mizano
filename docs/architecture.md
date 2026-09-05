@@ -1,3 +1,5 @@
+> Historical architecture/testing context. The September 2026 [roadmap](roadmap.md), [constitution](../AGENTS.md) and [demo acceptance](strategy/demo-acceptance.md) define the current CPU-first goal and release gates. Descriptions here are not proof that a feature is implemented or verified.
+
 # Mizano ERP System Architecture
 
 ## System Architecture
@@ -880,3 +882,4 @@ All tests run in GitHub Actions CI pipeline on every PR. See `docs/testing-strat
 | Predictive Compliance     | Auto-detect regulatory risks before filing        | Q4 2027  |
 
 See `docs/roadmap.md` for the complete product roadmap and market strategy.
+

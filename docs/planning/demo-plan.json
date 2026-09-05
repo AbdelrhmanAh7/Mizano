@@ -1,0 +1,513 @@
+{
+  "repository": "AbdelrhmanAh7/Mizano",
+  "project": {
+    "title": "Mizano | CPU Invoice Demo | 10 Days",
+    "description": "Accountant-first CPU invoice demo: 5-14 September 2026; Telegram to validated draft, batch approval, ledger and reports.",
+    "owner": "AbdelrhmanAh7"
+  },
+  "labels": [
+    {
+      "name": "priority:P0",
+      "color": "B60205",
+      "description": "Blocks demo: financial correctness or tenant security"
+    },
+    {
+      "name": "priority:P1",
+      "color": "D93F0B",
+      "description": "Required for the ten-day vertical demo"
+    },
+    {
+      "name": "priority:P2",
+      "color": "FBCA04",
+      "description": "After demo or explicit stretch"
+    },
+    {
+      "name": "type:bug",
+      "color": "D73A4A",
+      "description": "Verified code defect; reproduce before fixing"
+    },
+    {
+      "name": "type:feature",
+      "color": "A2EEEF",
+      "description": "New user capability"
+    },
+    {
+      "name": "type:quality",
+      "color": "5319E7",
+      "description": "Tests, reliability or delivery"
+    },
+    {
+      "name": "type:strategy",
+      "color": "0052CC",
+      "description": "Roadmap, research and governance"
+    },
+    {
+      "name": "demo:required",
+      "color": "0E8A16",
+      "description": "Part of the CPU invoice demo release gate"
+    },
+    {
+      "name": "demo:later",
+      "color": "CFD3D7",
+      "description": "Excluded from the ten-day release"
+    },
+    {
+      "name": "area:security",
+      "color": "B60205",
+      "description": "Identity, tenant scope, privacy"
+    },
+    {
+      "name": "area:accounting",
+      "color": "1D76DB",
+      "description": "Ledger, tax arithmetic, payments"
+    },
+    {
+      "name": "area:extraction",
+      "color": "006B75",
+      "description": "Document parsing and CPU OCR"
+    },
+    {
+      "name": "area:telegram",
+      "color": "0088CC",
+      "description": "Telegram ingestion"
+    },
+    {
+      "name": "area:platform",
+      "color": "5319E7",
+      "description": "Build, queue, deploy and operations"
+    },
+    {
+      "name": "area:ux",
+      "color": "C5DEF5",
+      "description": "Accountant workflow, Arabic, charts"
+    },
+    {
+      "name": "area:agents",
+      "color": "7057FF",
+      "description": "Four-provider development workflow"
+    },
+    {
+      "name": "country:EG",
+      "color": "006B75",
+      "description": "Egypt ETA integration"
+    },
+    {
+      "name": "country:SA",
+      "color": "0E8A16",
+      "description": "Saudi ZATCA integration"
+    },
+    {
+      "name": "country:AE",
+      "color": "D93F0B",
+      "description": "UAE ASP integration"
+    }
+  ],
+  "milestones": [
+    {
+      "key": "M0",
+      "title": "M0 | Safe foundation | Days 1-2",
+      "description": "Identity isolation, correct money, repeatable setup, four-provider preflight.",
+      "due_on": "2026-09-06T20:59:59Z"
+    },
+    {
+      "key": "M1",
+      "title": "M1 | CPU document intake | Days 3-4",
+      "description": "Durable CPU OCR and complete PDF/Word/image ingestion with validated drafts.",
+      "due_on": "2026-09-08T20:59:59Z"
+    },
+    {
+      "key": "M2",
+      "title": "M2 | Telegram to ledger | Days 5-7",
+      "description": "Private Telegram intake, low-click review, posting and reports connected.",
+      "due_on": "2026-09-11T20:59:59Z"
+    },
+    {
+      "key": "M3",
+      "title": "M3 | Demo acceptance | Days 8-10",
+      "description": "Benchmarks, Arabic E2E, CPU deploy/restore and accountant acceptance.",
+      "due_on": "2026-09-14T20:59:59Z"
+    },
+    {
+      "key": "M4",
+      "title": "M4 | Egypt controlled pilot",
+      "description": "After demo acceptance; taxpayer-authorized ETA PreProd then controlled pilot."
+    },
+    {
+      "key": "M5",
+      "title": "M5 | Regional adapters",
+      "description": "After core accounting stability; distinct Saudi and UAE onboarding."
+    }
+  ],
+  "issues": [
+    {
+      "key": "SPRINT",
+      "title": "[Sprint] Deliver the CPU invoice demo in ten days",
+      "body": "## Outcome\nGoal: by 14 September 2026 Cairo, Telegram/web documents become validated drafts, one batch approval creates correct ledger entries, payments and reports reconcile on CPU.\n\n## Scope\nCoordinate the linked tasks. No GPU, Colab or paid AI dependency in the critical path. 2-3 wall-clock hours daily for ten days; four provider lanes, bounded concurrency. Existing peripheral ERP modules remain outside acceptance.\n\n## Acceptance evidence\n- [ ] All demo:required issues meet acceptance or the release is explicitly blocked\n- [ ] Execute all scenarios in demo-acceptance.md on one immutable deployed SHA\n- [ ] Publish daily evidence and a final accountant acceptance record; do not call this tax certified\n\n## Delivery\n- Window: Days 8-10; estimate: 3 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Coordinator; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:strategy",
+        "area:agents",
+        "demo:required"
+      ],
+      "milestone": "M3",
+      "dependencies": []
+    },
+    {
+      "key": "AUTH",
+      "title": "[P0] Isolate concurrent session refresh by user/session",
+      "body": "## Outcome\napps/web/lib/auth.ts keeps one module-global refreshPromise and cooldown for every user. Overlapping refreshes can reuse another session’s returned tokens.\n\n## Scope\nReproduce two users refreshing concurrently, key single-flight/cooldown by a safe session identity, clear scoped state, and keep secrets out of error logs.\n\n## Acceptance evidence\n- [ ] Concurrent tenant-A/B refreshes return only their own tokens\n- [ ] A failed refresh does not block other users\n- [ ] Logout/revocation and expired session scenarios pass\n\n## Delivery\n- Window: Days 1-2; estimate: 3 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Codex; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P0",
+        "type:bug",
+        "area:security",
+        "demo:required"
+      ],
+      "milestone": "M0",
+      "dependencies": []
+    },
+    {
+      "key": "TENANT",
+      "title": "[P0] Enforce tenant ownership for intake SSE, results and references",
+      "body": "## Outcome\nDocumentIntakeController exposes @Public SSE and looks up jobs solely by jobId; jobs carry no owner. Financial writes also accept related object IDs without complete tenant checks.\n\n## Scope\nAuthenticate progress/results; persist owner scope; validate vendor/customer/account/item/project/bill references. Test payment allocations and journal updates. Never authorize with knowledge of a job ID.\n\n## Acceptance evidence\n- [ ] Anonymous SSE rejected; tenant B cannot read A result/progress\n- [ ] Cross-tenant allocations and account/project references rejected with no mutation\n- [ ] Authorized owner can reconnect and poll after worker restart\n\n## Delivery\n- Window: Days 1-2; estimate: 4 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Codex; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P0",
+        "type:bug",
+        "area:security",
+        "demo:required"
+      ],
+      "milestone": "M0",
+      "dependencies": []
+    },
+    {
+      "key": "MONEY",
+      "title": "[P0] Unify scan and manual invoice tax arithmetic with Decimal",
+      "body": "## Outcome\nScan confirmation adds taxRate directly as an amount; the scan UI also maps extracted taxAmount into taxRate. Manual creation uses percentage arithmetic. Float intermediates occur across money paths.\n\n## Scope\nDefine separate taxRatePercent/taxAmount fields, Decimal string transport and one shared calculation service; reconcile line/header discounts and currency rounding. Reuse it from scan, manual bills and sales invoices.\n\n## Acceptance evidence\n- [ ] 2 × 100 at 14% yields tax 28 and gross 228 through both paths\n- [ ] Non-100 line values, mixed taxes, discounts and Arabic decimals have exact expected totals\n- [ ] UI round-trip preserves amount versus rate; missing tax stays unresolved\n\n## Delivery\n- Window: Days 1-2; estimate: 4 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Codex; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P0",
+        "type:bug",
+        "area:accounting",
+        "demo:required"
+      ],
+      "milestone": "M0",
+      "dependencies": []
+    },
+    {
+      "key": "POSTING",
+      "title": "[P0] Make bill approval and payment posting atomic and idempotent",
+      "body": "## Outcome\nBill approval creates a posted-by-default journal before updating the bill. Payment creation, balance updates and journal creation also commit separately.\n\n## Scope\nUse one transaction, guarded state changes and unique source-event linkage. Use document accounting date, enforce locked periods and default accounts; retain audit source and reversal linkage.\n\n## Acceptance evidence\n- [ ] Concurrent/retried approval creates exactly one posting\n- [ ] Injected failure rolls back bill/payment/allocations/journal together\n- [ ] Missing AP/tax accounts or a locked date reject without partial writes\n\n## Delivery\n- Window: Days 1-2; estimate: 5 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Codex; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P0",
+        "type:bug",
+        "area:accounting",
+        "demo:required"
+      ],
+      "milestone": "M0",
+      "dependencies": [
+        "MONEY",
+        "TENANT"
+      ]
+    },
+    {
+      "key": "BULK",
+      "title": "[P0] Restore bulk action and posted-ledger invariants",
+      "body": "## Outcome\nBulk approve/pay/post changes flags without single-item financial commands or period checks. Posted journal lines can be replaced; repeated valid account IDs fail create validation.\n\n## Scope\nReuse safe commands for batches, return per-record outcomes, disallow destructive edits to posted journals, use reversals and distinct account validation. Never mark paid without payment allocation.\n\n## Acceptance evidence\n- [ ] Bulk and single approval/payment produce equivalent ledger effects\n- [ ] Locked-period batch post rejected; posted journal edit/delete rejected\n- [ ] Two expense lines using the same account post successfully\n- [ ] Payment reversal/deletion leaves balances and allocations reconciled\n\n## Delivery\n- Window: Days 1-2; estimate: 5 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Codex; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P0",
+        "type:bug",
+        "area:accounting",
+        "demo:required"
+      ],
+      "milestone": "M0",
+      "dependencies": [
+        "POSTING"
+      ]
+    },
+    {
+      "key": "RUNTIME",
+      "title": "[P1] Package a reproducible CPU demo runtime and baseline",
+      "body": "## Outcome\nCurrent API Dockerfile installs Node/openssl but not the Python/Paddle/Word conversion dependencies assumed by OCR. Colab-backed Ollama is a runtime dependency.\n\n## Scope\nPin CPU parser/recognizer dependencies and model hashes in an isolated worker image; no runtime downloads. Record CPU architecture, RAM, disk and dependency licenses. Establish clean seed/migration start.\n\n## Acceptance evidence\n- [ ] Cold start on target CPU without GPU/Colab/cloud AI succeeds\n- [ ] Native PDF, DOCX and an Arabic image can be processed offline after image build\n- [ ] Pin package manager and supported Node version; clean database migration/seed is repeatable\n\n## Delivery\n- Window: Days 1-2; estimate: 4 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Claude/platform; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:quality",
+        "area:platform",
+        "demo:required"
+      ],
+      "milestone": "M0",
+      "dependencies": []
+    },
+    {
+      "key": "AGENTS",
+      "title": "[P1] Verify four-provider launcher, leases and daily checkpoints",
+      "body": "## Outcome\nOne prompt must coordinate Codex, Claude, GLM and Antigravity in 2-3 hour daily windows. Instructions alone cannot prove tools launch or schedules run.\n\n## Scope\nFollow docs/agents/README.md. Discover installed CLI help/auth and supported unattended interfaces; implement an argv-based local launcher or reuse a verified runner, with isolated worktrees, leases, timeouts and persistent checkpoints. No fabricated CLI flags.\n\n## Acceptance evidence\n- [ ] Capture version/auth smoke evidence for all four providers\n- [ ] One entrypoint starts four independent bounded lanes and prevents duplicate ownership\n- [ ] A worker timeout/quota failure checkpoints and exits without bypassing permission controls\n- [ ] Local timer starts one 150-minute session/day with 180-minute hard stop and survives reboot; record next run\n\n## Delivery\n- Window: Days 1-2; estimate: 4 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Claude/coordinator; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:quality",
+        "area:agents",
+        "demo:required"
+      ],
+      "milestone": "M0",
+      "dependencies": []
+    },
+    {
+      "key": "QUEUE",
+      "title": "[P1] Persist intake jobs, originals, retries and deduplication",
+      "body": "## Outcome\nIntake uses a process cache (200 jobs/30-minute TTL) and detached promises. Restart loses work and there is no durable source-to-draft identity.\n\n## Scope\nUse existing Redis/BullMQ plus PostgreSQL job metadata and private original storage. Bound concurrency/pages/bytes/CPU time; unique tenant-source hashes and replay-safe draft creation; dead-letter retry.\n\n## Acceptance evidence\n- [ ] Restart worker mid-job then finish once with original retained\n- [ ] Duplicate web/Telegram deliveries create one job/draft; reprocess version is explicit\n- [ ] Unauthorized reads denied; retention cleanup is deliberate; queue saturation returns clear status\n\n## Delivery\n- Window: Days 3-4; estimate: 4 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Claude/platform; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:feature",
+        "area:platform",
+        "demo:required"
+      ],
+      "milestone": "M1",
+      "dependencies": [
+        "TENANT",
+        "RUNTIME"
+      ]
+    },
+    {
+      "key": "CPUOCR",
+      "title": "[P1] Add a no-LLM Arabic/English CPU extraction baseline",
+      "body": "## Outcome\nFast/OCR modes still call qwen2.5:7b or another Ollama model; unavailable model prevents structured extraction.\n\n## Scope\nNative text + local OCR + deterministic schema extraction. Start Tesseract ara+eng; benchmark explicit Paddle Arabic mobile recognizer. Use vendor layouts and Arabic/English labels. Unknown fields null; no invented confidence or amounts.\n\n## Acceptance evidence\n- [ ] Extract draft fields with all AI-provider endpoints unreachable\n- [ ] Correct Arabic digits, mixed scripts and supported vendor layouts\n- [ ] Unseen/unreadable layout enters review, never fabricated success\n- [ ] Engine/version/page/region provenance persisted\n\n## Delivery\n- Window: Days 3-4; estimate: 5 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: GLM/extraction; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:feature",
+        "area:extraction",
+        "demo:required"
+      ],
+      "milestone": "M1",
+      "dependencies": [
+        "RUNTIME",
+        "QUEUE"
+      ]
+    },
+    {
+      "key": "FORMATS",
+      "title": "[P1] Support full PDF, DOCX, legacy DOC and poor-image intake",
+      "body": "## Outcome\nWord is rejected; native/OCR text is truncated at 4,000 characters; VLM reads only the first PDF page. Mixed PDFs need per-page routing.\n\n## Scope\nParse each PDF page or bounded DOCX text/table block; isolate legacy DOC conversion via LibreOffice with macros/network disabled. Deskew/rotate images; type sniffing and safe resource limits. Require explicit too-large/encrypted/corrupt errors.\n\n## Acceptance evidence\n- [ ] Fixtures include later-page totals and text beyond 4,000 chars with no silent loss\n- [ ] Mixed native/scanned PDF routes each page correctly\n- [ ] DOCX table and legacy DOC fixtures produce reviewable fields\n- [ ] Poor image and oversized file give actionable repair, not false completion\n\n## Delivery\n- Window: Days 3-4; estimate: 4 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: GLM/extraction; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:feature",
+        "area:extraction",
+        "demo:required"
+      ],
+      "milestone": "M1",
+      "dependencies": [
+        "CPUOCR"
+      ]
+    },
+    {
+      "key": "VALIDATION",
+      "title": "[P1] Validate every extracted field and preserve source evidence",
+      "body": "## Outcome\nExtraction errors currently become empty results followed by complete/100%; due dates default to +30 days without source distinction.\n\n## Scope\nUse valid/review-required/failed states, field evidence and explicit derived defaults. Reconcile quantity/rate/net/tax/gross, dates/currency/vendor tax IDs; duplicate supplier invoice checks. Separate document type from forced UI intent.\n\n## Acceptance evidence\n- [ ] No empty extraction shown as successful\n- [ ] Unbalanced totals, unknown currency, missing IDs and uncertain dates block ready-to-approve status\n- [ ] User sees original evidence and distinction between extracted/derived/corrected\n- [ ] All failure and duplicate reasons are stable structured codes\n\n## Delivery\n- Window: Days 3-4; estimate: 3 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: GLM/extraction; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:feature",
+        "area:extraction",
+        "demo:required"
+      ],
+      "milestone": "M1",
+      "dependencies": [
+        "MONEY",
+        "FORMATS"
+      ]
+    },
+    {
+      "key": "PRIVACY",
+      "title": "[P1] Remove invoice payloads from logs and secure document storage",
+      "body": "## Outcome\nOCR strategy and Ollama service log invoice text/JSON and identifying fields at normal log levels.\n\n## Scope\nReplace payload logs with job IDs/timing/counters; redact error objects and credentials; private storage and tenant authorization. Review tracked environment files for placeholders versus secrets without printing values; rotate real exposed secrets through operator process.\n\n## Acceptance evidence\n- [ ] Captured logs contain no OCR text, amounts, tax IDs, bot tokens or auth headers\n- [ ] Original downloads require current tenant permission\n- [ ] Dependency/model provenance and retention policy recorded\n\n## Delivery\n- Window: Days 3-4; estimate: 3 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Claude/platform; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:bug",
+        "area:security",
+        "demo:required"
+      ],
+      "milestone": "M1",
+      "dependencies": [
+        "QUEUE"
+      ]
+    },
+    {
+      "key": "TELEGRAM",
+      "title": "[P1] Ingest Telegram channel invoices into the durable CPU queue",
+      "body": "## Outcome\nNo invoice-ingestion Telegram module was found in the repository tree. The demo needs one configured private channel feeding the same intake pipeline as web.\n\n## Scope\nValidate webhook secret; allowlist immutable chat IDs mapped to one tenant; support channel_post and document/photo. Prefer original files; enforce hosted Bot API limits. Acknowledge after durable enqueue, process asynchronously, dedupe update_id/chat/message/file. Handle edited posts explicitly.\n\n## Acceptance evidence\n- [ ] Authorized private channel document becomes one draft without web upload clicks\n- [ ] Replay/out-of-order updates and worker restart cannot duplicate draft\n- [ ] Wrong secret/chat rejected before file download or processing\n- [ ] Oversized/corrupt/poor photo gets a clear limited-status response; token never logged\n\n## Delivery\n- Window: Days 5-7; estimate: 4 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Claude/Telegram; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:feature",
+        "area:telegram",
+        "demo:required"
+      ],
+      "milestone": "M2",
+      "dependencies": [
+        "QUEUE",
+        "VALIDATION",
+        "PRIVACY"
+      ]
+    },
+    {
+      "key": "REVIEWUX",
+      "title": "[P1] Build one accountant inbox with bulk approval and exceptions",
+      "body": "## Outcome\nLow intervention requires automatic ingestion/draft preparation and a focused exception inbox, while accounting posting must remain trustworthy.\n\n## Scope\nOne inbox for Telegram/web, source preview with field highlights, inline edits, suggested vendor/account mapping, clear status and a single batch approve command. Persist learned template/rule only from explicit corrections. No manual Fast/Slow choice needed.\n\n## Acceptance evidence\n- [ ] Known supported invoice: zero clicks to draft, at most one batch confirmation to post\n- [ ] Exceptions cannot be approved without required corrections\n- [ ] Arabic/English, keyboard, 375px viewport, reconnect, empty/error/loading states pass\n- [ ] Pending draft totals visually separate from posted balances\n\n## Delivery\n- Window: Days 5-7; estimate: 5 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Antigravity/UX; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:feature",
+        "area:ux",
+        "demo:required"
+      ],
+      "milestone": "M2",
+      "dependencies": [
+        "VALIDATION",
+        "BULK"
+      ]
+    },
+    {
+      "key": "REPORTS",
+      "title": "[P1] Connect ledger, AP aging and useful accountant charts",
+      "body": "## Outcome\nThe demo must prove end-to-end data consistency, not only attractive OCR results or disconnected widgets.\n\n## Scope\nReuse existing reports; define and implement metrics in docs/strategy/demo-acceptance.md: AP aging, posted income/expenses, cash movements and intake health. Drill through to source records; date/tenant/currency filters; no fabricated forecasts.\n\n## Acceptance evidence\n- [ ] Posted bill, partial payment and reversal reconcile GL, trial balance and AP\n- [ ] Aging buckets reconcile to outstanding AP for a stated as-of date\n- [ ] Charts share the same verified source and expose accessible tables\n- [ ] EGP/SAR/AED never summed without explicit dated FX conversion\n\n## Delivery\n- Window: Days 5-7; estimate: 4 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Antigravity/UX; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:feature",
+        "area:ux",
+        "demo:required"
+      ],
+      "milestone": "M2",
+      "dependencies": [
+        "POSTING",
+        "BULK"
+      ]
+    },
+    {
+      "key": "SMOKE",
+      "title": "[P1] Add seeded API and browser tests for the complete accountant journey",
+      "body": "## Outcome\nCI runs unit tests; documented ci:full omits E2E. Current E2E cases accept 404 or conditional assertions, so green CI does not establish demo readiness.\n\n## Scope\nAdd explicit seeded two-tenant integration and browser journeys; no permissive status alternatives for required routes. Wire real E2E and CPU extraction fixtures into reproducible CI/local gates.\n\n## Acceptance evidence\n- [ ] Telegram/web to draft to approve to payment to reports passes exact assertions\n- [ ] Anonymous/cross-tenant, session refresh race, retry/double-click, locked period and failure injection pass\n- [ ] A deliberately broken required route or wrong total makes the suite fail\n\n## Delivery\n- Window: Days 8-10; estimate: 5 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Codex/review + Claude/CI; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:quality",
+        "area:platform",
+        "demo:required"
+      ],
+      "milestone": "M3",
+      "dependencies": [
+        "AUTH",
+        "TENANT",
+        "TELEGRAM",
+        "REVIEWUX",
+        "REPORTS"
+      ]
+    },
+    {
+      "key": "BENCHMARK",
+      "title": "[P1] Measure Arabic invoice quality and CPU latency on a held-out corpus",
+      "body": "## Outcome\nNo supplied customer corpus or CPU measurements establish claimed OCR accuracy. Acceptance must distinguish readable and poor-image cases.\n\n## Scope\nPrepare 60 labelled development documents and 30 held-out by vendor/layout; at least 20 poor images overall. Compare Tesseract/Paddle on identical rules. Record critical-field match, line-item precision/recall, review time, p50/p95, RAM and cost.\n\n## Acceptance evidence\n- [ ] No silent truncation or wrong auto-post; all unreadable values flagged\n- [ ] Target >=95% critical-header exact match on readable holdout; report numerator/denominator and language/quality slices\n- [ ] Provisional target warm p95 <=30s for <=3-page supported invoices on recorded CPU; if missed reduce concurrency/layout scope and disclose\n- [ ] Publish errors/limitations, model hashes and reproduction commands; no invented accuracy\n\n## Delivery\n- Window: Days 8-10; estimate: 4 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: GLM/benchmark; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:quality",
+        "area:extraction",
+        "demo:required"
+      ],
+      "milestone": "M3",
+      "dependencies": [
+        "CPUOCR",
+        "FORMATS",
+        "VALIDATION"
+      ]
+    },
+    {
+      "key": "DEPLOY",
+      "title": "[P1] Verify immutable CPU deployment, backup and rollback",
+      "body": "## Outcome\nThe deployed application must run on CPU and survive restarts. Existing workflow_run deployment checks out a mutable default ref and manual dispatch skips a fresh CI check.\n\n## Scope\nBind build/deploy to reviewed tested commit/digest; make docs/planning changes avoid production rollout; require correct environment and migrations; backup/restore original files plus DB; health includes queue/extractor. Rehearse on demo instance.\n\n## Acceptance evidence\n- [ ] Deployed SHA/digest equals tested release\n- [ ] CPU-only cold start and interrupted job recovery pass\n- [ ] Restore a backup into an isolated DB and verify source/ledger records\n- [ ] Rollback app/schema compatibility exercised; no existing real data reset\n\n## Delivery\n- Window: Days 8-10; estimate: 4 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Claude/platform; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:quality",
+        "area:platform",
+        "demo:required"
+      ],
+      "milestone": "M3",
+      "dependencies": [
+        "RUNTIME",
+        "SMOKE",
+        "PRIVACY"
+      ]
+    },
+    {
+      "key": "UAT",
+      "title": "[P1] Run day-ten accountant acceptance and publish demo evidence",
+      "body": "## Outcome\nFinal demo is a complete bounded accounting workflow, not a promise that every ERP module or arbitrary unreadable invoice is solved.\n\n## Scope\nRun docs/strategy/demo-acceptance.md with labelled synthetic/anonymized invoices and two tenants; record all release gates, limitations and known defects. Demonstrate 20-document batch and one poor-image exception.\n\n## Acceptance evidence\n- [ ] All P0 and required journey failures closed with evidence\n- [ ] Demo recording/screenshots and exact SHA available; no PII in evidence\n- [ ] Accountant verifies ledger/tax totals and one-action batch workflow\n- [ ] Publish go/no-go honestly; defer stretch work before weakening a gate\n\n## Delivery\n- Window: Days 8-10; estimate: 3 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Coordinator + accountant; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P1",
+        "type:quality",
+        "area:ux",
+        "demo:required"
+      ],
+      "milestone": "M3",
+      "dependencies": [
+        "SMOKE",
+        "BENCHMARK",
+        "DEPLOY"
+      ]
+    },
+    {
+      "key": "ETA",
+      "title": "[Later] Egypt ETA eInvoice PreProd adapter and structured import",
+      "body": "## Outcome\nEgypt uses ETA; OCR alone does not create a valid statutory eInvoice. Start Egypt first with authorized taxpayer onboarding.\n\n## Scope\nSeparate adapter for canonical JSON/XML, CAdES-BES signing, code lists, PreProd submission and asynchronous status reconciliation. Import existing structured invoices without OCR when available. Archive authority evidence.\n\n## Acceptance evidence\n- [ ] Taxpayer/ERP authorization and certificates documented without secrets in git\n- [ ] 202 response remains processing until final validation checked\n- [ ] Valid/invalid/cancel/reject and retry tests pass in PreProd\n- [ ] Accountant/regulatory review before any real issuance\n\n## Delivery\n- Window: After demo; estimate: 12 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Codex/accounting; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P2",
+        "type:feature",
+        "area:accounting",
+        "demo:later",
+        "country:EG"
+      ],
+      "milestone": "M4",
+      "dependencies": [
+        "UAT"
+      ]
+    },
+    {
+      "key": "ERECEIPT",
+      "title": "[Later] Scope Egypt eReceipt only for a B2C pilot",
+      "body": "## Outcome\nETA eReceipt is a separate POS/B2C integration with activation and potentially different signature enforcement.\n\n## Scope\nConfirm pilot need and current ETA activation/signature requirements before building receipts/returns integration.\n\n## Acceptance evidence\n- [ ] Pilot need and current ETA requirements captured\n- [ ] Separate schema/state machine/fixtures from eInvoice\n- [ ] No unsupported universal signing or certification claims\n\n## Delivery\n- Window: After demo; estimate: 4 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Claude/research; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P2",
+        "type:strategy",
+        "area:accounting",
+        "demo:later",
+        "country:EG"
+      ],
+      "milestone": "M4",
+      "dependencies": [
+        "ETA"
+      ]
+    },
+    {
+      "key": "ZATCA",
+      "title": "[Later] Saudi ZATCA adapter with distinct clearance and reporting",
+      "body": "## Outcome\nSaudi Phase 2 requires specific taxpayer-wave onboarding and standard/simplified invoice flows.\n\n## Scope\nUBL2.1/business rules, CSID lifecycle, hash/counter/QR, standard clearance before delivery and simplified reporting within 24h; official SDK plus sandbox evidence.\n\n## Acceptance evidence\n- [ ] Applicable taxpayer wave confirmed\n- [ ] Standard/simplified, credit/debit, outage/rejection and replay scenarios pass\n- [ ] Production keys isolated and tax review completed before issuance\n\n## Delivery\n- Window: After demo; estimate: 16 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Codex/accounting; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P2",
+        "type:feature",
+        "area:accounting",
+        "demo:later",
+        "country:SA"
+      ],
+      "milestone": "M5",
+      "dependencies": [
+        "UAT"
+      ]
+    },
+    {
+      "key": "UAE",
+      "title": "[Later] UAE PINT-AE adapter through an accredited ASP",
+      "body": "## Outcome\nUAE uses an ASP/Peppol/PINT-AE exchange and FTA reporting; do not clone Saudi clearance or treat PDFs as eInvoices.\n\n## Scope\nSelect finally accredited ASP; agree sending/receiving contract, status callbacks, retention and local tax rules; apply amended deadlines from MD66/2026.\n\n## Acceptance evidence\n- [ ] ASP accreditation verified from official current list\n- [ ] PINT-AE send/receive/reject/retry contracts tested\n- [ ] Customer applicability and current appointment/go-live dates recorded\n\n## Delivery\n- Window: After demo; estimate: 12 focused agent-hours (planning estimate, not a guarantee).\n- Suggested lane: Claude/integrations; actual assignee is selected by the coordinator.\n- Read AGENTS.md and docs/agents/README.md; isolate a branch/worktree.\n- Attach tested commit SHA, commands/results, fixture IDs and remaining limitations.\n- Follow docs/strategy/demo-acceptance.md; close only after merged behavior is verified.\n- Review baseline: f8bf699319a37198b585cb67b650069da4c6cd4d. Evidence: docs/strategy/repository-review.md.\n",
+      "labels": [
+        "priority:P2",
+        "type:feature",
+        "area:accounting",
+        "demo:later",
+        "country:AE"
+      ],
+      "milestone": "M5",
+      "dependencies": [
+        "UAT"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "repository": "AbdelrhmanAh7/Mizano",
+  "mode": "apply",
+  "status": "completed",
+  "planned": {
+    "labels": 19,
+    "milestones": 6,
+    "issues": 24
+  },
+  "counts": {
+    "labels_created": 19,
+    "labels_reused": 0,
+    "milestones_created": 6,
+    "milestones_reused": 0,
+    "issues_created": 24,
+    "issues_reused": 0,
+    "dependency_sections_updated": 24
+  },
+  "issues": [
+    {
+      "key": "SPRINT",
+      "number": 7,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/7"
+    },
+    {
+      "key": "AUTH",
+      "number": 8,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/8"
+    },
+    {
+      "key": "TENANT",
+      "number": 9,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/9"
+    },
+    {
+      "key": "MONEY",
+      "number": 10,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/10"
+    },
+    {
+      "key": "POSTING",
+      "number": 11,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/11"
+    },
+    {
+      "key": "BULK",
+      "number": 12,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/12"
+    },
+    {
+      "key": "RUNTIME",
+      "number": 13,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/13"
+    },
+    {
+      "key": "AGENTS",
+      "number": 14,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/14"
+    },
+    {
+      "key": "QUEUE",
+      "number": 15,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/15"
+    },
+    {
+      "key": "CPUOCR",
+      "number": 16,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/16"
+    },
+    {
+      "key": "FORMATS",
+      "number": 17,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/17"
+    },
+    {
+      "key": "VALIDATION",
+      "number": 18,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/18"
+    },
+    {
+      "key": "PRIVACY",
+      "number": 19,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/19"
+    },
+    {
+      "key": "TELEGRAM",
+      "number": 20,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/20"
+    },
+    {
+      "key": "REVIEWUX",
+      "number": 21,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/21"
+    },
+    {
+      "key": "REPORTS",
+      "number": 22,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/22"
+    },
+    {
+      "key": "SMOKE",
+      "number": 23,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/23"
+    },
+    {
+      "key": "BENCHMARK",
+      "number": 24,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/24"
+    },
+    {
+      "key": "DEPLOY",
+      "number": 25,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/25"
+    },
+    {
+      "key": "UAT",
+      "number": 26,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/26"
+    },
+    {
+      "key": "ETA",
+      "number": 27,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/27"
+    },
+    {
+      "key": "ERECEIPT",
+      "number": 28,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/28"
+    },
+    {
+      "key": "ZATCA",
+      "number": 29,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/29"
+    },
+    {
+      "key": "UAE",
+      "number": 30,
+      "url": "https://github.com/AbdelrhmanAh7/Mizano/issues/30"
+    }
+  ],
+  "project": {
+    "status": "not_configured",
+    "reason": "Optional Project token environment variable is unset"
+  },
+  "errors": []
+}
