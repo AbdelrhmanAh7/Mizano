@@ -47,13 +47,20 @@ describe('Inventory adjustments (e2e)', () => {
       sellingPrice: '100.00',
       costPrice: '60.25',
       inventoryAccountId,
-      openingStock: 10,
     });
     expect(item.status).toBe(201);
-    // Allocate the opening stock to the warehouse: decreases need a stock level there.
-    await prisma.inventoryLevel.create({
-      data: { itemId: item.body.id, warehouseId: wh.body.id, quantity: 10, organizationId: orgId },
+    // Opening stock is entered as an INCREASE adjustment so it posts its own journal.
+    const opening = await api.post('/inventory-adjustments').send({
+      date: isoDay(-10),
+      warehouseId: wh.body.id,
+      itemId: item.body.id,
+      type: 'INCREASE',
+      quantity: 10,
+      reason: 'STOCKTAKE',
+      accountId: expenseAccountId,
     });
+    expect(opening.status).toBe(201);
+    expect(orgId).toEqual(expect.any(String));
     return { inventoryAccountId, expenseAccountId, warehouseId: wh.body.id, itemId: item.body.id };
   }
 
@@ -251,11 +258,10 @@ describe('Inventory adjustments (e2e)', () => {
     });
 
     it('keeps the ledger balanced and inventory equal to the net adjustments', async () => {
-      // Only the increase (120.50) is still in force; the decrease was reversed.
+      // Opening stock (10 x 60.25 = 602.50) plus the increase (120.50) are in force; the decrease
+      // was reversed.
       expect(
-        (await accountBalance(prisma, tenantA.organizationId, fa.inventoryAccountId)).equals(
-          '120.5',
-        ),
+        (await accountBalance(prisma, tenantA.organizationId, fa.inventoryAccountId)).equals('723'),
       ).toBe(true);
       const tb = await a.get('/accounting-reports/trial-balance');
       expect(tb.status).toBe(200);
@@ -318,7 +324,7 @@ describe('Inventory adjustments (e2e)', () => {
       expect(await stockOf(a, fa.itemId)).toBe(before);
       expect(
         await prisma.journal.count({ where: { organizationId: tenantB.organizationId } }),
-      ).toBe(0);
+      ).toBe(1); // only tenant B's own opening-stock journal; the rejected attempts post none
     });
 
     it('lists adjustment account options per tenant (expense accounts only)', async () => {

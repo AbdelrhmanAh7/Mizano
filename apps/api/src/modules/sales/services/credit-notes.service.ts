@@ -45,7 +45,11 @@ export class CreditNotesService {
    *   or Cr refund bank/cash account (REFUND, which never touches AR).
    * VAT is the credit's proportional share of the invoice VAT, rounded to 4 decimals.
    */
-  async create(organizationId: string, dto: CreateCreditNoteDto) {
+  async create(
+    organizationId: string,
+    dto: CreateCreditNoteDto,
+    options: { tx?: Prisma.TransactionClient } = {},
+  ) {
     const amount = parsePositiveDecimal(dto.amount, 'amount');
     assertMoneyFits(amount, 'amount');
     const date = parseDocumentDate(dto.date, 'credit note date');
@@ -65,7 +69,7 @@ export class CreditNotesService {
     const applyTargetId = isApply ? (dto.appliedToInvoiceId ?? dto.invoiceId) : undefined;
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const run = async (tx: Prisma.TransactionClient) => {
         // Every referenced invoice must be this organization's before any lock is taken.
         const invoiceIds = [...new Set([dto.invoiceId, ...(applyTargetId ? [applyTargetId] : [])])];
         const owned = await tx.invoice.count({
@@ -215,7 +219,8 @@ export class CreditNotesService {
         );
 
         return creditNote;
-      });
+      };
+      return await (options.tx ? run(options.tx) : this.prisma.$transaction(run));
     } catch (error) {
       throw mapDocumentNumberConflict(error, 'Credit note');
     }

@@ -1,9 +1,19 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { CreditNoteType, PaymentMode, Prisma } from '@prisma/client';
+import { createHash } from 'crypto';
 import { Decimal } from '@prisma/client/runtime/library';
 import * as csv from 'csv-parser';
 import { Readable } from 'stream';
 import * as XLSX from 'xlsx';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { bankCashAccountWhere } from '../../../common/utils/bank-cash-accounts';
+import { CreditNotesService } from '../../sales/services/credit-notes.service';
+import { InvoicesService } from '../../sales/services/invoices.service';
+import { PaymentsReceivedService } from '../../sales/services/payments-received.service';
+import { BillsService } from '../../purchases/services/bills.service';
+import { ExpensesService } from '../../purchases/services/expenses.service';
+import { PaymentsMadeService } from '../../purchases/services/payments-made.service';
+import { VendorCreditsService } from '../../purchases/services/vendor-credits.service';
 import {
   ColumnMappingDto,
   ENTITY_FIELD_DEFINITIONS,
@@ -20,9 +30,34 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ImportRow = Record<string, any>;
 
+type DocumentKind =
+  | 'invoice'
+  | 'bill'
+  | 'expense'
+  | 'vendorCredit'
+  | 'creditNote'
+  | 'paymentMade'
+  | 'paymentReceived';
+
+interface RowContext {
+  tx: Prisma.TransactionClient;
+}
+
+/** AuditLog.entityType of the per-row idempotency record of a money-bearing import. */
+export const IMPORT_ROW_ENTITY = 'IMPORT_ROW';
+
 @Injectable()
 export class ImportService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private invoicesService: InvoicesService,
+    private creditNotesService: CreditNotesService,
+    private paymentsReceivedService: PaymentsReceivedService,
+    private billsService: BillsService,
+    private expensesService: ExpensesService,
+    private vendorCreditsService: VendorCreditsService,
+    private paymentsMadeService: PaymentsMadeService,
+  ) {}
 
   // ============ File Parsing ============
 
@@ -203,6 +238,8 @@ export class ImportService {
         }
       }
 
+      rowErrors.push(...this.conditionalErrors(config.entityType, mappedRow, rowNum));
+
       if (rowErrors.length > 0) {
         invalidRows++;
         errors.push(...rowErrors);
@@ -223,6 +260,29 @@ export class ImportService {
       errors: errors.slice(0, 100), // Limit to first 100 errors
       warnings: warnings.slice(0, 50),
     };
+  }
+
+  /** Columns that execution requires only for some rows (so the field table cannot say so). */
+  private conditionalErrors(
+    entityType: ImportEntityType,
+    row: ImportRow,
+    rowNum: number,
+  ): ValidationErrorDto[] {
+    if (
+      entityType === ImportEntityType.CREDIT_NOTES &&
+      String(row.type ?? '').toUpperCase() === 'REFUND' &&
+      !this.cell(row.refundAccountCode)
+    ) {
+      return [
+        {
+          row: rowNum,
+          field: 'refundAccountCode',
+          value: row.refundAccountCode,
+          error: 'Refund Account Code is required for REFUND credit notes',
+        },
+      ];
+    }
+    return [];
   }
 
   private validateFieldType(
@@ -291,11 +351,59 @@ export class ImportService {
 
   // ============ Import Execution ============
 
+  /** Permission the single-record create route of each entity requires. */
+  static readonly CREATE_PERMISSION: Record<ImportEntityType, string> = {
+    [ImportEntityType.CUSTOMERS]: 'sales.create',
+    [ImportEntityType.INVOICES]: 'sales.create',
+    [ImportEntityType.QUOTES]: 'sales.create',
+    [ImportEntityType.CREDIT_NOTES]: 'sales.create',
+    [ImportEntityType.PAYMENTS_RECEIVED]: 'sales.create',
+    [ImportEntityType.DELIVERY_CHALLANS]: 'sales.create',
+    [ImportEntityType.VENDORS]: 'purchases.create',
+    [ImportEntityType.BILLS]: 'purchases.create',
+    [ImportEntityType.EXPENSES]: 'purchases.create',
+    [ImportEntityType.VENDOR_CREDITS]: 'purchases.create',
+    [ImportEntityType.PAYMENTS_MADE]: 'purchases.create',
+    [ImportEntityType.ITEMS]: 'inventory.create',
+    [ImportEntityType.ACCOUNTS]: 'accounting.create',
+    [ImportEntityType.JOURNALS]: 'accounting.create',
+    [ImportEntityType.BANK_TRANSACTIONS]: 'banking.create',
+    [ImportEntityType.EMPLOYEES]: 'hr.create',
+  };
+
+  /**
+   * An import creates the same records as the single-record routes, so the caller needs that
+   * route's create permission as well as settings.manage; a missing one rejects the whole import
+   * (403 listing what is missing) before any row is processed. Admin bypasses, like the guard.
+   */
+  async assertCanImport(roleId: string | undefined, entityType: ImportEntityType): Promise<void> {
+    const required = [ImportService.CREATE_PERMISSION[entityType], 'settings.manage'].filter(
+      (p): p is string => !!p,
+    );
+    const role = roleId
+      ? await this.prisma.role.findUnique({
+          where: { id: roleId },
+          include: { permissions: true },
+        })
+      : null;
+    if (!role) throw new ForbiddenException('Access denied');
+    if (role.name === 'Admin') return;
+    const missing = required.filter((permission) => {
+      const [module, action] = permission.split('.');
+      const granted = role.permissions.find((p) => p.module === module);
+      return !granted || !granted.actions.includes(action);
+    });
+    if (missing.length > 0) {
+      throw new ForbiddenException(`Missing permission: ${missing.join(', ')}`);
+    }
+  }
+
   async importData(
     organizationId: string,
     buffer: Buffer,
     filename: string,
     config: ImportConfigDto,
+    actorUserId: string,
   ): Promise<ImportResultDto> {
     // Validate first
     const validation = await this.validateImport(organizationId, buffer, filename, config);
@@ -307,6 +415,9 @@ export class ImportService {
     }
 
     const rows = await this.getAllRows(buffer, filename);
+    // Stable per-row idempotency key: the same file re-run produces the same keys, so money-bearing
+    // rows already imported are skipped (see importOnce).
+    const fileHash = createHash('sha256').update(buffer).digest('hex');
     const result: ImportResultDto = {
       success: true,
       totalProcessed: 0,
@@ -328,6 +439,11 @@ export class ImportService {
           transformed,
           config.updateExisting,
           config.matchField,
+          createHash('sha256')
+            .update(`${fileHash}:${config.entityType}:sheet0:${i}`)
+            .digest('hex')
+            .slice(0, 32),
+          actorUserId,
         );
 
         result.totalProcessed++;
@@ -357,6 +473,8 @@ export class ImportService {
     data: ImportRow,
     updateExisting: boolean = false,
     matchField?: string,
+    rowKey: string = createHash('sha256').update(JSON.stringify(data)).digest('hex').slice(0, 32),
+    actorUserId: string = '',
   ): Promise<'created' | 'updated' | 'skipped'> {
     switch (entityType) {
       case ImportEntityType.CUSTOMERS:
@@ -372,23 +490,37 @@ export class ImportService {
       case ImportEntityType.BANK_TRANSACTIONS:
         return this.importBankTransaction(organizationId, data);
       case ImportEntityType.INVOICES:
-        return this.importInvoice(organizationId, data);
+        return this.importOnce(organizationId, 'invoice', rowKey, actorUserId, (ctx) =>
+          this.importInvoice(organizationId, data, ctx),
+        );
       case ImportEntityType.QUOTES:
         return this.importQuote(organizationId, data);
       case ImportEntityType.CREDIT_NOTES:
-        return this.importCreditNote(organizationId, data);
+        return this.importOnce(organizationId, 'creditNote', rowKey, actorUserId, (ctx) =>
+          this.importCreditNote(organizationId, data, ctx),
+        );
       case ImportEntityType.PAYMENTS_RECEIVED:
-        return this.importPaymentReceived(organizationId, data);
+        return this.importOnce(organizationId, 'paymentReceived', rowKey, actorUserId, (ctx) =>
+          this.importPaymentReceived(organizationId, data, ctx),
+        );
       case ImportEntityType.DELIVERY_CHALLANS:
         return this.importDeliveryChallan(organizationId, data);
       case ImportEntityType.BILLS:
-        return this.importBill(organizationId, data);
+        return this.importOnce(organizationId, 'bill', rowKey, actorUserId, (ctx) =>
+          this.importBill(organizationId, data, ctx),
+        );
       case ImportEntityType.EXPENSES:
-        return this.importExpense(organizationId, data);
+        return this.importOnce(organizationId, 'expense', rowKey, actorUserId, (ctx) =>
+          this.importExpense(organizationId, data, ctx),
+        );
       case ImportEntityType.VENDOR_CREDITS:
-        return this.importVendorCredit(organizationId, data);
+        return this.importOnce(organizationId, 'vendorCredit', rowKey, actorUserId, (ctx) =>
+          this.importVendorCredit(organizationId, data, ctx),
+        );
       case ImportEntityType.PAYMENTS_MADE:
-        return this.importPaymentMade(organizationId, data);
+        return this.importOnce(organizationId, 'paymentMade', rowKey, actorUserId, (ctx) =>
+          this.importPaymentMade(organizationId, data, ctx),
+        );
       default:
         throw new BadRequestException(`Import for ${entityType} not yet implemented`);
     }
@@ -586,6 +718,15 @@ export class ImportService {
       }
     }
 
+    // An opening balance is a ledger event (Dr/Cr against the opening-balance equity), not a
+    // column: it is entered through the Opening Balances command so it posts a journal.
+    const openingBalance = this.cell(data.openingBalance);
+    if (openingBalance && !/^0+(\.0+)?$/.test(openingBalance)) {
+      throw new BadRequestException(
+        'openingBalance cannot be imported with accounts; enter opening balances in Accounting > Opening Balances so they are posted to the ledger',
+      );
+    }
+
     // Find parent account if provided
     let parentId: string | undefined;
     if (data.parentCode) {
@@ -603,7 +744,6 @@ export class ImportService {
         subType: data.subType,
         description: data.description,
         parentId,
-        openingBalance: data.openingBalance ? new Decimal(data.openingBalance) : undefined,
         isActive: data.isActive ?? true,
         organizationId,
       },
@@ -775,112 +915,213 @@ export class ImportService {
     return 'created';
   }
 
+  // === Money-bearing imports go through the same domain commands as the UI/API ===
+  // (tenant checks, Decimal math, document numbering and, where the command posts, the journal).
+
+  // === Idempotent money-bearing rows ===
+
+  /**
+   * Runs one money-bearing row in its own transaction under an advisory lock on the row key. The
+   * idempotency record is an append-only AuditLog row (entityType IMPORT_ROW, entityId = row key)
+   * written in the same transaction as the document: unlike a marker inside the document's own
+   * notes/reference it cannot be edited or erased by a user, so a retry after the document text
+   * changed is still skipped. (There is no dedicated import-history model, and drafts such as
+   * invoices and bills have no journal to key on.)
+   */
+  private async importOnce(
+    organizationId: string,
+    kind: DocumentKind,
+    rowKey: string,
+    actorUserId: string,
+    create: (ctx: RowContext) => Promise<'created' | 'updated' | 'skipped'>,
+  ): Promise<'created' | 'updated' | 'skipped'> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`import:${organizationId}:${rowKey}`}))`;
+      const seen = await tx.auditLog.count({
+        where: { organizationId, entityType: IMPORT_ROW_ENTITY, entityId: rowKey },
+      });
+      if (seen > 0) return 'skipped';
+      const outcome = await create({ tx });
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          userId: actorUserId,
+          action: 'CREATE',
+          entityType: IMPORT_ROW_ENTITY,
+          entityId: rowKey,
+          newValues: { document: kind },
+        },
+      });
+      return outcome;
+    });
+  }
+
+  private cell(value: unknown): string | undefined {
+    if (value === undefined || value === null) return undefined;
+    const text = String(value).trim();
+    return text === '' ? undefined : text;
+  }
+
+  /** A required decimal cell as text; the domain command validates scale and range. */
+  private decimalCell(value: unknown, field: string): string {
+    const text = this.cell(value);
+    if (!text) throw new BadRequestException(`${field} is required`);
+    if (!/^\d+(\.\d+)?$/.test(text)) {
+      throw new BadRequestException(`${field} must be a non-negative decimal number`);
+    }
+    return text;
+  }
+
+  private isoDate(value: unknown, field: string): string {
+    const text = this.cell(value);
+    const date = text ? new Date(text) : null;
+    if (!date || Number.isNaN(date.getTime())) {
+      throw new BadRequestException(`${field} must be a valid date`);
+    }
+    return date.toISOString();
+  }
+
+  private async accountIdByCode(
+    organizationId: string,
+    code: unknown,
+    label: string,
+    options: { bankCash?: boolean } = {},
+  ): Promise<string> {
+    const text = this.cell(code);
+    if (!text) throw new BadRequestException(`${label} is required`);
+    const account = await this.prisma.account.findFirst({
+      where: { organizationId, code: text, deletedAt: null },
+      select: { id: true },
+    });
+    if (!account) throw new BadRequestException(`Account not found with code: ${text}`);
+    if (options.bankCash) {
+      // Payments move money through bank/cash: apply the shared eligibility rule before posting.
+      const eligible = await this.prisma.account.findFirst({
+        where: {
+          AND: [{ id: account.id }, await bankCashAccountWhere(this.prisma, organizationId)],
+        },
+        select: { id: true },
+      });
+      if (!eligible) {
+        throw new BadRequestException(
+          `${label} ${text} must be an active bank or cash account of this organization`,
+        );
+      }
+    }
+    return account.id;
+  }
+
+  private async customerIdByEmail(organizationId: string, email: unknown): Promise<string> {
+    const customer = await this.prisma.customer.findFirst({
+      where: { organizationId, email: this.cell(email), deletedAt: null },
+      select: { id: true },
+    });
+    if (!customer) throw new BadRequestException(`Customer not found with email: ${email}`);
+    return customer.id;
+  }
+
+  private async vendorIdByEmail(organizationId: string, email: unknown): Promise<string> {
+    const vendor = await this.prisma.vendor.findFirst({
+      where: { organizationId, email: this.cell(email), deletedAt: null },
+      select: { id: true },
+    });
+    if (!vendor) throw new BadRequestException(`Vendor not found with email: ${email}`);
+    return vendor.id;
+  }
+
+  private async invoiceByNumber(
+    organizationId: string,
+    invoiceNumber: unknown,
+  ): Promise<{ id: string; customerId: string }> {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { organizationId, invoiceNumber: this.cell(invoiceNumber), deletedAt: null },
+      select: { id: true, customerId: true },
+    });
+    if (!invoice) throw new BadRequestException(`Invoice not found with number: ${invoiceNumber}`);
+    return invoice;
+  }
+
+  private async billByNumber(
+    organizationId: string,
+    billNumber: unknown,
+  ): Promise<{ id: string; vendorId: string }> {
+    const bill = await this.prisma.bill.findFirst({
+      where: { organizationId, billNumber: this.cell(billNumber), deletedAt: null },
+      select: { id: true, vendorId: true },
+    });
+    if (!bill) throw new BadRequestException(`Bill not found with number: ${billNumber}`);
+    return bill;
+  }
+
   private async importCreditNote(
     organizationId: string,
     data: ImportRow,
+    ctx: RowContext,
   ): Promise<'created' | 'updated' | 'skipped'> {
-    const customer = await this.prisma.customer.findFirst({
-      where: { organizationId, email: data.customerEmail, deletedAt: null },
-    });
-    if (!customer) {
-      throw new BadRequestException(`Customer not found with email: ${data.customerEmail}`);
+    const customerId = await this.customerIdByEmail(organizationId, data.customerEmail);
+    const invoice = await this.invoiceByNumber(organizationId, data.invoiceNumber);
+    const type = String(data.type).toUpperCase();
+    if (type !== 'REFUND' && type !== 'APPLY_TO_INVOICE') {
+      throw new BadRequestException('type must be REFUND or APPLY_TO_INVOICE');
     }
-
-    const invoice = await this.prisma.invoice.findFirst({
-      where: { organizationId, invoiceNumber: data.invoiceNumber, deletedAt: null },
-    });
-    if (!invoice) {
-      throw new BadRequestException(`Invoice not found with number: ${data.invoiceNumber}`);
-    }
-
-    const creditNoteNumber = await this.generateDocNumber(
+    // Posts Dr Sales Returns / VAT, Cr AR (or the refund account) and applies the balance.
+    await this.creditNotesService.create(
       organizationId,
-      'CN',
-      'creditNote',
-      'creditNoteNumber',
-    );
-
-    await this.prisma.creditNote.create({
-      data: {
-        creditNoteNumber,
-        customerId: customer.id,
+      {
+        customerId,
         invoiceId: invoice.id,
-        date: new Date(data.date),
-        reason: data.reason || 'Imported credit note',
-        amount: new Decimal(data.amount),
-        type: String(data.type).toUpperCase() as 'REFUND' | 'APPLY_TO_INVOICE',
-        organizationId,
+        date: this.isoDate(data.date, 'date'),
+        reason: this.cell(data.reason) ?? 'Imported credit note',
+        amount: this.decimalCell(data.amount, 'amount'),
+        type: type as CreditNoteType,
+        refundAccountId:
+          type === 'REFUND'
+            ? await this.accountIdByCode(
+                organizationId,
+                data.refundAccountCode,
+                'refundAccountCode',
+              )
+            : undefined,
       },
-    });
-
+      { tx: ctx.tx },
+    );
     return 'created';
   }
 
   private async importPaymentReceived(
     organizationId: string,
     data: ImportRow,
+    ctx: RowContext,
   ): Promise<'created' | 'updated' | 'skipped'> {
-    const customer = await this.prisma.customer.findFirst({
-      where: { organizationId, email: data.customerEmail, deletedAt: null },
-    });
-    if (!customer) {
-      throw new BadRequestException(`Customer not found with email: ${data.customerEmail}`);
-    }
-
-    const depositAccount = await this.prisma.account.findFirst({
-      where: { organizationId, code: data.depositAccountCode },
-    });
-    if (!depositAccount) {
+    const customerId = await this.customerIdByEmail(organizationId, data.customerEmail);
+    const depositToAccountId = await this.accountIdByCode(
+      organizationId,
+      data.depositAccountCode,
+      'depositAccountCode',
+      { bankCash: true },
+    );
+    if (!this.cell(data.invoiceNumber)) {
       throw new BadRequestException(
-        `Deposit account not found with code: ${data.depositAccountCode}`,
+        'invoiceNumber is required: a payment must be allocated to an invoice',
       );
     }
-
-    const paymentNumber = await this.generateDocNumber(
+    const invoice = await this.invoiceByNumber(organizationId, data.invoiceNumber);
+    const amount = this.decimalCell(data.amount, 'amount');
+    // Posts Dr bank / Cr AR and reduces the invoice balance.
+    await this.paymentsReceivedService.create(
       organizationId,
-      'PMT',
-      'paymentReceived',
-      'paymentNumber',
+      {
+        customerId,
+        date: this.isoDate(data.date, 'date'),
+        amount,
+        paymentMode: String(data.paymentMode).toUpperCase() as PaymentMode,
+        depositToAccountId,
+        reference: this.cell(data.reference),
+        notes: this.cell(data.notes),
+        allocations: [{ invoiceId: invoice.id, amount }],
+      },
+      { tx: ctx.tx },
     );
-
-    await this.prisma.$transaction(async (tx) => {
-      const payment = await tx.paymentReceived.create({
-        data: {
-          paymentNumber,
-          customerId: customer.id,
-          date: new Date(data.date),
-          amount: new Decimal(data.amount),
-          paymentMode: String(data.paymentMode).toUpperCase() as
-            | 'CASH'
-            | 'BANK_TRANSFER'
-            | 'CREDIT_CARD'
-            | 'DEBIT_CARD'
-            | 'CHEQUE'
-            | 'ONLINE'
-            | 'OTHER',
-          depositToAccountId: depositAccount.id,
-          reference: data.reference,
-          notes: data.notes,
-          organizationId,
-        },
-      });
-
-      if (data.invoiceNumber) {
-        const invoice = await tx.invoice.findFirst({
-          where: { organizationId, invoiceNumber: data.invoiceNumber, deletedAt: null },
-        });
-        if (invoice) {
-          await tx.paymentAllocation.create({
-            data: {
-              paymentId: payment.id,
-              invoiceId: invoice.id,
-              amount: new Decimal(data.amount),
-            },
-          });
-        }
-      }
-    });
-
     return 'created';
   }
 
@@ -953,270 +1194,190 @@ export class ImportService {
     return 'created';
   }
 
+  private async itemBySku(
+    organizationId: string,
+    sku: unknown,
+  ): Promise<{ id: string; name: string }> {
+    const item = await this.prisma.item.findFirst({
+      where: { organizationId, sku: this.cell(sku), deletedAt: null },
+      select: { id: true, name: true },
+    });
+    if (!item) throw new BadRequestException(`Item not found with SKU: ${sku}`);
+    return item;
+  }
+
   private async importInvoice(
     organizationId: string,
     data: ImportRow,
+    ctx: RowContext,
   ): Promise<'created' | 'updated' | 'skipped'> {
-    const customer = await this.prisma.customer.findFirst({
-      where: { organizationId, email: data.customerEmail, deletedAt: null },
-    });
-    if (!customer) {
-      throw new BadRequestException(`Customer not found with email: ${data.customerEmail}`);
-    }
-
-    const item = await this.prisma.item.findFirst({
-      where: { organizationId, sku: data.itemSku, deletedAt: null },
-    });
-    if (!item) {
-      throw new BadRequestException(`Item not found with SKU: ${data.itemSku}`);
-    }
-
-    const quantity = new Decimal(data.quantity);
-    const rate = new Decimal(data.rate);
-    const lineAmount = quantity.mul(rate);
-
-    const invoiceNumber = await this.generateDocNumber(
+    const customerId = await this.customerIdByEmail(organizationId, data.customerEmail);
+    const item = await this.itemBySku(organizationId, data.itemSku);
+    const date = this.isoDate(data.date, 'date');
+    // A DRAFT invoice with server-computed totals; it posts when it is sent.
+    await this.invoicesService.create(
       organizationId,
-      'INV',
-      'invoice',
-      'invoiceNumber',
+      {
+        customerId,
+        date,
+        dueDate: data.dueDate ? this.isoDate(data.dueDate, 'dueDate') : date,
+        notes: this.cell(data.notes),
+        lines: [
+          {
+            itemId: item.id,
+            description: item.name,
+            quantity: this.decimalCell(data.quantity, 'quantity'),
+            rate: this.decimalCell(data.rate, 'rate'),
+          },
+        ],
+      },
+      { tx: ctx.tx },
     );
-
-    await this.prisma.$transaction(async (tx) => {
-      const invoice = await tx.invoice.create({
-        data: {
-          invoiceNumber,
-          customerId: customer.id,
-          date: new Date(data.date),
-          dueDate: data.dueDate ? new Date(data.dueDate) : new Date(data.date),
-          status: 'DRAFT',
-          subtotal: lineAmount,
-          grandTotal: lineAmount,
-          balanceDue: lineAmount,
-          notes: data.notes,
-          organizationId,
-        },
-      });
-
-      await tx.invoiceLine.create({
-        data: {
-          invoiceId: invoice.id,
-          itemId: item.id,
-          description: item.name,
-          quantity,
-          rate,
-          amount: lineAmount,
-        },
-      });
-    });
-
     return 'created';
   }
 
   private async importBill(
     organizationId: string,
     data: ImportRow,
+    ctx: RowContext,
   ): Promise<'created' | 'updated' | 'skipped'> {
-    const vendor = await this.prisma.vendor.findFirst({
-      where: { organizationId, email: data.vendorEmail, deletedAt: null },
-    });
-    if (!vendor) {
-      throw new BadRequestException(`Vendor not found with email: ${data.vendorEmail}`);
-    }
-
-    const item = await this.prisma.item.findFirst({
-      where: { organizationId, sku: data.itemSku, deletedAt: null },
-    });
-    if (!item) {
-      throw new BadRequestException(`Item not found with SKU: ${data.itemSku}`);
-    }
-
-    const quantity = new Decimal(data.quantity);
-    const rate = new Decimal(data.rate);
-    const lineAmount = quantity.mul(rate);
-
-    const billNumber = await this.generateDocNumber(organizationId, 'BILL', 'bill', 'billNumber');
-
-    await this.prisma.$transaction(async (tx) => {
-      const bill = await tx.bill.create({
-        data: {
-          billNumber,
-          vendorId: vendor.id,
-          date: new Date(data.date),
-          dueDate: data.dueDate ? new Date(data.dueDate) : new Date(data.date),
-          status: 'DRAFT',
-          subtotal: lineAmount,
-          grandTotal: lineAmount,
-          balanceDue: lineAmount,
-          reference: data.reference,
-          notes: data.notes,
-          organizationId,
-        },
-      });
-
-      await tx.billLine.create({
-        data: {
-          billId: bill.id,
-          itemId: item.id,
-          description: item.name,
-          quantity,
-          rate,
-          amount: lineAmount,
-        },
-      });
-    });
-
+    const vendorId = await this.vendorIdByEmail(organizationId, data.vendorEmail);
+    const item = await this.itemBySku(organizationId, data.itemSku);
+    const date = this.isoDate(data.date, 'date');
+    // A DRAFT bill with server-computed totals; it posts when it is approved.
+    await this.billsService.create(
+      organizationId,
+      {
+        vendorId,
+        date,
+        dueDate: data.dueDate ? this.isoDate(data.dueDate, 'dueDate') : date,
+        reference: this.cell(data.reference),
+        notes: this.cell(data.notes),
+        lines: [
+          {
+            itemId: item.id,
+            description: item.name,
+            quantity: this.decimalCell(data.quantity, 'quantity'),
+            rate: this.decimalCell(data.rate, 'rate'),
+          },
+        ],
+      },
+      { tx: ctx.tx },
+    );
     return 'created';
   }
 
   private async importExpense(
     organizationId: string,
     data: ImportRow,
+    ctx: RowContext,
   ): Promise<'created' | 'updated' | 'skipped'> {
-    const account = await this.prisma.account.findFirst({
-      where: { organizationId, code: data.accountCode },
-    });
-    if (!account) {
-      throw new BadRequestException(`Account not found with code: ${data.accountCode}`);
+    if (this.cell(data.taxAmount)) {
+      throw new BadRequestException(
+        'taxAmount is not accepted: provide taxRate (a percentage) and the VAT is computed',
+      );
     }
+    const accountId = await this.accountIdByCode(organizationId, data.accountCode, 'accountCode');
 
-    // Find a default paid-through account (cash or first bank account)
-    const paidThroughAccount = await this.prisma.account.findFirst({
-      where: { organizationId, type: 'ASSET', code: { startsWith: '1' } },
-      orderBy: { code: 'asc' },
-    });
-    if (!paidThroughAccount) {
-      throw new BadRequestException('No asset account found to use as paid-through account');
-    }
-
-    let vendorId: string | undefined;
-    if (data.vendorEmail) {
-      const vendor = await this.prisma.vendor.findFirst({
-        where: { organizationId, email: data.vendorEmail, deletedAt: null },
-      });
-      vendorId = vendor?.id;
-    }
-
-    await this.prisma.expense.create({
-      data: {
-        date: new Date(data.date),
-        accountId: account.id,
-        vendorId,
-        amount: new Decimal(data.amount),
-        taxAmount: data.taxAmount ? new Decimal(data.taxAmount) : new Decimal(0),
-        paidThroughAccountId: paidThroughAccount.id,
-        description: data.description,
-        reference: data.reference,
+    let paidThroughAccountId: string;
+    if (this.cell(data.paidThroughAccountCode)) {
+      paidThroughAccountId = await this.accountIdByCode(
         organizationId,
-      },
-    });
+        data.paidThroughAccountCode,
+        'paidThroughAccountCode',
+      );
+    } else {
+      const org = await this.prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { defaultBankAccountId: true, defaultCashAccountId: true },
+      });
+      const fallback = org?.defaultBankAccountId ?? org?.defaultCashAccountId;
+      if (!fallback) {
+        throw new BadRequestException(
+          'paidThroughAccountCode is required (or configure a default bank account in organization settings)',
+        );
+      }
+      paidThroughAccountId = fallback;
+    }
 
+    const vendorId = this.cell(data.vendorEmail)
+      ? await this.vendorIdByEmail(organizationId, data.vendorEmail)
+      : undefined;
+
+    // Posts Dr expense / VAT, Cr paid-through account.
+    await this.expensesService.create(
+      organizationId,
+      {
+        date: this.isoDate(data.date, 'date'),
+        accountId,
+        vendorId,
+        amount: this.decimalCell(data.amount, 'amount'),
+        taxRate: this.cell(data.taxRate) ? this.decimalCell(data.taxRate, 'taxRate') : undefined,
+        paidThroughAccountId,
+        description: this.cell(data.description),
+        reference: this.cell(data.reference),
+      },
+      { tx: ctx.tx },
+    );
     return 'created';
   }
 
   private async importVendorCredit(
     organizationId: string,
     data: ImportRow,
+    ctx: RowContext,
   ): Promise<'created' | 'updated' | 'skipped'> {
-    const vendor = await this.prisma.vendor.findFirst({
-      where: { organizationId, email: data.vendorEmail, deletedAt: null },
-    });
-    if (!vendor) {
-      throw new BadRequestException(`Vendor not found with email: ${data.vendorEmail}`);
-    }
-
-    const bill = await this.prisma.bill.findFirst({
-      where: { organizationId, billNumber: data.billNumber, deletedAt: null },
-    });
-    if (!bill) {
-      throw new BadRequestException(`Bill not found with number: ${data.billNumber}`);
-    }
-
-    const creditNumber = await this.generateDocNumber(
+    const vendorId = await this.vendorIdByEmail(organizationId, data.vendorEmail);
+    const bill = await this.billByNumber(organizationId, data.billNumber);
+    // Posts Dr AP / Cr expense (and VAT) against the posted bill.
+    await this.vendorCreditsService.create(
       organizationId,
-      'VC',
-      'vendorCredit',
-      'creditNumber',
-    );
-
-    await this.prisma.vendorCredit.create({
-      data: {
-        creditNumber,
-        vendorId: vendor.id,
+      {
+        vendorId,
         billId: bill.id,
-        date: data.date ? new Date(data.date) : new Date(),
-        reason: data.reason || 'Imported vendor credit',
-        amount: new Decimal(data.amount),
-        organizationId,
+        date: data.date ? this.isoDate(data.date, 'date') : undefined,
+        reason: this.cell(data.reason) ?? 'Imported vendor credit',
+        amount: this.decimalCell(data.amount, 'amount'),
       },
-    });
-
+      { tx: ctx.tx },
+    );
     return 'created';
   }
 
   private async importPaymentMade(
     organizationId: string,
     data: ImportRow,
+    ctx: RowContext,
   ): Promise<'created' | 'updated' | 'skipped'> {
-    const vendor = await this.prisma.vendor.findFirst({
-      where: { organizationId, email: data.vendorEmail, deletedAt: null },
-    });
-    if (!vendor) {
-      throw new BadRequestException(`Vendor not found with email: ${data.vendorEmail}`);
-    }
-
-    const paidFromAccount = await this.prisma.account.findFirst({
-      where: { organizationId, code: data.paidFromAccountCode },
-    });
-    if (!paidFromAccount) {
-      throw new BadRequestException(`Account not found with code: ${data.paidFromAccountCode}`);
-    }
-
-    const paymentNumber = await this.generateDocNumber(
+    const vendorId = await this.vendorIdByEmail(organizationId, data.vendorEmail);
+    const paidFromAccountId = await this.accountIdByCode(
       organizationId,
-      'VPMT',
-      'paymentMade',
-      'paymentNumber',
+      data.paidFromAccountCode,
+      'paidFromAccountCode',
+      { bankCash: true },
     );
-
-    await this.prisma.$transaction(async (tx) => {
-      const payment = await tx.paymentMade.create({
-        data: {
-          paymentNumber,
-          vendorId: vendor.id,
-          date: new Date(data.date),
-          amount: new Decimal(data.amount),
-          paymentMode: String(data.paymentMode).toUpperCase() as
-            | 'CASH'
-            | 'BANK_TRANSFER'
-            | 'CREDIT_CARD'
-            | 'DEBIT_CARD'
-            | 'CHEQUE'
-            | 'ONLINE'
-            | 'OTHER',
-          paidFromAccountId: paidFromAccount.id,
-          reference: data.reference,
-          notes: data.notes,
-          organizationId,
-        },
-      });
-
-      if (data.billNumber) {
-        const bill = await tx.bill.findFirst({
-          where: { organizationId, billNumber: data.billNumber, deletedAt: null },
-        });
-        if (bill) {
-          await tx.billAllocation.create({
-            data: {
-              paymentId: payment.id,
-              billId: bill.id,
-              amount: new Decimal(data.amount),
-            },
-          });
-        }
-      }
-    });
-
+    if (!this.cell(data.billNumber)) {
+      throw new BadRequestException(
+        'billNumber is required: a payment must be allocated to a bill',
+      );
+    }
+    const bill = await this.billByNumber(organizationId, data.billNumber);
+    const amount = this.decimalCell(data.amount, 'amount');
+    // Posts Dr AP / Cr bank and reduces the bill balance.
+    await this.paymentsMadeService.create(
+      organizationId,
+      {
+        vendorId,
+        date: this.isoDate(data.date, 'date'),
+        amount,
+        paymentMode: String(data.paymentMode).toUpperCase() as PaymentMode,
+        paidFromAccountId,
+        reference: this.cell(data.reference),
+        notes: this.cell(data.notes),
+        allocations: [{ billId: bill.id, amount }],
+      },
+      { tx: ctx.tx },
+    );
     return 'created';
   }
 

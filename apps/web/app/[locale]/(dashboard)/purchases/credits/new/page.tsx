@@ -9,8 +9,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { VendorCreditForm } from '@/components/purchases/vendor-credit-form';
 import { useCreateVendorCredit } from '@/lib/hooks/use-vendor-credits';
 import { useVendors } from '@/lib/hooks/use-vendors';
-import { useQuery } from '@tanstack/react-query';
-import { accountsApi, itemsApi } from '@/lib/api';
 
 export default function NewVendorCreditPage() {
   const router = useRouter();
@@ -21,54 +19,22 @@ export default function NewVendorCreditPage() {
   // Get preselected vendor from query params
   const preselectedVendorId = searchParams.get('vendorId') || undefined;
 
-  // Fetch vendors
-  const { data: vendorsData, isLoading: vendorsLoading } = useVendors();
-
-  // Fetch accounts
-  const { data: accountsData, isLoading: accountsLoading } = useQuery({
-    queryKey: ['accounts'],
-    queryFn: async () => {
-      const response = await accountsApi.getAll();
-      return response.data;
-    },
-  });
-
-  // Fetch items
-  const { data: itemsData, isLoading: itemsLoading } = useQuery({
-    queryKey: ['items'],
-    queryFn: async () => {
-      const response = await itemsApi.getAll();
-      return response.data;
-    },
-  });
-
+  const { data: vendorsData, isLoading: vendorsLoading, isError, refetch } = useVendors();
   const vendors = vendorsData?.data || [];
-  const accounts = accountsData?.data || [];
-  const items = itemsData?.data || [];
 
-  const handleSubmit = async (data: Record<string, unknown>) => {
+  const handleSubmit = async (
+    data: Parameters<typeof createCredit.mutateAsync>[0],
+  ): Promise<void> => {
     try {
-      await createCredit.mutateAsync(
-        data as unknown as Parameters<typeof createCredit.mutateAsync>[0],
-      );
+      await createCredit.mutateAsync(data);
       router.push('/purchases/credits');
-    } catch (error) {
-      // Error is handled in the hook
+    } catch {
+      // Error is surfaced by the mutation's toast.
     }
   };
 
-  if (vendorsLoading || accountsLoading || itemsLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-12 w-64" />
-        <Skeleton className="h-96" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
           <Link href="/purchases/credits">
@@ -81,16 +47,26 @@ export default function NewVendorCreditPage() {
         </div>
       </div>
 
-      {/* Form */}
-      <VendorCreditForm
-        vendors={vendors}
-        accounts={accounts}
-        items={items}
-        onSubmit={handleSubmit}
-        onCancel={() => router.push('/purchases/credits')}
-        isSubmitting={createCredit.isPending}
-        preselectedVendorId={preselectedVendorId}
-      />
+      {vendorsLoading ? (
+        <div className="space-y-6">
+          <Skeleton className="h-64" />
+        </div>
+      ) : isError ? (
+        <div className="rounded-md border border-destructive/50 p-6 text-center" role="alert">
+          <p className="text-destructive">{t('credits.form.loadError')}</p>
+          <Button className="mt-4" variant="outline" onClick={() => void refetch()}>
+            {t('expenses.form.retry')}
+          </Button>
+        </div>
+      ) : (
+        <VendorCreditForm
+          vendors={vendors}
+          onSubmit={(data) => void handleSubmit(data)}
+          onCancel={() => router.push('/purchases/credits')}
+          isSubmitting={createCredit.isPending}
+          preselectedVendorId={preselectedVendorId}
+        />
+      )}
     </div>
   );
 }

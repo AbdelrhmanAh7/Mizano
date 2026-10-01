@@ -120,7 +120,19 @@
       "paidThroughPlaceholder": "Select payment account",
       "description": "Description",
       "reference": "Reference",
-      "project": "Project"
+      "project": "Project",
+      "details": "Expense Details",
+      "noVendor": "No Vendor",
+      "noProject": "No Project",
+      "total": "Total",
+      "vat": "VAT",
+      "noExpenseAccounts": "No expense accounts are available. Add one in the chart of accounts.",
+      "noPaidThroughAccounts": "No bank or cash account is available. Add one in Banking.",
+      "loadError": "Could not load the accounts for this form.",
+      "retry": "Retry",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "submit": "Record Expense"
     },
     "total": "Total",
     "table": {
@@ -139,7 +151,11 @@
     "empty": {
       "title": "No expenses yet",
       "description": "Record your first expense to start tracking"
-    }
+    },
+    "voided": "Voided",
+    "pending": "Pending",
+    "post": "Post expense",
+    "posting": "Posting..."
   },
   "bills": {
     "title": "Bills",
@@ -257,7 +273,20 @@
       "date": "Date",
       "reason": "Reason",
       "amount": "Amount",
-      "applyToBill": "Apply to Bill"
+      "applyToBill": "Apply to Bill",
+      "details": "Credit Details",
+      "vendorPlaceholder": "Select vendor",
+      "billPlaceholder": "Select bill",
+      "selectVendorFirst": "Select a vendor first",
+      "noBills": "This vendor has no posted bills to credit.",
+      "loadError": "Could not load the data for this form.",
+      "amountHelp": "Gross amount including VAT. Posts Dr Accounts Payable / Cr expense and VAT.",
+      "exceedsBill": "The credit cannot exceed the bill total",
+      "account": "Credit Account",
+      "accountPlaceholder": "Default: the bill's main expense account",
+      "cancel": "Cancel",
+      "creating": "Creating...",
+      "submit": "Create Credit"
     },
     "table": {
       "creditNumber": "Credit #",
@@ -275,7 +304,15 @@
     "empty": {
       "title": "No vendor credits yet",
       "description": "Vendor credits will appear here when created"
-    }
+    },
+    "void": "Void Credit",
+    "voidDescription": "Voiding reverses the credit's journal. Only credits that are not applied to a bill or refunded can be voided.",
+    "voiding": "Voiding...",
+    "noRefundAccounts": "No bank or cash account is available. Add one in Banking.",
+    "cancel": "Cancel",
+    "voided": "Voided",
+    "refundAccountsError": "Could not load the bank and cash accounts.",
+    "retry": "Retry"
   },
   "payments": {
     "title": "Payments Made",

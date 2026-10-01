@@ -101,7 +101,11 @@
   },
   "purchasesByVendor": {
     "title": "المشتريات حسب المورد",
-    "description": "تفصيل المشتريات حسب المورد"
+    "description": "تفصيل المشتريات حسب المورد",
+    "unappliedCredits": "إشعارات دائنة غير مطبّقة",
+    "netPayable": "صافي المستحق",
+    "totalUnappliedCredits": "إشعارات الموردين غير المطبّقة",
+    "totalNetPayable": "صافي المستحق"
   },
   "inventoryValuation": {
     "title": "تقييم المخزون",

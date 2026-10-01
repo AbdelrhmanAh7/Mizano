@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ArrowLeft, Building2, CreditCard, Calendar, Receipt, Banknote } from 'lucide-react';
+import { ArrowLeft, Building2, CreditCard, Calendar, Receipt, Banknote, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -38,10 +38,13 @@ import {
   useVendorCredit,
   useApplyVendorCredit,
   useRefundVendorCredit,
+  useVoidVendorCredit,
   formatCurrency,
 } from '@/lib/hooks/use-vendor-credits';
 import { useQuery } from '@tanstack/react-query';
-import { billsApi, accountsApi } from '@/lib/api';
+import { billsApi, vendorCreditsApi } from '@/lib/api';
+import { compareDecimals } from '@/lib/decimal';
+import { usePermissions } from '@/lib/hooks/use-permissions';
 
 interface VendorCreditDetailPageProps {
   params: { id: string };
@@ -54,10 +57,15 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState<string>('');
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [voidDialogOpen, setVoidDialogOpen] = useState(false);
+  const { hasPermission } = usePermissions();
+  const canEdit = hasPermission('purchases.edit');
+  const canDelete = hasPermission('purchases.delete');
 
   const { data: credit, isLoading } = useVendorCredit(id);
   const applyCredit = useApplyVendorCredit();
   const refundCredit = useRefundVendorCredit();
+  const voidCredit = useVoidVendorCredit();
 
   const currency = credit?.vendor?.currency || 'USD';
 
@@ -68,28 +76,35 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
       if (!credit?.vendorId) return { data: [] };
       const response = await billsApi.getAll({
         vendorId: credit.vendorId,
-        status: 'OPEN,OVERDUE',
+        status: 'OPEN,PARTIALLY_PAID,OVERDUE',
         hasBalance: true,
       });
       return response.data;
     },
-    enabled: !!credit?.vendorId && !credit?.appliedToBillId,
+    enabled: canEdit && !!credit?.vendorId && !credit?.appliedToBillId && !credit?.refundedAt,
   });
 
-  // Fetch bank accounts for refund
-  const { data: accountsData } = useQuery({
-    queryKey: ['accounts', 'bank'],
-    queryFn: async () => {
-      const response = await accountsApi.getAll();
-      return response.data;
-    },
-    enabled: !!credit && !credit.appliedToBillId && !credit.refundedAt,
+  // Bank/cash accounts a refund can be received into (role-scoped lookup, purchases.edit)
+  const {
+    data: refundAccounts = [],
+    isLoading: refundAccountsLoading,
+    isError: refundAccountsError,
+    refetch: refetchRefundAccounts,
+  } = useQuery({
+    queryKey: ['vendor-credits', 'refund-accounts'],
+    queryFn: async (): Promise<Array<{ id: string; code: string; name: string }>> =>
+      (await vendorCreditsApi.refundAccounts()).data,
+    enabled: canEdit && !!credit && !credit.appliedToBillId && !credit.refundedAt,
   });
 
-  const unpaidBills = billsData?.data || [];
-  const bankAccounts = (accountsData?.data || []).filter(
-    (a: { code: string }) => a.code.startsWith('1'), // Asset accounts
-  );
+  // The whole credit is applied, so only bills with enough balance can take it.
+  const unpaidBills = (
+    (billsData?.data || []) as Array<{
+      id: string;
+      billNumber: string;
+      balanceDue: string | number;
+    }>
+  ).filter((b) => !credit || compareDecimals(b.balanceDue, credit.amount) >= 0);
 
   const handleApplyToBill = async () => {
     if (!selectedBillId) return;
@@ -98,12 +113,19 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
     setSelectedBillId('');
   };
 
+  const handleVoid = async (): Promise<void> => {
+    await voidCredit.mutateAsync(id);
+    setVoidDialogOpen(false);
+  };
+
   const handleRefund = async () => {
     if (!selectedAccountId) return;
     await refundCredit.mutateAsync({ id, bankAccountId: selectedAccountId });
     setRefundDialogOpen(false);
     setSelectedAccountId('');
   };
+
+  const isVoided = !!credit?.deletedAt;
 
   if (isLoading) {
     return (
@@ -143,9 +165,13 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight font-mono">{credit.creditNumber}</h1>
-              <Badge variant={credit.appliedToBillId ? 'secondary' : 'default'}>
-                {credit.appliedToBillId ? 'Applied' : credit.refundedAt ? 'Refunded' : 'Open'}
-              </Badge>
+              {isVoided ? (
+                <Badge variant="destructive">{t('credits.voided')}</Badge>
+              ) : (
+                <Badge variant={credit.appliedToBillId ? 'secondary' : 'default'}>
+                  {credit.appliedToBillId ? 'Applied' : credit.refundedAt ? 'Refunded' : 'Open'}
+                </Badge>
+              )}
             </div>
             <p className="text-muted-foreground">
               {t('credits.creditFrom', { name: credit.vendor?.name || '' })}
@@ -154,111 +180,165 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
         </div>
 
         {/* Actions */}
-        {!credit.appliedToBillId && !credit.refundedAt && (
+        {!isVoided && !credit.appliedToBillId && !credit.refundedAt && (canEdit || canDelete) && (
           <div className="flex items-center gap-2">
-            <Dialog open={applyDialogOpen} onOpenChange={setApplyDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Receipt className="mr-2 h-4 w-4" />
-                  {t('credits.applyToBill')}
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{t('credits.applyCreditToBill')}</DialogTitle>
-                  <DialogDescription>{t('credits.applyCreditDescription')}</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>{t('credits.selectBill')}</Label>
-                    <Select value={selectedBillId} onValueChange={setSelectedBillId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={t('credits.selectBillPlaceholder')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {unpaidBills.length === 0 ? (
-                          <SelectItem value="" disabled>
-                            {t('credits.noUnpaidBills')}
-                          </SelectItem>
-                        ) : (
-                          unpaidBills.map(
-                            (bill: {
-                              id: string;
-                              billNumber: string;
-                              balanceDue: string | number;
-                            }) => (
-                              <SelectItem key={bill.id} value={bill.id}>
-                                {bill.billNumber} - {formatCurrency(bill.balanceDue, currency)}
-                              </SelectItem>
-                            ),
-                          )
-                        )}
-                      </SelectContent>
-                    </Select>
+            {canEdit && (
+              <Dialog open={applyDialogOpen} onOpenChange={setApplyDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Receipt className="mr-2 h-4 w-4" />
+                    {t('credits.applyToBill')}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{t('credits.applyCreditToBill')}</DialogTitle>
+                    <DialogDescription>{t('credits.applyCreditDescription')}</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>{t('credits.selectBill')}</Label>
+                      <Select value={selectedBillId} onValueChange={setSelectedBillId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t('credits.selectBillPlaceholder')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {unpaidBills.length === 0 ? (
+                            <SelectItem value="" disabled>
+                              {t('credits.noUnpaidBills')}
+                            </SelectItem>
+                          ) : (
+                            unpaidBills.map(
+                              (bill: {
+                                id: string;
+                                billNumber: string;
+                                balanceDue: string | number;
+                              }) => (
+                                <SelectItem key={bill.id} value={bill.id}>
+                                  {bill.billNumber} - {formatCurrency(bill.balanceDue, currency)}
+                                </SelectItem>
+                              ),
+                            )
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setApplyDialogOpen(false)}>
-                    Cancel
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setApplyDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleApplyToBill}
+                      disabled={!selectedBillId || applyCredit.isPending}
+                    >
+                      {applyCredit.isPending ? t('credits.applying') : t('credits.applyCredit')}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+            {canEdit && (
+              <Dialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Banknote className="mr-2 h-4 w-4" />
+                    {t('credits.recordRefund')}
                   </Button>
-                  <Button
-                    onClick={handleApplyToBill}
-                    disabled={!selectedBillId || applyCredit.isPending}
-                  >
-                    {applyCredit.isPending ? t('credits.applying') : t('credits.applyCredit')}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Banknote className="mr-2 h-4 w-4" />
-                  {t('credits.recordRefund')}
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{t('credits.recordRefund')}</DialogTitle>
-                  <DialogDescription>{t('credits.recordRefundDescription')}</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>{t('credits.depositToAccount')}</Label>
-                    <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={t('credits.selectAccount')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {bankAccounts.map((account: { id: string; code: string; name: string }) => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.code} - {account.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{t('credits.recordRefund')}</DialogTitle>
+                    <DialogDescription>{t('credits.recordRefundDescription')}</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>{t('credits.depositToAccount')}</Label>
+                      <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t('credits.selectAccount')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {refundAccounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.code} - {account.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {refundAccountsLoading && <Skeleton className="h-10 w-full" />}
+                    {refundAccountsError && (
+                      <div className="flex items-center justify-between gap-2" role="alert">
+                        <p className="text-sm text-destructive">
+                          {t('credits.refundAccountsError')}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void refetchRefundAccounts()}
+                        >
+                          {t('credits.retry')}
+                        </Button>
+                      </div>
+                    )}
+                    {!refundAccountsLoading &&
+                      !refundAccountsError &&
+                      refundAccounts.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          {t('credits.noRefundAccounts')}
+                        </p>
+                      )}
+                    <div className="p-4 bg-muted rounded-lg">
+                      <p className="text-sm text-muted-foreground">{t('credits.refundAmount')}</p>
+                      <p className="text-2xl font-bold font-mono">
+                        {formatCurrency(credit.appliedToBillId ? '0' : credit.amount, currency)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm text-muted-foreground">{t('credits.refundAmount')}</p>
-                    <p className="text-2xl font-bold font-mono">
-                      {formatCurrency(credit.appliedToBillId ? '0' : credit.amount, currency)}
-                    </p>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setRefundDialogOpen(false)}>
-                    Cancel
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setRefundDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleRefund}
+                      disabled={!selectedAccountId || refundCredit.isPending}
+                    >
+                      {refundCredit.isPending ? t('credits.processing') : t('credits.recordRefund')}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+            {canDelete && (
+              <Dialog open={voidDialogOpen} onOpenChange={setVoidDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="destructive">
+                    <Ban className="mr-2 h-4 w-4" />
+                    {t('credits.void')}
                   </Button>
-                  <Button
-                    onClick={handleRefund}
-                    disabled={!selectedAccountId || refundCredit.isPending}
-                  >
-                    {refundCredit.isPending ? t('credits.processing') : t('credits.recordRefund')}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{t('credits.void')}</DialogTitle>
+                    <DialogDescription>{t('credits.voidDescription')}</DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setVoidDialogOpen(false)}>
+                      {t('credits.cancel')}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => void handleVoid()}
+                      disabled={voidCredit.isPending}
+                    >
+                      {voidCredit.isPending ? t('credits.voiding') : t('credits.void')}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         )}
       </div>

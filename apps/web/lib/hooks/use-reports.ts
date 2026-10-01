@@ -181,6 +181,10 @@ export interface PurchasesByVendorEntry {
   totalAmount: number;
   paidAmount: number;
   balanceDue: number;
+  /** Decimal string: live unapplied vendor credits dated in the period (debited from AP, not on any bill). */
+  unappliedCredits: string;
+  /** Decimal string: balanceDue - unappliedCredits. */
+  netPayable: string;
 }
 
 export interface PurchasesByVendorReport {
@@ -188,6 +192,9 @@ export interface PurchasesByVendorReport {
   totalAmount: number;
   totalPaid: number;
   totalBalance: number;
+  /** Decimal strings. */
+  totalUnappliedCredits: string;
+  totalNetPayable: string;
   period: DateRange;
 }
 

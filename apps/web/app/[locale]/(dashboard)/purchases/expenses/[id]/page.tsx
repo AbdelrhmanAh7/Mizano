@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ArrowLeft, Trash2, Receipt } from 'lucide-react';
+import { ArrowLeft, Trash2, Receipt, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +21,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { useExpense, useDeleteExpense, formatCurrency } from '@/lib/hooks/use-expenses';
+import {
+  useExpense,
+  useDeleteExpense,
+  usePostExpense,
+  formatCurrency,
+} from '@/lib/hooks/use-expenses';
+import { sumDecimals } from '@/lib/decimal';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 
 interface ExpenseDetailPageProps {
@@ -38,6 +44,8 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
   const deleteExpense = useDeleteExpense();
 
   const canDelete = hasPermission('purchases.delete');
+  const canEdit = hasPermission('purchases.edit');
+  const postExpense = usePostExpense();
 
   const handleDelete = async () => {
     try {
@@ -73,9 +81,14 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
     );
   }
 
-  const amount = parseFloat(expense.amount);
-  const taxAmount = parseFloat(expense.taxAmount || '0');
-  const total = expense.taxInclusive ? amount : amount + taxAmount;
+  // `amount` is stored net of VAT whether the entry was tax-inclusive or exclusive, so the total
+  // is always net + VAT (exact decimal sum).
+  const amount = expense.amount;
+  const taxAmount = expense.taxAmount || '0';
+  const hasTax = parseFloat(taxAmount) > 0;
+  const total = sumDecimals([amount, taxAmount]);
+  const isVoided = !!expense.deletedAt;
+  const isPending = !isVoided && expense.status === 'PENDING';
 
   return (
     <div className="space-y-6">
@@ -88,13 +101,23 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{t('expenses.expenseDetails')}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight">{t('expenses.expenseDetails')}</h1>
+              {isVoided && <Badge variant="destructive">{t('expenses.voided')}</Badge>}
+              {isPending && <Badge variant="secondary">{t('expenses.pending')}</Badge>}
+            </div>
             <p className="text-muted-foreground">
               {format(new Date(expense.date), 'MMMM d, yyyy')}
             </p>
           </div>
         </div>
-        {canDelete && (
+        {isPending && canEdit && (
+          <Button onClick={() => postExpense.mutate(id)} disabled={postExpense.isPending}>
+            <CheckCircle className="mr-2 h-4 w-4" />
+            {postExpense.isPending ? t('expenses.posting') : t('expenses.post')}
+          </Button>
+        )}
+        {canDelete && !isVoided && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive">
@@ -128,7 +151,7 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-mono">{formatCurrency(amount)}</div>
-            {taxAmount > 0 && (
+            {hasTax && (
               <p className="text-sm text-muted-foreground">+ {formatCurrency(taxAmount)} tax</p>
             )}
           </CardContent>
@@ -142,7 +165,7 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-mono text-red-600">{formatCurrency(total)}</div>
-            {expense.taxInclusive && taxAmount > 0 && (
+            {expense.taxInclusive && hasTax && (
               <p className="text-sm text-muted-foreground">{t('expenses.taxInclusive')}</p>
             )}
           </CardContent>

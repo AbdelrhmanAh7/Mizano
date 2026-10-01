@@ -121,7 +121,7 @@ describe('PaymentsMadeService (posting)', () => {
   it('records a partial payment, recalculates the bill and posts Dr AP / Cr bank atomically', async () => {
     await service.create(ORG, dto);
 
-    expect(bills.lockBills).toHaveBeenCalledWith(prisma, ['b1']);
+    expect(bills.lockBills).toHaveBeenCalledWith(prisma, ORG, ['b1']);
     expect(bills.recalculateBalance).toHaveBeenCalledWith(prisma, 'b1');
     expect(prisma.paymentMade.create.mock.calls[0][0].data.paymentNumber).toBe('VPMT-005');
     const [, journalDto, options] = journals.create.mock.calls[0];

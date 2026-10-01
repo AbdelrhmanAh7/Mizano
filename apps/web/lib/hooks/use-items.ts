@@ -72,7 +72,6 @@ export interface CreateItemData {
   purchasePrice?: number;
   taxRateId?: string;
   trackInventory?: boolean;
-  openingStock?: number;
   reorderPoint?: number;
   reorderQuantity?: number;
   incomeAccountId?: string;

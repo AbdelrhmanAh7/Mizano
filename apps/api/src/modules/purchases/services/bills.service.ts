@@ -33,13 +33,22 @@ export class BillsService {
     private journalsService: JournalsService,
   ) {}
 
-  async create(organizationId: string, dto: CreateBillDto) {
-    await this.assertReferences(this.prisma, organizationId, dto);
+  /**
+   * Creates a DRAFT bill (no journal until it is approved). Pass `options.tx` to compose the
+   * creation into a caller's transaction (recurring profiles).
+   */
+  async create(
+    organizationId: string,
+    dto: CreateBillDto,
+    options: { tx?: Prisma.TransactionClient } = {},
+  ) {
+    const db = options.tx ?? this.prisma;
+    await this.assertReferences(db, organizationId, dto);
     const { lineData, totals } = this.buildLines(dto.lines);
 
     try {
-      const billNumber = dto.billNumber?.trim() || (await this.nextBillNumber(organizationId));
-      return await this.prisma.bill.create({
+      const billNumber = dto.billNumber?.trim() || (await this.nextBillNumber(db, organizationId));
+      return await db.bill.create({
         data: {
           billNumber,
           vendorId: dto.vendorId,
@@ -192,7 +201,15 @@ export class BillsService {
       where: { billId, payment: { deletedAt: null } },
       select: { amount: true },
     });
-    const paid = allocations.reduce((s, a) => s.add(a.amount), new Decimal(0));
+    // Vendor credits applied to this bill settle it like a payment (AP was debited when the
+    // credit was created, so no journal accompanies the application).
+    const credits = await tx.vendorCredit.aggregate({
+      where: { appliedToBillId: billId, organizationId: bill.organizationId, deletedAt: null },
+      _sum: { amount: true },
+    });
+    const paid = allocations
+      .reduce((s, a) => s.add(a.amount), new Decimal(0))
+      .add(credits._sum.amount ?? new Decimal(0));
     const balance = Decimal.max(bill.grandTotal.sub(paid), new Decimal(0));
 
     let status = bill.status;
@@ -205,9 +222,13 @@ export class BillsService {
   }
 
   /** Row-locks bills (sorted to avoid deadlocks) for the rest of the transaction. */
-  async lockBills(tx: Prisma.TransactionClient, billIds: string[]): Promise<void> {
+  async lockBills(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    billIds: string[],
+  ): Promise<void> {
     for (const id of [...new Set(billIds)].sort()) {
-      await tx.$queryRaw`SELECT id FROM "bills" WHERE id = ${id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "bills" WHERE id = ${id} AND "organizationId" = ${organizationId} FOR UPDATE`;
     }
   }
 
@@ -525,15 +546,18 @@ export class BillsService {
    * Atomically reserves the organization's next bill number (e.g. BILL-0007). Numbers already
    * used (e.g. bills created before the counter existed) are skipped.
    */
-  private async nextBillNumber(organizationId: string): Promise<string> {
+  private async nextBillNumber(
+    db: Prisma.TransactionClient | PrismaService,
+    organizationId: string,
+  ): Promise<string> {
     for (let attempt = 0; attempt < 1000; attempt++) {
-      const org = await this.prisma.organization.update({
+      const org = await db.organization.update({
         where: { id: organizationId },
         data: { billNextNumber: { increment: 1 } },
         select: { billPrefix: true, billNextNumber: true },
       });
       const candidate = `${org.billPrefix}${String(org.billNextNumber - 1).padStart(4, '0')}`;
-      const taken = await this.prisma.bill.count({
+      const taken = await db.bill.count({
         where: { organizationId, billNumber: candidate },
       });
       if (taken === 0) return candidate;

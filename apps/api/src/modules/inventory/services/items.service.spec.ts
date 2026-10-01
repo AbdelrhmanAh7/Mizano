@@ -131,6 +131,35 @@ describe('ItemsService', () => {
   });
 
   describe('create', () => {
+    it('rejects a non-zero openingStock (stock needs a journal) and creates nothing', async () => {
+      mockPrismaService.item.findFirst.mockResolvedValue(null);
+      mockPrismaService.account.count.mockResolvedValue(0);
+      await expect(
+        service.create('org-001', {
+          name: 'Widget',
+          sku: 'W-009',
+          type: ItemType.GOODS,
+          sellingPrice: '100.00',
+          openingStock: 5,
+        }),
+      ).rejects.toThrow(/inventory adjustment/);
+      expect(mockPrismaService.item.create).not.toHaveBeenCalled();
+    });
+
+    it('creates the item with zero stock when openingStock is absent or zero', async () => {
+      mockPrismaService.item.findFirst.mockResolvedValue(null);
+      mockPrismaService.account.count.mockResolvedValue(0);
+      mockPrismaService.item.create.mockResolvedValue({ id: 'i1' });
+      await service.create('org-001', {
+        name: 'Widget',
+        sku: 'W-010',
+        type: ItemType.GOODS,
+        sellingPrice: '100.00',
+        openingStock: 0,
+      });
+      expect(mockPrismaService.item.create.mock.calls[0][0].data.currentStock).toBe(0);
+    });
+
     it('throws ConflictException when SKU already exists', async () => {
       mockPrismaService.item.findFirst.mockResolvedValue({ id: 'existing' });
       await expect(

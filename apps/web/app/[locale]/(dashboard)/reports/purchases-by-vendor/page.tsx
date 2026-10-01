@@ -68,8 +68,22 @@ function PurchasesByVendorContent() {
         ),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
+      {
+        accessorKey: 'unappliedCredits',
+        header: t('purchasesByVendor.unappliedCredits'),
+        cell: ({ row }) => formatCurrency(row.original.unappliedCredits),
+        meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      },
+      {
+        accessorKey: 'netPayable',
+        header: t('purchasesByVendor.netPayable'),
+        cell: ({ row }) => (
+          <span className="font-medium">{formatCurrency(row.original.netPayable)}</span>
+        ),
+        meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
+      },
     ],
-    [],
+    [t],
   );
 
   return (
@@ -83,7 +97,7 @@ function PurchasesByVendorContent() {
 
       {/* Summary Cards */}
       {data && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Total Purchases</CardTitle>
@@ -112,6 +126,30 @@ function PurchasesByVendorContent() {
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
                 {formatCurrency(data.totalBalance)}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">
+                {t('purchasesByVendor.totalUnappliedCredits')}
+              </CardTitle>
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(data.totalUnappliedCredits)}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">
+                {t('purchasesByVendor.totalNetPayable')}
+              </CardTitle>
+              <Receipt className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {formatCurrency(data.totalNetPayable)}
               </div>
             </CardContent>
           </Card>

@@ -56,36 +56,46 @@ export class InvoicesService {
     private journalsService: JournalsService,
   ) {}
 
-  async create(organizationId: string, dto: CreateInvoiceDto) {
+  /**
+   * Creates a DRAFT invoice (no journal until it is sent). Pass `options.tx` to compose the
+   * creation into a caller's transaction (recurring profiles).
+   */
+  async create(
+    organizationId: string,
+    dto: CreateInvoiceDto,
+    options: { tx?: Prisma.TransactionClient } = {},
+  ) {
     const date = parseDocumentDate(dto.date, 'invoice date');
     const dueDate = parseDocumentDate(dto.dueDate, 'due date');
     const { lineData, totals } = this.buildLines(dto.lines, dto.shippingAmount);
 
-    try {
-      return await this.prisma.$transaction(async (tx) => {
-        await this.assertReferences(tx, organizationId, dto, dto.customerId);
-        const invoiceNumber = await allocateInvoiceNumber(tx, organizationId);
-        return tx.invoice.create({
-          data: {
-            invoiceNumber,
-            customerId: dto.customerId,
-            quoteId: dto.quoteId,
-            projectId: dto.projectId,
-            date,
-            dueDate,
-            subtotal: totals.subtotal,
-            taxAmount: totals.taxAmount,
-            shippingAmount: totals.shipping,
-            grandTotal: totals.grandTotal,
-            balanceDue: totals.grandTotal,
-            notes: dto.notes,
-            terms: dto.terms,
-            organizationId,
-            lines: { create: lineData },
-          },
-          include: INVOICE_VIEW_INCLUDE,
-        });
+    const run = async (tx: Prisma.TransactionClient) => {
+      await this.assertReferences(tx, organizationId, dto, dto.customerId);
+      const invoiceNumber = await allocateInvoiceNumber(tx, organizationId);
+      return tx.invoice.create({
+        data: {
+          invoiceNumber,
+          customerId: dto.customerId,
+          quoteId: dto.quoteId,
+          projectId: dto.projectId,
+          date,
+          dueDate,
+          subtotal: totals.subtotal,
+          taxAmount: totals.taxAmount,
+          shippingAmount: totals.shipping,
+          grandTotal: totals.grandTotal,
+          balanceDue: totals.grandTotal,
+          notes: dto.notes,
+          terms: dto.terms,
+          organizationId,
+          lines: { create: lineData },
+        },
+        include: INVOICE_VIEW_INCLUDE,
       });
+    };
+
+    try {
+      return await (options.tx ? run(options.tx) : this.prisma.$transaction(run));
     } catch (error) {
       throw mapDocumentNumberConflict(error, 'Invoice');
     }

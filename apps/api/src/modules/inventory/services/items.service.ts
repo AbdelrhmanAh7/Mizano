@@ -21,6 +21,13 @@ export class ItemsService {
     const existing = await this.prisma.item.findFirst({ where: { sku: dto.sku, organizationId } });
     if (existing) throw new ConflictException('SKU already exists');
     await this.assertAccountsBelongToOrg(organizationId, dto);
+    // Stock without a journal would put units on the shelf the ledger knows nothing about:
+    // opening stock is entered as an inventory adjustment, which posts its journal.
+    if (dto.openingStock) {
+      throw new BadRequestException(
+        'Opening stock cannot be set when creating an item; create the item, then record an inventory adjustment so the stock is posted to the ledger',
+      );
+    }
 
     return this.prisma.item.create({
       data: {
@@ -35,7 +42,7 @@ export class ItemsService {
         inventoryAccountId: dto.inventoryAccountId,
         description: dto.description,
         reorderPoint: dto.reorderPoint,
-        currentStock: dto.openingStock || 0,
+        currentStock: 0,
         organizationId,
       },
     });
