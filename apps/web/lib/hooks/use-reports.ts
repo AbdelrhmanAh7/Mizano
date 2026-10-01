@@ -33,6 +33,10 @@ export interface BalanceSheetReport {
   totalAssets: number;
   totalLiabilities: number;
   totalEquity: number;
+  /** Exact decimal string from the API (never recomputed from floats on the client). */
+  totalLiabilitiesAndEquity: string;
+  /** Decided by the API with exact Decimal comparison. */
+  isBalanced: boolean;
   asOfDate: string;
 }
 
@@ -213,6 +217,8 @@ interface RawBalanceSheetData {
   totalAssets?: number | string;
   totalLiabilities?: number | string;
   totalEquity?: number | string;
+  totalLiabilitiesAndEquity?: number | string;
+  isBalanced?: boolean;
   asOfDate?: string;
 }
 
@@ -399,6 +405,8 @@ function transformBalanceSheet(raw: RawBalanceSheetData): BalanceSheetReport {
     totalAssets: toNum(raw.assets?.total ?? raw.totalAssets),
     totalLiabilities: toNum(raw.liabilities?.total ?? raw.totalLiabilities),
     totalEquity: toNum(raw.equity?.total ?? raw.totalEquity),
+    totalLiabilitiesAndEquity: String(raw.totalLiabilitiesAndEquity ?? '0'),
+    isBalanced: raw.isBalanced === true,
     asOfDate: raw.asOfDate ?? '',
   };
 }

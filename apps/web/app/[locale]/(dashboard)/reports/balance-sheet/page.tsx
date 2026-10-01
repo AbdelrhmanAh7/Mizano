@@ -52,6 +52,8 @@ export default function BalanceSheetReportPage() {
   const liabilities = Array.isArray(report?.liabilities) ? report.liabilities : [];
   const equity = Array.isArray(report?.equity) ? report.equity : [];
   const totalAssets = report?.totalAssets ?? 0;
+  // Exact comparison done by the API; never compare floats here.
+  const isBalanced = report?.isBalanced ?? false;
   const totalLiabilities = report?.totalLiabilities ?? 0;
   const totalEquity = report?.totalEquity ?? 0;
   const hasData = assets.length > 0 || liabilities.length > 0 || equity.length > 0;
@@ -161,29 +163,18 @@ export default function BalanceSheetReportPage() {
           <Card
             className={cn(
               'border-2',
-              totalAssets === totalLiabilities + totalEquity
-                ? 'border-green-500 bg-green-50'
-                : 'border-red-500 bg-red-50',
+              isBalanced ? 'border-success bg-success/10' : 'border-destructive bg-destructive/10',
             )}
           >
             <CardContent className="pt-6">
               <div className="flex justify-between items-center">
                 <span className="font-bold">{t('balanceSheet.totalLiabilitiesAndEquity')}</span>
                 <span className="text-xl font-bold font-mono">
-                  {formatCurrency(totalLiabilities + totalEquity)}
+                  {formatCurrency(report?.totalLiabilitiesAndEquity ?? '0')}
                 </span>
               </div>
-              <p
-                className={cn(
-                  'text-sm mt-2',
-                  totalAssets === totalLiabilities + totalEquity
-                    ? 'text-green-600'
-                    : 'text-red-600',
-                )}
-              >
-                {totalAssets === totalLiabilities + totalEquity
-                  ? 'Balance sheet is balanced'
-                  : 'Balance sheet is not balanced'}
+              <p className={cn('text-sm mt-2', isBalanced ? 'text-success' : 'text-destructive')}>
+                {isBalanced ? 'Balance sheet is balanced' : 'Balance sheet is not balanced'}
               </p>
             </CardContent>
           </Card>

@@ -27,6 +27,7 @@ import { addDays, format } from 'date-fns';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
+import { useTranslations } from 'next-intl';
 import { z } from 'zod';
 import { computeTotals, toDecimalInput } from '@/lib/money';
 
@@ -41,14 +42,10 @@ const lineSchema = z.object({
   quantity: z
     .string()
     .trim()
-    .regex(DECIMAL_INPUT, 'Quantity must be a non-negative number')
-    .refine((v) => /[1-9]/.test(v), 'Quantity must be greater than zero'),
-  rate: z.string().trim().regex(DECIMAL_INPUT, 'Rate must be a non-negative number'),
-  taxRate: z
-    .string()
-    .trim()
-    .regex(OPTIONAL_DECIMAL_INPUT, 'Tax % must be a non-negative number')
-    .default('0'),
+    .regex(DECIMAL_INPUT, 'quantityInvalid')
+    .refine((v) => /[1-9]/.test(v), 'quantityPositive'),
+  rate: z.string().trim().regex(DECIMAL_INPUT, 'rateInvalid'),
+  taxRate: z.string().trim().regex(OPTIONAL_DECIMAL_INPUT, 'taxInvalid').default('0'),
 });
 
 const billSchema = z.object({
@@ -105,6 +102,7 @@ export function BillForm({
   scanDefaults,
 }: BillFormProps) {
   const isEditing = !!bill;
+  const tValidation = useTranslations('purchases.bills.validation');
   const { data: vendorsData } = useVendors({ limit: 100 });
   const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
@@ -213,7 +211,13 @@ export function BillForm({
                   : undefined,
               )
               .filter((m): m is string => typeof m === 'string')
-              .map((m) => `Line ${index + 1}: ${m}`)
+              // Line schema messages are i18n keys under purchases.bills.validation.
+              .map((m) =>
+                tValidation('line', {
+                  line: index + 1,
+                  message: tValidation.has(m) ? tValidation(m) : m,
+                }),
+              )
           : [],
       )
     : [];

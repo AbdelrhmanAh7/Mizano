@@ -193,7 +193,14 @@
     "voidPaymentTitle": "Void payment",
     "voidPaymentConfirm": "Voiding {number} voids the whole payment: every bill it was allocated to gets its balance back, and a reversing journal entry is posted.",
     "paymentVoided": "Payment voided",
-    "voidFailed": "Failed to void payment"
+    "voidFailed": "Failed to void payment",
+    "validation": {
+      "line": "Line {line}: {message}",
+      "quantityInvalid": "Quantity must be a non-negative number",
+      "quantityPositive": "Quantity must be greater than zero",
+      "rateInvalid": "Rate must be a non-negative number",
+      "taxInvalid": "Tax % must be a non-negative number"
+    }
   },
   "credits": {
     "title": "Vendor Credits",

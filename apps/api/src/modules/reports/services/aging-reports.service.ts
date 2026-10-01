@@ -1,3 +1,4 @@
+import { Decimal } from '@prisma/client/runtime/library';
 import { Injectable } from '@nestjs/common';
 import { ReadReplicaService } from '../../../prisma/read-replica.service';
 
@@ -274,20 +275,21 @@ export class AgingReportsService {
     const openingBills = await this.prisma.bill.findMany({
       where: { vendorId, organizationId, date: { lt: start }, deletedAt: null },
     });
+    // Payments count on their own date even if voided later; a void is a separate debit on the
+    // date it happened. Later corrections therefore never rewrite an earlier period.
     const openingPayments = await this.prisma.paymentMade.findMany({
-      // Voided payments are excluded; their correction is the linked ledger reversal.
-      where: { vendorId, organizationId, date: { lt: start }, deletedAt: null },
+      where: { vendorId, organizationId, date: { lt: start } },
+    });
+    const openingVoids = await this.prisma.paymentMade.findMany({
+      where: { vendorId, organizationId, deletedAt: { lt: start } },
     });
 
-    const openingBillTotal = openingBills.reduce(
-      (sum, b) => sum + parseFloat((b.total ?? b.grandTotal).toString()),
-      0,
-    );
-    const openingPaymentTotal = openingPayments.reduce(
-      (sum, p) => sum + parseFloat(p.amount.toString()),
-      0,
-    );
-    const openingBalance = openingBillTotal - openingPaymentTotal;
+    const sum = (values: Decimal[]): Decimal =>
+      values.reduce((acc, v) => acc.add(v), new Decimal(0));
+    const openingBalance = sum(openingBills.map((b) => b.total ?? b.grandTotal))
+      .sub(sum(openingPayments.map((p) => p.amount)))
+      .add(sum(openingVoids.map((p) => p.amount)))
+      .toNumber();
 
     // Period transactions
     const bills = await this.prisma.bill.findMany({
@@ -296,8 +298,12 @@ export class AgingReportsService {
     });
 
     const payments = await this.prisma.paymentMade.findMany({
-      where: { vendorId, organizationId, date: { gte: start, lte: end }, deletedAt: null },
+      where: { vendorId, organizationId, date: { gte: start, lte: end } },
       orderBy: { date: 'asc' },
+    });
+    const voids = await this.prisma.paymentMade.findMany({
+      where: { vendorId, organizationId, deletedAt: { gte: start, lte: end } },
+      orderBy: { deletedAt: 'asc' },
     });
 
     const transactions: StatementTransaction[] = [
@@ -305,7 +311,7 @@ export class AgingReportsService {
         date: b.date,
         type: 'Bill' as const,
         reference: b.billNumber,
-        debit: parseFloat((b.total ?? b.grandTotal).toString()),
+        debit: (b.total ?? b.grandTotal).toNumber(),
         credit: 0,
       })),
       ...payments.map((p) => ({
@@ -313,7 +319,14 @@ export class AgingReportsService {
         type: 'Payment' as const,
         reference: p.paymentNumber,
         debit: 0,
-        credit: parseFloat(p.amount.toString()),
+        credit: p.amount.toNumber(),
+      })),
+      ...voids.map((p) => ({
+        date: p.deletedAt as Date,
+        type: 'Payment Void' as const,
+        reference: p.paymentNumber,
+        debit: p.amount.toNumber(),
+        credit: 0,
       })),
     ].sort((a, b) => new Date(a.date as Date).getTime() - new Date(b.date as Date).getTime());
 
