@@ -113,7 +113,8 @@ export function BillForm({
             description: l.description,
             quantity: l.quantity,
             rate: l.rate,
-            taxRate: l.taxRate || '0',
+            // Scan review leaves an unresolved tax rate empty; do not default it to 0.
+            taxRate: l.taxRate ?? '0',
           }))
         : [{ description: '', quantity: '1', rate: '', taxRate: '0' }],
     },

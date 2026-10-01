@@ -27,11 +27,28 @@ import {
   type DocumentIntakeResult,
 } from '@/lib/hooks/use-ai-document-intake';
 import { useCreateVendor } from '@/lib/hooks/use-vendors';
+import { resolveScanLineTaxes, toDecimalString } from '@/lib/document-intake-tax';
 import { BillForm, type BillFormDefaultValues } from '@/components/purchases/bill-form';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
 type Step = 'upload' | 'processing' | 'review' | 'confirmed';
+
+interface UnresolvedTaxLine {
+  lineNumber: number;
+  description: string;
+  extractedTaxAmount: string | null;
+}
+
+/** BillForm submits parsed numbers; send them back to the API as decimal strings. */
+function toConfirmDecimal(value: unknown, field: string, lineNumber: number): string {
+  const text =
+    typeof value === 'number' || typeof value === 'string' ? toDecimalString(value) : null;
+  if (text === null) {
+    throw new Error(`Line ${lineNumber}: ${field} must be a non-negative number`);
+  }
+  return text;
+}
 
 export default function ScanBillPage() {
   const router = useRouter();
@@ -45,6 +62,8 @@ export default function ScanBillPage() {
   const [localError, setLocalError] = useState<string | null>(null);
   const [scanDefaults, setScanDefaults] = useState<BillFormDefaultValues | null>(null);
   const [scanMode, setScanMode] = useState<'fast' | 'slow'>('fast');
+  const [unresolvedTaxLines, setUnresolvedTaxLines] = useState<UnresolvedTaxLine[]>([]);
+  const [taxReviewed, setTaxReviewed] = useState(false);
 
   // SSE-based document intake
   const intake = useDocumentIntakeStream();
@@ -57,6 +76,30 @@ export default function ScanBillPage() {
       const result = intake.result;
       setLocalResult(result);
 
+      // Extraction yields tax AMOUNTS; the form takes a tax RATE (%). Derive the
+      // rate only when exact; otherwise leave it empty and flag it for review.
+      const lineItems = result.extractedFields.lineItems;
+      const taxes = resolveScanLineTaxes(lineItems, {
+        subtotal: result.extractedFields.subtotal,
+        tax: result.extractedFields.tax,
+      });
+      const unresolved: UnresolvedTaxLine[] =
+        lineItems.length > 0
+          ? lineItems.flatMap((item, i) =>
+              taxes[i].unresolved
+                ? [
+                    {
+                      lineNumber: i + 1,
+                      description: item.description,
+                      extractedTaxAmount: taxes[i].extractedTaxAmount,
+                    },
+                  ]
+                : [],
+            )
+          : [{ lineNumber: 1, description: '', extractedTaxAmount: null }];
+      setUnresolvedTaxLines(unresolved);
+      setTaxReviewed(false);
+
       setScanDefaults({
         vendorId: result.matchedVendor?.id || '',
         date: result.extractedFields.date || format(new Date(), 'yyyy-MM-dd'),
@@ -66,13 +109,13 @@ export default function ScanBillPage() {
         notes: '',
         lines:
           result.extractedFields.lineItems.length > 0
-            ? result.extractedFields.lineItems.map((item) => ({
+            ? lineItems.map((item, i) => ({
                 description: item.description,
-                quantity: String(item.quantity),
-                rate: String(item.unitPrice),
-                taxRate: String(item.taxAmount ?? 0),
+                quantity: toDecimalString(item.quantity) ?? '',
+                rate: toDecimalString(item.unitPrice) ?? '',
+                taxRate: taxes[i].taxRatePercent,
               }))
-            : [{ description: '', quantity: '1', rate: '', taxRate: '0' }],
+            : [{ description: '', quantity: '1', rate: '', taxRate: '' }],
       });
 
       setStep('review');
@@ -157,6 +200,13 @@ export default function ScanBillPage() {
 
   const handleConfirm = async (formData: Record<string, unknown>) => {
     setLocalError(null);
+    if (unresolvedTaxLines.length > 0 && !taxReviewed) {
+      setLocalError(
+        'Some tax rates could not be determined from the document. Review the tax % on the ' +
+          'flagged lines and tick the confirmation before creating the bill.',
+      );
+      return;
+    }
     try {
       const lines = (
         formData.lines as Array<{
@@ -167,11 +217,14 @@ export default function ScanBillPage() {
           rate: number;
           taxRate: number;
         }>
-      ).map((l) => ({
+      ).map((l, i) => ({
+        itemId: l.itemId || undefined,
+        accountId: l.accountId || undefined,
         description: l.description,
-        quantity: l.quantity,
-        rate: l.rate,
-        taxRate: l.taxRate,
+        quantity: toConfirmDecimal(l.quantity, 'quantity', i + 1),
+        rate: toConfirmDecimal(l.rate, 'rate', i + 1),
+        // The form field is a PERCENTAGE; reviewed lines send it explicitly.
+        taxRatePercent: toConfirmDecimal(l.taxRate, 'tax %', i + 1),
       }));
 
       const response = await confirmIntake.mutateAsync({
@@ -210,6 +263,8 @@ export default function ScanBillPage() {
     setLocalResult(null);
     setScanDefaults(null);
     setLocalError(null);
+    setUnresolvedTaxLines([]);
+    setTaxReviewed(false);
     intake.reset();
   };
 
@@ -437,6 +492,11 @@ export default function ScanBillPage() {
                 <p className="text-sm text-muted-foreground">
                   AI is processing your document. You&apos;ll see live progress below.
                 </p>
+                {intake.isReconnecting && (
+                  <p className="text-xs text-yellow-600" role="status">
+                    Connection interrupted — reconnecting...
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -638,6 +698,48 @@ export default function ScanBillPage() {
                     {result.accountingEntry.taxAccount || '-'}
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Unresolved tax rates — never defaulted to 0% */}
+          {unresolvedTaxLines.length > 0 && (
+            <Card className="border-yellow-500" data-testid="unresolved-tax">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-sm text-yellow-700">
+                  <AlertTriangle className="h-4 w-4" />
+                  Tax rate needs review
+                </CardTitle>
+                <CardDescription>
+                  The tax rate (%) could not be determined exactly from the document for these
+                  lines. Enter the correct tax % in the form (use 0 only if the line is untaxed).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <ul className="space-y-1">
+                  {unresolvedTaxLines.map((line) => (
+                    <li key={line.lineNumber} className="flex justify-between gap-4">
+                      <span>
+                        Line {line.lineNumber}
+                        {line.description ? `: ${line.description}` : ''}
+                      </span>
+                      <span className="font-mono text-muted-foreground">
+                        {line.extractedTaxAmount !== null
+                          ? `Extracted tax amount: ${line.extractedTaxAmount}`
+                          : 'No tax amount found'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={taxReviewed}
+                    onChange={(e) => setTaxReviewed(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  I have reviewed the tax % on these lines
+                </label>
               </CardContent>
             </Card>
           )}
