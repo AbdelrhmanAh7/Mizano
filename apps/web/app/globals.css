@@ -24,6 +24,21 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
+
+    /* Semantic status colors for badges, alerts and icons (soft: bg-success/10 + text-success) */
+    --success: 142.1 72.2% 29.2%;
+    --success-foreground: 0 0% 100%;
+    --warning: 26 90.5% 37.1%;
+    --warning-foreground: 0 0% 100%;
+    --info: 221.2 83.2% 53.3%;
+    --info-foreground: 210 40% 98%;
+
+    /* Categorical chart series (Recharts: fill="hsl(var(--chart-1))") */
+    --chart-1: 221.2 83.2% 53.3%;
+    --chart-2: 142.1 70.6% 45.3%;
+    --chart-3: 37.7 92.1% 50.2%;
+    --chart-4: 258.3 89.5% 66.3%;
+    --chart-5: 0 84.2% 60.2%;
   }
 
   .dark {
@@ -46,6 +61,19 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
+
+    --success: 142.1 70.6% 45.3%;
+    --success-foreground: 144.9 80.4% 10%;
+    --warning: 37.7 92.1% 50.2%;
+    --warning-foreground: 26 83.3% 14.1%;
+    --info: 213.1 93.9% 67.8%;
+    --info-foreground: 222.2 47.4% 11.2%;
+
+    --chart-1: 217.2 91.2% 59.8%;
+    --chart-2: 142.1 70.6% 45.3%;
+    --chart-3: 43.3 96.4% 56.3%;
+    --chart-4: 255.1 91.7% 76.3%;
+    --chart-5: 0 90.6% 70.8%;
   }
 }
 

@@ -130,10 +130,10 @@ export function BulkProgressDialog({
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {isRunning && <Loader2 className="h-5 w-5 animate-spin text-blue-500" />}
-            {isCompleted && !hasFailures && <CheckCircle2 className="h-5 w-5 text-green-500" />}
-            {isCompleted && hasFailures && <AlertCircle className="h-5 w-5 text-yellow-500" />}
-            {isFailed && <XCircle className="h-5 w-5 text-red-500" />}
+            {isRunning && <Loader2 className="h-5 w-5 animate-spin text-info" />}
+            {isCompleted && !hasFailures && <CheckCircle2 className="h-5 w-5 text-success" />}
+            {isCompleted && hasFailures && <AlertCircle className="h-5 w-5 text-warning" />}
+            {isFailed && <XCircle className="h-5 w-5 text-destructive" />}
             {isRunning
               ? `${actionLabel} ${itemType}...`
               : isCompleted
@@ -165,22 +165,22 @@ export function BulkProgressDialog({
 
           {/* Failures list */}
           {hasFailures && (
-            <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-900 dark:bg-yellow-950">
+            <div className="rounded-md border border-warning/30 bg-warning/10 p-3">
               <div className="flex items-center gap-2 mb-2">
-                <AlertCircle className="h-4 w-4 text-yellow-600" />
-                <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                <AlertCircle className="h-4 w-4 text-warning" />
+                <span className="text-sm font-medium text-warning">
                   {progress?.failures?.length} item
                   {(progress?.failures?.length ?? 0) > 1 ? 's' : ''} failed
                 </span>
               </div>
               <ul className="space-y-1 max-h-32 overflow-y-auto">
                 {progress?.failures?.slice(0, 10).map((failure, idx) => (
-                  <li key={idx} className="text-xs text-yellow-700 dark:text-yellow-300 truncate">
+                  <li key={idx} className="text-xs text-warning truncate">
                     {failure.reason}
                   </li>
                 ))}
                 {(progress?.failures?.length ?? 0) > 10 && (
-                  <li className="text-xs text-yellow-600 dark:text-yellow-400 italic">
+                  <li className="text-xs text-warning italic">
                     ...and {(progress?.failures?.length ?? 0) - 10} more
                   </li>
                 )}

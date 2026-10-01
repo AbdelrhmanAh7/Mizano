@@ -32,18 +32,18 @@ export function SortableHeader({
     <Button
       variant="ghost"
       size="sm"
-      className={cn('-ml-3 h-8', className)}
+      className={cn('-ms-3 h-8', className)}
       onClick={() => onSort(columnId)}
     >
       {label}
       {isActive ? (
         currentSortOrder === 'asc' ? (
-          <ArrowUp className="ml-2 h-4 w-4" />
+          <ArrowUp className="ms-2 h-4 w-4" />
         ) : (
-          <ArrowDown className="ml-2 h-4 w-4" />
+          <ArrowDown className="ms-2 h-4 w-4" />
         )
       ) : (
-        <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
+        <ArrowUpDown className="ms-2 h-4 w-4 opacity-50" />
       )}
     </Button>
   );
