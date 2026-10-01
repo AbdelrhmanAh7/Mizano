@@ -4,10 +4,25 @@
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
+    "^.+\\.(t|j)s$": [
+      "ts-jest",
+      {
+        "diagnostics": false,
+        "tsconfig": {
+          "types": ["jest", "node"],
+          "module": "commonjs",
+          "esModuleInterop": true,
+          "emitDecoratorMetadata": true,
+          "experimentalDecorators": true,
+          "skipLibCheck": true
+        }
+      }
+    ]
   },
   "moduleNameMapper": {
-    "^@/(.*)$": "<rootDir>/../src/$1"
+    "^@/(.*)$": "<rootDir>/../src/$1",
+    "^@mizano/shared-types$": "<rootDir>/../../../packages/shared-types/src/index.ts",
+    "^@mizano/validators$": "<rootDir>/../../../packages/validators/src/index.ts"
   },
-  "setupFilesAfterSetup": ["./setup-e2e.ts"]
+  "setupFilesAfterEnv": ["./setup-e2e.ts"]
 }
