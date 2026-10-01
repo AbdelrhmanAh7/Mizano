@@ -62,9 +62,13 @@ export function BulkActionConfirmDialog({
               onConfirm();
             }}
             disabled={isLoading}
-            className={destructive ? 'bg-red-600 hover:bg-red-700 focus:ring-red-600' : undefined}
+            className={
+              destructive
+                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:ring-destructive'
+                : undefined
+            }
           >
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isLoading && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
             {action.charAt(0).toUpperCase() + action.slice(1)} {count} {itemType}
           </AlertDialogAction>
         </AlertDialogFooter>

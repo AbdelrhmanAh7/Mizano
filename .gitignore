@@ -111,3 +111,4 @@ services/vlm-service/models/
 **/*.bin
 **/*.pt
 **/*.pth
+.claude/worktrees/

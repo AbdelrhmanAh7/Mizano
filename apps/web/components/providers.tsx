@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionProvider, signOut, useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
+import { Toaster as SonnerToaster } from 'sonner';
 import { Toaster } from '@/components/ui/toaster';
 
 /**
@@ -41,6 +42,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <SessionGuard>{children}</SessionGuard>
         <Toaster />
+        {/* Some hooks still call sonner's toast(); mount its viewport so those messages render */}
+        <SonnerToaster position="top-center" richColors closeButton />
       </QueryClientProvider>
     </SessionProvider>
   );

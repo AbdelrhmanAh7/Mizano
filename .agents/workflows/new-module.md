@@ -16,14 +16,15 @@ description: Scaffold a new NestJS backend module following Mizano conventions
    ```
    {module-name}/
    ├── {module-name}.module.ts
-   ├── {module-name}.controller.ts
-   ├── {module-name}.service.ts
-   ├── dto/
-   │   ├── create-{entity}.dto.ts
-   │   └── update-{entity}.dto.ts
-   └── tests/
-       └── {module-name}.service.spec.ts
+   ├── controllers/{entity}.controller.ts
+   ├── services/{entity}.service.ts
+   ├── services/{entity}.service.spec.ts
+   └── dto/
+       ├── create-{entity}.dto.ts
+       └── update-{entity}.dto.ts
    ```
+
+   Small single-entity modules may keep `{module-name}.controller.ts` / `{module-name}.service.ts` at the module root.
 
 3. Follow these conventions for each file:
 
@@ -31,9 +32,9 @@ description: Scaffold a new NestJS backend module following Mizano conventions
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
-import { {Name}Controller } from './{name}.controller';
-import { {Name}Service } from './{name}.service';
+import { PrismaModule } from '../../prisma/prisma.module';
+import { {Name}Controller } from './controllers/{name}.controller';
+import { {Name}Service } from './services/{name}.service';
 
 @Module({
   imports: [PrismaModule],
@@ -47,8 +48,11 @@ export class {Name}Module {}
 ### Controller File
 
 ```typescript
+// organizationId always comes from the verified JWT via @CurrentOrg()
+@ApiTags('{Name}')
+@ApiBearerAuth()
 @Controller('{resource}')
-@UseGuards(JwtAuthGuard, OrganizationGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class {Name}Controller {
   constructor(private readonly {name}Service: {Name}Service) {}
 
@@ -74,32 +78,35 @@ export class {Name}Controller {
 - Inject `PrismaService`
 - ALL queries MUST include `organizationId`
 - Use `prisma.$transaction()` for multi-table writes
-- Use `Decimal` for monetary values
+- Use `Decimal` (`DecimalUtils` in `common/utils/decimal.ts`) for money; accept/return decimal strings
+- Validate that every referenced ID (account, vendor, bill...) belongs to `organizationId`
+- Number documents with `DocumentNumberService`
 - Financial records: soft delete with `deletedAt`
 
-4. Add the Prisma model to `apps/api/prisma/schema.prisma` following conventions:
+4. Request the Prisma model from the schema owner (the coordinator owns `apps/api/prisma/schema.prisma` during the sprint), following conventions:
    - `id String @id @default(cuid())`
    - `organizationId String`
    - `createdAt DateTime @default(now())`
    - `updatedAt DateTime @updatedAt`
    - `@@index([organizationId, createdAt])`
+   - money: `Decimal @db.Decimal(19, 4)`; financial records: `deletedAt DateTime?`
 
 5. Register the module in `apps/api/src/app.module.ts`
 
 6. Generate Prisma client:
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm db:generate
+pnpm db:generate
 ```
 
-7. Push schema changes:
+7. Create a migration against your dedicated local database only:
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm db:push
+pnpm db:migrate
 ```
 
 8. Run lint and type-check to verify:
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm --filter api lint && pnpm type-check
+pnpm --filter api lint && pnpm type-check
 ```

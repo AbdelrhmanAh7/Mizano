@@ -23,7 +23,7 @@ pnpm dev              # Web :5001 + API :6001
 pnpm dev:api / dev:web
 pnpm build / lint / type-check
 pnpm db:generate / db:push / db:migrate / db:seed / db:studio
-pnpm test / test:api / test:cov / test:e2e / test:playwright
+pnpm test / test:api / test:web / test:cov / test:e2e
 pnpm ci:full          # lint + type-check + test + e2e (MUST pass)
 pnpm docker:up / docker:down / docker:prod
 pnpm env:check        # verify env file for current APP_ENV
@@ -38,7 +38,7 @@ pnpm env:check        # verify env file for current APP_ENV
 | `.env.sit`   | sit     | production  | Integration testing |
 | `.env.prod`  | prod    | production  | Production          |
 
-API resolves: `.env.${APP_ENV}` → `.env`. See `docs/environment-guide.md`.
+API resolves: `.env.${APP_ENV}` → `.env`. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#environments).
 
 ## Project Structure
 
@@ -57,7 +57,7 @@ mizano/
 ├── packages/
 │   ├── shared-types/           # Shared TypeScript types
 │   └── validators/             # Shared Zod schemas
-└── docs/                       # Architecture, API, DB, testing guides
+└── docs/                       # ARCHITECTURE, DEVELOPMENT, DESIGN-SYSTEM, roadmap, strategy
 ```
 
 ## Critical Architecture Rules
@@ -210,7 +210,7 @@ All workflows are in `.agents/workflows/`. Use these commands for full project c
 | ---------------- | --------------------------------------------------- |
 | `/dev`           | Start dev servers (Docker + Web :5001 + API :6001)  |
 | `/build`         | Build for any environment (local/dev/sit/prod)      |
-| `/test`          | Run tests (unit/e2e/playwright/coverage/watch)      |
+| `/test`          | Run tests (unit/e2e/coverage/watch)                 |
 | `/lint`          | Lint + type-check + format (with auto-fix option)   |
 | `/ci`            | Full CI pipeline (lint → type-check → test → e2e)   |
 | `/db`            | Database ops (generate/push/migrate/seed/reset)     |
@@ -270,11 +270,11 @@ services (Docker) → ollama-proxy:11434 → Cloudflare tunnel → Colab (Ollama
 
 ## Docs Reference
 
-| File                        | Contents                            |
-| --------------------------- | ----------------------------------- |
-| `docs/architecture.md`      | System design, data flow, layers    |
-| `docs/modules.md`           | All 28 modules documented in detail |
-| `docs/environment-guide.md` | 4-env system setup                  |
-| `docs/testing-strategy.md`  | Test plan, pyramid, coverage goals  |
-| `docs/roadmap.md`           | 5-phase product roadmap             |
-
+| File                                                                   | Contents                                                            |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                         | System design, modules, domain rules, folder structure, adding code |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)                           | Setup, 4-env system, database, testing, CI, hooks, deployment       |
+| [`docs/DESIGN-SYSTEM.md`](docs/DESIGN-SYSTEM.md)                       | Tokens, components, UI patterns, RTL, money display                 |
+| [`docs/roadmap.md`](docs/roadmap.md)                                   | Ten-day CPU invoice demo plan                                       |
+| [`docs/strategy/demo-acceptance.md`](docs/strategy/demo-acceptance.md) | Demo go/no-go contract                                              |
+| [`docs/strategy/`](docs/strategy/)                                     | Vision, repository review, extraction and regional research         |

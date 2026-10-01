@@ -90,7 +90,7 @@ export function JournalForm({
 
   // Calculate totals
   const lines = form.watch('lines');
-  const { totalDebit, totalCredit, isBalanced } = calculateJournalTotals(lines);
+  const { totalDebit, totalCredit, difference, isBalanced } = calculateJournalTotals(lines);
 
   const handleSubmit = (data: JournalFormData) => {
     if (!isBalanced) {
@@ -280,8 +280,7 @@ export function JournalForm({
                 ) : (
                   <>
                     <X className="h-4 w-4" />
-                    Unbalanced (Difference:{' '}
-                    {formatJournalAmount(Math.abs(totalDebit - totalCredit))})
+                    Unbalanced (Difference: {formatJournalAmount(difference)})
                   </>
                 )}
               </div>

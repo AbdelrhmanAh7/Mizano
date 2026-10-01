@@ -13,7 +13,7 @@ This runs the same checks as the GitHub CI workflow. ALL must pass with **zero w
 1. Run the full CI pipeline:
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm ci:full
+pnpm ci:full
 ```
 
 This runs sequentially: `lint` → `type-check` → `test` → `format` → `test:e2e`
@@ -23,31 +23,31 @@ This runs sequentially: `lint` → `type-check` → `test` → `format` → `tes
 ### Step 1: Lint
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm lint
+pnpm lint
 ```
 
 ### Step 2: Type-Check
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm type-check
+pnpm type-check
 ```
 
 ### Step 3: Unit Tests
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm test
+pnpm test
 ```
 
 ### Step 4: Format Check
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm format:check
+pnpm format:check
 ```
 
 ### Step 5: E2E Tests
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm test:e2e
+pnpm test:e2e
 ```
 
 3. Fix any issues found and re-run until all pass.

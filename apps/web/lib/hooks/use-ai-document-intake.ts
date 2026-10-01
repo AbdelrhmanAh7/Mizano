@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { getSession } from 'next-auth/react';
 import api from '@/lib/api';
 
 // ============ Types ============
@@ -30,7 +31,8 @@ export interface IntakeLineItem {
   description: string;
   quantity: number;
   unitPrice: number;
-  taxAmount: number;
+  /** Extracted tax AMOUNT (not a rate); may be missing or 0 when not found. */
+  taxAmount: number | null;
   total: number;
 }
 
@@ -86,13 +88,20 @@ export interface DocumentIntakeResult {
   } | null;
 }
 
+/**
+ * Confirm line. Money travels as decimal strings; `taxRatePercent` is a
+ * percentage ("14" => 14%), never a tax amount. It must be explicit ("0" for
+ * no tax) unless `taxRateId` is given — the API rejects unresolved tax.
+ */
 export interface ConfirmIntakeLineData {
   itemId?: string;
   accountId?: string;
+  taxRateId?: string;
   description: string;
-  quantity: number;
-  rate: number;
-  taxRate?: number;
+  quantity: string;
+  rate: string;
+  taxRatePercent?: string;
+  discountPercent?: string;
 }
 
 export interface ConfirmIntakeData {
@@ -116,7 +125,7 @@ export interface ConfirmIntakeResponse {
   number: string;
 }
 
-interface IntakeProgressEvent {
+export interface IntakeProgressEvent {
   stage: IntakeStage;
   progress: number;
   message?: string;
@@ -134,8 +143,18 @@ const documentIntakeApi = {
     });
     return response.data;
   },
-  getResult: async (jobId: string) => {
-    const response = await api.get(`/ai/document-intake/${jobId}/result`);
+  getResult: async (
+    jobId: string,
+  ): Promise<{
+    data: {
+      jobId: string;
+      status: IntakeStage;
+      progress: number;
+      result: DocumentIntakeResult | null;
+      error: string | null;
+    };
+  }> => {
+    const response = await api.get(`/ai/document-intake/${encodeURIComponent(jobId)}/result`);
     return response.data;
   },
   confirmIntake: async (data: ConfirmIntakeData) => {
@@ -156,86 +175,216 @@ export function useDocumentIntakeProcess() {
   });
 }
 
+/** Poll interval and tolerance for the polling fallback. */
+const POLL_INTERVAL_MS = 2000;
+const MAX_CONSECUTIVE_POLL_FAILURES = 5;
+
+export class IntakeStreamHttpError extends Error {
+  constructor(public readonly status: number) {
+    super(`Progress stream failed with HTTP ${status}`);
+    this.name = 'IntakeStreamHttpError';
+  }
+}
+
+async function getAccessToken(): Promise<string | null> {
+  const session = (await getSession()) as { accessToken?: unknown } | null;
+  return typeof session?.accessToken === 'string' ? session.accessToken : null;
+}
+
 /**
- * SSE-based document intake with real-time progress.
- * POST file → get jobId → open SSE → stream progress events.
+ * Parse an SSE byte stream and invoke `onEvent` for each `data:` payload.
+ * Handles events split across chunks and multi-line `data:` fields.
+ * Resolves when the stream ends; rejects on read errors.
  */
-export function useDocumentIntakeStream() {
+export async function readSseStream(
+  body: ReadableStream<Uint8Array>,
+  onEvent: (data: string) => void,
+): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let dataLines: string[] = [];
+
+  const flushEvent = (): void => {
+    if (dataLines.length > 0) {
+      onEvent(dataLines.join('\n'));
+      dataLines = [];
+    }
+  };
+
+  const handleLine = (rawLine: string): void => {
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+    if (line === '') {
+      flushEvent();
+    } else if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).replace(/^ /, ''));
+    }
+    // `event:`, `id:`, `retry:` and comments are not needed by this client.
+  };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    lines.forEach(handleLine);
+  }
+  buffer += decoder.decode();
+  if (buffer) handleLine(buffer);
+  flushEvent();
+}
+
+/**
+ * Document intake with real-time progress.
+ * POST file → jobId → authenticated fetch() SSE stream (EventSource cannot send
+ * the Authorization header). If the stream fails or ends early, falls back to
+ * polling GET /:jobId/result through the authenticated API client.
+ */
+export function useDocumentIntakeStream(): {
+  processDocument: (formData: FormData) => Promise<void>;
+  stage: IntakeStage | null;
+  progress: number;
+  message: string | null;
+  result: DocumentIntakeResult | null;
+  error: string | null;
+  isProcessing: boolean;
+  isReconnecting: boolean;
+  reset: () => void;
+} {
   const [stage, setStage] = useState<IntakeStage | null>(null);
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [result, setResult] = useState<DocumentIntakeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
-    };
+  const stopAll = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
   }, []);
 
+  // Cleanup on unmount
+  useEffect(() => stopAll, [stopAll]);
+
   const reset = useCallback(() => {
+    stopAll();
     setStage(null);
     setProgress(0);
     setMessage(null);
     setResult(null);
     setError(null);
     setIsProcessing(false);
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-  }, []);
+    setIsReconnecting(false);
+  }, [stopAll]);
 
-  const handleProgressEvent = useCallback((event: IntakeProgressEvent) => {
+  /** Apply an event; returns true when the job reached a terminal state. */
+  const handleProgressEvent = useCallback((event: IntakeProgressEvent): boolean => {
     setStage(event.stage);
     setProgress(event.progress);
     if (event.message) setMessage(event.message);
 
-    if (event.stage === 'complete' && event.result) {
-      setResult(event.result);
+    if (event.stage === 'complete') {
+      if (event.result) setResult(event.result);
+      else setError('Processing finished without a result');
       setIsProcessing(false);
-    } else if (event.stage === 'error') {
+      setIsReconnecting(false);
+      return true;
+    }
+    if (event.stage === 'error') {
       setError(event.error || 'Processing failed');
       setIsProcessing(false);
+      setIsReconnecting(false);
+      return true;
     }
+    return false;
   }, []);
 
-  const startPollingFallback = useCallback(
-    (jobId: string) => {
-      pollIntervalRef.current = setInterval(async () => {
+  const fail = useCallback((msg: string) => {
+    setError(msg);
+    setStage('error');
+    setIsProcessing(false);
+    setIsReconnecting(false);
+  }, []);
+
+  const startPolling = useCallback(
+    (jobId: string, signal: AbortSignal) => {
+      setIsReconnecting(true);
+      let failures = 0;
+
+      const poll = async (): Promise<void> => {
+        if (signal.aborted) return;
         try {
           const response = await documentIntakeApi.getResult(jobId);
           const job = response.data;
-          handleProgressEvent({
+          failures = 0;
+          setIsReconnecting(false);
+          const terminal = handleProgressEvent({
             stage: job.status,
             progress: job.progress,
-            result: job.result,
-            error: job.error,
+            result: job.result ?? undefined,
+            error: job.error ?? undefined,
           });
-          if (job.status === 'complete' || job.status === 'error') {
-            if (pollIntervalRef.current) {
-              clearInterval(pollIntervalRef.current);
-              pollIntervalRef.current = null;
-            }
+          if (terminal) return;
+        } catch (err) {
+          const status = (err as { response?: { status?: number } }).response?.status;
+          if (status === 404) {
+            fail('This scan is no longer available. Please upload the document again.');
+            return;
           }
-        } catch {
-          // Ignore polling errors
+          failures += 1;
+          if (failures >= MAX_CONSECUTIVE_POLL_FAILURES) {
+            fail('Lost connection while processing the document. Please try again.');
+            return;
+          }
+          setIsReconnecting(true);
         }
-      }, 2000);
+        if (!signal.aborted) {
+          pollTimerRef.current = setTimeout(() => void poll(), POLL_INTERVAL_MS);
+        }
+      };
+
+      void poll();
+    },
+    [handleProgressEvent, fail],
+  );
+
+  const streamProgress = useCallback(
+    async (jobId: string, signal: AbortSignal): Promise<boolean> => {
+      const token = await getAccessToken();
+      const baseUrl = api.defaults.baseURL || '';
+      const response = await fetch(
+        `${baseUrl}/ai/document-intake/${encodeURIComponent(jobId)}/progress`,
+        {
+          headers: {
+            Accept: 'text/event-stream',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          signal,
+        },
+      );
+      if (!response.ok || !response.body) {
+        throw new IntakeStreamHttpError(response.status);
+      }
+
+      let terminal = false;
+      await readSseStream(response.body, (data) => {
+        try {
+          const parsed = JSON.parse(data) as IntakeProgressEvent;
+          if (handleProgressEvent(parsed)) terminal = true;
+        } catch {
+          // Ignore malformed events; polling will reconcile state if the stream ends early.
+        }
+      });
+      return terminal;
     },
     [handleProgressEvent],
   );
@@ -248,52 +397,37 @@ export function useDocumentIntakeStream() {
       setProgress(5);
       setMessage('Uploading document...');
 
+      let jobId: string;
       try {
         // Step 1: POST file → get jobId
         const response = await documentIntakeApi.processDocument(formData);
-        const jobId: string = response.data.jobId;
-
-        // Step 2: Open SSE connection for real-time progress
-        const baseUrl = api.defaults.baseURL || '';
-        const sseUrl = `${baseUrl}/ai/document-intake/${jobId}/progress`;
-
-        try {
-          const es = new EventSource(sseUrl);
-          eventSourceRef.current = es;
-
-          es.addEventListener('progress', (event: Event) => {
-            const messageEvent = event as MessageEvent;
-            try {
-              const parsed = JSON.parse(messageEvent.data) as IntakeProgressEvent;
-              handleProgressEvent(parsed);
-
-              if (parsed.stage === 'complete' || parsed.stage === 'error') {
-                es.close();
-                eventSourceRef.current = null;
-              }
-            } catch {
-              // Ignore parse errors
-            }
-          });
-
-          es.onerror = () => {
-            es.close();
-            eventSourceRef.current = null;
-            // Fall back to polling if SSE fails
-            startPollingFallback(jobId);
-          };
-        } catch {
-          // SSE not supported — fall back to polling
-          startPollingFallback(jobId);
-        }
+        jobId = response.data.jobId;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        setError(msg || 'Failed to process document');
-        setIsProcessing(false);
-        setStage('error');
+        fail(msg || 'Failed to process document');
+        return;
+      }
+
+      // Step 2: authenticated progress stream, polling as the reconnect path
+      const controller = new AbortController();
+      abortRef.current = controller;
+      try {
+        const terminal = await streamProgress(jobId, controller.signal);
+        if (!terminal && !controller.signal.aborted) {
+          startPolling(jobId, controller.signal);
+        }
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        if (err instanceof IntakeStreamHttpError && err.status === 404) {
+          fail('This scan is no longer available. Please upload the document again.');
+          return;
+        }
+        // Network drop, 401 (token refresh is handled by the API client), proxy
+        // buffering, etc. — continue via polling.
+        startPolling(jobId, controller.signal);
       }
     },
-    [reset, handleProgressEvent, startPollingFallback],
+    [reset, fail, streamProgress, startPolling],
   );
 
   return {
@@ -304,6 +438,7 @@ export function useDocumentIntakeStream() {
     result,
     error,
     isProcessing,
+    isReconnecting,
     reset,
   };
 }

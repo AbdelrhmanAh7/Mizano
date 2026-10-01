@@ -2,13 +2,30 @@
 
 import { useToast } from '@/components/ui/use-toast';
 import { journalsApi } from '@/lib/api';
+import { absDecimal, compareDecimals, decimalToDisplayNumber, sumDecimals } from '@/lib/decimal';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
 type ApiError = { response?: { data?: { message?: string } } };
 
 export type JournalStatus = 'DRAFT' | 'POSTED' | 'VOIDED';
+
+/** Business events that post journals (mirrors the API's JournalSourceType). */
+export type JournalSourceType =
+  | 'BILL_APPROVAL'
+  | 'PAYMENT_MADE'
+  | 'PAYMENT_MADE_VOID'
+  | 'INVOICE_SEND'
+  | 'INVOICE_VOID'
+  | 'PAYMENT_RECEIVED'
+  | 'PAYMENT_RECEIVED_VOID'
+  | 'CREDIT_NOTE'
+  | 'EXPENSE'
+  | 'VENDOR_CREDIT'
+  | 'VAT_RETURN'
+  | 'INVENTORY_ADJUSTMENT'
+  | 'OPENING_BALANCE';
 
 export interface JournalLine {
   id?: string;
@@ -39,8 +56,14 @@ export interface Journal {
   updatedAt: string;
   deletedAt: string | null;
   lines: JournalLine[];
-  totalDebit?: number;
-  totalCredit?: number;
+  /** Decimal strings computed by the API. */
+  totalDebit?: string;
+  totalCredit?: string;
+  /** Business event that produced this journal (null for manual entries). */
+  sourceType?: JournalSourceType | string | null;
+  sourceId?: string | null;
+  /** Set on a reversal journal: the journal it reverses. */
+  reversalOfId?: string | null;
 }
 
 export interface JournalParams {
@@ -49,8 +72,6 @@ export interface JournalParams {
   search?: string;
   dateFrom?: string;
   dateTo?: string;
-  isPosted?: boolean;
-  status?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -84,7 +105,7 @@ type RawJournal = Omit<Journal, 'entryDate' | 'description' | 'status'>;
 /**
  * Transform raw journal data to include computed fields
  */
-function transformJournal(journal: RawJournal): Journal {
+export function transformJournal(journal: RawJournal): Journal {
   const status: JournalStatus = journal.deletedAt
     ? 'VOIDED'
     : journal.isPosted
@@ -100,23 +121,14 @@ function transformJournal(journal: RawJournal): Journal {
 }
 
 /**
- * Hook to fetch all journals with pagination
+ * Hook to fetch all journals with pagination.
+ * The API filters by search and date only (no status filter; unknown params are rejected).
  */
 export function useJournals(params?: JournalParams) {
   return useQuery({
     queryKey: ['journals', params],
     queryFn: async () => {
-      // Convert status to isPosted for API
-      const apiParams = { ...params };
-      if (params?.status === 'DRAFT') {
-        apiParams.isPosted = false;
-        delete apiParams.status;
-      } else if (params?.status === 'POSTED') {
-        apiParams.isPosted = true;
-        delete apiParams.status;
-      }
-
-      const response = await journalsApi.getAll(apiParams);
+      const response = await journalsApi.getAll(params);
       const data = response.data;
 
       // Transform journals to include computed status
@@ -175,7 +187,7 @@ export function useCreateJournal() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['journals'] });
+      void invalidateLedgerQueries(queryClient);
       toast({
         title: 'Journal created',
         description: 'The journal entry has been created successfully.',
@@ -192,7 +204,7 @@ export function useCreateJournal() {
 }
 
 /**
- * Hook to update an existing journal
+ * Hook to update an existing journal (manual drafts only; the API rejects posted/system ones)
  */
 export function useUpdateJournal() {
   const queryClient = useQueryClient();
@@ -222,11 +234,10 @@ export function useUpdateJournal() {
 }
 
 /**
- * Hook to delete a journal
+ * Hook to delete a journal (manual drafts only). Toasts are left to the caller.
  */
 export function useDeleteJournal() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -235,77 +246,69 @@ export function useDeleteJournal() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['journals'] });
-      toast({
-        title: 'Journal deleted',
-        description: 'The journal entry has been deleted successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error deleting journal',
-        description: error.response?.data?.message || 'An error occurred',
-      });
     },
   });
 }
 
 /**
- * Hook to post a journal (mark as posted)
+ * Hook to post a journal (mark as posted). Toasts are left to the caller.
  */
 export function usePostJournal() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (id: string) => {
       const response = await journalsApi.post(id);
       return response.data;
     },
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['journals'] });
-      queryClient.invalidateQueries({ queryKey: ['journals', id] });
-      toast({
-        title: 'Journal posted',
-        description: 'The journal entry has been posted successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error posting journal',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    onSuccess: () => invalidateLedgerQueries(queryClient),
   });
 }
 
 /**
- * Calculate totals from journal lines
+ * Hook to reverse a posted journal. Resolves with the new reversal journal.
+ * Toasts are left to the caller (translated messages).
  */
-export function calculateJournalTotals(lines: Array<{ debit: string; credit: string }>) {
-  const totalDebit = lines.reduce((sum, line) => sum + parseFloat(line.debit || '0'), 0);
-  const totalCredit = lines.reduce((sum, line) => sum + parseFloat(line.credit || '0'), 0);
-  const difference = Math.abs(totalDebit - totalCredit);
-  const isBalanced = difference < 0.0001;
+export function useReverseJournal() {
+  const queryClient = useQueryClient();
 
+  return useMutation({
+    mutationFn: async ({ id, date }: { id: string; date?: string }): Promise<Journal> => {
+      const response = await journalsApi.reverse(id, date ? { date } : undefined);
+      return transformJournal(response.data as RawJournal);
+    },
+    onSuccess: () => invalidateLedgerQueries(queryClient),
+  });
+}
+
+/**
+ * Exact totals of journal lines (decimal strings, BigInt arithmetic — never floats).
+ */
+export function calculateJournalTotals(lines: Array<{ debit?: string; credit?: string }>): {
+  totalDebit: string;
+  totalCredit: string;
+  difference: string;
+  isBalanced: boolean;
+} {
+  const totalDebit = sumDecimals(lines.map((l) => l.debit || '0'));
+  const totalCredit = sumDecimals(lines.map((l) => l.credit || '0'));
   return {
     totalDebit,
     totalCredit,
-    difference,
-    isBalanced,
+    difference: absDecimal(sumDecimals([totalDebit, `-${totalCredit}`])),
+    isBalanced: compareDecimals(totalDebit, totalCredit) === 0,
   };
 }
 
 /**
- * Format currency for display
+ * Format a journal amount for display (2 decimals). Display only — never use for arithmetic.
  */
-export function formatJournalAmount(amount: number | string): string {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
+export function formatJournalAmount(amount: number | string, locale = 'en-US'): string {
+  const num = typeof amount === 'string' ? decimalToDisplayNumber(amount) : amount;
+  return new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(num);
+  }).format(Number.isFinite(num) ? num : 0);
 }
 
 /**
@@ -313,11 +316,16 @@ export function formatJournalAmount(amount: number | string): string {
  */
 export function getStatusColor(status: JournalStatus): string {
   const colorMap: Record<JournalStatus, string> = {
-    DRAFT: 'bg-yellow-100 text-yellow-800',
-    POSTED: 'bg-green-100 text-green-800',
-    VOIDED: 'bg-red-100 text-red-800',
+    DRAFT: 'border-border bg-muted text-muted-foreground',
+    POSTED: 'border-success/20 bg-success/10 text-success',
+    VOIDED: 'border-border bg-muted text-muted-foreground line-through',
   };
-  return colorMap[status] || 'bg-gray-100 text-gray-800';
+  return colorMap[status] || 'border-border bg-muted text-muted-foreground';
+}
+
+/** Badge variant for a journal status (design-system tokens). */
+export function getJournalStatusVariant(status: JournalStatus): 'muted' | 'success' {
+  return status === 'POSTED' ? 'success' : 'muted';
 }
 
 /**
@@ -328,4 +336,106 @@ export function getJournalStatus(journal: Journal): { label: string; color: stri
     label: journal.status,
     color: getStatusColor(journal.status),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Posting rules (mirror the API: posted history is immutable)
+// ---------------------------------------------------------------------------
+
+type JournalPostingState = Pick<Journal, 'isPosted' | 'deletedAt'> & {
+  sourceType?: string | null;
+  reversalOfId?: string | null;
+};
+
+/** Manual, unposted journals are the only ones that may be edited, posted or deleted. */
+export function isJournalEditable(journal: JournalPostingState): boolean {
+  return !journal.isPosted && !journal.sourceType && !journal.deletedAt;
+}
+
+/** True for journals generated by a business document (bill, payment, invoice, ...). */
+export function isSystemJournal(journal: { sourceType?: string | null }): boolean {
+  return !!journal.sourceType;
+}
+
+/**
+ * Posted journals are corrected by a linked reversal. A reversal itself cannot be reversed;
+ * the API also rejects journals that were already reversed.
+ */
+export function canReverseJournal(journal: JournalPostingState): boolean {
+  return journal.isPosted && !journal.reversalOfId && !journal.deletedAt;
+}
+
+export interface JournalSourceInfo {
+  /** i18n key under accounting.journals.source */
+  labelKey: string;
+  /** Link to the source document when one exists. */
+  href?: string;
+}
+
+const SOURCE_LINKS: Partial<Record<JournalSourceType, (id: string) => string>> = {
+  BILL_APPROVAL: (id) => `/purchases/bills/${id}`,
+  PAYMENT_MADE: (id) => `/purchases/payments/${id}`,
+  INVOICE_SEND: (id) => `/sales/invoices/${id}`,
+  INVOICE_VOID: (id) => `/sales/invoices/${id}`,
+  PAYMENT_RECEIVED: (id) => `/sales/payments/${id}`,
+  CREDIT_NOTE: (id) => `/sales/credit-notes/${id}`,
+  EXPENSE: (id) => `/purchases/expenses/${id}`,
+  VENDOR_CREDIT: (id) => `/purchases/credits/${id}`,
+};
+
+const SOURCE_LABEL_KEYS: Record<JournalSourceType, string> = {
+  BILL_APPROVAL: 'billApproval',
+  PAYMENT_MADE: 'paymentMade',
+  PAYMENT_MADE_VOID: 'paymentMadeVoid',
+  INVOICE_SEND: 'invoice',
+  INVOICE_VOID: 'invoiceVoid',
+  PAYMENT_RECEIVED: 'paymentReceived',
+  PAYMENT_RECEIVED_VOID: 'paymentReceivedVoid',
+  CREDIT_NOTE: 'creditNote',
+  EXPENSE: 'expense',
+  VENDOR_CREDIT: 'vendorCredit',
+  VAT_RETURN: 'vatReturn',
+  INVENTORY_ADJUSTMENT: 'inventoryAdjustment',
+  OPENING_BALANCE: 'openingBalance',
+};
+
+/** Label key (under accounting.journals.source) and source-document link for a journal. */
+export function getJournalSourceInfo(journal: {
+  sourceType?: string | null;
+  sourceId?: string | null;
+  reversalOfId?: string | null;
+}): JournalSourceInfo {
+  const type = journal.sourceType as JournalSourceType | null | undefined;
+  if (type && type in SOURCE_LABEL_KEYS) {
+    const link = SOURCE_LINKS[type];
+    return {
+      labelKey: SOURCE_LABEL_KEYS[type],
+      href: link && journal.sourceId ? link(journal.sourceId) : undefined,
+    };
+  }
+  if (type) return { labelKey: 'system' };
+  return { labelKey: journal.reversalOfId ? 'reversal' : 'manual' };
+}
+
+// ---------------------------------------------------------------------------
+// Ledger cache invalidation
+// ---------------------------------------------------------------------------
+
+/** Every query whose data changes when something is posted to (or reversed in) the ledger. */
+export const LEDGER_QUERY_KEYS: string[][] = [
+  ['bills'],
+  ['payments-made'],
+  ['vendors'],
+  ['journals'],
+  ['accounts'],
+  ['accounting-reports'],
+  ['reports'],
+  ['dashboard'],
+];
+
+/** Invalidates every ledger-dependent query (documents, journals, balances, reports). */
+export function invalidateLedgerQueries(queryClient: QueryClient): Promise<void> {
+  return Promise.all(
+    LEDGER_QUERY_KEYS.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+  ).then(() => undefined);
 }

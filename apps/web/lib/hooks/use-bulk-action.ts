@@ -4,6 +4,32 @@ import { useToast } from '@/components/ui/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 
+interface BulkFailure {
+  id: string;
+  reason: string;
+}
+
+interface BulkOutcome {
+  processed: number;
+  failures: BulkFailure[];
+}
+
+/** Reads the API's per-record bulk result ({ processed, total, failures }), possibly wrapped in { data }. */
+export function readBulkOutcome(result: unknown, requested: number): BulkOutcome {
+  const body =
+    result && typeof result === 'object' && 'data' in result
+      ? (result as { data: unknown }).data
+      : result;
+  if (body && typeof body === 'object' && 'processed' in body) {
+    const { processed, failures } = body as { processed: unknown; failures?: unknown };
+    return {
+      processed: typeof processed === 'number' ? processed : 0,
+      failures: Array.isArray(failures) ? (failures as BulkFailure[]) : [],
+    };
+  }
+  return { processed: requested, failures: [] };
+}
+
 interface UseBulkActionOptions<TResult = unknown> {
   /** The async function that performs the bulk action */
   mutationFn: (ids: string[]) => Promise<TResult>;
@@ -35,10 +61,22 @@ export function useBulkAction<TResult = unknown>({
       for (const key of queryKeys) {
         queryClient.invalidateQueries({ queryKey: key });
       }
-      toast({
-        title: 'Success',
-        description: successMessage.replace('{count}', String(ids.length)),
-      });
+      const { processed, failures } = readBulkOutcome(result, ids.length);
+      if (failures.length === 0) {
+        toast({
+          title: 'Success',
+          description: successMessage.replace('{count}', String(processed)),
+        });
+      } else {
+        const reasons = Array.from(new Set(failures.map((f) => f.reason)))
+          .slice(0, 3)
+          .join('; ');
+        toast({
+          title: processed > 0 ? 'Partially completed' : 'Nothing was processed',
+          description: `${processed} of ${processed + failures.length} succeeded. ${failures.length} failed: ${reasons}`,
+          variant: processed > 0 ? 'default' : 'destructive',
+        });
+      }
       setSelectedIds([]);
       onSuccess?.(result);
     },

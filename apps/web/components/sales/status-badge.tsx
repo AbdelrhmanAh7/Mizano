@@ -103,7 +103,7 @@ export function StatusBadge({
   className,
   strikethrough = false,
 }: StatusBadgeProps) {
-  const color = colorMap[status] || 'bg-gray-100 text-gray-800 border-gray-200';
+  const color = colorMap[status] || 'bg-muted text-muted-foreground border-border';
   const label = labelMap[status] || status;
 
   return (

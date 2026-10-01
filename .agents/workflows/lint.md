@@ -11,44 +11,44 @@ description: Run linting, type-checking, and formatting with optional auto-fix
 1. Run ESLint across all workspaces:
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm lint
+pnpm lint
 ```
 
 2. To auto-fix lint issues:
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm lint:fix
+pnpm lint:fix
 ```
 
 3. Run TypeScript type-checking:
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm type-check
+pnpm type-check
 ```
 
 4. Check formatting (Prettier):
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm format:check
+pnpm format:check
 ```
 
 5. Auto-fix formatting:
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm format
+pnpm format
 ```
 
 6. Run lint + type-check together (validate):
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm validate
+pnpm validate
 ```
 
 ### Lint Specific Workspace
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm --filter api lint
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm --filter @mizano/web lint
+pnpm --filter api lint
+pnpm --filter @mizano/web lint
 ```
 
 ## Zero-Tolerance Rules

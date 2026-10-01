@@ -2,13 +2,44 @@
 
 import { useToast } from '@/components/ui/use-toast';
 import { billsApi } from '@/lib/api';
+import { decimalToDisplayNumber } from '@/lib/decimal';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 type ApiError = { response?: { data?: { message?: string } } };
 
-// Types
-export type BillStatus = 'DRAFT' | 'OPEN' | 'OVERDUE' | 'PARTIAL' | 'PAID' | 'VOID';
+// Types — mirror the API's BillStatus enum exactly.
+export type BillStatus =
+  | 'DRAFT'
+  | 'PENDING'
+  | 'OPEN'
+  | 'PARTIALLY_PAID'
+  | 'PAID'
+  | 'OVERDUE'
+  | 'VOID';
+
+export const BILL_STATUSES: BillStatus[] = [
+  'DRAFT',
+  'PENDING',
+  'OPEN',
+  'PARTIALLY_PAID',
+  'OVERDUE',
+  'PAID',
+  'VOID',
+];
+
+/** Statuses the API accepts payments against (POST /payments-made). */
+export const PAYABLE_BILL_STATUSES: BillStatus[] = ['OPEN', 'PARTIALLY_PAID', 'OVERDUE'];
+
+export function isBillPayable(bill: Pick<Bill, 'status'>): boolean {
+  return PAYABLE_BILL_STATUSES.includes(bill.status);
+}
+
+/** Approval posts the bill to the ledger; anything past DRAFT/PENDING has a posted journal. */
+export function isBillPosted(bill: Pick<Bill, 'status'>): boolean {
+  return bill.status !== 'DRAFT' && bill.status !== 'PENDING' && bill.status !== 'VOID';
+}
 
 export interface BillLine {
   id?: string;
@@ -29,6 +60,14 @@ export interface BillLine {
     code: string;
     name: string;
   } | null;
+}
+
+export interface BillAllocationRecord {
+  id: string;
+  paymentId: string;
+  billId: string;
+  /** Decimal string */
+  amount: string;
 }
 
 export interface Bill {
@@ -54,9 +93,11 @@ export interface Bill {
   vendor?: {
     id: string;
     name: string;
-    currency: string;
+    currency?: string;
   };
   lines?: BillLine[];
+  /** Includes allocations of voided payments; match against live payments before display. */
+  billAllocations?: BillAllocationRecord[];
   project?: {
     id: string;
     name: string;
@@ -68,30 +109,45 @@ export interface BillParams {
   limit?: number;
   search?: string;
   vendorId?: string;
-  status?: BillStatus;
-  startDate?: string;
-  endDate?: string;
+  /** One status or a comma-separated list (e.g. "OPEN,PARTIALLY_PAID,OVERDUE"). */
+  status?: string;
+  hasBalance?: boolean | string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
 
+interface CreateBillLineData {
+  itemId?: string | null;
+  accountId?: string | null;
+  description: string;
+  /** Decimal strings — the API rejects JS numbers for money. */
+  quantity: string;
+  rate: string;
+  /** Percent as a decimal string ("" = unresolved). */
+  taxRate?: string;
+}
+
 interface CreateBillData {
   vendorId: string;
+  billNumber?: string;
   date: string;
   dueDate: string;
-  lines: Array<{
-    itemId?: string | null;
-    accountId?: string | null;
-    description: string;
-    quantity: number;
-    rate: number;
-    taxRate?: number;
-  }>;
+  reference?: string | null;
+  currencyCode?: string | null;
+  lines: CreateBillLineData[];
   notes?: string | null;
   projectId?: string | null;
 }
 
-interface UpdateBillData extends Partial<CreateBillData> {}
+type UpdateBillData = Partial<CreateBillData>;
+
+/** Document currency for display: bill currency, then vendor currency, then fallback. */
+export function billCurrency(
+  bill: Pick<Bill, 'currencyCode' | 'vendor'>,
+  fallback = 'USD',
+): string {
+  return bill.currencyCode || bill.vendor?.currency || fallback;
+}
 
 /**
  * Hook to fetch all bills with pagination
@@ -143,15 +199,15 @@ export function useCreateBill() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (data: CreateBillData) => {
+    mutationFn: async (data: CreateBillData): Promise<Bill> => {
       const response = await billsApi.create(data);
-      return response.data;
+      return response.data as Bill;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bills'] });
       toast({
         title: 'Bill created',
-        description: 'The bill has been created successfully.',
+        description: 'The bill has been saved as a draft.',
       });
     },
     onError: (error: ApiError) => {
@@ -195,33 +251,27 @@ export function useUpdateBill() {
 }
 
 /**
- * Hook to open a bill (change status from DRAFT to OPEN)
+ * Hook to approve a draft bill: POST /bills/:id/approve posts Dr expense / Dr VAT receivable /
+ * Cr AP dated on the bill date. Errors (missing default accounts, locked period, already
+ * approved) are surfaced by the caller with the server's message.
  */
-export function useOpenBill() {
+export function useApproveBill() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await billsApi.open(id);
-      return response.data;
+    mutationFn: async (id: string): Promise<Bill> => {
+      const response = await billsApi.approve(id);
+      return response.data as Bill;
     },
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['bills'] });
-      queryClient.invalidateQueries({ queryKey: ['bills', id] });
-      toast({
-        title: 'Bill opened',
-        description: 'The bill is now open and ready for payment.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error opening bill',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
+    onSuccess: () => invalidateLedgerQueries(queryClient),
   });
+}
+
+/**
+ * @deprecated "Open" is the same accounting event as approval; use useApproveBill.
+ */
+export function useOpenBill() {
+  return useApproveBill();
 }
 
 /**
@@ -229,7 +279,6 @@ export function useOpenBill() {
  */
 export function useDeleteBill() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -238,17 +287,6 @@ export function useDeleteBill() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bills'] });
-      toast({
-        title: 'Bill deleted',
-        description: 'The bill has been deleted successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error deleting bill',
-        description: error.response?.data?.message || 'An error occurred',
-      });
     },
   });
 }
@@ -282,59 +320,63 @@ export function useCloneBill() {
   });
 }
 
+export type BillBadgeVariant = 'muted' | 'info' | 'warning' | 'success' | 'destructive';
+
+const BILL_STATUS_BADGES: Record<BillStatus, { variant: BillBadgeVariant; labelKey: string }> = {
+  DRAFT: { variant: 'muted', labelKey: 'draft' },
+  PENDING: { variant: 'info', labelKey: 'pending' },
+  OPEN: { variant: 'info', labelKey: 'open' },
+  PARTIALLY_PAID: { variant: 'warning', labelKey: 'partiallyPaid' },
+  OVERDUE: { variant: 'destructive', labelKey: 'overdue' },
+  PAID: { variant: 'success', labelKey: 'paid' },
+  VOID: { variant: 'muted', labelKey: 'void' },
+};
+
+/**
+ * Badge variant and i18n key (under purchases.bills.status) for a bill status, following the
+ * design-system accounting status mapping.
+ */
+export function getBillStatusBadge(status: string): {
+  variant: BillBadgeVariant;
+  labelKey: string;
+} {
+  return BILL_STATUS_BADGES[status as BillStatus] ?? { variant: 'muted', labelKey: 'unknown' };
+}
+
 /**
  * Get status badge variant
  */
-export function getStatusVariant(
-  status: BillStatus,
-): 'default' | 'secondary' | 'destructive' | 'outline' {
-  switch (status) {
-    case 'DRAFT':
-      return 'secondary';
-    case 'OPEN':
-      return 'default';
-    case 'OVERDUE':
-      return 'destructive';
-    case 'PARTIAL':
-      return 'outline';
-    case 'PAID':
-      return 'default';
-    case 'VOID':
-      return 'secondary';
-    default:
-      return 'secondary';
-  }
+export function getStatusVariant(status: BillStatus | string): BillBadgeVariant {
+  return getBillStatusBadge(status).variant;
 }
 
 /**
- * Get status display text
+ * Get status display text (English fallback; prefer t(`bills.status.${labelKey}`))
  */
-export function getStatusText(status: BillStatus): string {
-  switch (status) {
-    case 'DRAFT':
-      return 'Draft';
-    case 'OPEN':
-      return 'Open';
-    case 'OVERDUE':
-      return 'Overdue';
-    case 'PARTIAL':
-      return 'Partial';
-    case 'PAID':
-      return 'Paid';
-    case 'VOID':
-      return 'Void';
-    default:
-      return status;
-  }
+export function getStatusText(status: BillStatus | string): string {
+  const labels: Record<string, string> = {
+    DRAFT: 'Draft',
+    PENDING: 'Pending',
+    OPEN: 'Open',
+    PARTIALLY_PAID: 'Partially Paid',
+    OVERDUE: 'Overdue',
+    PAID: 'Paid',
+    VOID: 'Void',
+  };
+  return labels[status] ?? status;
 }
 
 /**
- * Format currency amount
+ * Format currency amount (display only; value stays a decimal string elsewhere)
  */
-export function formatCurrency(amount: string | number, currency: string = 'USD'): string {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
+export function formatCurrency(
+  amount: string | number,
+  currency: string = 'USD',
+  locale = 'en-US',
+): string {
+  const num = typeof amount === 'string' ? decimalToDisplayNumber(amount) : amount;
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,
-  }).format(num);
+  }).format(Number.isFinite(num) ? num : 0);
 }

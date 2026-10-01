@@ -96,10 +96,10 @@ export function PhoneInput({
           value={phoneNumber}
           onChange={handlePhoneChange}
           disabled={disabled}
-          className={!isValid ? 'border-red-500 focus-visible:ring-red-500' : ''}
+          className={!isValid ? 'border-destructive focus-visible:ring-destructive' : ''}
         />
         {!isValid && phoneNumber && (
-          <p className="text-xs text-red-500 mt-1">
+          <p className="text-xs text-destructive mt-1">
             Phone number should be {country.phoneLength.join(' or ')} digits for {country.name}
           </p>
         )}

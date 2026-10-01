@@ -23,16 +23,13 @@ docker-compose ps
 3. Start all dev servers (Web :5001 + API :6001):
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm dev
+pnpm dev
 ```
 
 **Note:** To start individual services instead:
 
 - API only: `pnpm dev:api`
 - Web only: `pnpm dev:web`
-- OCR service: `pnpm dev:ocr`
-- VLM service: `pnpm dev:vlm`
-- With OCR: `pnpm dev:with-ocr`
 
 4. Health check — verify API is responding:
 
@@ -54,5 +51,3 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:5001 || echo "Web not re
 | API        | 6001 |
 | PostgreSQL | 5435 |
 | Redis      | 6380 |
-| OCR        | 7001 |
-| VLM        | 8100 |

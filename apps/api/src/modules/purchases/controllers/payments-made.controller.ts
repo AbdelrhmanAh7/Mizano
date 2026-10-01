@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -13,9 +14,10 @@ import {
   CacheResponse,
   CacheTTL,
   CurrentOrg,
-  InvalidateCache,
+  InvalidatesLedger,
   Permissions,
 } from '../../../common/decorators';
+import { BulkIdsDto } from '../../../common/dto/bulk-ids.dto';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -34,7 +36,7 @@ export class PaymentsMadeController {
 
   @Post()
   @Permissions('purchases.create')
-  @InvalidateCache('payments-made:*', 'bills:*')
+  @InvalidatesLedger('payments-made:*', 'bills:*')
   create(@CurrentOrg() orgId: string, @Body() dto: CreatePaymentMadeDto) {
     return this.paymentsMadeService.create(orgId, dto);
   }
@@ -49,9 +51,9 @@ export class PaymentsMadeController {
 
   @Post('bulk-delete')
   @Permissions('purchases.delete')
-  @InvalidateCache('payments-made:*')
-  @ApiOperation({ summary: 'Bulk delete payments made' })
-  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  @InvalidatesLedger('payments-made:*', 'bills:*')
+  @ApiOperation({ summary: 'Bulk void payments made (restores bill balances, reverses journals)' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.paymentsMadeService.bulkDelete(orgId, dto.ids);
   }
 
@@ -66,5 +68,13 @@ export class PaymentsMadeController {
   @Permissions('purchases.view')
   findOne(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.paymentsMadeService.findOne(orgId, id);
+  }
+
+  @Delete(':id')
+  @Permissions('purchases.delete')
+  @InvalidatesLedger('payments-made:*', 'bills:*')
+  @ApiOperation({ summary: 'Void a payment (restores bill balances, reverses journal)' })
+  void(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.paymentsMadeService.void(orgId, id);
   }
 }

@@ -1,6 +1,11 @@
 import { Body, Controller, Get, Param, Post, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentOrg, InvalidateCache, Permissions } from '../../../common/decorators';
+import {
+  CurrentOrg,
+  InvalidateCache,
+  InvalidatesLedger,
+  Permissions,
+} from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
@@ -30,7 +35,14 @@ export class ReconciliationController {
 
   @Post('confirm')
   @Permissions('banking.edit')
-  @InvalidateCache('reconciliation:*', 'bank-transactions:*')
+  @InvalidatesLedger(
+    'reconciliation:*',
+    'bank-transactions:*',
+    'bills:*',
+    'payments-made:*',
+    'invoices:*',
+    'payments-received:*',
+  )
   @ApiOperation({ summary: 'Confirm reconciliation match' })
   confirmMatch(
     @CurrentOrg() orgId: string,

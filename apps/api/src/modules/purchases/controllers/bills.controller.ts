@@ -17,6 +17,7 @@ import {
   CurrentOrg,
   HttpCache,
   InvalidateCache,
+  InvalidatesLedger,
   Permissions,
 } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -28,6 +29,9 @@ import { CheckDuplicateBillDto } from '../dto/check-duplicate-bill.dto';
 import { CreateBillDto } from '../dto/create-bill.dto';
 import { UpdateBillDto } from '../dto/update-bill.dto';
 import { BillsService } from '../services/bills.service';
+import { PaymentsMadeService } from '../services/payments-made.service';
+import { BulkPayBillsDto } from '../dto/bulk-pay-bills.dto';
+import { BulkIdsDto } from '../../../common/dto/bulk-ids.dto';
 
 @ApiTags('Bills')
 @ApiBearerAuth()
@@ -35,7 +39,10 @@ import { BillsService } from '../services/bills.service';
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @UseInterceptors(CacheInvalidationInterceptor)
 export class BillsController {
-  constructor(private readonly billsService: BillsService) {}
+  constructor(
+    private readonly billsService: BillsService,
+    private readonly paymentsMadeService: PaymentsMadeService,
+  ) {}
 
   @Post('check-duplicate')
   @Permissions('purchases.create')
@@ -86,7 +93,7 @@ export class BillsController {
 
   @Patch(':id/open')
   @Permissions('purchases.edit')
-  @InvalidateCache('bills:*')
+  @InvalidatesLedger('bills:*')
   @ApiOperation({ summary: 'Open a draft bill (change status DRAFT → OPEN)' })
   open(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.billsService.open(orgId, id);
@@ -102,7 +109,7 @@ export class BillsController {
 
   @Post(':id/approve')
   @Permissions('purchases.edit')
-  @InvalidateCache('bills:*')
+  @InvalidatesLedger('bills:*')
   @ApiOperation({ summary: 'Approve bill' })
   approve(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.billsService.approve(orgId, id);
@@ -121,31 +128,33 @@ export class BillsController {
   @Permissions('purchases.delete')
   @InvalidateCache('bills:*')
   @ApiOperation({ summary: 'Bulk delete draft bills' })
-  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.billsService.bulkDelete(orgId, dto.ids);
   }
 
   @Post('bulk-open')
   @Permissions('purchases.edit')
-  @InvalidateCache('bills:*')
-  @ApiOperation({ summary: 'Bulk open draft bills' })
-  bulkOpen(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  @InvalidatesLedger('bills:*')
+  @ApiOperation({ summary: 'Bulk open (approve and post) draft bills' })
+  bulkOpen(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.billsService.bulkOpen(orgId, dto.ids);
   }
 
   @Post('bulk-approve')
   @Permissions('purchases.edit')
-  @InvalidateCache('bills:*')
+  @InvalidatesLedger('bills:*')
   @ApiOperation({ summary: 'Bulk approve draft bills' })
-  bulkApprove(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  bulkApprove(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.billsService.bulkApprove(orgId, dto.ids);
   }
 
   @Post('bulk-pay')
-  @Permissions('purchases.edit')
-  @InvalidateCache('bills:*')
-  @ApiOperation({ summary: 'Bulk mark bills as paid' })
-  bulkPay(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
-    return this.billsService.bulkPay(orgId, dto.ids);
+  // Records real payments: same permission as creating a payment.
+  @Permissions('purchases.create')
+  @InvalidatesLedger('bills:*', 'payments-made:*')
+  @ApiOperation({ summary: 'Pay the full balance of each bill (records real payments)' })
+  bulkPay(@CurrentOrg() orgId: string, @Body() dto: BulkPayBillsDto) {
+    const { ids, ...options } = dto;
+    return this.paymentsMadeService.bulkPayBills(orgId, ids, options);
   }
 }

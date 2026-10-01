@@ -23,7 +23,7 @@ interface MoneyInputProps extends Omit<
  *
  * - Accepts only valid numeric input (digits, single decimal point)
  * - Shows currency prefix
- * - Right-aligns the value for readability
+ * - End-aligns the value (right in LTR, left in RTL) with tabular digits
  * - Stores value as string to avoid float precision issues
  *
  * Usage:
@@ -67,7 +67,7 @@ export function MoneyInput({
   return (
     <div className="relative">
       {currency && (
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+        <span className="absolute start-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
           {currency}
         </span>
       )}
@@ -77,7 +77,7 @@ export function MoneyInput({
         inputMode="decimal"
         value={value}
         onChange={handleChange}
-        className={cn('text-right', currency && 'pl-14', className)}
+        className={cn('text-end tabular-nums', currency && 'ps-14', className)}
       />
     </div>
   );

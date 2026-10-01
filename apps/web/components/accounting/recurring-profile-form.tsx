@@ -98,7 +98,7 @@ export function RecurringProfileForm({
 
   // Calculate totals
   const lines = form.watch('lines');
-  const { totalDebit, totalCredit, isBalanced } = calculateJournalTotals(lines);
+  const { totalDebit, totalCredit, difference, isBalanced } = calculateJournalTotals(lines);
 
   const handleSubmit = (data: ProfileFormData) => {
     if (!isBalanced) {
@@ -340,8 +340,7 @@ export function RecurringProfileForm({
                 ) : (
                   <>
                     <X className="h-4 w-4" />
-                    Unbalanced (Difference:{' '}
-                    {formatJournalAmount(Math.abs(totalDebit - totalCredit))})
+                    Unbalanced (Difference: {formatJournalAmount(difference)})
                   </>
                 )}
               </div>

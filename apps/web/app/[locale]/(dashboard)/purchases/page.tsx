@@ -52,7 +52,7 @@ export default function PurchasesPage() {
 
   const unpaidBills = bills.filter(
     (b: { status: string }) =>
-      b.status === 'OPEN' || b.status === 'OVERDUE' || b.status === 'PARTIAL',
+      b.status === 'OPEN' || b.status === 'OVERDUE' || b.status === 'PARTIALLY_PAID',
   );
 
   const now = new Date();
@@ -276,7 +276,7 @@ export default function PurchasesPage() {
                                 | 'DRAFT'
                                 | 'OPEN'
                                 | 'OVERDUE'
-                                | 'PARTIAL'
+                                | 'PARTIALLY_PAID'
                                 | 'PAID'
                                 | 'VOID',
                             )}

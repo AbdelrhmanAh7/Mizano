@@ -745,15 +745,33 @@ export class OrganizationsService {
     // Get the template accounts based on templateId
     const accounts = this.getTemplateAccounts(templateId);
 
-    // Create all accounts
-    for (const account of accounts) {
-      await this.prisma.account.create({
+    // Create all accounts and link organization defaults in one transaction
+    await this.prisma.$transaction(async (tx) => {
+      const created: { id: string; code: string }[] = [];
+      for (const account of accounts) {
+        created.push(
+          await tx.account.create({
+            data: { ...account, organizationId: orgId },
+            select: { id: true, code: true },
+          }),
+        );
+      }
+
+      const idFor = (code: string): string | undefined => created.find((a) => a.code === code)?.id;
+      await tx.organization.update({
+        where: { id: orgId },
         data: {
-          ...account,
-          organizationId: orgId,
+          defaultCashAccountId: idFor('1000'),
+          defaultBankAccountId: idFor('1110'),
+          defaultArAccountId: idFor('1200'),
+          defaultApAccountId: idFor('2000'),
+          defaultVatPayableAccountId: idFor('2200'),
+          defaultVatReceivableAccountId: idFor('2300'),
+          defaultRevenueAccountId: idFor('4100'),
+          defaultSalesReturnsAccountId: idFor('4400'),
         },
       });
-    }
+    });
   }
 
   private getTemplateAccounts(_templateId: string) {
@@ -809,7 +827,6 @@ export class OrganizationsService {
       code: acc.code,
       name: acc.name,
       type: acc.type as import('@prisma/client').AccountType,
-      isParent: acc.isParent || false,
       isActive: true,
     }));
   }

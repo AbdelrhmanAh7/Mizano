@@ -77,7 +77,7 @@ function BillsPageContent() {
     { value: 'DRAFT', label: t('bills.status.draft') },
     { value: 'OPEN', label: t('bills.status.open') },
     { value: 'OVERDUE', label: t('bills.status.overdue') },
-    { value: 'PARTIAL', label: t('bills.status.partiallyPaid') },
+    { value: 'PARTIALLY_PAID', label: t('bills.status.partiallyPaid') },
     { value: 'PAID', label: t('bills.status.paid') },
   ];
 
@@ -135,7 +135,7 @@ function BillsPageContent() {
   const bulkOpenAction = useBulkAction({
     mutationFn: (ids) => billsApi.bulkOpen(ids).then((r) => r.data),
     queryKeys: [['bills']],
-    successMessage: '{count} bills opened',
+    successMessage: '{count} bills approved and posted',
   });
 
   const bulkApproveAction = useBulkAction({
@@ -147,7 +147,7 @@ function BillsPageContent() {
   const bulkPayAction = useBulkAction({
     mutationFn: (ids) => billsApi.bulkPay(ids).then((r) => r.data),
     queryKeys: [['bills']],
-    successMessage: '{count} bills marked as paid',
+    successMessage: '{count} bills paid (payments recorded)',
   });
 
   const bulkActions = [
@@ -557,7 +557,7 @@ function BillsPageContent() {
         action="approve"
         count={bulkSelectedRows.length}
         itemType="bills"
-        description="Open bills will be approved for payment."
+        description="Draft bills will be approved and posted to the ledger (expense, VAT and accounts payable)."
         isLoading={bulkApproveAction.isLoading}
         onConfirm={async () => {
           await bulkApproveAction.execute(bulkSelectedRows.map((r) => r.id));
@@ -571,7 +571,7 @@ function BillsPageContent() {
         action="mark as paid"
         count={bulkSelectedRows.length}
         itemType="bills"
-        description="Bills will be marked as fully paid with balance set to zero."
+        description="A payment for the full remaining balance will be recorded for each bill from the default bank account and posted to the ledger."
         isLoading={bulkPayAction.isLoading}
         onConfirm={async () => {
           await bulkPayAction.execute(bulkSelectedRows.map((r) => r.id));

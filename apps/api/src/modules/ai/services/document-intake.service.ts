@@ -1,4 +1,5 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -16,6 +17,7 @@ import {
 import { extractTextFromPdf } from '../utils/pdf-extractor.util';
 import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.util';
 import { BoundedCache } from '../utils/bounded-cache.util';
+import { computeDocumentTotals } from '../../../common/utils/document-totals';
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -112,16 +114,22 @@ export interface DocumentIntakeResult {
   extractionMethod: 'ollama-vision' | 'ollama-text' | 'ocr-llm' | 'hybrid-ocr' | 'hybrid-vlm';
 }
 
-export interface ConfirmIntakeLineDto {
+/**
+ * Confirm payload. Money and percentages travel as decimal strings; the
+ * `taxRatePercent` is a percentage (14 => 14%), never a tax amount.
+ */
+export interface ConfirmIntakeLineInput {
   itemId?: string;
   accountId?: string;
+  taxRateId?: string;
   description: string;
-  quantity: number;
-  rate: number;
-  taxRate?: number;
+  quantity: string;
+  rate: string;
+  taxRatePercent?: string;
+  discountPercent?: string;
 }
 
-export interface ConfirmIntakeDto {
+export interface ConfirmIntakeInput {
   type: 'BILL' | 'INVOICE';
   vendorId?: string;
   customerId?: string;
@@ -130,11 +138,32 @@ export interface ConfirmIntakeDto {
   documentNumber?: string;
   reference?: string;
   currencyCode?: string;
-  lines: ConfirmIntakeLineDto[];
+  lines: ConfirmIntakeLineInput[];
   notes?: string;
   projectId?: string;
   /** User corrections for AI learning */
   corrections?: Record<string, unknown>;
+}
+
+/** A confirmed line after tenant validation and Decimal computation. */
+interface ResolvedIntakeLine {
+  itemId: string | null;
+  accountId: string | null;
+  taxRateId: string | null;
+  description: string;
+  quantity: Decimal;
+  rate: Decimal;
+  taxRatePercent: Decimal;
+  discountPercent: Decimal;
+  netAmount: Decimal;
+  taxAmount: Decimal;
+}
+
+interface ResolvedIntakeDocument {
+  lines: ResolvedIntakeLine[];
+  subtotal: Decimal;
+  taxAmount: Decimal;
+  grandTotal: Decimal;
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +188,11 @@ export interface IntakeProgressEvent {
 
 export interface IntakeJob {
   jobId: string;
+  /** Tenant that owns the job. Jobs are never visible to another organization. */
+  organizationId: string;
+  /** User who uploaded the document (audit only). */
+  userId: string;
+  forceType: 'BILL' | 'INVOICE' | null;
   status: IntakeStage;
   progress: number;
   result: DocumentIntakeResult | null;
@@ -168,6 +202,10 @@ export interface IntakeJob {
 
 /** Truncate PDF raw text to this length before sending to Ollama (speeds up inference). */
 const PDF_TEXT_TRUNCATION_LIMIT = 4000;
+
+function uniqueIds(values: Array<string | undefined>): string[] {
+  return [...new Set(values.filter((v): v is string => typeof v === 'string' && v.length > 0))];
+}
 
 // ---------------------------------------------------------------------------
 // Service
@@ -200,17 +238,29 @@ export class DocumentIntakeService {
    * Returns a jobId immediately so the caller can stream progress via SSE.
    */
   processDocumentAsync(
-    organizationId: string,
+    owner: { organizationId: string; userId: string },
     fileBuffer: Buffer,
     mimeType: string,
-    filename?: string,
-    language: string = 'eng+ara',
-    strategy?: string,
+    options: {
+      filename?: string;
+      language?: string;
+      strategy?: string;
+      forceType?: 'BILL' | 'INVOICE';
+    } = {},
   ): string {
-    const jobId = `intake_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const { organizationId, userId } = owner;
+    if (!organizationId || !userId) {
+      throw new BadRequestException('Authenticated organization and user are required');
+    }
+    const { filename, language = 'eng+ara', strategy, forceType } = options;
+    // Unguessable job id; ownership is still enforced on every lookup.
+    const jobId = `intake_${randomUUID()}`;
 
     const job: IntakeJob = {
       jobId,
+      organizationId,
+      userId,
+      forceType: forceType ?? null,
       status: 'received',
       progress: 5,
       result: null,
@@ -236,9 +286,16 @@ export class DocumentIntakeService {
     return jobId;
   }
 
-  /** Retrieve a job by ID. */
-  getJob(jobId: string): IntakeJob | undefined {
-    return this.jobs.get(jobId);
+  /**
+   * Retrieve a job owned by the given organization.
+   * Returns undefined both when the job does not exist and when it belongs to
+   * another tenant, so callers respond 404 and never leak job existence.
+   */
+  getJob(jobId: string, organizationId: string): IntakeJob | undefined {
+    if (!organizationId) return undefined;
+    const job = this.jobs.get(jobId);
+    if (!job || job.organizationId !== organizationId) return undefined;
+    return job;
   }
 
   private emitProgress(jobId: string, event: IntakeProgressEvent): void {
@@ -288,7 +345,10 @@ export class DocumentIntakeService {
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Async intake pipeline failed for job ${jobId}: ${msg}`);
+      // Extractor errors may quote document text; log the error type only.
+      this.logger.error(
+        `Async intake pipeline failed for job ${jobId}: ${error instanceof Error ? error.name : 'unknown error'}`,
+      );
       this.emitProgress(jobId, {
         stage: 'error',
         progress: 0,
@@ -315,8 +375,9 @@ export class DocumentIntakeService {
     onProgress?: (stage: IntakeStage, progress: number, message: string) => void,
     strategy?: string,
   ): Promise<DocumentIntakeResult> {
+    // Log metadata only — never file names, document text or extracted values.
     this.logger.log(
-      `Processing document intake: mime=${mimeType}, size=${fileBuffer.length}, file=${filename || 'unknown'}, strategy=${strategy || 'default'}`,
+      `Processing document intake: org=${organizationId}, mime=${mimeType}, size=${fileBuffer.length}, strategy=${strategy || 'default'}`,
     );
 
     let rawText = '';
@@ -353,7 +414,9 @@ export class DocumentIntakeService {
           }
         }
       } catch (error) {
-        this.logger.warn(`PDF text extraction failed: ${error}`);
+        this.logger.warn(
+          `PDF text extraction failed: ${error instanceof Error ? error.name : 'unknown error'}`,
+        );
       }
     }
 
@@ -501,81 +564,232 @@ export class DocumentIntakeService {
 
   /**
    * Confirm extracted data and create a draft Bill or Invoice.
+   *
+   * Every referenced id (party, project, item, account, tax rate) is verified to
+   * belong to `organizationId` before anything is written; a foreign or unknown
+   * id is rejected with 400 and no mutation. Totals come from the shared Decimal
+   * calculator: `taxRatePercent` is a percentage, line `amount` is the net.
    */
   async confirmAndCreate(
     organizationId: string,
-    dto: ConfirmIntakeDto,
+    dto: ConfirmIntakeInput,
   ): Promise<{ type: 'bill' | 'invoice'; id: string; number: string }> {
+    if (!organizationId) {
+      throw new BadRequestException('Organization context is required');
+    }
     if (dto.type === 'BILL') {
       return this.createDraftBill(organizationId, dto);
-    } else {
+    }
+    if (dto.type === 'INVOICE') {
       return this.createDraftInvoice(organizationId, dto);
     }
+    throw new BadRequestException('type must be BILL or INVOICE');
   }
 
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
 
+  /**
+   * Validate tenant ownership of every referenced id and compute totals.
+   * Read-only: performs no writes.
+   */
+  private async resolveConfirmation(
+    organizationId: string,
+    dto: ConfirmIntakeInput,
+  ): Promise<ResolvedIntakeDocument> {
+    if (!Array.isArray(dto.lines) || dto.lines.length === 0) {
+      throw new BadRequestException('At least one line is required');
+    }
+    for (const field of ['date', 'dueDate'] as const) {
+      const value = dto[field];
+      if (!value || isNaN(new Date(value).getTime())) {
+        throw new BadRequestException(`${field} must be a valid date`);
+      }
+    }
+
+    // Party
+    if (dto.type === 'BILL') {
+      if (!dto.vendorId) {
+        throw new BadRequestException('Vendor is required to create a bill');
+      }
+      const vendor = await this.prisma.vendor.findFirst({
+        where: { id: dto.vendorId, organizationId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!vendor) {
+        throw new BadRequestException('vendorId does not reference a vendor in this organization');
+      }
+    } else {
+      if (!dto.customerId) {
+        throw new BadRequestException('Customer is required to create an invoice');
+      }
+      const customer = await this.prisma.customer.findFirst({
+        where: { id: dto.customerId, organizationId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!customer) {
+        throw new BadRequestException(
+          'customerId does not reference a customer in this organization',
+        );
+      }
+    }
+
+    if (dto.projectId) {
+      const project = await this.prisma.project.findFirst({
+        where: { id: dto.projectId, organizationId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!project) {
+        throw new BadRequestException(
+          'projectId does not reference a project in this organization',
+        );
+      }
+    }
+
+    const itemIds = uniqueIds(dto.lines.map((l) => l.itemId));
+    const accountIds = uniqueIds(dto.lines.map((l) => l.accountId));
+    const taxRateIds = uniqueIds(dto.lines.map((l) => l.taxRateId));
+
+    if (itemIds.length > 0) {
+      const items = await this.prisma.item.findMany({
+        where: { id: { in: itemIds }, organizationId, deletedAt: null },
+        select: { id: true },
+      });
+      if (items.length !== itemIds.length) {
+        throw new BadRequestException('itemId does not reference an item in this organization');
+      }
+    }
+
+    if (accountIds.length > 0) {
+      const accounts = await this.prisma.account.findMany({
+        where: { id: { in: accountIds }, organizationId, deletedAt: null, isActive: true },
+        select: { id: true },
+      });
+      if (accounts.length !== accountIds.length) {
+        throw new BadRequestException(
+          'accountId does not reference an active account in this organization',
+        );
+      }
+    }
+
+    const taxRatePercentById = new Map<string, Decimal>();
+    if (taxRateIds.length > 0) {
+      const taxRates = await this.prisma.taxRate.findMany({
+        where: { id: { in: taxRateIds }, organizationId, deletedAt: null, isActive: true },
+        select: { id: true, rate: true },
+      });
+      if (taxRates.length !== taxRateIds.length) {
+        throw new BadRequestException(
+          'taxRateId does not reference an active tax rate in this organization',
+        );
+      }
+      for (const tr of taxRates) taxRatePercentById.set(tr.id, new Decimal(tr.rate.toString()));
+    }
+
+    // Per-line tax/discount resolution. Unresolved tax is an error, never a silent 0.
+    const prepared = dto.lines.map((line, index) => {
+      const lineNo = index + 1;
+      const discountPercent = new Decimal(line.discountPercent || '0');
+      if (dto.type === 'BILL' && !discountPercent.isZero()) {
+        throw new BadRequestException(
+          `Line ${lineNo}: line discounts are not supported on bills; enter the net rate`,
+        );
+      }
+
+      let taxRatePercent: Decimal | null =
+        line.taxRatePercent !== undefined && line.taxRatePercent !== ''
+          ? new Decimal(line.taxRatePercent)
+          : null;
+      if (line.taxRateId) {
+        const recordPercent = taxRatePercentById.get(line.taxRateId);
+        if (!recordPercent) {
+          throw new BadRequestException(`Line ${lineNo}: unknown taxRateId`);
+        }
+        if (taxRatePercent && !taxRatePercent.equals(recordPercent)) {
+          throw new BadRequestException(
+            `Line ${lineNo}: taxRatePercent does not match the selected tax rate`,
+          );
+        }
+        taxRatePercent = recordPercent;
+      }
+      if (taxRatePercent === null) {
+        throw new BadRequestException(
+          `Line ${lineNo}: tax rate is unresolved; provide taxRatePercent (use "0" for no tax) or taxRateId`,
+        );
+      }
+
+      return {
+        itemId: line.itemId || null,
+        accountId: line.accountId || null,
+        taxRateId: line.taxRateId || null,
+        description: line.description,
+        quantity: new Decimal(line.quantity),
+        rate: new Decimal(line.rate),
+        taxRatePercent,
+        discountPercent,
+      };
+    });
+
+    const totals = computeDocumentTotals(
+      prepared.map((l) => ({
+        quantity: l.quantity,
+        rate: l.rate,
+        taxRatePercent: l.taxRatePercent,
+        discountPercent: l.discountPercent,
+      })),
+    );
+
+    return {
+      lines: prepared.map((l, i) => ({
+        ...l,
+        netAmount: totals.lines[i].netAmount,
+        taxAmount: totals.lines[i].taxAmount,
+      })),
+      subtotal: totals.subtotal,
+      taxAmount: totals.taxAmount,
+      grandTotal: totals.grandTotal,
+    };
+  }
+
   private async createDraftBill(
     organizationId: string,
-    dto: ConfirmIntakeDto,
+    dto: ConfirmIntakeInput,
   ): Promise<{ type: 'bill'; id: string; number: string }> {
-    if (!dto.vendorId) {
-      throw new BadRequestException('Vendor is required to create a bill');
-    }
-
-    const vendor = await this.prisma.vendor.findFirst({
-      where: { id: dto.vendorId, organizationId, deletedAt: null },
-    });
-    if (!vendor) {
-      throw new NotFoundException('Vendor not found');
-    }
+    const resolved = await this.resolveConfirmation(organizationId, dto);
+    const vendorId = dto.vendorId as string;
 
     const billNumber = dto.documentNumber || (await this.generateBillNumber(organizationId));
-
-    let subtotal = 0;
-    let taxAmount = 0;
-    const lines = dto.lines.map((line) => {
-      const qty = line.quantity;
-      const rate = line.rate;
-      const tax = line.taxRate || 0;
-      const lineTotal = qty * rate;
-      subtotal += lineTotal;
-      taxAmount += tax;
-      return { ...line, amount: lineTotal };
-    });
-
-    const grandTotal = subtotal + taxAmount;
 
     const bill = await this.prisma.bill.create({
       data: {
         billNumber,
-        vendorId: dto.vendorId,
+        vendorId,
         date: new Date(dto.date),
         dueDate: new Date(dto.dueDate),
-        subtotal: new Decimal(subtotal),
-        taxAmount: new Decimal(taxAmount),
-        grandTotal: new Decimal(grandTotal),
-        balanceDue: new Decimal(grandTotal),
+        subtotal: resolved.subtotal,
+        taxAmount: resolved.taxAmount,
+        grandTotal: resolved.grandTotal,
+        balanceDue: resolved.grandTotal,
         reference: dto.reference,
         currencyCode: dto.currencyCode,
         notes: dto.notes || 'Created from document scan',
-        projectId: dto.projectId,
+        projectId: dto.projectId || null,
         organizationId,
         lines: {
-          create: lines.map((line) => ({
-            itemId: line.itemId || null,
-            accountId: line.accountId || null,
+          create: resolved.lines.map((line) => ({
+            itemId: line.itemId,
+            accountId: line.accountId,
+            taxRateId: line.taxRateId,
             description: line.description,
-            quantity: new Decimal(line.quantity),
-            rate: new Decimal(line.rate),
-            taxRate: new Decimal(line.taxRate || 0),
-            amount: new Decimal(line.amount),
+            quantity: line.quantity,
+            rate: line.rate,
+            taxRate: line.taxRatePercent,
+            amount: line.netAmount,
           })),
         },
       },
-      include: { vendor: { select: { id: true, name: true } }, lines: true },
+      select: { id: true },
     });
 
     // Log feedback for AI improvement
@@ -585,14 +799,16 @@ export class DocumentIntakeService {
         aiSuggestion: { type: 'document_intake', documentType: 'BILL' },
         userAction: dto.corrections ? AiFeedbackAction.CORRECTED : AiFeedbackAction.ACCEPTED,
         userAnswer: dto.corrections ? JSON.stringify(dto.corrections) : undefined,
-        inputData: { billNumber, vendorId: dto.vendorId },
+        inputData: { billNumber, vendorId },
       });
     } catch (error) {
-      this.logger.warn(`Failed to log feedback: ${error}`);
+      this.logger.warn(
+        `Failed to log intake feedback: ${error instanceof Error ? error.name : 'unknown error'}`,
+      );
     }
 
     this.logger.log(
-      `Created draft bill ${billNumber} from document intake for org ${organizationId}`,
+      `Created draft bill ${bill.id} (${resolved.lines.length} lines) from document intake for org ${organizationId}`,
     );
 
     return { type: 'bill', id: bill.id, number: billNumber };
@@ -600,70 +816,46 @@ export class DocumentIntakeService {
 
   private async createDraftInvoice(
     organizationId: string,
-    dto: ConfirmIntakeDto,
+    dto: ConfirmIntakeInput,
   ): Promise<{ type: 'invoice'; id: string; number: string }> {
-    if (!dto.customerId) {
-      throw new BadRequestException('Customer is required to create an invoice');
-    }
-
-    const customer = await this.prisma.customer.findFirst({
-      where: { id: dto.customerId, organizationId, deletedAt: null },
-    });
-    if (!customer) {
-      throw new NotFoundException('Customer not found');
-    }
+    const resolved = await this.resolveConfirmation(organizationId, dto);
+    const customerId = dto.customerId as string;
 
     const invoiceNumber = await this.generateInvoiceNumber(organizationId);
-
-    let subtotal = 0;
-    let taxAmount = 0;
-    const lines = dto.lines.map((line) => {
-      const qty = line.quantity;
-      const rate = line.rate;
-      const tax = line.taxRate || 0;
-      const lineTotal = qty * rate;
-      subtotal += lineTotal;
-      taxAmount += tax;
-      return { ...line, amount: lineTotal };
-    });
-
-    const grandTotal = subtotal + taxAmount;
 
     const invoice = await this.prisma.invoice.create({
       data: {
         invoiceNumber,
-        customerId: dto.customerId,
-        projectId: dto.projectId,
+        customerId,
+        projectId: dto.projectId || null,
         date: new Date(dto.date),
         dueDate: new Date(dto.dueDate),
-        subtotal: new Decimal(subtotal),
-        taxAmount: new Decimal(taxAmount),
+        subtotal: resolved.subtotal,
+        taxAmount: resolved.taxAmount,
         shippingAmount: new Decimal(0),
-        grandTotal: new Decimal(grandTotal),
-        balanceDue: new Decimal(grandTotal),
+        grandTotal: resolved.grandTotal,
+        balanceDue: resolved.grandTotal,
         notes: dto.notes || 'Created from document scan',
         organizationId,
         lines: {
-          create: lines.map((line) => ({
-            itemId: line.itemId || null,
-            accountId: line.accountId || null,
+          // InvoiceLine has no accountId column; a supplied account is only validated.
+          create: resolved.lines.map((line) => ({
+            itemId: line.itemId,
+            taxRateId: line.taxRateId,
             description: line.description,
-            quantity: new Decimal(line.quantity),
-            rate: new Decimal(line.rate),
-            discount: new Decimal(0),
-            taxRate: new Decimal(line.taxRate || 0),
-            amount: new Decimal(line.amount),
+            quantity: line.quantity,
+            rate: line.rate,
+            discount: line.discountPercent,
+            taxRate: line.taxRatePercent,
+            amount: line.netAmount,
           })),
         },
       },
-      include: {
-        customer: { select: { id: true, name: true } },
-        lines: true,
-      },
+      select: { id: true },
     });
 
     this.logger.log(
-      `Created draft invoice ${invoiceNumber} from document intake for org ${organizationId}`,
+      `Created draft invoice ${invoice.id} (${resolved.lines.length} lines) from document intake for org ${organizationId}`,
     );
 
     return { type: 'invoice', id: invoice.id, number: invoiceNumber };

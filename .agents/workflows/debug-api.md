@@ -11,7 +11,7 @@ description: Debug API issues — check Docker, test endpoints, verify DB, check
 ### 1. Check Docker Containers
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && docker-compose ps
+docker-compose ps
 ```
 
 ### 2. Check if API Port is in Use
@@ -23,7 +23,7 @@ lsof -i :6001 2>/dev/null || echo "Port 6001 not in use"
 ### 3. Check Docker Logs
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && docker-compose logs --tail=50
+docker-compose logs --tail=50
 ```
 
 ### 4. Test API Health Endpoint
@@ -48,13 +48,13 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:6001/api/organizations
 ### 6. Check Database Connection
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm --filter api exec prisma db execute --stdin <<< "SELECT 1"
+pnpm --filter api exec prisma db execute --stdin <<< "SELECT 1"
 ```
 
 ### 7. Validate Prisma Schema
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm db:check
+pnpm db:check
 ```
 
 ### 8. Check for Port Conflicts
@@ -76,7 +76,7 @@ lsof -ti :5001 | xargs kill -9 2>/dev/null
 ### 10. Restart Everything
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && docker-compose down && docker-compose up -d && pnpm dev
+docker-compose down && docker-compose up -d && pnpm dev
 ```
 
 ## Common Issues

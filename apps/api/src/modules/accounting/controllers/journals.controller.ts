@@ -16,7 +16,7 @@ import {
   CacheTTL,
   CurrentOrg,
   HttpCache,
-  InvalidateCache,
+  InvalidatesLedger,
   Permissions,
 } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -38,7 +38,7 @@ export class JournalsController {
 
   @Post()
   @Permissions('accounting.create')
-  @InvalidateCache('journals:*', 'accounts:*')
+  @InvalidatesLedger('journals:*')
   @ApiOperation({ summary: 'Create a new journal entry' })
   create(@CurrentOrg() orgId: string, @Body() createJournalDto: CreateJournalDto) {
     return this.journalsService.create(orgId, createJournalDto);
@@ -70,7 +70,7 @@ export class JournalsController {
 
   @Patch(':id')
   @Permissions('accounting.edit')
-  @InvalidateCache('journals:*', 'accounts:*')
+  @InvalidatesLedger('journals:*')
   @ApiOperation({ summary: 'Update journal entry' })
   update(
     @CurrentOrg() orgId: string,
@@ -82,7 +82,7 @@ export class JournalsController {
 
   @Post(':id/post')
   @Permissions('accounting.edit')
-  @InvalidateCache('journals:*', 'accounts:*')
+  @InvalidatesLedger('journals:*')
   @ApiOperation({ summary: 'Post a journal entry' })
   post(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.journalsService.post(orgId, id);
@@ -90,7 +90,7 @@ export class JournalsController {
 
   @Post(':id/reverse')
   @Permissions('accounting.create')
-  @InvalidateCache('journals:*', 'accounts:*')
+  @InvalidatesLedger('journals:*')
   @ApiOperation({ summary: 'Reverse a journal entry' })
   reverse(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: { date?: string }) {
     return this.journalsService.reverse(orgId, id, dto);
@@ -98,7 +98,7 @@ export class JournalsController {
 
   @Delete(':id')
   @Permissions('accounting.delete')
-  @InvalidateCache('journals:*', 'accounts:*')
+  @InvalidatesLedger('journals:*')
   @ApiOperation({ summary: 'Delete journal entry (soft delete)' })
   remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.journalsService.remove(orgId, id);
@@ -107,7 +107,7 @@ export class JournalsController {
   // Bulk Operations
   @Post('bulk-delete')
   @Permissions('accounting.delete')
-  @InvalidateCache('journals:*', 'accounts:*')
+  @InvalidatesLedger('journals:*')
   @ApiOperation({ summary: 'Bulk delete unposted journal entries' })
   bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
     return this.journalsService.bulkDelete(orgId, dto.ids);
@@ -115,7 +115,7 @@ export class JournalsController {
 
   @Post('bulk-post')
   @Permissions('accounting.edit')
-  @InvalidateCache('journals:*', 'accounts:*')
+  @InvalidatesLedger('journals:*')
   @ApiOperation({ summary: 'Bulk post journal entries' })
   bulkPost(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
     return this.journalsService.bulkPost(orgId, dto.ids);

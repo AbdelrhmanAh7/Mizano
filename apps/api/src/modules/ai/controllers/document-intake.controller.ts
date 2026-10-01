@@ -23,11 +23,16 @@ import {
 } from '@nestjs/swagger';
 import { Observable, Subject, finalize, map } from 'rxjs';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { OrganizationGuard } from '../../../common/guards/organization.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
-import { Public } from '../../../common/decorators/public.decorator';
-import { DocumentIntakeService, IntakeProgressEvent } from '../services/document-intake.service';
+import {
+  DocumentIntakeService,
+  IntakeJob,
+  IntakeProgressEvent,
+} from '../services/document-intake.service';
 import { ProcessDocumentDto, ConfirmIntakeDto } from '../dto/document-intake.dto';
 import { createOcrFileFilter } from '../utils/file-upload.util';
 
@@ -41,7 +46,7 @@ interface MessageEvent {
 @ApiTags('AI - Document Intake')
 @ApiBearerAuth()
 @Controller('ai/document-intake')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, OrganizationGuard, PermissionsGuard)
 export class DocumentIntakeController {
   constructor(
     private intakeService: DocumentIntakeService,
@@ -98,42 +103,47 @@ export class DocumentIntakeController {
     description: 'Document accepted — returns jobId for progress tracking',
   })
   @ApiResponse({ status: 400, description: 'No file uploaded or invalid file type' })
-  async processDocument(
+  processDocument(
     @CurrentOrg() orgId: string,
+    @CurrentUser('id') userId: string,
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: ProcessDocumentDto,
-  ) {
+  ): { data: { jobId: string } } {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
 
     const jobId = this.intakeService.processDocumentAsync(
-      orgId,
+      { organizationId: orgId, userId },
       file.buffer,
       file.mimetype,
-      file.originalname,
-      dto.language,
-      dto.strategy,
+      {
+        filename: file.originalname,
+        language: dto.language,
+        strategy: dto.strategy,
+        forceType: dto.forceType,
+      },
     );
-
-    // Store forceType on the job for later result retrieval
-    if (dto.forceType) {
-      const job = this.intakeService.getJob(jobId);
-      if (job) {
-        (job as unknown as Record<string, unknown>).forceType = dto.forceType;
-      }
-    }
 
     return { data: { jobId } };
   }
 
+  /**
+   * Authenticated SSE stream. Browsers' EventSource cannot send an Authorization
+   * header, so the web client consumes this with fetch() + a stream reader.
+   * Jobs from another organization respond 404 (existence is not disclosed).
+   */
   @Sse(':jobId/progress')
-  @Public()
-  @ApiOperation({ summary: 'Stream document intake progress via SSE' })
-  streamProgress(@Param('jobId') jobId: string): Observable<MessageEvent> {
-    const job = this.intakeService.getJob(jobId);
+  @Permissions('purchases.create')
+  @ApiOperation({ summary: 'Stream document intake progress via SSE (authenticated)' })
+  @ApiResponse({ status: 404, description: 'Job not found' })
+  streamProgress(
+    @CurrentOrg() orgId: string,
+    @Param('jobId') jobId: string,
+  ): Observable<MessageEvent> {
+    const job = this.intakeService.getJob(jobId, orgId);
     if (!job) {
-      throw new NotFoundException(`Intake job ${jobId} not found`);
+      throw new NotFoundException('Intake job not found');
     }
 
     const subject = new Subject<IntakeProgressEvent>();
@@ -181,10 +191,15 @@ export class DocumentIntakeController {
   @ApiOperation({ summary: 'Get document intake result (polling fallback)' })
   @ApiResponse({ status: 200, description: 'Job status and result' })
   @ApiResponse({ status: 404, description: 'Job not found' })
-  getResult(@Param('jobId') jobId: string) {
-    const job = this.intakeService.getJob(jobId);
+  getResult(
+    @CurrentOrg() orgId: string,
+    @Param('jobId') jobId: string,
+  ): {
+    data: Pick<IntakeJob, 'jobId' | 'status' | 'progress' | 'result' | 'error' | 'forceType'>;
+  } {
+    const job = this.intakeService.getJob(jobId, orgId);
     if (!job) {
-      throw new NotFoundException(`Intake job ${jobId} not found`);
+      throw new NotFoundException('Intake job not found');
     }
 
     return {
@@ -194,6 +209,7 @@ export class DocumentIntakeController {
         progress: job.progress,
         result: job.result,
         error: job.error,
+        forceType: job.forceType,
       },
     };
   }
@@ -224,8 +240,15 @@ export class DocumentIntakeController {
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Missing required fields (vendor/customer)' })
-  async confirmDocument(@CurrentOrg() orgId: string, @Body() dto: ConfirmIntakeDto) {
+  @ApiResponse({
+    status: 400,
+    description:
+      'Missing required fields, unresolved tax rate, or a referenced id that does not belong to the organization',
+  })
+  async confirmDocument(
+    @CurrentOrg() orgId: string,
+    @Body() dto: ConfirmIntakeDto,
+  ): Promise<{ data: { type: 'bill' | 'invoice'; id: string; number: string } }> {
     const result = await this.intakeService.confirmAndCreate(orgId, dto);
     return { data: result };
   }

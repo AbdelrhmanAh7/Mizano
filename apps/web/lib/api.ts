@@ -280,16 +280,26 @@ export const expensesApi = {
 export const billsApi = {
   ...crud('/bills'),
   open: (id: string) => api.patch(`/bills/${id}/open`),
+  /** Approves a draft bill and posts its journal (Dr expense/VAT, Cr AP) on the bill date. */
+  approve: (id: string) => api.post(`/bills/${id}/approve`),
   clone: (id: string) => api.post(`/bills/${id}/clone`),
   bulkDelete: (ids: string[]) => api.post('/bills/bulk-delete', { ids }),
   bulkOpen: (ids: string[]) => api.post('/bills/bulk-open', { ids }),
   bulkApprove: (ids: string[]) => api.post('/bills/bulk-approve', { ids }),
-  bulkPay: (ids: string[]) => api.post('/bills/bulk-pay', { ids }),
+  /** Records a full-balance payment per bill (default bank/cash account unless given). */
+  bulkPay: (
+    ids: string[],
+    options?: { paidFromAccountId?: string; date?: string; paymentMode?: string },
+  ) => api.post('/bills/bulk-pay', { ids, ...options }),
 };
 
 export const paymentsMadeApi = {
   ...crud('/payments-made'),
+  /** Voids a payment: restores bill balances and posts a linked reversal journal. */
+  void: (id: string) => api.delete(`/payments-made/${id}`),
   bulkDelete: (ids: string[]) => api.post('/payments-made/bulk-delete', { ids }),
+  /** Bulk void (same endpoint as bulk delete; payments are voided, never hard-deleted). */
+  bulkVoid: (ids: string[]) => api.post('/payments-made/bulk-delete', { ids }),
 };
 
 export const vendorCreditsApi = {
@@ -364,6 +374,9 @@ export const accountsApi = {
 export const journalsApi = {
   ...crud('/journals'),
   post: (id: string) => api.post(`/journals/${id}/post`),
+  /** Creates a posted, linked reversal of a posted journal (the original is never edited). */
+  reverse: (id: string, data?: { date?: string }) =>
+    api.post(`/journals/${id}/reverse`, data ?? {}),
   bulkDelete: (ids: string[]) => api.post('/journals/bulk-delete', { ids }),
   bulkPost: (ids: string[]) => api.post('/journals/bulk-post', { ids }),
 };

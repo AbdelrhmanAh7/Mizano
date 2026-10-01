@@ -65,9 +65,9 @@ export function DeleteConfirmDialog({
               onConfirm();
             }}
             disabled={isLoading}
-            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:ring-destructive"
           >
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isLoading && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
             Delete
           </AlertDialogAction>
         </AlertDialogFooter>
