@@ -7,7 +7,7 @@ import {
   QuoteEmailContext,
   PayslipEmailContext,
 } from '../dto/documents.dto';
-import { formatCurrency, formatDate } from '../templates/base.template';
+import { escapeHtml, formatCurrency, formatDate, safeColor } from '../templates/base.template';
 import nodemailer from 'nodemailer';
 import type { Attachment } from 'nodemailer/lib/mailer';
 
@@ -215,6 +215,12 @@ export class EmailService {
     payslipId: string,
     dto?: Partial<SendDocumentDto>,
   ): Promise<{ success: boolean; emailLogId?: string; error?: string }> {
+    // A payslip must never be resolved by id alone: the organization is mandatory and every
+    // lookup below (including the failure path) is scoped through the payroll run's organization.
+    if (!organizationId) {
+      throw new BadRequestException('organizationId is required to send a payslip');
+    }
+
     try {
       const payslip = await this.prisma.payslip.findFirst({
         where: {
@@ -297,9 +303,10 @@ export class EmailService {
       return { success: true, emailLogId: emailLog.id };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      // Same tenant scoping as the happy path: never read another organization's employee e-mail.
       const payslip = await this.prisma.payslip.findFirst({
-        where: { id: payslipId },
-        include: { employee: true },
+        where: { id: payslipId, payrollRun: { organizationId } },
+        select: { employee: { select: { email: true } } },
       });
 
       await this.prisma.emailLog.create({
@@ -421,7 +428,8 @@ export class EmailService {
   }
 
   private wrapInEmailTemplate(orgName: string, content: string, primaryColor?: string): string {
-    const color = primaryColor || '#3B82F6';
+    const color = safeColor(primaryColor, '#3B82F6');
+    const safeOrgName = escapeHtml(orgName);
 
     return `
       <!DOCTYPE html>
@@ -438,7 +446,7 @@ export class EmailService {
                 <!-- Header -->
                 <tr>
                   <td style="background-color: ${color}; padding: 30px; text-align: center;">
-                    <h1 style="color: #FFFFFF; margin: 0; font-size: 24px;">${orgName}</h1>
+                    <h1 style="color: #FFFFFF; margin: 0; font-size: 24px;">${safeOrgName}</h1>
                   </td>
                 </tr>
                 <!-- Content -->
@@ -451,7 +459,7 @@ export class EmailService {
                 <tr>
                   <td style="background-color: #F9FAFB; padding: 20px 30px; text-align: center; border-top: 1px solid #E5E7EB;">
                     <p style="margin: 0; color: #9CA3AF; font-size: 12px;">
-                      This email was sent by ${orgName}
+                      This email was sent by ${safeOrgName}
                     </p>
                   </td>
                 </tr>
@@ -467,30 +475,30 @@ export class EmailService {
   private getDefaultInvoiceMessage(context: InvoiceEmailContext): string {
     return `
       <p style="color: #111827; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
-        Dear ${context.customerName},
+        Dear ${escapeHtml(context.customerName)},
       </p>
       <p style="color: #4B5563; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
-        Please find attached invoice <strong>${context.invoiceNumber}</strong> for <strong>${context.grandTotal}</strong>.
+        Please find attached invoice <strong>${escapeHtml(context.invoiceNumber)}</strong> for <strong>${escapeHtml(context.grandTotal)}</strong>.
       </p>
       <table style="width: 100%; background-color: #F9FAFB; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
         <tr>
           <td style="padding: 10px;">
             <p style="margin: 0; color: #6B7280; font-size: 12px;">Invoice Number</p>
-            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${context.invoiceNumber}</p>
+            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.invoiceNumber)}</p>
           </td>
           <td style="padding: 10px;">
             <p style="margin: 0; color: #6B7280; font-size: 12px;">Invoice Date</p>
-            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${context.invoiceDate}</p>
+            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.invoiceDate)}</p>
           </td>
         </tr>
         <tr>
           <td style="padding: 10px;">
             <p style="margin: 0; color: #6B7280; font-size: 12px;">Due Date</p>
-            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${context.dueDate}</p>
+            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.dueDate)}</p>
           </td>
           <td style="padding: 10px;">
             <p style="margin: 0; color: #6B7280; font-size: 12px;">Amount Due</p>
-            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold; font-size: 18px;">${context.grandTotal}</p>
+            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold; font-size: 18px;">${escapeHtml(context.grandTotal)}</p>
           </td>
         </tr>
       </table>
@@ -502,7 +510,7 @@ export class EmailService {
       </p>
       <p style="color: #111827; font-size: 14px; margin-top: 30px;">
         Best regards,<br>
-        <strong>${context.organizationName}</strong>
+        <strong>${escapeHtml(context.organizationName)}</strong>
       </p>
     `;
   }
@@ -510,30 +518,30 @@ export class EmailService {
   private getDefaultQuoteMessage(context: QuoteEmailContext): string {
     return `
       <p style="color: #111827; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
-        Dear ${context.customerName},
+        Dear ${escapeHtml(context.customerName)},
       </p>
       <p style="color: #4B5563; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
-        Thank you for your interest! Please find attached our quotation <strong>${context.quoteNumber}</strong>.
+        Thank you for your interest! Please find attached our quotation <strong>${escapeHtml(context.quoteNumber)}</strong>.
       </p>
       <table style="width: 100%; background-color: #F9FAFB; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
         <tr>
           <td style="padding: 10px;">
             <p style="margin: 0; color: #6B7280; font-size: 12px;">Quote Number</p>
-            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${context.quoteNumber}</p>
+            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.quoteNumber)}</p>
           </td>
           <td style="padding: 10px;">
             <p style="margin: 0; color: #6B7280; font-size: 12px;">Quote Date</p>
-            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${context.quoteDate}</p>
+            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.quoteDate)}</p>
           </td>
         </tr>
         <tr>
           <td style="padding: 10px;">
             <p style="margin: 0; color: #6B7280; font-size: 12px;">Valid Until</p>
-            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${context.expiryDate}</p>
+            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.expiryDate)}</p>
           </td>
           <td style="padding: 10px;">
             <p style="margin: 0; color: #6B7280; font-size: 12px;">Total Amount</p>
-            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold; font-size: 18px;">${context.grandTotal}</p>
+            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold; font-size: 18px;">${escapeHtml(context.grandTotal)}</p>
           </td>
         </tr>
       </table>
@@ -542,7 +550,7 @@ export class EmailService {
       </p>
       <p style="color: #111827; font-size: 14px; margin-top: 30px;">
         Best regards,<br>
-        <strong>${context.organizationName}</strong>
+        <strong>${escapeHtml(context.organizationName)}</strong>
       </p>
     `;
   }
@@ -550,26 +558,26 @@ export class EmailService {
   private getDefaultPayslipMessage(context: PayslipEmailContext): string {
     return `
       <p style="color: #111827; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
-        Dear ${context.employeeName},
+        Dear ${escapeHtml(context.employeeName)},
       </p>
       <p style="color: #4B5563; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
-        Your payslip for the pay period <strong>${context.payPeriod}</strong> is now available.
+        Your payslip for the pay period <strong>${escapeHtml(context.payPeriod)}</strong> is now available.
       </p>
       <table style="width: 100%; background-color: #F9FAFB; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
         <tr>
           <td style="padding: 10px;">
             <p style="margin: 0; color: #6B7280; font-size: 12px;">Pay Period</p>
-            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${context.payPeriod}</p>
+            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.payPeriod)}</p>
           </td>
           <td style="padding: 10px;">
             <p style="margin: 0; color: #6B7280; font-size: 12px;">Pay Date</p>
-            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${context.payDate}</p>
+            <p style="margin: 5px 0 0 0; color: #111827; font-weight: bold;">${escapeHtml(context.payDate)}</p>
           </td>
         </tr>
         <tr>
           <td colspan="2" style="padding: 10px; text-align: center;">
             <p style="margin: 0; color: #6B7280; font-size: 12px;">Net Pay</p>
-            <p style="margin: 5px 0 0 0; color: #10B981; font-weight: bold; font-size: 24px;">${context.netPay}</p>
+            <p style="margin: 5px 0 0 0; color: #10B981; font-weight: bold; font-size: 24px;">${escapeHtml(context.netPay)}</p>
           </td>
         </tr>
       </table>

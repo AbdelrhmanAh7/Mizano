@@ -6,6 +6,7 @@ import { findBestMatch } from '../utils/text-similarity.util';
 import { BoundedCache } from '../utils/bounded-cache.util';
 import { buildKnowledgeAssistantPrompt } from '../prompts/nlp.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const natural = require('natural');
@@ -82,7 +83,7 @@ export class KnowledgeAssistantService {
     query: string,
     limit: number = 10,
   ): Promise<KnowledgeSearchResponse> {
-    this.logger.log(`Searching knowledge base in org ${organizationId}: "${query}"`);
+    this.logger.log(`Searching knowledge base in org ${organizationId}: queryLen=${query.length}`);
 
     // --- Ollama-first inference path ---
     {
@@ -144,7 +145,7 @@ export class KnowledgeAssistantService {
         }
       } catch (error) {
         this.logger.warn(
-          `Ollama knowledge search failed, falling back to TF-IDF: ${error instanceof Error ? error.message : String(error)}`,
+          `Ollama knowledge search failed, falling back to TF-IDF: ${describeError(error)}`,
         );
       }
     }
@@ -224,7 +225,7 @@ export class KnowledgeAssistantService {
           1,
         );
       } catch (error) {
-        this.logger.warn(`Failed to store search prediction: ${error.message}`);
+        this.logger.warn(`Failed to store search prediction: ${describeError(error)}`);
       }
     }
 

@@ -4,6 +4,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { FraudDetectionService } from '../services/fraud-detection.service';
 import { ComplianceMonitoringService } from '../services/compliance-monitoring.service';
 import { AuditRiskService } from '../services/audit-risk.service';
+import { describeError } from '../../../common/utils/redact';
 
 const BATCH_SIZE = 5;
 
@@ -43,21 +44,23 @@ export class AiSecurityScheduler {
                 );
               }
             } catch (error) {
-              this.logger.error(`Error running fraud scan for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error running fraud scan for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Daily fraud scan completed');
     } catch (error) {
-      this.logger.error(`Daily fraud scan failed: ${error.message}`);
+      this.logger.error(`Daily fraud scan failed: ${describeError(error)}`);
     }
   }
 
@@ -84,21 +87,23 @@ export class AiSecurityScheduler {
                 `Org ${org.name}: Compliance score ${report.score.toFixed(0)}% - ${report.violations.length} violations found`,
               );
             } catch (error) {
-              this.logger.error(`Error checking compliance for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error checking compliance for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Daily compliance check completed');
     } catch (error) {
-      this.logger.error(`Daily compliance check failed: ${error.message}`);
+      this.logger.error(`Daily compliance check failed: ${describeError(error)}`);
     }
   }
 
@@ -129,7 +134,7 @@ export class AiSecurityScheduler {
                 }
               } catch (error) {
                 this.logger.error(
-                  `Error scoring ${entityType} audit risk for org ${org.id}: ${error.message}`,
+                  `Error scoring ${entityType} audit risk for org ${org.id}: ${describeError(error)}`,
                 );
               }
             }
@@ -138,14 +143,14 @@ export class AiSecurityScheduler {
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Weekly audit risk scoring completed');
     } catch (error) {
-      this.logger.error(`Weekly audit risk scoring failed: ${error.message}`);
+      this.logger.error(`Weekly audit risk scoring failed: ${describeError(error)}`);
     }
   }
 
@@ -168,7 +173,7 @@ export class AiSecurityScheduler {
 
       this.logger.log(`Cleaned up ${deleted.count} old resolved fraud alerts`);
     } catch (error) {
-      this.logger.error(`Weekly fraud alert cleanup failed: ${error.message}`);
+      this.logger.error(`Weekly fraud alert cleanup failed: ${describeError(error)}`);
     }
   }
 }

@@ -4,6 +4,7 @@ import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { BoundedCache } from '../utils/bounded-cache.util';
 import { buildDocumentClassificationPrompt } from '../prompts/nlp.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const natural = require('natural');
@@ -296,7 +297,7 @@ export class DocumentClassificationService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama document classification failed, falling back to Bayes: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama document classification failed, falling back to Bayes: ${describeError(error)}`,
       );
     }
 

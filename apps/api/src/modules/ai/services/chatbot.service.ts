@@ -6,6 +6,7 @@ import { BoundedCache } from '../utils/bounded-cache.util';
 import { buildChatbotPrompt } from '../prompts/nlp.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
 import { OllamaInferencePriority } from '../types/ollama-inference.types';
+import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const natural = require('natural');
@@ -211,7 +212,7 @@ export class ChatbotService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama chatbot inference failed, falling back to Bayes: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama chatbot inference failed, falling back to Bayes: ${describeError(error)}`,
       );
     }
 
@@ -273,9 +274,7 @@ export class ChatbotService {
         1,
       );
     } catch (error) {
-      this.logger.warn(
-        `Failed to store chat prediction: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.warn(`Failed to store chat prediction: ${describeError(error)}`);
     }
 
     // Tag with prediction method
@@ -342,9 +341,7 @@ export class ChatbotService {
           },
           error: (err) => {
             // Fall back to non-streaming response
-            this.logger.warn(
-              `Streaming failed, falling back: ${err instanceof Error ? err.message : String(err)}`,
-            );
+            this.logger.warn(`Streaming failed, falling back: ${describeError(err)}`);
             void this.processMessage(organizationId, userId, message)
               .then((response) => {
                 callbacks.onComplete(response);
@@ -375,7 +372,7 @@ export class ChatbotService {
     } catch (error) {
       // Final fallback
       const msg = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Stream processing failed: ${msg}`);
+      this.logger.error(`Stream processing failed: ${describeError(error)}`);
       callbacks.onError(msg);
     }
   }

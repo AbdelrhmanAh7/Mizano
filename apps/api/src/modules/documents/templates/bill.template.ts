@@ -8,6 +8,8 @@ import {
   generateItemsTableHtml,
   generateTotalsHtml,
   defaultTemplateConfig,
+  escapeHtml,
+  safeColor,
 } from './base.template';
 
 export interface BillData {
@@ -34,7 +36,7 @@ export interface BillData {
 }
 
 export function generateBillHtml(org: OrganizationInfo, bill: BillData): string {
-  const primaryColor = org.primaryColor || defaultTemplateConfig.colors.primary;
+  const primaryColor = safeColor(org.primaryColor, defaultTemplateConfig.colors.primary);
 
   const statusColors: Record<string, string> = {
     DRAFT: '#9CA3AF',
@@ -52,7 +54,7 @@ export function generateBillHtml(org: OrganizationInfo, bill: BillData): string 
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Bill ${bill.billNumber}</title>
+      <title>Bill ${escapeHtml(bill.billNumber)}</title>
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #111827; line-height: 1.5; }
@@ -70,10 +72,10 @@ export function generateBillHtml(org: OrganizationInfo, bill: BillData): string 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
           <div>
             <h2 style="font-size: 28px; color: ${primaryColor}; margin-bottom: 5px;">BILL</h2>
-            <p style="color: #6B7280; font-size: 14px;">${bill.billNumber}</p>
+            <p style="color: #6B7280; font-size: 14px;">${escapeHtml(bill.billNumber)}</p>
           </div>
           <div style="background: ${statusColor}; color: white; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-            ${bill.status}
+            ${escapeHtml(bill.status)}
           </div>
         </div>
 
@@ -81,12 +83,12 @@ export function generateBillHtml(org: OrganizationInfo, bill: BillData): string 
         <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
           <div style="flex: 1;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">From (Vendor)</h4>
-            <p style="font-weight: bold; margin-bottom: 5px;">${bill.vendor.name}</p>
-            ${bill.vendor.address ? `<p style="color: #6B7280; font-size: 12px;">${bill.vendor.address}</p>` : ''}
-            ${bill.vendor.city && bill.vendor.country ? `<p style="color: #6B7280; font-size: 12px;">${bill.vendor.city}, ${bill.vendor.country}</p>` : ''}
-            ${bill.vendor.email ? `<p style="color: #6B7280; font-size: 12px;">${bill.vendor.email}</p>` : ''}
-            ${bill.vendor.phone ? `<p style="color: #6B7280; font-size: 12px;">${bill.vendor.phone}</p>` : ''}
-            ${bill.vendor.taxId ? `<p style="color: #6B7280; font-size: 12px;">Tax ID: ${bill.vendor.taxId}</p>` : ''}
+            <p style="font-weight: bold; margin-bottom: 5px;">${escapeHtml(bill.vendor.name)}</p>
+            ${bill.vendor.address ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(bill.vendor.address)}</p>` : ''}
+            ${bill.vendor.city && bill.vendor.country ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(bill.vendor.city)}, ${escapeHtml(bill.vendor.country)}</p>` : ''}
+            ${bill.vendor.email ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(bill.vendor.email)}</p>` : ''}
+            ${bill.vendor.phone ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(bill.vendor.phone)}</p>` : ''}
+            ${bill.vendor.taxId ? `<p style="color: #6B7280; font-size: 12px;">Tax ID: ${escapeHtml(bill.vendor.taxId)}</p>` : ''}
           </div>
           <div style="text-align: right;">
             <table style="margin-left: auto;">
@@ -120,7 +122,7 @@ export function generateBillHtml(org: OrganizationInfo, bill: BillData): string 
             ? `
           <div style="margin-top: 30px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">Notes</h4>
-            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;">${bill.notes}</p>
+            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;">${escapeHtml(bill.notes)}</p>
           </div>
         `
             : ''

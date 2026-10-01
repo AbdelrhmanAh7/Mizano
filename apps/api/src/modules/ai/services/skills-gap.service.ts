@@ -4,6 +4,7 @@ import { AiFeedbackService } from './ai-feedback.service';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildSkillsGapPrompt } from '../prompts/hr.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const KNN = require('ml-knn');
@@ -204,7 +205,7 @@ export class SkillsGapService {
         }
       } catch (error) {
         this.logger.warn(
-          `Ollama skills gap analysis failed, using rule-based: ${error instanceof Error ? error.message : String(error)}`,
+          `Ollama skills gap analysis failed, using rule-based: ${describeError(error)}`,
         );
       }
     }
@@ -248,7 +249,7 @@ export class SkillsGapService {
         1,
       );
     } catch (error) {
-      this.logger.warn(`Failed to store skills gap prediction: ${error.message}`);
+      this.logger.warn(`Failed to store skills gap prediction: ${describeError(error)}`);
     }
 
     return result;
@@ -306,7 +307,7 @@ export class SkillsGapService {
           }
         }
       } catch (error) {
-        this.logger.warn(`Failed to analyze gap for employee ${emp.id}: ${error.message}`);
+        this.logger.warn(`Failed to analyze gap for employee ${emp.id}: ${describeError(error)}`);
       }
     }
 
@@ -466,7 +467,7 @@ export class SkillsGapService {
       const predicted = knn.predict([targetVector]);
       this.logger.debug(`KNN predicted nearest index: ${predicted[0]}`);
     } catch (error) {
-      this.logger.debug(`KNN prediction note: ${error.message}`);
+      this.logger.debug(`KNN prediction note: ${describeError(error)}`);
     }
 
     // Calculate direct match scores for all employees and rank

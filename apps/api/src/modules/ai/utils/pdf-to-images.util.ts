@@ -6,9 +6,9 @@
  */
 
 import { Logger } from '@nestjs/common';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { pathToFileURL } from 'url';
+import { describeError } from '../../../common/utils/redact';
+import { secureTempFilePath, withSecureTempDir, writeSecureFile } from './secure-temp.util';
 
 const logger = new Logger('PdfToImages');
 
@@ -30,16 +30,31 @@ export async function convertPdfPagesToImages(
   const maxPages = options?.maxPages ?? 3;
   const width = options?.width ?? 1200;
 
-  // Write PDF to a temp file (puppeteer needs a file path)
-  const tmpDir = os.tmpdir();
-  const tmpFile = path.join(tmpDir, `mizano_pdf_${Date.now()}.pdf`);
   const images: Buffer[] = [];
 
+  try {
+    // puppeteer needs a file path: use a private temp dir, unguessable name, cleaned up in finally
+    await withSecureTempDir('mizano-pdf-', async (dir) => {
+      const tmpFile = secureTempFilePath(dir, '.pdf');
+      await writeSecureFile(tmpFile, pdfBuffer);
+      await renderFirstPage(tmpFile, width, maxPages, images);
+    });
+  } catch (err) {
+    logger.error(`PDF to images conversion failed: ${describeError(err)}`);
+  }
+
+  return images;
+}
+
+async function renderFirstPage(
+  pdfPath: string,
+  width: number,
+  maxPages: number,
+  images: Buffer[],
+): Promise<void> {
   let browser: { close(): Promise<void>; newPage(): Promise<unknown> } | null = null;
 
   try {
-    fs.writeFileSync(tmpFile, pdfBuffer);
-
     // Lazy-load puppeteer
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const puppeteer = require('puppeteer');
@@ -60,8 +75,7 @@ export async function convertPdfPagesToImages(
     await page.setViewport({ width, height: 1600 });
 
     // Navigate to the PDF file
-    const fileUrl = `file://${tmpFile.replace(/\\/g, '/')}`;
-    await page.goto(fileUrl, { waitUntil: 'networkidle0', timeout: 30_000 });
+    await page.goto(pathToFileURL(pdfPath).href, { waitUntil: 'networkidle0', timeout: 30_000 });
 
     // Get total page count from the PDF viewer
     const pageCount = await page.evaluate(() => {
@@ -83,19 +97,9 @@ export async function convertPdfPagesToImages(
     );
 
     await page.close();
-  } catch (err) {
-    logger.error(`PDF to images conversion failed: ${err instanceof Error ? err.message : err}`);
   } finally {
     if (browser) {
       await browser.close();
     }
-    // Clean up temp file
-    try {
-      if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
-    } catch {
-      // ignore cleanup errors
-    }
   }
-
-  return images;
 }

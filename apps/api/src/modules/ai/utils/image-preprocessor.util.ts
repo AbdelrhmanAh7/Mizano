@@ -6,6 +6,7 @@
  */
 
 import { Logger } from '@nestjs/common';
+import { describeError } from '../../../common/utils/redact';
 
 const logger = new Logger('ImagePreprocessor');
 
@@ -128,7 +129,7 @@ export async function preprocessForOcr(buffer: Buffer, mimeType: string): Promis
     );
     return result;
   } catch (err) {
-    logger.warn(`OCR preprocessing failed: ${err instanceof Error ? err.message : err}`);
+    logger.warn(`OCR preprocessing failed: ${describeError(err)}`);
     return jpegBuffer;
   }
 }
@@ -202,7 +203,7 @@ async function compressToTarget(
     );
     return result;
   } catch (err) {
-    logger.warn(`compression failed: ${err instanceof Error ? err.message : err}`);
+    logger.warn(`compression failed: ${describeError(err)}`);
     return null;
   }
 }

@@ -22,6 +22,7 @@ import {
 } from '../utils/logistic-regression.util';
 import { buildLeadScoringPrompt, LeadScoringResponse } from '../prompts/sales-crm.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 export interface ScoreBreakdown {
   category: string;
@@ -170,7 +171,7 @@ export class LeadScoringService {
       }
     } catch (error) {
       this.logger.warn(
-        `ML scoring failed for lead ${leadId}, falling back to rule-based: ${error.message}`,
+        `ML scoring failed for lead ${leadId}, falling back to rule-based: ${describeError(error)}`,
       );
     }
 
@@ -197,9 +198,7 @@ export class LeadScoringService {
         // Store as training data for custom model
       }
     } catch (error) {
-      this.logger.warn(
-        `Ollama lead scoring failed for lead ${leadId}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.warn(`Ollama lead scoring failed for lead ${leadId}: ${describeError(error)}`);
     }
 
     // Blend scores: custom model (graduated) + Ollama + rule-based

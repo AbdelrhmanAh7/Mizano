@@ -5,6 +5,7 @@ import * as puppeteer from 'puppeteer';
 import * as natural from 'natural';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { describeError, sanitizeStack } from '../../../common/utils/redact';
 
 interface WebSource {
   source: string;
@@ -501,7 +502,10 @@ export class DeepSearchService {
 
     // Fire and forget - pipeline runs asynchronously
     this.executePipeline(job.id, organizationId, options).catch((err) => {
-      this.logger.error(`DeepSearch pipeline failed for job ${job.id}: ${err.message}`, err.stack);
+      this.logger.error(
+        `DeepSearch pipeline failed for job ${job.id}: ${describeError(err)}`,
+        sanitizeStack(err),
+      );
     });
 
     return job;
@@ -635,11 +639,14 @@ export class DeepSearchService {
         progressMessage: `Done! Generated ${suggestions.length} enhancement suggestions.`,
       });
     } catch (error) {
-      this.logger.error(`Pipeline error for job ${jobId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Pipeline error for job ${jobId}: ${describeError(error)}`,
+        sanitizeStack(error),
+      );
       await this.updateJob(jobId, {
         status: 'FAILED',
-        error: error.message,
-        progressMessage: `Failed: ${error.message}`,
+        error: describeError(error),
+        progressMessage: `Failed: ${describeError(error)}`,
       });
     }
   }
@@ -697,12 +704,12 @@ export class DeepSearchService {
           // Rate limit: 2s between requests
           await new Promise((resolve) => setTimeout(resolve, 2000));
         } catch (err) {
-          this.logger.warn(`Failed to scrape ${target.source}: ${err.message}`);
+          this.logger.warn(`Failed to scrape ${target.source}: ${describeError(err)}`);
         }
       }
     } catch (err) {
       this.logger.warn(
-        `Browser launch failed: ${err.message}. Continuing with codebase-only analysis.`,
+        `Browser launch failed: ${describeError(err)}. Continuing with codebase-only analysis.`,
       );
     } finally {
       if (browser) {

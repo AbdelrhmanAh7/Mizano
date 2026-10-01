@@ -5,6 +5,7 @@ import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildCrossSellPrompt, CrossSellResponse } from '../prompts/sales-crm.prompts';
 import { BoundedCache } from '../utils/bounded-cache.util';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 export interface Recommendation {
   itemId: string;
@@ -149,7 +150,7 @@ export class CrossSellService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama cross-sell failed for customer ${customerId}: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama cross-sell failed for customer ${customerId}: ${describeError(error)}`,
       );
     }
 

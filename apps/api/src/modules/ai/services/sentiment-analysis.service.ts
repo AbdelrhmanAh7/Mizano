@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildSentimentPrompt } from '../prompts/nlp.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Sentiment = require('sentiment');
@@ -162,7 +163,7 @@ export class SentimentAnalysisService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama sentiment analysis failed, falling back to AFINN: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama sentiment analysis failed, falling back to AFINN: ${describeError(error)}`,
       );
     }
 

@@ -4,8 +4,15 @@ import { generateInvoiceHtml, InvoiceData } from '../templates/invoice.template'
 import { generateQuoteHtml, QuoteData } from '../templates/quote.template';
 import { generatePayslipHtml, PayslipData } from '../templates/payslip.template';
 import { generateBillHtml, BillData } from '../templates/bill.template';
-import { OrganizationInfo, formatCurrency, formatDate } from '../templates/base.template';
-import * as puppeteer from 'puppeteer';
+import {
+  OrganizationInfo,
+  escapeHtml,
+  formatCurrency,
+  formatDate,
+  renderLogoHtml,
+  safeColor,
+} from '../templates/base.template';
+import { renderHtmlToPdf } from './pdf-renderer';
 
 @Injectable()
 export class PdfService {
@@ -449,7 +456,7 @@ export class PdfService {
     endDate: string,
   ): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
-    const primaryColor = org.primaryColor || '#3B82F6';
+    const primaryColor = safeColor(org.primaryColor, '#3B82F6');
     const currency = org.currency || 'SAR';
     const journalLines = await this.prisma.journalLine.findMany({
       where: {
@@ -478,7 +485,7 @@ export class PdfService {
       .sort((a, b) => a[1].code.localeCompare(b[1].code))
       .map(([n, d]) => {
         totalRev += d.balance;
-        return `<tr style="border-bottom:1px solid #E5E7EB"><td style="padding:8px 10px;font-size:12px;padding-left:30px">${d.code} - ${n}</td><td style="padding:8px 10px;text-align:right;font-size:12px">${formatCurrency(d.balance, currency)}</td></tr>`;
+        return `<tr style="border-bottom:1px solid #E5E7EB"><td style="padding:8px 10px;font-size:12px;padding-left:30px">${escapeHtml(d.code)} - ${escapeHtml(n)}</td><td style="padding:8px 10px;text-align:right;font-size:12px">${formatCurrency(d.balance, currency)}</td></tr>`;
       })
       .join('');
     let totalExp = 0;
@@ -486,7 +493,7 @@ export class PdfService {
       .sort((a, b) => a[1].code.localeCompare(b[1].code))
       .map(([n, d]) => {
         totalExp += d.balance;
-        return `<tr style="border-bottom:1px solid #E5E7EB"><td style="padding:8px 10px;font-size:12px;padding-left:30px">${d.code} - ${n}</td><td style="padding:8px 10px;text-align:right;font-size:12px">${formatCurrency(d.balance, currency)}</td></tr>`;
+        return `<tr style="border-bottom:1px solid #E5E7EB"><td style="padding:8px 10px;font-size:12px;padding-left:30px">${escapeHtml(d.code)} - ${escapeHtml(n)}</td><td style="padding:8px 10px;text-align:right;font-size:12px">${formatCurrency(d.balance, currency)}</td></tr>`;
       })
       .join('');
     const net = totalRev - totalExp;
@@ -512,7 +519,7 @@ export class PdfService {
 
   async generateBalanceSheetPdf(organizationId: string, asOfDate: string): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
-    const pc = org.primaryColor || '#3B82F6';
+    const pc = safeColor(org.primaryColor, '#3B82F6');
     const cur = org.currency || 'SAR';
     const lines = await this.prisma.journalLine.findMany({
       where: {
@@ -545,7 +552,7 @@ export class PdfService {
         .sort((a, b) => a[1].code.localeCompare(b[1].code))
         .map(([n, d]) => {
           t += d.balance;
-          return `<tr style="border-bottom:1px solid #E5E7EB"><td style="padding:8px 10px;font-size:12px;padding-left:30px">${d.code} - ${n}</td><td style="padding:8px 10px;text-align:right;font-size:12px">${formatCurrency(d.balance, cur)}</td></tr>`;
+          return `<tr style="border-bottom:1px solid #E5E7EB"><td style="padding:8px 10px;font-size:12px;padding-left:30px">${escapeHtml(d.code)} - ${escapeHtml(n)}</td><td style="padding:8px 10px;text-align:right;font-size:12px">${formatCurrency(d.balance, cur)}</td></tr>`;
         })
         .join('');
       return { rows: r, total: t };
@@ -583,7 +590,7 @@ export class PdfService {
     asOfDate?: string,
   ): Promise<Buffer> {
     const org = await this.getOrganizationInfo(organizationId);
-    const pc = org.primaryColor || '#3B82F6',
+    const pc = safeColor(org.primaryColor, '#3B82F6'),
       cur = org.currency || 'SAR';
     const ref = asOfDate ? new Date(asOfDate) : new Date();
     const cat = (due: Date, amt: number) => {
@@ -644,10 +651,10 @@ export class PdfService {
       .sort((a, b) => b[1].total - a[1].total)
       .map(
         ([n, b]) =>
-          `<tr style="border-bottom:1px solid #E5E7EB"><td style="padding:8px 10px;font-size:11px">${n}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.current)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.days1to30)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.days31to60)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.days61to90)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.over90)}</td><td style="padding:8px 10px;text-align:right;font-size:11px;font-weight:bold">${fc(b.total)}</td></tr>`,
+          `<tr style="border-bottom:1px solid #E5E7EB"><td style="padding:8px 10px;font-size:11px">${escapeHtml(n)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.current)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.days1to30)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.days31to60)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.days61to90)}</td><td style="padding:8px 10px;text-align:right;font-size:11px">${fc(b.over90)}</td><td style="padding:8px 10px;text-align:right;font-size:11px;font-weight:bold">${fc(b.total)}</td></tr>`,
       )
       .join('');
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${ti}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111827;line-height:1.5}.container{max-width:800px;margin:0 auto;padding:40px}</style></head><body><div class="container"><div style="margin-bottom:30px">${org.logoUrl ? `<img src="${org.logoUrl}" style="max-height:60px"/>` : ''}<h1 style="color:${pc};margin:10px 0 5px 0;font-size:24px">${org.name}</h1>${org.address ? `<p style="color:#6B7280;font-size:12px">${org.address}</p>` : ''}</div><div style="text-align:center;margin-bottom:30px"><h2 style="font-size:24px;color:${pc}">${ti}</h2><p style="color:#6B7280;font-size:14px">As of ${formatDate(ref)}</p></div><table style="width:100%;border-collapse:collapse;margin-bottom:20px"><thead><tr style="background:${pc};color:white"><th style="padding:10px;text-align:left;font-size:11px">${la}</th><th style="padding:10px;text-align:right;font-size:11px">Current</th><th style="padding:10px;text-align:right;font-size:11px">1-30</th><th style="padding:10px;text-align:right;font-size:11px">31-60</th><th style="padding:10px;text-align:right;font-size:11px">61-90</th><th style="padding:10px;text-align:right;font-size:11px">90+</th><th style="padding:10px;text-align:right;font-size:11px">Total</th></tr></thead><tbody>${rw || `<tr><td colspan="7" style="padding:10px;text-align:center;color:#6B7280">No outstanding ${type}</td></tr>`}</tbody><tfoot><tr style="background:#F3F4F6;font-weight:bold"><td style="padding:10px">Total</td><td style="padding:10px;text-align:right">${fc(tot.current)}</td><td style="padding:10px;text-align:right">${fc(tot.days1to30)}</td><td style="padding:10px;text-align:right">${fc(tot.days31to60)}</td><td style="padding:10px;text-align:right">${fc(tot.days61to90)}</td><td style="padding:10px;text-align:right">${fc(tot.over90)}</td><td style="padding:10px;text-align:right">${fc(tot.total)}</td></tr></tfoot></table><div style="margin-top:40px;text-align:center"><p style="color:#9CA3AF;font-size:10px">Generated automatically.</p></div></div></body></html>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${ti}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111827;line-height:1.5}.container{max-width:800px;margin:0 auto;padding:40px}</style></head><body><div class="container"><div style="margin-bottom:30px">${renderLogoHtml(org, 'max-height:60px')}<h1 style="color:${pc};margin:10px 0 5px 0;font-size:24px">${escapeHtml(org.name)}</h1>${org.address ? `<p style="color:#6B7280;font-size:12px">${escapeHtml(org.address)}</p>` : ''}</div><div style="text-align:center;margin-bottom:30px"><h2 style="font-size:24px;color:${pc}">${ti}</h2><p style="color:#6B7280;font-size:14px">As of ${formatDate(ref)}</p></div><table style="width:100%;border-collapse:collapse;margin-bottom:20px"><thead><tr style="background:${pc};color:white"><th style="padding:10px;text-align:left;font-size:11px">${la}</th><th style="padding:10px;text-align:right;font-size:11px">Current</th><th style="padding:10px;text-align:right;font-size:11px">1-30</th><th style="padding:10px;text-align:right;font-size:11px">31-60</th><th style="padding:10px;text-align:right;font-size:11px">61-90</th><th style="padding:10px;text-align:right;font-size:11px">90+</th><th style="padding:10px;text-align:right;font-size:11px">Total</th></tr></thead><tbody>${rw || `<tr><td colspan="7" style="padding:10px;text-align:center;color:#6B7280">No outstanding ${type}</td></tr>`}</tbody><tfoot><tr style="background:#F3F4F6;font-weight:bold"><td style="padding:10px">Total</td><td style="padding:10px;text-align:right">${fc(tot.current)}</td><td style="padding:10px;text-align:right">${fc(tot.days1to30)}</td><td style="padding:10px;text-align:right">${fc(tot.days31to60)}</td><td style="padding:10px;text-align:right">${fc(tot.days61to90)}</td><td style="padding:10px;text-align:right">${fc(tot.over90)}</td><td style="padding:10px;text-align:right">${fc(tot.total)}</td></tr></tfoot></table><div style="margin-top:40px;text-align:center"><p style="color:#9CA3AF;font-size:10px">Generated automatically.</p></div></div></body></html>`;
     return this.htmlToPdf(html);
   }
 
@@ -667,10 +674,10 @@ export class PdfService {
     const sh = r.sections
       .map(
         (s) =>
-          `<table style="width:100%;border-collapse:collapse;margin-bottom:10px;margin-top:20px"><thead><tr style="background:${pc};color:white"><th style="padding:10px;text-align:left;font-size:12px">${s.heading}</th><th style="padding:10px;text-align:right;font-size:12px">Amount</th></tr></thead><tbody>${s.rows || `<tr><td colspan="2" style="padding:10px;color:#6B7280">No ${s.heading.toLowerCase()} recorded</td></tr>`}<tr style="background:#F3F4F6;font-weight:bold"><td style="padding:10px;font-size:13px">${s.totalLabel}</td><td style="padding:10px;text-align:right;font-size:13px">${formatCurrency(s.totalAmount, cur)}</td></tr></tbody></table>`,
+          `<table style="width:100%;border-collapse:collapse;margin-bottom:10px;margin-top:20px"><thead><tr style="background:${pc};color:white"><th style="padding:10px;text-align:left;font-size:12px">${escapeHtml(s.heading)}</th><th style="padding:10px;text-align:right;font-size:12px">Amount</th></tr></thead><tbody>${s.rows || `<tr><td colspan="2" style="padding:10px;color:#6B7280">No ${escapeHtml(s.heading.toLowerCase())} recorded</td></tr>`}<tr style="background:#F3F4F6;font-weight:bold"><td style="padding:10px;font-size:13px">${escapeHtml(s.totalLabel)}</td><td style="padding:10px;text-align:right;font-size:13px">${formatCurrency(s.totalAmount, cur)}</td></tr></tbody></table>`,
       )
       .join('');
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${r.title}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111827;line-height:1.5}.container{max-width:800px;margin:0 auto;padding:40px}</style></head><body><div class="container"><div style="margin-bottom:30px">${org.logoUrl ? `<img src="${org.logoUrl}" style="max-height:60px"/>` : ''}<h1 style="color:${pc};margin:10px 0 5px 0;font-size:24px">${org.name}</h1>${org.address ? `<p style="color:#6B7280;font-size:12px">${org.address}</p>` : ''}</div><div style="text-align:center;margin-bottom:30px"><h2 style="font-size:24px;color:${pc}">${r.title}</h2><p style="color:#6B7280;font-size:14px">${r.subtitle}</p></div>${sh}<div style="background:${pc};color:white;padding:15px;border-radius:8px;margin-top:20px"><div style="display:flex;justify-content:space-between"><span style="font-weight:bold;font-size:16px">${r.bottomBar.label}</span><span style="font-weight:bold;font-size:18px">${formatCurrency(r.bottomBar.amount, cur)}</span></div></div><div style="margin-top:40px;text-align:center"><p style="color:#9CA3AF;font-size:10px">Generated automatically.</p>${org.footerText ? `<p style="color:#9CA3AF;font-size:10px">${org.footerText}</p>` : ''}</div></div></body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escapeHtml(r.title)}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111827;line-height:1.5}.container{max-width:800px;margin:0 auto;padding:40px}</style></head><body><div class="container"><div style="margin-bottom:30px">${renderLogoHtml(org, 'max-height:60px')}<h1 style="color:${pc};margin:10px 0 5px 0;font-size:24px">${escapeHtml(org.name)}</h1>${org.address ? `<p style="color:#6B7280;font-size:12px">${escapeHtml(org.address)}</p>` : ''}</div><div style="text-align:center;margin-bottom:30px"><h2 style="font-size:24px;color:${pc}">${escapeHtml(r.title)}</h2><p style="color:#6B7280;font-size:14px">${escapeHtml(r.subtitle)}</p></div>${sh}<div style="background:${pc};color:white;padding:15px;border-radius:8px;margin-top:20px"><div style="display:flex;justify-content:space-between"><span style="font-weight:bold;font-size:16px">${escapeHtml(r.bottomBar.label)}</span><span style="font-weight:bold;font-size:18px">${formatCurrency(r.bottomBar.amount, cur)}</span></div></div><div style="margin-top:40px;text-align:center"><p style="color:#9CA3AF;font-size:10px">Generated automatically.</p>${org.footerText ? `<p style="color:#9CA3AF;font-size:10px">${escapeHtml(org.footerText)}</p>` : ''}</div></div></body></html>`;
   }
 
   private async getOrganizationInfo(organizationId: string): Promise<OrganizationInfo> {
@@ -699,31 +706,9 @@ export class PdfService {
     };
   }
 
-  private async htmlToPdf(html: string): Promise<Buffer> {
-    let browser: puppeteer.Browser | undefined;
-    try {
-      browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      });
-      const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0' });
-      const pdf = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: {
-          top: '20mm',
-          right: '15mm',
-          bottom: '20mm',
-          left: '15mm',
-        },
-      });
-      return Buffer.from(pdf);
-    } finally {
-      if (browser) {
-        await browser.close();
-      }
-    }
+  /** Renders in a sandboxed browser: no JavaScript, no network (see pdf-renderer.ts). */
+  private htmlToPdf(html: string): Promise<Buffer> {
+    return renderHtmlToPdf(html);
   }
 
   private generateStatementHtml(
@@ -750,14 +735,14 @@ export class PdfService {
       currency: string;
     },
   ): string {
-    const primaryColor = org.primaryColor || '#3B82F6';
+    const primaryColor = safeColor(org.primaryColor, '#3B82F6');
 
     const transactionRows = data.transactions
       .map(
         (t) => `
         <tr style="border-bottom: 1px solid #E5E7EB;">
           <td style="padding: 10px; font-size: 12px;">${formatDate(t.date)}</td>
-          <td style="padding: 10px; font-size: 12px;">${t.description}</td>
+          <td style="padding: 10px; font-size: 12px;">${escapeHtml(t.description)}</td>
           <td style="padding: 10px; text-align: right; font-size: 12px;">${t.debit > 0 ? formatCurrency(t.debit, data.currency) : '-'}</td>
           <td style="padding: 10px; text-align: right; font-size: 12px;">${t.credit > 0 ? formatCurrency(t.credit, data.currency) : '-'}</td>
           <td style="padding: 10px; text-align: right; font-size: 12px; font-weight: bold;">${formatCurrency(t.balance, data.currency)}</td>
@@ -771,7 +756,7 @@ export class PdfService {
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>Statement of Account - ${data.customer.name}</title>
+        <title>Statement of Account - ${escapeHtml(data.customer.name)}</title>
         <style>
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #111827; line-height: 1.5; }
@@ -783,9 +768,9 @@ export class PdfService {
           <!-- Header -->
           <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
             <div>
-              ${org.logoUrl ? `<img src="${org.logoUrl}" alt="${org.name}" style="max-height: 60px;" />` : ''}
-              <h1 style="color: ${primaryColor}; margin: 10px 0 5px 0; font-size: 24px;">${org.name}</h1>
-              ${org.address ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${org.address}</p>` : ''}
+              ${renderLogoHtml(org, 'max-height: 60px;')}
+              <h1 style="color: ${primaryColor}; margin: 10px 0 5px 0; font-size: 24px;">${escapeHtml(org.name)}</h1>
+              ${org.address ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${escapeHtml(org.address)}</p>` : ''}
             </div>
           </div>
 
@@ -798,9 +783,9 @@ export class PdfService {
           <!-- Customer Info -->
           <div style="margin-bottom: 30px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px;">CUSTOMER</h4>
-            <p style="font-weight: bold;">${data.customer.name}</p>
-            ${data.customer.address ? `<p style="color: #6B7280; font-size: 12px;">${data.customer.address}</p>` : ''}
-            ${data.customer.city && data.customer.country ? `<p style="color: #6B7280; font-size: 12px;">${data.customer.city}, ${data.customer.country}</p>` : ''}
+            <p style="font-weight: bold;">${escapeHtml(data.customer.name)}</p>
+            ${data.customer.address ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(data.customer.address)}</p>` : ''}
+            ${data.customer.city && data.customer.country ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(data.customer.city)}, ${escapeHtml(data.customer.country)}</p>` : ''}
           </div>
 
           <!-- Opening Balance -->
@@ -838,7 +823,7 @@ export class PdfService {
           <!-- Footer -->
           <div style="margin-top: 40px; text-align: center;">
             <p style="color: #9CA3AF; font-size: 10px;">This statement was generated automatically.</p>
-            ${org.footerText ? `<p style="color: #9CA3AF; font-size: 10px;">${org.footerText}</p>` : ''}
+            ${org.footerText ? `<p style="color: #9CA3AF; font-size: 10px;">${escapeHtml(org.footerText)}</p>` : ''}
           </div>
         </div>
       </body>

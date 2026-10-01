@@ -9,6 +9,7 @@ import {
   FinancialNarrativeResponse,
 } from '../prompts/forecasting.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 export interface NarrativeSection {
   id: string;
@@ -193,7 +194,7 @@ export class FinancialNarrativeService {
       }
     } catch (error) {
       this.logger.debug(
-        `Ollama narrative generation unavailable, falling back to templates: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama narrative generation unavailable, falling back to templates: ${describeError(error)}`,
       );
     }
 

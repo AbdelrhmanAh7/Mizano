@@ -68,6 +68,55 @@ export interface DocumentLineItem {
   amount: number;
 }
 
+// ---------------------------------------------------------------------------
+// HTML safety helpers
+//
+// Every value that is not a number/date formatter result and is interpolated into the
+// HTML must go through `escapeHtml`. Colours and image sources land in attributes and
+// CSS, where HTML escaping is not enough, so they use `safeColor` / `safeImageSrc`.
+// ---------------------------------------------------------------------------
+
+const HTML_ESCAPES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+  '`': '&#96;',
+};
+
+/** Escape text for use in HTML element content and quoted attribute values. */
+export function escapeHtml(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/[&<>"'`]/g, (ch) => HTML_ESCAPES[ch]);
+}
+
+/** Accepts only hex colours (#RGB, #RGBA, #RRGGBB, #RRGGBBAA); anything else falls back. */
+export function safeColor(value: string | undefined | null, fallback: string): string {
+  return typeof value === 'string' &&
+    /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value)
+    ? value
+    : fallback;
+}
+
+const SAFE_IMAGE_DATA_URI = /^data:image\/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/;
+
+/**
+ * Only inline `data:image/...;base64` sources are allowed. Remote URLs are refused: the PDF
+ * renderer has no network access (SSRF protection), so they could never load anyway.
+ */
+export function safeImageSrc(url: string | undefined | null): string | undefined {
+  return typeof url === 'string' && SAFE_IMAGE_DATA_URI.test(url) ? url : undefined;
+}
+
+/** `<img>` for the organization logo, or an empty string when there is no safe source. */
+export function renderLogoHtml(org: OrganizationInfo, style: string): string {
+  const src = safeImageSrc(org.logoUrl);
+  return src
+    ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(org.name)}" style="${style}" />`
+    : '';
+}
+
 // Common formatting utilities
 export function formatCurrency(amount: number | string, currency: string = 'SAR'): string {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -99,18 +148,18 @@ export function formatShortDate(date: Date | string, locale: string = 'en-SA'): 
 
 // Generate header section for documents
 export function generateHeaderHtml(org: OrganizationInfo, primaryColor?: string): string {
-  const color = primaryColor || org.primaryColor || defaultTemplateConfig.colors.primary;
+  const color = safeColor(primaryColor || org.primaryColor, defaultTemplateConfig.colors.primary);
 
   return `
     <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
       <div>
-        ${org.logoUrl ? `<img src="${org.logoUrl}" alt="${org.name}" style="max-height: 60px; max-width: 200px;" />` : ''}
-        <h1 style="color: ${color}; margin: 10px 0 5px 0; font-size: 24px;">${org.name}</h1>
-        ${org.address ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${org.address}</p>` : ''}
-        ${org.city && org.country ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${org.city}, ${org.country}</p>` : ''}
-        ${org.phone ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">Tel: ${org.phone}</p>` : ''}
-        ${org.email ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">Email: ${org.email}</p>` : ''}
-        ${org.taxId ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">Tax ID: ${org.taxId}</p>` : ''}
+        ${renderLogoHtml(org, 'max-height: 60px; max-width: 200px;')}
+        <h1 style="color: ${color}; margin: 10px 0 5px 0; font-size: 24px;">${escapeHtml(org.name)}</h1>
+        ${org.address ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${escapeHtml(org.address)}</p>` : ''}
+        ${org.city && org.country ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">${escapeHtml(org.city)}, ${escapeHtml(org.country)}</p>` : ''}
+        ${org.phone ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">Tel: ${escapeHtml(org.phone)}</p>` : ''}
+        ${org.email ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">Email: ${escapeHtml(org.email)}</p>` : ''}
+        ${org.taxId ? `<p style="margin: 2px 0; color: #6B7280; font-size: 12px;">Tax ID: ${escapeHtml(org.taxId)}</p>` : ''}
       </div>
     </div>
   `;
@@ -118,7 +167,7 @@ export function generateHeaderHtml(org: OrganizationInfo, primaryColor?: string)
 
 // Generate footer section for documents
 export function generateFooterHtml(org: OrganizationInfo, primaryColor?: string): string {
-  const color = primaryColor || org.primaryColor || defaultTemplateConfig.colors.primary;
+  const color = safeColor(primaryColor || org.primaryColor, defaultTemplateConfig.colors.primary);
 
   return `
     <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid ${defaultTemplateConfig.colors.border};">
@@ -127,7 +176,7 @@ export function generateFooterHtml(org: OrganizationInfo, primaryColor?: string)
           ? `
         <div style="margin-bottom: 15px;">
           <h4 style="color: ${color}; margin-bottom: 5px; font-size: 12px;">Bank Details</h4>
-          <p style="white-space: pre-line; color: #6B7280; font-size: 11px;">${org.bankDetails}</p>
+          <p style="white-space: pre-line; color: #6B7280; font-size: 11px;">${escapeHtml(org.bankDetails)}</p>
         </div>
       `
           : ''
@@ -135,7 +184,7 @@ export function generateFooterHtml(org: OrganizationInfo, primaryColor?: string)
       ${
         org.footerText
           ? `
-        <p style="text-align: center; color: #9CA3AF; font-size: 10px;">${org.footerText}</p>
+        <p style="text-align: center; color: #9CA3AF; font-size: 10px;">${escapeHtml(org.footerText)}</p>
       `
           : ''
       }
@@ -150,7 +199,7 @@ export function generateItemsTableHtml(
   showTax: boolean = true,
   primaryColor?: string,
 ): string {
-  const color = primaryColor || defaultTemplateConfig.colors.primary;
+  const color = safeColor(primaryColor, defaultTemplateConfig.colors.primary);
 
   const headers = ['Description', 'Qty', 'Rate', ...(showTax ? ['Tax %'] : []), 'Amount'];
 
@@ -165,10 +214,10 @@ export function generateItemsTableHtml(
     .map(
       (item) => `
       <tr style="border-bottom: 1px solid ${defaultTemplateConfig.colors.border};">
-        <td style="padding: 10px; font-size: 12px;">${item.description}</td>
-        <td style="padding: 10px; text-align: right; font-size: 12px;">${item.quantity}</td>
+        <td style="padding: 10px; font-size: 12px;">${escapeHtml(item.description)}</td>
+        <td style="padding: 10px; text-align: right; font-size: 12px;">${escapeHtml(item.quantity)}</td>
         <td style="padding: 10px; text-align: right; font-size: 12px;">${formatCurrency(item.rate, currency)}</td>
-        ${showTax ? `<td style="padding: 10px; text-align: right; font-size: 12px;">${item.taxRate || 0}%</td>` : ''}
+        ${showTax ? `<td style="padding: 10px; text-align: right; font-size: 12px;">${escapeHtml(item.taxRate || 0)}%</td>` : ''}
         <td style="padding: 10px; text-align: right; font-size: 12px; font-weight: bold;">${formatCurrency(item.amount, currency)}</td>
       </tr>
     `,
@@ -221,8 +270,8 @@ export function generateTotalsHtml(
           .map(
             (row) => `
           <tr>
-            <td style="padding: 8px; text-align: left; font-size: 12px; ${row.bold ? 'font-weight: bold; font-size: 14px;' : ''}">${row.label}</td>
-            <td style="padding: 8px; text-align: right; font-size: 12px; ${row.bold ? 'font-weight: bold; font-size: 14px; color: #111827;' : ''}">${row.value}</td>
+            <td style="padding: 8px; text-align: left; font-size: 12px; ${row.bold ? 'font-weight: bold; font-size: 14px;' : ''}">${escapeHtml(row.label)}</td>
+            <td style="padding: 8px; text-align: right; font-size: 12px; ${row.bold ? 'font-weight: bold; font-size: 14px; color: #111827;' : ''}">${escapeHtml(row.value)}</td>
           </tr>
         `,
           )

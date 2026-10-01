@@ -4,6 +4,8 @@ import {
   formatDate,
   generateHeaderHtml,
   defaultTemplateConfig,
+  escapeHtml,
+  safeColor,
 } from './base.template';
 
 export interface PayslipData {
@@ -38,7 +40,7 @@ export interface PayslipData {
 }
 
 export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData): string {
-  const primaryColor = org.primaryColor || defaultTemplateConfig.colors.primary;
+  const primaryColor = safeColor(org.primaryColor, defaultTemplateConfig.colors.primary);
 
   const payPeriod = `${formatDate(payslip.payPeriodStart)} - ${formatDate(payslip.payPeriodEnd)}`;
 
@@ -47,7 +49,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Payslip - ${payslip.employee.name}</title>
+      <title>Payslip - ${escapeHtml(payslip.employee.name)}</title>
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #111827; line-height: 1.5; }
@@ -74,18 +76,18 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
             <table style="font-size: 12px;">
               <tr>
                 <td style="padding: 3px 15px 3px 0; color: #6B7280;">Name:</td>
-                <td style="font-weight: bold;">${payslip.employee.name}</td>
+                <td style="font-weight: bold;">${escapeHtml(payslip.employee.name)}</td>
               </tr>
               <tr>
                 <td style="padding: 3px 15px 3px 0; color: #6B7280;">Employee ID:</td>
-                <td>${payslip.employee.employeeId}</td>
+                <td>${escapeHtml(payslip.employee.employeeId)}</td>
               </tr>
               ${
                 payslip.employee.department
                   ? `
                 <tr>
                   <td style="padding: 3px 15px 3px 0; color: #6B7280;">Department:</td>
-                  <td>${payslip.employee.department}</td>
+                  <td>${escapeHtml(payslip.employee.department)}</td>
                 </tr>
               `
                   : ''
@@ -95,7 +97,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
                   ? `
                 <tr>
                   <td style="padding: 3px 15px 3px 0; color: #6B7280;">Position:</td>
-                  <td>${payslip.employee.position}</td>
+                  <td>${escapeHtml(payslip.employee.position)}</td>
                 </tr>
               `
                   : ''
@@ -106,7 +108,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
             <table style="margin-left: auto; font-size: 12px;">
               <tr>
                 <td style="padding: 3px 15px 3px 0; color: #6B7280;">Payslip No:</td>
-                <td style="font-weight: bold;">${payslip.payslipNumber}</td>
+                <td style="font-weight: bold;">${escapeHtml(payslip.payslipNumber)}</td>
               </tr>
               <tr>
                 <td style="padding: 3px 15px 3px 0; color: #6B7280;">Pay Date:</td>
@@ -117,7 +119,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
                   ? `
                 <tr>
                   <td style="padding: 3px 15px 3px 0; color: #6B7280;">Bank Account:</td>
-                  <td>${payslip.employee.bankAccount}</td>
+                  <td>${escapeHtml(payslip.employee.bankAccount)}</td>
                 </tr>
               `
                   : ''
@@ -138,7 +140,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
                 .map(
                   (e) => `
                 <tr style="border-bottom: 1px solid ${defaultTemplateConfig.colors.border};">
-                  <td style="padding: 8px 0;">${e.description}</td>
+                  <td style="padding: 8px 0;">${escapeHtml(e.description)}</td>
                   <td style="padding: 8px 0; text-align: right; font-weight: ${e.isGross ? 'bold' : 'normal'};">
                     ${formatCurrency(e.amount, payslip.currency)}
                   </td>
@@ -167,7 +169,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
                       .map(
                         (d) => `
                 <tr style="border-bottom: 1px solid ${defaultTemplateConfig.colors.border};">
-                  <td style="padding: 8px 0;">${d.description}</td>
+                  <td style="padding: 8px 0;">${escapeHtml(d.description)}</td>
                   <td style="padding: 8px 0; text-align: right; color: #EF4444;">
                     -${formatCurrency(d.amount, payslip.currency)}
                   </td>
@@ -228,7 +230,7 @@ export function generatePayslipHtml(org: OrganizationInfo, payslip: PayslipData)
           <p style="color: #9CA3AF; font-size: 10px;">
             This is a computer-generated payslip and does not require a signature.
           </p>
-          ${org.footerText ? `<p style="color: #9CA3AF; font-size: 10px; margin-top: 10px;">${org.footerText}</p>` : ''}
+          ${org.footerText ? `<p style="color: #9CA3AF; font-size: 10px; margin-top: 10px;">${escapeHtml(org.footerText)}</p>` : ''}
         </div>
       </div>
     </body>

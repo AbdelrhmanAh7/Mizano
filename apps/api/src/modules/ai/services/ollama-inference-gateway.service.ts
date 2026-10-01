@@ -8,6 +8,7 @@ import {
   OllamaInferencePriority,
   OllamaStreamChunk,
 } from '../types/ollama-inference.types';
+import { describeError } from '../../../common/utils/redact';
 
 interface PriorityWaiter {
   priority: OllamaInferencePriority;
@@ -72,9 +73,7 @@ export class OllamaInferenceGateway implements OnModuleInit {
 
     // Fire-and-forget warmup — don't block app startup
     this.warmUpModel().catch((err) => {
-      this.logger.warn(
-        `Model warmup failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
-      );
+      this.logger.warn(`Model warmup failed (non-fatal): ${describeError(err)}`);
     });
   }
 
@@ -115,7 +114,7 @@ export class OllamaInferenceGateway implements OnModuleInit {
       this.logger.log(`Model "${model}" warmed up in ${Date.now() - start}ms`);
     } catch (err) {
       this.logger.warn(
-        `Model warmup request failed after ${Date.now() - start}ms: ${err instanceof Error ? err.message : String(err)}`,
+        `Model warmup request failed after ${Date.now() - start}ms: ${describeError(err)}`,
       );
     }
   }
@@ -203,9 +202,7 @@ export class OllamaInferenceGateway implements OnModuleInit {
       return available;
     } catch (error) {
       this.lastHealthCheck = { available: false, timestamp: Date.now() };
-      this.logger.debug(
-        `isHealthy: fresh check FAILED: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.debug(`isHealthy: fresh check FAILED: ${describeError(error)}`);
       return false;
     }
   }
@@ -243,9 +240,7 @@ export class OllamaInferenceGateway implements OnModuleInit {
         available: false,
         timestamp: Date.now(),
       });
-      this.logger.debug(
-        `isModelAvailable(${modelName}): FAILED: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.debug(`isModelAvailable(${modelName}): FAILED: ${describeError(error)}`);
       return false;
     }
   }
@@ -416,8 +411,9 @@ export class OllamaInferenceGateway implements OnModuleInit {
 
       const parsed = this.parseJsonResponse(content);
       if (!parsed) {
+        // Never log the model output: it echoes the document text it was given.
         this.logger.warn(
-          `Ollama returned unparseable JSON (model=${model}, content=${content.slice(0, 200)})`,
+          `Ollama returned unparseable JSON (model=${model}, contentLen=${content.length})`,
         );
         return null;
       }
@@ -430,7 +426,7 @@ export class OllamaInferenceGateway implements OnModuleInit {
     } catch (error) {
       this.lastHealthCheck = null;
       this.logger.warn(
-        `Ollama inference failed (model=${model}, attempt=${attempt}): ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama inference failed (model=${model}, attempt=${attempt}): ${describeError(error)}`,
       );
       return null;
     } finally {

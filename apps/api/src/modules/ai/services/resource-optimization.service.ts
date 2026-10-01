@@ -4,6 +4,7 @@ import { holtWinters, simpleExponentialSmoothing } from '../utils/holt-winters.u
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildResourcePrompt } from '../prompts/hr.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ss = require('simple-statistics');
 
@@ -226,7 +227,7 @@ export class ResourceOptimizationService {
         forecasts = simpleExponentialSmoothing(values, 0.3, forecastMonths);
       }
     } catch (error) {
-      this.logger.warn(`Forecasting failed, using SES fallback: ${error}`);
+      this.logger.warn(`Forecasting failed, using SES fallback: ${describeError(error)}`);
       forecasts = simpleExponentialSmoothing(values, 0.3, forecastMonths);
     }
 
@@ -414,7 +415,7 @@ export class ResourceOptimizationService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama resource optimization failed, using rule-based: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama resource optimization failed, using rule-based: ${describeError(error)}`,
       );
     }
 

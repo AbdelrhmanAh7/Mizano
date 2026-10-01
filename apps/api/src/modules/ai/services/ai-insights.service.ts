@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import type { AIInsight, AlertCategory, AlertSource, Prisma } from '@prisma/client';
+import { describeError } from '../../../common/utils/redact';
 
 interface RawInsight {
   type: string;
@@ -197,9 +198,7 @@ export class AiInsightsService {
         const result = await analyzer.fn();
         if (result) rawInsights.push(result);
       } catch (error) {
-        this.logger.warn(
-          `Insight analyzer "${analyzer.name}" failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        this.logger.warn(`Insight analyzer "${analyzer.name}" failed: ${describeError(error)}`);
       }
     }
 

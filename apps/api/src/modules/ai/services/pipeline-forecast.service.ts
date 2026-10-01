@@ -7,6 +7,7 @@ import {
   PipelineNarrativeResponse,
 } from '../prompts/forecasting.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 export interface PipelineForecast {
   totalWeighted: number;
@@ -221,9 +222,7 @@ export class PipelineForecastService {
         predictionMethod = 'HYBRID';
       }
     } catch (error) {
-      this.logger.debug(
-        `Ollama pipeline narrative unavailable: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.debug(`Ollama pipeline narrative unavailable: ${describeError(error)}`);
     }
 
     return {

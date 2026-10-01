@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 @Injectable()
 export class AiCategorizationService {
@@ -49,7 +50,7 @@ export class AiCategorizationService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama categorization failed, falling back to rule-based: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama categorization failed, falling back to rule-based: ${describeError(error)}`,
       );
     }
 
@@ -97,7 +98,7 @@ export class AiCategorizationService {
     const normalizedPattern = this.normalizeDescription(description);
 
     // Log the categorization for debugging/analytics purposes
-    this.logger.log(`Categorization learned: ${normalizedPattern} -> ${accountId} (${type})`);
+    this.logger.log(`Categorization learned: account=${accountId} (${type})`);
 
     return { success: true, pattern: normalizedPattern };
   }

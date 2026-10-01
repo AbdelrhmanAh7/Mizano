@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildDynamicPricingPrompt, DynamicPricingResponse } from '../prompts/sales-crm.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ss = require('simple-statistics');
@@ -200,9 +201,7 @@ export class DynamicPricingService {
         }
       }
     } catch (error) {
-      this.logger.warn(
-        `Ollama pricing failed for item ${itemId}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.warn(`Ollama pricing failed for item ${itemId}: ${describeError(error)}`);
     }
 
     // Blend: Ollama + rule-based

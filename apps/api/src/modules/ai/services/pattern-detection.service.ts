@@ -16,6 +16,7 @@ import {
   daysBetween,
   calculateNextOccurrence,
 } from '../utils/date-pattern.util';
+import { describeError } from '../../../common/utils/redact';
 
 interface TransactionData {
   id: string;
@@ -138,9 +139,7 @@ export class PatternDetectionService {
             result.predictionMethod = 'HYBRID';
           }
         } catch (error) {
-          this.logger.warn(
-            `Ollama pattern detection failed: ${error instanceof Error ? error.message : String(error)}`,
-          );
+          this.logger.warn(`Ollama pattern detection failed: ${describeError(error)}`);
         }
       }
 
@@ -150,7 +149,7 @@ export class PatternDetectionService {
 
       return result;
     } catch (error) {
-      this.logger.error(`Pattern analysis failed: ${error.message}`);
+      this.logger.error(`Pattern analysis failed: ${describeError(error)}`);
       throw error;
     }
   }

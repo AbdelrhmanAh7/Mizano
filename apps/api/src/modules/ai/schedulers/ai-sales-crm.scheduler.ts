@@ -6,6 +6,7 @@ import { ClvAnalysisService } from '../services/clv-analysis.service';
 import { CrossSellService } from '../services/cross-sell.service';
 import { DynamicPricingService } from '../services/dynamic-pricing.service';
 import { PipelineForecastService } from '../services/pipeline-forecast.service';
+import { describeError } from '../../../common/utils/redact';
 
 const BATCH_SIZE = 5;
 
@@ -45,21 +46,23 @@ export class AiSalesCrmScheduler {
                 `Org ${org.name}: Churn prediction - ${result.processed} customers (high: ${result.highRisk}, medium: ${result.mediumRisk}, low: ${result.lowRisk})`,
               );
             } catch (error) {
-              this.logger.error(`Error predicting churn for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error predicting churn for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Weekly churn prediction completed');
     } catch (error) {
-      this.logger.error(`Weekly churn prediction failed: ${error.message}`);
+      this.logger.error(`Weekly churn prediction failed: ${describeError(error)}`);
     }
   }
 
@@ -84,21 +87,21 @@ export class AiSalesCrmScheduler {
               const result = await this.clvService.calculateAllCLV(org.id);
               this.logger.log(`Org ${org.name}: CLV calculated for ${result.processed} customers`);
             } catch (error) {
-              this.logger.error(`Error calculating CLV for org ${org.id}: ${error.message}`);
+              this.logger.error(`Error calculating CLV for org ${org.id}: ${describeError(error)}`);
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Monthly CLV calculation completed');
     } catch (error) {
-      this.logger.error(`Monthly CLV calculation failed: ${error.message}`);
+      this.logger.error(`Monthly CLV calculation failed: ${describeError(error)}`);
     }
   }
 
@@ -126,7 +129,7 @@ export class AiSalesCrmScheduler {
               );
             } catch (error) {
               this.logger.error(
-                `Error rebuilding cross-sell matrix for org ${org.id}: ${error.message}`,
+                `Error rebuilding cross-sell matrix for org ${org.id}: ${describeError(error)}`,
               );
             }
           }),
@@ -134,14 +137,14 @@ export class AiSalesCrmScheduler {
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Weekly cross-sell matrix rebuild completed');
     } catch (error) {
-      this.logger.error(`Weekly cross-sell matrix rebuild failed: ${error.message}`);
+      this.logger.error(`Weekly cross-sell matrix rebuild failed: ${describeError(error)}`);
     }
   }
 
@@ -168,21 +171,23 @@ export class AiSalesCrmScheduler {
                 `Org ${org.name}: Pricing analysis - ${result.analyzed} items analyzed`,
               );
             } catch (error) {
-              this.logger.error(`Error analyzing pricing for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error analyzing pricing for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Monthly pricing analysis completed');
     } catch (error) {
-      this.logger.error(`Monthly pricing analysis failed: ${error.message}`);
+      this.logger.error(`Monthly pricing analysis failed: ${describeError(error)}`);
     }
   }
 
@@ -209,21 +214,23 @@ export class AiSalesCrmScheduler {
                 `Org ${org.name}: Pipeline forecast - weighted value: ${result.totalWeighted.toFixed(2)}, active deals: ${result.activeDeals}`,
               );
             } catch (error) {
-              this.logger.error(`Error forecasting pipeline for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error forecasting pipeline for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Weekly pipeline forecast completed');
     } catch (error) {
-      this.logger.error(`Weekly pipeline forecast failed: ${error.message}`);
+      this.logger.error(`Weekly pipeline forecast failed: ${describeError(error)}`);
     }
   }
 }

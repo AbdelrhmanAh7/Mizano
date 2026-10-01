@@ -7,6 +7,7 @@ import {
   buildOcrTextExtractionPrompt,
 } from '../prompts/ollama-extraction.prompts';
 import { preprocessForVlm } from '../utils/image-preprocessor.util';
+import { describeError } from '../../../common/utils/redact';
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -116,7 +117,7 @@ export class OllamaService {
     try {
       processed = await preprocessForVlm(fileBuffer, mimeType);
     } catch (err) {
-      this.logger.error(`Image preprocessing failed: ${err instanceof Error ? err.message : err}`);
+      this.logger.error(`Image preprocessing failed: ${describeError(err)}`);
       return null;
     }
     const base64 = processed.toString('base64');
@@ -192,9 +193,11 @@ export class OllamaService {
       return null;
     }
 
-    // Log the raw LLM JSON response
-    this.logger.log(`[LLM OUTPUT] Raw JSON from ${result.model} (${result.processingTimeMs}ms):`);
-    this.logger.log(JSON.stringify(result.data, null, 2));
+    // The raw LLM JSON holds invoice fields (vendor, amounts, tax ids): log metadata only.
+    this.logger.log(
+      `[LLM OUTPUT] Response from ${result.model} (${result.processingTimeMs}ms, ` +
+        `fields=${Object.keys(result.data ?? {}).length})`,
+    );
 
     return this.toDocumentExtractionResult(result.data, ocrText, result.processingTimeMs);
   }
@@ -322,9 +325,7 @@ export class OllamaService {
       }
     }
 
-    this.logger.warn(
-      `[NumberFix] LLM numbers inconsistent or missing: total=${total}, subtotal=${subtotal}, tax=${tax}`,
-    );
+    this.logger.warn('[NumberFix] LLM numbers inconsistent or missing; running reconciliation');
 
     // Collect ALL numbers from the extraction (LLM output + line items)
     const allNums: number[] = [];
@@ -351,7 +352,7 @@ export class OllamaService {
           const impliedRate = smaller / larger;
           if (impliedRate >= 0.03 && impliedRate <= 0.25) {
             this.logger.warn(
-              `[NumberFix] Math triplet: ${larger} + ${smaller} = ${c} (rate=${(impliedRate * 100).toFixed(1)}%)`,
+              `[NumberFix] Math triplet found (rate=${(impliedRate * 100).toFixed(1)}%)`,
             );
             total = c;
             subtotal = larger;
@@ -377,9 +378,7 @@ export class OllamaService {
             const subExists = unique.some((n) => Math.abs(n - derivedSub) < 0.02);
             const taxExists = unique.some((n) => Math.abs(n - derivedTax) < 0.02);
             if (subExists || taxExists) {
-              this.logger.warn(
-                `[NumberFix] Derived: total=${candidate}, subtotal=${derivedSub}, tax=${derivedTax} (${rate * 100}%)`,
-              );
+              this.logger.warn(`[NumberFix] Derived totals using ${rate * 100}% tax rate`);
               total = candidate;
               subtotal = derivedSub;
               tax = derivedTax;
@@ -439,7 +438,7 @@ export class OllamaService {
     let cleaned = lineItems.filter((li) => {
       const desc = (li.description || '').toLowerCase().trim();
       if (OllamaService.COLUMN_HEADERS.has(desc)) {
-        this.logger.warn(`[LineFix] Removing fake line item: "${li.description}" (column header)`);
+        this.logger.warn('[LineFix] Removing fake line item (column header)');
         return false;
       }
       // Remove items with no meaningful description (1-2 chars)
@@ -458,7 +457,7 @@ export class OllamaService {
           for (const div of [10, 100]) {
             const fixedQty = li.quantity / div;
             if (fixedQty >= 1 && Math.abs(fixedQty * li.unitPrice - li.total) / li.total < 0.1) {
-              this.logger.warn(`[LineFix] qty ${li.quantity}→${fixedQty} for "${li.description}"`);
+              this.logger.warn(`[LineFix] Corrected line quantity (divisor=${div})`);
               return { ...li, quantity: fixedQty };
             }
           }
@@ -467,9 +466,7 @@ export class OllamaService {
             const realQty = Math.round(li.quantity / 10) || 1;
             const realUnitPrice = Math.round((li.total / realQty) * 10000) / 10000;
             if (realQty >= 1 && Math.abs(realQty * realUnitPrice - (subtotal || li.total)) < 0.1) {
-              this.logger.warn(
-                `[LineFix] Reconstructed: qty=${realQty}, unitPrice=${realUnitPrice}`,
-              );
+              this.logger.warn('[LineFix] Reconstructed line quantity and unit price');
               return { ...li, quantity: realQty, unitPrice: realUnitPrice };
             }
           }
@@ -488,9 +485,6 @@ export class OllamaService {
         cleaned = cleaned.map((li) => {
           const preTax = Math.round((li.total / (1 + taxRate)) * 100) / 100;
           const lineTax = Math.round((li.total - preTax) * 100) / 100;
-          this.logger.warn(
-            `[LineFix] Tax split "${li.description}": unitPrice→${preTax / (li.quantity || 1)}, tax→${lineTax}`,
-          );
           return {
             ...li,
             unitPrice: Math.round((preTax / (li.quantity || 1)) * 10000) / 10000,

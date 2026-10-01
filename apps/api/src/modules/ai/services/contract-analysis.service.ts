@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildContractAnalysisPrompt } from '../prompts/nlp.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const nlp = require('compromise');
@@ -254,7 +255,7 @@ export class ContractAnalysisService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama contract analysis failed, falling back to NLP/regex: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama contract analysis failed, falling back to NLP/regex: ${describeError(error)}`,
       );
     }
 

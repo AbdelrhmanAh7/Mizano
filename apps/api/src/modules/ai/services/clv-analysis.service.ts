@@ -4,6 +4,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildClvPrompt, ClvResponse } from '../prompts/sales-crm.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ss = require('simple-statistics');
@@ -154,9 +155,7 @@ export class ClvAnalysisService {
         ollamaClv = ollamaResult.data.clv_estimate;
       }
     } catch (error) {
-      this.logger.warn(
-        `Ollama CLV failed for customer ${customerId}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.warn(`Ollama CLV failed for customer ${customerId}: ${describeError(error)}`);
     }
 
     // Blend: Ollama + rule-based (CLV has no separate ML model)
@@ -213,7 +212,7 @@ export class ClvAnalysisService {
         const result = await this.calculateCLV(organizationId, customer.id);
         clvValues.push({ customerId: customer.id, clv: result.lifetimeValue });
       } catch (error) {
-        this.logger.warn(`Failed to calculate CLV for ${customer.id}: ${error.message}`);
+        this.logger.warn(`Failed to calculate CLV for ${customer.id}: ${describeError(error)}`);
       }
     }
 

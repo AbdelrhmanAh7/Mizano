@@ -374,6 +374,7 @@ export function LoggerDashboard() {
     selectedIds,
     isOpen,
     logsLoading,
+    accessDenied,
     isClearing,
     isGeneratingPrompt,
     setFilter,
@@ -423,6 +424,10 @@ export function LoggerDashboard() {
     },
     [setFilter],
   );
+
+  // The log endpoints are admin-only (settings.edit): other users never see the trigger.
+  // Their own errors are still reported by useGlobalErrorCapture above.
+  if (accessDenied) return null;
 
   const errorCount = stats?.totalErrors || 0;
   const warnCount = stats?.totalWarnings || 0;

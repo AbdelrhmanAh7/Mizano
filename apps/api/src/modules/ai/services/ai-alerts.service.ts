@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AlertCategory, AlertPriority, AlertSource, AIInsight, Prisma } from '@prisma/client';
+import { describeError } from '../../../common/utils/redact';
 
 export interface UnifiedAlert {
   id: string;
@@ -155,7 +156,7 @@ export class AiAlertsService {
 
       return { created, updated, expired };
     } catch (error) {
-      this.logger.error(`Alert aggregation failed: ${error.message}`);
+      this.logger.error(`Alert aggregation failed: ${describeError(error)}`);
       throw error;
     }
   }

@@ -5,9 +5,12 @@ Reads the current Cloudflare tunnel URL from a file and forwards all
 Ollama API requests to it.  When the tunnel is down, returns 503.
 """
 
+import hashlib
+import hmac
 import json
 import os
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import httpx
@@ -20,8 +23,41 @@ from fastapi.responses import JSONResponse, StreamingResponse
 # ---------------------------------------------------------------------------
 
 TUNNEL_URL_FILE = os.environ.get("TUNNEL_URL_FILE", "/data/ollama_tunnel_url")
-WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "change-me")
 LISTEN_PORT = int(os.environ.get("LISTEN_PORT", "11434"))
+
+# Known placeholder values that must never be accepted as a real secret.
+_PLACEHOLDER_SECRETS = frozenset({"change-me", "changeme", "__change_me__", "secret", "password"})
+
+# There is deliberately NO default: without a real secret the tunnel-update webhook cannot be
+# authenticated, so the proxy refuses to start (see `require_webhook_secret`).
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "").strip()
+
+
+def webhook_secret_is_usable(secret: str) -> bool:
+    """A usable secret is non-empty and not a well-known placeholder."""
+    return bool(secret) and secret.lower() not in _PLACEHOLDER_SECRETS
+
+
+def require_webhook_secret() -> None:
+    """Refuse to run without a real WEBHOOK_SECRET."""
+    if not webhook_secret_is_usable(WEBHOOK_SECRET):
+        raise RuntimeError(
+            "WEBHOOK_SECRET is not set (or is a placeholder). Refusing to start: "
+            "set a long random value for the tunnel-update webhook."
+        )
+
+
+def secrets_match(provided: object, expected: str) -> bool:
+    """Constant-time secret comparison.
+
+    Both values are hashed first so `hmac.compare_digest` always sees equal-length inputs,
+    which also avoids leaking the expected secret's length. Non-string input never matches.
+    """
+    if not isinstance(provided, str) or not expected:
+        return False
+    provided_digest = hashlib.sha256(provided.encode("utf-8")).digest()
+    expected_digest = hashlib.sha256(expected.encode("utf-8")).digest()
+    return hmac.compare_digest(provided_digest, expected_digest)
 
 # Timeouts (seconds)
 CONNECT_TIMEOUT = 15.0
@@ -96,7 +132,14 @@ def _unavailable() -> JSONResponse:
 # FastAPI app
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="Ollama Tunnel Proxy", docs_url=None, redoc_url=None)
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    # Fail fast at startup (also when launched via `uvicorn ollama_proxy:app`).
+    require_webhook_secret()
+    yield
+
+
+app = FastAPI(title="Ollama Tunnel Proxy", docs_url=None, redoc_url=None, lifespan=_lifespan)
 
 
 # ---- Health ----------------------------------------------------------------
@@ -115,9 +158,10 @@ async def health():
         except Exception:
             pass
 
+    # The tunnel URL is an access path to the model host: report only whether one is configured.
     return {
         "proxy": "running",
-        "tunnel_url": tunnel_url or "NOT_CONFIGURED",
+        "tunnel_configured": bool(tunnel_url),
         "ollama_reachable": ollama_reachable,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
@@ -128,19 +172,30 @@ async def health():
 
 @app.post("/api/internal/tunnel-update")
 async def tunnel_update(request: Request):
-    body = await request.json()
-    secret = body.get("secret", "")
-    tunnel_url = body.get("tunnel_url", "")
+    # No usable secret configured: nobody can be authenticated, so reject every request.
+    if not webhook_secret_is_usable(WEBHOOK_SECRET):
+        raise HTTPException(status_code=503, detail="Webhook secret is not configured")
 
-    if secret != WEBHOOK_SECRET:
+    try:
+        body = await request.json()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    if not secrets_match(body.get("secret"), WEBHOOK_SECRET):
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    if not tunnel_url or not tunnel_url.startswith("https://"):
+    tunnel_url = body.get("tunnel_url", "")
+    if not isinstance(tunnel_url, str) or not tunnel_url.startswith("https://"):
         raise HTTPException(status_code=400, detail="Invalid tunnel URL")
 
-    # Write to file
-    os.makedirs(os.path.dirname(TUNNEL_URL_FILE), exist_ok=True)
-    with open(TUNNEL_URL_FILE, "w") as f:
+    # Write to file (private: it holds the access path to the model host)
+    directory = os.path.dirname(TUNNEL_URL_FILE)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    descriptor = os.open(TUNNEL_URL_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w") as f:
         f.write(tunnel_url)
 
     # Update in-memory cache immediately
@@ -148,7 +203,7 @@ async def tunnel_update(request: Request):
     _cached_url = tunnel_url
     _cached_url_ts = time.monotonic()
 
-    return {"status": "ok", "tunnel_url": tunnel_url}
+    return {"status": "ok"}
 
 
 # ---- Catch-all proxy -------------------------------------------------------
@@ -254,4 +309,5 @@ async def proxy(request: Request, path: str):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    require_webhook_secret()
     uvicorn.run(app, host="0.0.0.0", port=LISTEN_PORT)

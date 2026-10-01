@@ -12,6 +12,7 @@ import { buildIsolationForest1D, isolationForestScore1D } from '../utils/isolati
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildAnomalyExplanationPrompt } from '../prompts/operations.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 export interface AnomalyResult {
   isAnomaly: boolean;
@@ -163,9 +164,7 @@ export class AnomalyDetectionService {
         result.predictionMethod = 'HYBRID';
       }
     } catch (error) {
-      this.logger.warn(
-        `Ollama anomaly explanation failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.warn(`Ollama anomaly explanation failed: ${describeError(error)}`);
     }
 
     return result;

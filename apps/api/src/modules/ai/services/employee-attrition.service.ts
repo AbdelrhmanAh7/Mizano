@@ -7,6 +7,7 @@ import { getRiskLevel } from '../utils/risk-level.util';
 import { buildAttritionPrompt } from '../prompts/hr.prompts';
 import { HR_SYSTEM_PROMPT } from '../prompts/hr.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { RandomForestClassifier } = require('ml-random-forest');
@@ -119,7 +120,7 @@ export class EmployeeAttritionService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama attrition prediction failed for employee ${employeeId}: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama attrition prediction failed for employee ${employeeId}: ${describeError(error)}`,
       );
     }
 
@@ -251,7 +252,7 @@ export class EmployeeAttritionService {
         }
       } catch (error) {
         this.logger.warn(
-          `Failed to predict attrition for employee ${employee.id}: ${error.message}`,
+          `Failed to predict attrition for employee ${employee.id}: ${describeError(error)}`,
         );
       }
     }
@@ -322,7 +323,7 @@ export class EmployeeAttritionService {
         features.push(this.featuresToVector(featureSet));
         labels.push(sample.label);
       } catch (error) {
-        this.logger.debug(`Skipping employee ${sample.id} for training: ${error.message}`);
+        this.logger.debug(`Skipping employee ${sample.id} for training: ${describeError(error)}`);
         continue;
       }
     }

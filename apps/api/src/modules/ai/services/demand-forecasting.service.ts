@@ -19,6 +19,7 @@ import {
   ForecastInterpretationResponse,
 } from '../prompts/forecasting.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 export interface DemandForecast {
   forecasts: Array<{
@@ -227,7 +228,7 @@ export class DemandForecastingService {
       }
     } catch (error) {
       this.logger.debug(
-        `Ollama interpretation unavailable for demand forecast: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama interpretation unavailable for demand forecast: ${describeError(error)}`,
       );
     }
 
@@ -355,7 +356,7 @@ export class DemandForecastingService {
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         errors.push(`${item.name}: ${errorMsg}`);
-        this.logger.error(`Failed to forecast item ${item.id}: ${error}`);
+        this.logger.error(`Failed to forecast item ${item.id}: ${describeError(error)}`);
       }
     }
 
