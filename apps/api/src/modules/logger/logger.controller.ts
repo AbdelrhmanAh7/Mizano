@@ -147,7 +147,8 @@ export class LoggerController {
   ) {
     return this.loggerService.capture({
       level: dto.level,
-      source: dto.source,
+      // HTTP captures come from clients; they may never claim the trusted BACKEND source.
+      source: dto.source === LogSource.BACKEND ? LogSource.FRONTEND : dto.source,
       message: dto.message,
       stack: dto.stack,
       context: dto.context,

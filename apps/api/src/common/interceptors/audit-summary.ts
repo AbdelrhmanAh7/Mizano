@@ -1,21 +1,16 @@
-import { redactSensitive } from '../utils/redact';
-
 /**
  * Audit-trail summaries.
  *
  * The audit log answers "who changed which entity, when, and roughly how". It must
- * not become a second copy of the application data or a store for secrets, so only a
- * small, redacted description of the *request* is kept (never the full response):
- * credential-like keys are masked at any depth, strings are truncated, depth and array
- * length are capped, and the whole summary is dropped to field names when it is still
- * too large.
+ * not become a second copy of the application data or a store for secrets, so only the
+ * top-level field names of the request (capped in number and length) and a short
+ * lifecycle status from the response are kept. Values are never stored.
  */
 
 /** Entity types that are never audited (high-volume or credential endpoints). */
 export const AUDIT_EXCLUDED_ENTITY_TYPES: ReadonlySet<string> = new Set(['logger', 'internal']);
 
 /** Max serialized size of the stored summary, in characters. */
-export const AUDIT_SUMMARY_MAX_CHARS = 4000;
 
 const MAX_FIELD_NAMES = 50;
 const MAX_FIELD_NAME_LENGTH = 64;
@@ -26,10 +21,6 @@ const MAX_USER_AGENT_LENGTH = 255;
 export interface AuditSummary {
   /** Top-level field names present in the request. */
   fields: string[];
-  /** Redacted, size-capped copy of the request values. Omitted when over the cap. */
-  values?: unknown;
-  /** True when `values` was dropped because it exceeded the size cap. */
-  truncated?: boolean;
   /** Short lifecycle status after the operation, if the response exposes one. */
   status?: string;
 }
@@ -53,28 +44,11 @@ export function buildAuditSummary(body: unknown, response?: unknown): AuditSumma
     .slice(0, MAX_FIELD_NAMES)
     .map((key) => key.slice(0, MAX_FIELD_NAME_LENGTH));
 
-  const values = redactSensitive(body, {
-    maxDepth: 4,
-    maxStringLength: 200,
-    maxArrayLength: 20,
-  });
-
-  const summary: AuditSummary = { fields, values };
+  // Field names and lifecycle status only: request values (invoice descriptions, amounts,
+  // supplier details, tax ids) are document content and are never copied into the audit log.
+  const summary: AuditSummary = { fields };
   if (status) summary.status = status;
-
-  if (safeLength(summary) > AUDIT_SUMMARY_MAX_CHARS) {
-    delete summary.values;
-    summary.truncated = true;
-  }
   return summary;
-}
-
-function safeLength(value: unknown): number {
-  try {
-    return JSON.stringify(value).length;
-  } catch {
-    return Number.POSITIVE_INFINITY;
-  }
 }
 
 function extractStatus(response: unknown): string | undefined {

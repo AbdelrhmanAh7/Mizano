@@ -9,22 +9,13 @@ import { redactText } from '../common/utils/redact';
  * built-in `query` logger writes the SQL *and bound parameters* (invoice amounts, tax
  * ids, e-mail addresses, password hashes) straight to stdout, so it is never enabled
  * implicitly (it used to be on whenever NODE_ENV=development). Even when enabled, only
- * the SQL text and duration are logged; parameters need a second explicit opt-in
- * (`PRISMA_LOG_QUERY_PARAMS=true`) which is ignored in production.
+ * the parameterized SQL text and duration are logged; bound values never are.
  */
 
 type Env = Record<string, string | undefined>;
 
 export function isQueryLoggingEnabled(env: Env = process.env): boolean {
   return env.PRISMA_LOG_QUERIES === 'true';
-}
-
-export function isQueryParamLoggingEnabled(env: Env = process.env): boolean {
-  return (
-    isQueryLoggingEnabled(env) &&
-    env.PRISMA_LOG_QUERY_PARAMS === 'true' &&
-    env.NODE_ENV !== 'production'
-  );
 }
 
 /** `log` option for `new PrismaClient({ log })`. Query events are emitted, never printed. */
@@ -55,15 +46,12 @@ export function attachPrismaQueryLogging(
   if (!isQueryLoggingEnabled(env)) return false;
 
   const logger = new Logger(`PrismaQuery[${label}]`);
-  const withParams = isQueryParamLoggingEnabled(env);
 
   (client as QueryEventSource).$on('query', (event) => {
     const sql = redactText(event.query, 2000);
-    logger.debug(
-      withParams
-        ? `${sql} -- params=${redactText(event.params, 500)} (${event.duration}ms)`
-        : `${sql} (${event.duration}ms)`,
-    );
+    // Bound values (descriptions, amounts, tax ids...) are never logged, only the
+    // parameterized SQL and its duration.
+    logger.debug(`${sql} (${event.duration}ms)`);
   });
   return true;
 }

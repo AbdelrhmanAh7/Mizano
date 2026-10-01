@@ -1,6 +1,4 @@
-import { REDACTED } from '../utils/redact';
 import {
-  AUDIT_SUMMARY_MAX_CHARS,
   buildAuditSummary,
   resolveEntityId,
   resolveEntityType,
@@ -15,75 +13,31 @@ describe('audit summary', () => {
       expect(buildAuditSummary('text')).toBeNull();
     });
 
-    it('lists top-level field names and keeps harmless scalar values', () => {
-      const summary = buildAuditSummary({ name: 'Acme', creditLimit: '1500.0000', active: true });
-      expect(summary?.fields).toEqual(['name', 'creditLimit', 'active']);
-      expect(summary?.values).toEqual({ name: 'Acme', creditLimit: '1500.0000', active: true });
-    });
-
-    it('strips credential fields recursively', () => {
-      const summary = buildAuditSummary({
-        email: 'a@b.test',
+    it('records top-level field names only, never request values', () => {
+      const body = {
+        description: 'Cement 50kg bags',
+        amount: '1500.0000',
+        supplierTaxId: '300-123-456',
         password: 'hunter2',
-        currentPassword: 'old-pass-value',
-        profile: {
-          apiKey: 'k-123',
-          refreshToken: 'r-456',
-          nested: [{ token: 't-789', authorization: 'Bearer abc.def.ghi', note: 'ok' }],
-          clientSecret: 's-000',
-        },
-      });
-      const serialized = JSON.stringify(summary);
-      for (const leaked of [
-        'hunter2',
-        'old-pass-value',
-        'k-123',
-        'r-456',
-        't-789',
-        'abc.def.ghi',
-      ]) {
-        expect(serialized).not.toContain(leaked);
-      }
-      const values = summary?.values as Record<string, unknown>;
-      expect(values.password).toBe(REDACTED);
-      expect((values.profile as Record<string, unknown>).apiKey).toBe(REDACTED);
-      expect(serialized).toContain('"note":"ok"');
-    });
-
-    it('masks credential-looking text inside free-form strings', () => {
-      const summary = buildAuditSummary({
-        notes: 'call me, Authorization: Bearer abcdefghijkl and password=hunter2',
-      });
-      const serialized = JSON.stringify(summary);
-      expect(serialized).not.toContain('abcdefghijkl');
-      expect(serialized).not.toContain('hunter2');
-    });
-
-    it('truncates long strings', () => {
-      const summary = buildAuditSummary({ description: 'x'.repeat(5000) });
-      const description = (summary?.values as Record<string, string>).description;
-      expect(description.length).toBeLessThan(300);
-      expect(description).toContain('truncated');
-    });
-
-    it('drops values (keeping field names) when the summary exceeds the size cap', () => {
-      const body: Record<string, unknown> = {};
-      for (let i = 0; i < 40; i++) body[`field${i}`] = 'y'.repeat(190);
+        lines: [{ description: 'secret line', rate: '10.0000' }],
+      };
       const summary = buildAuditSummary(body);
-      expect(summary?.truncated).toBe(true);
-      expect(summary?.values).toBeUndefined();
-      expect(summary?.fields).toHaveLength(40);
-      expect(JSON.stringify(summary).length).toBeLessThan(AUDIT_SUMMARY_MAX_CHARS);
+      expect(summary).toEqual({
+        fields: ['description', 'amount', 'supplierTaxId', 'password', 'lines'],
+      });
+      const text = JSON.stringify(summary);
+      for (const value of ['Cement', '1500', '300-123-456', 'hunter2', 'secret line']) {
+        expect(text).not.toContain(value);
+      }
     });
 
-    it('limits depth and array length', () => {
-      const summary = buildAuditSummary({
-        lines: Array.from({ length: 500 }, (_, i) => ({ i })),
-        deep: { a: { b: { c: { d: 1 } } } },
-      });
-      const values = summary?.values as { lines: unknown[]; deep: unknown };
-      expect(values.lines.length).toBeLessThanOrEqual(21);
-      expect(JSON.stringify(values.deep)).toContain('[Truncated]');
+    it('caps the number and length of field names', () => {
+      const body = Object.fromEntries(
+        Array.from({ length: 80 }, (_, i) => [`${'f'.repeat(100)}${i}`, i]),
+      );
+      const summary = buildAuditSummary(body);
+      expect(summary?.fields).toHaveLength(50);
+      expect(summary?.fields.every((f) => f.length <= 64)).toBe(true);
     });
 
     it('records a short lifecycle status from the response but never the response itself', () => {

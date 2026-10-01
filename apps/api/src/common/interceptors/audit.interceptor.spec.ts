@@ -69,7 +69,6 @@ describe('AuditInterceptor', () => {
     expect(data.oldValues).toBe(Prisma.DbNull);
     expect(data.newValues).toEqual({
       fields: ['name'],
-      values: { name: 'Acme' },
       status: 'ACTIVE',
     });
   });
@@ -108,7 +107,11 @@ describe('AuditInterceptor', () => {
       expect(stored).not.toContain(leaked);
     }
     expect(data.action).toBe(AuditAction.UPDATE);
-    expect(stored).toContain('"theme":"dark"');
+    // Request values are never stored, harmless ones included; only field names are.
+    expect(stored).not.toContain('dark');
+    expect(data.newValues).toEqual({
+      fields: ['displayName', 'password', 'refreshToken', 'settings'],
+    });
   });
 
   it('ignores a client-supplied _oldData snapshot', async () => {

@@ -22,7 +22,6 @@ import {
   attachPrismaQueryLogging,
   buildPrismaLogConfig,
   isQueryLoggingEnabled,
-  isQueryParamLoggingEnabled,
 } from './prisma-logging';
 import { PrismaService } from './prisma.service';
 
@@ -53,25 +52,6 @@ describe('prisma query logging policy', () => {
       expect(isQueryLoggingEnabled({ PRISMA_LOG_QUERIES: 'false' })).toBe(false);
       expect(isQueryLoggingEnabled({ PRISMA_LOG_QUERIES: '1' })).toBe(false);
       expect(isQueryLoggingEnabled({ PRISMA_LOG_QUERIES: 'true' })).toBe(true);
-    });
-
-    it('needs a second opt-in for parameters and never logs them in production', () => {
-      expect(isQueryParamLoggingEnabled({ PRISMA_LOG_QUERIES: 'true' })).toBe(false);
-      expect(isQueryParamLoggingEnabled({ PRISMA_LOG_QUERY_PARAMS: 'true' })).toBe(false);
-      expect(
-        isQueryParamLoggingEnabled({
-          PRISMA_LOG_QUERIES: 'true',
-          PRISMA_LOG_QUERY_PARAMS: 'true',
-          NODE_ENV: 'development',
-        }),
-      ).toBe(true);
-      expect(
-        isQueryParamLoggingEnabled({
-          PRISMA_LOG_QUERIES: 'true',
-          PRISMA_LOG_QUERY_PARAMS: 'true',
-          NODE_ENV: 'production',
-        }),
-      ).toBe(false);
     });
   });
 
@@ -147,7 +127,7 @@ describe('prisma query logging policy', () => {
       expect(logged).not.toContain('1500.00');
     });
 
-    it('logs parameters only with the explicit second flag outside production', () => {
+    it('never logs bound parameters, whatever the environment', () => {
       const debug = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
       const client = { $on: jest.fn() };
       attachPrismaQueryLogging(client, 'primary', {
@@ -156,16 +136,6 @@ describe('prisma query logging policy', () => {
         NODE_ENV: 'development',
       });
       (client.$on.mock.calls[0][1] as (e: typeof queryEvent) => void)(queryEvent);
-      expect(String(debug.mock.calls[0][0])).toContain('300-123-456');
-
-      debug.mockClear();
-      const prodClient = { $on: jest.fn() };
-      attachPrismaQueryLogging(prodClient, 'primary', {
-        PRISMA_LOG_QUERIES: 'true',
-        PRISMA_LOG_QUERY_PARAMS: 'true',
-        NODE_ENV: 'production',
-      });
-      (prodClient.$on.mock.calls[0][1] as (e: typeof queryEvent) => void)(queryEvent);
       expect(String(debug.mock.calls[0][0])).not.toContain('300-123-456');
     });
   });

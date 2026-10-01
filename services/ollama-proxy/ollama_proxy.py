@@ -195,6 +195,10 @@ async def tunnel_update(request: Request):
     if directory:
         os.makedirs(directory, exist_ok=True)
     descriptor = os.open(TUNNEL_URL_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    # os.open's mode only applies on creation; re-apply it so files left by older
+    # versions (possibly world-readable) are tightened too.
+    if hasattr(os, "fchmod"):
+        os.fchmod(descriptor, 0o600)
     with os.fdopen(descriptor, "w") as f:
         f.write(tunnel_url)
 

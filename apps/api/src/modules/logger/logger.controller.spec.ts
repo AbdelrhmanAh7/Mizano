@@ -107,6 +107,16 @@ describe('LoggerController', () => {
       expect(result.level).toBe(LogLevel.ERROR);
       expect(result.message).toBe('Test error');
     });
+
+    it('never lets an HTTP client claim the trusted BACKEND source', () => {
+      const result = controller.capture(ORG, USER, {
+        level: LogLevel.ERROR,
+        source: LogSource.BACKEND,
+        message: 'Invoice 4471 total 1500.00',
+      });
+
+      expect(result.source).toBe(LogSource.FRONTEND);
+    });
   });
 
   describe('GET /logger/logs', () => {
