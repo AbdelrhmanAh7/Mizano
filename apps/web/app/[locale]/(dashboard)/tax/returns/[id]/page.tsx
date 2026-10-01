@@ -25,6 +25,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AlertDialog,
@@ -58,6 +65,7 @@ import {
   normalizeVATReturn,
   VATReturnStatus,
 } from '@/lib/hooks/use-tax';
+import { useAccounts } from '@/lib/hooks/use-accounts';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
 
@@ -67,6 +75,14 @@ const STATUS_STEPS: { key: VATReturnStatus; icon: typeof Circle }[] = [
   { key: 'SUBMITTED', icon: FileCheck },
   { key: 'FILED', icon: CheckCircle2 },
 ];
+
+/** Formats a decimal (string or number) with exactly four fraction digits, without float maths on strings. */
+function toDecimalString(value: number | string): string {
+  const text = String(value).trim();
+  if (!/^-?\d+(\.\d+)?$/.test(text)) return Number(value).toFixed(4);
+  const [int, frac = ''] = text.split('.');
+  return `${int}.${frac.padEnd(4, '0').slice(0, 4)}`;
+}
 
 export default function VATReturnDetailPage() {
   const t = useTranslations('tax');
@@ -83,7 +99,7 @@ export default function VATReturnDetailPage() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentRef, setPaymentRef] = useState('');
-  const [bankAccountId, _setBankAccountId] = useState('');
+  const [bankAccountId, setBankAccountId] = useState('');
 
   const { data: rawVatReturn, isLoading } = useVATReturn(returnId);
   const vatReturn = rawVatReturn ? normalizeVATReturn(rawVatReturn) : null;
@@ -93,6 +109,14 @@ export default function VATReturnDetailPage() {
   const createPayment = useRecordVATPayment();
 
   const canEdit = hasPermission('tax.edit');
+  const canSubmit = hasPermission('tax.submit');
+  const { data: assetAccounts, isLoading: accountsLoading } = useAccounts({
+    type: 'ASSET',
+    isActive: true,
+    limit: 200,
+  });
+  const paidFromOptions: Array<{ id: string; code: string; name: string }> =
+    assetAccounts?.data ?? [];
   const canDelete = hasPermission('tax.delete');
 
   const confirmFile = async () => {
@@ -147,7 +171,7 @@ export default function VATReturnDetailPage() {
     try {
       await createPayment.mutateAsync({
         vatReturnId: returnId,
-        amount: parseFloat(paymentAmount),
+        amount: paymentAmount,
         date: paymentDate,
         paidFromAccountId: bankAccountId,
         reference: paymentRef || undefined,
@@ -210,7 +234,9 @@ export default function VATReturnDetailPage() {
   const isDraft = vatReturn.status === 'DRAFT';
   const isCalculated = vatReturn.status === 'CALCULATED';
   const isSubmitted = vatReturn.status === 'SUBMITTED';
-  const isFiled = vatReturn.status === 'FILED';
+  // The API takes the exact net payable (no partial payments); send it as a 4-decimal string.
+  const exactPayable = toDecimalString(vatReturn.netVat);
+  const canPay = canEdit && isSubmitted && netVat > 0 && !vatReturn.payment;
   const currentStep = getVATReturnStatusStep(vatReturn.status);
 
   return (
@@ -249,16 +275,16 @@ export default function VATReturnDetailPage() {
               {t('returns.calculateReturn')}
             </Button>
           )}
-          {canEdit && (isDraft || isCalculated) && (
+          {canSubmit && isCalculated && (
             <Button onClick={() => setFileDialogOpen(true)}>
               <FileCheck className="mr-2 h-4 w-4" />
               {t('returns.submitReturn')}
             </Button>
           )}
-          {canEdit && (isSubmitted || isFiled) && !vatReturn.payment && (
+          {canPay && (
             <Button
               onClick={() => {
-                setPaymentAmount(String(netVat > 0 ? netVat : 0));
+                setPaymentAmount(exactPayable);
                 setPaymentDialogOpen(true);
               }}
             >
@@ -616,10 +642,10 @@ export default function VATReturnDetailPage() {
               <CardContent className="py-12 text-center">
                 <CreditCard className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">{t('returns.detail.noPayment')}</h3>
-                {canEdit && (isSubmitted || isFiled) && (
+                {canPay && (
                   <Button
                     onClick={() => {
-                      setPaymentAmount(String(netVat > 0 ? netVat : 0));
+                      setPaymentAmount(exactPayable);
                       setPaymentDialogOpen(true);
                     }}
                     className="mt-4"
@@ -658,13 +684,33 @@ export default function VATReturnDetailPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="paymentAmount">{t('payments.amount')}</Label>
-              <Input
-                id="paymentAmount"
-                type="number"
-                step="0.01"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-              />
+              <Input id="paymentAmount" inputMode="decimal" value={paymentAmount} readOnly />
+              <p className="text-xs text-muted-foreground">{t('payments.exactAmountHint')}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="paidFrom">{t('payments.paidFrom')}</Label>
+              <Select value={bankAccountId} onValueChange={setBankAccountId}>
+                <SelectTrigger id="paidFrom">
+                  <SelectValue
+                    placeholder={
+                      accountsLoading ? tCommon('table.loading') : t('payments.paidFromPlaceholder')
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {paidFromOptions.length === 0 && !accountsLoading ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      {t('payments.noPaidFromAccounts')}
+                    </div>
+                  ) : (
+                    paidFromOptions.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.code} - {account.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="paymentDate">{t('payments.paymentDate')}</Label>
@@ -691,7 +737,7 @@ export default function VATReturnDetailPage() {
             </Button>
             <Button
               onClick={handleRecordPayment}
-              disabled={createPayment.isPending || !paymentAmount}
+              disabled={createPayment.isPending || !paymentAmount || !bankAccountId}
             >
               {createPayment.isPending ? t('payments.recording') : t('payments.recordButton')}
             </Button>

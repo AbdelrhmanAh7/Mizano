@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/select';
 import {
   Adjustment,
-  AdjustmentStatus,
   AdjustmentType,
   getAdjustmentStatusColor,
   getAdjustmentStatusLabel,
@@ -37,7 +36,6 @@ import { Suspense, useState } from 'react';
 function AdjustmentsPageContent() {
   const t = useTranslations('inventory');
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
   const {
@@ -47,9 +45,9 @@ function AdjustmentsPageContent() {
     fetchNextPage,
     isFetchingNextPage,
     isLoading,
+    isError,
   } = useInfiniteAdjustments({
     ...tableParams.queryParams,
-    status: statusFilter !== 'all' ? (statusFilter as AdjustmentStatus) : undefined,
     type: typeFilter !== 'all' ? (typeFilter as AdjustmentType) : undefined,
   });
 
@@ -116,34 +114,29 @@ function AdjustmentsPageContent() {
       cell: ({ row }) => getReasonLabel(row.original.reason),
     },
     {
-      id: 'itemCount',
+      id: 'item',
       header: t('adjustments.table.item'),
-      meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
-      cell: ({ row }) => row.original.lines?.length || 0,
+      cell: ({ row }) => row.original.item?.name ?? '-',
     },
     {
-      id: 'totalQty',
-      header: 'Total Qty',
+      id: 'quantity',
+      header: t('adjustments.table.quantity'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) => {
-        const totalQty =
-          row.original.lines?.reduce((sum, line) => sum + (line.quantityAdjusted || 0), 0) || 0;
-        return (
-          <span
-            className={cn(
-              'font-medium',
-              row.original.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
-            )}
-          >
-            {row.original.type === 'INCREASE' ? '+' : '-'}
-            {totalQty}
-          </span>
-        );
-      },
+      cell: ({ row }) => (
+        <span
+          className={cn(
+            'font-medium',
+            row.original.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
+          )}
+        >
+          {row.original.type === 'INCREASE' ? '+' : '-'}
+          {row.original.quantity}
+        </span>
+      ),
     },
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: t('common.status'),
       cell: ({ row }) => (
         <Badge variant="outline" className={getAdjustmentStatusColor(row.original.status)}>
           {getAdjustmentStatusLabel(row.original.status)}
@@ -207,17 +200,16 @@ function AdjustmentsPageContent() {
             <SelectItem value="DECREASE">{t('adjustments.types.decrease')}</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="DRAFT">Draft</SelectItem>
-            <SelectItem value="POSTED">Posted</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
+
+      {isError && (
+        <div
+          role="alert"
+          className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+        >
+          {t('adjustments.loadError')}
+        </div>
+      )}
 
       {/* Table */}
       <DataTable

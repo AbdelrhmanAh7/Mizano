@@ -19,13 +19,11 @@ import {
   CompanyInfoStepDto,
   ChartOfAccountsStepDto,
   TaxConfigStepDto,
-  OpeningBalancesStepDto,
   ImportDataStepDto,
   AiFeaturesStepDto,
   OnboardingStatusResponse,
   CoaTemplatePreview,
 } from './dto/onboarding.dto';
-import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class OrganizationsService {
@@ -578,49 +576,6 @@ export class OrganizationsService {
     return this.getOnboardingStatus(orgId);
   }
 
-  async completeOpeningBalancesStep(orgId: string, dto: OpeningBalancesStepDto) {
-    if (dto.balances.length > 0) {
-      // Create opening balance journal entry
-      const lines = dto.balances.map((b) => ({
-        accountId: b.accountId,
-        debit: b.isDebit ? new Decimal(b.amount) : new Decimal(0),
-        credit: b.isDebit ? new Decimal(0) : new Decimal(b.amount),
-        description: 'Opening Balance',
-      }));
-
-      // Validate that debits equal credits
-      const totalDebits = lines.reduce((sum, l) => sum.add(l.debit), new Decimal(0));
-      const totalCredits = lines.reduce((sum, l) => sum.add(l.credit), new Decimal(0));
-
-      if (!totalDebits.equals(totalCredits)) {
-        throw new BadRequestException('Opening balances must balance (debits = credits)');
-      }
-
-      // Create the journal
-      await this.prisma.journal.create({
-        data: {
-          journalNumber: 'OB-001',
-          date: new Date(dto.openingDate),
-          reference: 'Opening Balances',
-          notes: 'Initial opening balances from onboarding',
-          isPosted: true,
-          organizationId: orgId,
-          lines: {
-            create: lines,
-          },
-        },
-      });
-    }
-
-    // Mark step as complete
-    await this.prisma.organizationOnboarding.update({
-      where: { organizationId: orgId },
-      data: { openingBalancesCompleted: true },
-    });
-
-    return this.getOnboardingStatus(orgId);
-  }
-
   async completeImportDataStep(orgId: string, _dto: ImportDataStepDto) {
     // This step is marked complete after imports are done
     // The actual import is handled by the import-export module
@@ -787,11 +742,19 @@ export class OrganizationsService {
 
     // Create all accounts and link organization defaults in one transaction
     await this.prisma.$transaction(async (tx) => {
+      const org = await tx.organization.findUnique({
+        where: { id: orgId },
+        select: { baseCurrency: true },
+      });
       const created: { id: string; code: string }[] = [];
       for (const account of accounts) {
         created.push(
           await tx.account.create({
-            data: { ...account, organizationId: orgId },
+            data: {
+              ...account,
+              organizationId: orgId,
+              ...(org?.baseCurrency ? { currency: org.baseCurrency } : {}),
+            },
             select: { id: true, code: true },
           }),
         );
@@ -839,6 +802,7 @@ export class OrganizationsService {
       { code: '3100', name: 'Capital', type: 'EQUITY', parentCode: '3000' },
       { code: '3200', name: 'Retained Earnings', type: 'EQUITY', parentCode: '3000' },
       { code: '3300', name: 'Drawings', type: 'EQUITY', parentCode: '3000' },
+      { code: '3900', name: 'Opening Balance Equity', type: 'EQUITY', parentCode: '3000' },
       { code: '4000', name: 'Revenue', type: 'REVENUE', isParent: true },
       { code: '4100', name: 'Sales Revenue', type: 'REVENUE', parentCode: '4000' },
       { code: '4200', name: 'Service Revenue', type: 'REVENUE', parentCode: '4000' },

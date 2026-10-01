@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { ItemType } from '@prisma/client';
 import { ItemsService } from './items.service';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -14,6 +14,7 @@ const mockPrismaService = {
     update: jest.fn(),
     findUnique: jest.fn(),
   },
+  account: { count: jest.fn() },
 };
 
 describe('ItemsService', () => {
@@ -140,6 +141,58 @@ describe('ItemsService', () => {
           sellingPrice: '100.00',
         }),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('rejects an account id that belongs to another organization (tenant isolation)', async () => {
+      mockPrismaService.item.findFirst.mockResolvedValue(null);
+      mockPrismaService.account.count.mockResolvedValue(1); // 2 distinct ids requested, 1 found
+
+      await expect(
+        service.create('org-001', {
+          name: 'Widget',
+          sku: 'W-002',
+          type: ItemType.GOODS,
+          sellingPrice: '100.00',
+          inventoryAccountId: 'acc-mine',
+          purchaseAccountId: 'acc-foreign',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.account.count).toHaveBeenCalledWith({
+        where: {
+          id: { in: expect.arrayContaining(['acc-mine', 'acc-foreign']) },
+          organizationId: 'org-001',
+          deletedAt: null,
+        },
+      });
+      expect(mockPrismaService.item.create).not.toHaveBeenCalled();
+    });
+
+    it('creates the item when every referenced account is in the organization', async () => {
+      mockPrismaService.item.findFirst.mockResolvedValue(null);
+      mockPrismaService.account.count.mockResolvedValue(1);
+      mockPrismaService.item.create.mockResolvedValue({ id: 'new' });
+
+      await service.create('org-001', {
+        name: 'Widget',
+        sku: 'W-003',
+        type: ItemType.GOODS,
+        sellingPrice: '100.00',
+        inventoryAccountId: 'acc-mine',
+      });
+
+      expect(mockPrismaService.item.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('update', () => {
+    it('rejects a foreign account id on update', async () => {
+      mockPrismaService.item.findFirst.mockResolvedValue({ id: 'item-1' });
+      mockPrismaService.account.count.mockResolvedValue(0);
+
+      await expect(
+        service.update('org-001', 'item-1', { inventoryAccountId: 'acc-foreign' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.item.update).not.toHaveBeenCalled();
     });
   });
 });

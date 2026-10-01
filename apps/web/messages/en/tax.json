@@ -187,6 +187,10 @@
       "amount": "Amount",
       "date": "Date",
       "reference": "Reference"
-    }
+    },
+    "exactAmountHint": "The payment must equal the VAT payable exactly; partial payments are not supported.",
+    "paidFrom": "Paid from account",
+    "paidFromPlaceholder": "Select bank or cash account",
+    "noPaidFromAccounts": "No asset accounts available"
   }
 }

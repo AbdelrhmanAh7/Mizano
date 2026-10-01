@@ -1,15 +1,16 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { format } from 'date-fns';
-import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
+import { CalendarIcon } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -17,33 +18,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import { reasonOptions, type CreateAdjustmentData } from '@/lib/hooks/use-adjustments';
 import { cn } from '@/lib/utils';
-import { reasonOptions } from '@/lib/hooks/use-adjustments';
-
-const lineSchema = z.object({
-  itemId: z.string().min(1, 'Item is required'),
-  warehouseId: z.string().min(1, 'Warehouse is required'),
-  quantityAdjusted: z.number().min(1, 'Quantity must be at least 1'),
-});
 
 const adjustmentSchema = z.object({
   date: z.date({ required_error: 'Date is required' }),
+  warehouseId: z.string().min(1, 'Warehouse is required'),
+  itemId: z.string().min(1, 'Item is required'),
   type: z.enum(['INCREASE', 'DECREASE']),
-  reason: z.enum(['STOCKTAKE', 'DAMAGE', 'THEFT', 'RETURN', 'OTHER']),
-  description: z.string().optional(),
-  reference: z.string().optional(),
-  lines: z.array(lineSchema).min(1, 'At least one line item is required'),
+  quantity: z
+    .number({ invalid_type_error: 'Quantity is required' })
+    .int('Quantity must be a whole number')
+    .min(1, 'Quantity must be at least 1')
+    .max(1_000_000, 'Quantity is too large'),
+  reason: z.enum(['DAMAGED', 'STOLEN', 'STOCKTAKE', 'RETURNED', 'EXPIRED', 'OTHER']),
+  accountId: z.string().min(1, 'Adjustment account is required'),
+  notes: z.string().max(1000).optional(),
 });
 
 type AdjustmentFormData = z.infer<typeof adjustmentSchema>;
@@ -51,67 +42,68 @@ type AdjustmentFormData = z.infer<typeof adjustmentSchema>;
 interface AdjustmentFormProps {
   items: Array<{ id: string; name: string; sku: string | null; currentStock: number }>;
   warehouses: Array<{ id: string; name: string; code: string }>;
-  onSubmit: (data: Record<string, unknown>) => void;
+  accounts: Array<{ id: string; name: string; code: string }>;
+  onSubmit: (data: CreateAdjustmentData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
+  errorMessage?: string | null;
+}
+
+function FieldError({ message }: { message?: string }): JSX.Element | null {
+  return message ? <p className="text-sm text-red-500">{message}</p> : null;
 }
 
 export function AdjustmentForm({
   items,
   warehouses,
+  accounts,
   onSubmit,
   onCancel,
   isSubmitting,
-}: AdjustmentFormProps) {
+  errorMessage,
+}: AdjustmentFormProps): JSX.Element {
   const form = useForm<AdjustmentFormData>({
     resolver: zodResolver(adjustmentSchema),
     defaultValues: {
       date: new Date(),
+      warehouseId: warehouses[0]?.id || '',
+      itemId: '',
       type: 'DECREASE',
+      quantity: 1,
       reason: 'STOCKTAKE',
-      description: '',
-      reference: '',
-      lines: [
-        {
-          itemId: '',
-          warehouseId: warehouses[0]?.id || '',
-          quantityAdjusted: 1,
-        },
-      ],
+      accountId: '',
+      notes: '',
     },
   });
-
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'lines',
-  });
-
+  const errors = form.formState.errors;
   const watchType = form.watch('type');
+  const selectedItem = items.find((i) => i.id === form.watch('itemId'));
+  const quantity = form.watch('quantity') || 0;
 
-  // Calculate total adjustment
-  const watchedLines = form.watch('lines');
-  const totalAdjustment = useMemo(() => {
-    return watchedLines.reduce((sum, line) => sum + (line.quantityAdjusted || 0), 0);
-  }, [watchedLines]);
-
-  const handleSubmit = (data: AdjustmentFormData) => {
+  const handleSubmit = (data: AdjustmentFormData): void => {
+    const notes = data.notes?.trim();
     onSubmit({
-      ...data,
       date: format(data.date, 'yyyy-MM-dd'),
-    });
-  };
-
-  const addLine = () => {
-    append({
-      itemId: '',
-      warehouseId: warehouses[0]?.id || '',
-      quantityAdjusted: 1,
+      warehouseId: data.warehouseId,
+      itemId: data.itemId,
+      type: data.type,
+      quantity: data.quantity,
+      reason: data.reason,
+      accountId: data.accountId,
+      notes: notes ? notes : undefined,
     });
   };
 
   return (
     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-      {/* Adjustment Details */}
+      {errorMessage && (
+        <div
+          role="alert"
+          className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+        >
+          {errorMessage}
+        </div>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>Adjustment Details</CardTitle>
@@ -119,10 +111,11 @@ export function AdjustmentForm({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="date">Date *</Label>
+              <Label>Date *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
+                    type="button"
                     variant="outline"
                     className={cn(
                       'w-full justify-start text-left font-normal',
@@ -142,33 +135,27 @@ export function AdjustmentForm({
                   />
                 </PopoverContent>
               </Popover>
-              {form.formState.errors.date && (
-                <p className="text-sm text-red-500">{form.formState.errors.date.message}</p>
-              )}
+              <FieldError message={errors.date?.message} />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="type">Type *</Label>
+              <Label>Type *</Label>
               <Select
-                value={form.watch('type')}
+                value={watchType}
                 onValueChange={(value: 'INCREASE' | 'DECREASE') => form.setValue('type', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="INCREASE">
-                    <span className="text-green-600">Increase Stock</span>
-                  </SelectItem>
-                  <SelectItem value="DECREASE">
-                    <span className="text-red-600">Decrease Stock</span>
-                  </SelectItem>
+                  <SelectItem value="INCREASE">Increase Stock</SelectItem>
+                  <SelectItem value="DECREASE">Decrease Stock</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="reason">Reason *</Label>
+              <Label>Reason *</Label>
               <Select
                 value={form.watch('reason')}
                 onValueChange={(value: AdjustmentFormData['reason']) =>
@@ -191,175 +178,105 @@ export function AdjustmentForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="reference">Reference</Label>
-              <Input
-                id="reference"
-                placeholder="Reference number"
-                {...form.register('reference')}
-              />
+              <Label>Item *</Label>
+              <Select
+                value={form.watch('itemId')}
+                onValueChange={(value) => form.setValue('itemId', value, { shouldValidate: true })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select item" />
+                </SelectTrigger>
+                <SelectContent>
+                  {items.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name} {item.sku && `(${item.sku})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldError message={errors.itemId?.message} />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                placeholder="Reason for adjustment"
-                {...form.register('description')}
-                rows={2}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Line Items */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Items to Adjust</CardTitle>
-            <Button type="button" variant="outline" size="sm" onClick={addLine}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Item
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[250px]">Item</TableHead>
-                <TableHead className="w-[200px]">Warehouse</TableHead>
-                <TableHead className="w-[100px]">Current Stock</TableHead>
-                <TableHead className="w-[120px]">Adjustment</TableHead>
-                <TableHead className="w-[100px]">New Stock</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {fields.map((field, index) => {
-                const selectedItemId = form.watch(`lines.${index}.itemId`);
-                const selectedItem = items.find((i) => i.id === selectedItemId);
-                const currentStock = selectedItem?.currentStock || 0;
-                const adjustment = form.watch(`lines.${index}.quantityAdjusted`) || 0;
-                const newStock =
-                  watchType === 'INCREASE' ? currentStock + adjustment : currentStock - adjustment;
-
-                return (
-                  <TableRow key={field.id}>
-                    <TableCell>
-                      <Select
-                        value={form.watch(`lines.${index}.itemId`) || ''}
-                        onValueChange={(value) => form.setValue(`lines.${index}.itemId`, value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select item" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {items.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>
-                              {item.name} {item.sku && `(${item.sku})`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={form.watch(`lines.${index}.warehouseId`) || ''}
-                        onValueChange={(value) =>
-                          form.setValue(`lines.${index}.warehouseId`, value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select warehouse" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {warehouses.map((wh) => (
-                            <SelectItem key={wh.id} value={wh.id}>
-                              {wh.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-center font-mono">
-                      {selectedItemId ? currentStock : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <span
-                          className={cn(
-                            'text-sm',
-                            watchType === 'INCREASE' ? 'text-green-600' : 'text-red-600',
-                          )}
-                        >
-                          {watchType === 'INCREASE' ? '+' : '-'}
-                        </span>
-                        <Input
-                          type="number"
-                          min="1"
-                          className="w-20"
-                          {...form.register(`lines.${index}.quantityAdjusted`, {
-                            valueAsNumber: true,
-                          })}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        'text-center font-mono font-medium',
-                        newStock < 0 && 'text-red-600',
-                      )}
-                    >
-                      {selectedItemId ? newStock : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => fields.length > 1 && remove(index)}
-                        disabled={fields.length === 1}
-                        aria-label="Remove item"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-
-          {form.formState.errors.lines && (
-            <p className="text-sm text-red-500 mt-2">{form.formState.errors.lines.message}</p>
-          )}
-
-          {/* Summary */}
-          <div className="mt-4 flex justify-end">
-            <div className="text-sm">
-              <span className="text-muted-foreground">Total Adjustment: </span>
-              <span
-                className={cn(
-                  'font-mono font-medium',
-                  watchType === 'INCREASE' ? 'text-green-600' : 'text-red-600',
-                )}
+              <Label>Warehouse *</Label>
+              <Select
+                value={form.watch('warehouseId')}
+                onValueChange={(value) =>
+                  form.setValue('warehouseId', value, { shouldValidate: true })
+                }
               >
-                {watchType === 'INCREASE' ? '+' : '-'}
-                {totalAdjustment} units
-              </span>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select warehouse" />
+                </SelectTrigger>
+                <SelectContent>
+                  {warehouses.map((wh) => (
+                    <SelectItem key={wh.id} value={wh.id}>
+                      {wh.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldError message={errors.warehouseId?.message} />
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Quantity (whole units) *</Label>
+              <Input
+                id="quantity"
+                type="number"
+                min="1"
+                step="1"
+                {...form.register('quantity', { valueAsNumber: true })}
+              />
+              {selectedItem && (
+                <p className="text-xs text-muted-foreground">
+                  Current stock {selectedItem.currentStock} &rarr; new stock{' '}
+                  {watchType === 'INCREASE'
+                    ? selectedItem.currentStock + quantity
+                    : selectedItem.currentStock - quantity}
+                </p>
+              )}
+              <FieldError message={errors.quantity?.message} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Adjustment Account *</Label>
+              <Select
+                value={form.watch('accountId')}
+                onValueChange={(value) =>
+                  form.setValue('accountId', value, { shouldValidate: true })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.code} - {account.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldError message={errors.accountId?.message} />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea id="notes" rows={2} {...form.register('notes')} />
           </div>
         </CardContent>
       </Card>
 
-      {/* Actions */}
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating...' : 'Create Adjustment'}
+          {isSubmitting ? 'Posting...' : 'Post Adjustment'}
         </Button>
       </div>
     </form>

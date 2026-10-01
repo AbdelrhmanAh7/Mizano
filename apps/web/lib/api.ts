@@ -362,7 +362,7 @@ export const adjustmentsApi = {
   ...crud('/inventory-adjustments', { hasCursor: false }),
   getAllCursor: (params?: Record<string, unknown>) =>
     api.get('/inventory-adjustments/cursor', { params }),
-  post: (id: string) => api.patch(`/inventory-adjustments/${id}/post`),
+  void: (id: string) => api.post(`/inventory-adjustments/${id}/void`),
 };
 
 // ===========================================================================

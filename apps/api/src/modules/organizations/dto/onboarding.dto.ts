@@ -3,12 +3,15 @@ import {
   IsOptional,
   IsBoolean,
   IsArray,
+  IsDateString,
   IsIn,
+  IsNotEmpty,
   ValidateNested,
   IsNumber,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { IsDecimalString } from '../../../common/dto/decimal-string';
 
 // ============================================
 // STEP 1: COMPANY INFO
@@ -112,14 +115,21 @@ export class TaxConfigStepDto {
 export class OpeningBalanceDto {
   @ApiProperty({ description: 'Account ID' })
   @IsString()
+  @IsNotEmpty()
   accountId: string;
 
-  @ApiProperty({ description: 'Opening balance amount' })
-  @IsNumber()
-  @Type(() => Number)
-  amount: number;
+  @ApiProperty({
+    example: '12500.50',
+    description: 'Opening balance as a decimal string (max 4 decimals); the side is isDebit',
+  })
+  @IsString()
+  @IsDecimalString()
+  amount: string;
 
-  @ApiPropertyOptional({ description: 'Is debit (true) or credit (false)' })
+  @ApiPropertyOptional({
+    description:
+      'Debit (true) or credit (false). Defaults to the account normal side: assets and expenses debit, everything else credit',
+  })
   @IsOptional()
   @IsBoolean()
   isDebit?: boolean;
@@ -132,9 +142,26 @@ export class OpeningBalancesStepDto {
   @Type(() => OpeningBalanceDto)
   balances: OpeningBalanceDto[];
 
-  @ApiProperty({ description: 'Opening date' })
-  @IsString()
+  @ApiProperty({ description: 'Opening date (the journal date)', example: '2026-01-01' })
+  @IsDateString()
   openingDate: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Equity account that takes the difference when the balances do not balance. Defaults to the account named "Opening Balance Equity"',
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  equityAccountId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Opening balances were already posted: reverse them and post these instead (history is kept)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  replaceExisting?: boolean;
 }
 
 // ============================================

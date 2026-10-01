@@ -54,13 +54,18 @@ export class AccountsService {
       }
     }
 
+    // Accounts default to the organization's base currency (the ledger is kept in it).
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { baseCurrency: true },
+    });
     const account = await this.prisma.account.create({
       data: {
         code,
         name,
         type,
         parentId,
-        currency: currency || 'USD',
+        currency: currency || org?.baseCurrency || 'USD',
         description,
         organizationId,
       },
@@ -348,6 +353,10 @@ export class AccountsService {
     };
 
     const accounts = templates[industry] || templates.services;
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { baseCurrency: true },
+    });
 
     const createdAccounts = await this.prisma.$transaction(
       accounts.map((account) =>
@@ -363,6 +372,7 @@ export class AccountsService {
             ...account,
             organizationId,
             isSystem: true,
+            ...(org?.baseCurrency ? { currency: org.baseCurrency } : {}),
           },
         }),
       ),

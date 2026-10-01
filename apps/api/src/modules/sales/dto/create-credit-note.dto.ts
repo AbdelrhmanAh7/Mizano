@@ -1,7 +1,7 @@
 import { IsString, IsDateString, IsEnum, IsOptional, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CreditNoteType } from '@prisma/client';
-import { IsDecimalString } from './decimal-string';
+import { IsDecimalString } from '../../../common/dto/decimal-string';
 
 export class CreateCreditNoteDto {
   @ApiProperty() @IsString() customerId: string;

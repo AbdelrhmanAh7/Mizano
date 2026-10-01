@@ -166,7 +166,8 @@ const vatReturnsApi = {
 const vatPaymentsApi = {
   recordPayment: async (data: {
     vatReturnId: string;
-    amount: number;
+    /** Exact net payable as a decimal string (max 4 decimals). */
+    amount: string;
     date: string;
     paidFromAccountId: string;
     reference?: string;

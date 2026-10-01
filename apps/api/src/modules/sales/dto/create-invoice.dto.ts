@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDecimalString } from './decimal-string';
+import { IsDecimalString } from '../../../common/dto/decimal-string';
 
 export class InvoiceLineDto {
   @IsString() @IsOptional() itemId?: string;

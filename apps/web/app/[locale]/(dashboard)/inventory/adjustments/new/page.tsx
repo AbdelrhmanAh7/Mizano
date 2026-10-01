@@ -7,7 +7,8 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AdjustmentForm } from '@/components/inventory/adjustment-form';
-import { useCreateAdjustment } from '@/lib/hooks/use-adjustments';
+import { useAccounts } from '@/lib/hooks/use-accounts';
+import { useCreateAdjustment, type CreateAdjustmentData } from '@/lib/hooks/use-adjustments';
 import { useItems } from '@/lib/hooks/use-items';
 import { useWarehouses } from '@/lib/hooks/use-warehouses';
 
@@ -36,18 +37,34 @@ export default function NewAdjustmentPage() {
     }),
   );
 
-  const handleSubmit = async (data: Record<string, unknown>) => {
+  const { data: accountsData, isLoading: accountsLoading } = useAccounts({
+    isActive: true,
+    limit: 200,
+  });
+  const accounts = (accountsData?.data || []).map(
+    (a: { id: string; name: string; code: string }) => ({ id: a.id, name: a.name, code: a.code }),
+  );
+
+  const handleSubmit = async (data: CreateAdjustmentData): Promise<void> => {
     try {
-      await createAdjustment.mutateAsync(
-        data as unknown as Parameters<typeof createAdjustment.mutateAsync>[0],
-      );
+      await createAdjustment.mutateAsync(data);
       router.push('/inventory/adjustments');
-    } catch (error) {
-      // Error handled by mutation
+    } catch {
+      // Shown inline below and by the mutation toast
     }
   };
 
-  if (itemsLoading || warehousesLoading) {
+  const mutationError = createAdjustment.error as {
+    response?: { data?: { message?: string | string[] } };
+  } | null;
+  const apiMessage = mutationError?.response?.data?.message;
+  const errorMessage = mutationError
+    ? Array.isArray(apiMessage)
+      ? apiMessage.join(', ')
+      : apiMessage || 'The adjustment could not be posted'
+    : null;
+
+  if (itemsLoading || warehousesLoading || accountsLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-12 w-64" />
@@ -75,6 +92,8 @@ export default function NewAdjustmentPage() {
       <AdjustmentForm
         items={items}
         warehouses={warehouses}
+        accounts={accounts}
+        errorMessage={errorMessage}
         onSubmit={handleSubmit}
         onCancel={() => router.push('/inventory/adjustments')}
         isSubmitting={createAdjustment.isPending}
