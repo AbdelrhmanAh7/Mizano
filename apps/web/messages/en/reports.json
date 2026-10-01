@@ -43,7 +43,18 @@
     "financingActivities": "Financing Activities",
     "netCashFlow": "Net Cash Flow",
     "openingBalance": "Opening Balance",
-    "closingBalance": "Closing Balance"
+    "closingBalance": "Closing Balance",
+    "lines": {
+      "netIncome": "Net Income",
+      "accountsReceivableChange": "Accounts Receivable Change",
+      "accountsPayableChange": "Accounts Payable Change",
+      "inventoryChange": "Inventory Change",
+      "otherOperatingChanges": "Other Operating Changes",
+      "fixedAssetPurchases": "Fixed Asset Purchases",
+      "equityChanges": "Equity Changes",
+      "debtChanges": "Debt Changes"
+    },
+    "noItems": "No items"
   },
   "trialBalance": {
     "title": "Trial Balance",

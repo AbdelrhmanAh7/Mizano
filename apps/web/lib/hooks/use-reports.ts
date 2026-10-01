@@ -43,15 +43,15 @@ export interface BalanceSheetReport {
 export interface CashFlowReport {
   operations: {
     netIncome: number;
-    adjustments: Array<{ name: string; amount: number }>;
+    adjustments: Array<{ key?: string; name: string; amount: number }>;
     total: number;
   };
   investing: {
-    items: Array<{ name: string; amount: number }>;
+    items: Array<{ key?: string; name: string; amount: number }>;
     total: number;
   };
   financing: {
-    items: Array<{ name: string; amount: number }>;
+    items: Array<{ key?: string; name: string; amount: number }>;
     total: number;
   };
   netChange: number;
@@ -550,7 +550,7 @@ export function useBalanceSheetReport(asOfDate: string) {
 }
 
 interface CashFlowSection {
-  items: Array<{ name: string; amount: number }>;
+  items: Array<{ key?: string; name: string; amount: number }>;
   total: number;
 }
 interface TransformedCashFlowReport {
@@ -592,23 +592,45 @@ function transformCashFlow(raw: CashFlowApiResponse): TransformedCashFlowReport 
   return {
     operatingActivities: {
       items: [
-        { name: 'Net Income', amount: toNum(raw.operating?.netIncome) },
-        { name: 'Accounts Receivable Change', amount: toNum(opAdj.accountsReceivableChange) },
-        { name: 'Accounts Payable Change', amount: toNum(opAdj.accountsPayableChange) },
-        { name: 'Inventory Change', amount: toNum(opAdj.inventoryChange) },
+        { key: 'netIncome', name: 'Net Income', amount: toNum(raw.operating?.netIncome) },
+        {
+          key: 'accountsReceivableChange',
+          name: 'Accounts Receivable Change',
+          amount: toNum(opAdj.accountsReceivableChange),
+        },
+        {
+          key: 'accountsPayableChange',
+          name: 'Accounts Payable Change',
+          amount: toNum(opAdj.accountsPayableChange),
+        },
+        { key: 'inventoryChange', name: 'Inventory Change', amount: toNum(opAdj.inventoryChange) },
         // Keeps the visible items summing to the operating total.
-        { name: 'Other Operating Changes', amount: toNum(opAdj.otherOperatingChanges) },
+        {
+          key: 'otherOperatingChanges',
+          name: 'Other Operating Changes',
+          amount: toNum(opAdj.otherOperatingChanges),
+        },
       ],
       total: toNum(raw.operating?.netCashFromOperating),
     },
     investingActivities: {
-      items: [{ name: 'Fixed Asset Purchases', amount: toNum(raw.investing?.fixedAssetPurchases) }],
+      items: [
+        {
+          key: 'fixedAssetPurchases',
+          name: 'Fixed Asset Purchases',
+          amount: toNum(raw.investing?.fixedAssetPurchases),
+        },
+      ],
       total: toNum(raw.investing?.netCashFromInvesting),
     },
     financingActivities: {
       items: [
-        { name: 'Equity Changes', amount: toNum(raw.financing?.equityChanges) },
-        { name: 'Debt Changes', amount: toNum(raw.financing?.debtChanges) },
+        {
+          key: 'equityChanges',
+          name: 'Equity Changes',
+          amount: toNum(raw.financing?.equityChanges),
+        },
+        { key: 'debtChanges', name: 'Debt Changes', amount: toNum(raw.financing?.debtChanges) },
       ],
       total: toNum(raw.financing?.netCashFromFinancing),
     },

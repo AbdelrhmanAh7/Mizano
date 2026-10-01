@@ -406,6 +406,17 @@ describe('BillsService', () => {
       await expect(service.approve(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
 
+    it('takes the ledger lock before reading the bill and organization settings', async () => {
+      prisma.bill.findFirst.mockResolvedValue(null);
+
+      await expect(service.approve(ORG_ID, 'bill-1')).rejects.toThrow(NotFoundException);
+
+      expect(prisma.$executeRaw).toHaveBeenCalled();
+      expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.bill.findFirst.mock.invocationCallOrder[0],
+      );
+    });
+
     it('bulkApprove should reuse approve and report per-record failures', async () => {
       prisma.bill.findFirst
         .mockResolvedValueOnce(draftBill() as any)

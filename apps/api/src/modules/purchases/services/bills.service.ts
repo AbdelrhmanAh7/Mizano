@@ -10,6 +10,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
@@ -283,6 +284,9 @@ export class BillsService {
    */
   async approve(organizationId: string, id: string) {
     return this.prisma.$transaction(async (tx) => {
+      // Lock first: the currency/account checks below must see the same organization settings
+      // the journal is posted under (a base-currency change takes this lock too).
+      await lockOrganizationLedger(tx, organizationId);
       const bill = await tx.bill.findFirst({
         where: { id, organizationId, deletedAt: null },
         include: { lines: true },
