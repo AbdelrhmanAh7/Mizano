@@ -17,6 +17,10 @@ export interface InvoiceLine {
   quantity: string;
   rate: string;
   discountPercent?: string;
+  /** Server line discount percent. */
+  discount?: string;
+  /** Server line tax percent (14 means 14%). */
+  taxRate?: string;
   taxRateId?: string;
   amount: string;
   item?: {

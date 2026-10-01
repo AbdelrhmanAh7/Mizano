@@ -1,66 +1,71 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, QuoteStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
-import { QuoteQueryDto } from '../dto/quote-query.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { computeDocumentTotals } from '../../../common/utils/document-totals';
+import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateQuoteDto } from '../dto/create-quote.dto';
+import { CreateQuoteDto, QuoteLineDto } from '../dto/create-quote.dto';
+import { QuoteQueryDto } from '../dto/quote-query.dto';
 import { UpdateQuoteDto } from '../dto/update-quote.dto';
+import {
+  allocateInvoiceNumber,
+  allocateQuoteNumber,
+  assertMoneyFits,
+  assertTotalsFit,
+  mapDocumentNumberConflict,
+  parseDocumentDate,
+  startOfTodayUtc,
+} from '../utils/sales-helpers';
+
+const QUOTE_VIEW_INCLUDE = {
+  customer: { select: { id: true, name: true } },
+  lines: true,
+} satisfies Prisma.QuoteInclude;
+
+/** Days between conversion and the invoice due date. */
+const DEFAULT_PAYMENT_TERMS_DAYS = 30;
 
 @Injectable()
 export class QuotesService {
   constructor(private prisma: PrismaService) {}
 
-  async create(organizationId: string, createQuoteDto: CreateQuoteDto) {
-    const { customerId, date, expiryDate, lines, notes, terms } = createQuoteDto;
+  async create(organizationId: string, dto: CreateQuoteDto) {
+    const date = parseDocumentDate(dto.date, 'quote date');
+    const expiryDate = parseDocumentDate(dto.expiryDate, 'expiry date');
+    const { lineData, totals } = this.buildLines(dto.lines);
 
-    const customer = await this.prisma.customer.findFirst({
-      where: { id: customerId, organizationId, deletedAt: null },
-    });
-    if (!customer) throw new BadRequestException('Customer not found');
-
-    let subtotal = 0,
-      taxAmount = 0;
-    const calculatedLines = lines.map((line) => {
-      const qty = parseFloat(line.quantity);
-      const rate = parseFloat(line.rate);
-      const discount = parseFloat(line.discount || '0');
-      const tax = parseFloat(line.taxRate || '0');
-      const lineTotal = qty * rate * (1 - discount / 100);
-      subtotal += lineTotal;
-      taxAmount += lineTotal * (tax / 100);
-      return { ...line, amount: lineTotal.toFixed(4) };
-    });
-
-    const quoteNumber = await this.generateQuoteNumber(organizationId);
-
-    return this.prisma.quote.create({
-      data: {
-        quoteNumber,
-        customerId,
-        date: new Date(date),
-        expiryDate: new Date(expiryDate),
-        subtotal: new Decimal(subtotal),
-        taxAmount: new Decimal(taxAmount),
-        grandTotal: new Decimal(subtotal + taxAmount),
-        notes,
-        terms,
-        organizationId,
-        lines: {
-          create: calculatedLines.map((line) => ({
-            itemId: line.itemId,
-            description: line.description,
-            quantity: new Decimal(line.quantity),
-            rate: new Decimal(line.rate),
-            discount: new Decimal(line.discount || '0'),
-            taxRate: new Decimal(line.taxRate || '0'),
-            amount: new Decimal(line.amount),
-          })),
-        },
-      },
-      include: { customer: { select: { id: true, name: true } }, lines: true },
-    });
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await this.assertReferences(tx, organizationId, dto.customerId, dto.lines);
+        const quoteNumber = await allocateQuoteNumber(tx, organizationId);
+        return tx.quote.create({
+          data: {
+            quoteNumber,
+            customerId: dto.customerId,
+            date,
+            expiryDate,
+            subtotal: totals.subtotal,
+            taxAmount: totals.taxAmount,
+            grandTotal: totals.grandTotal,
+            notes: dto.notes,
+            terms: dto.terms,
+            organizationId,
+            lines: { create: lineData },
+          },
+          include: QUOTE_VIEW_INCLUDE,
+        });
+      });
+    } catch (error) {
+      throw mapDocumentNumberConflict(error, 'Quote');
+    }
   }
 
   async findAll(organizationId: string, query: QuoteQueryDto) {
@@ -132,238 +137,296 @@ export class QuotesService {
     return quote;
   }
 
-  async update(organizationId: string, id: string, updateQuoteDto: UpdateQuoteDto) {
-    const quote = await this.prisma.quote.findFirst({
-      where: { id, organizationId, deletedAt: null },
-    });
-    if (!quote) throw new NotFoundException('Quote not found');
-    if (quote.status !== QuoteStatus.DRAFT)
-      throw new BadRequestException('Only draft quotes can be updated');
+  /** Draft quotes only. When lines are supplied they replace the old lines and totals. */
+  async update(organizationId: string, id: string, dto: UpdateQuoteDto) {
+    const date = dto.date !== undefined ? parseDocumentDate(dto.date, 'quote date') : undefined;
+    const expiryDate =
+      dto.expiryDate !== undefined ? parseDocumentDate(dto.expiryDate, 'expiry date') : undefined;
 
-    const { customerId, lines: _lines, date, expiryDate, ...restData } = updateQuoteDto;
-    return this.prisma.quote.update({
-      where: { id },
-      data: {
-        ...restData,
-        ...(date && { date: new Date(date) }),
-        ...(expiryDate && { expiryDate: new Date(expiryDate) }),
-        ...(customerId && { customer: { connect: { id: customerId } } }),
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const quote = await tx.quote.findFirst({ where: { id, organizationId, deletedAt: null } });
+      if (!quote) throw new NotFoundException('Quote not found');
+      if (quote.status !== QuoteStatus.DRAFT) {
+        throw new BadRequestException('Only draft quotes can be updated');
+      }
+      await this.assertReferences(tx, organizationId, dto.customerId, dto.lines ?? []);
+
+      // Guarded: the quote must still be a draft when the write lands.
+      const { count } = await tx.quote.updateMany({
+        where: { id, organizationId, status: QuoteStatus.DRAFT, deletedAt: null },
+        data: { updatedAt: new Date() },
+      });
+      if (count === 0) throw new ConflictException('Quote was sent or changed concurrently');
+
+      const data: Prisma.QuoteUncheckedUpdateInput = {};
+      if (dto.customerId !== undefined) data.customerId = dto.customerId;
+      if (date) data.date = date;
+      if (expiryDate) data.expiryDate = expiryDate;
+      if (dto.notes !== undefined) data.notes = dto.notes;
+      if (dto.terms !== undefined) data.terms = dto.terms;
+      if (dto.lines) {
+        const { lineData, totals } = this.buildLines(dto.lines);
+        await tx.quoteLine.deleteMany({ where: { quoteId: id } });
+        await tx.quoteLine.createMany({ data: lineData.map((line) => ({ ...line, quoteId: id })) });
+        data.subtotal = totals.subtotal;
+        data.taxAmount = totals.taxAmount;
+        data.grandTotal = totals.grandTotal;
+      }
+
+      return tx.quote.update({ where: { id }, data, include: QUOTE_VIEW_INCLUDE });
     });
   }
 
+  /**
+   * Converts an accepted quote into a draft invoice. The guarded ACCEPTED -> INVOICED transition
+   * and the invoice creation commit together, so a quote converts exactly once even when the
+   * request is repeated or raced.
+   */
   async convertToInvoice(organizationId: string, id: string) {
-    const quote = await this.prisma.quote.findFirst({
-      where: { id, organizationId, deletedAt: null },
-      include: { lines: true },
-    });
-    if (!quote) throw new NotFoundException('Quote not found');
-    if (quote.status !== QuoteStatus.ACCEPTED)
-      throw new BadRequestException('Only accepted quotes can be converted');
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const quote = await tx.quote.findFirst({
+          where: { id, organizationId, deletedAt: null },
+          include: { lines: true },
+        });
+        if (!quote) throw new NotFoundException('Quote not found');
+        if (quote.status !== QuoteStatus.ACCEPTED) {
+          throw new BadRequestException('Only accepted quotes can be converted');
+        }
+        if (quote.lines.length === 0) throw new BadRequestException('Quote has no lines');
 
-    const invoiceNumber = await this.generateInvoiceNumber(organizationId);
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 30);
+        const customer = await tx.customer.findFirst({
+          where: { id: quote.customerId, organizationId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!customer) throw new BadRequestException('Customer not found');
 
-    const invoice = await this.prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        customerId: quote.customerId,
-        quoteId: quote.id,
-        date: new Date(),
-        dueDate,
-        subtotal: quote.subtotal,
-        taxAmount: quote.taxAmount,
-        grandTotal: quote.grandTotal,
-        balanceDue: quote.grandTotal,
-        notes: quote.notes,
-        terms: quote.terms,
-        organizationId,
-        lines: {
-          create: quote.lines.map((line) => ({
-            itemId: line.itemId,
-            description: line.description,
-            quantity: line.quantity,
-            rate: line.rate,
-            discount: line.discount,
-            taxRate: line.taxRate,
-            amount: line.amount,
-          })),
-        },
-      },
-    });
+        // The customer accepted the stored amounts: copy lines and totals verbatim rather
+        // than recomputing. A quote whose stored figures disagree with its own lines is
+        // corrupt and is rejected instead of silently invoiced at a different amount.
+        const linesNet = quote.lines.reduce((sum, l) => sum.add(l.amount), new Decimal(0));
+        if (
+          !linesNet.equals(quote.subtotal) ||
+          !quote.subtotal.add(quote.taxAmount).equals(quote.grandTotal)
+        ) {
+          throw new BadRequestException(
+            'Quote totals do not match its lines; correct the quote before converting it',
+          );
+        }
+        assertMoneyFits(quote.grandTotal, 'grand total');
 
-    await this.prisma.quote.update({ where: { id }, data: { status: QuoteStatus.INVOICED } });
-    return invoice;
-  }
+        const { count } = await tx.quote.updateMany({
+          where: { id, organizationId, status: QuoteStatus.ACCEPTED, deletedAt: null },
+          data: { status: QuoteStatus.INVOICED },
+        });
+        if (count === 0) throw new ConflictException('Quote has already been converted');
 
-  async send(organizationId: string, id: string) {
-    const quote = await this.prisma.quote.findFirst({
-      where: { id, organizationId, deletedAt: null },
-    });
-    if (!quote) throw new NotFoundException('Quote not found');
-    if (quote.status !== QuoteStatus.DRAFT) {
-      throw new BadRequestException('Only draft quotes can be sent');
+        const invoiceNumber = await allocateInvoiceNumber(tx, organizationId);
+        const date = startOfTodayUtc();
+        const dueDate = new Date(date);
+        dueDate.setUTCDate(dueDate.getUTCDate() + DEFAULT_PAYMENT_TERMS_DAYS);
+
+        return tx.invoice.create({
+          data: {
+            invoiceNumber,
+            customerId: quote.customerId,
+            quoteId: quote.id,
+            // The quote's currency travels with it so a foreign-currency quote is never
+            // silently invoiced as base currency (send() rejects foreign currencies).
+            currencyCode: quote.currencyCode,
+            date,
+            dueDate,
+            subtotal: quote.subtotal,
+            taxAmount: quote.taxAmount,
+            shippingAmount: new Decimal(0),
+            grandTotal: quote.grandTotal,
+            balanceDue: quote.grandTotal,
+            notes: quote.notes,
+            terms: quote.terms,
+            organizationId,
+            lines: {
+              create: quote.lines.map((line, i) => ({
+                itemId: line.itemId,
+                description: line.description,
+                quantity: line.quantity,
+                rate: line.rate,
+                discount: line.discount,
+                taxRate: line.taxRate,
+                amount: line.amount,
+                sortOrder: i,
+              })),
+            },
+          },
+          include: {
+            customer: { select: { id: true, name: true, email: true } },
+            lines: true,
+          },
+        });
+      });
+    } catch (error) {
+      throw mapDocumentNumberConflict(error, 'Invoice');
     }
-
-    return this.prisma.quote.update({
-      where: { id },
-      data: { status: QuoteStatus.SENT },
-      include: { customer: { select: { id: true, name: true } }, lines: true },
-    });
   }
 
-  async accept(organizationId: string, id: string) {
-    const quote = await this.prisma.quote.findFirst({
-      where: { id, organizationId, deletedAt: null },
-    });
-    if (!quote) throw new NotFoundException('Quote not found');
-    if (quote.status !== QuoteStatus.SENT) {
-      throw new BadRequestException('Only sent quotes can be accepted');
-    }
-
-    return this.prisma.quote.update({
-      where: { id },
-      data: { status: QuoteStatus.ACCEPTED },
-      include: { customer: { select: { id: true, name: true } }, lines: true },
-    });
+  send(organizationId: string, id: string) {
+    return this.transition(organizationId, id, QuoteStatus.DRAFT, QuoteStatus.SENT, 'sent');
   }
 
-  async decline(organizationId: string, id: string) {
-    const quote = await this.prisma.quote.findFirst({
-      where: { id, organizationId, deletedAt: null },
-    });
-    if (!quote) throw new NotFoundException('Quote not found');
-    if (quote.status !== QuoteStatus.SENT) {
-      throw new BadRequestException('Only sent quotes can be declined');
-    }
-
-    return this.prisma.quote.update({
-      where: { id },
-      data: { status: QuoteStatus.DECLINED },
-      include: { customer: { select: { id: true, name: true } }, lines: true },
-    });
+  accept(organizationId: string, id: string) {
+    return this.transition(organizationId, id, QuoteStatus.SENT, QuoteStatus.ACCEPTED, 'accepted');
   }
 
+  decline(organizationId: string, id: string) {
+    return this.transition(organizationId, id, QuoteStatus.SENT, QuoteStatus.DECLINED, 'declined');
+  }
+
+  /** Soft-deletes a draft quote. */
   async remove(organizationId: string, id: string) {
-    const quote = await this.prisma.quote.findFirst({
-      where: { id, organizationId, deletedAt: null },
+    const { count } = await this.prisma.quote.updateMany({
+      where: { id, organizationId, deletedAt: null, status: QuoteStatus.DRAFT },
+      data: { deletedAt: new Date() },
     });
-    if (!quote) throw new NotFoundException('Quote not found');
-    await this.prisma.quote.update({ where: { id }, data: { deletedAt: new Date() } });
+    if (count === 0) {
+      const exists = await this.prisma.quote.findFirst({
+        where: { id, organizationId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!exists) throw new NotFoundException('Quote not found');
+      throw new BadRequestException('Only draft quotes can be deleted');
+    }
     return { message: 'Quote deleted successfully' };
-  }
-
-  private async generateQuoteNumber(organizationId: string): Promise<string> {
-    const last = await this.prisma.quote.findFirst({
-      where: { organizationId },
-      orderBy: { createdAt: 'desc' },
-      select: { quoteNumber: true },
-    });
-    if (!last) return 'EST-001';
-    const num = parseInt(last.quoteNumber.split('-')[1], 10);
-    return `EST-${String(num + 1).padStart(3, '0')}`;
   }
 
   async clone(organizationId: string, id: string) {
     const original = await this.prisma.quote.findFirst({
       where: { id, organizationId, deletedAt: null },
-      include: {
-        lines: true,
-      },
+      include: { lines: true },
     });
+    if (!original) throw new NotFoundException('Quote not found');
 
-    if (!original) {
-      throw new NotFoundException('Quote not found');
+    const today = startOfTodayUtc();
+    const expiryDate = new Date(today);
+    expiryDate.setUTCDate(expiryDate.getUTCDate() + 30);
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const quoteNumber = await allocateQuoteNumber(tx, organizationId);
+        return tx.quote.create({
+          data: {
+            quoteNumber,
+            customerId: original.customerId,
+            date: today,
+            expiryDate,
+            subtotal: original.subtotal,
+            taxAmount: original.taxAmount,
+            grandTotal: original.grandTotal,
+            notes: original.notes,
+            terms: original.terms,
+            organizationId,
+            lines: {
+              create: original.lines.map((line) => ({
+                itemId: line.itemId,
+                description: line.description,
+                quantity: line.quantity,
+                rate: line.rate,
+                discount: line.discount,
+                taxRate: line.taxRate,
+                amount: line.amount,
+              })),
+            },
+          },
+          include: QUOTE_VIEW_INCLUDE,
+        });
+      });
+    } catch (error) {
+      throw mapDocumentNumberConflict(error, 'Quote');
     }
-
-    const quoteNumber = await this.generateQuoteNumber(organizationId);
-    const today = new Date();
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + 30);
-
-    const cloned = await this.prisma.quote.create({
-      data: {
-        quoteNumber,
-        customerId: original.customerId,
-        date: today,
-        expiryDate,
-        subtotal: original.subtotal,
-        taxAmount: original.taxAmount,
-        grandTotal: original.grandTotal,
-        notes: original.notes,
-        terms: original.terms,
-        organizationId,
-        lines: {
-          create: original.lines.map((line) => ({
-            itemId: line.itemId,
-            description: line.description,
-            quantity: line.quantity,
-            rate: line.rate,
-            discount: line.discount,
-            taxRate: line.taxRate,
-            amount: line.amount,
-          })),
-        },
-      },
-      include: {
-        customer: { select: { id: true, name: true } },
-        lines: true,
-      },
-    });
-
-    return cloned;
   }
 
-  // === Bulk Operations ===
+  // === Bulk Operations — same command as the single-record routes ===
 
-  async bulkDelete(organizationId: string, ids: string[]) {
-    const result = await this.prisma.quote.updateMany({
-      where: {
-        id: { in: ids },
-        organizationId,
-        deletedAt: null,
-        status: QuoteStatus.DRAFT,
-      },
-      data: { deletedAt: new Date() },
-    });
-    return { deleted: result.count, total: ids.length };
+  bulkDelete(organizationId: string, ids: string[]): Promise<BulkResultDto> {
+    return runBulk(ids, (id) => this.remove(organizationId, id));
   }
 
-  async bulkSend(organizationId: string, ids: string[]) {
-    const result = await this.prisma.quote.updateMany({
-      where: {
-        id: { in: ids },
-        organizationId,
-        deletedAt: null,
-        status: QuoteStatus.DRAFT,
-      },
-      data: { status: QuoteStatus.SENT },
-    });
-    return { sent: result.count, total: ids.length };
+  bulkSend(organizationId: string, ids: string[]): Promise<BulkResultDto> {
+    return runBulk(ids, (id) => this.send(organizationId, id));
   }
 
-  async bulkDecline(organizationId: string, ids: string[]) {
-    const result = await this.prisma.quote.updateMany({
-      where: {
-        id: { in: ids },
-        organizationId,
-        deletedAt: null,
-        status: QuoteStatus.SENT,
-      },
-      data: { status: QuoteStatus.DECLINED },
-    });
-    return { declined: result.count, total: ids.length };
+  bulkDecline(organizationId: string, ids: string[]): Promise<BulkResultDto> {
+    return runBulk(ids, (id) => this.decline(organizationId, id));
   }
 
-  private async generateInvoiceNumber(organizationId: string): Promise<string> {
-    const last = await this.prisma.invoice.findFirst({
-      where: { organizationId },
-      orderBy: { createdAt: 'desc' },
-      select: { invoiceNumber: true },
+  // === Helpers ===
+
+  /** Guarded status change: the write only lands while the quote is still in `from`. */
+  private async transition(
+    organizationId: string,
+    id: string,
+    from: QuoteStatus,
+    to: QuoteStatus,
+    verb: string,
+  ) {
+    const { count } = await this.prisma.quote.updateMany({
+      where: { id, organizationId, status: from, deletedAt: null },
+      data: { status: to },
     });
-    if (!last) return 'INV-001';
-    const num = parseInt(last.invoiceNumber.split('-')[1], 10);
-    return `INV-${String(num + 1).padStart(3, '0')}`;
+    if (count === 0) {
+      const exists = await this.prisma.quote.findFirst({
+        where: { id, organizationId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!exists) throw new NotFoundException('Quote not found');
+      throw new BadRequestException(`Only ${from.toLowerCase()} quotes can be ${verb}`);
+    }
+    return this.prisma.quote.findFirstOrThrow({
+      where: { id, organizationId },
+      include: QUOTE_VIEW_INCLUDE,
+    });
+  }
+
+  private buildLines(lines: QuoteLineDto[]) {
+    const totals = computeDocumentTotals(
+      lines.map((l) => ({
+        quantity: l.quantity,
+        rate: l.rate,
+        taxRatePercent: l.taxRate,
+        discountPercent: l.discount,
+      })),
+    );
+    assertTotalsFit(totals);
+    const lineData = lines.map((line, i) => ({
+      itemId: line.itemId,
+      description: line.description,
+      quantity: new Decimal(line.quantity),
+      rate: new Decimal(line.rate),
+      discount: new Decimal(line.discount || '0'),
+      taxRate: new Decimal(line.taxRate || '0'),
+      amount: totals.lines[i].netAmount,
+    }));
+    return { lineData, totals };
+  }
+
+  /** Every referenced id must belong to the caller's organization. */
+  private async assertReferences(
+    db: Prisma.TransactionClient,
+    organizationId: string,
+    customerId: string | undefined,
+    lines: Pick<QuoteLineDto, 'itemId'>[],
+  ): Promise<void> {
+    if (customerId) {
+      const customer = await db.customer.findFirst({
+        where: { id: customerId, organizationId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!customer) throw new BadRequestException('Customer not found');
+    }
+    const itemIds = [...new Set(lines.map((l) => l.itemId).filter((i): i is string => !!i))];
+    if (itemIds.length) {
+      const found = await db.item.count({
+        where: { id: { in: itemIds }, organizationId, deletedAt: null },
+      });
+      if (found !== itemIds.length) throw new BadRequestException('Item not found');
+    }
   }
 }

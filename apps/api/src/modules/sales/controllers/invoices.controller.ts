@@ -17,16 +17,21 @@ import {
   CurrentOrg,
   HttpCache,
   InvalidateCache,
+  InvalidatesLedger,
   Permissions,
 } from '../../../common/decorators';
+import { BulkIdsDto } from '../../../common/dto/bulk-ids.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { BulkPayInvoicesDto } from '../dto/bulk-pay-invoices.dto';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
 import { InvoiceCursorQueryDto } from '../dto/invoice-cursor-query.dto';
 import { InvoiceQueryDto } from '../dto/invoice-query.dto';
+import { RecordInvoicePaymentDto } from '../dto/record-invoice-payment.dto';
 import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
 import { InvoicesService } from '../services/invoices.service';
+import { PaymentsReceivedService } from '../services/payments-received.service';
 
 @ApiTags('Invoices')
 @ApiBearerAuth()
@@ -34,12 +39,15 @@ import { InvoicesService } from '../services/invoices.service';
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @UseInterceptors(CacheInvalidationInterceptor)
 export class InvoicesController {
-  constructor(private readonly invoicesService: InvoicesService) {}
+  constructor(
+    private readonly invoicesService: InvoicesService,
+    private readonly paymentsReceivedService: PaymentsReceivedService,
+  ) {}
 
   @Post()
   @Permissions('sales.create')
-  @InvalidateCache('invoices:*')
-  @ApiOperation({ summary: 'Create a new invoice' })
+  @InvalidateCache('invoices:*', 'customers:*')
+  @ApiOperation({ summary: 'Create a new draft invoice' })
   create(@CurrentOrg() orgId: string, @Body() createInvoiceDto: CreateInvoiceDto) {
     return this.invoicesService.create(orgId, createInvoiceDto);
   }
@@ -64,34 +72,45 @@ export class InvoicesController {
   // Bulk Operations
   @Post('bulk-delete')
   @Permissions('sales.delete')
-  @InvalidateCache('invoices:*')
+  @InvalidateCache('invoices:*', 'customers:*')
   @ApiOperation({ summary: 'Bulk delete draft invoices' })
-  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.invoicesService.bulkDelete(orgId, dto.ids);
   }
 
   @Post('bulk-send')
   @Permissions('sales.edit')
-  @InvalidateCache('invoices:*')
-  @ApiOperation({ summary: 'Bulk send invoices' })
-  bulkSend(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  @InvalidatesLedger('invoices:*', 'customers:*')
+  @ApiOperation({ summary: 'Bulk send (post to the ledger) draft invoices' })
+  bulkSend(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.invoicesService.bulkSend(orgId, dto.ids);
   }
 
   @Post('bulk-void')
   @Permissions('sales.edit')
-  @InvalidateCache('invoices:*')
-  @ApiOperation({ summary: 'Bulk void invoices' })
-  bulkVoid(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  @InvalidatesLedger('invoices:*', 'customers:*')
+  @ApiOperation({ summary: 'Bulk void invoices (reverses the journal of sent invoices)' })
+  bulkVoid(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.invoicesService.bulkVoid(orgId, dto.ids);
   }
 
   @Post('bulk-pay')
-  @Permissions('sales.edit')
-  @InvalidateCache('invoices:*')
-  @ApiOperation({ summary: 'Bulk mark invoices as paid' })
-  bulkPay(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
-    return this.invoicesService.bulkPay(orgId, dto.ids);
+  // Records real payments: same permission as creating a payment received.
+  @Permissions('sales.create')
+  @InvalidatesLedger('invoices:*', 'payments-received:*', 'customers:*')
+  @ApiOperation({ summary: 'Receive the full balance of each invoice (records real payments)' })
+  bulkPay(@CurrentOrg() orgId: string, @Body() dto: BulkPayInvoicesDto) {
+    const { ids, ...options } = dto;
+    return this.paymentsReceivedService.bulkPayInvoices(orgId, ids, options);
+  }
+
+  @Get('tax-rate-options')
+  @Permissions('sales.view')
+  @ApiOperation({
+    summary: 'Active SALES/BOTH tax rates for sales forms (sales.view, no tax.view needed)',
+  })
+  taxRateOptions(@CurrentOrg() orgId: string) {
+    return this.invoicesService.taxRateOptions(orgId);
   }
 
   @Get(':id')
@@ -103,8 +122,8 @@ export class InvoicesController {
 
   @Patch(':id')
   @Permissions('sales.edit')
-  @InvalidateCache('invoices:*')
-  @ApiOperation({ summary: 'Update invoice' })
+  @InvalidateCache('invoices:*', 'customers:*')
+  @ApiOperation({ summary: 'Update a draft invoice' })
   update(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
@@ -115,35 +134,36 @@ export class InvoicesController {
 
   @Patch(':id/send')
   @Permissions('sales.edit')
-  @InvalidateCache('invoices:*')
-  @ApiOperation({ summary: 'Mark invoice as sent' })
+  @InvalidatesLedger('invoices:*', 'customers:*')
+  @ApiOperation({ summary: 'Send an invoice: DRAFT -> SENT and post Dr AR / Cr Revenue / Cr VAT' })
   send(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.invoicesService.send(orgId, id);
   }
 
   @Patch(':id/void')
   @Permissions('sales.edit')
-  @InvalidateCache('invoices:*')
-  @ApiOperation({ summary: 'Void invoice' })
+  @InvalidatesLedger('invoices:*', 'customers:*')
+  @ApiOperation({ summary: 'Void an invoice (reverses the journal of a sent invoice)' })
   void(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.invoicesService.voidInvoice(orgId, id);
   }
 
   @Post(':id/record-payment')
-  @Permissions('sales.edit')
-  @InvalidateCache('invoices:*', 'payments-received:*')
-  @ApiOperation({ summary: 'Record payment for invoice' })
+  // Records a real payment: same permission as creating a payment received.
+  @Permissions('sales.create')
+  @InvalidatesLedger('invoices:*', 'payments-received:*', 'customers:*')
+  @ApiOperation({ summary: 'Record a payment for one invoice (payment + allocation + journal)' })
   recordPayment(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
-    @Body() dto: { amount: number; date: string; bankAccountId: string; reference?: string },
+    @Body() dto: RecordInvoicePaymentDto,
   ) {
-    return this.invoicesService.recordPayment(orgId, id, dto);
+    return this.paymentsReceivedService.recordForInvoice(orgId, id, dto);
   }
 
   @Post(':id/clone')
   @Permissions('sales.create')
-  @InvalidateCache('invoices:*')
+  @InvalidateCache('invoices:*', 'customers:*')
   @ApiOperation({ summary: 'Clone an invoice as a new draft' })
   clone(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.invoicesService.clone(orgId, id);
@@ -151,8 +171,8 @@ export class InvoicesController {
 
   @Delete(':id')
   @Permissions('sales.delete')
-  @InvalidateCache('invoices:*')
-  @ApiOperation({ summary: 'Delete invoice' })
+  @InvalidateCache('invoices:*', 'customers:*')
+  @ApiOperation({ summary: 'Delete a draft invoice' })
   remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.invoicesService.remove(orgId, id);
   }

@@ -19,17 +19,48 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useCustomers, Customer } from '@/lib/hooks/use-customers';
 import { useInvoices, Invoice } from '@/lib/hooks/use-invoices';
+import { useTranslations } from 'next-intl';
+import { useQuery } from '@tanstack/react-query';
+import { creditNotesApi } from '@/lib/api';
 import { CreditNoteType } from '@/lib/hooks/use-credit-notes';
 
-const creditNoteSchema = z.object({
-  customerId: z.string().min(1, 'Customer is required'),
-  invoiceId: z.string().min(1, 'Original invoice is required'),
-  date: z.string().min(1, 'Date is required'),
-  type: z.enum(['REFUND', 'APPLY_TO_INVOICE']),
-  amount: z.string().min(1, 'Amount is required'),
-  reason: z.string().optional(),
-  appliedToInvoiceId: z.string().optional(),
-});
+const creditNoteSchema = z
+  .object({
+    customerId: z.string().min(1, 'Customer is required'),
+    invoiceId: z.string().min(1, 'Original invoice is required'),
+    date: z.string().min(1, 'Date is required'),
+    type: z.enum(['REFUND', 'APPLY_TO_INVOICE']),
+    amount: z
+      .string()
+      .trim()
+      .regex(/^\d{1,15}(\.\d{1,4})?$/, 'Enter a valid amount (up to 15 digits, 4 decimals)'),
+    reason: z.string().trim().min(1, 'Reason is required').max(500),
+    appliedToInvoiceId: z.string().optional(),
+    refundAccountId: z.string().optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.type === 'REFUND' && !v.refundAccountId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Refund account is required',
+        path: ['refundAccountId'],
+      });
+    }
+    // No silent default: applying a credit needs an explicit target invoice.
+    if (v.type === 'APPLY_TO_INVOICE' && !v.appliedToInvoiceId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Choose the invoice to apply this credit to',
+        path: ['appliedToInvoiceId'],
+      });
+    }
+  });
+
+interface RefundAccount {
+  id: string;
+  code: string;
+  name: string;
+}
 
 export type CreditNoteFormData = z.infer<typeof creditNoteSchema>;
 
@@ -61,8 +92,17 @@ export function CreditNoteForm({
       amount: '',
       reason: '',
       appliedToInvoiceId: '',
+      refundAccountId: '',
     },
   });
+
+  const t = useTranslations('sales');
+  // Sales-authorized lookup of bank/cash accounts (the server enforces the same rule on create).
+  const { data: refundAccountsData } = useQuery({
+    queryKey: ['credit-notes', 'refund-accounts'],
+    queryFn: async () => (await creditNotesApi.refundAccounts()).data as RefundAccount[],
+  });
+  const refundAccounts = refundAccountsData ?? [];
 
   const selectedCustomerId = form.watch('customerId');
   const selectedType = form.watch('type');
@@ -213,7 +253,7 @@ export function CreditNoteForm({
               <RadioGroupItem value="REFUND" id="refund" />
               <div>
                 <Label htmlFor="refund" className="font-medium cursor-pointer">
-                  Refund
+                  {t('creditNotes.form.refundLabel')}
                 </Label>
                 <p className="text-sm text-muted-foreground">
                   Issue a refund to the customer. The credit will reduce their account balance.
@@ -234,20 +274,60 @@ export function CreditNoteForm({
             </div>
           </RadioGroup>
 
+          {selectedType === 'REFUND' && (
+            <div className="space-y-2 pt-4">
+              <Label htmlFor="refundAccountId">Refund Paid From *</Label>
+              <Select
+                value={form.watch('refundAccountId') || ''}
+                onValueChange={(value) =>
+                  form.setValue('refundAccountId', value, { shouldValidate: true })
+                }
+                disabled={refundAccounts.length === 0}
+              >
+                <SelectTrigger id="refundAccountId">
+                  <SelectValue
+                    placeholder={
+                      refundAccounts.length === 0
+                        ? t('creditNotes.form.noRefundAccountOption')
+                        : t('creditNotes.form.selectRefundAccount')
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {refundAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.code} - {account.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {refundAccountsData && refundAccounts.length === 0 && (
+                <p className="text-sm text-amber-600">{t('creditNotes.form.noRefundAccounts')}</p>
+              )}
+              {form.formState.errors.refundAccountId && (
+                <p className="text-sm text-red-500">
+                  {form.formState.errors.refundAccountId.message}
+                </p>
+              )}
+            </div>
+          )}
+
           {selectedType === 'APPLY_TO_INVOICE' && (
             <div className="space-y-2 pt-4">
               <Label htmlFor="appliedToInvoiceId">Apply to Invoice *</Label>
               <Select
                 value={form.watch('appliedToInvoiceId') || ''}
-                onValueChange={(value) => form.setValue('appliedToInvoiceId', value)}
+                onValueChange={(value) =>
+                  form.setValue('appliedToInvoiceId', value, { shouldValidate: true })
+                }
                 disabled={!selectedCustomerId || openInvoices.length === 0}
               >
                 <SelectTrigger>
                   <SelectValue
                     placeholder={
                       openInvoices.length === 0
-                        ? 'No open invoices available'
-                        : 'Select an invoice to apply credit'
+                        ? t('creditNotes.form.noOpenInvoices')
+                        : t('creditNotes.form.selectInvoiceToApply')
                     }
                   />
                 </SelectTrigger>
@@ -259,6 +339,9 @@ export function CreditNoteForm({
                   ))}
                 </SelectContent>
               </Select>
+              {form.formState.errors.appliedToInvoiceId && (
+                <p className="text-sm text-red-500">{t('creditNotes.form.applyInvoiceRequired')}</p>
+              )}
               {selectedType === 'APPLY_TO_INVOICE' && openInvoices.length === 0 && (
                 <p className="text-sm text-amber-600">
                   No other open invoices available for this customer.
@@ -279,9 +362,8 @@ export function CreditNoteForm({
             <Label htmlFor="amount">Credit Amount *</Label>
             <Input
               id="amount"
-              type="number"
-              step="0.01"
-              min="0"
+              type="text"
+              inputMode="decimal"
               placeholder="0.00"
               {...form.register('amount')}
             />
@@ -296,13 +378,16 @@ export function CreditNoteForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reason">Reason</Label>
+            <Label htmlFor="reason">Reason *</Label>
             <Textarea
               id="reason"
               placeholder="Reason for issuing this credit note..."
               rows={4}
               {...form.register('reason')}
             />
+            {form.formState.errors.reason && (
+              <p className="text-sm text-red-500">{form.formState.errors.reason.message}</p>
+            )}
           </div>
         </CardContent>
       </Card>

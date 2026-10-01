@@ -16,14 +16,18 @@ import {
   CacheTTL,
   CurrentOrg,
   InvalidateCache,
+  InvalidatesLedger,
   Permissions,
 } from '../../../common/decorators';
+import { BulkIdsDto } from '../../../common/dto/bulk-ids.dto';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { ApplyCreditNoteDto } from '../dto/apply-credit-note.dto';
 import { CreateCreditNoteDto } from '../dto/create-credit-note.dto';
 import { CreditNoteQueryDto } from '../dto/credit-note-query.dto';
+import { UpdateCreditNoteDto } from '../dto/update-credit-note.dto';
 import { CreditNotesService } from '../services/credit-notes.service';
 
 @ApiTags('Credit Notes')
@@ -36,8 +40,8 @@ export class CreditNotesController {
 
   @Post()
   @Permissions('sales.create')
-  @InvalidateCache('credit-notes:*', 'invoices:*')
-  @ApiOperation({ summary: 'Create a credit note' })
+  @InvalidatesLedger('credit-notes:*', 'invoices:*', 'customers:*')
+  @ApiOperation({ summary: 'Create a credit note (posts Dr Sales Returns / VAT, Cr AR or refund)' })
   create(@CurrentOrg() orgId: string, @Body() createCreditNoteDto: CreateCreditNoteDto) {
     return this.creditNotesService.create(orgId, createCreditNoteDto);
   }
@@ -58,12 +62,21 @@ export class CreditNotesController {
     return this.creditNotesService.findAllCursor(orgId, query);
   }
 
+  @Get('refund-accounts')
+  @Permissions('sales.create')
+  @ApiOperation({
+    summary: 'Bank/cash accounts a REFUND credit note can be paid from (sales.create)',
+  })
+  refundAccounts(@CurrentOrg() orgId: string) {
+    return this.creditNotesService.refundAccounts(orgId);
+  }
+
   // Bulk Operations
   @Post('bulk-delete')
   @Permissions('sales.delete')
-  @InvalidateCache('credit-notes:*')
-  @ApiOperation({ summary: 'Bulk delete credit notes' })
-  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  @InvalidatesLedger('credit-notes:*', 'invoices:*', 'customers:*')
+  @ApiOperation({ summary: 'Bulk void credit notes (restores balances, reverses journals)' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.creditNotesService.bulkDelete(orgId, dto.ids);
   }
 
@@ -77,28 +90,24 @@ export class CreditNotesController {
   @Put(':id')
   @Permissions('sales.edit')
   @InvalidateCache('credit-notes:*')
-  @ApiOperation({ summary: 'Update credit note' })
-  update(
-    @CurrentOrg() orgId: string,
-    @Param('id') id: string,
-    @Body() dto: Record<string, unknown>,
-  ) {
+  @ApiOperation({ summary: 'Update the reason of a credit note (posted notes are immutable)' })
+  update(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: UpdateCreditNoteDto) {
     return this.creditNotesService.update(orgId, id, dto);
   }
 
   @Delete(':id')
   @Permissions('sales.delete')
-  @InvalidateCache('credit-notes:*')
-  @ApiOperation({ summary: 'Delete credit note' })
+  @InvalidatesLedger('credit-notes:*', 'invoices:*', 'customers:*')
+  @ApiOperation({ summary: 'Void a credit note (restores balance, reverses journal)' })
   remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.creditNotesService.remove(orgId, id);
   }
 
   @Post(':id/apply')
   @Permissions('sales.edit')
-  @InvalidateCache('credit-notes:*', 'invoices:*')
-  @ApiOperation({ summary: 'Apply credit note to an invoice' })
-  apply(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: { invoiceId: string }) {
+  @InvalidateCache('credit-notes:*', 'invoices:*', 'customers:*')
+  @ApiOperation({ summary: 'Apply an unapplied credit note to an invoice balance' })
+  apply(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: ApplyCreditNoteDto) {
     return this.creditNotesService.apply(orgId, id, dto.invoiceId);
   }
 }

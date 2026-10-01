@@ -239,16 +239,24 @@ export const invoicesApi = {
   bulkDelete: (ids: string[]) => api.post('/invoices/bulk-delete', { ids }),
   bulkSend: (ids: string[]) => api.post('/invoices/bulk-send', { ids }),
   bulkVoid: (ids: string[]) => api.post('/invoices/bulk-void', { ids }),
-  bulkPay: (ids: string[]) => api.post('/invoices/bulk-pay', { ids }),
+  /** Records a full-balance payment per invoice; returns { processed, total, failures }. */
+  bulkPay: (
+    ids: string[],
+    options?: { depositToAccountId?: string; date?: string; paymentMode?: string },
+  ) => api.post('/invoices/bulk-pay', { ids, ...options }),
 };
 
 export const creditNotesApi = {
   ...crud('/credit-notes'),
   bulkDelete: (ids: string[]) => api.post('/credit-notes/bulk-delete', { ids }),
+  /** Bank/cash accounts a REFUND can be paid from (sales.create; no accounting.view needed). */
+  refundAccounts: () => api.get('/credit-notes/refund-accounts'),
 };
 
 export const paymentsReceivedApi = {
   ...crud('/payments-received'),
+  /** Voids a payment: restores invoice balances and posts a linked reversal journal. */
+  void: (id: string) => api.post(`/payments-received/${id}/void`),
   bulkDelete: (ids: string[]) => api.post('/payments-received/bulk-delete', { ids }),
 };
 

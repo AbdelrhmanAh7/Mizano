@@ -1,5 +1,6 @@
 'use client';
 
+import { useTaxRateOptions } from '@/lib/hooks/use-tax';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
@@ -18,11 +19,7 @@ export default function NewQuotePage() {
   const customerId = searchParams.get('customerId') || undefined;
   const createQuote = useCreateQuote();
 
-  // TODO: Fetch tax rates from API
-  const taxRates = [
-    { id: 'vat-14', name: 'VAT 14%', rate: 14 },
-    { id: 'vat-0', name: 'VAT 0%', rate: 0 },
-  ];
+  const taxRateLookup = useTaxRateOptions();
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
@@ -67,7 +64,8 @@ export default function NewQuotePage() {
       {/* Form */}
       <QuoteForm
         customerId={customerId}
-        taxRates={taxRates}
+        taxRates={taxRateLookup.options}
+        taxRatesStatus={{ isLoading: taxRateLookup.isLoading, isError: taxRateLookup.isError }}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         isSubmitting={createQuote.isPending}

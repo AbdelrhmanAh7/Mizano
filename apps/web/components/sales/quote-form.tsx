@@ -18,7 +18,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCustomers, Customer } from '@/lib/hooks/use-customers';
 import { Quote } from '@/lib/hooks/use-quotes';
-import { LineItemsForm, calculateLineTotals } from './line-items-form';
+import { LineItemsForm, taxFieldsForPercent, toApiLines } from './line-items-form';
 
 const lineItemSchema = z.object({
   itemId: z.string().optional(),
@@ -27,6 +27,7 @@ const lineItemSchema = z.object({
   rate: z.string().min(1, 'Rate is required'),
   discountPercent: z.string().optional(),
   taxRateId: z.string().optional(),
+  taxPercent: z.string().optional(),
   amount: z.string(),
 });
 
@@ -43,10 +44,14 @@ const quoteSchema = z.object({
 
 type QuoteFormData = z.infer<typeof quoteSchema>;
 
+const NO_TAX_RATES: { id: string; name: string; rate: number }[] = [];
+
 interface QuoteFormProps {
   quote?: Quote | null;
   customerId?: string;
   taxRates?: { id: string; name: string; rate: number }[];
+  /** State of the tax-rate lookup; a failed lookup blocks saving. */
+  taxRatesStatus?: { isLoading: boolean; isError: boolean };
   onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -55,7 +60,8 @@ interface QuoteFormProps {
 export function QuoteForm({
   quote,
   customerId,
-  taxRates = [],
+  taxRates = NO_TAX_RATES,
+  taxRatesStatus,
   onSubmit,
   onCancel,
   isSubmitting,
@@ -109,8 +115,10 @@ export function QuoteForm({
           description: line.description,
           quantity: line.quantity,
           rate: line.rate,
-          discountPercent: line.discountPercent || '0',
-          taxRateId: line.taxRateId || '',
+          discountPercent: line.discountPercent || line.discount || '0',
+          ...(line.taxRateId
+            ? { taxRateId: line.taxRateId }
+            : taxFieldsForPercent(line.taxRate, taxRates)),
           amount: line.amount,
         })) || [
           {
@@ -125,29 +133,23 @@ export function QuoteForm({
         ],
       });
     }
-  }, [quote, form]);
+  }, [quote, form, taxRates]);
 
   const selectedCustomerId = form.watch('customerId');
   const selectedCustomer = customers.find((c: Customer) => c.id === selectedCustomerId);
 
   const handleSubmit = (data: QuoteFormData) => {
-    // Calculate totals
-    const totals = calculateLineTotals(data.lines, taxRates);
-
-    const submitData = {
-      ...data,
-      subtotal: totals.subtotal.toFixed(2),
-      discountAmount: totals.totalDiscount.toFixed(2),
-      taxAmount: totals.totalTax.toFixed(2),
-      grandTotal: totals.grandTotal.toFixed(2),
-      lines: data.lines.map((line) => ({
-        ...line,
-        itemId: line.itemId || null,
-        taxRateId: line.taxRateId || null,
-      })),
-    };
-
-    onSubmit(submitData);
+    // Never save lines against a tax lookup that failed or has not finished.
+    if (taxRatesStatus?.isError || taxRatesStatus?.isLoading) return;
+    // Exactly the CreateQuoteDto shape: totals are computed by the server from the lines.
+    onSubmit({
+      customerId: data.customerId,
+      date: data.quoteDate,
+      expiryDate: data.expiryDate,
+      notes: data.notes || undefined,
+      terms: data.terms || undefined,
+      lines: toApiLines(data.lines, taxRates),
+    });
   };
 
   return (
@@ -228,6 +230,7 @@ export function QuoteForm({
         setValue={form.setValue as unknown as UseFormSetValue<FieldValues>}
         name="lines"
         taxRates={taxRates}
+        taxRatesStatus={taxRatesStatus}
         currency={selectedCustomer?.currency || 'USD'}
         showTax={true}
         showDiscount={true}

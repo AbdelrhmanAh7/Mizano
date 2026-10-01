@@ -8,12 +8,15 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { CurrentOrg, InvalidateCache, Permissions } from '../../../common/decorators';
+import { BulkIdsDto } from '../../../common/dto/bulk-ids.dto';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import { CreateQuoteDto } from '../dto/create-quote.dto';
 import { QuoteQueryDto } from '../dto/quote-query.dto';
 import { UpdateQuoteDto } from '../dto/update-quote.dto';
@@ -23,11 +26,13 @@ import { QuotesService } from '../services/quotes.service';
 @ApiBearerAuth()
 @Controller('quotes')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseInterceptors(CacheInvalidationInterceptor)
 export class QuotesController {
   constructor(private readonly quotesService: QuotesService) {}
 
   @Post()
   @Permissions('sales.create')
+  @InvalidateCache('quotes:*')
   @ApiOperation({ summary: 'Create a new quote' })
   create(@CurrentOrg() orgId: string, @Body() createQuoteDto: CreateQuoteDto) {
     return this.quotesService.create(orgId, createQuoteDto);
@@ -49,22 +54,25 @@ export class QuotesController {
   // Bulk Operations
   @Post('bulk-delete')
   @Permissions('sales.delete')
+  @InvalidateCache('quotes:*')
   @ApiOperation({ summary: 'Bulk delete draft quotes' })
-  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.quotesService.bulkDelete(orgId, dto.ids);
   }
 
   @Post('bulk-send')
   @Permissions('sales.edit')
+  @InvalidateCache('quotes:*')
   @ApiOperation({ summary: 'Bulk send quotes' })
-  bulkSend(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  bulkSend(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.quotesService.bulkSend(orgId, dto.ids);
   }
 
   @Post('bulk-decline')
   @Permissions('sales.edit')
+  @InvalidateCache('quotes:*')
   @ApiOperation({ summary: 'Bulk decline quotes' })
-  bulkDecline(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  bulkDecline(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.quotesService.bulkDecline(orgId, dto.ids);
   }
 
@@ -76,6 +84,8 @@ export class QuotesController {
 
   @Patch(':id')
   @Permissions('sales.edit')
+  @InvalidateCache('quotes:*')
+  @ApiOperation({ summary: 'Update a draft quote' })
   update(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
@@ -86,6 +96,7 @@ export class QuotesController {
 
   @Patch(':id/send')
   @Permissions('sales.edit')
+  @InvalidateCache('quotes:*')
   @ApiOperation({ summary: 'Mark quote as sent' })
   send(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.quotesService.send(orgId, id);
@@ -93,6 +104,7 @@ export class QuotesController {
 
   @Patch(':id/accept')
   @Permissions('sales.edit')
+  @InvalidateCache('quotes:*')
   @ApiOperation({ summary: 'Mark quote as accepted' })
   accept(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.quotesService.accept(orgId, id);
@@ -100,6 +112,7 @@ export class QuotesController {
 
   @Patch(':id/decline')
   @Permissions('sales.edit')
+  @InvalidateCache('quotes:*')
   @ApiOperation({ summary: 'Mark quote as declined' })
   decline(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.quotesService.decline(orgId, id);
@@ -107,6 +120,7 @@ export class QuotesController {
 
   @Post(':id/clone')
   @Permissions('sales.create')
+  @InvalidateCache('quotes:*')
   @ApiOperation({ summary: 'Clone a quote as a new draft' })
   clone(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.quotesService.clone(orgId, id);
@@ -114,13 +128,16 @@ export class QuotesController {
 
   @Post(':id/convert-to-invoice')
   @Permissions('sales.create')
-  @ApiOperation({ summary: 'Convert quote to invoice' })
+  @InvalidateCache('quotes:*', 'invoices:*', 'customers:*')
+  @ApiOperation({ summary: 'Convert an accepted quote to a draft invoice (exactly once)' })
   convertToInvoice(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.quotesService.convertToInvoice(orgId, id);
   }
 
   @Delete(':id')
   @Permissions('sales.delete')
+  @InvalidateCache('quotes:*')
+  @ApiOperation({ summary: 'Delete a draft quote' })
   remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.quotesService.remove(orgId, id);
   }

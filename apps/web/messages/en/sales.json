@@ -231,7 +231,14 @@
       "reason": "Reason",
       "amount": "Amount",
       "type": "Type",
-      "applyToInvoice": "Apply to Invoice"
+      "applyToInvoice": "Apply to Invoice",
+      "noRefundAccounts": "No bank or cash accounts are set up. Ask an accountant to add a bank or cash account in Banking, or set a default bank account in Settings, then try again.",
+      "applyInvoiceRequired": "Choose which invoice to apply this credit to",
+      "refundLabel": "Refund",
+      "selectRefundAccount": "Select bank or cash account",
+      "noRefundAccountOption": "No bank or cash accounts available",
+      "selectInvoiceToApply": "Select an invoice to apply credit",
+      "noOpenInvoices": "No open invoices available"
     },
     "types": {
       "refund": "Refund",
@@ -298,7 +305,11 @@
     "empty": {
       "title": "No payments yet",
       "description": "Payments will appear here when recorded"
-    }
+    },
+    "voidedBadge": "Voided",
+    "voidPayment": "Void payment",
+    "voidPaymentTitle": "Void payment",
+    "voidPaymentConfirm": "Voiding {number} voids the whole payment: every invoice it was allocated to gets its balance back, and a reversing journal entry is posted."
   },
   "deliveryChallans": {
     "title": "Delivery Challans",
@@ -358,7 +369,9 @@
     "rate": "Rate",
     "discount": "Discount",
     "tax": "Tax",
-    "amount": "Amount"
+    "amount": "Amount",
+    "taxLoading": "Loading tax rates...",
+    "taxLoadFailed": "Tax rates could not be loaded. Reload the page before saving, otherwise lines would be saved without tax."
   },
   "overview": {
     "quickActions": "Quick Actions",

@@ -59,8 +59,9 @@ interface CreateCreditNoteData {
   date: string;
   type: CreditNoteType;
   amount: string;
-  reason?: string;
+  reason: string;
   appliedToInvoiceId?: string;
+  refundAccountId?: string;
 }
 
 /**

@@ -18,7 +18,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCustomers, Customer } from '@/lib/hooks/use-customers';
 import { Invoice } from '@/lib/hooks/use-invoices';
-import { LineItemsForm, calculateLineTotals } from './line-items-form';
+import {
+  LineItemsForm,
+  calculateLineTotals,
+  taxFieldsForPercent,
+  toApiLines,
+} from './line-items-form';
 
 const lineItemSchema = z.object({
   itemId: z.string().optional(),
@@ -27,6 +32,7 @@ const lineItemSchema = z.object({
   rate: z.string().min(1, 'Rate is required'),
   discountPercent: z.string().optional(),
   taxRateId: z.string().optional(),
+  taxPercent: z.string().optional(),
   amount: z.string(),
 });
 
@@ -44,10 +50,14 @@ const invoiceSchema = z.object({
 
 type InvoiceFormData = z.infer<typeof invoiceSchema>;
 
+const NO_TAX_RATES: { id: string; name: string; rate: number }[] = [];
+
 interface InvoiceFormProps {
   invoice?: Invoice | null;
   customerId?: string;
   taxRates?: { id: string; name: string; rate: number }[];
+  /** State of the tax-rate lookup; a failed lookup blocks saving. */
+  taxRatesStatus?: { isLoading: boolean; isError: boolean };
   onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -64,7 +74,8 @@ const paymentTermsOptions = [
 export function InvoiceForm({
   invoice,
   customerId,
-  taxRates = [],
+  taxRates = NO_TAX_RATES,
+  taxRatesStatus,
   onSubmit,
   onCancel,
   isSubmitting,
@@ -120,8 +131,10 @@ export function InvoiceForm({
           description: line.description,
           quantity: line.quantity,
           rate: line.rate,
-          discountPercent: line.discountPercent || '0',
-          taxRateId: line.taxRateId || '',
+          discountPercent: line.discountPercent || line.discount || '0',
+          ...(line.taxRateId
+            ? { taxRateId: line.taxRateId }
+            : taxFieldsForPercent(line.taxRate, taxRates)),
           amount: line.amount,
         })) || [
           {
@@ -136,7 +149,7 @@ export function InvoiceForm({
         ],
       });
     }
-  }, [invoice, form]);
+  }, [invoice, form, taxRates]);
 
   const selectedCustomerId = form.watch('customerId');
   const selectedCustomer = customers.find((c: Customer) => c.id === selectedCustomerId);
@@ -178,33 +191,18 @@ export function InvoiceForm({
   }, [selectedCustomer]);
 
   const handleSubmit = (data: InvoiceFormData) => {
-    // Calculate totals
-    const totals = calculateLineTotals(data.lines, taxRates);
-    const shipping = parseFloat(data.shippingCharge || '0') || 0;
-
-    const submitData = {
+    // Never save lines against a tax lookup that failed or has not finished.
+    if (taxRatesStatus?.isError || taxRatesStatus?.isLoading) return;
+    // Exactly the CreateInvoiceDto shape: totals are computed by the server from the lines.
+    onSubmit({
       customerId: data.customerId,
       date: data.invoiceDate,
       dueDate: data.dueDate,
-      notes: data.notes || null,
-      terms: data.terms || null,
-      subtotal: totals.subtotal.toFixed(2),
-      discountAmount: totals.totalDiscount.toFixed(2),
-      taxAmount: totals.totalTax.toFixed(2),
-      shippingAmount: shipping.toFixed(2),
-      grandTotal: (totals.grandTotal + shipping).toFixed(2),
-      lines: data.lines.map((line) => ({
-        itemId: line.itemId || null,
-        description: line.description,
-        quantity: line.quantity,
-        rate: line.rate,
-        discountPercent: line.discountPercent || '0',
-        taxRateId: line.taxRateId || null,
-        amount: line.amount,
-      })),
-    };
-
-    onSubmit(submitData);
+      notes: data.notes || undefined,
+      terms: data.terms || undefined,
+      shippingAmount: data.shippingCharge?.trim() || '0',
+      lines: toApiLines(data.lines, taxRates),
+    });
   };
 
   const lines = form.watch('lines');
@@ -300,6 +298,7 @@ export function InvoiceForm({
         setValue={form.setValue as unknown as UseFormSetValue<FieldValues>}
         name="lines"
         taxRates={taxRates}
+        taxRatesStatus={taxRatesStatus}
         currency={selectedCustomer?.currency || 'USD'}
         showTax={true}
         showDiscount={true}

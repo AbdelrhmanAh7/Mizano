@@ -26,7 +26,9 @@ export default function NewCreditNotePage() {
         type: data.type,
         amount: data.amount,
         reason: data.reason,
-        appliedToInvoiceId: data.type === 'APPLY_TO_INVOICE' ? data.appliedToInvoiceId : undefined,
+        appliedToInvoiceId:
+          data.type === 'APPLY_TO_INVOICE' ? data.appliedToInvoiceId || undefined : undefined,
+        refundAccountId: data.type === 'REFUND' ? data.refundAccountId : undefined,
       });
       router.push(`/sales/credit-notes/${result.id}`);
     } catch (error) {

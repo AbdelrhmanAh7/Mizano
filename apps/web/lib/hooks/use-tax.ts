@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 
@@ -183,6 +184,33 @@ export function useTaxRates(params?: { isActive?: boolean }) {
     queryKey: ['tax-rates', params],
     queryFn: () => taxRatesApi.list(params),
   });
+}
+
+/**
+ * Active SALES/BOTH tax rates as { id, name, rate (percent) } options for sales documents.
+ * Reads the sales-authorized endpoint (sales.view), not /tax-rates (tax.view), so sales users
+ * can pick a rate; the server already excludes purchase-only rates.
+ */
+export interface TaxRateOptionsState {
+  options: { id: string; name: string; rate: number }[];
+  isLoading: boolean;
+  /** True when the lookup failed: forms must not save lines as if there were no tax rates. */
+  isError: boolean;
+}
+
+export function useTaxRateOptions(): TaxRateOptionsState {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['tax-rates', 'sales-options'],
+    queryFn: async () => {
+      const response = await api.get('/invoices/tax-rate-options');
+      return response.data as { id: string; name: string; rate: string }[];
+    },
+  });
+  const options = useMemo(
+    () => (data ?? []).map((r) => ({ id: r.id, name: r.name, rate: Number(r.rate) })),
+    [data],
+  );
+  return { options, isLoading, isError };
 }
 
 export function useTaxRate(id: string) {

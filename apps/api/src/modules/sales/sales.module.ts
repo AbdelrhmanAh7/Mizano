@@ -31,6 +31,6 @@ import { AccountingModule } from '../accounting/accounting.module';
     PaymentsReceivedService,
     DeliveryChallansService,
   ],
-  exports: [CustomersService, InvoicesService],
+  exports: [CustomersService, InvoicesService, PaymentsReceivedService, CreditNotesService],
 })
 export class SalesModule {}

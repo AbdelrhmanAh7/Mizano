@@ -2,6 +2,7 @@
 
 import { useToast } from '@/components/ui/use-toast';
 import { paymentsReceivedApi } from '@/lib/api';
+import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -148,6 +149,38 @@ export function useCreatePaymentReceived() {
       toast({
         variant: 'destructive',
         title: 'Error recording payment',
+        description: error.response?.data?.message || 'An error occurred',
+      });
+    },
+  });
+}
+
+/**
+ * Hook to void a payment received (restores invoice balances, posts a reversal journal)
+ */
+export function useVoidPaymentReceived() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await paymentsReceivedApi.void(id);
+      return response.data;
+    },
+    onSuccess: () => {
+      void invalidateLedgerQueries(queryClient);
+      queryClient.invalidateQueries({ queryKey: ['payments-received'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast({
+        title: 'Payment voided',
+        description: 'The invoice balances were restored and a reversal journal was posted.',
+      });
+    },
+    onError: (error: ApiError) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error voiding payment',
         description: error.response?.data?.message || 'An error occurred',
       });
     },

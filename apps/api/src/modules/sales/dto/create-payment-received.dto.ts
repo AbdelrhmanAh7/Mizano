@@ -11,16 +11,19 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { PaymentMode } from '@prisma/client';
+import { IsDecimalString } from './decimal-string';
 
-class PaymentAllocationDto {
+export class PaymentAllocationDto {
   @IsString() invoiceId: string;
-  @IsString() amount: string;
+  @IsDecimalString() amount: string;
 }
 
 export class CreatePaymentReceivedDto {
   @ApiProperty() @IsString() customerId: string;
   @ApiProperty() @IsDateString() date: string;
-  @ApiProperty() @IsString() amount: string;
+  @ApiProperty({ description: 'Decimal string; must equal the sum of the allocations' })
+  @IsDecimalString()
+  amount: string;
   @ApiProperty({ enum: PaymentMode }) @IsEnum(PaymentMode) paymentMode: PaymentMode;
   @ApiProperty() @IsString() depositToAccountId: string;
   @ApiProperty({ required: false }) @IsString() @IsOptional() @MaxLength(100) reference?: string;
