@@ -431,11 +431,13 @@ describe('Audit trail (e2e)', () => {
       organizationId: tenant.organizationId,
     });
     expect(row.oldValues).toBeNull();
-    const summary = row.newValues as { fields: string[]; values: Record<string, unknown> };
+    const summary = row.newValues as { fields: string[]; values?: unknown };
     expect(summary.fields).toEqual(['name']);
-    expect(summary.values).toEqual({ name });
-    // none of the response's columns were copied
+    // request values (document content) are never stored, only field names
+    expect(summary.values).toBeUndefined();
     const stored = JSON.stringify(row.newValues);
+    expect(stored).not.toContain(name);
+    // none of the response's columns were copied
     expect(stored).not.toContain('createdAt');
     expect(stored).not.toContain('organizationId');
   });
