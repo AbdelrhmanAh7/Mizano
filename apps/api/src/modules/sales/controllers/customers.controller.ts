@@ -19,6 +19,7 @@ import {
   InvalidateCache,
   Permissions,
 } from '../../../common/decorators';
+import { BulkIdsDto } from '../../../common/dto/bulk-ids.dto';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -66,7 +67,7 @@ export class CustomersController {
   @Permissions('sales.delete')
   @InvalidateCache('customers:*')
   @ApiOperation({ summary: 'Bulk delete customers' })
-  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.customersService.bulkDelete(orgId, dto.ids);
   }
 

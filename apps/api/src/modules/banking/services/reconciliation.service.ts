@@ -130,15 +130,13 @@ export class ReconciliationService {
       if (count === 0) throw new BadRequestException('Already reconciled');
 
       if (entityType === 'invoice') {
+        await this.invoicesService.lockInvoices(tx, [entityId]);
         await this.createPaymentForInvoice(tx, organizationId, entityId, amount, transaction);
+        await this.invoicesService.recalculateBalance(tx, entityId);
       } else {
         await this.createPaymentForBill(tx, organizationId, entityId, amount, transaction);
       }
     });
-
-    if (entityType === 'invoice') {
-      await this.invoicesService.updateBalanceDue(entityId);
-    }
 
     return { message: 'Reconciliation confirmed' };
   }

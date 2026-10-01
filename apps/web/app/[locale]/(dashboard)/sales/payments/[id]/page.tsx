@@ -3,7 +3,19 @@
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { ArrowLeft, User, Calendar, CreditCard, DollarSign, Building } from 'lucide-react';
+import { ArrowLeft, User, Calendar, CreditCard, DollarSign, Building, Ban } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,16 +27,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { usePaymentReceived, getPaymentModeLabel } from '@/lib/hooks/use-payments-received';
+import {
+  usePaymentReceived,
+  useVoidPaymentReceived,
+  getPaymentModeLabel,
+} from '@/lib/hooks/use-payments-received';
 import { PaymentModeBadge } from '@/components/sales/status-badge';
 import { format } from 'date-fns';
 
 export default function PaymentReceivedDetailPage() {
   const params = useParams();
   const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
   const paymentId = params.id as string;
 
   const { data: payment, isLoading } = usePaymentReceived(paymentId);
+  const voidPayment = useVoidPaymentReceived();
 
   const formatCurrency = (amount: string | number, currency: string = 'USD') => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -91,6 +109,9 @@ export default function PaymentReceivedDetailPage() {
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">{payment.paymentNumber}</h1>
               <PaymentModeBadge mode={payment.paymentMode} />
+              {payment.deletedAt && (
+                <Badge variant="destructive">{t('payments.voidedBadge')}</Badge>
+              )}
             </div>
             {payment.customer && (
               <Link
@@ -102,6 +123,38 @@ export default function PaymentReceivedDetailPage() {
             )}
           </div>
         </div>
+
+        {!payment.deletedAt && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="text-destructive"
+                disabled={voidPayment.isPending}
+              >
+                <Ban className="mr-2 h-4 w-4" />
+                {t('payments.voidPayment')}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('payments.voidPaymentTitle')}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t('payments.voidPaymentConfirm', { number: payment.paymentNumber })}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => voidPayment.mutate(payment.id)}
+                  className="bg-destructive hover:bg-destructive/90"
+                >
+                  {t('payments.voidPayment')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
 
       {/* Summary Cards */}

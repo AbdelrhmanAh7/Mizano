@@ -13,9 +13,10 @@ import {
   CacheResponse,
   CacheTTL,
   CurrentOrg,
-  InvalidateCache,
+  InvalidatesLedger,
   Permissions,
 } from '../../../common/decorators';
+import { BulkIdsDto } from '../../../common/dto/bulk-ids.dto';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaymentReceivedQueryDto } from '../dto/payment-received-query.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -34,8 +35,8 @@ export class PaymentsReceivedController {
 
   @Post()
   @Permissions('sales.create')
-  @InvalidateCache('payments-received:*', 'invoices:*')
-  @ApiOperation({ summary: 'Record a payment received' })
+  @InvalidatesLedger('payments-received:*', 'invoices:*', 'customers:*')
+  @ApiOperation({ summary: 'Record a payment received (allocations + journal)' })
   create(@CurrentOrg() orgId: string, @Body() createPaymentReceivedDto: CreatePaymentReceivedDto) {
     return this.paymentsReceivedService.create(orgId, createPaymentReceivedDto);
   }
@@ -58,9 +59,11 @@ export class PaymentsReceivedController {
   // Bulk Operations
   @Post('bulk-delete')
   @Permissions('sales.delete')
-  @InvalidateCache('payments-received:*')
-  @ApiOperation({ summary: 'Bulk delete payments received' })
-  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  @InvalidatesLedger('payments-received:*', 'invoices:*', 'customers:*')
+  @ApiOperation({
+    summary: 'Bulk void payments received (restores invoice balances, reverses journals)',
+  })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.paymentsReceivedService.bulkDelete(orgId, dto.ids);
   }
 
@@ -68,5 +71,13 @@ export class PaymentsReceivedController {
   @Permissions('sales.view')
   findOne(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.paymentsReceivedService.findOne(orgId, id);
+  }
+
+  @Post(':id/void')
+  @Permissions('sales.delete')
+  @InvalidatesLedger('payments-received:*', 'invoices:*', 'customers:*')
+  @ApiOperation({ summary: 'Void a payment (restores invoice balances, reverses journal)' })
+  void(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.paymentsReceivedService.void(orgId, id);
   }
 }

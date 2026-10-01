@@ -1,24 +1,67 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { InvoicesService } from './invoices.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
-import { createMockInvoice, createMockCustomer } from '../../../test/helpers/test-utils';
+import { createMockCustomer } from '../../../test/helpers/test-utils';
 import { dec, expectDecimalEqual } from '../../../test/helpers/decimal.helpers';
+
+const ORG_ID = 'org-test-001';
+
+function invoiceRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'inv-1',
+    invoiceNumber: 'INV-0001',
+    organizationId: ORG_ID,
+    customerId: 'cust-test-001',
+    status: 'DRAFT',
+    date: new Date('2024-06-15T00:00:00.000Z'),
+    dueDate: new Date('2999-01-01T00:00:00.000Z'),
+    subtotal: dec('1000'),
+    taxAmount: dec('150'),
+    shippingAmount: dec('0'),
+    grandTotal: dec('1150'),
+    balanceDue: dec('1150'),
+    lines: [{ id: 'line-1' }],
+    deletedAt: null,
+    ...overrides,
+  };
+}
+
+/**
+ * Transaction fake with commit/rollback semantics: writes recorded while the callback runs are
+ * only "committed" when it resolves; a rejection discards them, like a real rollback.
+ */
+function trackWrites(prisma: MockPrismaClient) {
+  const committed: string[] = [];
+  let pending: string[] = [];
+  (prisma.$transaction as jest.Mock).mockImplementation(async (fn: any) => {
+    pending = [];
+    const result = await fn(prisma);
+    committed.push(...pending);
+    return result;
+  });
+  return {
+    committed,
+    write: (name: string) => {
+      pending.push(name);
+    },
+  };
+}
 
 describe('InvoicesService', () => {
   let service: InvoicesService;
   let prisma: MockPrismaClient;
-  let journalsService: { create: jest.Mock };
-
-  const ORG_ID = 'org-test-001';
+  let journalsService: { create: jest.Mock; reverse: jest.Mock };
 
   beforeEach(async () => {
     prisma = createMockPrisma();
     journalsService = {
       create: jest.fn().mockResolvedValue({}),
+      reverse: jest.fn().mockResolvedValue({}),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -40,198 +83,763 @@ describe('InvoicesService', () => {
       lines: [{ description: 'Consulting services', quantity: '10', rate: '100', taxRate: '15' }],
     };
 
-    it('should create an invoice with correct total calculation', async () => {
+    beforeEach(() => {
       prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
-      prisma.invoice.findFirst.mockResolvedValue(null); // no existing invoice for numbering
-
-      const mockInvoice = createMockInvoice({
-        invoiceNumber: 'INV-001',
-        subtotal: dec('1000'),
-        taxAmount: dec('150'),
-        grandTotal: dec('1150'),
-        balanceDue: dec('1150'),
-        lines: [{ amount: dec('1000') }],
-        customer: { id: 'cust-test-001', name: 'Test Customer', email: 'test@test.com' },
-      });
-      prisma.invoice.create.mockResolvedValue(mockInvoice as any);
-
-      const result = await service.create(ORG_ID, validDto);
-
-      expect(result).toBeDefined();
-      // Verify the create call had correct calculated totals
-      const createCall = prisma.invoice.create.mock.calls[0][0];
-      const data = createCall.data;
-
-      // subtotal = 10 * 100 = 1000
-      expectDecimalEqual(data.subtotal as any, '1000');
-      // tax = 1000 * 0.15 = 150
-      expectDecimalEqual(data.taxAmount as any, '150');
-      // grandTotal = 1000 + 150 = 1150
-      expectDecimalEqual(data.grandTotal as any, '1150');
-      // balanceDue = grandTotal
-      expectDecimalEqual(data.balanceDue as any, '1150');
+      prisma.organization.update.mockResolvedValue({
+        invoicePrefix: 'INV-',
+        invoiceNextNumber: 8,
+      } as any);
+      prisma.invoice.count.mockResolvedValue(0);
+      prisma.invoice.create.mockResolvedValue(invoiceRow() as any);
     });
 
-    it('should calculate line totals with discount applied', async () => {
-      const dtoWithDiscount = {
-        customerId: 'cust-test-001',
-        date: '2024-06-15',
-        dueDate: '2024-07-15',
-        lines: [{ description: 'Item', quantity: '5', rate: '200', discount: '10', taxRate: '20' }],
-      };
+    function createdData() {
+      return prisma.invoice.create.mock.calls[0][0].data as any;
+    }
 
-      prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
-      prisma.invoice.findFirst.mockResolvedValue(null);
-      prisma.invoice.create.mockResolvedValue(createMockInvoice() as any);
+    it('creates a draft with exact Decimal totals (tax percent applied to the line net)', async () => {
+      await service.create(ORG_ID, validDto);
 
-      await service.create(ORG_ID, dtoWithDiscount);
-
-      const createCall = prisma.invoice.create.mock.calls[0][0];
-      const data = createCall.data;
-
-      // lineTotal = 5 * 200 * (1 - 10/100) = 900
-      expectDecimalEqual(data.subtotal as any, '900');
-      // lineTax = 900 * (20/100) = 180
-      expectDecimalEqual(data.taxAmount as any, '180');
-      // grandTotal = 900 + 180 = 1080
-      expectDecimalEqual(data.grandTotal as any, '1080');
+      const data = createdData();
+      expectDecimalEqual(data.subtotal, '1000');
+      expectDecimalEqual(data.taxAmount, '150');
+      expectDecimalEqual(data.grandTotal, '1150');
+      expectDecimalEqual(data.balanceDue, '1150');
+      expect(data.subtotal).toBeInstanceOf(Decimal);
+      expect(data.grandTotal).toBeInstanceOf(Decimal);
+      expect(data.organizationId).toBe(ORG_ID);
     });
 
-    it('should include shipping amount in grandTotal', async () => {
-      const dtoWithShipping = {
+    it('applies the line discount before tax', async () => {
+      await service.create(ORG_ID, {
         ...validDto,
-        shippingAmount: '50',
-      };
+        lines: [{ description: 'Item', quantity: '5', rate: '200', discount: '10', taxRate: '20' }],
+      });
 
-      prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
-      prisma.invoice.findFirst.mockResolvedValue(null);
-      prisma.invoice.create.mockResolvedValue(createMockInvoice() as any);
-
-      await service.create(ORG_ID, dtoWithShipping);
-
-      const createCall = prisma.invoice.create.mock.calls[0][0];
-      const data = createCall.data;
-
-      // subtotal = 1000, tax = 150, shipping = 50
-      // grandTotal = 1000 + 150 + 50 = 1200
-      expectDecimalEqual(data.grandTotal as any, '1200');
+      const data = createdData();
+      expectDecimalEqual(data.subtotal, '900'); // 5 * 200 * 0.9
+      expectDecimalEqual(data.taxAmount, '180'); // 900 * 20%
+      expectDecimalEqual(data.grandTotal, '1080');
     });
 
-    it('should handle multiple line items', async () => {
-      const multiLineDto = {
-        customerId: 'cust-test-001',
-        date: '2024-06-15',
-        dueDate: '2024-07-15',
+    it('includes shipping in the grand total and balance due', async () => {
+      await service.create(ORG_ID, { ...validDto, shippingAmount: '50' });
+
+      const data = createdData();
+      expectDecimalEqual(data.shippingAmount, '50');
+      expectDecimalEqual(data.grandTotal, '1200');
+      expectDecimalEqual(data.balanceDue, '1200');
+    });
+
+    it('does not accumulate floating point error across lines', async () => {
+      await service.create(ORG_ID, {
+        ...validDto,
         lines: [
-          { description: 'Service A', quantity: '2', rate: '500', taxRate: '10' },
-          { description: 'Service B', quantity: '3', rate: '300', taxRate: '10' },
+          { description: 'A', quantity: '1', rate: '0.1' },
+          { description: 'B', quantity: '1', rate: '0.2' },
         ],
-      };
-
-      prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
-      prisma.invoice.findFirst.mockResolvedValue(null);
-      prisma.invoice.create.mockResolvedValue(createMockInvoice() as any);
-
-      await service.create(ORG_ID, multiLineDto);
-
-      const createCall = prisma.invoice.create.mock.calls[0][0];
-      const data = createCall.data;
-
-      // Line A: 2 * 500 = 1000, tax = 100
-      // Line B: 3 * 300 = 900, tax = 90
-      // subtotal = 1900, taxAmount = 190, grandTotal = 2090
-      expectDecimalEqual(data.subtotal as any, '1900');
-      expectDecimalEqual(data.taxAmount as any, '190');
-      expectDecimalEqual(data.grandTotal as any, '2090');
+      });
+      expectDecimalEqual(createdData().subtotal, '0.3');
+      expectDecimalEqual(createdData().grandTotal, '0.3');
     });
 
-    it('should throw BadRequestException when customer not found', async () => {
+    it('rejects malformed quantities instead of storing garbage', async () => {
+      await expect(
+        service.create(ORG_ID, {
+          ...validDto,
+          lines: [{ description: 'x', quantity: 'ten', rate: '1' }],
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.invoice.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid date before touching the database', async () => {
+      await expect(service.create(ORG_ID, { ...validDto, date: 'nope' })).rejects.toThrow(
+        'Invalid invoice date',
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('numbers from the organization counter inside the creating transaction', async () => {
+      await service.create(ORG_ID, validDto);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.organization.update).toHaveBeenCalledWith({
+        where: { id: ORG_ID },
+        data: { invoiceNextNumber: { increment: 1 } },
+        select: { invoicePrefix: true, invoiceNextNumber: true },
+      });
+      expect(createdData().invoiceNumber).toBe('INV-0007');
+    });
+
+    it('skips numbers that are already used', async () => {
+      prisma.organization.update
+        .mockResolvedValueOnce({ invoicePrefix: 'INV-', invoiceNextNumber: 8 } as any)
+        .mockResolvedValueOnce({ invoicePrefix: 'INV-', invoiceNextNumber: 9 } as any);
+      prisma.invoice.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+
+      await service.create(ORG_ID, validDto);
+
+      expect(createdData().invoiceNumber).toBe('INV-0008');
+    });
+
+    it('maps a unique-number race to a 409', async () => {
+      prisma.invoice.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('dup', { code: 'P2002', clientVersion: 'x' }),
+      );
+      await expect(service.create(ORG_ID, validDto)).rejects.toThrow(ConflictException);
+    });
+
+    it('rejects a customer from another organization', async () => {
       prisma.customer.findFirst.mockResolvedValue(null);
 
-      await expect(service.create(ORG_ID, validDto)).rejects.toThrow(BadRequestException);
       await expect(service.create(ORG_ID, validDto)).rejects.toThrow('Customer not found');
+      expect(prisma.customer.findFirst.mock.calls[0][0]!.where).toMatchObject({
+        organizationId: ORG_ID,
+        deletedAt: null,
+      });
+      expect(prisma.invoice.create).not.toHaveBeenCalled();
     });
 
-    it('should generate INV-001 for first invoice', async () => {
-      prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
+    it('rejects items, projects and quotes from another organization', async () => {
+      prisma.item.count.mockResolvedValue(0);
+      await expect(
+        service.create(ORG_ID, {
+          ...validDto,
+          lines: [{ itemId: 'foreign-item', description: 'x', quantity: '1', rate: '1' }],
+        }),
+      ).rejects.toThrow('Item not found');
+      expect(prisma.item.count.mock.calls[0][0]!.where).toMatchObject({ organizationId: ORG_ID });
+
+      prisma.project.findFirst.mockResolvedValue(null);
+      await expect(service.create(ORG_ID, { ...validDto, projectId: 'foreign' })).rejects.toThrow(
+        'Project not found',
+      );
+      expect(prisma.project.findFirst.mock.calls[0][0]!.where).toMatchObject({
+        organizationId: ORG_ID,
+      });
+
+      prisma.quote.findFirst.mockResolvedValue(null);
+      await expect(service.create(ORG_ID, { ...validDto, quoteId: 'foreign' })).rejects.toThrow(
+        'Quote not found',
+      );
+      expect(prisma.quote.findFirst.mock.calls[0][0]!.where).toMatchObject({
+        organizationId: ORG_ID,
+      });
+      expect(prisma.invoice.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a quote that belongs to a different customer', async () => {
+      prisma.quote.findFirst.mockResolvedValue({ id: 'q1', customerId: 'someone-else' } as any);
+      await expect(service.create(ORG_ID, { ...validDto, quoteId: 'q1' })).rejects.toThrow(
+        'different customer',
+      );
+    });
+  });
+
+  describe('update', () => {
+    beforeEach(() => {
+      prisma.invoice.findFirst.mockResolvedValue(invoiceRow() as any);
+      prisma.invoice.updateMany.mockResolvedValue({ count: 1 });
+      prisma.invoice.update.mockResolvedValue(invoiceRow() as any);
+    });
+
+    it.each(['SENT', 'PAID', 'VOID', 'PARTIALLY_PAID', 'OVERDUE'])(
+      'rejects updating a %s invoice',
+      async (status) => {
+        prisma.invoice.findFirst.mockResolvedValue(invoiceRow({ status }) as any);
+        await expect(service.update(ORG_ID, 'inv-1', { notes: 'x' })).rejects.toThrow(
+          'Only draft invoices can be updated',
+        );
+        expect(prisma.invoice.update).not.toHaveBeenCalled();
+      },
+    );
+
+    it('treats another tenant invoice as not found', async () => {
       prisma.invoice.findFirst.mockResolvedValue(null);
-      prisma.invoice.create.mockResolvedValue(createMockInvoice() as any);
-
-      await service.create(ORG_ID, validDto);
-
-      const createCall = prisma.invoice.create.mock.calls[0][0];
-      expect(createCall.data.invoiceNumber).toBe('INV-001');
+      await expect(service.update(ORG_ID, 'foreign', {})).rejects.toThrow(NotFoundException);
+      expect(prisma.invoice.findFirst.mock.calls[0][0]!.where).toMatchObject({
+        organizationId: ORG_ID,
+        deletedAt: null,
+      });
     });
 
-    it('should auto-increment invoice numbers (INV-XXX format)', async () => {
-      prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
-      prisma.invoice.findFirst.mockResolvedValue({ invoiceNumber: 'INV-015' } as any);
-      prisma.invoice.create.mockResolvedValue(createMockInvoice() as any);
-
-      await service.create(ORG_ID, validDto);
-
-      const createCall = prisma.invoice.create.mock.calls[0][0];
-      expect(createCall.data.invoiceNumber).toBe('INV-016');
+    it('is guarded: a concurrent send that won the row makes the update a 409', async () => {
+      prisma.invoice.updateMany.mockResolvedValue({ count: 0 });
+      await expect(service.update(ORG_ID, 'inv-1', { notes: 'x' })).rejects.toThrow(
+        ConflictException,
+      );
+      expect(prisma.invoice.update).not.toHaveBeenCalled();
+      expect(prisma.invoice.updateMany.mock.calls[0][0]).toMatchObject({
+        where: { id: 'inv-1', organizationId: ORG_ID, status: 'DRAFT', deletedAt: null },
+      });
     });
 
-    it('should always include organizationId in the created record', async () => {
-      prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
+    it('replaces the lines and re-derives all totals as Decimal', async () => {
+      await service.update(ORG_ID, 'inv-1', {
+        lines: [{ description: 'New', quantity: '3', rate: '100', taxRate: '14' }],
+        shippingAmount: '10',
+      });
+
+      expect(prisma.invoiceLine.deleteMany).toHaveBeenCalledWith({ where: { invoiceId: 'inv-1' } });
+      const lines = (prisma.invoiceLine.createMany.mock.calls[0][0] as any).data;
+      expect(lines).toHaveLength(1);
+      expect(lines[0].invoiceId).toBe('inv-1');
+      expectDecimalEqual(lines[0].amount, '300');
+      const data = prisma.invoice.update.mock.calls[0][0].data as any;
+      expectDecimalEqual(data.subtotal, '300');
+      expectDecimalEqual(data.taxAmount, '42');
+      expectDecimalEqual(data.grandTotal, '352');
+      expectDecimalEqual(data.balanceDue, '352');
+    });
+
+    it('re-derives the gross total when only shipping changes', async () => {
+      await service.update(ORG_ID, 'inv-1', { shippingAmount: '25' });
+
+      expect(prisma.invoiceLine.deleteMany).not.toHaveBeenCalled();
+      const data = prisma.invoice.update.mock.calls[0][0].data as any;
+      expectDecimalEqual(data.grandTotal, '1175'); // 1000 + 150 + 25
+      expectDecimalEqual(data.balanceDue, '1175');
+    });
+
+    it('checks every referenced id against the tenant', async () => {
+      prisma.customer.findFirst.mockResolvedValue(null);
+      await expect(service.update(ORG_ID, 'inv-1', { customerId: 'foreign' })).rejects.toThrow(
+        'Customer not found',
+      );
+      expect(prisma.invoice.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('send', () => {
+    const accounts = {
+      defaultArAccountId: 'ar-acc',
+      defaultRevenueAccountId: 'rev-acc',
+      defaultVatPayableAccountId: 'vat-acc',
+      baseCurrency: 'USD',
+    };
+
+    beforeEach(() => {
+      prisma.invoice.findFirst.mockResolvedValue(invoiceRow() as any);
+      prisma.organization.findUnique.mockResolvedValue(accounts as any);
+      prisma.invoice.updateMany.mockResolvedValue({ count: 1 });
+      prisma.invoice.findUniqueOrThrow.mockResolvedValue(invoiceRow({ status: 'SENT' }) as any);
+    });
+
+    function journalCall() {
+      return journalsService.create.mock.calls[0] as [
+        string,
+        { date: string; reference: string; lines: Array<Record<string, string>> },
+        { tx: unknown; source: { type: string; id: string } },
+      ];
+    }
+
+    it('takes the ledger lock before reading the invoice and organization settings', async () => {
+      await service.send(ORG_ID, 'inv-1');
+
+      expect(prisma.$executeRaw).toHaveBeenCalled();
+      expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.invoice.findFirst.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('refuses to post a foreign-currency invoice into the single-currency ledger', async () => {
+      prisma.invoice.findFirst.mockResolvedValue(invoiceRow({ currencyCode: 'EUR' }) as any);
+
+      await expect(service.send(ORG_ID, 'inv-1')).rejects.toThrow(
+        'differs from the base currency USD',
+      );
+      expect(prisma.invoice.updateMany).not.toHaveBeenCalled();
+      expect(journalsService.create).not.toHaveBeenCalled();
+    });
+
+    it('sends the draft and posts exactly one journal tied to the INVOICE_SEND event', async () => {
+      const result = await service.send(ORG_ID, 'inv-1');
+
+      expect(result.status).toBe('SENT');
+      expect(journalsService.create).toHaveBeenCalledTimes(1);
+      const [orgId, dto, options] = journalCall();
+      expect(orgId).toBe(ORG_ID);
+      expect(options).toEqual({ tx: prisma, source: { type: 'INVOICE_SEND', id: 'inv-1' } });
+      expect(dto.reference).toBe('Invoice INV-0001');
+      // Dated on the invoice (document) date, not on the day it was sent.
+      expect(dto.date).toBe('2024-06-15T00:00:00.000Z');
+    });
+
+    it('posts Dr AR / Cr Revenue / Cr VAT Payable and the entry balances', async () => {
+      await service.send(ORG_ID, 'inv-1');
+
+      const { lines } = journalCall()[1];
+      expect(lines).toEqual([
+        expect.objectContaining({ accountId: 'ar-acc', debit: '1150.0000', credit: '0' }),
+        expect.objectContaining({ accountId: 'rev-acc', debit: '0', credit: '1000.0000' }),
+        expect.objectContaining({ accountId: 'vat-acc', debit: '0', credit: '150.0000' }),
+      ]);
+      const debit = lines.reduce((s, l) => s.add(l.debit), new Decimal(0));
+      const credit = lines.reduce((s, l) => s.add(l.credit), new Decimal(0));
+      expect(debit.equals(credit)).toBe(true);
+    });
+
+    it('balances when the invoice has shipping and line discounts (revenue = gross - VAT)', async () => {
+      // 5 * 200 less 10% = 900 net, 20% VAT = 180, shipping 50 -> gross 1130.
+      prisma.invoice.findFirst.mockResolvedValue(
+        invoiceRow({
+          subtotal: dec('900'),
+          taxAmount: dec('180'),
+          shippingAmount: dec('50'),
+          grandTotal: dec('1130'),
+          balanceDue: dec('1130'),
+        }) as any,
+      );
+
+      await service.send(ORG_ID, 'inv-1');
+
+      const { lines } = journalCall()[1];
+      expect(lines[0]).toMatchObject({ accountId: 'ar-acc', debit: '1130.0000' });
+      expect(lines[1]).toMatchObject({ accountId: 'rev-acc', credit: '950.0000' }); // 900 + 50
+      expect(lines[2]).toMatchObject({ accountId: 'vat-acc', credit: '180.0000' });
+      const debit = lines.reduce((s, l) => s.add(l.debit), new Decimal(0));
+      const credit = lines.reduce((s, l) => s.add(l.credit), new Decimal(0));
+      expect(debit.equals(credit)).toBe(true);
+    });
+
+    it('omits the VAT line for a zero-tax invoice', async () => {
+      prisma.invoice.findFirst.mockResolvedValue(
+        invoiceRow({
+          subtotal: dec('400'),
+          taxAmount: dec('0'),
+          grandTotal: dec('400'),
+          balanceDue: dec('400'),
+        }) as any,
+      );
+      prisma.organization.findUnique.mockResolvedValue({
+        ...accounts,
+        defaultVatPayableAccountId: null,
+      } as any);
+
+      await service.send(ORG_ID, 'inv-1');
+
+      expect(journalCall()[1].lines).toHaveLength(2);
+    });
+
+    it('never silently drops the VAT line: a taxed invoice needs a VAT Payable account', async () => {
+      prisma.organization.findUnique.mockResolvedValue({
+        ...accounts,
+        defaultVatPayableAccountId: null,
+      } as any);
+
+      await expect(service.send(ORG_ID, 'inv-1')).rejects.toThrow(/VAT Payable/);
+      expect(prisma.invoice.updateMany).not.toHaveBeenCalled();
+      expect(journalsService.create).not.toHaveBeenCalled();
+    });
+
+    it('requires the default AR and revenue accounts', async () => {
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultArAccountId: null,
+        defaultRevenueAccountId: null,
+      } as any);
+
+      await expect(service.send(ORG_ID, 'inv-1')).rejects.toThrow(/configure default accounts/);
+      expect(prisma.invoice.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('transitions with a guard on the DRAFT status and stamps the issue date', async () => {
+      await service.send(ORG_ID, 'inv-1');
+
+      expect(prisma.invoice.updateMany).toHaveBeenCalledWith({
+        where: { id: 'inv-1', organizationId: ORG_ID, status: 'DRAFT', deletedAt: null },
+        data: { status: 'SENT', issueDate: expect.any(Date) },
+      });
+    });
+
+    it('rejects a repeated send: the invoice is no longer a draft, nothing is posted', async () => {
+      prisma.invoice.findFirst.mockResolvedValue(invoiceRow({ status: 'SENT' }) as any);
+
+      await expect(service.send(ORG_ID, 'inv-1')).rejects.toThrow(
+        'Only draft invoices can be sent',
+      );
+      expect(journalsService.create).not.toHaveBeenCalled();
+    });
+
+    it('a concurrent send that lost the guarded transition gets a 409 and posts nothing', async () => {
+      prisma.invoice.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.send(ORG_ID, 'inv-1')).rejects.toThrow(ConflictException);
+      expect(journalsService.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invoice without lines or without a positive total', async () => {
+      prisma.invoice.findFirst.mockResolvedValue(invoiceRow({ lines: [] }) as any);
+      await expect(service.send(ORG_ID, 'inv-1')).rejects.toThrow('no lines');
+
+      prisma.invoice.findFirst.mockResolvedValue(
+        invoiceRow({ grandTotal: dec('0'), taxAmount: dec('0') }) as any,
+      );
+      await expect(service.send(ORG_ID, 'inv-1')).rejects.toThrow('greater than zero');
+      expect(journalsService.create).not.toHaveBeenCalled();
+    });
+
+    it('treats another tenant invoice as not found', async () => {
       prisma.invoice.findFirst.mockResolvedValue(null);
-      prisma.invoice.create.mockResolvedValue(createMockInvoice() as any);
-
-      await service.create(ORG_ID, validDto);
-
-      const createCall = prisma.invoice.create.mock.calls[0][0];
-      expect(createCall.data.organizationId).toBe(ORG_ID);
+      await expect(service.send(ORG_ID, 'foreign')).rejects.toThrow(NotFoundException);
+      expect(prisma.invoice.findFirst.mock.calls[0][0]!.where).toMatchObject({
+        organizationId: ORG_ID,
+        deletedAt: null,
+      });
     });
 
-    it('should store monetary values as Decimal, not floating-point numbers', async () => {
-      prisma.customer.findFirst.mockResolvedValue(createMockCustomer() as any);
+    it('commits the status change only together with the journal (rolls back on journal failure)', async () => {
+      const writes = trackWrites(prisma);
+      prisma.invoice.updateMany.mockImplementation((async () => {
+        writes.write('invoice.status');
+        return { count: 1 };
+      }) as any);
+      journalsService.create.mockRejectedValue(new BadRequestException('This period is locked'));
+
+      await expect(service.send(ORG_ID, 'inv-1')).rejects.toThrow('This period is locked');
+      expect(writes.committed).toEqual([]);
+
+      journalsService.create.mockResolvedValue({});
+      await service.send(ORG_ID, 'inv-1');
+      expect(writes.committed).toEqual(['invoice.status']);
+    });
+  });
+
+  describe('voidInvoice', () => {
+    beforeEach(() => {
+      prisma.invoice.findFirst.mockResolvedValue(invoiceRow({ status: 'SENT' }) as any);
+      prisma.paymentAllocation.count.mockResolvedValue(0);
+      prisma.creditNote.count.mockResolvedValue(0);
+      prisma.invoice.updateMany.mockResolvedValue({ count: 1 });
+      prisma.journal.findFirst.mockResolvedValue({ id: 'j-send' } as any);
+      prisma.invoice.findUniqueOrThrow.mockResolvedValue(invoiceRow({ status: 'VOID' }) as any);
+    });
+
+    it('voids a sent invoice and reverses its INVOICE_SEND journal with an INVOICE_VOID source', async () => {
+      const result = await service.voidInvoice(ORG_ID, 'inv-1');
+
+      expect(result.status).toBe('VOID');
+      expect(prisma.invoice.updateMany).toHaveBeenCalledWith({
+        where: { id: 'inv-1', organizationId: ORG_ID, status: 'SENT', deletedAt: null },
+        data: { status: 'VOID' },
+      });
+      expect(prisma.journal.findFirst.mock.calls[0][0]!.where).toMatchObject({
+        organizationId: ORG_ID,
+        sourceType: 'INVOICE_SEND',
+        sourceId: 'inv-1',
+      });
+      expect(journalsService.reverse).toHaveBeenCalledTimes(1);
+      expect(journalsService.reverse).toHaveBeenCalledWith(ORG_ID, 'j-send', undefined, {
+        tx: prisma,
+        source: { type: 'INVOICE_VOID', id: 'inv-1' },
+      });
+    });
+
+    it('locks the invoice row for the transaction', async () => {
+      await service.voidInvoice(ORG_ID, 'inv-1');
+      expect(prisma.$queryRaw).toHaveBeenCalled();
+      const [strings] = (prisma.$queryRaw as jest.Mock).mock.calls[0];
+      expect(strings.join('?')).toMatch(/FOR UPDATE/);
+    });
+
+    it('cancels a draft without any journal', async () => {
+      prisma.invoice.findFirst.mockResolvedValue(invoiceRow({ status: 'DRAFT' }) as any);
+
+      await service.voidInvoice(ORG_ID, 'inv-1');
+
+      expect(prisma.invoice.updateMany.mock.calls[0][0]).toMatchObject({
+        where: { status: 'DRAFT' },
+        data: { status: 'VOID' },
+      });
+      expect(prisma.journal.findFirst).not.toHaveBeenCalled();
+      expect(journalsService.reverse).not.toHaveBeenCalled();
+    });
+
+    it('refuses an invoice with live payments and writes nothing', async () => {
+      prisma.paymentAllocation.count.mockResolvedValue(1);
+
+      await expect(service.voidInvoice(ORG_ID, 'inv-1')).rejects.toThrow('void the payments first');
+      expect(prisma.paymentAllocation.count.mock.calls[0][0]!.where).toMatchObject({
+        invoiceId: 'inv-1',
+        payment: { deletedAt: null },
+      });
+      expect(prisma.invoice.updateMany).not.toHaveBeenCalled();
+      expect(journalsService.reverse).not.toHaveBeenCalled();
+    });
+
+    it('refuses an invoice with live credit notes (issued against or applied to it)', async () => {
+      prisma.creditNote.count.mockResolvedValue(1);
+
+      await expect(service.voidInvoice(ORG_ID, 'inv-1')).rejects.toThrow(
+        'void the credit notes first',
+      );
+      expect(prisma.creditNote.count.mock.calls[0][0]!.where).toMatchObject({
+        organizationId: ORG_ID,
+        deletedAt: null,
+        OR: [{ invoiceId: 'inv-1' }, { appliedToInvoiceId: 'inv-1' }],
+      });
+      expect(journalsService.reverse).not.toHaveBeenCalled();
+    });
+
+    it('refuses to void a legacy sent invoice that has no linked journal', async () => {
+      prisma.journal.findFirst.mockResolvedValue(null);
+
+      await expect(service.voidInvoice(ORG_ID, 'inv-1')).rejects.toThrow('no linked ledger entry');
+      expect(journalsService.reverse).not.toHaveBeenCalled();
+    });
+
+    it('rolls the status change back when the reversal fails (period locked)', async () => {
+      const writes = trackWrites(prisma);
+      prisma.invoice.updateMany.mockImplementation((async () => {
+        writes.write('invoice.status');
+        return { count: 1 };
+      }) as any);
+      journalsService.reverse.mockRejectedValue(new BadRequestException('This period is locked'));
+
+      await expect(service.voidInvoice(ORG_ID, 'inv-1')).rejects.toThrow('This period is locked');
+      expect(writes.committed).toEqual([]);
+    });
+
+    it('rejects an already void invoice', async () => {
+      prisma.invoice.findFirst.mockResolvedValue(invoiceRow({ status: 'VOID' }) as any);
+      await expect(service.voidInvoice(ORG_ID, 'inv-1')).rejects.toThrow('already void');
+    });
+
+    it('treats another tenant invoice as not found and takes no lock', async () => {
       prisma.invoice.findFirst.mockResolvedValue(null);
-      prisma.invoice.create.mockResolvedValue(createMockInvoice() as any);
 
-      await service.create(ORG_ID, validDto);
+      await expect(service.voidInvoice(ORG_ID, 'foreign')).rejects.toThrow(NotFoundException);
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+      expect(prisma.invoice.findFirst.mock.calls[0][0]!.where).toMatchObject({
+        organizationId: ORG_ID,
+      });
+    });
 
-      const createCall = prisma.invoice.create.mock.calls[0][0];
-      const data = createCall.data;
+    it('a concurrent change under the guard is a 409', async () => {
+      prisma.invoice.updateMany.mockResolvedValue({ count: 0 });
+      await expect(service.voidInvoice(ORG_ID, 'inv-1')).rejects.toThrow(ConflictException);
+      expect(journalsService.reverse).not.toHaveBeenCalled();
+    });
+  });
 
-      expect(data.subtotal).toBeInstanceOf(Decimal);
-      expect(data.taxAmount).toBeInstanceOf(Decimal);
-      expect(data.grandTotal).toBeInstanceOf(Decimal);
-      expect(data.balanceDue).toBeInstanceOf(Decimal);
+  describe('remove (soft delete)', () => {
+    it('soft-deletes a draft with a guarded update', async () => {
+      prisma.invoice.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.remove(ORG_ID, 'inv-1');
+
+      expect(result.message).toBe('Invoice deleted successfully');
+      expect(prisma.invoice.updateMany).toHaveBeenCalledWith({
+        where: { id: 'inv-1', organizationId: ORG_ID, deletedAt: null, status: 'DRAFT' },
+        data: { deletedAt: expect.any(Date) },
+      });
+      expect(prisma.invoice.delete).not.toHaveBeenCalled();
+      expect(prisma.invoice.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('only deletes drafts', async () => {
+      prisma.invoice.updateMany.mockResolvedValue({ count: 0 });
+      prisma.invoice.findFirst.mockResolvedValue({ id: 'inv-1' } as any);
+
+      await expect(service.remove(ORG_ID, 'inv-1')).rejects.toThrow(
+        'Only draft invoices can be deleted',
+      );
+    });
+
+    it('reports another tenant invoice as not found', async () => {
+      prisma.invoice.updateMany.mockResolvedValue({ count: 0 });
+      prisma.invoice.findFirst.mockResolvedValue(null);
+
+      await expect(service.remove(ORG_ID, 'foreign')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('recalculateBalance', () => {
+    const allocations = (...amounts: string[]) => amounts.map((a) => ({ amount: dec(a) }));
+    const run = (
+      invoice: Record<string, unknown>,
+      paid: string[] = [],
+      credited: string[] = [],
+    ) => {
+      prisma.invoice.findUnique.mockResolvedValue(invoiceRow(invoice) as any);
+      prisma.paymentAllocation.findMany.mockResolvedValue(allocations(...paid) as any);
+      prisma.creditNote.findMany.mockResolvedValue(allocations(...credited) as any);
+      prisma.invoice.update.mockResolvedValue({} as any);
+      return service.recalculateBalance(prisma, 'inv-1');
+    };
+    const updated = () => prisma.invoice.update.mock.calls[0][0].data as any;
+
+    it('is PAID with a zero balance when fully paid', async () => {
+      await run({ status: 'SENT', grandTotal: dec('1000') }, ['1000']);
+      expect(updated().status).toBe('PAID');
+      expectDecimalEqual(updated().balanceDue, '0');
+    });
+
+    it('is PARTIALLY_PAID for a partial payment', async () => {
+      await run({ status: 'SENT', grandTotal: dec('1000') }, ['400']);
+      expect(updated().status).toBe('PARTIALLY_PAID');
+      expectDecimalEqual(updated().balanceDue, '600');
+    });
+
+    it('counts credit notes applied to the invoice', async () => {
+      await run({ status: 'SENT', grandTotal: dec('1000') }, ['500'], ['500']);
+      expect(updated().status).toBe('PAID');
+      expectDecimalEqual(updated().balanceDue, '0');
+
+      prisma.invoice.update.mockClear();
+      await run({ status: 'SENT', grandTotal: dec('1000') }, [], ['250.25']);
+      expect(updated().status).toBe('PARTIALLY_PAID');
+      expectDecimalEqual(updated().balanceDue, '749.75');
+    });
+
+    it('reads live allocations only and credit notes by appliedToInvoiceId', async () => {
+      await run({ status: 'SENT' });
+
+      expect(prisma.paymentAllocation.findMany.mock.calls[0][0]!.where).toEqual({
+        invoiceId: 'inv-1',
+        payment: { deletedAt: null },
+      });
+      expect(prisma.creditNote.findMany.mock.calls[0][0]!.where).toEqual({
+        appliedToInvoiceId: 'inv-1',
+        deletedAt: null,
+      });
+    });
+
+    it('never goes negative', async () => {
+      await run({ status: 'SENT', grandTotal: dec('100') }, ['150']);
+      expectDecimalEqual(updated().balanceDue, '0');
+    });
+
+    it('sums exactly in Decimal (0.1 + 0.2 settles 0.3)', async () => {
+      await run({ status: 'SENT', grandTotal: dec('0.3') }, ['0.1', '0.2']);
+      expect(updated().status).toBe('PAID');
+    });
+
+    it('returns an unpaid invoice to SENT, or OVERDUE when past due', async () => {
+      await run({ status: 'PAID', grandTotal: dec('100') });
+      expect(updated().status).toBe('SENT');
+      expectDecimalEqual(updated().balanceDue, '100');
+
+      prisma.invoice.update.mockClear();
+      await run({ status: 'PAID', grandTotal: dec('100'), dueDate: new Date('2020-01-01') });
+      expect(updated().status).toBe('OVERDUE');
+    });
+
+    it.each(['DRAFT', 'VOID'])('never touches a %s invoice', async (status) => {
+      await run({ status }, ['10']);
+      expect(prisma.invoice.update).not.toHaveBeenCalled();
+    });
+
+    it('fails loudly for a missing invoice', async () => {
+      prisma.invoice.findUnique.mockResolvedValue(null);
+      await expect(service.recalculateBalance(prisma, 'x')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('lockInvoices / updateBalanceDue', () => {
+    it('locks distinct ids in sorted order to avoid deadlocks', async () => {
+      await service.lockInvoices(prisma, ['b', 'a', 'b']);
+
+      const calls = (prisma.$queryRaw as jest.Mock).mock.calls;
+      expect(calls.map((c) => c[1])).toEqual(['a', 'b']);
+      expect(calls[0][0].join('?')).toMatch(/FROM "invoices" WHERE id = \? FOR UPDATE/);
+    });
+
+    it('updateBalanceDue locks and recalculates inside one transaction (legacy callers)', async () => {
+      prisma.invoice.findUnique.mockResolvedValue(
+        invoiceRow({ status: 'SENT', grandTotal: dec('100') }) as any,
+      );
+      prisma.paymentAllocation.findMany.mockResolvedValue([{ amount: dec('100') }] as any);
+      prisma.creditNote.findMany.mockResolvedValue([] as any);
+
+      await service.updateBalanceDue('inv-1');
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.$queryRaw).toHaveBeenCalled();
+      expect(prisma.invoice.update.mock.calls[0][0].data).toMatchObject({ status: 'PAID' });
+    });
+  });
+
+  describe('markOverdueInvoices', () => {
+    it('only marks invoices that are open, past due and still owed', async () => {
+      prisma.invoice.updateMany.mockResolvedValue({ count: 0 });
+
+      await service.markOverdueInvoices();
+
+      const args = prisma.invoice.updateMany.mock.calls[0][0] as any;
+      expect(args.where.status).toEqual({ in: ['SENT', 'PARTIALLY_PAID'] });
+      expect(args.where.balanceDue).toEqual({ gt: 0 });
+      expect(args.where.deletedAt).toBeNull();
+      expect(args.where.dueDate.lt).toBeInstanceOf(Date);
+      expect(args.data).toEqual({ status: 'OVERDUE' });
+    });
+  });
+
+  describe('bulk operations reuse the single-record commands', () => {
+    it('bulkSend reports per-invoice failures and posts each success once', async () => {
+      prisma.invoice.findFirst.mockImplementation(((args: any) =>
+        Promise.resolve(
+          args.where.id === 'ok'
+            ? invoiceRow({ id: 'ok' })
+            : args.where.id === 'sent'
+              ? invoiceRow({ id: 'sent', status: 'SENT' })
+              : null,
+        )) as any);
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultArAccountId: 'ar',
+        defaultRevenueAccountId: 'rev',
+        defaultVatPayableAccountId: 'vat',
+      } as any);
+      prisma.invoice.updateMany.mockResolvedValue({ count: 1 });
+      prisma.invoice.findUniqueOrThrow.mockResolvedValue(invoiceRow({ status: 'SENT' }) as any);
+
+      const result = await service.bulkSend(ORG_ID, ['ok', 'sent', 'foreign', 'ok']);
+
+      expect(result.processed).toBe(1);
+      expect(result.total).toBe(3);
+      expect(result.failures).toEqual([
+        { id: 'sent', reason: 'Only draft invoices can be sent' },
+        { id: 'foreign', reason: 'Invoice not found' },
+      ]);
+      expect(journalsService.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('bulkVoid and bulkDelete return the same per-record outcome shape', async () => {
+      prisma.invoice.findFirst.mockResolvedValue(null);
+      prisma.invoice.updateMany.mockResolvedValue({ count: 0 });
+
+      const voided = await service.bulkVoid(ORG_ID, ['x']);
+      expect(voided).toEqual({
+        processed: 0,
+        total: 1,
+        failures: [{ id: 'x', reason: 'Invoice not found' }],
+      });
+      const deleted = await service.bulkDelete(ORG_ID, ['x']);
+      expect(deleted.failures).toEqual([{ id: 'x', reason: 'Invoice not found' }]);
     });
   });
 
   describe('findOne', () => {
-    it('should return invoice with customer and lines', async () => {
-      const invoice = createMockInvoice({
-        id: 'inv-1',
-        customer: createMockCustomer(),
-        lines: [],
-        paymentAllocations: [],
-        creditNotes: [],
-      });
-      prisma.invoice.findFirst.mockResolvedValue(invoice as any);
+    it('should return invoice with customer, lines and live settlement', async () => {
+      prisma.invoice.findFirst.mockResolvedValue(invoiceRow({ id: 'inv-1' }) as any);
 
       const result = await service.findOne(ORG_ID, 'inv-1');
-      expect(result).toBeDefined();
       expect(result.id).toBe('inv-1');
+
+      const include = (prisma.invoice.findFirst.mock.calls[0][0] as any).include;
+      expect(include.paymentAllocations.where).toEqual({ payment: { deletedAt: null } });
+      expect(include.appliedCredits.where).toEqual({ deletedAt: null });
     });
 
     it('should throw NotFoundException for non-existent invoice', async () => {
       prisma.invoice.findFirst.mockResolvedValue(null);
-
       await expect(service.findOne(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
 
     it('should filter by organizationId and exclude soft-deleted', async () => {
       prisma.invoice.findFirst.mockResolvedValue(null);
 
-      try {
-        await service.findOne(ORG_ID, 'inv-1');
-      } catch {
-        // Expected
-      }
+      await expect(service.findOne(ORG_ID, 'inv-1')).rejects.toThrow(NotFoundException);
 
       const findCall = prisma.invoice.findFirst.mock.calls[0]![0]!;
       expect(findCall.where!.organizationId).toBe(ORG_ID);
@@ -239,318 +847,29 @@ describe('InvoicesService', () => {
     });
   });
 
-  describe('update', () => {
-    it('should only allow updating DRAFT invoices', async () => {
-      const sentInvoice = createMockInvoice({ status: 'SENT' });
-      prisma.invoice.findFirst.mockResolvedValue(sentInvoice as any);
+  describe('clone', () => {
+    it('numbers the copy from the counter in one transaction and keeps the tenant', async () => {
+      prisma.invoice.findFirst.mockResolvedValue({ ...invoiceRow(), lines: [] } as any);
+      prisma.organization.update.mockResolvedValue({
+        invoicePrefix: 'INV-',
+        invoiceNextNumber: 3,
+      } as any);
+      prisma.invoice.count.mockResolvedValue(0);
+      prisma.invoice.create.mockResolvedValue(invoiceRow() as any);
 
-      await expect(service.update(ORG_ID, 'inv-1', { notes: 'updated' } as any)).rejects.toThrow(
-        'Only draft invoices can be updated',
-      );
+      await service.clone(ORG_ID, 'inv-1');
+
+      const data = prisma.invoice.create.mock.calls[0][0].data as any;
+      expect(data.invoiceNumber).toBe('INV-0002');
+      expect(data.organizationId).toBe(ORG_ID);
+      expect(prisma.invoice.findFirst.mock.calls[0][0]!.where).toMatchObject({
+        organizationId: ORG_ID,
+      });
     });
 
-    it('should reject updating PAID invoices', async () => {
-      const paidInvoice = createMockInvoice({ status: 'PAID' });
-      prisma.invoice.findFirst.mockResolvedValue(paidInvoice as any);
-
-      await expect(service.update(ORG_ID, 'inv-1', { notes: 'updated' } as any)).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-
-    it('should reject updating VOID invoices', async () => {
-      const voidInvoice = createMockInvoice({ status: 'VOID' });
-      prisma.invoice.findFirst.mockResolvedValue(voidInvoice as any);
-
-      await expect(service.update(ORG_ID, 'inv-1', { notes: 'updated' } as any)).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-
-    it('should throw NotFoundException for non-existent invoice', async () => {
+    it('treats another tenant invoice as not found', async () => {
       prisma.invoice.findFirst.mockResolvedValue(null);
-
-      await expect(service.update(ORG_ID, 'nonexistent', {} as any)).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-  });
-
-  describe('send (status transition DRAFT -> SENT)', () => {
-    it('should transition invoice from DRAFT to SENT', async () => {
-      const invoice = createMockInvoice({
-        status: 'DRAFT',
-        grandTotal: dec('1150'),
-        subtotal: dec('1000'),
-        taxAmount: dec('150'),
-        shippingAmount: dec('0'),
-        invoiceNumber: 'INV-001',
-      });
-      prisma.invoice.findFirst.mockResolvedValue(invoice as any);
-      prisma.organization.findUnique.mockResolvedValue({
-        defaultArAccountId: 'ar-acc',
-        defaultRevenueAccountId: 'rev-acc',
-        defaultVatPayableAccountId: 'vat-acc',
-      } as any);
-      prisma.invoice.update.mockResolvedValue({
-        ...invoice,
-        status: 'SENT',
-      } as any);
-
-      const result = await service.send(ORG_ID, 'inv-1');
-
-      expect(result.status).toBe('SENT');
-    });
-
-    it('should create a balanced journal entry when sending invoice', async () => {
-      const invoice = createMockInvoice({
-        status: 'DRAFT',
-        grandTotal: dec('1150'),
-        subtotal: dec('1000'),
-        taxAmount: dec('150'),
-        shippingAmount: dec('0'),
-        invoiceNumber: 'INV-001',
-      });
-      prisma.invoice.findFirst.mockResolvedValue(invoice as any);
-      prisma.organization.findUnique.mockResolvedValue({
-        defaultArAccountId: 'ar-acc',
-        defaultRevenueAccountId: 'rev-acc',
-        defaultVatPayableAccountId: 'vat-acc',
-      } as any);
-      prisma.invoice.update.mockResolvedValue({ ...invoice, status: 'SENT' } as any);
-
-      await service.send(ORG_ID, 'inv-1');
-
-      expect(journalsService.create).toHaveBeenCalledWith(
-        ORG_ID,
-        expect.objectContaining({
-          lines: expect.arrayContaining([
-            expect.objectContaining({ accountId: 'ar-acc', debit: '1150.0000', credit: '0' }),
-            expect.objectContaining({ accountId: 'rev-acc', debit: '0', credit: '1000.0000' }),
-            expect.objectContaining({ accountId: 'vat-acc', debit: '0', credit: '150.0000' }),
-          ]),
-        }),
-      );
-    });
-
-    it('should reject sending a non-DRAFT invoice', async () => {
-      const sentInvoice = createMockInvoice({ status: 'SENT' });
-      prisma.invoice.findFirst.mockResolvedValue(sentInvoice as any);
-
-      await expect(service.send(ORG_ID, 'inv-1')).rejects.toThrow(
-        'Only draft invoices can be sent',
-      );
-    });
-
-    it('should throw when default accounts are not configured', async () => {
-      const invoice = createMockInvoice({ status: 'DRAFT' });
-      prisma.invoice.findFirst.mockResolvedValue(invoice as any);
-      prisma.organization.findUnique.mockResolvedValue({
-        defaultArAccountId: null,
-        defaultRevenueAccountId: null,
-      } as any);
-
-      await expect(service.send(ORG_ID, 'inv-1')).rejects.toThrow(/configure default accounts/);
-    });
-  });
-
-  describe('voidInvoice', () => {
-    it('should void an invoice without payments', async () => {
-      const invoice = createMockInvoice({
-        status: 'SENT',
-        paymentAllocations: [],
-      });
-      prisma.invoice.findFirst.mockResolvedValue(invoice as any);
-      prisma.invoice.update.mockResolvedValue({ ...invoice, status: 'VOID' } as any);
-
-      const result = await service.voidInvoice(ORG_ID, 'inv-1');
-      expect(result.status).toBe('VOID');
-    });
-
-    it('should prevent voiding an invoice with existing payments', async () => {
-      const invoice = createMockInvoice({
-        paymentAllocations: [{ id: 'pa-1', amount: dec('500') }],
-      });
-      prisma.invoice.findFirst.mockResolvedValue(invoice as any);
-
-      await expect(service.voidInvoice(ORG_ID, 'inv-1')).rejects.toThrow(
-        'Cannot void invoice with payments',
-      );
-    });
-  });
-
-  describe('remove (soft delete)', () => {
-    it('should soft-delete a DRAFT invoice', async () => {
-      const invoice = createMockInvoice({ status: 'DRAFT', paymentAllocations: [] });
-      prisma.invoice.findFirst.mockResolvedValue(invoice as any);
-      prisma.invoice.update.mockResolvedValue({ ...invoice, deletedAt: new Date() } as any);
-
-      const result = await service.remove(ORG_ID, 'inv-1');
-
-      expect(result.message).toBe('Invoice deleted successfully');
-      expect(prisma.invoice.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ deletedAt: expect.any(Date) }),
-        }),
-      );
-    });
-
-    it('should only allow deleting DRAFT invoices', async () => {
-      const sentInvoice = createMockInvoice({ status: 'SENT', paymentAllocations: [] });
-      prisma.invoice.findFirst.mockResolvedValue(sentInvoice as any);
-
-      await expect(service.remove(ORG_ID, 'inv-1')).rejects.toThrow(
-        'Only draft invoices can be deleted',
-      );
-    });
-
-    it('should never hard-delete financial records', async () => {
-      const invoice = createMockInvoice({ status: 'DRAFT', paymentAllocations: [] });
-      prisma.invoice.findFirst.mockResolvedValue(invoice as any);
-      prisma.invoice.update.mockResolvedValue({ ...invoice, deletedAt: new Date() } as any);
-
-      await service.remove(ORG_ID, 'inv-1');
-
-      expect(prisma.invoice.delete).not.toHaveBeenCalled();
-      expect(prisma.invoice.deleteMany).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('recordPayment', () => {
-    it('should record a full payment and update balance', async () => {
-      const invoice = createMockInvoice({
-        status: 'SENT',
-        grandTotal: dec('1000'),
-        balanceDue: dec('1000'),
-        customer: { id: 'cust-1', name: 'Customer' },
-      });
-      prisma.invoice.findFirst.mockResolvedValue(invoice as any);
-      prisma.paymentReceived.findFirst.mockResolvedValue(null);
-      prisma.paymentReceived.create.mockResolvedValue({
-        id: 'pmt-1',
-        paymentNumber: 'PMT-001',
-        amount: dec('1000'),
-        allocations: [{ invoiceId: 'inv-test-001', amount: dec('1000') }],
-        customer: { id: 'cust-1', name: 'Customer' },
-      } as any);
-
-      // Mock for updateBalanceDue
-      prisma.invoice.findUnique.mockResolvedValue({
-        ...invoice,
-        paymentAllocations: [{ amount: dec('1000') }],
-        creditNotes: [],
-      } as any);
-      prisma.invoice.update.mockResolvedValue({} as any);
-
-      const result = await service.recordPayment(ORG_ID, 'inv-test-001', {
-        amount: 1000,
-        date: '2024-07-01',
-        bankAccountId: 'bank-1',
-      });
-
-      expect(result).toBeDefined();
-      expect(result.paymentNumber).toBe('PMT-001');
-    });
-
-    it('should reject payment exceeding balance due', async () => {
-      const invoice = createMockInvoice({
-        status: 'SENT',
-        grandTotal: dec('1000'),
-        balanceDue: dec('500'),
-        customer: { id: 'cust-1', name: 'Customer' },
-      });
-      prisma.invoice.findFirst.mockResolvedValue(invoice as any);
-
-      await expect(
-        service.recordPayment(ORG_ID, 'inv-1', {
-          amount: 600,
-          date: '2024-07-01',
-          bankAccountId: 'bank-1',
-        }),
-      ).rejects.toThrow('Payment amount exceeds balance due');
-    });
-
-    it('should reject payment on a DRAFT invoice', async () => {
-      const invoice = createMockInvoice({ status: 'DRAFT' });
-      prisma.invoice.findFirst.mockResolvedValue(invoice as any);
-
-      await expect(
-        service.recordPayment(ORG_ID, 'inv-1', {
-          amount: 100,
-          date: '2024-07-01',
-          bankAccountId: 'bank-1',
-        }),
-      ).rejects.toThrow('Cannot record payment for a draft invoice');
-    });
-
-    it('should reject payment on a VOID invoice', async () => {
-      const invoice = createMockInvoice({ status: 'VOID' });
-      prisma.invoice.findFirst.mockResolvedValue(invoice as any);
-
-      await expect(
-        service.recordPayment(ORG_ID, 'inv-1', {
-          amount: 100,
-          date: '2024-07-01',
-          bankAccountId: 'bank-1',
-        }),
-      ).rejects.toThrow('Cannot record payment for a voided invoice');
-    });
-  });
-
-  describe('updateBalanceDue', () => {
-    it('should mark invoice as PAID when fully paid', async () => {
-      const invoice = createMockInvoice({
-        id: 'inv-1',
-        grandTotal: dec('1000'),
-        status: 'SENT',
-        paymentAllocations: [{ amount: dec('1000') }],
-        creditNotes: [],
-      });
-      prisma.invoice.findUnique.mockResolvedValue(invoice as any);
-      prisma.invoice.update.mockResolvedValue({} as any);
-
-      await service.updateBalanceDue('inv-1');
-
-      const updateCall = prisma.invoice.update.mock.calls[0]![0]!;
-      expect(updateCall.data.status).toBe('PAID');
-      expectDecimalEqual(updateCall.data.balanceDue as any, '0');
-    });
-
-    it('should mark invoice as PARTIALLY_PAID for partial payments', async () => {
-      const invoice = createMockInvoice({
-        id: 'inv-1',
-        grandTotal: dec('1000'),
-        status: 'SENT',
-        paymentAllocations: [{ amount: dec('400') }],
-        creditNotes: [],
-      });
-      prisma.invoice.findUnique.mockResolvedValue(invoice as any);
-      prisma.invoice.update.mockResolvedValue({} as any);
-
-      await service.updateBalanceDue('inv-1');
-
-      const updateCall = prisma.invoice.update.mock.calls[0]![0]!;
-      expect(updateCall.data.status).toBe('PARTIALLY_PAID');
-      expectDecimalEqual(updateCall.data.balanceDue as any, '600');
-    });
-
-    it('should account for credit notes in balance calculation', async () => {
-      const invoice = createMockInvoice({
-        id: 'inv-1',
-        grandTotal: dec('1000'),
-        status: 'SENT',
-        paymentAllocations: [{ amount: dec('500') }],
-        creditNotes: [{ type: 'APPLY_TO_INVOICE', amount: dec('500'), deletedAt: null }],
-      });
-      prisma.invoice.findUnique.mockResolvedValue(invoice as any);
-      prisma.invoice.update.mockResolvedValue({} as any);
-
-      await service.updateBalanceDue('inv-1');
-
-      const updateCall = prisma.invoice.update.mock.calls[0]![0]!;
-      // 1000 - 500 (payment) - 500 (credit) = 0
-      expect(updateCall.data.status).toBe('PAID');
-      expectDecimalEqual(updateCall.data.balanceDue as any, '0');
+      await expect(service.clone(ORG_ID, 'foreign')).rejects.toThrow(NotFoundException);
     });
   });
 });

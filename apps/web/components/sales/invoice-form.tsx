@@ -18,7 +18,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCustomers, Customer } from '@/lib/hooks/use-customers';
 import { Invoice } from '@/lib/hooks/use-invoices';
-import { LineItemsForm, calculateLineTotals } from './line-items-form';
+import {
+  LineItemsForm,
+  calculateLineTotals,
+  taxRateIdForPercent,
+  toApiLines,
+} from './line-items-form';
 
 const lineItemSchema = z.object({
   itemId: z.string().optional(),
@@ -44,6 +49,8 @@ const invoiceSchema = z.object({
 
 type InvoiceFormData = z.infer<typeof invoiceSchema>;
 
+const NO_TAX_RATES: { id: string; name: string; rate: number }[] = [];
+
 interface InvoiceFormProps {
   invoice?: Invoice | null;
   customerId?: string;
@@ -64,7 +71,7 @@ const paymentTermsOptions = [
 export function InvoiceForm({
   invoice,
   customerId,
-  taxRates = [],
+  taxRates = NO_TAX_RATES,
   onSubmit,
   onCancel,
   isSubmitting,
@@ -120,8 +127,8 @@ export function InvoiceForm({
           description: line.description,
           quantity: line.quantity,
           rate: line.rate,
-          discountPercent: line.discountPercent || '0',
-          taxRateId: line.taxRateId || '',
+          discountPercent: line.discountPercent || line.discount || '0',
+          taxRateId: line.taxRateId || taxRateIdForPercent(line.taxRate, taxRates),
           amount: line.amount,
         })) || [
           {
@@ -136,7 +143,7 @@ export function InvoiceForm({
         ],
       });
     }
-  }, [invoice, form]);
+  }, [invoice, form, taxRates]);
 
   const selectedCustomerId = form.watch('customerId');
   const selectedCustomer = customers.find((c: Customer) => c.id === selectedCustomerId);
@@ -178,33 +185,16 @@ export function InvoiceForm({
   }, [selectedCustomer]);
 
   const handleSubmit = (data: InvoiceFormData) => {
-    // Calculate totals
-    const totals = calculateLineTotals(data.lines, taxRates);
-    const shipping = parseFloat(data.shippingCharge || '0') || 0;
-
-    const submitData = {
+    // Exactly the CreateInvoiceDto shape: totals are computed by the server from the lines.
+    onSubmit({
       customerId: data.customerId,
       date: data.invoiceDate,
       dueDate: data.dueDate,
-      notes: data.notes || null,
-      terms: data.terms || null,
-      subtotal: totals.subtotal.toFixed(2),
-      discountAmount: totals.totalDiscount.toFixed(2),
-      taxAmount: totals.totalTax.toFixed(2),
-      shippingAmount: shipping.toFixed(2),
-      grandTotal: (totals.grandTotal + shipping).toFixed(2),
-      lines: data.lines.map((line) => ({
-        itemId: line.itemId || null,
-        description: line.description,
-        quantity: line.quantity,
-        rate: line.rate,
-        discountPercent: line.discountPercent || '0',
-        taxRateId: line.taxRateId || null,
-        amount: line.amount,
-      })),
-    };
-
-    onSubmit(submitData);
+      notes: data.notes || undefined,
+      terms: data.terms || undefined,
+      shippingAmount: data.shippingCharge?.trim() || '0',
+      lines: toApiLines(data.lines, taxRates),
+    });
   };
 
   const lines = form.watch('lines');

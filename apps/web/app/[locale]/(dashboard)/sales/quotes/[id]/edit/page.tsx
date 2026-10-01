@@ -1,5 +1,6 @@
 'use client';
 
+import { useTaxRateOptions } from '@/lib/hooks/use-tax';
 import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
@@ -21,11 +22,7 @@ export default function EditQuotePage() {
   const { data: quote, isLoading } = useQuote(quoteId);
   const updateQuote = useUpdateQuote();
 
-  // TODO: Fetch tax rates from API
-  const taxRates = [
-    { id: 'vat-14', name: 'VAT 14%', rate: 14 },
-    { id: 'vat-0', name: 'VAT 0%', rate: 0 },
-  ];
+  const taxRates = useTaxRateOptions();
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {

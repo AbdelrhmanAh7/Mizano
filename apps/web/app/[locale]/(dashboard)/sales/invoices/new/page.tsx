@@ -6,24 +6,8 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InvoiceForm } from '@/components/sales/invoice-form';
+import { useTaxRateOptions } from '@/lib/hooks/use-tax';
 import { useCreateInvoice } from '@/lib/hooks/use-invoices';
-
-interface InvoiceSubmitData {
-  customerId: string;
-  invoiceDate: string;
-  dueDate: string;
-  shippingCharge?: string;
-  notes?: string;
-  terms?: string;
-  lines: Array<{
-    itemId?: string;
-    description: string;
-    quantity: string;
-    rate: string;
-    discountPercent?: string;
-    taxRateId?: string;
-  }>;
-}
 
 export default function NewInvoicePage() {
   const router = useRouter();
@@ -32,30 +16,12 @@ export default function NewInvoicePage() {
   const customerId = searchParams.get('customerId') || undefined;
 
   const createInvoice = useCreateInvoice();
+  const taxRates = useTaxRateOptions();
 
   const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
-      const data = formData as unknown as InvoiceSubmitData;
-      // Transform the data to match API expectations
-      const invoiceData = {
-        customerId: data.customerId,
-        date: data.invoiceDate,
-        dueDate: data.dueDate,
-        shippingAmount: data.shippingCharge || '0',
-        notes: data.notes,
-        terms: data.terms,
-        lines: (data.lines ?? []).map((line: InvoiceSubmitData['lines'][number]) => ({
-          itemId: line.itemId || undefined,
-          description: line.description,
-          quantity: line.quantity,
-          rate: line.rate,
-          discount: line.discountPercent || '0',
-          taxRate: line.taxRateId ? '0' : '0', // We'll handle tax differently if needed
-        })),
-      };
-
       const result = await createInvoice.mutateAsync(
-        invoiceData as Parameters<typeof createInvoice.mutateAsync>[0],
+        formData as unknown as Parameters<typeof createInvoice.mutateAsync>[0],
       );
       router.push(`/sales/invoices/${result.id}`);
     } catch (error) {
@@ -84,6 +50,7 @@ export default function NewInvoicePage() {
 
       {/* Form */}
       <InvoiceForm
+        taxRates={taxRates}
         customerId={customerId}
         onSubmit={handleSubmit}
         onCancel={handleCancel}

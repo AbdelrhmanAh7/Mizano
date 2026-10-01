@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 
@@ -183,6 +184,15 @@ export function useTaxRates(params?: { isActive?: boolean }) {
     queryKey: ['tax-rates', params],
     queryFn: () => taxRatesApi.list(params),
   });
+}
+
+/** Active tax rates as { id, name, rate (percent) } options for document forms. */
+export function useTaxRateOptions(): { id: string; name: string; rate: number }[] {
+  const { data } = useTaxRates({ isActive: true });
+  return useMemo(() => {
+    const rates: TaxRate[] = data?.data ?? [];
+    return rates.map((r) => ({ id: r.id, name: r.name, rate: Number(r.rate) }));
+  }, [data]);
 }
 
 export function useTaxRate(id: string) {

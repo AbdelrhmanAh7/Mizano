@@ -8,24 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { InvoiceForm } from '@/components/sales/invoice-form';
+import { useTaxRateOptions } from '@/lib/hooks/use-tax';
 import { useInvoice, useUpdateInvoice, Invoice, InvoiceLine } from '@/lib/hooks/use-invoices';
-
-interface InvoiceSubmitData {
-  customerId: string;
-  invoiceDate: string;
-  dueDate: string;
-  shippingCharge?: string;
-  notes?: string;
-  terms?: string;
-  lines: Array<{
-    itemId?: string;
-    description: string;
-    quantity: string;
-    rate: string;
-    discountPercent?: string;
-    taxRateId?: string;
-  }>;
-}
 
 export default function EditInvoicePage() {
   const params = useParams();
@@ -35,31 +19,13 @@ export default function EditInvoicePage() {
 
   const { data: invoice, isLoading } = useInvoice(invoiceId);
   const updateInvoice = useUpdateInvoice();
+  const taxRates = useTaxRateOptions();
 
   const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
-      const data = formData as unknown as InvoiceSubmitData;
-      // Transform the data to match API expectations
-      const invoiceData = {
-        customerId: data.customerId,
-        date: data.invoiceDate,
-        dueDate: data.dueDate,
-        shippingAmount: data.shippingCharge || '0',
-        notes: data.notes,
-        terms: data.terms,
-        lines: (data.lines ?? []).map((line: InvoiceSubmitData['lines'][number]) => ({
-          itemId: line.itemId || undefined,
-          description: line.description,
-          quantity: line.quantity,
-          rate: line.rate,
-          discount: line.discountPercent || '0',
-          taxRate: line.taxRateId ? '0' : '0',
-        })),
-      };
-
       await updateInvoice.mutateAsync({
         id: invoiceId,
-        data: invoiceData as Parameters<typeof updateInvoice.mutateAsync>[0]['data'],
+        data: formData as unknown as Parameters<typeof updateInvoice.mutateAsync>[0]['data'],
       });
       router.push(`/sales/invoices/${invoiceId}`);
     } catch (error) {
@@ -163,6 +129,7 @@ export default function EditInvoicePage() {
 
       {/* Form */}
       <InvoiceForm
+        taxRates={taxRates}
         invoice={formInvoice as Invoice}
         onSubmit={handleSubmit}
         onCancel={handleCancel}

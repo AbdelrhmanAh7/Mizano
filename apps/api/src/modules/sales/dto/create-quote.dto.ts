@@ -9,14 +9,21 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsDecimalString } from './decimal-string';
 
-class QuoteLineDto {
+export class QuoteLineDto {
   @IsString() @IsOptional() itemId?: string;
-  @IsString() description: string;
-  @IsString() quantity: string;
-  @IsString() rate: string;
-  @IsString() @IsOptional() discount?: string;
-  @IsString() @IsOptional() taxRate?: string;
+  @IsString() @MaxLength(500) description: string;
+  @IsDecimalString() quantity: string;
+  @IsDecimalString() rate: string;
+  @ApiProperty({ required: false, description: 'Line discount percent (0-100)' })
+  @IsOptional()
+  @IsDecimalString()
+  discount?: string;
+  @ApiProperty({ required: false, description: 'Line tax percent (14 means 14%)' })
+  @IsOptional()
+  @IsDecimalString(2)
+  taxRate?: string;
 }
 
 export class CreateQuoteDto {

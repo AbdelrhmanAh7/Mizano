@@ -36,6 +36,38 @@ interface TaxRate {
   rate: number;
 }
 
+export interface ApiDocumentLine {
+  itemId?: string;
+  description: string;
+  quantity: string;
+  rate: string;
+  discount: string;
+  taxRate: string;
+}
+
+/** Maps form lines to the exact line shape the sales DTOs accept (percent strings, no totals). */
+export function toApiLines(lines: LineItem[], taxRates: TaxRate[]): ApiDocumentLine[] {
+  return lines.map((line) => {
+    const selected = line.taxRateId ? taxRates.find((t) => t.id === line.taxRateId) : undefined;
+    return {
+      itemId: line.itemId || undefined,
+      description: line.description,
+      quantity: line.quantity,
+      rate: line.rate,
+      discount: line.discountPercent || '0',
+      taxRate: (selected ? selected.rate : 0).toFixed(2),
+    };
+  });
+}
+
+/** Finds the tax rate option matching a stored line percent (server stores percent, not an id). */
+export function taxRateIdForPercent(percent: string | undefined, taxRates: TaxRate[]): string {
+  if (percent === undefined || percent === null || percent === '') return '';
+  const value = Number(percent);
+  if (!Number.isFinite(value)) return '';
+  return taxRates.find((t) => Number(t.rate) === value)?.id ?? '';
+}
+
 interface LineItemsFormProps {
   control: Control<FieldValues>;
   watch: UseFormWatch<FieldValues>;

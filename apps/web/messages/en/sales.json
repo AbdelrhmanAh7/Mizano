@@ -298,7 +298,11 @@
     "empty": {
       "title": "No payments yet",
       "description": "Payments will appear here when recorded"
-    }
+    },
+    "voidedBadge": "Voided",
+    "voidPayment": "Void payment",
+    "voidPaymentTitle": "Void payment",
+    "voidPaymentConfirm": "Voiding {number} voids the whole payment: every invoice it was allocated to gets its balance back, and a reversing journal entry is posted."
   },
   "deliveryChallans": {
     "title": "Delivery Challans",

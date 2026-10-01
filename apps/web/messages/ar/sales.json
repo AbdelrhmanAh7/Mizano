@@ -298,7 +298,11 @@
     "empty": {
       "title": "لا توجد مدفوعات بعد",
       "description": "ستظهر المدفوعات هنا عند تسجيلها"
-    }
+    },
+    "voidedBadge": "ملغاة",
+    "voidPayment": "إلغاء الدفعة",
+    "voidPaymentTitle": "إلغاء الدفعة",
+    "voidPaymentConfirm": "إلغاء {number} يلغي الدفعة بالكامل: تُستعاد أرصدة كل الفواتير المخصصة لها ويُسجَّل قيد عكسي."
   },
   "deliveryChallans": {
     "title": "سندات التسليم",

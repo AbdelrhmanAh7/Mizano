@@ -18,7 +18,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCustomers, Customer } from '@/lib/hooks/use-customers';
 import { Quote } from '@/lib/hooks/use-quotes';
-import { LineItemsForm, calculateLineTotals } from './line-items-form';
+import { LineItemsForm, taxRateIdForPercent, toApiLines } from './line-items-form';
 
 const lineItemSchema = z.object({
   itemId: z.string().optional(),
@@ -43,6 +43,8 @@ const quoteSchema = z.object({
 
 type QuoteFormData = z.infer<typeof quoteSchema>;
 
+const NO_TAX_RATES: { id: string; name: string; rate: number }[] = [];
+
 interface QuoteFormProps {
   quote?: Quote | null;
   customerId?: string;
@@ -55,7 +57,7 @@ interface QuoteFormProps {
 export function QuoteForm({
   quote,
   customerId,
-  taxRates = [],
+  taxRates = NO_TAX_RATES,
   onSubmit,
   onCancel,
   isSubmitting,
@@ -109,8 +111,8 @@ export function QuoteForm({
           description: line.description,
           quantity: line.quantity,
           rate: line.rate,
-          discountPercent: line.discountPercent || '0',
-          taxRateId: line.taxRateId || '',
+          discountPercent: line.discountPercent || line.discount || '0',
+          taxRateId: line.taxRateId || taxRateIdForPercent(line.taxRate, taxRates),
           amount: line.amount,
         })) || [
           {
@@ -125,29 +127,21 @@ export function QuoteForm({
         ],
       });
     }
-  }, [quote, form]);
+  }, [quote, form, taxRates]);
 
   const selectedCustomerId = form.watch('customerId');
   const selectedCustomer = customers.find((c: Customer) => c.id === selectedCustomerId);
 
   const handleSubmit = (data: QuoteFormData) => {
-    // Calculate totals
-    const totals = calculateLineTotals(data.lines, taxRates);
-
-    const submitData = {
-      ...data,
-      subtotal: totals.subtotal.toFixed(2),
-      discountAmount: totals.totalDiscount.toFixed(2),
-      taxAmount: totals.totalTax.toFixed(2),
-      grandTotal: totals.grandTotal.toFixed(2),
-      lines: data.lines.map((line) => ({
-        ...line,
-        itemId: line.itemId || null,
-        taxRateId: line.taxRateId || null,
-      })),
-    };
-
-    onSubmit(submitData);
+    // Exactly the CreateQuoteDto shape: totals are computed by the server from the lines.
+    onSubmit({
+      customerId: data.customerId,
+      date: data.quoteDate,
+      expiryDate: data.expiryDate,
+      notes: data.notes || undefined,
+      terms: data.terms || undefined,
+      lines: toApiLines(data.lines, taxRates),
+    });
   };
 
   return (

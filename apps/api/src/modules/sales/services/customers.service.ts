@@ -3,6 +3,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
+import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateCustomerDto } from '../dto/create-customer.dto';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
@@ -235,19 +237,8 @@ export class CustomersService {
 
   // === Bulk Operations ===
 
-  async bulkDelete(
-    organizationId: string,
-    ids: string[],
-  ): Promise<{ deleted: number; total: number }> {
-    const result = await this.prisma.customer.updateMany({
-      where: {
-        id: { in: ids },
-        organizationId,
-        deletedAt: null,
-      },
-      data: { deletedAt: new Date() },
-    });
-    return { deleted: result.count, total: ids.length };
+  async bulkDelete(organizationId: string, ids: string[]): Promise<BulkResultDto> {
+    return runBulk(ids, (id) => this.remove(organizationId, id));
   }
 
   private async calculateOutstandingBalance(customerId: string): Promise<string> {
@@ -261,8 +252,8 @@ export class CustomersService {
     });
 
     const total = invoices.reduce(
-      (sum, invoice) => sum + parseFloat(invoice.balanceDue.toString()),
-      0,
+      (sum, invoice) => sum.add(invoice.balanceDue),
+      new Prisma.Decimal(0),
     );
 
     return total.toFixed(4);
