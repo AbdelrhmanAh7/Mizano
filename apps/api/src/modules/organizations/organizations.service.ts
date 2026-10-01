@@ -265,7 +265,9 @@ export class OrganizationsService {
         website: dto.website,
         taxRegistrationNumber: dto.taxRegistrationNumber,
         industry: dto.industry,
+        // Legacy `currency` mirrors the base currency so the two can never drift apart.
         baseCurrency: dto.baseCurrency,
+        currency: dto.baseCurrency,
       },
       select: { id: true, name: true, updatedAt: true },
     });
@@ -460,6 +462,7 @@ export class OrganizationsService {
         industry: dto.industry,
         logoUrl: dto.logoUrl,
         baseCurrency: dto.baseCurrency,
+        currency: dto.baseCurrency,
         address: dto.address,
         phone: dto.phone,
       },

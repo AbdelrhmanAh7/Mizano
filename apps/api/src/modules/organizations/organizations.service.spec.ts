@@ -187,6 +187,33 @@ describe('OrganizationsService', () => {
         expect.objectContaining({ where: { id: ORG_ID } }),
       );
     });
+
+    it('keeps the legacy currency in sync when the base currency changes', async () => {
+      mockPrisma.organization.update.mockResolvedValue({
+        id: ORG_ID,
+        name: 'X',
+        updatedAt: new Date(),
+      });
+
+      await service.updateGeneralSettings(ORG_ID, { name: 'X', baseCurrency: 'EGP' });
+
+      const { data } = mockPrisma.organization.update.mock.calls[0][0];
+      expect(data).toMatchObject({ baseCurrency: 'EGP', currency: 'EGP' });
+    });
+
+    it('leaves both currency fields untouched when no base currency is sent', async () => {
+      mockPrisma.organization.update.mockResolvedValue({
+        id: ORG_ID,
+        name: 'X',
+        updatedAt: new Date(),
+      });
+
+      await service.updateGeneralSettings(ORG_ID, { name: 'X' });
+
+      const { data } = mockPrisma.organization.update.mock.calls[0][0];
+      expect(data.baseCurrency).toBeUndefined();
+      expect(data.currency).toBeUndefined();
+    });
   });
 
   // ── updateFinancialSettings ────────────────────────────────────
