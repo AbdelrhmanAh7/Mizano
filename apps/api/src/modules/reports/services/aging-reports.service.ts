@@ -1,6 +1,7 @@
 import { Decimal } from '@prisma/client/runtime/library';
 import { Injectable } from '@nestjs/common';
 import { ReadReplicaService } from '../../../prisma/read-replica.service';
+import { endOfUtcDay } from '../utils/report-utils';
 
 export interface AgingItem {
   invoiceId?: string;
@@ -178,7 +179,8 @@ export class AgingReportsService {
     if (!customer) return null;
 
     const start = new Date(startDate);
-    const end = new Date(endDate);
+    // A date-only end must include that whole day (voids/payments later on the end date).
+    const end = endOfUtcDay(new Date(endDate));
 
     // Get opening balance (sum of all invoices minus payments before start date)
     const openingInvoices = await this.prisma.invoice.findMany({
@@ -269,7 +271,8 @@ export class AgingReportsService {
     if (!vendor) return null;
 
     const start = new Date(startDate);
-    const end = new Date(endDate);
+    // A date-only end must include that whole day (voids/payments later on the end date).
+    const end = endOfUtcDay(new Date(endDate));
 
     // Opening balance
     const openingBills = await this.prisma.bill.findMany({

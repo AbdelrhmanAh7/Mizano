@@ -46,6 +46,15 @@ describe('AgingReportsService.getVendorStatement (voided payments)', () => {
     expect(jan?.transactions.at(-1)?.balance).toBe(128);
   });
 
+  it('includes a void made later on the statement end date', async () => {
+    payment.deletedAt = new Date('2026-02-28T10:00:00Z');
+    const feb = await service.getVendorStatement('org', 'v1', '2026-02-01', '2026-02-28');
+    payment.deletedAt = new Date('2026-02-05');
+    expect(feb?.transactions).toEqual([
+      expect.objectContaining({ type: 'Payment Void', debit: 100, balance: 228 }),
+    ]);
+  });
+
   it('shows the void as a debit on the date it happened', async () => {
     const feb = await service.getVendorStatement('org', 'v1', '2026-02-01', '2026-02-28');
     expect(feb?.openingBalance).toBe(128);
