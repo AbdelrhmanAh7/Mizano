@@ -197,7 +197,7 @@ interface RawAccountData {
   code?: string;
   name?: string;
   type?: string;
-  balance?: number;
+  balance?: number | string;
   children?: RawAccountData[];
 }
 
@@ -294,7 +294,8 @@ function toReportAccount(a: RawAccountData): ReportAccount {
     code: a.code || '',
     name: a.name || '',
     type: a.type || '',
-    balance: typeof a.balance === 'number' ? a.balance : 0,
+    // API sends decimal strings; ReportAccount.balance is a display number.
+    balance: Number.isFinite(Number(a.balance)) ? Number(a.balance) : 0,
     children: Array.isArray(a.children) ? a.children.map(toReportAccount) : undefined,
   };
 }
