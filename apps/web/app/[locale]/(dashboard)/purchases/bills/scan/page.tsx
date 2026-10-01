@@ -213,9 +213,9 @@ export default function ScanBillPage() {
           itemId: string | null;
           accountId: string | null;
           description: string;
-          quantity: number;
-          rate: number;
-          taxRate: number;
+          quantity: string;
+          rate: string;
+          taxRate: string;
         }>
       ).map((l, i) => ({
         itemId: l.itemId || undefined,

@@ -21,7 +21,10 @@ export class BillLineDto {
 
 export class CreateBillDto {
   @ApiProperty() @IsString() vendorId: string;
-  @ApiProperty() @IsString() billNumber: string;
+  @ApiProperty({ required: false, description: 'Vendor bill number; auto-numbered when omitted' })
+  @IsString()
+  @IsOptional()
+  billNumber?: string;
   @ApiProperty() @IsDateString() date: string;
   @ApiProperty() @IsDateString() dueDate: string;
   @ApiProperty({ required: false }) @IsString() @IsOptional() reference?: string;

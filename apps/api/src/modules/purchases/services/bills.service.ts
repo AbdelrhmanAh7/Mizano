@@ -37,9 +37,10 @@ export class BillsService {
     const { lineData, totals } = this.buildLines(dto.lines);
 
     try {
+      const billNumber = dto.billNumber?.trim() || (await this.nextBillNumber(organizationId));
       return await this.prisma.bill.create({
         data: {
-          billNumber: dto.billNumber,
+          billNumber,
           vendorId: dto.vendorId,
           date: new Date(dto.date),
           dueDate: new Date(dto.dueDate),
@@ -494,6 +495,17 @@ export class BillsService {
       const found = await db.item.count({ where: { id: { in: itemIds }, organizationId } });
       if (found !== itemIds.length) throw new BadRequestException('Item not found');
     }
+  }
+
+  /** Atomically reserves the organization's next bill number (e.g. BILL-0007). */
+  private async nextBillNumber(organizationId: string): Promise<string> {
+    const org = await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { billNextNumber: { increment: 1 } },
+      select: { billPrefix: true, billNextNumber: true },
+    });
+    const number = org.billNextNumber - 1;
+    return `${org.billPrefix}${String(number).padStart(4, '0')}`;
   }
 
   private mapUniqueViolation(error: unknown): unknown {

@@ -28,6 +28,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { computeTotals, toDecimalInput } from '@/lib/money';
 
 const lineSchema = z.object({
   itemId: z.string().optional(),
@@ -167,9 +168,11 @@ export function BillForm({
       itemId: line.itemId || null,
       accountId: line.accountId || null,
       description: line.description,
-      quantity: parseFloat(line.quantity),
-      rate: parseFloat(line.rate),
-      taxRate: parseFloat(line.taxRate || '0'),
+      // Decimal strings: the API rejects JS numbers for money.
+      quantity: toDecimalInput(line.quantity),
+      rate: toDecimalInput(line.rate),
+      // Empty stays empty so scan review cannot silently turn an unresolved rate into 0%.
+      taxRate: toDecimalInput(line.taxRate, ''),
     }));
 
     const submitData = {
@@ -185,24 +188,9 @@ export function BillForm({
     onSubmit(submitData);
   };
 
-  // Calculate totals
+  // Exact preview; tax is a percentage per line (same rules as the API).
   const watchLines = form.watch('lines');
-  const calculateTotals = () => {
-    let subtotal = 0;
-    let taxAmount = 0;
-
-    watchLines.forEach((line) => {
-      const qty = parseFloat(line.quantity || '0');
-      const rate = parseFloat(line.rate || '0');
-      const lineAmount = qty * rate;
-      subtotal += lineAmount;
-      taxAmount += parseFloat(line.taxRate || '0');
-    });
-
-    return { subtotal, taxAmount, grandTotal: subtotal + taxAmount };
-  };
-
-  const totals = calculateTotals();
+  const totals = computeTotals(watchLines);
 
   const handleItemSelect = (index: number, itemId: string) => {
     if (itemId === 'none') {
@@ -342,18 +330,14 @@ export function BillForm({
                 <TableHead className="w-[80px]">Qty</TableHead>
                 <TableHead className="w-[110px]">Unit Price</TableHead>
                 <TableHead className="w-[110px] text-right">Amount</TableHead>
-                <TableHead className="w-[100px]">Tax</TableHead>
+                <TableHead className="w-[100px]">Tax %</TableHead>
                 <TableHead className="w-[110px] text-right">Total</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {fields.map((field, index) => {
-                const qty = parseFloat(form.watch(`lines.${index}.quantity`) || '0');
-                const rate = parseFloat(form.watch(`lines.${index}.rate`) || '0');
-                const lineTax = parseFloat(form.watch(`lines.${index}.taxRate`) || '0');
-                const lineAmount = qty * rate;
-                const lineTotal = lineAmount + lineTax;
+                const lineTotals = totals.lines[index] ?? { net: '0.00', total: '0.00' };
 
                 return (
                   <TableRow key={field.id}>
@@ -398,7 +382,7 @@ export function BillForm({
                         className="h-8"
                       />
                     </TableCell>
-                    <TableCell className="text-right font-mono">{lineAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-mono">{lineTotals.net}</TableCell>
                     <TableCell>
                       <Input
                         {...form.register(`lines.${index}.taxRate`)}
@@ -410,7 +394,7 @@ export function BillForm({
                       />
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold">
-                      {lineTotal.toFixed(2)}
+                      {lineTotals.total}
                     </TableCell>
                     <TableCell>
                       {fields.length > 1 && (
@@ -448,15 +432,15 @@ export function BillForm({
             <div className="w-64 space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Subtotal</span>
-                <span className="font-mono">${totals.subtotal.toFixed(2)}</span>
+                <span className="font-mono">{totals.subtotal}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span>Tax</span>
-                <span className="font-mono">${totals.taxAmount.toFixed(2)}</span>
+                <span className="font-mono">{totals.taxAmount}</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>Total</span>
-                <span className="font-mono">${totals.grandTotal.toFixed(2)}</span>
+                <span className="font-mono">{totals.grandTotal}</span>
               </div>
             </div>
           </div>
