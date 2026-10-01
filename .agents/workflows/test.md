@@ -1,5 +1,5 @@
 ---
-description: Run tests — unit, integration, e2e, coverage, playwright, or watch mode
+description: Run tests — unit, integration, e2e, coverage, or watch mode
 ---
 
 // turbo-all
@@ -15,56 +15,46 @@ description: Run tests — unit, integration, e2e, coverage, playwright, or watc
 ### All Tests (via Turborepo)
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm test
+pnpm test
 ```
 
 ### API Unit Tests Only
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm test:api
+pnpm test:api
 ```
 
 ### Web Tests Only
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm test:web
+pnpm test:web
 ```
 
 ### Watch Mode (API — re-runs on file change)
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm test:watch
+pnpm test:watch
 ```
 
 ### Coverage Report
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm test:cov
+pnpm test:cov
 ```
 
 ### E2E Tests (API)
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm test:e2e
+pnpm test:e2e
 ```
 
-### Playwright (Browser E2E)
-
-```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm test:playwright
-```
-
-### Regression Tests
-
-```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm test:regression
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm test:regression:web
-```
+Browser E2E is not wired yet (no Playwright dependency or config); it is tracked by the seeded API/browser journey issue in `docs/planning/demo-plan.json`.
 
 ### Run Specific Test File
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm --filter api exec jest --testPathPattern="<pattern>"
+node apps/api/_run_tests.js --testPathPattern="<pattern>"
+cd apps/web && npx jest --testPathPattern="<pattern>"
 ```
 
 3. Review the test output. If tests fail:
