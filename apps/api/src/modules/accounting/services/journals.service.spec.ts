@@ -373,6 +373,28 @@ describe('JournalsService', () => {
     });
   });
 
+  describe('post', () => {
+    it('posts a draft under the ledger lock inside one transaction', async () => {
+      prisma.journal.findFirst.mockResolvedValue({
+        id: 'j1',
+        organizationId: ORG_ID,
+        isPosted: false,
+        date: new Date('2026-03-01'),
+        lines: [],
+      } as never);
+      prisma.journal.updateMany.mockResolvedValue({ count: 1 } as never);
+
+      await service.post(ORG_ID, 'j1');
+
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(prisma.$executeRaw).toHaveBeenCalled();
+      expect(prisma.journal.updateMany).toHaveBeenCalledWith({
+        where: { id: 'j1', organizationId: ORG_ID, isPosted: false, deletedAt: null },
+        data: { isPosted: true },
+      });
+    });
+  });
+
   describe('reverse', () => {
     it('should create a reversal journal with debits and credits swapped', async () => {
       const originalJournal = createMockJournalEntry({

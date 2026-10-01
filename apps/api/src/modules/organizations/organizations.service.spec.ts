@@ -105,6 +105,15 @@ describe('OrganizationsService', () => {
       expect(result.name).toBe('Acme Corp');
     });
 
+    it('returns the base currency the ledger is kept in', async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue(mockOrg);
+
+      await service.findOne(ORG_ID);
+
+      const { select } = mockPrisma.organization.findUnique.mock.calls[0][0];
+      expect(select).toMatchObject({ currency: true, baseCurrency: true });
+    });
+
     it('throws NotFoundException when org not found', async () => {
       mockPrisma.organization.findUnique.mockResolvedValue(null);
 

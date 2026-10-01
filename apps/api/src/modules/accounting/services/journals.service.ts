@@ -359,12 +359,16 @@ export class JournalsService {
     if (journal.isPosted) throw new BadRequestException('Journal is already posted');
     await this.checkLockDate(organizationId, journal.date);
 
-    // Guarded update: a concurrent post cannot flip it twice.
-    const { count } = await this.prisma.journal.updateMany({
-      where: { id, organizationId, isPosted: false, deletedAt: null },
-      data: { isPosted: true },
+    // Guarded update under the ledger lock: a concurrent post cannot flip it twice, and a
+    // base-currency change cannot commit between its check and this posting.
+    await this.prisma.$transaction(async (tx) => {
+      await lockOrganizationLedger(tx, organizationId);
+      const { count } = await tx.journal.updateMany({
+        where: { id, organizationId, isPosted: false, deletedAt: null },
+        data: { isPosted: true },
+      });
+      if (count === 0) throw new BadRequestException('Journal is already posted');
     });
-    if (count === 0) throw new BadRequestException('Journal is already posted');
 
     return this.findOne(organizationId, id);
   }

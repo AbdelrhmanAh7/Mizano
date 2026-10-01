@@ -45,6 +45,7 @@ export class OrganizationsService {
         phone: true,
         address: true,
         currency: true,
+        baseCurrency: true,
         taxId: true,
         lockDate: true,
         createdAt: true,
