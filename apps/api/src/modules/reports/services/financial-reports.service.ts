@@ -225,6 +225,8 @@ function startsWithAny(code: string, prefixes: string[]): boolean {
 const FIXED_ASSET_PREFIXES = ['15', '16', '17'];
 // Seeded onboarding chart: 2500 short-term loans, 2600 long-term loans.
 const LONG_TERM_LIABILITY_PREFIXES = ['26', '27', '28', '29'];
+// Cash-flow financing debt: short-term (25xx) and long-term loans alike.
+const DEBT_LIABILITY_PREFIXES = ['25', ...LONG_TERM_LIABILITY_PREFIXES];
 const COGS_PREFIXES = ['5'];
 const OTHER_EXPENSE_PREFIXES = ['7', '8', '9'];
 // 49xx other income and the seeded 8000 interest income are non-operating.
@@ -503,7 +505,7 @@ export class FinancialReportsService {
       } else if (account.type === AccountType.LIABILITY) {
         if (account.id === org?.defaultApAccountId || account.code.startsWith('2000')) {
           apChange = apChange.add(cashEffect);
-        } else if (startsWithAny(account.code, LONG_TERM_LIABILITY_PREFIXES)) {
+        } else if (startsWithAny(account.code, DEBT_LIABILITY_PREFIXES)) {
           debtChange = debtChange.add(cashEffect);
         } else {
           otherOperating = otherOperating.add(cashEffect);

@@ -63,6 +63,8 @@ export default function JournalDetailPage() {
   const reverseJournal = useReverseJournal();
 
   const canEdit = hasPermission('accounting.edit');
+  // Same permission as POST /journals/:id/reverse.
+  const canReverse = hasPermission('accounting.create');
   const canDelete = hasPermission('accounting.delete');
 
   const handlePost = async () => {
@@ -204,7 +206,7 @@ export default function JournalDetailPage() {
               {t('journals.deleteJournal')}
             </Button>
           )}
-          {canEdit && reversible && (
+          {canReverse && reversible && (
             <Button
               variant="outline"
               onClick={() => setReverseDialogOpen(true)}

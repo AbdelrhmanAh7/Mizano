@@ -191,7 +191,7 @@
     "noPayments": "No payments recorded for this bill",
     "voidPayment": "Void",
     "voidPaymentTitle": "Void payment",
-    "voidPaymentConfirm": "Voiding {number} restores this bill's balance and posts a reversing journal entry.",
+    "voidPaymentConfirm": "Voiding {number} voids the whole payment: every bill it was allocated to gets its balance back, and a reversing journal entry is posted.",
     "paymentVoided": "Payment voided",
     "voidFailed": "Failed to void payment"
   },

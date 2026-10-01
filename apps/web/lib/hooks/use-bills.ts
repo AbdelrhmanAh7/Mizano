@@ -68,6 +68,8 @@ export interface BillAllocationRecord {
   billId: string;
   /** Decimal string */
   amount: string;
+  /** The allocation's payment (deletedAt set when the payment was voided). */
+  payment?: { id: string; paymentNumber: string; date: string; deletedAt: string | null };
 }
 
 export interface Bill {

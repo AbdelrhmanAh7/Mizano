@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { useTranslations } from 'next-intl';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Edit, Send, DollarSign, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,7 +46,6 @@ import {
   getStatusText,
 } from '@/lib/hooks/use-bills';
 import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
-import type { PaymentMade } from '@/lib/hooks/use-payments-made';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
 
@@ -79,17 +78,6 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
 
   const canEdit = hasPermission('purchases.edit');
   const canVoid = hasPermission('purchases.delete');
-
-  const vendorId = bill?.vendorId;
-  const hasAllocations = (bill?.billAllocations?.length ?? 0) > 0;
-  const paymentsQuery = useQuery({
-    queryKey: ['payments-made', 'bill-detail', vendorId],
-    queryFn: async (): Promise<PaymentMade[]> => {
-      const response = await paymentsMadeApi.getAll({ vendorId, limit: 100 });
-      return ((response.data as { data?: PaymentMade[] })?.data ?? []) as PaymentMade[];
-    },
-    enabled: !!vendorId && hasAllocations,
-  });
 
   const handleApprove = async () => {
     try {
@@ -155,10 +143,10 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
   const grandTotal = bill.grandTotal;
   const balanceDue = bill.balanceDue;
   const hasBalance = isPositiveDecimal(balanceDue);
-  const livePayments = new Map((paymentsQuery.data ?? []).map((p) => [p.id, p]));
   const paymentRows: BillPaymentRow[] = (bill.billAllocations ?? []).flatMap((allocation) => {
-    const payment = livePayments.get(allocation.paymentId);
-    return payment
+    // The bill endpoint returns each allocation's payment; voided payments are excluded.
+    const payment = allocation.payment;
+    return payment && !payment.deletedAt
       ? [
           {
             allocationId: allocation.id,
@@ -172,7 +160,8 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
   });
   const isOverdue =
     bill.status === 'OVERDUE' || (bill.status === 'OPEN' && new Date(bill.dueDate) < new Date());
-  const currency = bill.vendor?.currency || 'USD';
+  // The bill's own currency wins over the vendor default.
+  const currency = bill.currencyCode || bill.vendor?.currency || 'USD';
 
   return (
     <div className="space-y-6">
@@ -377,13 +366,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
             <CardTitle>{t('bills.payments')}</CardTitle>
           </CardHeader>
           <CardContent>
-            {hasAllocations && paymentsQuery.isLoading ? (
-              <Skeleton className="h-24 w-full" />
-            ) : paymentsQuery.isError ? (
-              <p className="text-sm text-destructive">
-                {getApiErrorMessage(paymentsQuery.error, tCommon('errors.notFound'))}
-              </p>
-            ) : paymentRows.length === 0 ? (
+            {paymentRows.length === 0 ? (
               <p className="py-4 text-center text-sm text-muted-foreground">
                 {t('bills.noPayments')}
               </p>

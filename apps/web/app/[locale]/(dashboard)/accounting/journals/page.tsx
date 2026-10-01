@@ -113,6 +113,8 @@ function JournalsPageContent() {
 
   const canCreate = hasPermission('accounting.create');
   const canEdit = hasPermission('accounting.edit');
+  // Same permission as POST /journals/:id/reverse.
+  const canReverse = hasPermission('accounting.create');
   const canDelete = hasPermission('accounting.delete');
 
   const bulkActions = [
@@ -293,7 +295,7 @@ function JournalsPageContent() {
                   Delete
                 </DropdownMenuItem>
               )}
-              {canEdit && reversible && (
+              {canReverse && reversible && (
                 <DropdownMenuItem onClick={() => setJournalToReverse(journal)}>
                   <Undo2 className="mr-2 h-4 w-4" />
                   {t('journals.reverse')}

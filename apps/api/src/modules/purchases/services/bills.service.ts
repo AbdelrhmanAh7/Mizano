@@ -114,7 +114,16 @@ export class BillsService {
   async findOne(organizationId: string, id: string) {
     const bill = await this.prisma.bill.findFirst({
       where: { id, organizationId, deletedAt: null },
-      include: { vendor: true, lines: true, billAllocations: true },
+      include: {
+        vendor: true,
+        lines: true,
+        // Each allocation carries its payment so clients don't need a separate (paged) lookup.
+        billAllocations: {
+          include: {
+            payment: { select: { id: true, paymentNumber: true, date: true, deletedAt: true } },
+          },
+        },
+      },
     });
     if (!bill) throw new NotFoundException('Bill not found');
     return bill;

@@ -53,6 +53,8 @@ const JOURNAL_INCLUDE = {
       account: { select: { id: true, code: true, name: true, type: true } },
     },
   },
+  // Lets clients see that a journal was already reversed (and link to the reversal).
+  reversedBy: { select: { id: true, journalNumber: true } },
 } satisfies Prisma.JournalInclude;
 
 type JournalWithLines = Prisma.JournalGetPayload<{ include: typeof JOURNAL_INCLUDE }>;
