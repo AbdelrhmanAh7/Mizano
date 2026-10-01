@@ -529,7 +529,10 @@ function BillsPageContent() {
         action="approve & post"
         count={bulkSelectedRows.length}
         itemType="bills"
-        description="Draft bills will be approved and posted to the ledger (expense, VAT and accounts payable)."
+        title={t('bills.bulkApprove.title', { count: bulkSelectedRows.length })}
+        description={t('bills.bulkApprove.description')}
+        confirmLabel={t('bills.bulkApprove.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={t('bills.bulkApprove.cancel')}
         isLoading={bulkApproveAction.isLoading}
         onConfirm={async () => {
           await bulkApproveAction.execute(bulkSelectedRows.map((r) => r.id));
