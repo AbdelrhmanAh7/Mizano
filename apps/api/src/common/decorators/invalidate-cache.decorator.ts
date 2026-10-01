@@ -19,3 +19,13 @@ export const INVALIDATE_CACHE_KEY = 'invalidateCachePatterns';
  */
 export const InvalidateCache = (...patterns: string[]) =>
   SetMetadata(INVALIDATE_CACHE_KEY, patterns);
+
+/** Caches derived from the posted ledger. Any endpoint that posts or reverses a journal must clear them. */
+export const LEDGER_CACHE_PATTERNS = ['journals:*', 'accounts:*', 'reports:*', 'dashboard:*'];
+
+/**
+ * {@link InvalidateCache} for endpoints that post to the ledger: clears the given module patterns
+ * plus every ledger-derived cache. Use one decorator per handler (a second one overrides the first).
+ */
+export const InvalidatesLedger = (...patterns: string[]) =>
+  InvalidateCache(...new Set([...patterns, ...LEDGER_CACHE_PATTERNS]));

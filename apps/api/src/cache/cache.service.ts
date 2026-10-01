@@ -29,6 +29,13 @@ export class CacheService implements OnModuleInit {
   private redisClient: Redis | null = null;
   private hits = 0;
   private misses = 0;
+  /**
+   * Keys written through this service. The cache-manager store may be in-process memory
+   * (cache-manager v7 ignores the legacy redis `store` option), which cannot be scanned, so
+   * pattern invalidation matches against the keys we know we wrote.
+   */
+  private readonly knownKeys = new Set<string>();
+  private static readonly MAX_TRACKED_KEYS = 50_000;
 
   constructor(
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -91,6 +98,7 @@ export class CacheService implements OnModuleInit {
     const cacheKey = this.buildKey(key, options?.organizationId);
     const ttl = options?.ttl ? options.ttl * 1000 : undefined; // Convert to ms
     await this.cacheManager.set(cacheKey, value, ttl);
+    this.track(cacheKey);
   }
 
   /**
@@ -108,14 +116,35 @@ export class CacheService implements OnModuleInit {
    */
   async deletePattern(pattern: string, organizationId: string): Promise<number> {
     const fullPattern = this.buildKey(pattern, organizationId);
-
+    let deleted = await this.deleteKnownKeys(fullPattern);
     if (this.isRedisAvailable) {
-      return this.scanAndDelete(fullPattern);
+      deleted += await this.scanAndDelete(fullPattern);
     }
+    return deleted;
+  }
 
-    // Fallback: try to delete the exact key (no pattern matching in memory store)
-    await this.cacheManager.del(fullPattern);
-    return 1;
+  private track(cacheKey: string): void {
+    if (this.knownKeys.size >= CacheService.MAX_TRACKED_KEYS) {
+      const oldest = this.knownKeys.values().next().value;
+      if (oldest !== undefined) this.knownKeys.delete(oldest);
+    }
+    this.knownKeys.add(cacheKey);
+  }
+
+  /** Deletes tracked keys matching a Redis-style glob (`*` and `?`). */
+  private async deleteKnownKeys(globPattern: string): Promise<number> {
+    const regex = new RegExp(
+      '^' +
+        globPattern
+          .split('')
+          .map((c) => (c === '*' ? '.*' : c === '?' ? '.' : c.replace(/[.+^${}()|[\]\\]/g, '\\$&')))
+          .join('') +
+        '$',
+    );
+    const matches = [...this.knownKeys].filter((k) => regex.test(k));
+    await Promise.all(matches.map((k) => this.cacheManager.del(k)));
+    matches.forEach((k) => this.knownKeys.delete(k));
+    return matches.length;
   }
 
   /**
@@ -140,6 +169,7 @@ export class CacheService implements OnModuleInit {
     const value = await factory();
     const ttl = options?.ttl ? options.ttl * 1000 : undefined;
     await this.cacheManager.set(cacheKey, value, ttl);
+    this.track(cacheKey);
     return value;
   }
 
@@ -160,16 +190,9 @@ export class CacheService implements OnModuleInit {
    * Returns the number of keys deleted.
    */
   async clearOrganization(organizationId: string): Promise<number> {
-    const pattern = `org:${organizationId}:*`;
-
-    if (this.isRedisAvailable) {
-      const count = await this.scanAndDelete(pattern);
-      this.logger.log(`Cleared ${count} cache keys for organization ${organizationId}`);
-      return count;
-    }
-
-    this.logger.warn(`Cannot clear organization cache without Redis; pattern: ${pattern}`);
-    return 0;
+    const count = await this.deletePattern('*', organizationId);
+    this.logger.log(`Cleared ${count} cache keys for organization ${organizationId}`);
+    return count;
   }
 
   /**

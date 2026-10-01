@@ -17,6 +17,7 @@ import {
   CurrentOrg,
   HttpCache,
   InvalidateCache,
+  InvalidatesLedger,
   Permissions,
 } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -92,7 +93,7 @@ export class BillsController {
 
   @Patch(':id/open')
   @Permissions('purchases.edit')
-  @InvalidateCache('bills:*')
+  @InvalidatesLedger('bills:*')
   @ApiOperation({ summary: 'Open a draft bill (change status DRAFT → OPEN)' })
   open(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.billsService.open(orgId, id);
@@ -108,7 +109,7 @@ export class BillsController {
 
   @Post(':id/approve')
   @Permissions('purchases.edit')
-  @InvalidateCache('bills:*')
+  @InvalidatesLedger('bills:*')
   @ApiOperation({ summary: 'Approve bill' })
   approve(@CurrentOrg() orgId: string, @Param('id') id: string) {
     return this.billsService.approve(orgId, id);
@@ -133,7 +134,7 @@ export class BillsController {
 
   @Post('bulk-open')
   @Permissions('purchases.edit')
-  @InvalidateCache('bills:*')
+  @InvalidatesLedger('bills:*')
   @ApiOperation({ summary: 'Bulk open (approve and post) draft bills' })
   bulkOpen(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.billsService.bulkOpen(orgId, dto.ids);
@@ -141,7 +142,7 @@ export class BillsController {
 
   @Post('bulk-approve')
   @Permissions('purchases.edit')
-  @InvalidateCache('bills:*')
+  @InvalidatesLedger('bills:*')
   @ApiOperation({ summary: 'Bulk approve draft bills' })
   bulkApprove(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.billsService.bulkApprove(orgId, dto.ids);
@@ -149,8 +150,7 @@ export class BillsController {
 
   @Post('bulk-pay')
   @Permissions('purchases.edit')
-  @InvalidateCache('bills:*')
-  @InvalidateCache('payments-made:*')
+  @InvalidatesLedger('bills:*', 'payments-made:*')
   @ApiOperation({ summary: 'Pay the full balance of each bill (records real payments)' })
   bulkPay(@CurrentOrg() orgId: string, @Body() dto: BulkPayBillsDto) {
     const { ids, ...options } = dto;

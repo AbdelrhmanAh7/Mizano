@@ -2,7 +2,7 @@ import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } fr
 import { Reflector } from '@nestjs/core';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { mergeMap } from 'rxjs/operators';
 import { CacheService } from '../../cache/cache.service';
 import { INVALIDATE_CACHE_KEY } from '../decorators/invalidate-cache.decorator';
 
@@ -54,34 +54,32 @@ export class CacheInvalidationInterceptor implements NestInterceptor {
       return next.handle();
     }
 
+    // Invalidate BEFORE the response is released, so a client refetching right after a
+    // successful write can never read the stale entry.
     return next.handle().pipe(
-      tap(() => {
-        void (async () => {
-          try {
-            // Delete all patterns in parallel
-            const deletePromises = patterns.map((pattern) =>
-              this.cacheService.deletePattern(pattern, organizationId),
-            );
-            const results = await Promise.all(deletePromises);
-            const totalDeleted = results.reduce((sum, n) => sum + n, 0);
+      mergeMap(async (response: unknown) => {
+        try {
+          const results = await Promise.all(
+            patterns.map((pattern) => this.cacheService.deletePattern(pattern, organizationId)),
+          );
+          const totalDeleted = results.reduce((sum, n) => sum + n, 0);
 
-            this.logger.debug(
-              `Cache invalidated: ${patterns.join(', ')} (${totalDeleted} keys) for org ${organizationId}`,
-            );
+          this.logger.debug(
+            `Cache invalidated: ${patterns.join(', ')} (${totalDeleted} keys) for org ${organizationId}`,
+          );
 
-            // Emit event for cross-module listeners
-            const event: CacheInvalidatedEvent = {
-              patterns,
-              organizationId,
-              method: request.method,
-              path: request.path,
-            };
-            this.eventEmitter.emit('cache.invalidated', event);
-          } catch (error) {
-            // Never fail the request due to cache invalidation errors
-            this.logger.warn(`Cache invalidation error: ${error}`);
-          }
-        })();
+          const event: CacheInvalidatedEvent = {
+            patterns,
+            organizationId,
+            method: request.method,
+            path: request.path,
+          };
+          this.eventEmitter.emit('cache.invalidated', event);
+        } catch (error) {
+          // Never fail the request due to cache invalidation errors
+          this.logger.warn(`Cache invalidation error: ${error}`);
+        }
+        return response;
       }),
     );
   }
