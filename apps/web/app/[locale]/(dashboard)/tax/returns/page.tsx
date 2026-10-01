@@ -91,8 +91,10 @@ function VATReturnsPageContent() {
   const deleteReturn = useDeleteVATReturn();
   const fileReturn = useFileVATReturn();
 
-  const rawReturns: VATReturn[] = returnsData?.data || returnsData || [];
-  const returns = useMemo(() => rawReturns.map(normalizeVATReturn), [rawReturns]);
+  const returns = useMemo(() => {
+    const rawReturns: VATReturn[] = returnsData?.data || returnsData || [];
+    return rawReturns.map(normalizeVATReturn);
+  }, [returnsData]);
 
   // Client-side search
   const filteredReturns = useMemo(() => {
