@@ -47,7 +47,7 @@ describe('Accountant journey (e2e)', () => {
   let payment1Id = '';
   let payment1JournalId = '';
   let manualJournalId = '';
-  let bulkPaymentIds: string[] = [];
+  const bulkPaymentIds: string[] = [];
 
   const bill1Date = isoDay(-10);
   const lockedBillDate = isoDay(-400);
@@ -428,9 +428,9 @@ describe('Accountant journey (e2e)', () => {
       expect(created.body.totalDebit).toBe('10.2500');
       expect(created.body.journalNumber).toMatch(/^JRN-\d{3,}$/);
 
-      expect(
-        (await a.patch(`/journals/${manualJournalId}`).send({ notes: 'edit' })).status,
-      ).toBe(400);
+      expect((await a.patch(`/journals/${manualJournalId}`).send({ notes: 'edit' })).status).toBe(
+        400,
+      );
       expect((await a.delete(`/journals/${manualJournalId}`)).status).toBe(400);
 
       const reversed = await a.post(`/journals/${manualJournalId}/reverse`).send({});
@@ -605,7 +605,11 @@ describe('Accountant journey (e2e)', () => {
       expect(ap.credit).toBe('193.9');
 
       const open = await prisma.bill.findMany({
-        where: { organizationId: tenantA.organizationId, deletedAt: null, status: { not: 'DRAFT' } },
+        where: {
+          organizationId: tenantA.organizationId,
+          deletedAt: null,
+          status: { not: 'DRAFT' },
+        },
         select: { balanceDue: true },
       });
       const openTotal = open.reduce((s, x) => s.add(x.balanceDue), new Prisma.Decimal(0));
