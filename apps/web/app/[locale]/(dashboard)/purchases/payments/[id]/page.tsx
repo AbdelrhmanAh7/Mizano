@@ -34,7 +34,7 @@ import {
   formatPaymentMode,
   formatCurrency,
 } from '@/lib/hooks/use-payments-made';
-import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 
 interface PaymentDetailPageProps {
   params: { id: string };

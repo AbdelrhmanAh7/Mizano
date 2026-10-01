@@ -42,7 +42,7 @@ import { format } from 'date-fns';
 import { Ban, Eye, Plus, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
-import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 
 function PaymentsMadePageContent() {
   const t = useTranslations('purchases');
