@@ -153,6 +153,30 @@ describe('AdjustmentsService', () => {
       expect(journals.create).not.toHaveBeenCalled();
     });
 
+    it('DECREASE from a warehouse without a stock level is rejected and never touches global stock', async () => {
+      // No InventoryLevel row for the warehouse: the guarded level update matches nothing.
+      prisma.inventoryLevel.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.create(ORG, { ...baseDto, type: 'DECREASE' })).rejects.toThrow(
+        'Insufficient stock for Widget in this warehouse',
+      );
+      expect(prisma.inventoryLevel.updateMany.mock.calls[0][0].where).toMatchObject({
+        itemId: 'item-1',
+        warehouseId: 'wh-1',
+        organizationId: ORG,
+      });
+      expect(prisma.item.updateMany).not.toHaveBeenCalled();
+      expect(prisma.inventoryMovement.create).not.toHaveBeenCalled();
+      expect(journals.create).not.toHaveBeenCalled();
+    });
+
+    it('dates the movement on the adjustment date', async () => {
+      await service.create(ORG, baseDto);
+      expect(prisma.inventoryMovement.create.mock.calls[0][0].data.createdAt).toEqual(
+        new Date('2026-03-10'),
+      );
+    });
+
     it('rejects item, warehouse and account ids from another organization', async () => {
       prisma.item.findFirst.mockResolvedValueOnce(null);
       await expect(service.create(ORG, baseDto)).rejects.toThrow('Item not found');
@@ -246,6 +270,23 @@ describe('AdjustmentsService', () => {
         tx: prisma,
         source: { type: 'INVENTORY_ADJUSTMENT_VOID', id: 'adj-1' },
       });
+    });
+
+    it('the void movement carries the original unit cost and is dated at void time', async () => {
+      prisma.inventoryAdjustment.findFirst.mockResolvedValue(adjustmentRow('INCREASE'));
+      prisma.inventoryMovement.findFirst.mockResolvedValue({ costPerUnit: dec('0.3333') });
+      const before = Date.now();
+
+      await service.void(ORG, 'adj-1');
+
+      expect(prisma.inventoryMovement.findFirst.mock.calls[0][0].where).toMatchObject({
+        organizationId: ORG,
+        referenceId: 'adj-1',
+        type: 'adjustment',
+      });
+      const data = prisma.inventoryMovement.create.mock.calls[0][0].data;
+      expect((data.costPerUnit as Decimal).toString()).toBe('0.3333');
+      expect((data.createdAt as Date).getTime()).toBeGreaterThanOrEqual(before);
     });
 
     it('voiding a DECREASE puts the stock back', async () => {

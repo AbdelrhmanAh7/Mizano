@@ -32,7 +32,7 @@ describe('Inventory adjustments (e2e)', () => {
   let fa: Fixture;
   let fb: Fixture;
 
-  async function setup(api: ApiHelper, label: string): Promise<Fixture> {
+  async function setup(api: ApiHelper, label: string, orgId: string): Promise<Fixture> {
     const inventoryAccountId = await createAccount(api, '1400', 'Inventory', 'ASSET');
     const expenseAccountId = await createAccount(api, '6700', 'Inventory Shrinkage', 'EXPENSE');
     const wh = await api
@@ -50,6 +50,10 @@ describe('Inventory adjustments (e2e)', () => {
       openingStock: 10,
     });
     expect(item.status).toBe(201);
+    // Allocate the opening stock to the warehouse: decreases need a stock level there.
+    await prisma.inventoryLevel.create({
+      data: { itemId: item.body.id, warehouseId: wh.body.id, quantity: 10, organizationId: orgId },
+    });
     return { inventoryAccountId, expenseAccountId, warehouseId: wh.body.id, itemId: item.body.id };
   }
 
@@ -85,8 +89,8 @@ describe('Inventory adjustments (e2e)', () => {
     tenantB = await registerTenant(app, 'InvB');
     a = tenantA.api;
     b = tenantB.api;
-    fa = await setup(a, 'A');
-    fb = await setup(b, 'B');
+    fa = await setup(a, 'A', tenantA.organizationId);
+    fb = await setup(b, 'B', tenantB.organizationId);
   });
 
   afterAll(async () => {
@@ -127,6 +131,28 @@ describe('Inventory adjustments (e2e)', () => {
       });
       expect(movements).toHaveLength(1);
       expect(Number(movements[0].quantity)).toBe(-3);
+    });
+
+    it('dates the movement on the adjustment date and carries the unit cost', async () => {
+      const [movement] = await prisma.inventoryMovement.findMany({
+        where: { organizationId: tenantA.organizationId, referenceId: decreaseId },
+      });
+      expect(movement.createdAt.toISOString().slice(0, 10)).toBe(isoDay(-3));
+      expect(movement.costPerUnit.toString()).toBe('60.25');
+    });
+
+    it('rejects a decrease from a warehouse that holds no stock of the item', async () => {
+      const other = await a
+        .post('/warehouses')
+        .send({ code: `WH-${uniqueSuffix()}`, name: 'Empty WH' });
+      expect(other.status).toBe(201);
+      const before = await stockOf(a, fa.itemId);
+      const res = await a
+        .post('/inventory-adjustments')
+        .send(payload(fa, { warehouseId: other.body.id, quantity: 1 }));
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/Insufficient stock .* in this warehouse/);
+      expect(await stockOf(a, fa.itemId)).toBe(before);
     });
 
     it('reads the adjustment back with its ledger status', async () => {
@@ -200,6 +226,17 @@ describe('Inventory adjustments (e2e)', () => {
           { accountId: fa.inventoryAccountId, debit: '180.75', credit: '0' },
         ]),
       );
+
+      const voidMovements = await prisma.inventoryMovement.findMany({
+        where: {
+          organizationId: tenantA.organizationId,
+          referenceId: decreaseId,
+          type: 'adjustment_void',
+        },
+      });
+      expect(voidMovements).toHaveLength(1);
+      expect(voidMovements[0].costPerUnit.toString()).toBe('60.25');
+      expect(voidMovements[0].createdAt.toISOString().slice(0, 10)).toBe(isoDay(0));
 
       const again = await a.post(`/inventory-adjustments/${decreaseId}/void`).send({});
       expect(again.status).toBe(400);

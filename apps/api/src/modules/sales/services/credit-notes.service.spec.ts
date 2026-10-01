@@ -773,11 +773,12 @@ describe('CreditNotesService (posting)', () => {
         deletedAt: null,
         type: 'ASSET',
       });
-      // Only base-currency accounts (the ledger is single-currency).
-      expect(where.currency).toEqual({ equals: 'EGP', mode: 'insensitive' });
-      expect(where.OR[1].bankAccounts.some.currency).toEqual({
-        equals: 'EGP',
-        mode: 'insensitive',
+      // Only accounts linked to a foreign-currency bank register are excluded.
+      expect(where.currency).toBeUndefined();
+      expect(where.NOT.bankAccounts.some).toEqual({
+        organizationId: ORG_ID,
+        deletedAt: null,
+        NOT: { currency: { equals: 'EGP', mode: 'insensitive' } },
       });
       expect(where.OR[0]).toEqual({ id: { in: ['bank-1', 'cash-1'] } });
       expect(where.OR[1].bankAccounts.some).toMatchObject({

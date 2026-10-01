@@ -142,7 +142,10 @@
       "netPayable": "Net Payable",
       "status": "Status",
       "dueDate": "Due Date"
-    }
+    },
+    "markFiled": "Mark as filed",
+    "markFiledSuccess": "VAT return marked as filed",
+    "markFiledFail": "Failed to mark the VAT return as filed"
   },
   "generate": {
     "title": "Generate VAT Return",

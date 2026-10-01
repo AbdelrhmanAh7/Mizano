@@ -148,6 +148,8 @@ export class AdjustmentsService {
           referenceId: adjustment.id,
           reference: adjustmentNumber,
           costPerUnit: item.costPrice,
+          // The model has no date column: the movement is dated through createdAt.
+          createdAt: date,
           organizationId,
         },
       });
@@ -235,6 +237,15 @@ export class AdjustmentsService {
         quantity: adjustment.quantity,
         failure: 'Cannot void: the stock added by this adjustment has since been used',
       });
+      const originalMovement = await tx.inventoryMovement.findFirst({
+        where: {
+          organizationId,
+          referenceType: 'adjustment',
+          referenceId: id,
+          type: 'adjustment',
+        },
+        select: { costPerUnit: true },
+      });
       await tx.inventoryMovement.create({
         data: {
           itemId: adjustment.itemId,
@@ -243,6 +254,9 @@ export class AdjustmentsService {
             restore === AdjustmentType.INCREASE ? adjustment.quantity : -adjustment.quantity,
           ),
           type: 'adjustment_void',
+          // Same unit cost as the movement being undone; dated at void time.
+          costPerUnit: originalMovement?.costPerUnit ?? 0,
+          createdAt: new Date(),
           movementType: restore === AdjustmentType.INCREASE ? 'IN' : 'OUT',
           referenceType: 'adjustment',
           referenceId: adjustment.id,
@@ -414,29 +428,20 @@ export class AdjustmentsService {
       return;
     }
 
+    // The warehouse must hold the quantity: a missing level or an insufficient one is rejected,
+    // and the global stock is never decremented on its own.
+    const moved = await tx.inventoryLevel.updateMany({
+      where: { itemId, warehouseId, organizationId, quantity: { gte: new Decimal(quantity) } },
+      data: { quantity: { decrement: quantity } },
+    });
+    if (moved.count === 0) {
+      throw new BadRequestException(`${failure} for ${itemName} in this warehouse`);
+    }
     const { count } = await tx.item.updateMany({
       where: { id: itemId, organizationId, currentStock: { gte: quantity } },
       data: { currentStock: { decrement: quantity } },
     });
     if (count === 0) throw new BadRequestException(`${failure} for ${itemName}`);
-
-    // Stock allocated to this warehouse (levels did not exist for opening stock): when the
-    // warehouse is tracked, it must hold the quantity too.
-    const level = await tx.inventoryLevel.findUnique({
-      where: { itemId_warehouseId: { itemId, warehouseId } },
-      select: { id: true, quantity: true },
-    });
-    if (level) {
-      const moved = await tx.inventoryLevel.updateMany({
-        where: { id: level.id, organizationId, quantity: { gte: new Decimal(quantity) } },
-        data: { quantity: { decrement: quantity } },
-      });
-      if (moved.count === 0) {
-        throw new BadRequestException(
-          `${failure} for ${itemName} in this warehouse (holds ${level.quantity.toFixed(0)})`,
-        );
-      }
-    }
   }
 
   /** Serialized per organization so concurrent adjustments never share a number. */

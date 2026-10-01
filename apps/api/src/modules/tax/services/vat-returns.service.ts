@@ -54,6 +54,10 @@ export interface VatAccounts {
   payableId: string;
   /** Input VAT (recoverable on purchases); also carries a refund due from the authority. */
   receivableId: string;
+  /** Every account that is or was an output-VAT account (includes payableId). */
+  outputIds: string[];
+  /** Every account that is or was an input-VAT account (includes receivableId). */
+  inputIds: string[];
 }
 
 export interface VatFigures {
@@ -62,6 +66,9 @@ export interface VatFigures {
   totalPurchases: Decimal;
   inputVat: Decimal;
   netPayable: Decimal;
+  /** Net credit movement per output account / net debit movement per input account. */
+  outputByAccount: { accountId: string; amount: Decimal }[];
+  inputByAccount: { accountId: string; amount: Decimal }[];
 }
 
 interface SettlementLine {
@@ -126,30 +133,34 @@ export class VatReturnsService {
     if (endDate < startDate) throw new BadRequestException('endDate must not be before startDate');
     const period = derivePeriodLabel(startDate, endDate);
 
-    const existing = await this.prisma.vATReturn.findFirst({
-      where: { organizationId, period },
-      select: { id: true },
-    });
-    if (existing) throw new BadRequestException('VAT return for this period already exists');
-
-    // A day covered by two returns would be declared (and settled) twice.
-    const overlapping = await this.prisma.vATReturn.findFirst({
-      where: {
-        organizationId,
-        deletedAt: null,
-        startDate: { lte: endDate },
-        endDate: { gte: startDate },
-      },
-      select: { returnNumber: true, period: true },
-    });
-    if (overlapping) {
-      throw new BadRequestException(
-        `The period overlaps VAT return ${overlapping.returnNumber ?? overlapping.period}`,
-      );
-    }
-
     try {
       return await this.prisma.$transaction(async (tx) => {
+        // Overlap check and insert happen under one per-organization lock (the same one that
+        // serializes return numbering), so two concurrent creations cannot both pass the check.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`vat-return:${organizationId}`}))`;
+
+        const existing = await tx.vATReturn.findFirst({
+          where: { organizationId, period },
+          select: { id: true },
+        });
+        if (existing) throw new BadRequestException('VAT return for this period already exists');
+
+        // A day covered by two returns would be declared (and settled) twice.
+        const overlapping = await tx.vATReturn.findFirst({
+          where: {
+            organizationId,
+            deletedAt: null,
+            startDate: { lte: endDate },
+            endDate: { gte: startDate },
+          },
+          select: { returnNumber: true, period: true },
+        });
+        if (overlapping) {
+          throw new BadRequestException(
+            `The period overlaps VAT return ${overlapping.returnNumber ?? overlapping.period}`,
+          );
+        }
+
         const returnNumber = await this.nextReturnNumber(tx, organizationId);
         return tx.vATReturn.create({
           data: {
@@ -332,9 +343,9 @@ export class VatReturnsService {
     const date = parseDate(dto.date, 'date');
 
     return this.prisma.$transaction(async (tx) => {
-      // Lock order: document row, then the organization ledger.
-      await tx.$queryRaw`SELECT id FROM vat_returns WHERE id = ${vatReturnId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+      // Lock order (same as submit): organization ledger, then the return row.
       await lockOrganizationLedger(tx, organizationId);
+      await tx.$queryRaw`SELECT id FROM vat_returns WHERE id = ${vatReturnId} AND "organizationId" = ${organizationId} FOR UPDATE`;
       const vatReturn = await tx.vATReturn.findFirst({
         where: { id: vatReturnId, organizationId, deletedAt: null },
         include: { payment: true },
@@ -372,18 +383,29 @@ export class VatReturnsService {
           isActive: true,
           type: AccountType.ASSET,
         },
-        select: { id: true, currency: true },
+        select: { id: true },
       });
       if (!paidFrom) {
         throw new BadRequestException(
           'Paid-from account must be an active bank or cash asset account',
         );
       }
-      if (paidFrom.currency.toUpperCase() !== org.baseCurrency.toUpperCase()) {
+      // The ledger is single-currency: only a bank register carries a meaningful currency.
+      const foreignRegister = await tx.bankAccount.findFirst({
+        where: {
+          linkedAccountId: paidFrom.id,
+          organizationId,
+          deletedAt: null,
+          NOT: { currency: { equals: org.baseCurrency, mode: 'insensitive' } },
+        },
+        select: { id: true },
+      });
+      if (foreignRegister) {
         throw new BadRequestException(
-          `Paid-from account must be in the base currency ${org.baseCurrency}`,
+          `Paid-from account is linked to a bank account that is not in the base currency ${org.baseCurrency}`,
         );
       }
+
       if (paidFrom.id === org.defaultVatPayableAccountId) {
         throw new BadRequestException('Paid-from account must differ from the VAT Payable account');
       }
@@ -437,6 +459,41 @@ export class VatReturnsService {
       );
 
       return payment;
+    });
+  }
+
+  /**
+   * Terminal state for a submitted return with nothing to pay (zero or refundable): SUBMITTED ->
+   * FILED with a guarded update, no journal (the settlement already posted at submission). A
+   * return with VAT payable is filed by recording its payment instead.
+   */
+  async fileReturn(organizationId: string, id: string): Promise<VATReturn> {
+    return this.prisma.$transaction(async (tx) => {
+      await lockOrganizationLedger(tx, organizationId);
+      const { count } = await tx.vATReturn.updateMany({
+        where: {
+          id,
+          organizationId,
+          deletedAt: null,
+          status: VATReturnStatus.SUBMITTED,
+          netPayable: { lte: 0 },
+        },
+        data: { status: VATReturnStatus.FILED, filedAt: new Date() },
+      });
+      if (count === 0) {
+        const current = await tx.vATReturn.findFirst({
+          where: { id, organizationId, deletedAt: null },
+          select: { status: true, netPayable: true },
+        });
+        if (!current) throw new NotFoundException('VAT return not found');
+        if (current.status !== VATReturnStatus.SUBMITTED) {
+          throw new BadRequestException('Only a submitted VAT return can be marked as filed');
+        }
+        throw new BadRequestException(
+          'This VAT return has VAT payable; record its payment to file it',
+        );
+      }
+      return tx.vATReturn.findUniqueOrThrow({ where: { id }, include: { payment: true } });
     });
   }
 
@@ -607,9 +664,53 @@ export class VatReturnsService {
         'The configured VAT Payable/Receivable accounts no longer exist; review organization settings',
       );
     }
+    const payableId = org.defaultVatPayableAccountId;
+    const receivableId = org.defaultVatReceivableAccountId;
+    const history = await this.historicalVatAccounts(db, organizationId);
+    const outputIds = [...new Set([payableId, ...history.output])].filter(
+      (id) => id !== receivableId,
+    );
+    const inputIds = [...new Set([receivableId, ...history.input])].filter(
+      (id) => !outputIds.includes(id),
+    );
+    return { payableId, receivableId, outputIds, inputIds };
+  }
+
+  /**
+   * Accounts that carried VAT before the organization's defaults changed. Neither Account nor
+   * TaxRate has an authoritative VAT marker (tax-rate account links are not used by posting),
+   * so the marker is the posting itself: every VAT line is written with a fixed description
+   * ("... - VAT Payable" by invoices and credit notes, "... - VAT Receivable" by bills, and the
+   * "Output VAT cleared"/"Input VAT cleared" lines of VAT return settlements). Any account that
+   * ever carried such a line in this organization still counts as a VAT account. Current
+   * defaults always win when an account appears on both sides.
+   */
+  private async historicalVatAccounts(
+    db: Db,
+    organizationId: string,
+  ): Promise<{ output: string[]; input: string[] }> {
+    const sources = [
+      JournalSourceType.INVOICE_SEND,
+      JournalSourceType.BILL_APPROVAL,
+      JournalSourceType.CREDIT_NOTE,
+      JournalSourceType.VAT_RETURN,
+    ];
+    const lines = (descriptions: string[]) =>
+      db.journalLine.findMany({
+        where: {
+          OR: descriptions.map((d) => ({ description: { endsWith: d } })),
+          journal: { organizationId, deletedAt: null, sourceType: { in: sources } },
+        },
+        select: { accountId: true },
+        distinct: ['accountId'],
+      });
+    const [output, input] = await Promise.all([
+      lines(['- VAT Payable', '- Output VAT cleared']),
+      lines(['- VAT Receivable', '- Input VAT cleared']),
+    ]);
     return {
-      payableId: org.defaultVatPayableAccountId,
-      receivableId: org.defaultVatReceivableAccountId,
+      output: (output ?? []).map((l) => l.accountId),
+      input: (input ?? []).map((l) => l.accountId),
     };
   }
 
@@ -641,8 +742,8 @@ export class VatReturnsService {
     };
 
     const [output, input, sales, purchases] = await Promise.all([
-      movement(accounts.payableId),
-      movement(accounts.receivableId),
+      Promise.all(accounts.outputIds.map(movement)),
+      Promise.all(accounts.inputIds.map(movement)),
       db.invoice.aggregate({
         where: {
           organizationId,
@@ -663,9 +764,19 @@ export class VatReturnsService {
       }),
     ]);
 
-    const outputVat = output.credit.sub(output.debit);
-    const inputVat = input.debit.sub(input.credit);
+    const outputByAccount = accounts.outputIds.map((accountId, i) => ({
+      accountId,
+      amount: output[i].credit.sub(output[i].debit),
+    }));
+    const inputByAccount = accounts.inputIds.map((accountId, i) => ({
+      accountId,
+      amount: input[i].debit.sub(input[i].credit),
+    }));
+    const outputVat = outputByAccount.reduce((sum, x) => sum.add(x.amount), ZERO);
+    const inputVat = inputByAccount.reduce((sum, x) => sum.add(x.amount), ZERO);
     return {
+      outputByAccount,
+      inputByAccount,
       totalSales: sales._sum.subtotal ?? ZERO,
       outputVat,
       totalPurchases: purchases._sum.subtotal ?? ZERO,
@@ -692,9 +803,9 @@ export class VatReturnsService {
       });
     };
 
-    const { outputVat, inputVat, netPayable } = figures;
-    push(accounts.payableId, outputVat, 'Output VAT cleared');
-    push(accounts.receivableId, inputVat.neg(), 'Input VAT cleared');
+    const { netPayable } = figures;
+    for (const x of figures.outputByAccount) push(x.accountId, x.amount, 'Output VAT cleared');
+    for (const x of figures.inputByAccount) push(x.accountId, x.amount.neg(), 'Input VAT cleared');
     if (netPayable.greaterThan(0)) {
       push(accounts.payableId, netPayable.neg(), 'VAT payable to tax authority');
     } else {

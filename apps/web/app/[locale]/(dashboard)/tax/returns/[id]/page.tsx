@@ -58,6 +58,7 @@ import {
   useCalculateVATReturn,
   useDeleteVATReturn,
   useRecordVATPayment,
+  useMarkVATReturnFiled,
   getVATReturnStatusColor,
   getVATReturnStatusLabel,
   getVATReturnStatusStep,
@@ -107,6 +108,7 @@ export default function VATReturnDetailPage() {
   const calculateReturn = useCalculateVATReturn();
   const deleteReturn = useDeleteVATReturn();
   const createPayment = useRecordVATPayment();
+  const markFiled = useMarkVATReturnFiled();
 
   const canEdit = hasPermission('tax.edit');
   const canSubmit = hasPermission('tax.submit');
@@ -130,6 +132,21 @@ export default function VATReturnDetailPage() {
         description:
           (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
           t('returns.fileFail'),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleMarkFiled = async (): Promise<void> => {
+    try {
+      await markFiled.mutateAsync(returnId);
+      toast({ title: t('returns.markFiledSuccess') });
+    } catch (error: unknown) {
+      toast({
+        title: tCommon('errors.generic'),
+        description:
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          t('returns.markFiledFail'),
         variant: 'destructive',
       });
     }
@@ -265,7 +282,7 @@ export default function VATReturnDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {canEdit && isDraft && (
+          {canEdit && (isDraft || isCalculated) && (
             <Button
               onClick={handleCalculate}
               variant="outline"
@@ -290,6 +307,12 @@ export default function VATReturnDetailPage() {
             >
               <CreditCard className="mr-2 h-4 w-4" />
               {t('returns.recordPayment')}
+            </Button>
+          )}
+          {canSubmit && isSubmitted && netVat <= 0 && (
+            <Button onClick={handleMarkFiled} disabled={markFiled.isPending}>
+              <FileCheck className="mr-2 h-4 w-4" />
+              {t('returns.markFiled')}
             </Button>
           )}
           {canDelete && isDraft && (

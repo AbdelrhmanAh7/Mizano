@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import {
   Injectable,
   Logger,
@@ -77,6 +78,18 @@ export interface ExecutionResult {
 const MAX_CATCH_UP_RUNS = 12;
 
 /** UTC calendar day (YYYY-MM-DD) of a scheduled run: the idempotency key of that run. */
+/** First instant after the end date's whole (UTC) day. */
+function endOfEndDay(endDate: Date): Date {
+  return new Date(
+    Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate() + 1),
+  );
+}
+
+/** An occurrence is past the end when it falls after the end date's last day (inclusive). */
+function isPastEnd(occurrence: Date, endDate: Date | null): boolean {
+  return endDate !== null && occurrence >= endOfEndDay(endDate);
+}
+
 function runDay(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
@@ -288,11 +301,15 @@ export class RecurringProfilesService {
         ? this.mapEntityTypeToRecurringType(entityType)
         : undefined;
 
-    if (
-      restDto.templateData !== undefined &&
-      (mappedType ?? profile.type) === RecurringType.JOURNAL
-    ) {
-      await this.assertValidJournalTemplate(organizationId, restDto.templateData);
+    // Whenever the resulting profile is a journal profile (changed or unchanged type), the
+    // effective template (new or retained) must be a valid journal template.
+    const effectiveType =
+      mappedType ?? profile.type ?? this.mapEntityTypeToRecurringType(profile.entityType ?? '');
+    if (effectiveType === RecurringType.JOURNAL) {
+      await this.assertValidJournalTemplate(
+        organizationId,
+        restDto.templateData ?? (profile.templateData as Record<string, unknown>),
+      );
     }
 
     // Build update payload, converting templateData to Prisma-compatible type
@@ -364,23 +381,23 @@ export class RecurringProfilesService {
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async processRecurringProfiles(): Promise<void> {
     const now = new Date();
-    const endOfToday = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
-    );
 
-    const profiles = await this.prisma.recurringProfile.findMany({
+    // Due means nextRunDate <= now. The end date is inclusive of its whole day and only limits
+    // which occurrences may run (nextRunDate before the end of the end date), so missed runs are
+    // still caught up after the end date has passed.
+    const due = await this.prisma.recurringProfile.findMany({
       where: {
         isActive: true,
         deletedAt: null,
-        nextRunDate: { lt: endOfToday },
-        OR: [{ endDate: null }, { endDate: { gte: now } }],
+        nextRunDate: { lte: now },
       },
     });
+    const profiles = due.filter((p) => !isPastEnd(p.nextRunDate, p.endDate));
 
     for (const profile of profiles) {
       try {
         if (this.isJournalProfile(profile)) {
-          await this.catchUpJournalProfile(profile, endOfToday);
+          await this.catchUpJournalProfile(profile, now);
           continue;
         }
 
@@ -408,11 +425,11 @@ export class RecurringProfilesService {
   }
 
   /** Executes each due occurrence of a journal profile, oldest first, until one fails. */
-  private async catchUpJournalProfile(profile: RecurringProfile, before: Date): Promise<void> {
+  private async catchUpJournalProfile(profile: RecurringProfile, asOf: Date): Promise<void> {
     let current: RecurringProfile = profile;
     for (let run = 0; run < MAX_CATCH_UP_RUNS; run++) {
-      if (current.nextRunDate >= before) return;
-      if (current.endDate && current.nextRunDate > current.endDate) return;
+      if (current.nextRunDate > asOf) return;
+      if (isPastEnd(current.nextRunDate, current.endDate)) return;
       const result = await this.executeJournalProfile(current);
       if (!result.success) return;
       const refreshed = await this.prisma.recurringProfile.findFirst({
@@ -425,6 +442,8 @@ export class RecurringProfilesService {
 
   async executeProfile(organizationId: string, profileId: string): Promise<ExecutionResult> {
     const profile = await this.findOne(organizationId, profileId);
+    // A manual run of a journal profile is its own explicit event (see executeJournalProfile).
+    if (this.isJournalProfile(profile)) return this.executeJournalProfile(profile, true);
     return this.executeRecurringProfile(profile);
   }
 
@@ -513,34 +532,47 @@ export class RecurringProfilesService {
    * guard (or the source uniqueness) and posts nothing. autoPost=false keeps the entry as an
    * unposted draft for review (it never reaches the ledger until posted).
    */
-  private async executeJournalProfile(profile: RecurringProfile): Promise<ExecutionResult> {
-    const occurrence = profile.nextRunDate;
+  private async executeJournalProfile(
+    profile: RecurringProfile,
+    manual = false,
+  ): Promise<ExecutionResult> {
+    // A manual run is dated at execution time, never advances nextRunDate and never consumes a
+    // scheduled run; each one is a separate event with its own source id.
+    const occurrence = manual ? new Date() : profile.nextRunDate;
     const createdEntityType: string = profile.type || profile.entityType || '';
-    const sourceId = `${profile.id}:${runDay(occurrence)}`;
-    const next = this.calculateNextRunDate(occurrence, profile.frequency, profile.startDate);
+    const sourceId = manual
+      ? `${profile.id}:manual:${randomUUID()}`
+      : `${profile.id}:${runDay(occurrence)}`;
+    const next = this.calculateNextRunDate(
+      profile.nextRunDate,
+      profile.frequency,
+      profile.startDate,
+    );
 
     try {
-      if (profile.endDate && occurrence > profile.endDate) {
+      if (!manual && isPastEnd(occurrence, profile.endDate)) {
         throw new BadRequestException('This recurring profile has passed its end date');
       }
       const template = profile.templateData as unknown as JournalTemplateData;
       const lines = this.journalLinesFromTemplate(template);
 
       const journalId = await this.prisma.$transaction(async (tx) => {
-        const { count } = await tx.recurringProfile.updateMany({
-          where: {
-            id: profile.id,
-            organizationId: profile.organizationId,
-            deletedAt: null,
-            nextRunDate: occurrence,
-          },
-          data: {
-            nextRunDate: next,
-            executionCount: { increment: 1 },
-            lastExecutedAt: new Date(),
-          },
-        });
-        if (count === 0) throw new ConflictException('This scheduled run was already executed');
+        if (!manual) {
+          const { count } = await tx.recurringProfile.updateMany({
+            where: {
+              id: profile.id,
+              organizationId: profile.organizationId,
+              deletedAt: null,
+              nextRunDate: occurrence,
+            },
+            data: {
+              nextRunDate: next,
+              executionCount: { increment: 1 },
+              lastExecutedAt: new Date(),
+            },
+          });
+          if (count === 0) throw new ConflictException('This scheduled run was already executed');
+        }
 
         const journal = await this.journalsService.create(
           profile.organizationId,

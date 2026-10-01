@@ -53,8 +53,9 @@ export function assertTotalsFit(totals: DocumentTotals): void {
  * Authoritative rule for "bank or cash account" in sales: an active, non-deleted ASSET account
  * of the organization that is either the organization's default bank/cash account, or the
  * linked ledger account of an active bank-register account (BANK or PETTY_CASH; credit cards
- * are liabilities and excluded). Account (and bank-register) currency must equal the
- * organization's base currency. Used both to list refund accounts and to validate a REFUND.
+ * are liabilities and excluded). The ledger is single-currency, so only a bank register carries
+ * a meaningful currency: an account linked to a bank register whose currency differs from the
+ * organization's base currency is rejected. Used both to list refund accounts and to validate a REFUND.
  */
 export async function bankCashAccountWhere(
   db: Prisma.TransactionClient,
@@ -73,9 +74,21 @@ export async function bankCashAccountWhere(
     deletedAt: null,
     isActive: true,
     type: AccountType.ASSET,
-    // The ledger is single-currency: a refund account in another currency would post foreign
-    // amounts as base currency.
-    ...(baseCurrency ? { currency: { equals: baseCurrency, mode: 'insensitive' } } : {}),
+    // A refund account linked to a foreign-currency bank register would post foreign amounts as
+    // base currency.
+    ...(baseCurrency
+      ? {
+          NOT: {
+            bankAccounts: {
+              some: {
+                organizationId,
+                deletedAt: null,
+                NOT: { currency: { equals: baseCurrency, mode: 'insensitive' } },
+              },
+            },
+          },
+        }
+      : {}),
     OR: [
       { id: { in: defaultIds } },
       {
@@ -84,7 +97,6 @@ export async function bankCashAccountWhere(
             organizationId,
             deletedAt: null,
             isActive: true,
-            ...(baseCurrency ? { currency: { equals: baseCurrency, mode: 'insensitive' } } : {}),
             type: { in: [BankAccountType.BANK, BankAccountType.PETTY_CASH] },
           },
         },

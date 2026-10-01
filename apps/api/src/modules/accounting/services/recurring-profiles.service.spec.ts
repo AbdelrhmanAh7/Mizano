@@ -54,9 +54,13 @@ describe('RecurringProfilesService (journal profiles)', () => {
     prisma.recurringProfile.findFirst.mockResolvedValue(journalProfile());
   });
 
-  describe('executeProfile', () => {
+  // The cron path: one scheduled occurrence of a profile (executeProfile is the manual path).
+  const runScheduled = (profile: any = journalProfile()): Promise<any> =>
+    (service as any).executeJournalProfile(profile);
+
+  describe('scheduled run', () => {
     it('posts through JournalsService with a per-run source id, advancing nextRunDate in the same transaction', async () => {
-      const result = await service.executeProfile(ORG, 'prof-1');
+      const result = await runScheduled();
 
       expect(result).toEqual({
         success: true,
@@ -98,7 +102,7 @@ describe('RecurringProfilesService (journal profiles)', () => {
     it('a duplicate/concurrent cron run (guard count 0) posts nothing and records no failure', async () => {
       prisma.recurringProfile.updateMany.mockResolvedValue({ count: 0 });
 
-      const result = await service.executeProfile(ORG, 'prof-1');
+      const result = await runScheduled();
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('already executed');
@@ -111,16 +115,14 @@ describe('RecurringProfilesService (journal profiles)', () => {
         new ConflictException('This transaction has already been posted'),
       );
 
-      const result = await service.executeProfile(ORG, 'prof-1');
+      const result = await runScheduled();
 
       expect(result.success).toBe(false);
       expect(prisma.recurringExecution.create).not.toHaveBeenCalled();
     });
 
     it('autoPost=false leaves an unposted draft for review inside the same transaction', async () => {
-      prisma.recurringProfile.findFirst.mockResolvedValue(journalProfile({ autoPost: false }));
-
-      await service.executeProfile(ORG, 'prof-1');
+      await runScheduled(journalProfile({ autoPost: false }));
 
       expect(prisma.journal.update).toHaveBeenCalledWith({
         where: { id: 'j1' },
@@ -131,7 +133,7 @@ describe('RecurringProfilesService (journal profiles)', () => {
     it('records a failed execution when the ledger rejects the entry (e.g. locked period)', async () => {
       journals.create.mockRejectedValue(new BadRequestException('This period is locked.'));
 
-      const result = await service.executeProfile(ORG, 'prof-1');
+      const result = await runScheduled();
 
       expect(result).toEqual(
         expect.objectContaining({ success: false, error: 'This period is locked.' }),
@@ -142,7 +144,7 @@ describe('RecurringProfilesService (journal profiles)', () => {
     });
 
     it('rejects a template with float-unsafe or invalid amounts without posting', async () => {
-      prisma.recurringProfile.findFirst.mockResolvedValue(
+      const result = await runScheduled(
         journalProfile({
           templateData: {
             lines: [
@@ -153,11 +155,27 @@ describe('RecurringProfilesService (journal profiles)', () => {
         }),
       );
 
-      const result = await service.executeProfile(ORG, 'prof-1');
-
       expect(result.success).toBe(false);
       expect(result.error).toContain('valid decimal');
       expect(journals.create).not.toHaveBeenCalled();
+    });
+
+    it('a manual run is dated now, keeps the schedule and uses its own manual source id', async () => {
+      const before = Date.now();
+      const first = await service.executeProfile(ORG, 'prof-1');
+      const second = await service.executeProfile(ORG, 'prof-1');
+
+      expect(first.success).toBe(true);
+      expect(second.success).toBe(true);
+      // The schedule is neither guarded nor advanced.
+      expect(prisma.recurringProfile.updateMany).not.toHaveBeenCalled();
+      const [, dto1, opts1] = journals.create.mock.calls[0];
+      const [, , opts2] = journals.create.mock.calls[1];
+      expect(opts1.source.id).toMatch(/^prof-1:manual:[0-9a-f-]{36}$/);
+      expect(opts2.source.id).not.toBe(opts1.source.id);
+      expect(new Date(dto1.date).getTime()).toBeGreaterThanOrEqual(before);
+      expect(new Date(dto1.date).getTime()).toBeLessThanOrEqual(Date.now());
+      expect(opts1.source.id).not.toContain('2026-03-01');
     });
 
     it('is tenant scoped', async () => {
@@ -209,6 +227,29 @@ describe('RecurringProfilesService (journal profiles)', () => {
       expect(journals.create).toHaveBeenCalledTimes(1);
     });
 
+    it('runs the occurrence on the final day of the end date (inclusive)', async () => {
+      const due = new Date(Date.UTC(2020, 4, 1));
+      prisma.recurringProfile.findMany.mockResolvedValue([
+        journalProfile({ nextRunDate: due, endDate: new Date(Date.UTC(2020, 4, 1)) }),
+      ]);
+      prisma.recurringProfile.findFirst.mockResolvedValue(
+        journalProfile({ nextRunDate: new Date(Date.UTC(2020, 5, 1)), endDate: due }),
+      );
+
+      await service.processRecurringProfiles();
+
+      expect(journals.create).toHaveBeenCalledTimes(1);
+      expect(journals.create.mock.calls[0][2].source.id).toBe('prof-1:2020-05-01');
+    });
+
+    it('selects due profiles with nextRunDate <= now and filters the end date per occurrence', async () => {
+      prisma.recurringProfile.findMany.mockResolvedValue([]);
+      await service.processRecurringProfiles();
+      const where = prisma.recurringProfile.findMany.mock.calls[0][0].where;
+      expect(where.nextRunDate.lte).toBeInstanceOf(Date);
+      expect(where.OR).toBeUndefined();
+    });
+
     it('does not run occurrences past the profile end date', async () => {
       const due = new Date(Date.UTC(2020, 5, 1));
       prisma.recurringProfile.findMany.mockResolvedValue([
@@ -242,6 +283,60 @@ describe('RecurringProfilesService (journal profiles)', () => {
       expect(next('2026-02-28', 'MONTHLY', '2026-01-31')).toBe('2026-03-31');
       expect(next('2024-02-29', 'YEARLY')).toBe('2025-02-28');
       expect(next('2025-02-28', 'YEARLY', '2024-02-29')).toBe('2026-02-28');
+    });
+  });
+
+  describe('journal template validation on update', () => {
+    const balanced = {
+      lines: [
+        { accountId: 'a', debit: '10' },
+        { accountId: 'b', credit: '10' },
+      ],
+    };
+
+    it('validates the retained template when only other fields change on a journal profile', async () => {
+      prisma.recurringProfile.findFirst.mockResolvedValue(
+        journalProfile({
+          templateData: {
+            lines: [
+              { accountId: 'a', debit: '10' },
+              { accountId: 'b', credit: '9' },
+            ],
+          },
+        }),
+      );
+      await expect(service.update(ORG, 'prof-1', { name: 'Renamed' } as any)).rejects.toThrow(
+        'debits must equal credits',
+      );
+      expect(prisma.recurringProfile.update).not.toHaveBeenCalled();
+    });
+
+    it('validates the new template when the type is unchanged', async () => {
+      await expect(
+        service.update(ORG, 'prof-1', {
+          templateData: { lines: [{ accountId: 'a', debit: '10' }] },
+        } as any),
+      ).rejects.toThrow();
+      expect(prisma.recurringProfile.update).not.toHaveBeenCalled();
+    });
+
+    it('validates the effective template when switching an invoice profile to journal', async () => {
+      prisma.recurringProfile.findFirst.mockResolvedValue(
+        journalProfile({
+          type: 'INVOICE',
+          entityType: 'invoice',
+          templateData: { customerId: 'c' },
+        }),
+      );
+      await expect(service.update(ORG, 'prof-1', { type: 'journal' } as any)).rejects.toThrow();
+      expect(prisma.recurringProfile.update).not.toHaveBeenCalled();
+    });
+
+    it('accepts a valid template of tenant accounts', async () => {
+      prisma.account.count.mockResolvedValue(2);
+      prisma.recurringProfile.update.mockResolvedValue({ id: 'prof-1' });
+      await service.update(ORG, 'prof-1', { templateData: balanced } as any);
+      expect(prisma.recurringProfile.update).toHaveBeenCalled();
     });
   });
 

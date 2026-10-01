@@ -55,8 +55,13 @@ export class OpeningBalancesService {
       // One writer at a time per organization: replace and first-post cannot interleave.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`opening-balances:${organizationId}`}))`;
 
-      if (entries.length > 0) {
-        const lines = await this.buildLines(tx, organizationId, entries, dto.equityAccountId);
+      // With replaceExisting and no non-zero entry the posted balances are cleared: the current
+      // opening journal is reversed and nothing new is posted.
+      if (entries.length > 0 || dto.replaceExisting) {
+        const lines =
+          entries.length > 0
+            ? await this.buildLines(tx, organizationId, entries, dto.equityAccountId)
+            : [];
 
         const current = await tx.journal.findFirst({
           where: {
@@ -88,29 +93,31 @@ export class OpeningBalancesService {
           );
         }
 
-        const revisions = await tx.journal.count({
-          where: {
-            organizationId,
-            sourceType: JournalSourceType.OPENING_BALANCE,
-            reversalOfId: null,
-          },
-        });
-        await this.journalsService.create(
-          organizationId,
-          {
-            date: openingDate.toISOString(),
-            reference: 'Opening Balances',
-            notes: 'Opening balances',
-            lines,
-          },
-          {
-            tx,
-            source: {
-              type: JournalSourceType.OPENING_BALANCE,
-              id: revisions === 0 ? organizationId : `${organizationId}:${revisions + 1}`,
+        if (lines.length > 0) {
+          const revisions = await tx.journal.count({
+            where: {
+              organizationId,
+              sourceType: JournalSourceType.OPENING_BALANCE,
+              reversalOfId: null,
             },
-          },
-        );
+          });
+          await this.journalsService.create(
+            organizationId,
+            {
+              date: openingDate.toISOString(),
+              reference: 'Opening Balances',
+              notes: 'Opening balances',
+              lines,
+            },
+            {
+              tx,
+              source: {
+                type: JournalSourceType.OPENING_BALANCE,
+                id: revisions === 0 ? organizationId : `${organizationId}:${revisions + 1}`,
+              },
+            },
+          );
+        }
       }
 
       await tx.organizationOnboarding.upsert({

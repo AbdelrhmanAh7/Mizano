@@ -79,6 +79,14 @@ export class VatReturnsController {
     return this.vatReturnsService.submit(orgId, id);
   }
 
+  @Post(':id/file')
+  @Permissions('tax.submit')
+  @InvalidatesLedger('vat-returns:*', 'tax:*')
+  @ApiOperation({ summary: 'Mark a submitted zero/refundable VAT return as filed (no journal)' })
+  fileReturn(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.vatReturnsService.fileReturn(orgId, id);
+  }
+
   @Post(':id/payment')
   @Permissions('tax.edit')
   @InvalidatesLedger('vat-returns:*', 'tax:*')

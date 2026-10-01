@@ -215,6 +215,26 @@ describe('OpeningBalancesService', () => {
     );
   });
 
+  it('replaceExisting with no non-zero entries clears the balances: reverses, posts nothing', async () => {
+    prisma.journal.findFirst.mockResolvedValue({ id: 'j-old', date: new Date('2026-01-01') });
+
+    await service.post(
+      ORG,
+      dto({ balances: [{ accountId: 'cash', amount: '0' }], replaceExisting: true }),
+    );
+
+    expect(journals.reverse).toHaveBeenCalledTimes(1);
+    expect(journals.reverse.mock.calls[0][1]).toBe('j-old');
+    expect(journals.create).not.toHaveBeenCalled();
+  });
+
+  it('without replaceExisting an empty step neither reverses nor posts', async () => {
+    prisma.journal.findFirst.mockResolvedValue({ id: 'j-old', date: new Date('2026-01-01') });
+    await service.post(ORG, dto({ balances: [] }));
+    expect(journals.reverse).not.toHaveBeenCalled();
+    expect(journals.create).not.toHaveBeenCalled();
+  });
+
   it('only considers the live opening journal (not reversals, not already reversed ones)', async () => {
     await service.post(ORG, dto());
     expect(prisma.journal.findFirst.mock.calls[0][0].where).toEqual(

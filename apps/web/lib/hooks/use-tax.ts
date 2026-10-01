@@ -316,6 +316,21 @@ export function useFileVATReturn() {
   });
 }
 
+/** Marks a submitted zero/refundable return as filed (no journal; payment files the others). */
+export function useMarkVATReturnFiled() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post(`/vat-returns/${id}/file`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vat-returns'] });
+      queryClient.invalidateQueries({ queryKey: ['tax-dashboard-stats'] });
+    },
+  });
+}
+
 export function useDeleteVATReturn() {
   const queryClient = useQueryClient();
   return useMutation({

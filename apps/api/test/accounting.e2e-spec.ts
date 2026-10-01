@@ -16,6 +16,7 @@ import {
   sumLines,
 } from './helpers/postings.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
+import { RecurringProfilesService } from '../src/modules/accounting/services/recurring-profiles.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const VAT_RETURN = 'VAT_RETURN';
@@ -225,7 +226,16 @@ describe('Accounting postings (e2e)', () => {
       expect((await send('does-not-exist')).status).toBe(400);
 
       const foreign = await createAccount(v, '1020', 'USD Bank', 'ASSET');
-      await prisma.account.update({ where: { id: foreign }, data: { currency: 'JPY' } });
+      // Only a bank register carries a meaningful currency in a single-currency ledger.
+      await prisma.bankAccount.create({
+        data: {
+          name: 'JPY register',
+          currency: 'JPY',
+          type: 'BANK',
+          linkedAccountId: foreign,
+          organizationId: tenantV.organizationId,
+        },
+      });
       expect((await send(foreign)).status).toBe(400);
 
       expect(await journalsFor(tenantV.organizationId, VAT_PAYMENT)).toHaveLength(0);
@@ -273,6 +283,35 @@ describe('Accounting postings (e2e)', () => {
       expect(
         await prisma.vATPayment.count({ where: { organizationId: tenantV.organizationId } }),
       ).toBe(1);
+    });
+
+    it('files a zero return with POST /file: no journal, no payment path, guarded', async () => {
+      const created = await v
+        .post('/vat-returns')
+        .send({ startDate: isoDay(-29), endDate: isoDay(-20) });
+      expect(created.status).toBe(201);
+      const zeroId = created.body.id as string;
+      expect((await v.post(`/vat-returns/${zeroId}/calculate`).send({})).status).toBe(201);
+
+      // Not submitted yet.
+      expect((await v.post(`/vat-returns/${zeroId}/file`).send({})).status).toBe(400);
+      expect((await v.post(`/vat-returns/${zeroId}/submit`).send({})).status).toBe(201);
+      expect(await journalsFor(tenantV.organizationId, VAT_RETURN, zeroId)).toHaveLength(0);
+
+      expect((await b.post(`/vat-returns/${zeroId}/file`).send({})).status).toBe(404);
+      expect((await anon.post(`/vat-returns/${zeroId}/file`).send({})).status).toBe(401);
+
+      const filed = await v.post(`/vat-returns/${zeroId}/file`).send({});
+      expect(filed.status).toBe(201);
+      expect(filed.body.status).toBe('FILED');
+      expect((await v.post(`/vat-returns/${zeroId}/file`).send({})).status).toBe(400);
+      expect(await journalsFor(tenantV.organizationId, VAT_RETURN, zeroId)).toHaveLength(0);
+    });
+
+    it('a return with VAT payable is filed by its payment, not by /file', async () => {
+      // The first return was filed by its payment; it cannot be filed again.
+      const res = await v.post(`/vat-returns/${returnId}/file`).send({});
+      expect(res.status).toBe(400);
     });
 
     it('keeps the trial balance balanced', async () => {
@@ -376,6 +415,20 @@ describe('Accounting postings (e2e)', () => {
       await expectBalancedTrialBalance(o);
     });
 
+    it('replaceExisting with no balances clears the posted opening balances', async () => {
+      const res = await o
+        .post('/organization/onboarding/opening-balances')
+        .send(body([], { replaceExisting: true }));
+      expect(res.status).toBe(201);
+      const all = await journalsFor(tenantO.organizationId, OPENING_BALANCE);
+      expect(all).toHaveLength(4); // original, its reversal, revision 2, its reversal
+      expect((await accountBalance(prisma, tenantO.organizationId, chartO.bank)).isZero()).toBe(
+        true,
+      );
+      expect((await accountBalance(prisma, tenantO.organizationId, equityId)).isZero()).toBe(true);
+      await expectBalancedTrialBalance(o);
+    });
+
     it('tenant B cannot post against tenant A accounts and posts nothing', async () => {
       const path = '/organization/onboarding/opening-balances';
       const foreign = await b.post(path).send(body([{ accountId: chartO.bank, amount: '10' }]));
@@ -397,8 +450,8 @@ describe('Accounting postings (e2e)', () => {
 
   describe('recurring journals', () => {
     let profileId = '';
-    const firstRun = isoDay(-9);
-    const secondRun = isoDay(-8);
+    const today = isoDay(0);
+    const days = [isoDay(-2), isoDay(-1), today];
 
     const template = (rent: string, cash: string, amount = '75.5'): Record<string, unknown> => ({
       lines: [
@@ -409,11 +462,20 @@ describe('Accounting postings (e2e)', () => {
     const profileBody = (templateData: Record<string, unknown>): Record<string, unknown> => ({
       name: `Rent ${uniqueSuffix()}`,
       frequency: 'DAILY',
-      startDate: isoDay(-10),
+      startDate: isoDay(-3),
       autoPost: true,
       entityType: 'journal',
       templateData,
     });
+    const profileJournals = () =>
+      prisma.journal.findMany({
+        where: {
+          organizationId: tenantO.organizationId,
+          sourceType: RECURRING_JOURNAL,
+          sourceId: { startsWith: `${profileId}:` },
+        },
+        include: { lines: true },
+      });
 
     it('rejects unbalanced templates and templates using another tenant accounts', async () => {
       const unbalanced = await o.post('/recurring-profiles').send(
@@ -434,61 +496,67 @@ describe('Accounting postings (e2e)', () => {
       ).toBe(0);
     });
 
-    it('creates a profile whose first run is the day after its start date', async () => {
+    it('creates a profile whose first scheduled run is the day after its start date', async () => {
       const res = await o
         .post('/recurring-profiles')
         .send(profileBody(template(chartO.rent, chartO.cash)));
       expect(res.status).toBe(201);
       profileId = res.body.id;
-      expect(String(res.body.nextRunDate).slice(0, 10)).toBe(firstRun);
+      expect(String(res.body.nextRunDate).slice(0, 10)).toBe(days[0]);
     });
 
-    it('posts the scheduled run exactly once even when executed concurrently', async () => {
-      const results = await Promise.all([
-        o.post(`/recurring-profiles/${profileId}/execute`).send({}),
-        o.post(`/recurring-profiles/${profileId}/execute`).send({}),
-      ]);
-      expect(results.map((r) => r.status)).toEqual([201, 201]);
-      expect(results.filter((r) => r.body.success === true)).toHaveLength(1);
-      expect(results.filter((r) => r.body.success === false)).toHaveLength(1);
-
-      const journals = await journalsFor(
-        tenantO.organizationId,
-        RECURRING_JOURNAL,
-        `${profileId}:${firstRun}`,
-      );
-      expect(journals).toHaveLength(1);
-      expect(journals[0].isPosted).toBe(true);
-      expect(journals[0].date.toISOString().slice(0, 10)).toBe(firstRun);
-      expect(lineSignature(dbLines(journals[0].lines))).toEqual(
-        lineSignature([
-          { accountId: chartO.rent, debit: '75.5', credit: '0' },
-          { accountId: chartO.cash, debit: '0', credit: '75.5' },
-        ]),
-      );
+    it('rejects updates that would leave an invalid journal template', async () => {
+      const bad = await o
+        .patch(`/recurring-profiles/${profileId}`)
+        .send({ templateData: { lines: [{ accountId: chartO.rent, debit: '1' }] } });
+      expect(bad.status).toBe(400);
+      const renamed = await o.patch(`/recurring-profiles/${profileId}`).send({ name: 'Renamed' });
+      expect(renamed.status).toBe(200);
     });
 
-    it('the next execution posts the next date, one journal per date', async () => {
-      const res = await o.post(`/recurring-profiles/${profileId}/execute`).send({});
-      expect(res.status).toBe(201);
-      expect(res.body.success).toBe(true);
+    it('manual execution is a separate dated-today event and leaves the schedule alone', async () => {
+      const first = await o.post(`/recurring-profiles/${profileId}/execute`).send({});
+      const second = await o.post(`/recurring-profiles/${profileId}/execute`).send({});
+      expect(first.status).toBe(201);
+      expect(first.body.success).toBe(true);
+      expect(second.body.success).toBe(true);
 
-      const all = await prisma.journal.findMany({
-        where: {
-          organizationId: tenantO.organizationId,
-          sourceType: RECURRING_JOURNAL,
-          sourceId: { startsWith: `${profileId}:` },
-        },
-        select: { sourceId: true },
-      });
-      expect(all.map((j) => j.sourceId).sort()).toEqual([
-        `${profileId}:${firstRun}`,
-        `${profileId}:${secondRun}`,
-      ]);
-
+      const manual = await profileJournals();
+      expect(manual).toHaveLength(2);
+      for (const j of manual) {
+        expect(j.sourceId).toMatch(new RegExp(`^${profileId}:manual:[0-9a-f-]{36}$`));
+        expect(j.date.toISOString().slice(0, 10)).toBe(today);
+      }
       const profile = await o.get(`/recurring-profiles/${profileId}`);
-      expect(profile.status).toBe(200);
-      expect(profile.body.executionCount).toBe(2);
+      expect(String(profile.body.nextRunDate).slice(0, 10)).toBe(days[0]);
+      expect(profile.body.executionCount).toBe(0);
+    });
+
+    it('the schedule posts each due date exactly once, even when run concurrently', async () => {
+      const cron = app.get(RecurringProfilesService);
+      await Promise.all([cron.processRecurringProfiles(), cron.processRecurringProfiles()]);
+
+      const scheduled = (await profileJournals()).filter((j) => !j.sourceId?.includes(':manual:'));
+      expect(scheduled.map((j) => j.sourceId).sort()).toEqual(
+        days.map((d) => `${profileId}:${d}`).sort(),
+      );
+      for (const j of scheduled) {
+        expect(j.isPosted).toBe(true);
+        expect(j.date.toISOString().slice(0, 10)).toBe((j.sourceId as string).split(':')[1]);
+        expect(lineSignature(dbLines(j.lines))).toEqual(
+          lineSignature([
+            { accountId: chartO.rent, debit: '75.5', credit: '0' },
+            { accountId: chartO.cash, debit: '0', credit: '75.5' },
+          ]),
+        );
+      }
+      const profile = await o.get(`/recurring-profiles/${profileId}`);
+      expect(profile.body.executionCount).toBe(3);
+      expect(String(profile.body.nextRunDate).slice(0, 10)).toBe(isoDay(1));
+
+      // Nothing more is due: a further run posts nothing new.
+      await cron.processRecurringProfiles();
+      expect(await profileJournals()).toHaveLength(5);
     });
 
     it('tenant B cannot read or execute the profile', async () => {
