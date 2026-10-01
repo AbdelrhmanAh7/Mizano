@@ -419,6 +419,20 @@ describe('JournalsService', () => {
       await expect(service.reverse(ORG_ID, 'j1')).rejects.toThrow('Only posted journals');
     });
 
+    it('should reject reversing a system journal outside its source command', async () => {
+      prisma.journal.findFirst.mockResolvedValue(
+        createMockJournalEntry({
+          id: 'j1',
+          isPosted: true,
+          sourceType: 'BILL_APPROVAL',
+          reversedBy: null,
+          reversalOfId: null,
+          lines: [],
+        }) as any,
+      );
+      await expect(service.reverse(ORG_ID, 'j1')).rejects.toThrow('voiding their source document');
+    });
+
     it('should reject reversing an already-reversed journal', async () => {
       const journal = createMockJournalEntry({
         id: 'j1',

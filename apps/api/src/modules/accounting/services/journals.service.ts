@@ -307,6 +307,13 @@ export class JournalsService {
       if (journal.reversalOfId) {
         throw new BadRequestException('Cannot reverse a reversal journal');
       }
+      // A system journal belongs to its source document (bill, payment...). Reversing it
+      // directly would leave the document and the ledger out of sync.
+      if (journal.sourceType && !options.source) {
+        throw new BadRequestException(
+          'System-generated journals are reversed by voiding their source document',
+        );
+      }
 
       const reversalDate = dto?.date ? new Date(dto.date) : new Date();
       await this.checkLockDate(organizationId, reversalDate);

@@ -105,7 +105,9 @@ export class AgingReportsService {
         organizationId,
         deletedAt: null,
         balanceDue: { gt: 0 },
-        billDate: { lte: date },
+        // Only bills posted to AP; `date` is the accounting date (billDate is optional).
+        status: { in: ['OPEN', 'PARTIALLY_PAID', 'OVERDUE'] },
+        date: { lte: date },
       },
       include: {
         vendor: { select: { id: true, name: true } },
@@ -270,7 +272,7 @@ export class AgingReportsService {
 
     // Opening balance
     const openingBills = await this.prisma.bill.findMany({
-      where: { vendorId, organizationId, billDate: { lt: start }, deletedAt: null },
+      where: { vendorId, organizationId, date: { lt: start }, deletedAt: null },
     });
     const openingPayments = await this.prisma.paymentMade.findMany({
       where: { vendorId, organizationId, date: { lt: start } },
@@ -288,8 +290,8 @@ export class AgingReportsService {
 
     // Period transactions
     const bills = await this.prisma.bill.findMany({
-      where: { vendorId, organizationId, billDate: { gte: start, lte: end }, deletedAt: null },
-      orderBy: { billDate: 'asc' },
+      where: { vendorId, organizationId, date: { gte: start, lte: end }, deletedAt: null },
+      orderBy: { date: 'asc' },
     });
 
     const payments = await this.prisma.paymentMade.findMany({
