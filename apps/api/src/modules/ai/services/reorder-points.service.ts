@@ -6,6 +6,7 @@ import { mean, standardDeviation, getZValueForServiceLevel } from '../utils/stat
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildReorderPrompt } from '../prompts/operations.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 export interface ReorderCalculation {
   avgDailyDemand: number;
@@ -224,7 +225,7 @@ export class ReorderPointsService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama reorder calculation failed, using rule-based: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama reorder calculation failed, using rule-based: ${describeError(error)}`,
       );
     }
 
@@ -296,7 +297,9 @@ export class ReorderPointsService {
         });
         calculated++;
       } catch (error) {
-        this.logger.error(`Failed to calculate reorder for item ${item.id}: ${error}`);
+        this.logger.error(
+          `Failed to calculate reorder for item ${item.id}: ${describeError(error)}`,
+        );
         failed++;
       }
     }
@@ -522,7 +525,7 @@ export class ReorderPointsService {
 
         updated++;
       } catch (error) {
-        this.logger.error(`Failed to update reorder for item ${item.id}: ${error}`);
+        this.logger.error(`Failed to update reorder for item ${item.id}: ${describeError(error)}`);
       }
     }
 
@@ -987,7 +990,7 @@ export class ReorderPointsService {
         byCategory[item.category]++;
       } catch (error) {
         this.logger.error(
-          `Failed to update reorder for item ${item.itemId} (${item.category}): ${error}`,
+          `Failed to update reorder for item ${item.itemId} (${item.category}): ${describeError(error)}`,
         );
       }
     }

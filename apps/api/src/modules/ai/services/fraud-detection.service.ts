@@ -8,6 +8,7 @@ import { zScore } from '../utils/statistics.util';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildFraudAnalysisPrompt, FraudAnalysisResponse } from '../prompts/security.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 export interface FraudScoreResult {
   entityType: string;
@@ -148,9 +149,7 @@ export class FraudDetectionService {
             : 'No significant fraud signals detected.';
       }
     } catch (error) {
-      this.logger.debug(
-        `Ollama fraud explanation unavailable: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.debug(`Ollama fraud explanation unavailable: ${describeError(error)}`);
     }
 
     const riskLevel = getRiskLevel(fraudScore);

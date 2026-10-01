@@ -8,6 +8,8 @@ import {
   generateItemsTableHtml,
   generateTotalsHtml,
   defaultTemplateConfig,
+  escapeHtml,
+  safeColor,
 } from './base.template';
 
 export interface QuoteData {
@@ -35,7 +37,7 @@ export interface QuoteData {
 }
 
 export function generateQuoteHtml(org: OrganizationInfo, quote: QuoteData): string {
-  const primaryColor = org.primaryColor || defaultTemplateConfig.colors.primary;
+  const primaryColor = safeColor(org.primaryColor, defaultTemplateConfig.colors.primary);
 
   const statusColors: Record<string, string> = {
     DRAFT: '#9CA3AF',
@@ -53,7 +55,7 @@ export function generateQuoteHtml(org: OrganizationInfo, quote: QuoteData): stri
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Quote ${quote.quoteNumber}</title>
+      <title>Quote ${escapeHtml(quote.quoteNumber)}</title>
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #111827; line-height: 1.5; }
@@ -71,10 +73,10 @@ export function generateQuoteHtml(org: OrganizationInfo, quote: QuoteData): stri
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
           <div>
             <h2 style="font-size: 28px; color: ${primaryColor}; margin-bottom: 5px;">QUOTATION</h2>
-            <p style="color: #6B7280; font-size: 14px;">${quote.quoteNumber}</p>
+            <p style="color: #6B7280; font-size: 14px;">${escapeHtml(quote.quoteNumber)}</p>
           </div>
           <div style="background: ${statusColor}; color: white; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-            ${quote.status}
+            ${escapeHtml(quote.status)}
           </div>
         </div>
 
@@ -82,11 +84,11 @@ export function generateQuoteHtml(org: OrganizationInfo, quote: QuoteData): stri
         <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
           <div style="flex: 1;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">Prepared For</h4>
-            <p style="font-weight: bold; margin-bottom: 5px;">${quote.customer.name}</p>
-            ${quote.customer.address ? `<p style="color: #6B7280; font-size: 12px;">${quote.customer.address}</p>` : ''}
-            ${quote.customer.city && quote.customer.country ? `<p style="color: #6B7280; font-size: 12px;">${quote.customer.city}, ${quote.customer.country}</p>` : ''}
-            ${quote.customer.email ? `<p style="color: #6B7280; font-size: 12px;">${quote.customer.email}</p>` : ''}
-            ${quote.customer.phone ? `<p style="color: #6B7280; font-size: 12px;">${quote.customer.phone}</p>` : ''}
+            <p style="font-weight: bold; margin-bottom: 5px;">${escapeHtml(quote.customer.name)}</p>
+            ${quote.customer.address ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(quote.customer.address)}</p>` : ''}
+            ${quote.customer.city && quote.customer.country ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(quote.customer.city)}, ${escapeHtml(quote.customer.country)}</p>` : ''}
+            ${quote.customer.email ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(quote.customer.email)}</p>` : ''}
+            ${quote.customer.phone ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(quote.customer.phone)}</p>` : ''}
           </div>
           <div style="text-align: right;">
             <table style="margin-left: auto;">
@@ -126,7 +128,7 @@ export function generateQuoteHtml(org: OrganizationInfo, quote: QuoteData): stri
             ? `
           <div style="margin-top: 30px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">Notes</h4>
-            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;">${quote.notes}</p>
+            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;">${escapeHtml(quote.notes)}</p>
           </div>
         `
             : ''
@@ -137,7 +139,7 @@ export function generateQuoteHtml(org: OrganizationInfo, quote: QuoteData): stri
             ? `
           <div style="margin-top: 20px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">Terms & Conditions</h4>
-            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;">${quote.terms}</p>
+            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;">${escapeHtml(quote.terms)}</p>
           </div>
         `
             : ''

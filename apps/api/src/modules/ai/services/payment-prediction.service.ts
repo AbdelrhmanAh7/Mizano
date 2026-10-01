@@ -9,6 +9,7 @@ import {
   PaymentPredictionResponse,
 } from '../prompts/forecasting.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 interface InvoiceWithCustomer {
   id: string;
@@ -169,9 +170,7 @@ export class PaymentPredictionService {
           prediction.predictionMethod = 'HYBRID';
         }
       } catch (error) {
-        this.logger.debug(
-          `Ollama collection priority unavailable: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        this.logger.debug(`Ollama collection priority unavailable: ${describeError(error)}`);
       }
     }
 

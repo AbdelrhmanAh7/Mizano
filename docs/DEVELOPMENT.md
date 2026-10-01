@@ -69,7 +69,8 @@ Four environment templates are tracked at the repository root. They hold placeho
 | Redis        | `REDIS_URL`                                                                                                                                                                                                                     |
 | Auth         | `JWT_SECRET`, `JWT_REFRESH_SECRET`, `JWT_EXPIRATION` (15m), `JWT_REFRESH_EXPIRATION` (7d), `NEXTAUTH_SECRET`, `NEXTAUTH_URL`                                                                                                    |
 | Web          | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_APP_URL`, `API_INTERNAL_URL`                                                                                                                                        |
-| Limits       | `RATE_LIMIT_TTL`, `RATE_LIMIT_MAX`, `RATE_LIMIT_AUTH_MAX`, `LOG_LEVEL`                                                                                                                                                          |
+| Limits       | `RATE_LIMIT_TTL`, `RATE_LIMIT_MAX`, `RATE_LIMIT_AUTH_MAX`                                                                                                                                                                       |
+| Logging      | `LOG_LEVEL`, `PRISMA_LOG_QUERIES` (default off)                                                                                                                                                                                 |
 | AI (current) | `OLLAMA_BASE_URL`, `OLLAMA_ENABLED`, `OLLAMA_{TEXT,VISION,FAST,SLOW}_MODEL`, `OLLAMA_TIMEOUT_MS`, `OLLAMA_MAX_CONCURRENT`, `OLLAMA_NUM_CTX`, `OLLAMA_NUM_THREAD`, `OLLAMA_WEBHOOK_SECRET`                                       |
 | Extraction   | `EXTRACTION_STRATEGY` (`vlm`/`ocr-llm`/`hybrid`), `EXTRACTION_OCR_CONFIDENCE_THRESHOLD`, `EXTRACTION_MAX_PDF_PAGES`, `PADDLE_OCR_{LANG,PKG_PATH,MODELS_DIR,TIMEOUT_MS}`, `PADDLE_OCR_API_{URL,TOKEN,TIMEOUT_MS}`, `PYTHON_PATH` |
 | Email        | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`                                                                                                                                     |
@@ -80,6 +81,19 @@ Four environment templates are tracked at the repository root. They hold placeho
 | ---------------- | ----- | ----- | ---- | ---- |
 | `LOG_LEVEL`      | debug | debug | info | warn |
 | `RATE_LIMIT_MAX` | 100   | 100   | 60   | 30   |
+
+### Logging and privacy
+
+Logs must never contain invoice/OCR text, LLM prompts or output, credentials, bot tokens or auth headers (see [AGENTS.md](../AGENTS.md)). Log ids, counts and durations; use `describeError()` / `redactText()` from `apps/api/src/common/utils/redact.ts` for errors and any text that must appear.
+
+| Variable             | Values / default                                                                                                                                      | Effect                                                                                                                                                                                                      |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LOG_LEVEL`          | `verbose`, `debug`, `info` (= Nest `log`), `warn`, `error`, `fatal`, `silent`; case-insensitive. Unset or invalid: `info` in production, else `debug` | Applied at startup in `main.ts` to the NestJS logger. Each level also enables everything more severe (`warn` = fatal + error + warn). An invalid value never silences logging.                              |
+| `PRISMA_LOG_QUERIES` | `true` to enable; anything else (default) is off, in every environment                                                                                | Logs each SQL statement and its duration at debug level (still subject to `LOG_LEVEL`). Off by default because Prisma's own query log prints bound parameters (amounts, tax ids, e-mails, password hashes). |
+
+Error-log endpoints (`/api/logger/*`) and the `/logger` WebSocket require a signed-in user with the Admin-level `settings.edit` permission (`settings.delete` for clearing), see `LoggerController`. Entries are scoped to the caller's organization; entries without an organization (unauthenticated requests, schedulers) are never returned. The WebSocket handshake needs `auth: { token: <access token> }` (or an `Authorization: Bearer` header) and joins the caller's organization room only.
+
+The `ollama-proxy` container (`services/ollama-proxy`) has no default `WEBHOOK_SECRET`: it refuses to start when the variable is missing or a placeholder such as `change-me`. Set the same value as the API's `OLLAMA_WEBHOOK_SECRET`.
 
 ## Database
 

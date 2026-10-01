@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { attachPrismaQueryLogging, buildPrismaLogConfig } from './prisma-logging';
 import { attachQueryMetricsMiddleware } from './prisma-query.middleware';
 
 @Injectable()
@@ -21,11 +22,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     }
 
     super({
-      log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+      // Query logging is opt-in (PRISMA_LOG_QUERIES=true) in every environment; see prisma-logging.ts
+      log: buildPrismaLogConfig(),
       datasources: {
         db: { url: url.toString() },
       },
     });
+
+    attachPrismaQueryLogging(this, 'primary');
 
     // Attach query metrics middleware
     const slowThreshold = parseInt(process.env.SLOW_QUERY_THRESHOLD_MS || '500', 10);

@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildSchedulingPrompt } from '../prompts/hr.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ss = require('simple-statistics');
 
@@ -249,9 +250,7 @@ export class WorkforceSchedulingService {
         predictionMethod = 'HYBRID';
       }
     } catch (error) {
-      this.logger.warn(
-        `Ollama scheduling failed, using rule-based: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.warn(`Ollama scheduling failed, using rule-based: ${describeError(error)}`);
     }
 
     return {

@@ -8,6 +8,8 @@ import {
   generateItemsTableHtml,
   generateTotalsHtml,
   defaultTemplateConfig,
+  escapeHtml,
+  safeColor,
 } from './base.template';
 
 export interface InvoiceData {
@@ -36,7 +38,7 @@ export interface InvoiceData {
 }
 
 export function generateInvoiceHtml(org: OrganizationInfo, invoice: InvoiceData): string {
-  const primaryColor = org.primaryColor || defaultTemplateConfig.colors.primary;
+  const primaryColor = safeColor(org.primaryColor, defaultTemplateConfig.colors.primary);
 
   const statusColors: Record<string, string> = {
     DRAFT: '#9CA3AF',
@@ -54,7 +56,7 @@ export function generateInvoiceHtml(org: OrganizationInfo, invoice: InvoiceData)
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Invoice ${invoice.invoiceNumber}</title>
+      <title>Invoice ${escapeHtml(invoice.invoiceNumber)}</title>
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #111827; line-height: 1.5; }
@@ -72,10 +74,10 @@ export function generateInvoiceHtml(org: OrganizationInfo, invoice: InvoiceData)
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
           <div>
             <h2 style="font-size: 28px; color: ${primaryColor}; margin-bottom: 5px;">INVOICE</h2>
-            <p style="color: #6B7280; font-size: 14px;">${invoice.invoiceNumber}</p>
+            <p style="color: #6B7280; font-size: 14px;">${escapeHtml(invoice.invoiceNumber)}</p>
           </div>
           <div style="background: ${statusColor}; color: white; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-            ${invoice.status}
+            ${escapeHtml(invoice.status)}
           </div>
         </div>
 
@@ -83,12 +85,12 @@ export function generateInvoiceHtml(org: OrganizationInfo, invoice: InvoiceData)
         <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
           <div style="flex: 1;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">Bill To</h4>
-            <p style="font-weight: bold; margin-bottom: 5px;">${invoice.customer.name}</p>
-            ${invoice.customer.address ? `<p style="color: #6B7280; font-size: 12px;">${invoice.customer.address}</p>` : ''}
-            ${invoice.customer.city && invoice.customer.country ? `<p style="color: #6B7280; font-size: 12px;">${invoice.customer.city}, ${invoice.customer.country}</p>` : ''}
-            ${invoice.customer.email ? `<p style="color: #6B7280; font-size: 12px;">${invoice.customer.email}</p>` : ''}
-            ${invoice.customer.phone ? `<p style="color: #6B7280; font-size: 12px;">${invoice.customer.phone}</p>` : ''}
-            ${invoice.customer.taxId ? `<p style="color: #6B7280; font-size: 12px;">Tax ID: ${invoice.customer.taxId}</p>` : ''}
+            <p style="font-weight: bold; margin-bottom: 5px;">${escapeHtml(invoice.customer.name)}</p>
+            ${invoice.customer.address ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(invoice.customer.address)}</p>` : ''}
+            ${invoice.customer.city && invoice.customer.country ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(invoice.customer.city)}, ${escapeHtml(invoice.customer.country)}</p>` : ''}
+            ${invoice.customer.email ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(invoice.customer.email)}</p>` : ''}
+            ${invoice.customer.phone ? `<p style="color: #6B7280; font-size: 12px;">${escapeHtml(invoice.customer.phone)}</p>` : ''}
+            ${invoice.customer.taxId ? `<p style="color: #6B7280; font-size: 12px;">Tax ID: ${escapeHtml(invoice.customer.taxId)}</p>` : ''}
           </div>
           <div style="text-align: right;">
             <table style="margin-left: auto;">
@@ -128,7 +130,7 @@ export function generateInvoiceHtml(org: OrganizationInfo, invoice: InvoiceData)
             ? `
           <div style="margin-top: 30px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">Notes</h4>
-            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;">${invoice.notes}</p>
+            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;">${escapeHtml(invoice.notes)}</p>
           </div>
         `
             : ''
@@ -139,7 +141,7 @@ export function generateInvoiceHtml(org: OrganizationInfo, invoice: InvoiceData)
             ? `
           <div style="margin-top: 20px;">
             <h4 style="color: ${primaryColor}; margin-bottom: 10px; font-size: 12px; text-transform: uppercase;">Terms & Conditions</h4>
-            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;">${invoice.terms}</p>
+            <p style="color: #6B7280; font-size: 12px; white-space: pre-line;">${escapeHtml(invoice.terms)}</p>
           </div>
         `
             : ''

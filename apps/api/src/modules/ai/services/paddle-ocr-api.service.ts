@@ -14,6 +14,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
+import { describeError, redactText } from '../../../common/utils/redact';
 
 export interface PaddleOcrApiResult {
   text: string;
@@ -97,7 +98,7 @@ export class PaddleOcrApiService {
 
       if (data.errorCode !== 0) {
         this.logger.error(
-          `[API] PaddleOCR API error: code=${data.errorCode}, msg=${data.errorMsg}`,
+          `[API] PaddleOCR API error: code=${data.errorCode}, msg=${redactText(String(data.errorMsg ?? ''), 200)}`,
         );
         return { text: '', confidence: 0, processingTimeMs };
       }
@@ -132,7 +133,6 @@ export class PaddleOcrApiService {
       this.logger.log(
         `[API] PaddleOCR Cloud result: textLen=${plainText.length}, time=${processingTimeMs}ms`,
       );
-      this.logger.debug(`[API] Extracted text:\n${plainText.slice(0, 500)}`);
 
       return {
         text: plainText,
@@ -142,9 +142,7 @@ export class PaddleOcrApiService {
       };
     } catch (err) {
       const processingTimeMs = Date.now() - startTime;
-      this.logger.error(
-        `[API] PaddleOCR Cloud API call failed: ${err instanceof Error ? err.message : err}`,
-      );
+      this.logger.error(`[API] PaddleOCR Cloud API call failed: ${describeError(err)}`);
       return { text: '', confidence: 0, processingTimeMs };
     }
   }

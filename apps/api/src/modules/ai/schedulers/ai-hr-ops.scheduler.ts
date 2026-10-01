@@ -6,6 +6,7 @@ import { CompensationBenchmarkService } from '../services/compensation-benchmark
 import { QualityPredictionService } from '../services/quality-prediction.service';
 import { PredictiveMaintenanceService } from '../services/predictive-maintenance.service';
 import { ResourceOptimizationService } from '../services/resource-optimization.service';
+import { describeError } from '../../../common/utils/redact';
 
 const BATCH_SIZE = 5;
 
@@ -45,21 +46,23 @@ export class AiHrOpsScheduler {
                 `Org ${org.name}: Attrition prediction - ${result.processed} employees (high: ${result.highRisk}, medium: ${result.mediumRisk}, low: ${result.lowRisk})`,
               );
             } catch (error) {
-              this.logger.error(`Error predicting attrition for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error predicting attrition for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Monthly attrition prediction completed');
     } catch (error) {
-      this.logger.error(`Monthly attrition prediction failed: ${error.message}`);
+      this.logger.error(`Monthly attrition prediction failed: ${describeError(error)}`);
     }
   }
 
@@ -87,7 +90,7 @@ export class AiHrOpsScheduler {
               );
             } catch (error) {
               this.logger.error(
-                `Error benchmarking compensation for org ${org.id}: ${error.message}`,
+                `Error benchmarking compensation for org ${org.id}: ${describeError(error)}`,
               );
             }
           }),
@@ -95,14 +98,14 @@ export class AiHrOpsScheduler {
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Monthly compensation benchmark completed');
     } catch (error) {
-      this.logger.error(`Monthly compensation benchmark failed: ${error.message}`);
+      this.logger.error(`Monthly compensation benchmark failed: ${describeError(error)}`);
     }
   }
 
@@ -127,21 +130,23 @@ export class AiHrOpsScheduler {
               const trends = await this.qualityService.getQualityTrends(org.id);
               this.logger.log(`Org ${org.name}: Quality trends - ${trends.length} months analyzed`);
             } catch (error) {
-              this.logger.error(`Error analyzing quality for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error analyzing quality for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Weekly quality prediction completed');
     } catch (error) {
-      this.logger.error(`Weekly quality prediction failed: ${error.message}`);
+      this.logger.error(`Weekly quality prediction failed: ${describeError(error)}`);
     }
   }
 
@@ -168,21 +173,23 @@ export class AiHrOpsScheduler {
                 `Org ${org.name}: Maintenance prediction - ${result.processed} assets (critical: ${result.critical}, warning: ${result.warning}, healthy: ${result.healthy})`,
               );
             } catch (error) {
-              this.logger.error(`Error predicting maintenance for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error predicting maintenance for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Monthly predictive maintenance completed');
     } catch (error) {
-      this.logger.error(`Monthly predictive maintenance failed: ${error.message}`);
+      this.logger.error(`Monthly predictive maintenance failed: ${describeError(error)}`);
     }
   }
 
@@ -209,21 +216,23 @@ export class AiHrOpsScheduler {
                 `Org ${org.name}: Resource optimization - ${opportunities.opportunities.length} opportunities found`,
               );
             } catch (error) {
-              this.logger.error(`Error optimizing resources for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error optimizing resources for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Monthly resource optimization completed');
     } catch (error) {
-      this.logger.error(`Monthly resource optimization failed: ${error.message}`);
+      this.logger.error(`Monthly resource optimization failed: ${describeError(error)}`);
     }
   }
 }

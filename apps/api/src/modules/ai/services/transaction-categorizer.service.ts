@@ -6,6 +6,7 @@ import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import * as natural from 'natural';
 import { BoundedCache } from '../utils/bounded-cache.util';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError, sanitizeStack } from '../../../common/utils/redact';
 
 export interface CategorizationInput {
   description: string;
@@ -152,10 +153,10 @@ export class TransactionCategorizerService {
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       this.logger.error(
-        `Categorization training failed for org ${organizationId}: ${error.message}`,
-        error.stack,
+        `Categorization training failed for org ${organizationId}: ${describeError(error)}`,
+        sanitizeStack(error),
       );
-      throw new BadRequestException(`Training failed: ${error.message}`);
+      throw new BadRequestException(`Training failed: ${describeError(error)}`);
     }
   }
 
@@ -290,7 +291,7 @@ Return ONLY valid JSON.`;
       }
     } catch (error) {
       this.logger.debug(
-        `Ollama categorization unavailable, falling back to Bayes: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama categorization unavailable, falling back to Bayes: ${describeError(error)}`,
       );
     }
 
@@ -431,7 +432,7 @@ Return ONLY valid JSON.`;
     const source = isCorrection ? 'CORRECTION' : 'USER';
 
     this.logger.debug(
-      `Learned categorization for org ${organizationId}: ${input.description} -> ${selectedAccountId} (${source})`,
+      `Learned categorization for org ${organizationId}: account=${selectedAccountId} (${source})`,
     );
   }
 

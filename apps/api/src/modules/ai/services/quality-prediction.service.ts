@@ -4,6 +4,7 @@ import { AiFeedbackService } from './ai-feedback.service';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildQualityPrompt } from '../prompts/hr.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { DecisionTreeClassifier } = require('ml-cart');
@@ -126,7 +127,7 @@ export class QualityPredictionService {
         }
       } catch (error) {
         this.logger.warn(
-          `Ollama quality prediction failed, using existing: ${error instanceof Error ? error.message : String(error)}`,
+          `Ollama quality prediction failed, using existing: ${describeError(error)}`,
         );
       }
     }

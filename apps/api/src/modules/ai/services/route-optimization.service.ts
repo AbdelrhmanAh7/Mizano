@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildRoutePrompt } from '../prompts/hr.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 export interface OptimizedStop {
   deliveryId: string;
@@ -166,7 +167,7 @@ export class RouteOptimizationService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama route optimization failed, using heuristic: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama route optimization failed, using heuristic: ${describeError(error)}`,
       );
     }
 

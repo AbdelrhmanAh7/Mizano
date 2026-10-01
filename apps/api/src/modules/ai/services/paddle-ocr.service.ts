@@ -10,12 +10,20 @@
  *   pip install rapidocr-onnxruntime PyMuPDF arabic-reshaper python-bidi --target C:/paddleocr_pkg
  */
 
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { execFile } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { describeError, redactText } from '../../../common/utils/redact';
+import {
+  createSecureTempDir,
+  removeSecureTempDir,
+  secureTempFilePath,
+  withSecureTempDir,
+  writeSecureFile,
+} from '../utils/secure-temp.util';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -34,12 +42,51 @@ export interface OcrResult {
   processingTimeMs: number;
 }
 
+/** stderr lines written by our own Python scripts that are safe to log (no document content). */
+const SAFE_PYTHON_STDERR =
+  /^(Downloading Arabic |Using Arabic recognition model|Arabic models unavailable|Arabic model download failed|PyMuPDF \(fitz\) not installed)/;
+
+/** Environment variables the Python OCR subprocess may inherit (platform basics + proxies). */
+const PYTHON_ENV_ALLOWLIST = [
+  'PATH',
+  'Path',
+  'PATHEXT',
+  'SYSTEMROOT',
+  'SystemRoot',
+  'WINDIR',
+  'TEMP',
+  'TMP',
+  'TMPDIR',
+  'HOME',
+  'USERPROFILE',
+  'LOCALAPPDATA',
+  'APPDATA',
+  'LANG',
+  'LC_ALL',
+  'PYTHONHOME',
+  'VIRTUAL_ENV',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'NO_PROXY',
+  'SSL_CERT_FILE',
+  'REQUESTS_CA_BUNDLE',
+];
+
+function pickEnv(source: NodeJS.ProcessEnv, keys: string[]): Record<string, string> {
+  const picked: Record<string, string> = {};
+  for (const key of keys) {
+    const value = source[key];
+    if (value !== undefined) picked[key] = value;
+  }
+  return picked;
+}
+
 // ---------------------------------------------------------------------------
 // Python script — Arabic OCR with PDF support
 // ---------------------------------------------------------------------------
 
 const PYTHON_OCR_SCRIPT = `
-import sys, json, os, tempfile
+import sys, json, os, tempfile, uuid, shutil, atexit
 from pathlib import Path
 
 # ── Arabic model setup ───────────────────────────────────────────────────────
@@ -51,7 +98,7 @@ def ensure_arabic_models():
     dict_path = os.path.join(MODELS_DIR, "arabic_dict.txt")
     if os.path.exists(rec_path) and os.path.exists(dict_path):
         return rec_path, dict_path
-    os.makedirs(MODELS_DIR, exist_ok=True)
+    os.makedirs(MODELS_DIR, mode=0o700, exist_ok=True)
     import urllib.request
     base = "https://huggingface.co/monkt/paddleocr-onnx/resolve/main"
     try:
@@ -122,6 +169,9 @@ except ImportError:
         return text
 
 # ── PDF to images ────────────────────────────────────────────────────────────
+PAGE_DIRS = []
+atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in PAGE_DIRS])
+
 def pdf_to_images(pdf_path, dpi=300):
     try:
         import fitz
@@ -130,9 +180,12 @@ def pdf_to_images(pdf_path, dpi=300):
         return []
     doc = fitz.open(pdf_path)
     images = []
+    # Private (0700) directory + random names: never predictable paths in the shared temp dir.
+    page_dir = tempfile.mkdtemp(prefix="mizano-pdfpages-")
+    PAGE_DIRS.append(page_dir)
     for i in range(len(doc)):
         pix = doc[i].get_pixmap(dpi=dpi)
-        img_path = os.path.join(tempfile.gettempdir(), f"mizano_page_{os.getpid()}_{i}.png")
+        img_path = os.path.join(page_dir, f"{uuid.uuid4().hex}.png")
         pix.save(img_path)
         images.append(img_path)
     doc.close()
@@ -186,11 +239,7 @@ for page_path in image_paths:
             total_conf += conf
             total_count += 1
 
-# Cleanup temp images from PDF conversion
-if is_pdf:
-    for p in image_paths:
-        try: os.unlink(p)
-        except: pass
+# Temp page images are removed by the atexit hook registered above (also runs on errors)
 
 output = {
     "regions": all_regions,
@@ -225,7 +274,7 @@ print("ok")
 // ---------------------------------------------------------------------------
 
 @Injectable()
-export class PaddleOcrService implements OnModuleInit {
+export class PaddleOcrService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PaddleOcrService.name);
 
   private readonly pythonPath: string;
@@ -234,6 +283,8 @@ export class PaddleOcrService implements OnModuleInit {
   private readonly pythonPkgPath: string;
   private readonly modelsDir: string;
 
+  /** Private (0700) directory holding the generated Python helper scripts. */
+  private scriptDir: string | null = null;
   private ocrScriptPath: string = '';
   private pdfScriptPath: string = '';
   private ocrAvailable = false;
@@ -254,11 +305,13 @@ export class PaddleOcrService implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    // Write Python scripts to temp files
-    this.ocrScriptPath = path.join(os.tmpdir(), 'mizano_paddleocr.py');
-    this.pdfScriptPath = path.join(os.tmpdir(), 'mizano_pdf_to_image.py');
-    fs.writeFileSync(this.ocrScriptPath, PYTHON_OCR_SCRIPT, 'utf-8');
-    fs.writeFileSync(this.pdfScriptPath, PYTHON_PDF_TO_IMAGE_SCRIPT, 'utf-8');
+    // Write the Python helper scripts into a private temp directory. A fixed name in the
+    // shared temp dir would let another local user replace a script we then execute.
+    this.scriptDir = await createSecureTempDir('mizano-ocr-scripts-');
+    this.ocrScriptPath = path.join(this.scriptDir, 'paddleocr.py');
+    this.pdfScriptPath = path.join(this.scriptDir, 'pdf_to_image.py');
+    await writeSecureFile(this.ocrScriptPath, PYTHON_OCR_SCRIPT, 'utf-8');
+    await writeSecureFile(this.pdfScriptPath, PYTHON_PDF_TO_IMAGE_SCRIPT, 'utf-8');
 
     // Check RapidOCR
     try {
@@ -272,7 +325,7 @@ export class PaddleOcrService implements OnModuleInit {
       this.ocrAvailable = false;
       this.logger.warn(
         `RapidOCR not available. Install: pip install rapidocr-onnxruntime --target ${this.pythonPkgPath}. ` +
-          `Error: ${err instanceof Error ? err.message : err}`,
+          `Error: ${describeError(err)}`,
       );
     }
 
@@ -299,6 +352,13 @@ export class PaddleOcrService implements OnModuleInit {
       this.logger.warn(
         `Arabic RTL text fixing not available. Install: pip install arabic-reshaper python-bidi --target ${this.pythonPkgPath}`,
       );
+    }
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.scriptDir) {
+      await removeSecureTempDir(this.scriptDir);
+      this.scriptDir = null;
     }
   }
 
@@ -330,54 +390,43 @@ export class PaddleOcrService implements OnModuleInit {
     }
 
     const ext = isPdf ? '.pdf' : '.jpg';
-    const tmpFile = path.join(os.tmpdir(), `mizano_ocr_${Date.now()}${ext}`);
 
     try {
-      fs.writeFileSync(tmpFile, fileBuffer);
+      return await withSecureTempDir('mizano-ocr-', async (dir) => {
+        const tmpFile = secureTempFilePath(dir, ext);
+        await writeSecureFile(tmpFile, fileBuffer);
 
-      this.logger.log(`[OCR] Running PaddleOCR (lang=${this.defaultLang}, pdf=${isPdf})...`);
+        this.logger.log(`[OCR] Running PaddleOCR (lang=${this.defaultLang}, pdf=${isPdf})...`);
 
-      const output = await this.execPython([this.ocrScriptPath, tmpFile], this.timeoutMs);
+        const output = await this.execPython([this.ocrScriptPath, tmpFile], this.timeoutMs);
 
-      const processingTimeMs = Date.now() - startTime;
+        const processingTimeMs = Date.now() - startTime;
 
-      // Parse JSON output (last line of stdout)
-      const jsonStr = output.trim().split('\n').pop() || '{}';
-      const result = JSON.parse(jsonStr) as {
-        text: string;
-        confidence: number;
-        regions: OcrRegion[];
-      };
+        // Parse JSON output (last line of stdout)
+        const jsonStr = output.trim().split('\n').pop() || '{}';
+        const result = JSON.parse(jsonStr) as {
+          text: string;
+          confidence: number;
+          regions: OcrRegion[];
+        };
 
-      this.logger.log(
-        `[OCR] PaddleOCR result: regions=${result.regions.length}, confidence=${result.confidence}%, ` +
-          `textLen=${result.text.length}, time=${processingTimeMs}ms`,
-      );
-
-      for (const region of result.regions) {
-        this.logger.debug(
-          `  [${region.bbox.join(',')}] conf=${region.confidence}%: "${region.text}"`,
+        // Counters only: region text is document content and is never logged.
+        this.logger.log(
+          `[OCR] PaddleOCR result: regions=${result.regions.length}, confidence=${result.confidence}%, ` +
+            `textLen=${result.text.length}, time=${processingTimeMs}ms`,
         );
-      }
 
-      return {
-        text: result.text,
-        confidence: result.confidence,
-        regions: result.regions,
-        processingTimeMs,
-      };
+        return {
+          text: result.text,
+          confidence: result.confidence,
+          regions: result.regions,
+          processingTimeMs,
+        };
+      });
     } catch (err) {
       const processingTimeMs = Date.now() - startTime;
-      this.logger.error(
-        `[OCR] PaddleOCR failed (${processingTimeMs}ms): ${err instanceof Error ? err.message : err}`,
-      );
+      this.logger.error(`[OCR] PaddleOCR failed (${processingTimeMs}ms): ${describeError(err)}`);
       return { text: '', confidence: 0, regions: [], processingTimeMs };
-    } finally {
-      try {
-        if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
-      } catch {
-        // ignore
-      }
     }
   }
 
@@ -397,38 +446,31 @@ export class PaddleOcrService implements OnModuleInit {
       return null;
     }
 
-    const tmpPdf = path.join(os.tmpdir(), `mizano_pdf_render_${Date.now()}.pdf`);
-    const tmpImg = path.join(os.tmpdir(), `mizano_pdf_render_${Date.now()}.png`);
-
     try {
-      fs.writeFileSync(tmpPdf, pdfBuffer);
+      return await withSecureTempDir('mizano-pdf-', async (dir) => {
+        const tmpPdf = secureTempFilePath(dir, '.pdf');
+        const tmpImg = secureTempFilePath(dir, '.png');
+        await writeSecureFile(tmpPdf, pdfBuffer);
 
-      await this.execPython([this.pdfScriptPath, tmpPdf, tmpImg, String(page), String(dpi)], 30000);
+        await this.execPython(
+          [this.pdfScriptPath, tmpPdf, tmpImg, String(page), String(dpi)],
+          30000,
+        );
 
-      if (!fs.existsSync(tmpImg)) {
-        this.logger.warn('pdfPageToImage: output image not created');
-        return null;
-      }
+        if (!fs.existsSync(tmpImg)) {
+          this.logger.warn('pdfPageToImage: output image not created');
+          return null;
+        }
 
-      const imageBuffer = fs.readFileSync(tmpImg);
-      this.logger.log(
-        `pdfPageToImage: page=${page}, dpi=${dpi}, size=${(imageBuffer.length / 1024).toFixed(0)}KB`,
-      );
-      return imageBuffer;
+        const imageBuffer = await fs.promises.readFile(tmpImg);
+        this.logger.log(
+          `pdfPageToImage: page=${page}, dpi=${dpi}, size=${(imageBuffer.length / 1024).toFixed(0)}KB`,
+        );
+        return imageBuffer;
+      });
     } catch (err) {
-      this.logger.error(`pdfPageToImage failed: ${err instanceof Error ? err.message : err}`);
+      this.logger.error(`pdfPageToImage failed: ${describeError(err)}`);
       return null;
-    } finally {
-      try {
-        if (fs.existsSync(tmpPdf)) fs.unlinkSync(tmpPdf);
-      } catch {
-        /* ignore */
-      }
-      try {
-        if (fs.existsSync(tmpImg)) fs.unlinkSync(tmpImg);
-      } catch {
-        /* ignore */
-      }
     }
   }
 
@@ -445,7 +487,8 @@ export class PaddleOcrService implements OnModuleInit {
           timeout,
           maxBuffer: 10 * 1024 * 1024, // 10MB
           env: {
-            ...process.env,
+            // Allowlist only: the OCR subprocess must not inherit JWT/DB/SMTP secrets
+            ...pickEnv(process.env, PYTHON_ENV_ALLOWLIST),
             PYTHONIOENCODING: 'utf-8',
             PYTHONPATH: this.pythonPkgPath,
             PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: 'True',
@@ -454,14 +497,19 @@ export class PaddleOcrService implements OnModuleInit {
         },
         (error, stdout, stderr) => {
           if (stderr) {
-            // Log Python stderr as debug (model download progress, warnings)
+            // Python stderr may quote the document (tracebacks, library warnings): only our own
+            // status lines (model download / model selection) are logged, as debug.
             for (const line of stderr.split('\n').filter(Boolean)) {
-              this.logger.debug(`[Python] ${line}`);
+              if (SAFE_PYTHON_STDERR.test(line)) {
+                this.logger.debug(`[Python] ${redactText(line, 200)}`);
+              }
             }
           }
           if (error) {
-            const msg = stderr || error.message;
-            reject(new Error(msg.slice(0, 500)));
+            // Surface only the last stderr line (the exception summary), redacted and capped.
+            const lines = (stderr || error.message).split('\n').filter((l) => l.trim());
+            const summary = lines[lines.length - 1] ?? 'Python process failed';
+            reject(new Error(redactText(summary, 200)));
             return;
           }
           resolve(stdout);

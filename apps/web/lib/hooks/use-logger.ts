@@ -56,9 +56,39 @@ async function captureToBackend(params: {
   }
 }
 
+// ---- Access handling ----
+
+/**
+ * The log endpoints require a signed-in admin-level user (`settings.edit`). A 401/403 means
+ * "not allowed (any more)": retrying or polling every 10 s would only generate errors.
+ */
+export function isAccessDenied(error: unknown): boolean {
+  const status = (error as { response?: { status?: number } } | null | undefined)?.response?.status;
+  return status === 401 || status === 403;
+}
+
+const POLL_INTERVAL_MS = 10_000;
+
+function retryUnlessDenied(failureCount: number, error: unknown): boolean {
+  return !isAccessDenied(error) && failureCount < 2;
+}
+
+function pollUnlessDenied(query: { state: { error: unknown } }): number | false {
+  return isAccessDenied(query.state.error) ? false : POLL_INTERVAL_MS;
+}
+
 // ---- React Hook ----
 
-export function useLogger() {
+export interface UseLoggerOptions {
+  /**
+   * Fetch (and poll) the log list and stats. Pass `false` for consumers that only report
+   * errors, so non-admin users never call the admin-only read endpoints.
+   */
+  poll?: boolean;
+}
+
+export function useLogger(options: UseLoggerOptions = {}) {
+  const poll = options.poll !== false;
   const queryClient = useQueryClient();
   const store = useLoggerStore();
   const capturedErrors = useRef<Set<string>>(new Set());
@@ -67,9 +97,12 @@ export function useLogger() {
   const {
     data: logs,
     isLoading: logsLoading,
+    error: logsError,
     refetch: refetchLogs,
   } = useQuery({
     queryKey: ['logger-logs', store.filter],
+    enabled: poll,
+    retry: retryUnlessDenied,
     queryFn: async () => {
       const params = new URLSearchParams();
       if (store.filter.levels?.length) params.set('levels', store.filter.levels.join(','));
@@ -83,18 +116,26 @@ export function useLogger() {
       const res = await api.get(`/logger/logs?${params.toString()}`);
       return res.data as LogEntry[];
     },
-    refetchInterval: 10000, // Poll every 10s
+    refetchInterval: pollUnlessDenied, // Poll every 10s until access is denied
   });
 
   // Fetch stats
-  const { data: stats, refetch: refetchStats } = useQuery({
+  const {
+    data: stats,
+    error: statsError,
+    refetch: refetchStats,
+  } = useQuery({
     queryKey: ['logger-stats'],
+    enabled: poll,
+    retry: retryUnlessDenied,
     queryFn: async () => {
       const res = await api.get('/logger/stats');
       return res.data as LogStats;
     },
-    refetchInterval: 10000,
+    refetchInterval: pollUnlessDenied,
   });
+
+  const accessDenied = isAccessDenied(logsError) || isAccessDenied(statsError);
 
   // Sync to store
   useEffect(() => {
@@ -164,7 +205,7 @@ export function useLogger() {
     }).then((entry) => {
       if (entry) {
         store.addLog(entry);
-        refetchStats();
+        if (poll) refetchStats();
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,7 +229,7 @@ export function useLogger() {
     }).then((entry) => {
       if (entry) {
         store.addLog(entry);
-        refetchStats();
+        if (poll) refetchStats();
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -205,7 +246,7 @@ export function useLogger() {
     }).then((entry) => {
       if (entry) {
         store.addLog(entry);
-        refetchStats();
+        if (poll) refetchStats();
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -293,6 +334,7 @@ export function useLogger() {
 
     // Loading states
     logsLoading,
+    accessDenied,
     isClearing: clearLogsMutation.isPending,
     isGeneratingPrompt: generatePromptMutation.isPending,
 

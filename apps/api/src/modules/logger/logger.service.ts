@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
+import { redactSensitive, redactText, redactUrl, sanitizeStack } from '../../common/utils/redact';
 import {
   LogEntry,
   LogLevel,
@@ -11,11 +12,37 @@ import {
   GeneratePromptResponse,
 } from '@mizano/shared-types';
 
+/** Bucket for entries that cannot be attributed to an organization (never exposed through the API). */
+const SYSTEM_SCOPE = 'system';
+
+/** Caps applied at capture time: client-supplied fields are untrusted. */
+const MAX_MESSAGE_LENGTH = 2000;
+const MAX_STACK_LENGTH = 8000;
+const MAX_URL_LENGTH = 500;
+const MAX_USER_AGENT_LENGTH = 255;
+const MAX_METHOD_LENGTH = 16;
+const MAX_FILE_PATHS = 20;
+const MAX_FILE_PATH_LENGTH = 300;
+const MAX_CONTEXT_KEYS = 50;
+
+/**
+ * In-memory error capture, strictly tenant-scoped.
+ *
+ * Every entry carries the organization it belongs to (taken from the authenticated
+ * request, never from the client). All reads and writes take the caller's
+ * `organizationId`; entries without one ("system" entries: unauthenticated requests,
+ * schedulers) are kept for process logs only and are not readable through the API,
+ * because there is no platform-admin role to scope them to. Fingerprints include the
+ * organization so identical errors from two tenants never share a record (and its
+ * context). Captured text is redacted and truncated before it is stored.
+ */
 @Injectable()
 export class LoggerService {
   private readonly logger = new Logger(LoggerService.name);
   private logs: Map<string, LogEntry> = new Map();
   private maxLogs = 10000;
+  /** Per-organization cap so one noisy tenant cannot evict everyone else's entries. */
+  private maxLogsPerOrg = 2000;
 
   /**
    * Create a fingerprint for deduplication
@@ -25,13 +52,14 @@ export class LoggerService {
     source: LogSource,
     message: string,
     stack?: string,
+    organizationId?: string,
   ): string {
     const normalizedMessage = message
       .replace(/\d+/g, 'N')
       .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, 'UUID')
       .trim();
     const stackFirstLine = stack?.split('\n')[0] || '';
-    const raw = `${level}:${source}:${normalizedMessage}:${stackFirstLine}`;
+    const raw = `${organizationId ?? SYSTEM_SCOPE}:${level}:${source}:${normalizedMessage}:${stackFirstLine}`;
     return createHash('sha256').update(raw).digest('hex').substring(0, 16);
   }
 
@@ -86,11 +114,23 @@ export class LoggerService {
     organizationId?: string;
     filePaths?: string[];
   }): LogEntry {
+    const message = redactText(String(params.message ?? ''), MAX_MESSAGE_LENGTH);
+    const stack =
+      typeof params.stack === 'string' ? redactText(params.stack, MAX_STACK_LENGTH) : undefined;
+    const context = params.context
+      ? redactSensitive(params.context, {
+          maxStringLength: 500,
+          maxDepth: 4,
+          maxArrayLength: 20,
+        })
+      : undefined;
+
     const fingerprint = this.createFingerprint(
       params.level,
       params.source,
-      params.message,
-      params.stack,
+      message,
+      stack,
+      params.organizationId,
     );
 
     // Deduplication: increment existing
@@ -98,8 +138,8 @@ export class LoggerService {
     if (existing) {
       existing.occurrences += 1;
       existing.timestamp = new Date().toISOString();
-      if (params.context) {
-        existing.context = { ...existing.context, ...params.context };
+      if (context && Object.keys(existing.context ?? {}).length < MAX_CONTEXT_KEYS) {
+        existing.context = { ...existing.context, ...context };
       }
       this.logs.set(fingerprint, existing);
       return existing;
@@ -110,73 +150,114 @@ export class LoggerService {
       timestamp: new Date().toISOString(),
       level: params.level,
       source: params.source,
-      category: this.categorize(params.message, params.context),
+      category: this.categorize(message, context),
       status: LogStatus.OPEN,
-      message: params.message,
-      stack: params.stack,
-      context: params.context,
-      url: params.url,
-      method: params.method,
+      message,
+      stack,
+      context,
+      url: redactUrl(params.url, MAX_URL_LENGTH),
+      method: params.method?.slice(0, MAX_METHOD_LENGTH),
       statusCode: params.statusCode,
-      userAgent: params.userAgent,
+      userAgent: params.userAgent?.slice(0, MAX_USER_AGENT_LENGTH),
       userId: params.userId,
       organizationId: params.organizationId,
       occurrences: 1,
       fingerprint,
-      filePaths: params.filePaths,
+      filePaths: params.filePaths
+        ?.slice(0, MAX_FILE_PATHS)
+        .map((p) => String(p).slice(0, MAX_FILE_PATH_LENGTH)),
       hasTestCoverage: false,
     };
 
-    // Evict oldest when at capacity
-    if (this.logs.size >= this.maxLogs) {
-      const oldest = [...this.logs.entries()].sort(
-        (a, b) => new Date(a[1].timestamp).getTime() - new Date(b[1].timestamp).getTime(),
-      )[0];
-      if (oldest) this.logs.delete(oldest[0]);
-    }
-
+    this.evictIfNeeded(params.organizationId);
     this.logs.set(fingerprint, entry);
 
-    // Also log through NestJS logger
+    // Also log through the NestJS logger. Only backend-sourced messages (already built
+    // from safe descriptions by the exception filter) are printed; frontend/AI messages
+    // are client-supplied text and are referenced by fingerprint only.
+    const detail = params.source === LogSource.BACKEND ? ` ${message}` : '';
+    const summary = `[${params.source}] ${entry.category} fingerprint=${fingerprint}${detail}`;
     if (params.level === LogLevel.ERROR) {
-      this.logger.error(`[${params.source}] ${params.message}`, params.stack);
+      this.logger.error(summary, params.source === LogSource.BACKEND ? stack : undefined);
     } else if (params.level === LogLevel.WARN) {
-      this.logger.warn(`[${params.source}] ${params.message}`);
+      this.logger.warn(summary);
     }
 
     return entry;
   }
 
+  /** Evict the oldest entry of the organization (per-org cap), then the oldest overall (global cap). */
+  private evictIfNeeded(organizationId?: string): void {
+    const scope = organizationId ?? SYSTEM_SCOPE;
+    const own = [...this.logs.entries()].filter(
+      ([, log]) => (log.organizationId ?? SYSTEM_SCOPE) === scope,
+    );
+    if (own.length >= this.maxLogsPerOrg) {
+      const oldestOwn = this.oldest(own);
+      if (oldestOwn) this.logs.delete(oldestOwn);
+    }
+    if (this.logs.size >= this.maxLogs) {
+      const oldest = this.oldest([...this.logs.entries()]);
+      if (oldest) this.logs.delete(oldest);
+    }
+  }
+
+  private oldest(entries: Array<[string, LogEntry]>): string | undefined {
+    return entries.sort(
+      (a, b) => new Date(a[1].timestamp).getTime() - new Date(b[1].timestamp).getTime(),
+    )[0]?.[0];
+  }
+
   /**
    * Capture error from exception filter
    */
-  captureException(error: Error, source: LogSource, context?: Record<string, unknown>): LogEntry {
+  captureException(
+    error: Error,
+    source: LogSource,
+    context?: Record<string, unknown>,
+    scope?: { organizationId?: string; userId?: string },
+  ): LogEntry {
     return this.capture({
       level: LogLevel.ERROR,
       source,
       message: error.message,
-      stack: error.stack,
+      stack: sanitizeStack(error),
       context,
+      organizationId: scope?.organizationId,
+      userId: scope?.userId,
     });
   }
 
   /**
    * Capture warning
    */
-  captureWarning(message: string, source: LogSource, context?: Record<string, unknown>): LogEntry {
+  captureWarning(
+    message: string,
+    source: LogSource,
+    context?: Record<string, unknown>,
+    scope?: { organizationId?: string; userId?: string },
+  ): LogEntry {
     return this.capture({
       level: LogLevel.WARN,
       source,
       message,
       context,
+      organizationId: scope?.organizationId,
+      userId: scope?.userId,
     });
   }
 
+  /** Entries of one organization; an empty organization id matches nothing. */
+  private forOrg(organizationId: string): LogEntry[] {
+    if (!organizationId) return [];
+    return [...this.logs.values()].filter((l) => l.organizationId === organizationId);
+  }
+
   /**
-   * Get all logs with optional filtering
+   * Get the organization's logs with optional filtering
    */
-  getLogs(filter?: LogFilter): LogEntry[] {
-    let logs = [...this.logs.values()];
+  getLogs(organizationId: string, filter?: LogFilter): LogEntry[] {
+    let logs = this.forOrg(organizationId);
 
     if (filter) {
       if (filter.levels?.length) {
@@ -216,8 +297,8 @@ export class LoggerService {
   /**
    * Get statistics
    */
-  getStats(): LogStats {
-    const logs = [...this.logs.values()];
+  getStats(organizationId: string): LogStats {
+    const logs = this.forOrg(organizationId);
 
     const bySource: Record<LogSource, number> = {
       [LogSource.FRONTEND]: 0,
@@ -263,11 +344,11 @@ export class LoggerService {
   /**
    * Update status of logs
    */
-  updateStatus(ids: string[], status: LogStatus): number {
+  updateStatus(organizationId: string, ids: string[], status: LogStatus): number {
     let updated = 0;
     for (const id of ids) {
       const log = this.logs.get(id);
-      if (log) {
+      if (log && !!organizationId && log.organizationId === organizationId) {
         log.status = status;
         if (status === LogStatus.TEST_COVERED) {
           log.hasTestCoverage = true;
@@ -280,17 +361,23 @@ export class LoggerService {
   }
 
   /**
-   * Clear logs by IDs or status
+   * Clear the organization's logs by IDs, status or age. With no filter at all (no params,
+   * or an empty `{}` as the web "Clear all" button sends) every entry of the organization is
+   * removed; an explicit empty `ids` list removes nothing. Other organizations are never touched.
    */
-  clearLogs(params?: { ids?: string[]; status?: LogStatus; before?: string }): number {
-    if (!params) {
-      const count = this.logs.size;
-      this.logs.clear();
-      return count;
-    }
-
+  clearLogs(
+    organizationId: string,
+    params?: { ids?: string[]; status?: LogStatus; before?: string },
+  ): number {
     let removed = 0;
-    const entries = [...this.logs.entries()];
+    const entries = [...this.logs.entries()].filter(
+      ([, log]) => !!organizationId && log.organizationId === organizationId,
+    );
+
+    if (!params || (params.ids === undefined && !params.status && !params.before)) {
+      for (const [key] of entries) this.logs.delete(key);
+      return entries.length;
+    }
 
     for (const [key, log] of entries) {
       let shouldRemove = false;
@@ -310,13 +397,16 @@ export class LoggerService {
    * Generate a Claude prompt for fixing selected errors
    */
   generatePrompt(
+    organizationId: string,
     ids: string[],
     options?: { includeStacks?: boolean; includeContext?: boolean },
   ): GeneratePromptResponse {
     const includeStacks = options?.includeStacks ?? true;
     const includeContext = options?.includeContext ?? true;
 
-    const selectedLogs = ids.map((id) => this.logs.get(id)).filter((l): l is LogEntry => !!l);
+    const selectedLogs = ids
+      .map((id) => this.getById(organizationId, id))
+      .filter((l): l is LogEntry => !!l);
 
     if (selectedLogs.length === 0) {
       return { prompt: 'No errors selected.', logCount: 0 };
@@ -360,9 +450,10 @@ Rules: \`Decimal\` for money, \`organizationId\` in all DB queries, no \`any\` t
   }
 
   /**
-   * Get a single log by ID
+   * Get a single log by ID, only if it belongs to the organization
    */
-  getById(id: string): LogEntry | undefined {
-    return this.logs.get(id);
+  getById(organizationId: string, id: string): LogEntry | undefined {
+    const log = this.logs.get(id);
+    return log && !!organizationId && log.organizationId === organizationId ? log : undefined;
   }
 }

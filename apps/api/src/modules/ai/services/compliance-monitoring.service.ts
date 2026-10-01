@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildComplianceCheckPrompt, ComplianceCheckResponse } from '../prompts/security.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 export interface ComplianceViolation {
   type: string;
@@ -146,7 +147,7 @@ export class ComplianceMonitoringService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama compliance check failed for org ${organizationId}: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama compliance check failed for org ${organizationId}: ${describeError(error)}`,
       );
     }
 

@@ -5,6 +5,7 @@ import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildCompensationPrompt } from '../prompts/hr.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
 import { Decimal } from '@prisma/client/runtime/library';
+import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ss = require('simple-statistics');
@@ -167,7 +168,7 @@ export class CompensationBenchmarkService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama compensation benchmark failed, using rule-based: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama compensation benchmark failed, using rule-based: ${describeError(error)}`,
       );
     }
 
@@ -195,7 +196,7 @@ export class CompensationBenchmarkService {
         1,
       );
     } catch (error) {
-      this.logger.warn(`Failed to store benchmark prediction: ${error.message}`);
+      this.logger.warn(`Failed to store benchmark prediction: ${describeError(error)}`);
     }
 
     return result;

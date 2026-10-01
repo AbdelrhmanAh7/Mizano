@@ -16,6 +16,7 @@ import {
   CashFlowExplanationResponse,
 } from '../prompts/forecasting.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 export interface CashFlowForecast {
   date: Date;
@@ -242,7 +243,7 @@ export class CashFlowPredictionService {
         }
       } catch (error) {
         this.logger.debug(
-          `Ollama risk narrative unavailable for cash flow prediction: ${error instanceof Error ? error.message : String(error)}`,
+          `Ollama risk narrative unavailable for cash flow prediction: ${describeError(error)}`,
         );
       }
     }
@@ -477,7 +478,9 @@ export class CashFlowPredictionService {
       const prediction = await this.predict(organizationId, 90);
       return { updated: prediction.forecasts.length };
     } catch (error) {
-      this.logger.error(`Failed to recalculate cash flow for org ${organizationId}: ${error}`);
+      this.logger.error(
+        `Failed to recalculate cash flow for org ${organizationId}: ${describeError(error)}`,
+      );
       return { updated: 0 };
     }
   }

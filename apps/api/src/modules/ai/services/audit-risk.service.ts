@@ -7,6 +7,7 @@ import { buildIsolationForest1D, isolationForestScore1D } from '../utils/isolati
 import { zScoreWithStats, mean, standardDeviation } from '../utils/statistics.util';
 import { buildAuditRiskPrompt, AuditRiskResponse } from '../prompts/security.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 export interface AuditRiskResult {
   entityType: string;
@@ -75,7 +76,7 @@ export class AuditRiskService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama audit risk failed for ${entityType}/${entityId}: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama audit risk failed for ${entityType}/${entityId}: ${describeError(error)}`,
       );
     }
 

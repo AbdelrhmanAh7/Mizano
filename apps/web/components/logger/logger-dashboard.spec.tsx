@@ -237,6 +237,7 @@ const mockUseLogger: Record<string, unknown> & {
   selectedIds: [] as string[],
   isOpen: true,
   logsLoading: false,
+  accessDenied: false,
   isClearing: false,
   isGeneratingPrompt: false,
   setFilter: jest.fn(),
@@ -276,6 +277,14 @@ describe('LoggerDashboard', () => {
     mockUseLogger.selectedIds = [];
     mockUseLogger.isOpen = true;
     mockUseLogger.logsLoading = false;
+    mockUseLogger.accessDenied = false;
+  });
+
+  it('renders nothing for users who are not allowed to read the logs (401/403)', () => {
+    mockUseLogger.accessDenied = true;
+    const { container } = render(<LoggerDashboard />);
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByLabelText('Toggle error logger')).not.toBeInTheDocument();
   });
 
   it('should render the empty state when no logs', () => {

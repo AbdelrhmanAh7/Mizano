@@ -4,6 +4,7 @@ import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildEntityExtractionPrompt } from '../prompts/nlp.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
 import { findBestMatch } from '../utils/text-similarity.util';
+import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const nlp = require('compromise');
@@ -118,7 +119,7 @@ export class EntityExtractionService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama entity extraction failed, falling back to compromise/regex: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama entity extraction failed, falling back to compromise/regex: ${describeError(error)}`,
       );
     }
 

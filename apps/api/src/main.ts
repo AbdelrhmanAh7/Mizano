@@ -7,10 +7,15 @@ import compression from 'compression';
 import { randomUUID } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
+import { resolveLogLevels } from './modules/logger/log-level';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // Buffer startup logs until LOG_LEVEL (from the env file loaded by ConfigModule) is applied
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
   const configService = app.get(ConfigService);
+  app.useLogger(
+    resolveLogLevels(configService.get<string>('LOG_LEVEL'), configService.get<string>('NODE_ENV')),
+  );
   const logger = new Logger('Bootstrap');
 
   // Assign a unique request ID to each incoming request for tracing

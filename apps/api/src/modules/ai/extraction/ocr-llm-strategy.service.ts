@@ -7,6 +7,7 @@ import {
 import { OllamaService } from '../services/ollama.service';
 import { PaddleOcrService } from '../services/paddle-ocr.service';
 import { preprocessForOcr } from '../utils/image-preprocessor.util';
+import { describeError } from '../../../common/utils/redact';
 
 /**
  * OCR + LLM Strategy — OCR reads the document, then text model structures it.
@@ -105,7 +106,7 @@ export class OcrLlmStrategy implements ExtractionStrategy {
             `[STEP 2] Tesseract.js result: textLen=${ocrText.length}, confidence=${ocrConfidence.toFixed(1)}%`,
           );
         } catch (err) {
-          this.logger.error(`[STEP 2] Tesseract.js OCR failed: ${err}`);
+          this.logger.error(`[STEP 2] Tesseract.js OCR failed: ${describeError(err)}`);
         }
       }
 
@@ -115,11 +116,10 @@ export class OcrLlmStrategy implements ExtractionStrategy {
       }
     }
 
-    // Log the full OCR text that will be sent to the LLM
+    // Only metadata is logged: OCR text is document content and must never reach logs.
     this.logger.log(
-      `[STEP 3] OCR text (${ocrText.length} chars, confidence=${ocrConfidence.toFixed(1)}%):`,
+      `[STEP 3] OCR text ready (${ocrText.length} chars, confidence=${ocrConfidence.toFixed(1)}%)`,
     );
-    this.logger.log(`--- OCR TEXT START ---\n${ocrText}\n--- OCR TEXT END ---`);
 
     // Truncate long text (same limit as PDF pipeline)
     const maxLen = 4000;
@@ -142,23 +142,12 @@ export class OcrLlmStrategy implements ExtractionStrategy {
       return null;
     }
 
-    // Log the extraction result
-    this.logger.log(`[STEP 5] Extraction result:`);
-    this.logger.log(`  vendorName: ${extraction.vendorName}`);
-    this.logger.log(`  invoiceNumber: ${extraction.invoiceNumber}`);
-    this.logger.log(`  date: ${extraction.date}`);
-    this.logger.log(`  total: ${extraction.total}`);
-    this.logger.log(`  subtotal: ${extraction.subtotal}`);
-    this.logger.log(`  tax: ${extraction.tax}`);
-    this.logger.log(`  currency: ${extraction.currency}`);
-    this.logger.log(`  documentCategory: ${extraction.documentCategory}`);
-    this.logger.log(`  lineItems: ${extraction.lineItems.length} items`);
-    for (const li of extraction.lineItems) {
-      this.logger.log(
-        `    - "${li.description}" qty=${li.quantity} price=${li.unitPrice} total=${li.total}`,
-      );
-    }
-    this.logger.log(`  processingTimeMs: ${extraction.processingTimeMs}ms`);
+    // Counters and timings only: vendor names, amounts, tax ids and line descriptions are
+    // invoice content and must not be logged.
+    this.logger.log(
+      `[STEP 5] Extraction result: category=${extraction.documentCategory ?? 'none'}, ` +
+        `lineItems=${extraction.lineItems.length}, processingTimeMs=${extraction.processingTimeMs}ms`,
+    );
 
     return {
       extraction,

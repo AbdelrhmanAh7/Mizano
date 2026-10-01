@@ -5,6 +5,7 @@ import { holtWinters, simpleExponentialSmoothing } from '../utils/holt-winters.u
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildMaintenancePrompt } from '../prompts/hr.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 export interface AssetHealthPrediction {
   assetId: string;
@@ -139,7 +140,7 @@ export class PredictiveMaintenanceService {
           }
         }
       } catch (error) {
-        this.logger.warn(`Forecast failed for asset ${assetId}: ${error}`);
+        this.logger.warn(`Forecast failed for asset ${assetId}: ${describeError(error)}`);
       }
     }
 
@@ -231,7 +232,7 @@ export class PredictiveMaintenanceService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama maintenance prediction failed, using rule-based: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama maintenance prediction failed, using rule-based: ${describeError(error)}`,
       );
     }
 
@@ -381,7 +382,7 @@ export class PredictiveMaintenanceService {
           healthy++;
         }
       } catch (error) {
-        this.logger.error(`Failed to predict asset ${asset.id}: ${error}`);
+        this.logger.error(`Failed to predict asset ${asset.id}: ${describeError(error)}`);
       }
     }
 

@@ -1,9 +1,30 @@
-import { Injectable, Logger, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
+import { Prisma, AuditAction } from '@prisma/client';
+import { Request } from 'express';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { PrismaService } from '../../prisma/prisma.service';
-import { AuditAction } from '@prisma/client';
+import { describeError } from '../utils/redact';
+import {
+  buildAuditSummary,
+  resolveEntityId,
+  resolveEntityType,
+  truncateUserAgent,
+} from './audit-summary';
 
+interface AuditedUser {
+  id: string;
+  organizationId?: string;
+}
+
+const AUDITED_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/**
+ * Records who wrote which entity. Only metadata is stored: entity type and id, action,
+ * user, organization, IP/user agent, and a small redacted summary of the request. The
+ * full response and any client-supplied "old data" are never persisted (they used to
+ * be, which copied whole records, tokens and passwords into the audit table).
+ */
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
   private readonly logger = new Logger(AuditInterceptor.name);
@@ -11,47 +32,52 @@ export class AuditInterceptor implements NestInterceptor {
   constructor(private prisma: PrismaService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<Request & { user?: AuditedUser }>();
     const method = request.method;
     const user = request.user;
 
-    // Only audit write operations
-    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) || !user) {
+    // Only audit write operations by authenticated users
+    if (!AUDITED_METHODS.has(method) || !user) {
       return next.handle();
     }
 
-    const oldData = request.body?._oldData; // Can be set by service before update
-
     return next.handle().pipe(
       tap((response) => {
-        void (async () => {
-          try {
-            const action = this.getAction(method);
-            const entityType = this.getEntityType(request.path);
-            const entityId = response?.id || request.params?.id || 'unknown';
-
-            if (entityType && user.organizationId) {
-              await this.prisma.auditLog.create({
-                data: {
-                  userId: user.id,
-                  action,
-                  entityType,
-                  entityId,
-                  oldValues: oldData || null,
-                  newValues: method !== 'DELETE' ? response : null,
-                  ipAddress: request.ip,
-                  userAgent: request.headers['user-agent'],
-                  organizationId: user.organizationId,
-                },
-              });
-            }
-          } catch (error) {
-            // Don't fail the request if audit logging fails
-            this.logger.error('Audit logging failed:', error);
-          }
-        })();
+        void this.record(request, user, method, response);
       }),
     );
+  }
+
+  private async record(
+    request: Request,
+    user: AuditedUser,
+    method: string,
+    response: unknown,
+  ): Promise<void> {
+    try {
+      const entityType = resolveEntityType(request.path);
+      if (!entityType || !user.organizationId) return;
+
+      const summary = method === 'DELETE' ? null : buildAuditSummary(request.body, response);
+
+      await this.prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action: this.getAction(method),
+          entityType,
+          entityId: resolveEntityId(response, request.params?.id),
+          // Never trust a client-supplied "old" snapshot and never store the response.
+          oldValues: Prisma.DbNull,
+          newValues: summary ? (summary as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
+          ipAddress: request.ip,
+          userAgent: truncateUserAgent(request.headers['user-agent']),
+          organizationId: user.organizationId,
+        },
+      });
+    } catch (error) {
+      // Don't fail the request if audit logging fails
+      this.logger.error(`Audit logging failed: ${describeError(error)}`);
+    }
   }
 
   private getAction(method: string): AuditAction {
@@ -66,11 +92,5 @@ export class AuditInterceptor implements NestInterceptor {
       default:
         return AuditAction.UPDATE;
     }
-  }
-
-  private getEntityType(path: string): string | null {
-    // Extract entity type from path like /api/customers/123
-    const parts = path.replace('/api/', '').split('/');
-    return parts[0] || null;
   }
 }

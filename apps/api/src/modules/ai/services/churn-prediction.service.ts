@@ -6,6 +6,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { getRiskLevel } from '../utils/risk-level.util';
 import { buildChurnPredictionPrompt, ChurnPredictionResponse } from '../prompts/sales-crm.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 export interface RFMFeatures {
   recency: number; // days since last purchase
@@ -86,7 +87,7 @@ export class ChurnPredictionService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama churn prediction failed for customer ${customerId}: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama churn prediction failed for customer ${customerId}: ${describeError(error)}`,
       );
     }
 

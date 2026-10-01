@@ -10,6 +10,7 @@ import { CashFlowPredictionService } from '../services/cash-flow-prediction.serv
 import { LeadScoringService } from '../services/lead-scoring.service';
 import { PatternDetectionService } from '../services/pattern-detection.service';
 import { AiAlertsService } from '../services/ai-alerts.service';
+import { describeError } from '../../../common/utils/redact';
 
 const BATCH_SIZE = 5;
 
@@ -59,21 +60,23 @@ export class AiOperationsScheduler {
                 this.logger.log(`Org ${org.name}: Found ${result.newAnomaliesCreated} anomalies`);
               }
             } catch (error) {
-              this.logger.error(`Error scanning anomalies for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error scanning anomalies for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log(`Daily anomaly scan completed. Total anomalies found: ${totalAnomalies}`);
     } catch (error) {
-      this.logger.error(`Daily anomaly scan failed: ${error.message}`);
+      this.logger.error(`Daily anomaly scan failed: ${describeError(error)}`);
     }
   }
 
@@ -100,7 +103,7 @@ export class AiOperationsScheduler {
               this.logger.log(`Org ${org.name}: Updated ${result.updated} item reorder points`);
             } catch (error) {
               this.logger.error(
-                `Error updating reorder points for org ${org.id}: ${error.message}`,
+                `Error updating reorder points for org ${org.id}: ${describeError(error)}`,
               );
             }
           }),
@@ -108,14 +111,14 @@ export class AiOperationsScheduler {
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Weekly reorder points update completed');
     } catch (error) {
-      this.logger.error(`Weekly reorder points update failed: ${error.message}`);
+      this.logger.error(`Weekly reorder points update failed: ${describeError(error)}`);
     }
   }
 
@@ -151,7 +154,7 @@ export class AiOperationsScheduler {
               }
             } catch (error) {
               this.logger.error(
-                `Error updating demand forecasts for org ${org.id}: ${error.message}`,
+                `Error updating demand forecasts for org ${org.id}: ${describeError(error)}`,
               );
             }
           }),
@@ -159,14 +162,14 @@ export class AiOperationsScheduler {
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Weekly demand forecast update completed');
     } catch (error) {
-      this.logger.error(`Weekly demand forecast update failed: ${error.message}`);
+      this.logger.error(`Weekly demand forecast update failed: ${describeError(error)}`);
     }
   }
 
@@ -195,21 +198,23 @@ export class AiOperationsScheduler {
                 `Org ${org.name}: Updated ${result.updated} days of cash flow forecasts`,
               );
             } catch (error) {
-              this.logger.error(`Error updating cash flow for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error updating cash flow for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Daily cash flow prediction update completed');
     } catch (error) {
-      this.logger.error(`Daily cash flow prediction update failed: ${error.message}`);
+      this.logger.error(`Daily cash flow prediction update failed: ${describeError(error)}`);
     }
   }
 
@@ -238,21 +243,23 @@ export class AiOperationsScheduler {
                 `Org ${org.name}: Updated ${result.updated} lead scores, ${result.decayed} leads had decay applied`,
               );
             } catch (error) {
-              this.logger.error(`Error updating lead scores for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error updating lead scores for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Weekly lead scoring update completed');
     } catch (error) {
-      this.logger.error(`Weekly lead scoring update failed: ${error.message}`);
+      this.logger.error(`Weekly lead scoring update failed: ${describeError(error)}`);
     }
   }
 
@@ -279,7 +286,7 @@ export class AiOperationsScheduler {
               this.logger.log(`Org ${org.name}: Updated ${result.updated} payment predictions`);
             } catch (error) {
               this.logger.error(
-                `Error updating payment predictions for org ${org.id}: ${error.message}`,
+                `Error updating payment predictions for org ${org.id}: ${describeError(error)}`,
               );
             }
           }),
@@ -287,14 +294,14 @@ export class AiOperationsScheduler {
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Weekly payment prediction update completed');
     } catch (error) {
-      this.logger.error(`Weekly payment prediction update failed: ${error.message}`);
+      this.logger.error(`Weekly payment prediction update failed: ${describeError(error)}`);
     }
   }
 
@@ -349,21 +356,23 @@ export class AiOperationsScheduler {
 
               this.logger.log(`Org ${org.name}: Monthly narrative generated for ${month}/${year}`);
             } catch (error) {
-              this.logger.error(`Error generating narrative for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error generating narrative for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Monthly narrative generation completed');
     } catch (error) {
-      this.logger.error(`Monthly narrative generation failed: ${error.message}`);
+      this.logger.error(`Monthly narrative generation failed: ${describeError(error)}`);
     }
   }
 
@@ -392,21 +401,23 @@ export class AiOperationsScheduler {
                 `Org ${org.name}: Detected ${result.patternsDetected} patterns, created ${result.suggestionsCreated} suggestions, found ${result.duplicatesFound} potential duplicates`,
               );
             } catch (error) {
-              this.logger.error(`Error analyzing patterns for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error analyzing patterns for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Weekly pattern detection analysis completed');
     } catch (error) {
-      this.logger.error(`Weekly pattern detection analysis failed: ${error.message}`);
+      this.logger.error(`Weekly pattern detection analysis failed: ${describeError(error)}`);
     }
   }
 
@@ -437,21 +448,23 @@ export class AiOperationsScheduler {
                 );
               }
             } catch (error) {
-              this.logger.error(`Error aggregating alerts for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error aggregating alerts for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Hourly AI alerts aggregation completed');
     } catch (error) {
-      this.logger.error(`Hourly AI alerts aggregation failed: ${error.message}`);
+      this.logger.error(`Hourly AI alerts aggregation failed: ${describeError(error)}`);
     }
   }
 
@@ -479,21 +492,23 @@ export class AiOperationsScheduler {
               const cleaned = await this.aiAlertsService.cleanupExpiredAlerts(org.id);
               totalCleaned += cleaned;
             } catch (error) {
-              this.logger.error(`Error cleaning up alerts for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error cleaning up alerts for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log(`Daily AI alerts cleanup completed. Cleaned ${totalCleaned} alerts`);
     } catch (error) {
-      this.logger.error(`Daily AI alerts cleanup failed: ${error.message}`);
+      this.logger.error(`Daily AI alerts cleanup failed: ${describeError(error)}`);
     }
   }
 
@@ -523,7 +538,7 @@ export class AiOperationsScheduler {
 
       this.logger.log(`Marked ${result.count} patterns as stale`);
     } catch (error) {
-      this.logger.error(`Weekly stale pattern check failed: ${error.message}`);
+      this.logger.error(`Weekly stale pattern check failed: ${describeError(error)}`);
     }
   }
 
@@ -561,7 +576,7 @@ export class AiOperationsScheduler {
 
       this.logger.log('Weekly AI data cleanup completed');
     } catch (error) {
-      this.logger.error(`Weekly AI data cleanup failed: ${error.message}`);
+      this.logger.error(`Weekly AI data cleanup failed: ${describeError(error)}`);
     }
   }
 
@@ -591,21 +606,23 @@ export class AiOperationsScheduler {
                   `(A:${result.byCategory.A}, B:${result.byCategory.B}, C:${result.byCategory.C})`,
               );
             } catch (error) {
-              this.logger.error(`Error running ABC analysis for org ${org.id}: ${error.message}`);
+              this.logger.error(
+                `Error running ABC analysis for org ${org.id}: ${describeError(error)}`,
+              );
             }
           }),
         );
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Monthly ABC analysis completed');
     } catch (error) {
-      this.logger.error(`Monthly ABC analysis failed: ${error.message}`);
+      this.logger.error(`Monthly ABC analysis failed: ${describeError(error)}`);
     }
   }
 }

@@ -13,6 +13,7 @@ import {
   extractPattern,
   patternMatches,
 } from '../utils/text-similarity.util';
+import { describeError } from '../../../common/utils/redact';
 
 /** A financial entity (Invoice, Bill, Expense, Payment) returned from Prisma. */
 type MatchableEntity = Record<string, unknown>;
@@ -179,9 +180,7 @@ export class ReconciliationMatcherService {
           scores.sort((a, b) => b.totalScore - a.totalScore);
         }
       } catch (error) {
-        this.logger.warn(
-          `Ollama reconciliation failed, using rule-based: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        this.logger.warn(`Ollama reconciliation failed, using rule-based: ${describeError(error)}`);
       }
     }
 
@@ -553,7 +552,9 @@ export class ReconciliationMatcherService {
       },
     });
 
-    this.logger.debug(`Learned pattern for transaction ${transactionId}: ${pattern}`);
+    this.logger.debug(
+      `Learned pattern for transaction ${transactionId} (patternLen=${pattern.length})`,
+    );
   }
 
   private async getPatternMatchCount(

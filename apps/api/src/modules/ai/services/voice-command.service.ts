@@ -4,6 +4,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { buildVoiceCommandPrompt } from '../prompts/nlp.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
+import { describeError } from '../../../common/utils/redact';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const nlp = require('compromise');
@@ -103,7 +104,7 @@ export class VoiceCommandService {
    * Use this method when async is acceptable (e.g., API handlers).
    */
   async parseCommandAsync(text: string): Promise<ParsedCommand> {
-    this.logger.log(`Parsing voice command (async): "${text}"`);
+    this.logger.log(`Parsing voice command (async): textLen=${text.length}`);
 
     // --- Ollama-first inference path ---
     try {
@@ -133,7 +134,7 @@ export class VoiceCommandService {
       }
     } catch (error) {
       this.logger.warn(
-        `Ollama voice command parsing failed, falling back to NLP/regex: ${error instanceof Error ? error.message : String(error)}`,
+        `Ollama voice command parsing failed, falling back to NLP/regex: ${describeError(error)}`,
       );
     }
 
@@ -146,7 +147,7 @@ export class VoiceCommandService {
    * Uses compromise for NLP extraction and pattern matching for entity details.
    */
   parseCommand(text: string): ParsedCommand {
-    this.logger.log(`Parsing voice command: "${text}"`);
+    this.logger.log(`Parsing voice command: textLen=${text.length}`);
 
     const doc = nlp(text);
     const lowerText = text.toLowerCase();

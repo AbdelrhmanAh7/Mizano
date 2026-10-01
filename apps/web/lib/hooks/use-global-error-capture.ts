@@ -9,7 +9,8 @@ import { LogCategory } from '@mizano/shared-types';
  * unhandled promise rejections on the frontend.
  */
 export function useGlobalErrorCapture() {
-  const { captureError, captureWarning } = useLogger();
+  // Report-only consumer: must not call the admin-only log read endpoints
+  const { captureError, captureWarning } = useLogger({ poll: false });
 
   useEffect(() => {
     // Capture unhandled errors

@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { DocumentClassificationService } from '../services/document-classification.service';
 import { KnowledgeAssistantService } from '../services/knowledge-assistant.service';
+import { describeError } from '../../../common/utils/redact';
 
 const BATCH_SIZE = 5;
 
@@ -41,7 +42,7 @@ export class AiNlpChatScheduler {
               );
             } catch (error) {
               this.logger.error(
-                `Error retraining doc classification for org ${org.id}: ${error.message}`,
+                `Error retraining doc classification for org ${org.id}: ${describeError(error)}`,
               );
             }
           }),
@@ -49,14 +50,14 @@ export class AiNlpChatScheduler {
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Document classification retraining completed');
     } catch (error) {
-      this.logger.error(`Document classification retraining failed: ${error.message}`);
+      this.logger.error(`Document classification retraining failed: ${describeError(error)}`);
     }
   }
 
@@ -84,7 +85,7 @@ export class AiNlpChatScheduler {
               );
             } catch (error) {
               this.logger.error(
-                `Error rebuilding knowledge index for org ${org.id}: ${error.message}`,
+                `Error rebuilding knowledge index for org ${org.id}: ${describeError(error)}`,
               );
             }
           }),
@@ -92,14 +93,14 @@ export class AiNlpChatScheduler {
         // Log any unexpected rejections
         for (const r of results) {
           if (r.status === 'rejected') {
-            this.logger.error(`Scheduler batch rejection: ${r.reason}`);
+            this.logger.error(`Scheduler batch rejection: ${describeError(r.reason)}`);
           }
         }
       }
 
       this.logger.log('Weekly knowledge index rebuild completed');
     } catch (error) {
-      this.logger.error(`Weekly knowledge index rebuild failed: ${error.message}`);
+      this.logger.error(`Weekly knowledge index rebuild failed: ${describeError(error)}`);
     }
   }
 }
