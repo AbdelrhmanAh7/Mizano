@@ -3,6 +3,7 @@
 import { useToast } from '@/components/ui/use-toast';
 import { billsApi, paymentsMadeApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
+import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 // Types
@@ -182,12 +183,12 @@ export function useDeletePaymentMade() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payments-made'] });
-      queryClient.invalidateQueries({ queryKey: ['bills'] });
+      // DELETE voids the payment: bill balances are restored and a reversal is posted.
+      void invalidateLedgerQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
       toast({
-        title: 'Payment deleted',
-        description: 'The payment has been deleted successfully.',
+        title: 'Payment voided',
+        description: 'The bill balance was restored and a reversal journal was posted.',
       });
     },
     onError: (error: ApiError) => {
