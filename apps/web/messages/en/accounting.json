@@ -78,7 +78,34 @@
     "empty": {
       "title": "No journal entries yet",
       "description": "Create your first journal entry"
-    }
+    },
+    "source": {
+      "manual": "Manual entry",
+      "reversal": "Reversal",
+      "system": "System entry",
+      "billApproval": "Bill",
+      "paymentMade": "Payment made",
+      "paymentMadeVoid": "Voided payment made",
+      "invoice": "Invoice",
+      "invoiceVoid": "Voided invoice",
+      "paymentReceived": "Payment received",
+      "paymentReceivedVoid": "Voided payment received",
+      "creditNote": "Credit note",
+      "expense": "Expense",
+      "vendorCredit": "Vendor credit",
+      "vatReturn": "VAT return",
+      "inventoryAdjustment": "Inventory adjustment",
+      "openingBalance": "Opening balance"
+    },
+    "sourceLabel": "Source",
+    "systemNote": "This entry was posted automatically by a business document. It cannot be edited or reversed here; void or correct the source document instead.",
+    "viewSource": "View source document",
+    "reversalOf": "Reversal of the original entry",
+    "reverse": "Reverse",
+    "reverseTitle": "Reverse journal entry",
+    "reverseConfirm": "This posts a new journal that reverses every line of {number}. The original entry stays unchanged.",
+    "reversed": "Reversal posted",
+    "reverseFailed": "Failed to reverse journal"
   },
   "recurring": {
     "title": "Recurring Profiles",

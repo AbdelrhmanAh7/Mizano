@@ -64,6 +64,8 @@ export interface Journal {
   sourceId?: string | null;
   /** Set on a reversal journal: the journal it reverses. */
   reversalOfId?: string | null;
+  /** Set on an original journal that has already been reversed. */
+  reversedBy?: { id: string; journalNumber: string } | null;
 }
 
 export interface JournalParams {
@@ -345,6 +347,7 @@ export function getJournalStatus(journal: Journal): { label: string; color: stri
 type JournalPostingState = Pick<Journal, 'isPosted' | 'deletedAt'> & {
   sourceType?: string | null;
   reversalOfId?: string | null;
+  reversedBy?: { id: string } | null;
 };
 
 /** Manual, unposted journals are the only ones that may be edited, posted or deleted. */
@@ -362,7 +365,7 @@ export function isSystemJournal(journal: { sourceType?: string | null }): boolea
  * the API also rejects journals that were already reversed.
  */
 export function canReverseJournal(journal: JournalPostingState): boolean {
-  return journal.isPosted && !journal.reversalOfId && !journal.deletedAt;
+  return journal.isPosted && !journal.reversalOfId && !journal.reversedBy && !journal.deletedAt;
 }
 
 export interface JournalSourceInfo {

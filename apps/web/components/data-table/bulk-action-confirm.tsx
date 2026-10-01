@@ -29,6 +29,10 @@ interface BulkActionConfirmDialogProps {
   isLoading?: boolean;
   /** Called when user confirms */
   onConfirm: () => void;
+  /** Localized overrides (fall back to the English composed strings). */
+  title?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
 }
 
 export function BulkActionConfirmDialog({
@@ -41,21 +45,23 @@ export function BulkActionConfirmDialog({
   destructive = false,
   isLoading = false,
   onConfirm,
+  title,
+  confirmLabel,
+  cancelLabel,
 }: BulkActionConfirmDialogProps) {
+  const composedLabel = `${action.charAt(0).toUpperCase() + action.slice(1)} ${count} ${itemType}`;
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>
-            {action.charAt(0).toUpperCase() + action.slice(1)} {count} {itemType}?
-          </AlertDialogTitle>
+          <AlertDialogTitle>{title ?? `${composedLabel}?`}</AlertDialogTitle>
           <AlertDialogDescription>
             {description ||
               `Are you sure you want to ${action} ${count} ${itemType}? This action cannot be undone.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={isLoading}>{cancelLabel ?? 'Cancel'}</AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault(); // Prevent dialog from closing before async completes
@@ -69,7 +75,7 @@ export function BulkActionConfirmDialog({
             }
           >
             {isLoading && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
-            {action.charAt(0).toUpperCase() + action.slice(1)} {count} {itemType}
+            {confirmLabel ?? composedLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

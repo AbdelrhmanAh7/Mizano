@@ -43,6 +43,8 @@ import {
   useInfiniteBills,
 } from '@/lib/hooks/use-bills';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
+import { LEDGER_QUERY_KEYS } from '@/lib/hooks/use-journals';
+import { isPositiveDecimal } from '@/lib/decimal';
 import { useExportAll } from '@/lib/hooks/use-export-all';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
@@ -57,7 +59,6 @@ import {
   DollarSign,
   Edit,
   Eye,
-  FolderOpen,
   Plus,
   RefreshCw,
   Sparkles,
@@ -67,9 +68,11 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
+import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
 
 function BillsPageContent() {
   const t = useTranslations('purchases');
+  const baseCurrency = useBaseCurrency();
   const tCommon = useTranslations('common');
   const { toast } = useToast();
 
@@ -121,32 +124,25 @@ function BillsPageContent() {
 
   // Bulk action state
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
-  const [bulkOpenOpen, setBulkOpenOpen] = useState(false);
   const [bulkApproveOpen, setBulkApproveOpen] = useState(false);
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
   const [bulkSelectedRows, setBulkSelectedRows] = useState<Bill[]>([]);
 
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => billsApi.bulkDelete(ids).then((r) => r.data),
-    queryKeys: [['bills']],
+    queryKeys: LEDGER_QUERY_KEYS,
     successMessage: '{count} draft bills deleted',
-  });
-
-  const bulkOpenAction = useBulkAction({
-    mutationFn: (ids) => billsApi.bulkOpen(ids).then((r) => r.data),
-    queryKeys: [['bills']],
-    successMessage: '{count} bills approved and posted',
   });
 
   const bulkApproveAction = useBulkAction({
     mutationFn: (ids) => billsApi.bulkApprove(ids).then((r) => r.data),
-    queryKeys: [['bills']],
-    successMessage: '{count} bills approved',
+    queryKeys: LEDGER_QUERY_KEYS,
+    successMessage: '{count} bills approved and posted',
   });
 
   const bulkPayAction = useBulkAction({
     mutationFn: (ids) => billsApi.bulkPay(ids).then((r) => r.data),
-    queryKeys: [['bills']],
+    queryKeys: LEDGER_QUERY_KEYS,
     successMessage: '{count} bills paid (payments recorded)',
   });
 
@@ -154,15 +150,7 @@ function BillsPageContent() {
     ...(canEdit
       ? [
           {
-            label: 'Open',
-            icon: FolderOpen,
-            onClick: (rows: Bill[]) => {
-              setBulkSelectedRows(rows);
-              setBulkOpenOpen(true);
-            },
-          },
-          {
-            label: 'Approve',
+            label: t('bills.approvePost'),
             icon: CheckCircle,
             onClick: (rows: Bill[]) => {
               setBulkSelectedRows(rows);
@@ -286,7 +274,7 @@ function BillsPageContent() {
           bill.status === 'OVERDUE' ||
           (bill.status === 'OPEN' && new Date(bill.dueDate) < new Date());
         return (
-          <span className={cn(isOverdue && 'text-red-600')}>
+          <span className={cn(isOverdue && 'text-destructive')}>
             {format(new Date(bill.dueDate), 'MMM d, yyyy')}
           </span>
         );
@@ -313,22 +301,26 @@ function BillsPageContent() {
         />
       ),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) => formatCurrency(row.original.grandTotal, row.original.vendor?.currency),
+      cell: ({ row }) =>
+        formatCurrency(
+          row.original.grandTotal,
+          documentCurrency(row.original.currencyCode, baseCurrency),
+        ),
     },
     {
       accessorKey: 'balanceDue',
       header: t('bills.table.balance'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       cell: ({ row }) => {
-        const balanceDue = parseFloat(row.original.balanceDue || '0');
+        const balanceDue = row.original.balanceDue || '0';
         return (
           <span
             className={cn(
               'font-mono font-medium',
-              balanceDue > 0 ? 'text-red-600' : 'text-green-600',
+              isPositiveDecimal(balanceDue) ? 'text-destructive' : 'text-success',
             )}
           >
-            {formatCurrency(balanceDue, row.original.vendor?.currency)}
+            {formatCurrency(balanceDue, documentCurrency(row.original.currencyCode, baseCurrency))}
           </span>
         );
       },
@@ -368,7 +360,7 @@ function BillsPageContent() {
                 </DropdownMenuItem>
               )}
               {canDelete && bill.status === 'DRAFT' && (
-                <DropdownMenuItem onClick={() => handleDelete(bill)} className="text-red-600">
+                <DropdownMenuItem onClick={() => handleDelete(bill)} className="text-destructive">
                   <Trash2 className="mr-2 h-4 w-4" />
                   {tCommon('buttons.delete')}
                 </DropdownMenuItem>
@@ -538,26 +530,15 @@ function BillsPageContent() {
         }}
       />
       <BulkActionConfirmDialog
-        open={bulkOpenOpen}
-        onOpenChange={setBulkOpenOpen}
-        action="open"
-        count={bulkSelectedRows.length}
-        itemType="bills"
-        description="Draft bills will be marked as open. This will create accounting entries."
-        isLoading={bulkOpenAction.isLoading}
-        onConfirm={async () => {
-          await bulkOpenAction.execute(bulkSelectedRows.map((r) => r.id));
-          setBulkOpenOpen(false);
-          refetch();
-        }}
-      />
-      <BulkActionConfirmDialog
         open={bulkApproveOpen}
         onOpenChange={setBulkApproveOpen}
-        action="approve"
+        action="approve & post"
         count={bulkSelectedRows.length}
         itemType="bills"
-        description="Draft bills will be approved and posted to the ledger (expense, VAT and accounts payable)."
+        title={t('bills.bulkApprove.title', { count: bulkSelectedRows.length })}
+        description={t('bills.bulkApprove.description')}
+        confirmLabel={t('bills.bulkApprove.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={t('bills.bulkApprove.cancel')}
         isLoading={bulkApproveAction.isLoading}
         onConfirm={async () => {
           await bulkApproveAction.execute(bulkSelectedRows.map((r) => r.id));

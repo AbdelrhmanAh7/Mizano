@@ -72,6 +72,15 @@ const mockPrisma = {
   account: {
     findMany: jest.fn(),
   },
+  journal: {
+    count: jest.fn(),
+  },
+  $executeRaw: jest.fn(),
+};
+// Interactive transactions run against the same mock client.
+const prismaWithTx = {
+  ...mockPrisma,
+  $transaction: jest.fn(async (fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma)),
 };
 
 describe('OrganizationsService', () => {
@@ -80,7 +89,7 @@ describe('OrganizationsService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      providers: [OrganizationsService, { provide: PrismaService, useValue: mockPrisma }],
+      providers: [OrganizationsService, { provide: PrismaService, useValue: prismaWithTx }],
     }).compile();
 
     service = module.get<OrganizationsService>(OrganizationsService);
@@ -94,6 +103,15 @@ describe('OrganizationsService', () => {
 
       const result = await service.findOne(ORG_ID);
       expect(result.name).toBe('Acme Corp');
+    });
+
+    it('returns the base currency the ledger is kept in', async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue(mockOrg);
+
+      await service.findOne(ORG_ID);
+
+      const { select } = mockPrisma.organization.findUnique.mock.calls[0][0];
+      expect(select).toMatchObject({ currency: true, baseCurrency: true });
     });
 
     it('throws NotFoundException when org not found', async () => {
@@ -186,6 +204,62 @@ describe('OrganizationsService', () => {
       expect(mockPrisma.organization.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: ORG_ID } }),
       );
+    });
+
+    it('keeps the legacy currency in sync when the base currency changes', async () => {
+      mockPrisma.organization.update.mockResolvedValue({
+        id: ORG_ID,
+        name: 'X',
+        updatedAt: new Date(),
+      });
+
+      await service.updateGeneralSettings(ORG_ID, { name: 'X', baseCurrency: 'EGP' });
+
+      const { data } = mockPrisma.organization.update.mock.calls[0][0];
+      expect(data).toMatchObject({ baseCurrency: 'EGP', currency: 'EGP' });
+    });
+
+    it('rejects a base-currency change once journals are posted', async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'USD' });
+      mockPrisma.journal.count.mockResolvedValue(3);
+
+      await expect(
+        service.updateGeneralSettings(ORG_ID, { name: 'X', baseCurrency: 'EGP' }),
+      ).rejects.toThrow('cannot be changed after journals have been posted');
+      expect(mockPrisma.journal.count).toHaveBeenCalledWith({
+        where: { organizationId: ORG_ID, isPosted: true, deletedAt: null },
+      });
+      expect(mockPrisma.$executeRaw).toHaveBeenCalled(); // ledger lock taken before the check
+      expect(mockPrisma.organization.update).not.toHaveBeenCalled();
+    });
+
+    it('allows re-saving the same base currency after posting', async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'USD' });
+      mockPrisma.journal.count.mockResolvedValue(3);
+      mockPrisma.organization.update.mockResolvedValue({
+        id: ORG_ID,
+        name: 'X',
+        updatedAt: new Date(),
+      });
+
+      await service.updateGeneralSettings(ORG_ID, { name: 'X', baseCurrency: 'USD' });
+
+      expect(mockPrisma.journal.count).not.toHaveBeenCalled();
+      expect(mockPrisma.organization.update).toHaveBeenCalled();
+    });
+
+    it('leaves both currency fields untouched when no base currency is sent', async () => {
+      mockPrisma.organization.update.mockResolvedValue({
+        id: ORG_ID,
+        name: 'X',
+        updatedAt: new Date(),
+      });
+
+      await service.updateGeneralSettings(ORG_ID, { name: 'X' });
+
+      const { data } = mockPrisma.organization.update.mock.calls[0][0];
+      expect(data.baseCurrency).toBeUndefined();
+      expect(data.currency).toBeUndefined();
     });
   });
 

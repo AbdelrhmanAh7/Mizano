@@ -1,5 +1,7 @@
+import { Decimal } from '@prisma/client/runtime/library';
 import { Injectable } from '@nestjs/common';
 import { ReadReplicaService } from '../../../prisma/read-replica.service';
+import { endOfUtcDay } from '../utils/report-utils';
 
 export interface AgingItem {
   invoiceId?: string;
@@ -177,7 +179,8 @@ export class AgingReportsService {
     if (!customer) return null;
 
     const start = new Date(startDate);
-    const end = new Date(endDate);
+    // A date-only end must include that whole day (voids/payments later on the end date).
+    const end = endOfUtcDay(new Date(endDate));
 
     // Get opening balance (sum of all invoices minus payments before start date)
     const openingInvoices = await this.prisma.invoice.findMany({
@@ -268,25 +271,27 @@ export class AgingReportsService {
     if (!vendor) return null;
 
     const start = new Date(startDate);
-    const end = new Date(endDate);
+    // A date-only end must include that whole day (voids/payments later on the end date).
+    const end = endOfUtcDay(new Date(endDate));
 
     // Opening balance
     const openingBills = await this.prisma.bill.findMany({
       where: { vendorId, organizationId, date: { lt: start }, deletedAt: null },
     });
+    // Payments count on their own date even if voided later; a void is a separate debit on the
+    // date it happened. Later corrections therefore never rewrite an earlier period.
     const openingPayments = await this.prisma.paymentMade.findMany({
       where: { vendorId, organizationId, date: { lt: start } },
     });
+    const openingVoids = await this.prisma.paymentMade.findMany({
+      where: { vendorId, organizationId, deletedAt: { lt: start } },
+    });
 
-    const openingBillTotal = openingBills.reduce(
-      (sum, b) => sum + parseFloat((b.total ?? b.grandTotal).toString()),
-      0,
-    );
-    const openingPaymentTotal = openingPayments.reduce(
-      (sum, p) => sum + parseFloat(p.amount.toString()),
-      0,
-    );
-    const openingBalance = openingBillTotal - openingPaymentTotal;
+    const sum = (values: Decimal[]): Decimal =>
+      values.reduce((acc, v) => acc.add(v), new Decimal(0));
+    const openingBalance = sum(openingBills.map((b) => b.total ?? b.grandTotal))
+      .sub(sum(openingPayments.map((p) => p.amount)))
+      .add(sum(openingVoids.map((p) => p.amount)));
 
     // Period transactions
     const bills = await this.prisma.bill.findMany({
@@ -298,38 +303,56 @@ export class AgingReportsService {
       where: { vendorId, organizationId, date: { gte: start, lte: end } },
       orderBy: { date: 'asc' },
     });
+    const voids = await this.prisma.paymentMade.findMany({
+      where: { vendorId, organizationId, deletedAt: { gte: start, lte: end } },
+      orderBy: { deletedAt: 'asc' },
+    });
 
-    const transactions: StatementTransaction[] = [
+    const zero = new Decimal(0);
+    const transactions = [
       ...bills.map((b) => ({
-        date: b.billDate ?? b.date,
+        date: b.date,
         type: 'Bill' as const,
         reference: b.billNumber,
-        debit: parseFloat((b.total ?? b.grandTotal).toString()),
-        credit: 0,
+        debit: b.total ?? b.grandTotal,
+        credit: zero,
       })),
       ...payments.map((p) => ({
         date: p.date,
         type: 'Payment' as const,
         reference: p.paymentNumber,
-        debit: 0,
-        credit: parseFloat(p.amount.toString()),
+        debit: zero,
+        credit: p.amount,
+      })),
+      ...voids.map((p) => ({
+        date: p.deletedAt as Date,
+        type: 'Payment Void' as const,
+        reference: p.paymentNumber,
+        debit: p.amount,
+        credit: zero,
       })),
     ].sort((a, b) => new Date(a.date as Date).getTime() - new Date(b.date as Date).getTime());
 
+    // Exact Decimal arithmetic; money leaves the service as fixed 4-dp decimal strings.
     let runningBalance = openingBalance;
     const entries = transactions.map((t) => {
-      runningBalance += t.debit - t.credit;
-      return { ...t, balance: runningBalance };
+      runningBalance = runningBalance.add(t.debit).sub(t.credit);
+      return {
+        ...t,
+        debit: t.debit.toFixed(4),
+        credit: t.credit.toFixed(4),
+        balance: runningBalance.toFixed(4),
+      };
     });
 
     return {
       vendor: { id: vendor.id, name: vendor.name, email: vendor.email },
       period: { startDate, endDate },
-      openingBalance,
+      openingBalance: openingBalance.toFixed(4),
       transactions: entries,
-      closingBalance: runningBalance,
-      totalDebits: entries.reduce((sum, e) => sum + e.debit, 0),
-      totalCredits: entries.reduce((sum, e) => sum + e.credit, 0),
+      closingBalance: runningBalance.toFixed(4),
+      totalDebits: sum(transactions.map((t) => t.debit)).toFixed(4),
+      totalCredits: sum(transactions.map((t) => t.credit)).toFixed(4),
     };
   }
 }

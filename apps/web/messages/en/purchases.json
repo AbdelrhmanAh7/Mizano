@@ -183,6 +183,29 @@
     "empty": {
       "title": "No bills yet",
       "description": "Record your first bill to track payables"
+    },
+    "approvePost": "Approve & post",
+    "approved": "Bill approved and posted",
+    "approveFailed": "Failed to approve bill",
+    "payments": "Payments",
+    "noPayments": "No payments recorded for this bill",
+    "voidPayment": "Void",
+    "voidPaymentTitle": "Void payment",
+    "voidPaymentConfirm": "Voiding {number} voids the whole payment: every bill it was allocated to gets its balance back, and a reversing journal entry is posted.",
+    "paymentVoided": "Payment voided",
+    "voidFailed": "Failed to void payment",
+    "validation": {
+      "line": "Line {line}: {message}",
+      "quantityInvalid": "Quantity must be a non-negative number",
+      "quantityPositive": "Quantity must be greater than zero",
+      "rateInvalid": "Rate must be a non-negative number",
+      "taxInvalid": "Tax % must be a non-negative number"
+    },
+    "bulkApprove": {
+      "title": "Approve and post {count} bills?",
+      "description": "Draft bills will be approved and posted to the ledger (expense, VAT and accounts payable).",
+      "confirm": "Approve & post {count} bills",
+      "cancel": "Cancel"
     }
   },
   "credits": {
@@ -260,7 +283,7 @@
     "allPayments": "All Payments",
     "newPayment": "New Payment",
     "editPayment": "Edit Payment",
-    "deletePayment": "Delete Payment",
+    "deletePayment": "Void Payment",
     "paymentDetails": "Payment Details",
     "paymentNotFound": "Payment not found",
     "backToPayments": "Back to Payments",
@@ -279,8 +302,8 @@
     "notes": "Notes",
     "billAllocations": "Bill Allocations",
     "noBillAllocations": "No bill allocations",
-    "deleteTitle": "Delete Payment",
-    "deleteConfirmation": "Are you sure you want to delete this payment? This will also update the associated bill balances. This action cannot be undone.",
+    "deleteTitle": "Void Payment",
+    "deleteConfirmation": "Voiding this payment restores the balances of the bills it paid and posts a reversing journal entry. The payment is kept for the audit trail.",
     "form": {
       "vendor": "Vendor",
       "vendorPlaceholder": "Select a vendor",
@@ -306,6 +329,15 @@
     "empty": {
       "title": "No payments yet",
       "description": "Payments will appear here when recorded"
+    },
+    "void": "Void",
+    "voided": "Payment voided",
+    "voidedBadge": "Voided",
+    "voidFailed": "Failed to void payment",
+    "bulkVoid": {
+      "title": "Void {count} payments?",
+      "description": "Each payment is voided as a whole: every bill it paid is reopened and a linked reversal is posted to the ledger.",
+      "confirm": "Void {count} payments"
     }
   },
   "lineItems": {

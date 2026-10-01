@@ -10,6 +10,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
@@ -114,7 +115,16 @@ export class BillsService {
   async findOne(organizationId: string, id: string) {
     const bill = await this.prisma.bill.findFirst({
       where: { id, organizationId, deletedAt: null },
-      include: { vendor: true, lines: true, billAllocations: true },
+      include: {
+        vendor: true,
+        lines: true,
+        // Each allocation carries its payment so clients don't need a separate (paged) lookup.
+        billAllocations: {
+          include: {
+            payment: { select: { id: true, paymentNumber: true, date: true, deletedAt: true } },
+          },
+        },
+      },
     });
     if (!bill) throw new NotFoundException('Bill not found');
     return bill;
@@ -274,6 +284,9 @@ export class BillsService {
    */
   async approve(organizationId: string, id: string) {
     return this.prisma.$transaction(async (tx) => {
+      // Lock first: the currency/account checks below must see the same organization settings
+      // the journal is posted under (a base-currency change takes this lock too).
+      await lockOrganizationLedger(tx, organizationId);
       const bill = await tx.bill.findFirst({
         where: { id, organizationId, deletedAt: null },
         include: { lines: true },
@@ -291,8 +304,19 @@ export class BillsService {
 
       const org = await tx.organization.findUnique({
         where: { id: organizationId },
-        select: { defaultApAccountId: true, defaultVatReceivableAccountId: true },
+        select: {
+          defaultApAccountId: true,
+          defaultVatReceivableAccountId: true,
+          baseCurrency: true,
+        },
       });
+      // The ledger is single-currency: never post foreign amounts as if they were base currency.
+      const billCurrency = bill.currencyCode?.trim().toUpperCase();
+      if (billCurrency && org && billCurrency !== org.baseCurrency.toUpperCase()) {
+        throw new BadRequestException(
+          `Bill currency ${billCurrency} differs from the base currency ${org.baseCurrency}; foreign-currency bills cannot be posted yet`,
+        );
+      }
       if (!org?.defaultApAccountId) {
         throw new BadRequestException(
           'Please configure default Accounts Payable account in organization settings before approving bills',

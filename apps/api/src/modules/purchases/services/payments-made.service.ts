@@ -282,9 +282,10 @@ export class PaymentsMadeService {
     );
   }
 
+  /** Voided payments stay readable (with deletedAt set) so journal source links resolve. */
   async findOne(organizationId: string, id: string) {
     const payment = await this.prisma.paymentMade.findFirst({
-      where: { id, organizationId, deletedAt: null },
+      where: { id, organizationId },
       include: { vendor: true, allocations: { include: { bill: true } } },
     });
     if (!payment) throw new NotFoundException('Payment not found');

@@ -187,8 +187,16 @@ jest.mock('@/lib/hooks/use-journals', () => ({
   useInfiniteJournals: (...args: unknown[]) => mockUseInfiniteJournals(...args),
   useDeleteJournal: () => mockUseDeleteJournal(),
   usePostJournal: () => mockUsePostJournal(),
+  useReverseJournal: () => ({ mutateAsync: jest.fn(), isPending: false }),
   formatJournalAmount: (v: number | string) => `$${v}`,
   getStatusColor: () => '',
+  calculateJournalTotals: () => ({ totalDebit: '0', totalCredit: '0' }),
+  isJournalEditable: (j: { isPosted: boolean; sourceType?: string | null }) =>
+    !j.isPosted && !j.sourceType,
+  isSystemJournal: (j: { sourceType?: string | null }) => !!j.sourceType,
+  canReverseJournal: (j: { isPosted: boolean; reversalOfId?: string | null }) =>
+    j.isPosted && !j.reversalOfId,
+  LEDGER_QUERY_KEYS: [['journals']],
 }));
 
 jest.mock('@/lib/hooks/use-table-params', () => ({

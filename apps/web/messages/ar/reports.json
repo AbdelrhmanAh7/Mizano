@@ -43,7 +43,18 @@
     "financingActivities": "الأنشطة التمويلية",
     "netCashFlow": "صافي التدفق النقدي",
     "openingBalance": "الرصيد الافتتاحي",
-    "closingBalance": "الرصيد الختامي"
+    "closingBalance": "الرصيد الختامي",
+    "lines": {
+      "netIncome": "صافي الدخل",
+      "accountsReceivableChange": "التغير في الذمم المدينة",
+      "accountsPayableChange": "التغير في الذمم الدائنة",
+      "inventoryChange": "التغير في المخزون",
+      "otherOperatingChanges": "تغيرات تشغيلية أخرى",
+      "fixedAssetPurchases": "مشتريات الأصول الثابتة",
+      "equityChanges": "التغيرات في حقوق الملكية",
+      "debtChanges": "التغيرات في الديون"
+    },
+    "noItems": "لا توجد بنود"
   },
   "trialBalance": {
     "title": "ميزان المراجعة",

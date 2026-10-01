@@ -33,21 +33,25 @@ export interface BalanceSheetReport {
   totalAssets: number;
   totalLiabilities: number;
   totalEquity: number;
+  /** Exact decimal string from the API (never recomputed from floats on the client). */
+  totalLiabilitiesAndEquity: string;
+  /** Decided by the API with exact Decimal comparison. */
+  isBalanced: boolean;
   asOfDate: string;
 }
 
 export interface CashFlowReport {
   operations: {
     netIncome: number;
-    adjustments: Array<{ name: string; amount: number }>;
+    adjustments: Array<{ key?: string; name: string; amount: number }>;
     total: number;
   };
   investing: {
-    items: Array<{ name: string; amount: number }>;
+    items: Array<{ key?: string; name: string; amount: number }>;
     total: number;
   };
   financing: {
-    items: Array<{ name: string; amount: number }>;
+    items: Array<{ key?: string; name: string; amount: number }>;
     total: number;
   };
   netChange: number;
@@ -203,16 +207,18 @@ interface RawAccountData {
 
 interface RawAccountGroup {
   accounts?: RawAccountData[];
-  total?: number;
+  total?: number | string;
 }
 
 interface RawBalanceSheetData {
   assets?: RawAccountGroup & { current?: RawAccountGroup; fixed?: RawAccountGroup };
   liabilities?: RawAccountGroup & { current?: RawAccountGroup; longTerm?: RawAccountGroup };
-  equity?: RawAccountGroup & { retainedEarnings?: number };
-  totalAssets?: number;
-  totalLiabilities?: number;
-  totalEquity?: number;
+  equity?: RawAccountGroup & { retainedEarnings?: number | string };
+  totalAssets?: number | string;
+  totalLiabilities?: number | string;
+  totalEquity?: number | string;
+  totalLiabilitiesAndEquity?: number | string;
+  isBalanced?: boolean;
   asOfDate?: string;
 }
 
@@ -222,9 +228,9 @@ interface RawProfitLossData {
   expenses?: RawAccountData[];
   costOfGoodsSold?: RawAccountGroup;
   operatingExpenses?: RawAccountGroup;
-  totalIncome?: number;
-  totalExpenses?: number;
-  netProfit?: number;
+  totalIncome?: number | string;
+  totalExpenses?: number | string;
+  netProfit?: number | string;
   period?: DateRange;
 }
 
@@ -288,6 +294,12 @@ function unwrap<T = unknown>(response: { data?: { data?: unknown } & Record<stri
   return (response.data?.data ?? response.data) as T;
 }
 
+/** Report money arrives as decimal strings; convert once for display (never for posting). */
+function toNum(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function toReportAccount(a: RawAccountData): ReportAccount {
   return {
     id: a.id || a.accountId || '',
@@ -295,7 +307,7 @@ function toReportAccount(a: RawAccountData): ReportAccount {
     name: a.name || '',
     type: a.type || '',
     // API sends decimal strings; ReportAccount.balance is a display number.
-    balance: Number.isFinite(Number(a.balance)) ? Number(a.balance) : 0,
+    balance: toNum(a.balance),
     children: Array.isArray(a.children) ? a.children.map(toReportAccount) : undefined,
   };
 }
@@ -309,7 +321,7 @@ function transformBalanceSheet(raw: RawBalanceSheetData): BalanceSheetReport {
         code: '',
         name: 'Current Assets',
         type: 'ASSET',
-        balance: raw.assets.current.total ?? 0,
+        balance: toNum(raw.assets.current.total),
         children: (Array.isArray(raw.assets.current.accounts)
           ? raw.assets.current.accounts
           : []
@@ -322,7 +334,7 @@ function transformBalanceSheet(raw: RawBalanceSheetData): BalanceSheetReport {
         code: '',
         name: 'Fixed Assets',
         type: 'ASSET',
-        balance: raw.assets.fixed.total ?? 0,
+        balance: toNum(raw.assets.fixed.total),
         children: (Array.isArray(raw.assets.fixed.accounts) ? raw.assets.fixed.accounts : []).map(
           toReportAccount,
         ),
@@ -342,7 +354,7 @@ function transformBalanceSheet(raw: RawBalanceSheetData): BalanceSheetReport {
         code: '',
         name: 'Current Liabilities',
         type: 'LIABILITY',
-        balance: raw.liabilities.current.total ?? 0,
+        balance: toNum(raw.liabilities.current.total),
         children: (Array.isArray(raw.liabilities.current.accounts)
           ? raw.liabilities.current.accounts
           : []
@@ -355,7 +367,7 @@ function transformBalanceSheet(raw: RawBalanceSheetData): BalanceSheetReport {
         code: '',
         name: 'Long-Term Liabilities',
         type: 'LIABILITY',
-        balance: raw.liabilities.longTerm.total ?? 0,
+        balance: toNum(raw.liabilities.longTerm.total),
         children: (Array.isArray(raw.liabilities.longTerm.accounts)
           ? raw.liabilities.longTerm.accounts
           : []
@@ -372,13 +384,13 @@ function transformBalanceSheet(raw: RawBalanceSheetData): BalanceSheetReport {
     if (Array.isArray(raw.equity.accounts)) {
       equity.push(...raw.equity.accounts.map(toReportAccount));
     }
-    if (typeof raw.equity.retainedEarnings === 'number') {
+    if (raw.equity.retainedEarnings !== undefined && raw.equity.retainedEarnings !== null) {
       equity.push({
         id: 'retained-earnings',
         code: '3100',
         name: 'Retained Earnings',
         type: 'EQUITY',
-        balance: raw.equity.retainedEarnings,
+        balance: toNum(raw.equity.retainedEarnings),
       });
     }
     if (Array.isArray(raw.equity)) {
@@ -390,9 +402,11 @@ function transformBalanceSheet(raw: RawBalanceSheetData): BalanceSheetReport {
     assets,
     liabilities,
     equity,
-    totalAssets: raw.assets?.total ?? raw.totalAssets ?? 0,
-    totalLiabilities: raw.liabilities?.total ?? raw.totalLiabilities ?? 0,
-    totalEquity: raw.equity?.total ?? raw.totalEquity ?? 0,
+    totalAssets: toNum(raw.assets?.total ?? raw.totalAssets),
+    totalLiabilities: toNum(raw.liabilities?.total ?? raw.totalLiabilities),
+    totalEquity: toNum(raw.equity?.total ?? raw.totalEquity),
+    totalLiabilitiesAndEquity: String(raw.totalLiabilitiesAndEquity ?? '0'),
+    isBalanced: raw.isBalanced === true,
     asOfDate: raw.asOfDate ?? '',
   };
 }
@@ -416,16 +430,18 @@ function transformProfitLoss(raw: RawProfitLossData): ProfitLossReport {
     }
   }
 
-  const totalIncome = raw.totalIncome ?? raw.revenue?.total ?? 0;
+  const totalIncome = toNum(raw.totalIncome ?? raw.revenue?.total);
   const totalExpenses =
-    raw.totalExpenses ?? (raw.costOfGoodsSold?.total ?? 0) + (raw.operatingExpenses?.total ?? 0);
+    raw.totalExpenses !== undefined
+      ? toNum(raw.totalExpenses)
+      : toNum(raw.costOfGoodsSold?.total) + toNum(raw.operatingExpenses?.total);
 
   return {
     income,
     expenses,
     totalIncome,
     totalExpenses,
-    netProfit: raw.netProfit ?? totalIncome - totalExpenses,
+    netProfit: raw.netProfit !== undefined ? toNum(raw.netProfit) : totalIncome - totalExpenses,
     period: raw.period ?? { startDate: '', endDate: '' },
   };
 }
@@ -437,15 +453,15 @@ function transformTrialBalance(raw: RawTrialBalanceData): TrialBalanceReport {
         code: a.code || '',
         name: a.name || '',
         type: a.type || '',
-        debit: a.debit ?? 0,
-        credit: a.credit ?? 0,
+        debit: toNum(a.debit),
+        credit: toNum(a.credit),
       }))
     : [];
 
   return {
     accounts,
-    totalDebits: raw.totalDebits ?? raw.totals?.debit ?? 0,
-    totalCredits: raw.totalCredits ?? raw.totals?.credit ?? 0,
+    totalDebits: toNum(raw.totalDebits ?? raw.totals?.debit),
+    totalCredits: toNum(raw.totalCredits ?? raw.totals?.credit),
     isBalanced: raw.isBalanced ?? false,
     asOfDate: raw.asOfDate ?? '',
   };
@@ -534,7 +550,7 @@ export function useBalanceSheetReport(asOfDate: string) {
 }
 
 interface CashFlowSection {
-  items: Array<{ name: string; amount: number }>;
+  items: Array<{ key?: string; name: string; amount: number }>;
   total: number;
 }
 interface TransformedCashFlowReport {
@@ -547,27 +563,28 @@ interface TransformedCashFlowReport {
 }
 
 interface CashFlowApiResponse {
-  openingCashBalance?: number;
+  openingCashBalance?: number | string;
   operating?: {
-    netIncome?: number;
+    netIncome?: number | string;
     adjustments?: {
-      accountsReceivableChange?: number;
-      accountsPayableChange?: number;
-      inventoryChange?: number;
+      accountsReceivableChange?: number | string;
+      accountsPayableChange?: number | string;
+      inventoryChange?: number | string;
+      otherOperatingChanges?: number | string;
     };
-    netCashFromOperating?: number;
+    netCashFromOperating?: number | string;
   };
   investing?: {
-    fixedAssetPurchases?: number;
-    netCashFromInvesting?: number;
+    fixedAssetPurchases?: number | string;
+    netCashFromInvesting?: number | string;
   };
   financing?: {
-    equityChanges?: number;
-    debtChanges?: number;
-    netCashFromFinancing?: number;
+    equityChanges?: number | string;
+    debtChanges?: number | string;
+    netCashFromFinancing?: number | string;
   };
-  netCashChange?: number;
-  closingCashBalance?: number;
+  netCashChange?: number | string;
+  closingCashBalance?: number | string;
 }
 
 function transformCashFlow(raw: CashFlowApiResponse): TransformedCashFlowReport {
@@ -575,27 +592,51 @@ function transformCashFlow(raw: CashFlowApiResponse): TransformedCashFlowReport 
   return {
     operatingActivities: {
       items: [
-        { name: 'Net Income', amount: raw.operating?.netIncome ?? 0 },
-        { name: 'Accounts Receivable Change', amount: opAdj.accountsReceivableChange ?? 0 },
-        { name: 'Accounts Payable Change', amount: opAdj.accountsPayableChange ?? 0 },
-        { name: 'Inventory Change', amount: opAdj.inventoryChange ?? 0 },
+        { key: 'netIncome', name: 'Net Income', amount: toNum(raw.operating?.netIncome) },
+        {
+          key: 'accountsReceivableChange',
+          name: 'Accounts Receivable Change',
+          amount: toNum(opAdj.accountsReceivableChange),
+        },
+        {
+          key: 'accountsPayableChange',
+          name: 'Accounts Payable Change',
+          amount: toNum(opAdj.accountsPayableChange),
+        },
+        { key: 'inventoryChange', name: 'Inventory Change', amount: toNum(opAdj.inventoryChange) },
+        // Keeps the visible items summing to the operating total.
+        {
+          key: 'otherOperatingChanges',
+          name: 'Other Operating Changes',
+          amount: toNum(opAdj.otherOperatingChanges),
+        },
       ],
-      total: raw.operating?.netCashFromOperating ?? 0,
+      total: toNum(raw.operating?.netCashFromOperating),
     },
     investingActivities: {
-      items: [{ name: 'Fixed Asset Purchases', amount: raw.investing?.fixedAssetPurchases ?? 0 }],
-      total: raw.investing?.netCashFromInvesting ?? 0,
+      items: [
+        {
+          key: 'fixedAssetPurchases',
+          name: 'Fixed Asset Purchases',
+          amount: toNum(raw.investing?.fixedAssetPurchases),
+        },
+      ],
+      total: toNum(raw.investing?.netCashFromInvesting),
     },
     financingActivities: {
       items: [
-        { name: 'Equity Changes', amount: raw.financing?.equityChanges ?? 0 },
-        { name: 'Debt Changes', amount: raw.financing?.debtChanges ?? 0 },
+        {
+          key: 'equityChanges',
+          name: 'Equity Changes',
+          amount: toNum(raw.financing?.equityChanges),
+        },
+        { key: 'debtChanges', name: 'Debt Changes', amount: toNum(raw.financing?.debtChanges) },
       ],
-      total: raw.financing?.netCashFromFinancing ?? 0,
+      total: toNum(raw.financing?.netCashFromFinancing),
     },
-    netCashFlow: raw.netCashChange ?? 0,
-    openingBalance: raw.openingCashBalance ?? 0,
-    closingBalance: raw.closingCashBalance ?? 0,
+    netCashFlow: toNum(raw.netCashChange),
+    openingBalance: toNum(raw.openingCashBalance),
+    closingBalance: toNum(raw.closingCashBalance),
   };
 }
 

@@ -4,7 +4,6 @@ import type { DateRangeValue } from '@/components/data-table';
 import {
   DataTable,
   DataTableDateRangeFilter,
-  DataTableFacetedFilter,
   DataTableSearch,
   SortableHeader,
 } from '@/components/data-table';
@@ -32,44 +31,47 @@ import {
 
 import { useToast } from '@/components/ui/use-toast';
 import { journalsApi } from '@/lib/api';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { useExportAll } from '@/lib/hooks/use-export-all';
 import {
   Journal,
+  LEDGER_QUERY_KEYS,
+  calculateJournalTotals,
+  canReverseJournal,
   formatJournalAmount,
   getStatusColor,
+  isJournalEditable,
+  isSystemJournal,
   useDeleteJournal,
   useInfiniteJournals,
   usePostJournal,
+  useReverseJournal,
 } from '@/lib/hooks/use-journals';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { CheckCircle, Edit, Eye, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { CheckCircle, Edit, Eye, Plus, RefreshCw, Trash2, Undo2 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
 
-const JOURNAL_STATUS_OPTIONS = [
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'POSTED', label: 'Posted' },
-  { value: 'VOIDED', label: 'Voided' },
-];
-
 function JournalsPageContent() {
   const t = useTranslations('accounting');
+  const tCommon = useTranslations('common');
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const { onExportAll } = useExportAll('journals', 'journals');
   const tableParams = useTableParams({
     defaultSortBy: 'date',
-    filterKeys: ['status', 'dateFrom', 'dateTo'],
+    filterKeys: ['dateFrom', 'dateTo'],
     mode: 'virtual',
   });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [journalToDelete, setJournalToDelete] = useState<Journal | null>(null);
+  const [journalToReverse, setJournalToReverse] = useState<Journal | null>(null);
 
   // Bulk action state
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -78,13 +80,13 @@ function JournalsPageContent() {
 
   const bulkDeleteAction = useBulkAction({
     mutationFn: (ids) => journalsApi.bulkDelete(ids).then((r) => r.data),
-    queryKeys: [['journals']],
+    queryKeys: LEDGER_QUERY_KEYS,
     successMessage: '{count} unposted journals deleted',
   });
 
   const bulkPostAction = useBulkAction({
     mutationFn: (ids) => journalsApi.bulkPost(ids).then((r) => r.data),
-    queryKeys: [['journals']],
+    queryKeys: LEDGER_QUERY_KEYS,
     successMessage: '{count} journals posted',
   });
 
@@ -98,7 +100,6 @@ function JournalsPageContent() {
     refetch,
   } = useInfiniteJournals({
     ...tableParams.queryParams,
-    status: tableParams.filters.status || undefined,
     dateFrom: tableParams.filters.dateFrom || undefined,
     dateTo: tableParams.filters.dateTo || undefined,
   });
@@ -109,9 +110,12 @@ function JournalsPageContent() {
       : undefined;
   const deleteJournal = useDeleteJournal();
   const postJournal = usePostJournal();
+  const reverseJournal = useReverseJournal();
 
   const canCreate = hasPermission('accounting.create');
   const canEdit = hasPermission('accounting.edit');
+  // Same permission as POST /journals/:id/reverse.
+  const canReverse = hasPermission('accounting.create');
   const canDelete = hasPermission('accounting.delete');
 
   const bulkActions = [
@@ -158,7 +162,7 @@ function JournalsPageContent() {
       } catch (error) {
         toast({
           title: 'Error',
-          description: 'Failed to delete journal. It may have associated records.',
+          description: getApiErrorMessage(error, 'Failed to delete journal.'),
           variant: 'destructive',
         });
       }
@@ -177,15 +181,29 @@ function JournalsPageContent() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to post journal.',
+        description: getApiErrorMessage(error, 'Failed to post journal.'),
         variant: 'destructive',
       });
     }
   };
 
-  const calculateTotal = (journal: Journal) => {
-    return journal.lines?.reduce((sum, line) => sum + parseFloat(line.debit || '0'), 0) || 0;
+  const confirmReverse = async () => {
+    if (!journalToReverse) return;
+    try {
+      const reversal = await reverseJournal.mutateAsync({ id: journalToReverse.id });
+      toast({ title: t('journals.reversed'), description: reversal.journalNumber });
+    } catch (error) {
+      toast({
+        title: t('journals.reverseFailed'),
+        description: getApiErrorMessage(error, t('journals.reverseFailed')),
+        variant: 'destructive',
+      });
+    }
+    setJournalToReverse(null);
   };
+
+  const calculateTotal = (journal: Journal): string =>
+    journal.totalDebit ?? calculateJournalTotals(journal.lines ?? []).totalDebit;
 
   const columns: ColumnDef<Journal>[] = [
     {
@@ -239,6 +257,8 @@ function JournalsPageContent() {
       meta: { cellClassName: 'text-right' },
       cell: ({ row }) => {
         const journal = row.original;
+        const editable = isJournalEditable(journal);
+        const reversible = canReverseJournal(journal) && !isSystemJournal(journal);
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -253,7 +273,7 @@ function JournalsPageContent() {
                   View
                 </Link>
               </DropdownMenuItem>
-              {canEdit && journal.status === 'DRAFT' && (
+              {canEdit && editable && (
                 <>
                   <DropdownMenuItem asChild>
                     <Link href={`/accounting/journals/${journal.id}/edit`}>
@@ -267,10 +287,19 @@ function JournalsPageContent() {
                   </DropdownMenuItem>
                 </>
               )}
-              {canDelete && journal.status === 'DRAFT' && (
-                <DropdownMenuItem onClick={() => handleDelete(journal)} className="text-red-600">
+              {canDelete && editable && (
+                <DropdownMenuItem
+                  onClick={() => handleDelete(journal)}
+                  className="text-destructive"
+                >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
+                </DropdownMenuItem>
+              )}
+              {canReverse && reversible && (
+                <DropdownMenuItem onClick={() => setJournalToReverse(journal)}>
+                  <Undo2 className="mr-2 h-4 w-4" />
+                  {t('journals.reverse')}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -309,15 +338,6 @@ function JournalsPageContent() {
               value={tableParams.search}
               onChange={tableParams.setSearch}
               placeholder="Search by journal number or description..."
-            />
-            <DataTableFacetedFilter
-              title="Status"
-              options={JOURNAL_STATUS_OPTIONS}
-              selected={tableParams.filters.status ? [tableParams.filters.status] : []}
-              onSelectionChange={(values) =>
-                tableParams.setFilter('status', values[0] || undefined)
-              }
-              singleSelect
             />
             <DataTableDateRangeFilter
               value={dateRange}
@@ -394,9 +414,33 @@ function JournalsPageContent() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reverse Confirmation Dialog */}
+      <AlertDialog
+        open={!!journalToReverse}
+        onOpenChange={(open) => !open && setJournalToReverse(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('journals.reverseTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('journals.reverseConfirm', { number: journalToReverse?.journalNumber ?? '' })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReverse} disabled={reverseJournal.isPending}>
+              {t('journals.reverse')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

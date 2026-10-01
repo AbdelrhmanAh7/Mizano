@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { OrganizationsService } from '../../organizations/organizations.service';
@@ -53,6 +54,8 @@ const JOURNAL_INCLUDE = {
       account: { select: { id: true, code: true, name: true, type: true } },
     },
   },
+  // Lets clients see that a journal was already reversed (and link to the reversal).
+  reversedBy: { select: { id: true, journalNumber: true } },
 } satisfies Prisma.JournalInclude;
 
 type JournalWithLines = Prisma.JournalGetPayload<{ include: typeof JOURNAL_INCLUDE }>;
@@ -356,12 +359,16 @@ export class JournalsService {
     if (journal.isPosted) throw new BadRequestException('Journal is already posted');
     await this.checkLockDate(organizationId, journal.date);
 
-    // Guarded update: a concurrent post cannot flip it twice.
-    const { count } = await this.prisma.journal.updateMany({
-      where: { id, organizationId, isPosted: false, deletedAt: null },
-      data: { isPosted: true },
+    // Guarded update under the ledger lock: a concurrent post cannot flip it twice, and a
+    // base-currency change cannot commit between its check and this posting.
+    await this.prisma.$transaction(async (tx) => {
+      await lockOrganizationLedger(tx, organizationId);
+      const { count } = await tx.journal.updateMany({
+        where: { id, organizationId, isPosted: false, deletedAt: null },
+        data: { isPosted: true },
+      });
+      if (count === 0) throw new BadRequestException('Journal is already posted');
     });
-    if (count === 0) throw new BadRequestException('Journal is already posted');
 
     return this.findOne(organizationId, id);
   }
@@ -437,7 +444,7 @@ export class JournalsService {
     tx: Prisma.TransactionClient,
     organizationId: string,
   ): Promise<void> {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`journal:${organizationId}`}))`;
+    await lockOrganizationLedger(tx, organizationId);
   }
 
   private async nextJournalNumber(

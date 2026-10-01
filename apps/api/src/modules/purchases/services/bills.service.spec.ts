@@ -220,6 +220,22 @@ describe('BillsService', () => {
       expect(result).toBeDefined();
     });
 
+    it('includes each allocation payment so clients need no paged payment lookup', async () => {
+      prisma.bill.findFirst.mockResolvedValue(createMockBill({ billAllocations: [] }) as any);
+
+      await service.findOne(ORG_ID, 'bill-test-001');
+
+      const include = prisma.bill.findFirst.mock.calls[0]![0]!.include as {
+        billAllocations: { include: { payment: { select: Record<string, boolean> } } };
+      };
+      expect(include.billAllocations.include.payment.select).toMatchObject({
+        id: true,
+        paymentNumber: true,
+        date: true,
+        deletedAt: true,
+      });
+    });
+
     it('should throw NotFoundException for non-existent bill', async () => {
       prisma.bill.findFirst.mockResolvedValue(null);
 
@@ -355,6 +371,19 @@ describe('BillsService', () => {
       expect(prisma.$transaction).toHaveBeenCalled();
     });
 
+    it('should refuse to post a bill in a currency other than the base currency', async () => {
+      prisma.bill.findFirst.mockResolvedValue({ ...draftBill(), currencyCode: 'USD' } as any);
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultApAccountId: 'ap',
+        defaultVatReceivableAccountId: 'vat',
+        baseCurrency: 'EGP',
+      } as any);
+
+      await expect(service.approve(ORG_ID, 'bill-1')).rejects.toThrow('differs from the base');
+      expect(prisma.bill.updateMany).not.toHaveBeenCalled();
+      expect(journalsService.create).not.toHaveBeenCalled();
+    });
+
     it('should reject a taxed bill when no VAT receivable account is configured', async () => {
       prisma.bill.findFirst.mockResolvedValue(draftBill() as any);
       prisma.organization.findUnique.mockResolvedValue({ defaultApAccountId: 'ap' } as any);
@@ -375,6 +404,17 @@ describe('BillsService', () => {
       prisma.bill.findFirst.mockResolvedValue(null);
 
       await expect(service.approve(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
+    });
+
+    it('takes the ledger lock before reading the bill and organization settings', async () => {
+      prisma.bill.findFirst.mockResolvedValue(null);
+
+      await expect(service.approve(ORG_ID, 'bill-1')).rejects.toThrow(NotFoundException);
+
+      expect(prisma.$executeRaw).toHaveBeenCalled();
+      expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.bill.findFirst.mock.invocationCallOrder[0],
+      );
     });
 
     it('bulkApprove should reuse approve and report per-record failures', async () => {

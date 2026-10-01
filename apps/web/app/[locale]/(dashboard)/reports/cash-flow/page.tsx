@@ -13,6 +13,7 @@ import { ReportFilters } from '@/components/reports/report-filters';
 import { useCashFlowReport, formatCurrency } from '@/lib/hooks/use-reports';
 
 interface CashFlowItem {
+  key?: string;
   name?: string;
   description?: string;
   amount: number;
@@ -65,12 +66,14 @@ export default function CashFlowReportPage() {
       </CardHeader>
       <CardContent>
         {section.items.length === 0 ? (
-          <p className="text-center py-4 text-muted-foreground text-sm">No items</p>
+          <p className="text-center py-4 text-muted-foreground text-sm">{t('cashFlow.noItems')}</p>
         ) : (
           <div className="space-y-2">
             {section.items.map((item: CashFlowItem, i: number) => (
               <div key={i} className="flex justify-between py-1.5 border-b last:border-0">
-                <span className="text-sm">{item.name || item.description}</span>
+                <span className="text-sm">
+                  {item.key ? t(`cashFlow.lines.${item.key}`) : item.name || item.description}
+                </span>
                 <span
                   className={cn(
                     'text-sm font-mono font-medium',

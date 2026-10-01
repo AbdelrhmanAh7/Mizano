@@ -36,7 +36,9 @@ export class AuthService {
       const organization = await tx.organization.create({
         data: {
           name: organizationName,
+          // Keep both currency fields consistent until onboarding sets the base currency.
           currency: 'USD',
+          baseCurrency: 'USD',
         },
       });
 
