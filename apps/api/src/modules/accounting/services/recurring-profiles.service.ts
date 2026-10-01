@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import {
   Injectable,
   Logger,
@@ -440,10 +439,15 @@ export class RecurringProfilesService {
     }
   }
 
-  async executeProfile(organizationId: string, profileId: string): Promise<ExecutionResult> {
+  async executeProfile(
+    organizationId: string,
+    profileId: string,
+    idempotencyKey: string,
+  ): Promise<ExecutionResult> {
     const profile = await this.findOne(organizationId, profileId);
-    // A manual run of a journal profile is its own explicit event (see executeJournalProfile).
-    if (this.isJournalProfile(profile)) return this.executeJournalProfile(profile, true);
+    // A manual run of a journal profile is its own explicit event, identified by the caller's
+    // idempotency key (see executeJournalProfile).
+    if (this.isJournalProfile(profile)) return this.executeJournalProfile(profile, idempotencyKey);
     return this.executeRecurringProfile(profile);
   }
 
@@ -534,20 +538,38 @@ export class RecurringProfilesService {
    */
   private async executeJournalProfile(
     profile: RecurringProfile,
-    manual = false,
+    manualKey?: string,
   ): Promise<ExecutionResult> {
+    const manual = manualKey !== undefined;
     // A manual run is dated at execution time, never advances nextRunDate and never consumes a
     // scheduled run; each one is a separate event with its own source id.
     const occurrence = manual ? new Date() : profile.nextRunDate;
     const createdEntityType: string = profile.type || profile.entityType || '';
     const sourceId = manual
-      ? `${profile.id}:manual:${randomUUID()}`
+      ? `${profile.id}:manual:${manualKey}`
       : `${profile.id}:${runDay(occurrence)}`;
     const next = this.calculateNextRunDate(
       profile.nextRunDate,
       profile.frequency,
       profile.startDate,
     );
+
+    // A retried manual request (same key) returns the journal it already posted.
+    const replay = async (): Promise<ExecutionResult | null> => {
+      const existing = await this.prisma.journal.findFirst({
+        where: {
+          organizationId: profile.organizationId,
+          sourceType: JournalSourceType.RECURRING_JOURNAL,
+          sourceId,
+        },
+        select: { id: true },
+      });
+      return existing ? { success: true, createdEntityType, createdEntityId: existing.id } : null;
+    };
+    if (manual) {
+      const already = await replay();
+      if (already) return already;
+    }
 
     try {
       if (!manual && isPastEnd(occurrence, profile.endDate)) {
@@ -604,6 +626,11 @@ export class RecurringProfilesService {
       return { success: true, createdEntityType, createdEntityId: journalId };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      if (manual && error instanceof ConflictException) {
+        // A concurrent request with the same key won the race: return its journal.
+        const already = await replay();
+        if (already) return already;
+      }
       // An already-executed run is not a failure of the schedule; everything else is recorded.
       if (!(error instanceof ConflictException)) {
         await this.prisma.recurringExecution.create({

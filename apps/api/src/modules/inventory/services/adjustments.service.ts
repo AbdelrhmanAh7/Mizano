@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AdjustmentType, ItemType, Prisma } from '@prisma/client';
+import { AccountType, AdjustmentType, ItemType, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -36,6 +36,21 @@ type AdjustmentWithRelations = Prisma.InventoryAdjustmentGetPayload<{
 
 export type AdjustmentView = AdjustmentWithRelations & AdjustmentLedgerView;
 
+/**
+ * The offset of an adjustment (shrinkage, write-off, stocktake gain) is an expense account: the
+ * chart has no separate cost-of-goods-sold type, COGS accounts are EXPENSE accounts.
+ */
+const ADJUSTMENT_ACCOUNT_TYPES: AccountType[] = [AccountType.EXPENSE];
+
+function adjustmentAccountWhere(organizationId: string): Prisma.AccountWhereInput {
+  return {
+    organizationId,
+    deletedAt: null,
+    isActive: true,
+    type: { in: ADJUSTMENT_ACCOUNT_TYPES },
+  };
+}
+
 function parseDate(value: string): Date {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) throw new BadRequestException('Invalid adjustment date');
@@ -60,6 +75,17 @@ export class AdjustmentsService {
    * Decreases are guarded (the stock row is only decremented while enough remains), so concurrent
    * adjustments can neither oversell stock nor leave the ledger out of step with it.
    */
+  /** Accounts that may take the other side of an adjustment (what create() accepts). */
+  async accountOptions(
+    organizationId: string,
+  ): Promise<{ id: string; code: string; name: string; type: AccountType }[]> {
+    return this.prisma.account.findMany({
+      where: adjustmentAccountWhere(organizationId),
+      select: { id: true, code: true, name: true, type: true },
+      orderBy: { code: 'asc' },
+    });
+  }
+
   async create(organizationId: string, dto: CreateAdjustmentDto): Promise<AdjustmentView> {
     const date = parseDate(dto.date);
 
@@ -87,10 +113,12 @@ export class AdjustmentsService {
       if (!warehouse) throw new BadRequestException('Warehouse not found');
 
       const adjustmentAccount = await tx.account.findFirst({
-        where: { id: dto.accountId, organizationId, deletedAt: null, isActive: true },
+        where: { id: dto.accountId, ...adjustmentAccountWhere(organizationId) },
         select: { id: true },
       });
-      if (!adjustmentAccount) throw new BadRequestException('Adjustment account not found');
+      if (!adjustmentAccount) {
+        throw new BadRequestException('Adjustment account must be an active expense account');
+      }
 
       if (!item.inventoryAccountId) {
         throw new BadRequestException(
@@ -139,9 +167,9 @@ export class AdjustmentsService {
         data: {
           itemId: item.id,
           warehouseId: warehouse.id,
-          quantity: new Decimal(
-            dto.type === AdjustmentType.INCREASE ? dto.quantity : -dto.quantity,
-          ),
+          // Quantity is always positive; movementType carries the direction (the inventory
+          // value reports negate OUT movements themselves).
+          quantity: new Decimal(dto.quantity),
           type: 'adjustment',
           movementType: dto.type === AdjustmentType.INCREASE ? 'IN' : 'OUT',
           referenceType: 'adjustment',
@@ -250,9 +278,7 @@ export class AdjustmentsService {
         data: {
           itemId: adjustment.itemId,
           warehouseId: adjustment.warehouseId,
-          quantity: new Decimal(
-            restore === AdjustmentType.INCREASE ? adjustment.quantity : -adjustment.quantity,
-          ),
+          quantity: new Decimal(adjustment.quantity),
           type: 'adjustment_void',
           // Same unit cost as the movement being undone; dated at void time.
           costPerUnit: originalMovement?.costPerUnit ?? 0,

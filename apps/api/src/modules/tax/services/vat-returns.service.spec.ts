@@ -56,9 +56,13 @@ describe('VatReturnsService', () => {
     outputDebit?: string;
     inputDebit: string;
     inputCredit?: string;
+    creditNotesNet?: string;
   }): void {
     prisma.journalLine.aggregate.mockImplementation(
-      async (args: { where: { accountId: string } }) => {
+      async (args: { where: { accountId?: string; description?: unknown } }) => {
+        if (args.where.description) {
+          return { _sum: { debit: dec(opts.creditNotesNet ?? '0'), credit: dec('0') } };
+        }
         if (args.where.accountId === PAYABLE) {
           return { _sum: { debit: dec(opts.outputDebit ?? '0'), credit: dec(opts.outputCredit) } };
         }
@@ -112,9 +116,45 @@ describe('VatReturnsService', () => {
           organizationId: ORG,
           isPosted: true,
           deletedAt: null,
-          OR: [{ sourceType: null }, { sourceType: { notIn: ['VAT_RETURN', 'VAT_PAYMENT'] } }],
+          AND: [
+            {
+              OR: [
+                { sourceType: null },
+                { sourceType: { notIn: ['VAT_RETURN', 'VAT_PAYMENT', 'OPENING_BALANCE'] } },
+              ],
+            },
+            { NOT: { journalNumber: 'OB-001', sourceType: null } },
+            { NOT: { reversalOf: { is: { journalNumber: 'OB-001', sourceType: null } } } },
+          ],
         }),
       );
+    });
+
+    it('excludes opening balance journals (and their reversals) from VAT activity', async () => {
+      prisma.vATReturn.findFirst.mockResolvedValue(vatReturn({ status: 'DRAFT' }));
+      prisma.vATReturn.updateMany.mockResolvedValue({ count: 1 });
+      prisma.vATReturn.findUniqueOrThrow.mockResolvedValue({ id: 'vr-1' });
+      givenLedger({ outputCredit: '10', inputDebit: '0' });
+      await service.calculate(ORG, 'vr-1');
+      const sources = prisma.journalLine.aggregate.mock.calls[0][0].where.journal.AND[0].OR[1];
+      expect(sources.sourceType.notIn).toContain('OPENING_BALANCE');
+    });
+
+    it('subtracts credit notes issued in the period (net of VAT) from the sales base', async () => {
+      prisma.vATReturn.findFirst.mockResolvedValue(vatReturn({ status: 'DRAFT' }));
+      prisma.vATReturn.updateMany.mockResolvedValue({ count: 1 });
+      prisma.vATReturn.findUniqueOrThrow.mockResolvedValue({ id: 'vr-1' });
+      givenLedger({ outputCredit: '140.1', inputDebit: '56.2', creditNotesNet: '100.25' });
+
+      await service.calculate(ORG, 'vr-1');
+
+      const update = prisma.vATReturn.updateMany.mock.calls[0][0];
+      // invoices 1000 - credit notes 100.25
+      expect((update.data.totalSales as Decimal).toFixed(4)).toBe('899.7500');
+      const creditNoteQuery = prisma.journalLine.aggregate.mock.calls.find(
+        (c: any) => c[0].where.description,
+      )[0].where;
+      expect(creditNoteQuery.journal.sourceType.in).toEqual(['CREDIT_NOTE', 'CREDIT_NOTE_VOID']);
     });
 
     it('includes VAT on an account that was a default VAT account before', async () => {
@@ -298,6 +338,16 @@ describe('VatReturnsService', () => {
     beforeEach(() => {
       prisma.vATReturn.findFirst.mockResolvedValue(vatReturn({ status: 'SUBMITTED' }));
       prisma.account.findFirst.mockResolvedValue({ id: BANK });
+      prisma.journal.findFirst.mockResolvedValue({
+        lines: [
+          { accountId: PAYABLE, credit: dec('0'), description: 'VAT-001 - Output VAT cleared' },
+          {
+            accountId: PAYABLE,
+            credit: dec('83.9'),
+            description: 'VAT-001 - VAT payable to tax authority',
+          },
+        ],
+      });
       prisma.vATReturn.updateMany.mockResolvedValue({ count: 1 });
       prisma.vATPayment.create.mockResolvedValue({ id: 'pay-1' });
     });
@@ -335,18 +385,51 @@ describe('VatReturnsService', () => {
       expect(journals.create).not.toHaveBeenCalled();
     });
 
-    it('locks the return row and the ledger, and requires an asset account in base currency', async () => {
+    it('requires an eligible bank/cash account of the tenant (shared sales rule)', async () => {
       await service.recordPayment(ORG, 'vr-1', dto);
       expect(prisma.$queryRaw).toHaveBeenCalled();
-      expect(prisma.account.findFirst.mock.calls[0][0].where).toMatchObject({
+      const where = prisma.account.findFirst.mock.calls[0][0].where;
+      expect(where.AND[0]).toEqual({ id: BANK });
+      expect(where.AND[1]).toMatchObject({
         organizationId: ORG,
         type: 'ASSET',
         isActive: true,
+        deletedAt: null,
       });
-      // Only a bank register in another currency disqualifies the account.
-      expect(prisma.bankAccount.findFirst).toHaveBeenCalled();
-      prisma.bankAccount.findFirst.mockResolvedValue({ id: 'reg-1' });
-      await expect(service.recordPayment(ORG, 'vr-1', dto)).rejects.toThrow('base currency');
+    });
+
+    it('debits the payable account the settlement credited, not the current default', async () => {
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultVatPayableAccountId: 'acc-new-default-payable',
+        defaultVatReceivableAccountId: RECEIVABLE,
+        defaultBankAccountId: BANK,
+        baseCurrency: 'EGP',
+      });
+      await service.recordPayment(ORG, 'vr-1', dto);
+      expect(prisma.journal.findFirst.mock.calls[0][0].where).toMatchObject({
+        organizationId: ORG,
+        sourceType: 'VAT_RETURN',
+        sourceId: 'vr-1',
+      });
+      expect(journals.create.mock.calls[0][1].lines[0]).toEqual(
+        expect.objectContaining({ accountId: PAYABLE, debit: '83.9000' }),
+      );
+    });
+
+    it('refuses to pay when the settlement journal cannot be found', async () => {
+      prisma.journal.findFirst.mockResolvedValue(null);
+      await expect(service.recordPayment(ORG, 'vr-1', dto)).rejects.toThrow('settlement journal');
+      expect(journals.create).not.toHaveBeenCalled();
+    });
+
+    it('lists the eligible payment accounts with the same rule', async () => {
+      prisma.account.findMany.mockResolvedValue([{ id: BANK, code: '1010', name: 'Bank' }]);
+      const res = await service.paymentAccounts(ORG);
+      expect(res).toHaveLength(1);
+      expect(prisma.account.findMany.mock.calls[0][0].where).toMatchObject({
+        organizationId: ORG,
+        type: 'ASSET',
+      });
     });
 
     it('takes the ledger lock first, then locks the return row (same order as submit)', async () => {
@@ -392,16 +475,10 @@ describe('VatReturnsService', () => {
     it('rejects a paid-from account from another organization or equal to VAT Payable', async () => {
       prisma.account.findFirst.mockResolvedValue(null);
       await expect(service.recordPayment(ORG, 'vr-1', dto)).rejects.toThrow('Paid-from account');
-      expect(prisma.account.findFirst.mock.calls[0][0].where.organizationId).toBe(ORG);
+      expect(prisma.account.findFirst.mock.calls[0][0].where.AND[1].organizationId).toBe(ORG);
 
       prisma.account.findFirst.mockResolvedValue({ id: PAYABLE });
       await expect(service.recordPayment(ORG, 'vr-1', dto)).rejects.toThrow('must differ');
-    });
-
-    it('errors clearly when no VAT Payable account is configured', async () => {
-      prisma.organization.findUnique.mockResolvedValue({ defaultVatPayableAccountId: null });
-      await expect(service.recordPayment(ORG, 'vr-1', dto)).rejects.toThrow('VAT Payable');
-      expect(journals.create).not.toHaveBeenCalled();
     });
   });
 

@@ -4,6 +4,7 @@
  * strict tenant isolation. Real registered users and JWTs (see helpers/tenant.helper.ts).
  */
 import { INestApplication } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { ApiHelper } from './helpers/api-client.helper';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { decimalEquals, isoDay, lineSignature } from './helpers/journey.helper';
@@ -212,6 +213,20 @@ describe('Accounting postings (e2e)', () => {
       ).toBe(0);
     });
 
+    it('lists only eligible bank/cash accounts of the tenant as payment accounts', async () => {
+      const res = await v.get('/vat-returns/payment-accounts');
+      expect(res.status).toBe(200);
+      const ids = res.body.map((x: { id: string }) => x.id);
+      expect(ids).toContain(chartV.bank);
+      expect(ids).toContain(chartV.cash);
+      expect(ids).not.toContain(chartV.vatInput); // an asset, but not a bank/cash account
+      expect(ids).not.toContain(chartV.revenue);
+      const other = await b.get('/vat-returns/payment-accounts');
+      expect(other.status).toBe(200);
+      expect(other.body.map((x: { id: string }) => x.id)).not.toContain(chartV.bank);
+      expect((await anon.get('/vat-returns/payment-accounts')).status).toBe(401);
+    });
+
     it('requires an active base-currency asset account of the same tenant to pay from', async () => {
       const send = (paidFromAccountId?: string) =>
         v.post(`/vat-returns/${returnId}/payment`).send({
@@ -222,6 +237,7 @@ describe('Accounting postings (e2e)', () => {
       expect((await send()).status).toBe(400);
       expect((await send(chartV.vatPayable)).status).toBe(400); // liability
       expect((await send(chartV.revenue)).status).toBe(400); // income
+      expect((await send(chartV.vatInput)).status).toBe(400); // asset, but not bank/cash
       expect((await send(chartB.bank)).status).toBe(400); // another tenant's account
       expect((await send('does-not-exist')).status).toBe(400);
 
@@ -429,6 +445,42 @@ describe('Accounting postings (e2e)', () => {
       await expectBalancedTrialBalance(o);
     });
 
+    it('replaces a legacy source-less opening journal (OB-001) instead of double posting', async () => {
+      const legacy = await registerTenant(app, 'AccLegacy');
+      const chartL = await seedChart(legacy.api);
+      const equity = await createAccount(legacy.api, '3900', 'Opening Balance Equity', 'EQUITY');
+      const journal = await prisma.journal.create({
+        data: {
+          journalNumber: 'OB-001',
+          date: new Date(`${openingDate}T00:00:00.000Z`),
+          reference: 'Opening Balances',
+          isPosted: true,
+          organizationId: legacy.organizationId,
+          lines: {
+            create: [
+              { accountId: chartL.bank, debit: '900', credit: '0' },
+              { accountId: equity, debit: '0', credit: '900' },
+            ],
+          },
+        },
+      });
+      const path = '/organization/onboarding/opening-balances';
+      const payload = body([{ accountId: chartL.bank, amount: '500' }]);
+
+      expect((await legacy.api.post(path).send(payload)).status).toBe(409);
+
+      const res = await legacy.api.post(path).send({ ...payload, replaceExisting: true });
+      expect(res.status).toBe(201);
+      const reversal = await prisma.journal.findFirst({
+        where: { organizationId: legacy.organizationId, reversalOfId: journal.id },
+      });
+      expect(reversal).not.toBeNull();
+      expect((await accountBalance(prisma, legacy.organizationId, chartL.bank)).equals('500')).toBe(
+        true,
+      );
+      expect(await journalsFor(legacy.organizationId, OPENING_BALANCE)).toHaveLength(1);
+    });
+
     it('tenant B cannot post against tenant A accounts and posts nothing', async () => {
       const path = '/organization/onboarding/opening-balances';
       const foreign = await b.post(path).send(body([{ accountId: chartO.bank, amount: '10' }]));
@@ -515,8 +567,26 @@ describe('Accounting postings (e2e)', () => {
     });
 
     it('manual execution is a separate dated-today event and leaves the schedule alone', async () => {
-      const first = await o.post(`/recurring-profiles/${profileId}/execute`).send({});
-      const second = await o.post(`/recurring-profiles/${profileId}/execute`).send({});
+      const key = randomUUID();
+      const first = await o
+        .post(`/recurring-profiles/${profileId}/execute`)
+        .send({ idempotencyKey: key });
+      const second = await o
+        .post(`/recurring-profiles/${profileId}/execute`)
+        .send({ idempotencyKey: randomUUID() });
+      // A retry of the first request (same key) returns its journal and posts nothing new.
+      const retry = await o
+        .post(`/recurring-profiles/${profileId}/execute`)
+        .send({ idempotencyKey: key });
+      expect(retry.status).toBe(201);
+      expect(retry.body.success).toBe(true);
+      expect(retry.body.createdEntityId).toBe(first.body.createdEntityId);
+      const noKey = await o.post(`/recurring-profiles/${profileId}/execute`).send({});
+      expect(noKey.status).toBe(400);
+      const badKey = await o
+        .post(`/recurring-profiles/${profileId}/execute`)
+        .send({ idempotencyKey: 'not-a-uuid' });
+      expect(badKey.status).toBe(400);
       expect(first.status).toBe(201);
       expect(first.body.success).toBe(true);
       expect(second.body.success).toBe(true);
@@ -561,15 +631,25 @@ describe('Accounting postings (e2e)', () => {
 
     it('tenant B cannot read or execute the profile', async () => {
       expect((await b.get(`/recurring-profiles/${profileId}`)).status).toBe(404);
-      expect((await b.post(`/recurring-profiles/${profileId}/execute`).send({})).status).toBe(404);
+      expect(
+        (
+          await b
+            .post(`/recurring-profiles/${profileId}/execute`)
+            .send({ idempotencyKey: randomUUID() })
+        ).status,
+      ).toBe(404);
       expect(await journalsFor(tenantB.organizationId, RECURRING_JOURNAL)).toHaveLength(0);
     });
 
     it('rejects anonymous callers', async () => {
       expect((await anon.get('/recurring-profiles')).status).toBe(401);
-      expect((await anon.post(`/recurring-profiles/${profileId}/execute`).send({})).status).toBe(
-        401,
-      );
+      expect(
+        (
+          await anon
+            .post(`/recurring-profiles/${profileId}/execute`)
+            .send({ idempotencyKey: randomUUID() })
+        ).status,
+      ).toBe(401);
     });
 
     it('ends with a balanced trial balance', async () => {

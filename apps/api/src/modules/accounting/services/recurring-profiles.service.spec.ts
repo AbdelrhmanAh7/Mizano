@@ -160,10 +160,13 @@ describe('RecurringProfilesService (journal profiles)', () => {
       expect(journals.create).not.toHaveBeenCalled();
     });
 
-    it('a manual run is dated now, keeps the schedule and uses its own manual source id', async () => {
+    const KEY_1 = '11111111-1111-4111-8111-111111111111';
+    const KEY_2 = '22222222-2222-4222-8222-222222222222';
+
+    it('a manual run is dated now, keeps the schedule and uses the key as its source id', async () => {
       const before = Date.now();
-      const first = await service.executeProfile(ORG, 'prof-1');
-      const second = await service.executeProfile(ORG, 'prof-1');
+      const first = await service.executeProfile(ORG, 'prof-1', KEY_1);
+      const second = await service.executeProfile(ORG, 'prof-1', KEY_2);
 
       expect(first.success).toBe(true);
       expect(second.success).toBe(true);
@@ -171,16 +174,44 @@ describe('RecurringProfilesService (journal profiles)', () => {
       expect(prisma.recurringProfile.updateMany).not.toHaveBeenCalled();
       const [, dto1, opts1] = journals.create.mock.calls[0];
       const [, , opts2] = journals.create.mock.calls[1];
-      expect(opts1.source.id).toMatch(/^prof-1:manual:[0-9a-f-]{36}$/);
-      expect(opts2.source.id).not.toBe(opts1.source.id);
+      expect(opts1.source).toEqual({ type: 'RECURRING_JOURNAL', id: `prof-1:manual:${KEY_1}` });
+      expect(opts2.source.id).toBe(`prof-1:manual:${KEY_2}`);
       expect(new Date(dto1.date).getTime()).toBeGreaterThanOrEqual(before);
       expect(new Date(dto1.date).getTime()).toBeLessThanOrEqual(Date.now());
-      expect(opts1.source.id).not.toContain('2026-03-01');
+    });
+
+    it('a retried manual request (same key) returns the existing journal and posts nothing', async () => {
+      prisma.journal.findFirst.mockResolvedValue({ id: 'j-existing' });
+      const res = await service.executeProfile(ORG, 'prof-1', KEY_1);
+      expect(res).toEqual({
+        success: true,
+        createdEntityType: 'JOURNAL',
+        createdEntityId: 'j-existing',
+      });
+      expect(prisma.journal.findFirst.mock.calls[0][0].where).toEqual({
+        organizationId: ORG,
+        sourceType: 'RECURRING_JOURNAL',
+        sourceId: `prof-1:manual:${KEY_1}`,
+      });
+      expect(journals.create).not.toHaveBeenCalled();
+    });
+
+    it('a concurrent same-key request that loses the unique race returns the winner journal', async () => {
+      prisma.journal.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'j-winner' });
+      journals.create.mockRejectedValue(
+        new ConflictException('This transaction has already been posted'),
+      );
+      const res = await service.executeProfile(ORG, 'prof-1', KEY_1);
+      expect(res).toEqual(expect.objectContaining({ success: true, createdEntityId: 'j-winner' }));
     });
 
     it('is tenant scoped', async () => {
       prisma.recurringProfile.findFirst.mockResolvedValue(null);
-      await expect(service.executeProfile('other-org', 'prof-1')).rejects.toThrow('not found');
+      await expect(service.executeProfile('other-org', 'prof-1', KEY_1)).rejects.toThrow(
+        'not found',
+      );
       expect(prisma.recurringProfile.findFirst.mock.calls[0][0].where.organizationId).toBe(
         'other-org',
       );

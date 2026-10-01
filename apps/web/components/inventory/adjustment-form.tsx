@@ -47,6 +47,8 @@ interface AdjustmentFormProps {
   onCancel: () => void;
   isSubmitting?: boolean;
   errorMessage?: string | null;
+  /** True once the account options loaded and there is none to pick. */
+  accountsEmpty?: boolean;
 }
 
 function FieldError({ message }: { message?: string }): JSX.Element | null {
@@ -61,6 +63,7 @@ export function AdjustmentForm({
   onCancel,
   isSubmitting,
   errorMessage,
+  accountsEmpty,
 }: AdjustmentFormProps): JSX.Element {
   const form = useForm<AdjustmentFormData>({
     resolver: zodResolver(adjustmentSchema),
@@ -253,6 +256,11 @@ export function AdjustmentForm({
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
+                  {accountsEmpty && (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      No expense accounts available
+                    </div>
+                  )}
                   {accounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.code} - {account.name}

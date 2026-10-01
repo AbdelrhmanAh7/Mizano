@@ -7,8 +7,11 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AdjustmentForm } from '@/components/inventory/adjustment-form';
-import { useAccounts } from '@/lib/hooks/use-accounts';
-import { useCreateAdjustment, type CreateAdjustmentData } from '@/lib/hooks/use-adjustments';
+import {
+  useAdjustmentAccountOptions,
+  useCreateAdjustment,
+  type CreateAdjustmentData,
+} from '@/lib/hooks/use-adjustments';
 import { useItems } from '@/lib/hooks/use-items';
 import { useWarehouses } from '@/lib/hooks/use-warehouses';
 
@@ -37,13 +40,12 @@ export default function NewAdjustmentPage() {
     }),
   );
 
-  const { data: accountsData, isLoading: accountsLoading } = useAccounts({
-    isActive: true,
-    limit: 200,
-  });
-  const accounts = (accountsData?.data || []).map(
-    (a: { id: string; name: string; code: string }) => ({ id: a.id, name: a.name, code: a.code }),
-  );
+  const {
+    data: accountOptions,
+    isLoading: accountsLoading,
+    isError: accountsError,
+  } = useAdjustmentAccountOptions();
+  const accounts = accountOptions ?? [];
 
   const handleSubmit = async (data: CreateAdjustmentData): Promise<void> => {
     try {
@@ -93,7 +95,8 @@ export default function NewAdjustmentPage() {
         items={items}
         warehouses={warehouses}
         accounts={accounts}
-        errorMessage={errorMessage}
+        errorMessage={errorMessage ?? (accountsError ? t('adjustments.accountsLoadError') : null)}
+        accountsEmpty={accounts.length === 0}
         onSubmit={handleSubmit}
         onCancel={() => router.push('/inventory/adjustments')}
         isSubmitting={createAdjustment.isPending}

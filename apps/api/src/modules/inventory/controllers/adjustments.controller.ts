@@ -39,6 +39,13 @@ export class AdjustmentsController {
     return this.adjustmentsService.findAll(orgId, query);
   }
 
+  @Get('account-options')
+  @Permissions('inventory.create')
+  @ApiOperation({ summary: 'Accounts that can take the other side of an adjustment' })
+  accountOptions(@CurrentOrg() orgId: string) {
+    return this.adjustmentsService.accountOptions(orgId);
+  }
+
   @Get('cursor')
   @Permissions('inventory.view')
   @ApiOperation({ summary: 'List adjustments with cursor-based pagination' })

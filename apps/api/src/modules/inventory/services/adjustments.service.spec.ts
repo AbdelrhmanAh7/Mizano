@@ -126,7 +126,7 @@ describe('AdjustmentsService', () => {
       expect(prisma.inventoryMovement.create.mock.calls[0][0].data.movementType).toBe('OUT');
       expect(
         (prisma.inventoryMovement.create.mock.calls[0][0].data.quantity as Decimal).toString(),
-      ).toBe('-3');
+      ).toBe('3');
       expect(journals.create.mock.calls[0][1].lines).toEqual([
         expect.objectContaining({ accountId: SHRINKAGE, debit: '0.9999', credit: '0' }),
         expect.objectContaining({ accountId: INVENTORY, debit: '0', credit: '0.9999' }),
@@ -170,6 +170,60 @@ describe('AdjustmentsService', () => {
       expect(journals.create).not.toHaveBeenCalled();
     });
 
+    it('validates the adjustment account as an active expense account of the organization', async () => {
+      await service.create(ORG, baseDto);
+      expect(prisma.account.findFirst.mock.calls[0][0].where).toEqual({
+        id: SHRINKAGE,
+        organizationId: ORG,
+        deletedAt: null,
+        isActive: true,
+        type: { in: ['EXPENSE'] },
+      });
+      prisma.account.findFirst.mockResolvedValue(null);
+      await expect(service.create(ORG, baseDto)).rejects.toThrow('active expense account');
+    });
+
+    it('lists the same accounts for roles without accounting.view', async () => {
+      prisma.account.findMany.mockResolvedValue([
+        { id: SHRINKAGE, code: '5500', name: 'Shrinkage', type: 'EXPENSE' },
+      ]);
+      const res = await service.accountOptions(ORG);
+      expect(res).toHaveLength(1);
+      expect(prisma.account.findMany.mock.calls[0][0].where).toEqual({
+        organizationId: ORG,
+        deletedAt: null,
+        isActive: true,
+        type: { in: ['EXPENSE'] },
+      });
+    });
+
+    it('stores positive quantities so the value report nets an increase and its void to zero', async () => {
+      prisma.inventoryAdjustment.findFirst.mockResolvedValue({
+        id: 'adj-1',
+        adjustmentNumber: 'ADJ-007',
+        type: 'INCREASE',
+        quantity: 3,
+        itemId: 'item-1',
+        warehouseId: 'wh-1',
+        item: { id: 'item-1', name: 'Widget', sku: 'W', unit: null },
+      });
+      prisma.journal.findFirst.mockResolvedValue({ id: 'j1', reversedBy: null });
+      prisma.journal.findMany.mockResolvedValue([]);
+      prisma.inventoryMovement.findFirst.mockResolvedValue({ costPerUnit: dec('0.3333') });
+
+      await service.create(ORG, baseDto);
+      await service.void(ORG, 'adj-1');
+
+      // The dashboard inventory value report: qty x cost, negated for OUT movements.
+      const valueDelta = (mv: { quantity: Decimal; movementType: string; costPerUnit: Decimal }) =>
+        mv.quantity.mul(mv.costPerUnit).mul(mv.movementType === 'IN' ? 1 : -1);
+      const [inc, voided] = prisma.inventoryMovement.create.mock.calls.map((c: any) => c[0].data);
+      expect(inc.movementType).toBe('IN');
+      expect(voided.movementType).toBe('OUT');
+      expect(inc.quantity.greaterThan(0) && voided.quantity.greaterThan(0)).toBe(true);
+      expect(valueDelta(inc).add(valueDelta(voided)).isZero()).toBe(true);
+    });
+
     it('dates the movement on the adjustment date', async () => {
       await service.create(ORG, baseDto);
       expect(prisma.inventoryMovement.create.mock.calls[0][0].data.createdAt).toEqual(
@@ -189,7 +243,7 @@ describe('AdjustmentsService', () => {
       expect(prisma.warehouse.findFirst.mock.calls[0][0].where.organizationId).toBe(ORG);
 
       prisma.account.findFirst.mockResolvedValueOnce(null);
-      await expect(service.create(ORG, baseDto)).rejects.toThrow('Adjustment account not found');
+      await expect(service.create(ORG, baseDto)).rejects.toThrow('active expense account');
       expect(prisma.account.findFirst.mock.calls[0][0].where.organizationId).toBe(ORG);
 
       expect(prisma.inventoryAdjustment.create).not.toHaveBeenCalled();

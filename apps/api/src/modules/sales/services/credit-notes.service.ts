@@ -17,12 +17,12 @@ import { CreditNoteQueryDto } from '../dto/credit-note-query.dto';
 import { UpdateCreditNoteDto } from '../dto/update-credit-note.dto';
 import {
   assertMoneyFits,
-  bankCashAccountWhere,
   mapDocumentNumberConflict,
   nextCreditNoteNumber,
   parseDocumentDate,
   parsePositiveDecimal,
 } from '../utils/sales-helpers';
+import { bankCashAccountWhere } from '../../../common/utils/bank-cash-accounts';
 import { InvoicesService, RECEIVABLE_INVOICE_STATUSES } from './invoices.service';
 
 const CREDIT_NOTE_VIEW_INCLUDE = {

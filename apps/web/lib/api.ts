@@ -363,6 +363,7 @@ export const adjustmentsApi = {
   getAllCursor: (params?: Record<string, unknown>) =>
     api.get('/inventory-adjustments/cursor', { params }),
   void: (id: string) => api.post(`/inventory-adjustments/${id}/void`),
+  accountOptions: () => api.get('/inventory-adjustments/account-options'),
 };
 
 // ===========================================================================
@@ -392,7 +393,8 @@ export const journalsApi = {
 export const recurringProfilesApi = {
   ...crud('/recurring-profiles', { hasCursor: false }),
   toggle: (id: string) => api.patch(`/recurring-profiles/${id}/toggle`),
-  execute: (id: string) => api.post(`/recurring-profiles/${id}/execute`),
+  execute: (id: string, idempotencyKey: string) =>
+    api.post(`/recurring-profiles/${id}/execute`, { idempotencyKey }),
   getStatistics: () => api.get('/recurring-profiles/statistics'),
   getExecutionHistory: (id: string, params?: { limit?: number }) =>
     api.get(`/recurring-profiles/${id}/executions`, { params }),

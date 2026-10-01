@@ -118,7 +118,8 @@
       "action": "Void adjustment",
       "title": "Void this adjustment?",
       "description": "This reverses the journal entry and restores the stock. It cannot be undone."
-    }
+    },
+    "accountsLoadError": "Could not load the adjustment accounts"
   },
   "priceLists": {
     "title": "Price Lists",

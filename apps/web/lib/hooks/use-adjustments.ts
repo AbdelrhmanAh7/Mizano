@@ -59,6 +59,24 @@ export interface CreateAdjustmentData {
   notes?: string;
 }
 
+export interface AdjustmentAccountOption {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+}
+
+/** Accounts that may take the other side of an adjustment (needs inventory.create only). */
+export function useAdjustmentAccountOptions() {
+  return useQuery({
+    queryKey: ['adjustments', 'account-options'],
+    queryFn: async (): Promise<AdjustmentAccountOption[]> => {
+      const response = await adjustmentsApi.accountOptions();
+      return response.data;
+    },
+  });
+}
+
 /**
  * Hook to fetch all adjustments
  */

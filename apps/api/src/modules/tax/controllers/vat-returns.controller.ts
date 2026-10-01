@@ -57,6 +57,13 @@ export class VatReturnsController {
     return this.vatReturnsService.getVatSummary(orgId, query.startDate, query.endDate);
   }
 
+  @Get('payment-accounts')
+  @Permissions('tax.edit')
+  @ApiOperation({ summary: 'Bank/cash accounts a VAT payment can be made from' })
+  paymentAccounts(@CurrentOrg() orgId: string) {
+    return this.vatReturnsService.paymentAccounts(orgId);
+  }
+
   @Get(':id')
   @Permissions('tax.view')
   @ApiOperation({ summary: 'Get VAT return by ID' })

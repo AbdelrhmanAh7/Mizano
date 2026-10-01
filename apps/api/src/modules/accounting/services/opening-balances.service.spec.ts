@@ -184,7 +184,11 @@ describe('OpeningBalancesService', () => {
   });
 
   it('refuses a second posting unless replaceExisting is explicit', async () => {
-    prisma.journal.findFirst.mockResolvedValue({ id: 'j-old', date: new Date('2026-01-01') });
+    prisma.journal.findFirst.mockResolvedValue({
+      id: 'j-old',
+      date: new Date('2026-01-01'),
+      sourceType: 'OPENING_BALANCE',
+    });
 
     await expect(service.post(ORG, dto())).rejects.toThrow(ConflictException);
     expect(journals.reverse).not.toHaveBeenCalled();
@@ -192,7 +196,11 @@ describe('OpeningBalancesService', () => {
   });
 
   it('replaceExisting reverses the current journal (linked) then posts the new revision', async () => {
-    prisma.journal.findFirst.mockResolvedValue({ id: 'j-old', date: new Date('2026-01-01') });
+    prisma.journal.findFirst.mockResolvedValue({
+      id: 'j-old',
+      date: new Date('2026-01-01'),
+      sourceType: 'OPENING_BALANCE',
+    });
     prisma.journal.count.mockResolvedValue(1);
 
     await service.post(ORG, dto({ replaceExisting: true }));
@@ -216,7 +224,11 @@ describe('OpeningBalancesService', () => {
   });
 
   it('replaceExisting with no non-zero entries clears the balances: reverses, posts nothing', async () => {
-    prisma.journal.findFirst.mockResolvedValue({ id: 'j-old', date: new Date('2026-01-01') });
+    prisma.journal.findFirst.mockResolvedValue({
+      id: 'j-old',
+      date: new Date('2026-01-01'),
+      sourceType: 'OPENING_BALANCE',
+    });
 
     await service.post(
       ORG,
@@ -229,7 +241,11 @@ describe('OpeningBalancesService', () => {
   });
 
   it('without replaceExisting an empty step neither reverses nor posts', async () => {
-    prisma.journal.findFirst.mockResolvedValue({ id: 'j-old', date: new Date('2026-01-01') });
+    prisma.journal.findFirst.mockResolvedValue({
+      id: 'j-old',
+      date: new Date('2026-01-01'),
+      sourceType: 'OPENING_BALANCE',
+    });
     await service.post(ORG, dto({ balances: [] }));
     expect(journals.reverse).not.toHaveBeenCalled();
     expect(journals.create).not.toHaveBeenCalled();
@@ -240,12 +256,42 @@ describe('OpeningBalancesService', () => {
     expect(prisma.journal.findFirst.mock.calls[0][0].where).toEqual(
       expect.objectContaining({
         organizationId: ORG,
-        sourceType: 'OPENING_BALANCE',
         deletedAt: null,
+        isPosted: true,
         reversalOfId: null,
         reversedBy: null,
+        OR: [{ sourceType: 'OPENING_BALANCE' }, { sourceType: null, journalNumber: 'OB-001' }],
       }),
     );
+  });
+
+  it('a legacy source-less opening journal counts as posted: 409 without replaceExisting', async () => {
+    prisma.journal.findFirst.mockResolvedValue({
+      id: 'j-legacy',
+      date: new Date('2026-01-01'),
+      sourceType: null,
+    });
+    await expect(service.post(ORG, dto())).rejects.toThrow(ConflictException);
+    expect(journals.create).not.toHaveBeenCalled();
+  });
+
+  it('replaceExisting reverses a legacy journal (no source) and posts revision 1', async () => {
+    prisma.journal.findFirst.mockResolvedValue({
+      id: 'j-legacy',
+      date: new Date('2026-01-01'),
+      sourceType: null,
+    });
+    await service.post(ORG, dto({ replaceExisting: true }));
+    expect(journals.reverse).toHaveBeenCalledWith(
+      ORG,
+      'j-legacy',
+      { date: new Date('2026-01-01').toISOString() },
+      { tx: prisma, source: undefined },
+    );
+    expect(journals.create.mock.calls[0][2].source).toEqual({
+      type: 'OPENING_BALANCE',
+      id: ORG,
+    });
   });
 
   it('no balances (or all zero) only completes the step', async () => {

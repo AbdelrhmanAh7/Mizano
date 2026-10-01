@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { idempotencyKeyFor, releaseIdempotencyKey } from '@/lib/utils/idempotency';
 
 // ============ Types ============
 
@@ -109,7 +110,9 @@ const recurringApi = {
     return response.data;
   },
   execute: async (id: string) => {
-    const response = await api.post(`/recurring-profiles/${id}/execute`);
+    const response = await api.post(`/recurring-profiles/${id}/execute`, {
+      idempotencyKey: idempotencyKeyFor(`execute:${id}`),
+    });
     return response.data;
   },
   getStatistics: async () => {
@@ -196,6 +199,7 @@ export function useExecuteRecurringProfile() {
   return useMutation({
     mutationFn: recurringApi.execute,
     onSuccess: (result, id) => {
+      releaseIdempotencyKey(`execute:${id}`);
       queryClient.invalidateQueries({ queryKey: ['recurring-profiles'] });
       queryClient.invalidateQueries({ queryKey: ['recurring-profiles', id] });
       queryClient.invalidateQueries({ queryKey: ['recurring-executions', id] });

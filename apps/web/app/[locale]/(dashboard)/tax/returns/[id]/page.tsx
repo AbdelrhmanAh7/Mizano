@@ -59,6 +59,7 @@ import {
   useDeleteVATReturn,
   useRecordVATPayment,
   useMarkVATReturnFiled,
+  useVatPaymentAccounts,
   getVATReturnStatusColor,
   getVATReturnStatusLabel,
   getVATReturnStatusStep,
@@ -66,7 +67,6 @@ import {
   normalizeVATReturn,
   VATReturnStatus,
 } from '@/lib/hooks/use-tax';
-import { useAccounts } from '@/lib/hooks/use-accounts';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
 
@@ -112,13 +112,11 @@ export default function VATReturnDetailPage() {
 
   const canEdit = hasPermission('tax.edit');
   const canSubmit = hasPermission('tax.submit');
-  const { data: assetAccounts, isLoading: accountsLoading } = useAccounts({
-    type: 'ASSET',
-    isActive: true,
-    limit: 200,
-  });
-  const paidFromOptions: Array<{ id: string; code: string; name: string }> =
-    assetAccounts?.data ?? [];
+  const {
+    data: paidFromOptions = [],
+    isLoading: accountsLoading,
+    isError: accountsError,
+  } = useVatPaymentAccounts(canEdit);
   const canDelete = hasPermission('tax.delete');
 
   const confirmFile = async () => {
@@ -723,7 +721,9 @@ export default function VATReturnDetailPage() {
                 <SelectContent>
                   {paidFromOptions.length === 0 && !accountsLoading ? (
                     <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                      {t('payments.noPaidFromAccounts')}
+                      {accountsError
+                        ? t('payments.paidFromLoadError')
+                        : t('payments.noPaidFromAccounts')}
                     </div>
                   ) : (
                     paidFromOptions.map((account) => (

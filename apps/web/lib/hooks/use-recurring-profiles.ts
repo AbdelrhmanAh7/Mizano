@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { recurringProfilesApi } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import { idempotencyKeyFor, releaseIdempotencyKey } from '@/lib/utils/idempotency';
 
 // Types
 type ApiError = { response?: { data?: { message?: string } } };
@@ -227,10 +228,11 @@ export function useExecuteRecurringProfile() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await recurringProfilesApi.execute(id);
+      const response = await recurringProfilesApi.execute(id, idempotencyKeyFor(`execute:${id}`));
       return response.data;
     },
     onSuccess: (_, id) => {
+      releaseIdempotencyKey(`execute:${id}`);
       queryClient.invalidateQueries({ queryKey: ['recurring-profiles'] });
       queryClient.invalidateQueries({ queryKey: ['recurring-profiles', id] });
       toast({

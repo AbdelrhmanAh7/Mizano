@@ -316,6 +316,18 @@ export function useFileVATReturn() {
   });
 }
 
+/** Bank/cash accounts a VAT payment can be made from (GET /vat-returns/payment-accounts). */
+export function useVatPaymentAccounts(enabled = true) {
+  return useQuery({
+    queryKey: ['vat-returns', 'payment-accounts'],
+    enabled,
+    queryFn: async (): Promise<Array<{ id: string; code: string; name: string }>> => {
+      const response = await api.get('/vat-returns/payment-accounts');
+      return response.data;
+    },
+  });
+}
+
 /** Marks a submitted zero/refundable return as filed (no journal; payment files the others). */
 export function useMarkVATReturnFiled() {
   const queryClient = useQueryClient();

@@ -11,6 +11,8 @@ import { JournalSourceType, JournalsService } from './journals.service';
 
 /** Account subType that marks the equity account taking the opening-balance difference. */
 export const OPENING_BALANCE_EQUITY_SUBTYPE = 'OPENING_BALANCE_EQUITY';
+/** Journal number of the opening journal posted by the legacy (source-less) implementation. */
+export const LEGACY_OPENING_JOURNAL_NUMBER = 'OB-001';
 export const OPENING_BALANCE_EQUITY_NAME = 'Opening Balance Equity';
 
 /** Account types whose normal balance is a debit. */
@@ -66,12 +68,17 @@ export class OpeningBalancesService {
         const current = await tx.journal.findFirst({
           where: {
             organizationId,
-            sourceType: JournalSourceType.OPENING_BALANCE,
             deletedAt: null,
+            isPosted: true,
             reversalOfId: null,
             reversedBy: null,
+            OR: [
+              { sourceType: JournalSourceType.OPENING_BALANCE },
+              // The original onboarding implementation posted its journal without a source link.
+              { sourceType: null, journalNumber: LEGACY_OPENING_JOURNAL_NUMBER },
+            ],
           },
-          select: { id: true, date: true },
+          select: { id: true, date: true, sourceType: true },
         });
         if (current) {
           if (!dto.replaceExisting) {
@@ -85,10 +92,13 @@ export class OpeningBalancesService {
             { date: current.date.toISOString() },
             {
               tx,
-              source: {
-                type: JournalSourceType.OPENING_BALANCE,
-                id: `${organizationId}:reversal:${current.id}`,
-              },
+              // A legacy journal has no source; its reversal is a plain linked reversal.
+              source: current.sourceType
+                ? {
+                    type: JournalSourceType.OPENING_BALANCE,
+                    id: `${organizationId}:reversal:${current.id}`,
+                  }
+                : undefined,
             },
           );
         }

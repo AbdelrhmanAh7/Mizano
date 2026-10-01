@@ -130,7 +130,8 @@ describe('Inventory adjustments (e2e)', () => {
         where: { organizationId: tenantA.organizationId, referenceId: decreaseId },
       });
       expect(movements).toHaveLength(1);
-      expect(Number(movements[0].quantity)).toBe(-3);
+      expect(Number(movements[0].quantity)).toBe(3); // direction is movementType
+      expect(movements[0].movementType).toBe('OUT');
     });
 
     it('dates the movement on the adjustment date and carries the unit cost', async () => {
@@ -318,6 +319,25 @@ describe('Inventory adjustments (e2e)', () => {
       expect(
         await prisma.journal.count({ where: { organizationId: tenantB.organizationId } }),
       ).toBe(0);
+    });
+
+    it('lists adjustment account options per tenant (expense accounts only)', async () => {
+      const res = await a.get('/inventory-adjustments/account-options');
+      expect(res.status).toBe(200);
+      const ids = res.body.map((x: { id: string }) => x.id);
+      expect(ids).toContain(fa.expenseAccountId);
+      expect(ids).not.toContain(fa.inventoryAccountId);
+      expect(ids).not.toContain(fb.expenseAccountId);
+      const other = await b.get('/inventory-adjustments/account-options');
+      expect(other.body.map((x: { id: string }) => x.id)).toEqual([fb.expenseAccountId]);
+      expect((await anon.get('/inventory-adjustments/account-options')).status).toBe(401);
+    });
+
+    it('rejects a non-expense adjustment account', async () => {
+      const equity = await createAccount(a, '3500', 'Misc equity', 'EQUITY');
+      const res = await a.post('/inventory-adjustments').send(payload(fa, { accountId: equity }));
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/expense account/);
     });
 
     it('tenant B can adjust its own stock without touching tenant A', async () => {

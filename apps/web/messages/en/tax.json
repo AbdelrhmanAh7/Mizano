@@ -194,6 +194,7 @@
     "exactAmountHint": "The payment must equal the VAT payable exactly; partial payments are not supported.",
     "paidFrom": "Paid from account",
     "paidFromPlaceholder": "Select bank or cash account",
-    "noPaidFromAccounts": "No asset accounts available"
+    "noPaidFromAccounts": "No bank or cash accounts available",
+    "paidFromLoadError": "Could not load the bank and cash accounts"
   }
 }

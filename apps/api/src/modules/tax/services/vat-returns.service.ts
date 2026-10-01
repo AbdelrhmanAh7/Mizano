@@ -4,20 +4,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  AccountType,
-  BillStatus,
-  InvoiceStatus,
-  Prisma,
-  VATReturn,
-  VATReturnStatus,
-} from '@prisma/client';
+import { BillStatus, InvoiceStatus, Prisma, VATReturn, VATReturnStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
+import { bankCashAccountWhere } from '../../../common/utils/bank-cash-accounts';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
+import { LEGACY_OPENING_JOURNAL_NUMBER } from '../../accounting/services/opening-balances.service';
 import { CreateVatReturnDto } from '../dto/create-vat-return.dto';
 import { RecordVatPaymentDto } from '../dto/record-vat-payment.dto';
 import { VatReturnQueryDto } from '../dto/vat-return-query.dto';
@@ -41,11 +36,18 @@ const TAXABLE_BILL_STATUSES: BillStatus[] = [
   BillStatus.OVERDUE,
 ];
 
-/** Settlement and payment journals move VAT between accounts; they are not VAT activity. */
-const VAT_SETTLEMENT_SOURCES: string[] = [
+/**
+ * Settlement and payment journals move VAT between accounts, and opening balances (and their
+ * reversals) restate balances; none of them is VAT activity of the period.
+ */
+const VAT_NON_ACTIVITY_SOURCES: string[] = [
   JournalSourceType.VAT_RETURN,
   JournalSourceType.VAT_PAYMENT,
+  JournalSourceType.OPENING_BALANCE,
 ];
+
+/** The legacy onboarding implementation posted its opening journal without a source type. */
+const LEGACY_OPENING = { journalNumber: LEGACY_OPENING_JOURNAL_NUMBER, sourceType: null };
 
 type Db = Prisma.TransactionClient;
 
@@ -366,47 +368,43 @@ export class VatReturnsService {
         );
       }
 
-      const org = await tx.organization.findUnique({
-        where: { id: organizationId },
-        select: { defaultVatPayableAccountId: true, baseCurrency: true },
+      // Debit the VAT payable account this return's settlement actually credited (the default
+      // may have changed since), read from the settlement journal itself.
+      const settlement = await tx.journal.findFirst({
+        where: {
+          organizationId,
+          sourceType: JournalSourceType.VAT_RETURN,
+          sourceId: vatReturnId,
+          deletedAt: null,
+          isPosted: true,
+        },
+        select: { lines: { select: { accountId: true, credit: true, description: true } } },
       });
-      if (!org?.defaultVatPayableAccountId) {
-        throw new BadRequestException(
-          'Please configure the default VAT Payable account in organization settings before recording VAT payments',
+      const payableLine = settlement?.lines.find(
+        (l) =>
+          new Decimal(l.credit).greaterThan(0) &&
+          (l.description ?? '').endsWith('- VAT payable to tax authority'),
+      );
+      if (!payableLine) {
+        throw new ConflictException(
+          'The settlement journal of this VAT return was not found; it cannot be paid',
         );
       }
+      const payableAccountId = payableLine.accountId;
+
+      // Only an eligible bank/cash account (same rule as sales refunds) can pay.
       const paidFrom = await tx.account.findFirst({
         where: {
-          id: dto.paidFromAccountId,
-          organizationId,
-          deletedAt: null,
-          isActive: true,
-          type: AccountType.ASSET,
+          AND: [{ id: dto.paidFromAccountId }, await bankCashAccountWhere(tx, organizationId)],
         },
         select: { id: true },
       });
       if (!paidFrom) {
         throw new BadRequestException(
-          'Paid-from account must be an active bank or cash asset account',
+          'Paid-from account must be an active bank or cash account of this organization in the base currency',
         );
       }
-      // The ledger is single-currency: only a bank register carries a meaningful currency.
-      const foreignRegister = await tx.bankAccount.findFirst({
-        where: {
-          linkedAccountId: paidFrom.id,
-          organizationId,
-          deletedAt: null,
-          NOT: { currency: { equals: org.baseCurrency, mode: 'insensitive' } },
-        },
-        select: { id: true },
-      });
-      if (foreignRegister) {
-        throw new BadRequestException(
-          `Paid-from account is linked to a bank account that is not in the base currency ${org.baseCurrency}`,
-        );
-      }
-
-      if (paidFrom.id === org.defaultVatPayableAccountId) {
+      if (paidFrom.id === payableAccountId) {
         throw new BadRequestException('Paid-from account must differ from the VAT Payable account');
       }
 
@@ -442,7 +440,7 @@ export class VatReturnsService {
           notes: `VAT payment for return ${label}`,
           lines: [
             {
-              accountId: org.defaultVatPayableAccountId,
+              accountId: payableAccountId,
               debit: amount.toFixed(4),
               credit: '0',
               description: `VAT Payment - ${label}`,
@@ -459,6 +457,17 @@ export class VatReturnsService {
       );
 
       return payment;
+    });
+  }
+
+  /** Bank/cash accounts a VAT payment may be made from (the rule recordPayment enforces). */
+  async paymentAccounts(
+    organizationId: string,
+  ): Promise<{ id: string; code: string; name: string }[]> {
+    return this.prisma.account.findMany({
+      where: await bankCashAccountWhere(this.prisma, organizationId),
+      select: { id: true, code: true, name: true },
+      orderBy: { code: 'asc' },
     });
   }
 
@@ -733,7 +742,11 @@ export class VatReturnsService {
             isPosted: true,
             deletedAt: null,
             date: window,
-            OR: [{ sourceType: null }, { sourceType: { notIn: VAT_SETTLEMENT_SOURCES } }],
+            AND: [
+              { OR: [{ sourceType: null }, { sourceType: { notIn: VAT_NON_ACTIVITY_SOURCES } }] },
+              { NOT: LEGACY_OPENING },
+              { NOT: { reversalOf: { is: LEGACY_OPENING } } },
+            ],
           },
         },
         _sum: { debit: true, credit: true },
@@ -741,7 +754,7 @@ export class VatReturnsService {
       return { debit: _sum.debit ?? ZERO, credit: _sum.credit ?? ZERO };
     };
 
-    const [output, input, sales, purchases] = await Promise.all([
+    const [output, input, sales, creditedNet, purchases] = await Promise.all([
       Promise.all(accounts.outputIds.map(movement)),
       Promise.all(accounts.inputIds.map(movement)),
       db.invoice.aggregate({
@@ -752,6 +765,21 @@ export class VatReturnsService {
           date: window,
         },
         _sum: { subtotal: true },
+      }),
+      // Credit notes (and their voids) in the period, net of VAT: the Sales Returns lines of the
+      // same posted journals that carry the VAT, so the base matches the output VAT.
+      db.journalLine.aggregate({
+        where: {
+          description: { endsWith: '- Sales Returns' },
+          journal: {
+            organizationId,
+            isPosted: true,
+            deletedAt: null,
+            date: window,
+            sourceType: { in: [JournalSourceType.CREDIT_NOTE, JournalSourceType.CREDIT_NOTE_VOID] },
+          },
+        },
+        _sum: { debit: true, credit: true },
       }),
       db.bill.aggregate({
         where: {
@@ -777,7 +805,9 @@ export class VatReturnsService {
     return {
       outputByAccount,
       inputByAccount,
-      totalSales: sales._sum.subtotal ?? ZERO,
+      totalSales: (sales._sum.subtotal ?? ZERO)
+        .sub(creditedNet._sum.debit ?? ZERO)
+        .add(creditedNet._sum.credit ?? ZERO),
       outputVat,
       totalPurchases: purchases._sum.subtotal ?? ZERO,
       inputVat,
