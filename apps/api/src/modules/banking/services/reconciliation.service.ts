@@ -1,8 +1,15 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { InvoicesService } from '../../sales/services/invoices.service';
+import { PaymentsReceivedService } from '../../sales/services/payments-received.service';
+import { ExpensesService } from '../../purchases/services/expenses.service';
 import { PaymentsMadeService } from '../../purchases/services/payments-made.service';
-import { ReconciliationStatus, BankTransactionType, BankTransaction, Prisma } from '@prisma/client';
+import {
+  BankTransaction,
+  BankTransactionType,
+  PaymentMode,
+  Prisma,
+  ReconciliationStatus,
+} from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 export interface ReconciliationMatch {
@@ -15,8 +22,9 @@ export interface ReconciliationMatch {
 export class ReconciliationService {
   constructor(
     private prisma: PrismaService,
-    private invoicesService: InvoicesService,
     private paymentsMadeService: PaymentsMadeService,
+    private paymentsReceivedService: PaymentsReceivedService,
+    private expensesService: ExpensesService,
   ) {}
 
   async getSuggestions(organizationId: string, bankAccountId: string) {
@@ -130,9 +138,7 @@ export class ReconciliationService {
       if (count === 0) throw new BadRequestException('Already reconciled');
 
       if (entityType === 'invoice') {
-        await this.invoicesService.lockInvoices(tx, organizationId, [entityId]);
         await this.createPaymentForInvoice(tx, organizationId, entityId, amount, transaction);
-        await this.invoicesService.recalculateBalance(tx, entityId);
       } else {
         await this.createPaymentForBill(tx, organizationId, entityId, amount, transaction);
       }
@@ -154,20 +160,27 @@ export class ReconciliationService {
     if (!invoice)
       throw new NotFoundException(`Invoice ${invoiceId} not found for reconciliation payment`);
 
-    const paymentNumber = await this.generatePaymentNumber(organizationId, 'PMT');
-    await tx.paymentReceived.create({
-      data: {
-        paymentNumber,
-        customerId: invoice.customerId,
-        date: transaction.date,
-        amount,
-        paymentMode: 'BANK_TRANSFER',
-        depositToAccountId: transaction.bankAccountId,
-        reference: transaction.reference,
-        organizationId,
-        allocations: { create: [{ invoiceId, amount }] },
-      },
+    const bankAccount = await tx.bankAccount.findFirst({
+      where: { id: transaction.bankAccountId, organizationId },
+      select: { linkedAccountId: true },
     });
+    if (!bankAccount) throw new NotFoundException('Bank account not found');
+
+    // Goes through the standard customer-payment command (locks the invoice, allocates,
+    // recalculates the balance and posts Dr bank / Cr AR) inside the caller's transaction.
+    await this.paymentsReceivedService.create(
+      organizationId,
+      {
+        customerId: invoice.customerId,
+        date: transaction.date.toISOString(),
+        amount: amount.toFixed(4),
+        paymentMode: PaymentMode.BANK_TRANSFER,
+        depositToAccountId: bankAccount.linkedAccountId,
+        reference: transaction.reference ?? undefined,
+        allocations: [{ invoiceId, amount: amount.toFixed(4) }],
+      },
+      { tx },
+    );
   }
 
   /** Goes through the standard vendor-payment command so AP, balances and the ledger agree. */
@@ -204,6 +217,11 @@ export class ReconciliationService {
     );
   }
 
+  /**
+   * Books a withdrawal as an expense through the standard expense command (posts Dr expense,
+   * Cr the bank account's ledger account). The guarded PENDING -> CREATED transition and the
+   * expense commit in one transaction, so a retry cannot create a second expense.
+   */
   async createExpenseFromTransaction(
     organizationId: string,
     transactionId: string,
@@ -214,24 +232,39 @@ export class ReconciliationService {
       where: { id: transactionId, organizationId },
     });
     if (!transaction) throw new NotFoundException('Transaction not found');
+    if (transaction.status !== ReconciliationStatus.PENDING) {
+      throw new BadRequestException('Already reconciled');
+    }
+    if (transaction.type !== BankTransactionType.WITHDRAWAL) {
+      throw new BadRequestException('Only withdrawals can be recorded as expenses');
+    }
 
-    await this.prisma.expense.create({
-      data: {
-        date: transaction.date,
-        accountId,
-        vendorId,
-        amount: transaction.amount,
-        taxAmount: new Decimal(0),
-        paidThroughAccountId: accountId,
-        description: transaction.description,
-        reference: transaction.reference,
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.bankTransaction.updateMany({
+        where: { id: transactionId, organizationId, status: ReconciliationStatus.PENDING },
+        data: { status: ReconciliationStatus.CREATED },
+      });
+      if (count === 0) throw new BadRequestException('Already reconciled');
+
+      const bankAccount = await tx.bankAccount.findFirst({
+        where: { id: transaction.bankAccountId, organizationId },
+        select: { linkedAccountId: true },
+      });
+      if (!bankAccount) throw new NotFoundException('Bank account not found');
+
+      await this.expensesService.create(
         organizationId,
-      },
-    });
-
-    await this.prisma.bankTransaction.update({
-      where: { id: transactionId },
-      data: { status: ReconciliationStatus.CREATED },
+        {
+          date: transaction.date.toISOString(),
+          accountId,
+          vendorId,
+          amount: transaction.amount.abs().toFixed(4),
+          paidThroughAccountId: bankAccount.linkedAccountId,
+          description: transaction.description ?? undefined,
+          reference: transaction.reference ?? undefined,
+        },
+        { tx },
+      );
     });
 
     return { message: 'Expense created' };
@@ -273,29 +306,5 @@ export class ReconciliationService {
       matchedAmount: matchedAmountResult._sum.amount?.toString() || '0',
       reconciliationRate: total > 0 ? Math.round(((matched + created) / total) * 100) : 0,
     };
-  }
-
-  private async generatePaymentNumber(organizationId: string, prefix: string): Promise<string> {
-    let lastNumber: string | undefined;
-
-    if (prefix === 'PMT') {
-      const last = await this.prisma.paymentReceived.findFirst({
-        where: { organizationId },
-        orderBy: { createdAt: 'desc' },
-        select: { paymentNumber: true },
-      });
-      lastNumber = last?.paymentNumber;
-    } else {
-      const last = await this.prisma.paymentMade.findFirst({
-        where: { organizationId },
-        orderBy: { createdAt: 'desc' },
-        select: { paymentNumber: true },
-      });
-      lastNumber = last?.paymentNumber;
-    }
-
-    if (!lastNumber) return `${prefix}-001`;
-    const num = parseInt(lastNumber.split('-')[1], 10);
-    return `${prefix}-${String(num + 1).padStart(3, '0')}`;
   }
 }

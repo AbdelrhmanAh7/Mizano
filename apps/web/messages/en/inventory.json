@@ -24,7 +24,8 @@
       "descriptionPlaceholder": "Enter description",
       "reorderPoint": "Reorder Point",
       "openingStock": "Opening Stock",
-      "isActive": "Active"
+      "isActive": "Active",
+      "openingStockHint": "Add opening stock with an inventory adjustment"
     },
     "types": {
       "goods": "Goods",

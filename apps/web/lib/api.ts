@@ -283,6 +283,10 @@ export const expensesApi = {
   bulkCategorize: (ids: string[], accountId: string) =>
     api.post('/expenses/bulk-categorize', { ids, accountId }),
   bulkApprove: (ids: string[]) => api.post('/expenses/bulk-approve', { ids }),
+  /** Expense-type accounts for the expense form (purchases.create; no accounting.view needed). */
+  expenseAccounts: () => api.get('/expenses/expense-accounts'),
+  /** Bank/cash accounts an expense can be paid from (purchases.create). */
+  paidThroughAccounts: () => api.get('/expenses/paid-through-accounts'),
 };
 
 export const billsApi = {
@@ -312,10 +316,19 @@ export const paymentsMadeApi = {
 
 export const vendorCreditsApi = {
   ...crud('/vendor-credits'),
-  applyToBill: (id: string, billId: string) => api.patch(`/vendor-credits/${id}/apply`, { billId }),
-  refund: (id: string, bankAccountId: string) =>
-    api.patch(`/vendor-credits/${id}/refund`, { bankAccountId }),
+  /** Applies the whole credit to a bill balance (no journal; AP was debited on creation). */
+  applyToBill: (id: string, billId: string) =>
+    api.post(`/vendor-credits/${id}/apply-to-bill`, { billId }),
+  /** Posts Dr bank / Cr AP for the vendor's refund. */
+  refund: (id: string, bankAccountId: string, date?: string) =>
+    api.post(`/vendor-credits/${id}/refund`, { bankAccountId, date }),
+  /** Voids an unapplied, unrefunded credit (posts a reversal journal). */
+  void: (id: string) => api.delete(`/vendor-credits/${id}`),
   bulkDelete: (ids: string[]) => api.post('/vendor-credits/bulk-delete', { ids }),
+  /** Expense accounts a credit can be posted to (purchases.create). */
+  creditAccounts: () => api.get('/vendor-credits/credit-accounts'),
+  /** Bank/cash accounts a refund can be received into (purchases.edit). */
+  refundAccounts: () => api.get('/vendor-credits/refund-accounts'),
 };
 
 // ===========================================================================

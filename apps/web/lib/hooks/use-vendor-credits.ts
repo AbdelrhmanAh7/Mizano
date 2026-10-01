@@ -4,6 +4,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { vendorCreditsApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { CreateVendorCreditPayload } from '@/components/purchases/vendor-credit-payload';
 
 // Types
 type ApiError = { response?: { data?: { message?: string } } };
@@ -72,22 +73,8 @@ export interface VendorCreditParams {
   sortOrder?: 'asc' | 'desc';
 }
 
-export interface CreateVendorCreditData {
-  vendorId: string;
-  billId?: string;
-  date: string;
-  type: string;
-  reason?: string;
-  notes?: string;
-  lines: Array<{
-    itemId?: string;
-    accountId?: string;
-    description?: string;
-    quantity: number;
-    rate: number;
-    taxRate?: number;
-  }>;
-}
+/** Exactly the API DTO (POST /vendor-credits): decimal-string amount, gross of VAT. */
+export type CreateVendorCreditData = CreateVendorCreditPayload;
 
 /**
  * Hook to fetch all vendor credits with pagination
@@ -200,8 +187,16 @@ export function useRefundVendorCredit() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ id, bankAccountId }: { id: string; bankAccountId: string }) => {
-      const response = await vendorCreditsApi.refund(id, bankAccountId);
+    mutationFn: async ({
+      id,
+      bankAccountId,
+      date,
+    }: {
+      id: string;
+      bankAccountId: string;
+      date?: string;
+    }) => {
+      const response = await vendorCreditsApi.refund(id, bankAccountId, date);
       return response.data;
     },
     onSuccess: () => {
@@ -216,6 +211,36 @@ export function useRefundVendorCredit() {
       toast({
         variant: 'destructive',
         title: 'Error processing refund',
+        description: error.response?.data?.message || 'An error occurred',
+      });
+    },
+  });
+}
+
+/**
+ * Hook to void an unapplied, unrefunded vendor credit (reverses its journal)
+ */
+export function useVoidVendorCredit() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await vendorCreditsApi.void(id);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendor-credits'] });
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      toast({
+        title: 'Credit voided',
+        description: 'The vendor credit was voided and its journal reversed.',
+      });
+    },
+    onError: (error: ApiError) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error voiding credit',
         description: error.response?.data?.message || 'An error occurred',
       });
     },

@@ -319,13 +319,6 @@ export const ENTITY_FIELD_DEFINITIONS: Record<ImportEntityType, EntityFieldDefin
     { field: 'subType', label: 'Sub Type', required: false, type: 'string' },
     { field: 'description', label: 'Description', required: false, type: 'string' },
     { field: 'parentCode', label: 'Parent Account Code', required: false, type: 'string' },
-    {
-      field: 'openingBalance',
-      label: 'Opening Balance',
-      required: false,
-      type: 'decimal',
-      example: '0',
-    },
     { field: 'isActive', label: 'Is Active', required: false, type: 'boolean', example: 'true' },
   ],
   [ImportEntityType.INVOICES]: [
@@ -376,7 +369,14 @@ export const ENTITY_FIELD_DEFINITIONS: Record<ImportEntityType, EntityFieldDefin
       example: '5000',
     },
     { field: 'amount', label: 'Amount', required: true, type: 'decimal', example: '500.00' },
-    { field: 'taxAmount', label: 'Tax Amount', required: false, type: 'decimal', example: '75.00' },
+    { field: 'taxRate', label: 'Tax Rate (%)', required: false, type: 'decimal', example: '14' },
+    {
+      field: 'paidThroughAccountCode',
+      label: 'Paid-Through Account Code',
+      required: false,
+      type: 'string',
+      description: 'Bank or cash account; defaults to the organization default bank account',
+    },
     { field: 'reference', label: 'Reference', required: false, type: 'string' },
     { field: 'description', label: 'Description', required: false, type: 'string' },
   ],
@@ -504,6 +504,13 @@ export const ENTITY_FIELD_DEFINITIONS: Record<ImportEntityType, EntityFieldDefin
       required: true,
       type: 'enum',
       enumValues: ['REFUND', 'APPLY_TO_INVOICE'],
+    },
+    {
+      field: 'refundAccountCode',
+      label: 'Refund Account Code',
+      required: false,
+      type: 'string',
+      description: 'Required for REFUND: the bank or cash account the refund is paid from',
     },
   ],
   [ImportEntityType.PAYMENTS_RECEIVED]: [

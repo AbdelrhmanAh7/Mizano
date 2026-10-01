@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -14,13 +15,17 @@ import {
   CacheTTL,
   CurrentOrg,
   InvalidateCache,
+  InvalidatesLedger,
   Permissions,
 } from '../../../common/decorators';
+import { BulkIdsDto } from '../../../common/dto/bulk-ids.dto';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
+import { ApplyVendorCreditDto } from '../dto/apply-vendor-credit.dto';
 import { CreateVendorCreditDto } from '../dto/create-vendor-credit.dto';
+import { RefundVendorCreditDto } from '../dto/refund-vendor-credit.dto';
 import { VendorCreditQueryDto } from '../dto/vendor-credit-query.dto';
 import { VendorCreditsService } from '../services/vendor-credits.service';
 
@@ -34,8 +39,8 @@ export class VendorCreditsController {
 
   @Post()
   @Permissions('purchases.create')
-  @InvalidateCache('vendor-credits:*')
-  @ApiOperation({ summary: 'Create a vendor credit' })
+  @InvalidatesLedger('vendor-credits:*', 'bills:*', 'vendors:*')
+  @ApiOperation({ summary: 'Create a vendor credit (posts Dr AP / Cr expense and VAT)' })
   create(@CurrentOrg() orgId: string, @Body() dto: CreateVendorCreditDto) {
     return this.vendorCreditsService.create(orgId, dto);
   }
@@ -51,9 +56,9 @@ export class VendorCreditsController {
 
   @Post('bulk-delete')
   @Permissions('purchases.delete')
-  @InvalidateCache('vendor-credits:*')
-  @ApiOperation({ summary: 'Bulk delete vendor credits' })
-  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
+  @InvalidatesLedger('vendor-credits:*', 'bills:*', 'vendors:*')
+  @ApiOperation({ summary: 'Bulk void vendor credits (per-record outcomes)' })
+  bulkDelete(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.vendorCreditsService.bulkDelete(orgId, dto.ids);
   }
 
@@ -64,6 +69,20 @@ export class VendorCreditsController {
     return this.vendorCreditsService.findAllCursor(orgId, query);
   }
 
+  @Get('credit-accounts')
+  @Permissions('purchases.create')
+  @ApiOperation({ summary: 'Expense accounts a vendor credit can be posted to (purchases.create)' })
+  creditAccounts(@CurrentOrg() orgId: string) {
+    return this.vendorCreditsService.creditAccounts(orgId);
+  }
+
+  @Get('refund-accounts')
+  @Permissions('purchases.edit')
+  @ApiOperation({ summary: 'Bank/cash accounts a refund can be received into (purchases.edit)' })
+  refundAccounts(@CurrentOrg() orgId: string) {
+    return this.vendorCreditsService.refundAccounts(orgId);
+  }
+
   @Get(':id')
   @Permissions('purchases.view')
   @ApiOperation({ summary: 'Get vendor credit by ID' })
@@ -71,27 +90,31 @@ export class VendorCreditsController {
     return this.vendorCreditsService.findOne(orgId, id);
   }
 
+  @Delete(':id')
+  @Permissions('purchases.delete')
+  @InvalidatesLedger('vendor-credits:*', 'bills:*', 'vendors:*')
+  @ApiOperation({ summary: 'Void an unapplied, unrefunded vendor credit (posts a reversal)' })
+  remove(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.vendorCreditsService.void(orgId, id);
+  }
+
   @Post(':id/apply-to-bill')
   @Permissions('purchases.edit')
-  @InvalidateCache('vendor-credits:*', 'bills:*')
-  @ApiOperation({ summary: 'Apply vendor credit to a bill' })
+  @InvalidateCache('vendor-credits:*', 'bills:*', 'vendors:*')
+  @ApiOperation({ summary: 'Apply vendor credit to a bill balance (no journal)' })
   applyToBill(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
-    @Body() dto: { billId: string },
+    @Body() dto: ApplyVendorCreditDto,
   ) {
     return this.vendorCreditsService.applyToBill(orgId, id, dto.billId);
   }
 
   @Post(':id/refund')
   @Permissions('purchases.edit')
-  @InvalidateCache('vendor-credits:*')
-  @ApiOperation({ summary: 'Record vendor credit refund' })
-  refund(
-    @CurrentOrg() orgId: string,
-    @Param('id') id: string,
-    @Body() dto: { bankAccountId: string; date?: string },
-  ) {
+  @InvalidatesLedger('vendor-credits:*', 'vendors:*')
+  @ApiOperation({ summary: 'Record vendor credit refund (posts Dr bank / Cr AP)' })
+  refund(@CurrentOrg() orgId: string, @Param('id') id: string, @Body() dto: RefundVendorCreditDto) {
     return this.vendorCreditsService.refund(orgId, id, dto);
   }
 }

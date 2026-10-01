@@ -87,7 +87,7 @@ export class PaymentsMadeService {
         );
       }
 
-      await this.billsService.lockBills(tx, billIds);
+      await this.billsService.lockBills(tx, organizationId, billIds);
       const bills = await tx.bill.findMany({
         where: { id: { in: billIds }, organizationId, deletedAt: null },
       });
@@ -217,7 +217,7 @@ export class PaymentsMadeService {
       if (!payment) throw new NotFoundException('Payment not found');
 
       const billIds = payment.allocations.map((a) => a.billId);
-      await this.billsService.lockBills(tx, billIds);
+      await this.billsService.lockBills(tx, organizationId, billIds);
 
       const { count } = await tx.paymentMade.updateMany({
         where: { id, organizationId, deletedAt: null },

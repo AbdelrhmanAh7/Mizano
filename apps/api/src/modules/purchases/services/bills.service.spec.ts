@@ -435,7 +435,7 @@ describe('BillsService', () => {
   });
 
   describe('recalculateBalance', () => {
-    const setup = (grandTotal: string, paid: string[]) => {
+    const setup = (grandTotal: string, paid: string[], credits: string | null = null) => {
       prisma.bill.findUnique.mockResolvedValue(
         createMockBill({
           id: 'bill-1',
@@ -447,8 +447,32 @@ describe('BillsService', () => {
       prisma.billAllocation.findMany.mockResolvedValue(
         paid.map((a) => ({ amount: dec(a) })) as any,
       );
+      prisma.vendorCredit.aggregate.mockResolvedValue({
+        _sum: { amount: credits === null ? null : dec(credits) },
+      } as any);
       prisma.bill.update.mockResolvedValue({} as any);
     };
+
+    it('subtracts live vendor credits applied to the bill', async () => {
+      setup('575', ['200'], '75');
+      await service.recalculateBalance(prisma as any, 'bill-1');
+      expect(prisma.vendorCredit.aggregate.mock.calls[0]![0]!.where).toEqual({
+        appliedToBillId: 'bill-1',
+        organizationId: 'org-test-001',
+        deletedAt: null,
+      });
+      const data = prisma.bill.update.mock.calls[0]![0]!.data as any;
+      expect(data.status).toBe('PARTIALLY_PAID');
+      expectDecimalEqual(data.balanceDue, '300');
+    });
+
+    it('marks the bill PAID when a vendor credit settles the remaining balance', async () => {
+      setup('575', ['500'], '75');
+      await service.recalculateBalance(prisma as any, 'bill-1');
+      const data = prisma.bill.update.mock.calls[0]![0]!.data as any;
+      expect(data.status).toBe('PAID');
+      expectDecimalEqual(data.balanceDue, '0');
+    });
 
     it('should mark bill as PAID when fully paid', async () => {
       setup('575', ['575']);

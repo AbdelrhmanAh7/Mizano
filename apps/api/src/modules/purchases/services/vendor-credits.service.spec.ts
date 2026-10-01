@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { VendorCreditsService } from './vendor-credits.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
+import { BillsService } from './bills.service';
 
 const mockFindMany = jest.fn();
 const mockCount = jest.fn();
@@ -22,6 +23,7 @@ describe('VendorCreditsService.findAll', () => {
         VendorCreditsService,
         { provide: PrismaService, useValue: prismaServiceMock },
         { provide: JournalsService, useValue: {} },
+        { provide: BillsService, useValue: {} },
       ],
     }).compile();
 

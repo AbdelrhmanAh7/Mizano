@@ -6,10 +6,10 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ExpenseForm } from '@/components/purchases/expense-form';
+import { ExpenseForm, LookupAccount } from '@/components/purchases/expense-form';
 import { useCreateExpense } from '@/lib/hooks/use-expenses';
 import { useQuery } from '@tanstack/react-query';
-import { accountsApi } from '@/lib/api';
+import { expensesApi } from '@/lib/api';
 
 export default function NewExpensePage() {
   const router = useRouter();
@@ -19,40 +19,34 @@ export default function NewExpensePage() {
 
   const createExpense = useCreateExpense();
 
-  // Fetch accounts for dropdowns
-  const { data: accountsData, isLoading: accountsLoading } = useQuery({
-    queryKey: ['accounts'],
-    queryFn: async () => {
-      const response = await accountsApi.getAll();
-      return response.data;
-    },
+  // Role-scoped lookups: purchases.create is enough, accounting.view is not required.
+  const expenseAccountsQuery = useQuery({
+    queryKey: ['expenses', 'expense-accounts'],
+    queryFn: async (): Promise<LookupAccount[]> =>
+      (await expensesApi.expenseAccounts()).data as LookupAccount[],
+  });
+  const paidThroughQuery = useQuery({
+    queryKey: ['expenses', 'paid-through-accounts'],
+    queryFn: async (): Promise<LookupAccount[]> =>
+      (await expensesApi.paidThroughAccounts()).data as LookupAccount[],
   });
 
-  const accounts = accountsData?.data || [];
-
-  const handleSubmit = async (data: Record<string, unknown>) => {
+  const handleSubmit = async (
+    data: Parameters<typeof createExpense.mutateAsync>[0],
+  ): Promise<void> => {
     try {
-      await createExpense.mutateAsync(
-        data as unknown as Parameters<typeof createExpense.mutateAsync>[0],
-      );
+      await createExpense.mutateAsync(data);
       router.push('/purchases/expenses');
-    } catch (error) {
-      // Error is handled in the hook
+    } catch {
+      // Error is surfaced by the mutation's toast.
     }
   };
 
-  if (accountsLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-12 w-64" />
-        <Skeleton className="h-96" />
-      </div>
-    );
-  }
+  const isLoading = expenseAccountsQuery.isLoading || paidThroughQuery.isLoading;
+  const isError = expenseAccountsQuery.isError || paidThroughQuery.isError;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
           <Link href="/purchases/expenses">
@@ -65,14 +59,34 @@ export default function NewExpensePage() {
         </div>
       </div>
 
-      {/* Form */}
-      <ExpenseForm
-        accounts={accounts}
-        onSubmit={handleSubmit}
-        onCancel={() => router.push('/purchases/expenses')}
-        isSubmitting={createExpense.isPending}
-        defaultVendorId={defaultVendorId}
-      />
+      {isLoading ? (
+        <div className="space-y-6">
+          <Skeleton className="h-96" />
+        </div>
+      ) : isError ? (
+        <div className="rounded-md border border-destructive/50 p-6 text-center" role="alert">
+          <p className="text-destructive">{t('expenses.form.loadError')}</p>
+          <Button
+            className="mt-4"
+            variant="outline"
+            onClick={() => {
+              void expenseAccountsQuery.refetch();
+              void paidThroughQuery.refetch();
+            }}
+          >
+            {t('expenses.form.retry')}
+          </Button>
+        </div>
+      ) : (
+        <ExpenseForm
+          expenseAccounts={expenseAccountsQuery.data ?? []}
+          paidThroughAccounts={paidThroughQuery.data ?? []}
+          onSubmit={(data) => void handleSubmit(data)}
+          onCancel={() => router.push('/purchases/expenses')}
+          isSubmitting={createExpense.isPending}
+          defaultVendorId={defaultVendorId}
+        />
+      )}
     </div>
   );
 }

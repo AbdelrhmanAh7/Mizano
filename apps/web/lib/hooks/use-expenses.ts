@@ -4,6 +4,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { expensesApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { CreateExpensePayload } from '@/components/purchases/expense-payload';
 
 // Types
 type ApiError = { response?: { data?: { message?: string } } };
@@ -16,6 +17,7 @@ export interface Expense {
   amount: string;
   taxAmount: string;
   taxInclusive: boolean;
+  status?: string;
   paidThroughAccountId: string;
   description: string | null;
   reference: string | null;
@@ -58,20 +60,8 @@ export interface ExpenseParams {
   sortOrder?: 'asc' | 'desc';
 }
 
-interface CreateExpenseData {
-  date: string;
-  accountId: string;
-  vendorId?: string | null;
-  amount: number | string;
-  taxAmount?: number | string;
-  taxInclusive?: boolean;
-  paidThroughAccountId: string;
-  description?: string | null;
-  reference?: string | null;
-  projectId?: string | null;
-}
-
-interface UpdateExpenseData extends Partial<CreateExpenseData> {}
+/** Exactly the API DTO (POST /expenses): decimal strings, VAT computed by the server. */
+export type CreateExpenseData = CreateExpensePayload;
 
 /**
  * Hook to fetch all expenses with pagination
@@ -145,36 +135,6 @@ export function useCreateExpense() {
 }
 
 /**
- * Hook to update an existing expense
- */
-export function useUpdateExpense() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateExpenseData }) => {
-      const response = await expensesApi.update(id, data);
-      return response.data;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      queryClient.invalidateQueries({ queryKey: ['expenses', variables.id] });
-      toast({
-        title: 'Expense updated',
-        description: 'The expense has been updated successfully.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error updating expense',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
-  });
-}
-
-/**
  * Hook to delete an expense
  */
 export function useDeleteExpense() {
@@ -189,14 +149,14 @@ export function useDeleteExpense() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       toast({
-        title: 'Expense deleted',
-        description: 'The expense has been deleted successfully.',
+        title: 'Expense voided',
+        description: 'The expense was voided and its journal reversed.',
       });
     },
     onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
-        title: 'Error deleting expense',
+        title: 'Error voiding expense',
         description: error.response?.data?.message || 'An error occurred',
       });
     },

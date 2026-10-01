@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from './journals.service';
@@ -13,6 +14,12 @@ import { RecurringProfileQueryDto } from '../dto/recurring-profile-query.dto';
 import { UpdateRecurringProfileDto } from '../dto/update-recurring-profile.dto';
 import { RecurringFrequency, RecurringType, Prisma, RecurringProfile } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { CreateInvoiceDto } from '../../sales/dto/create-invoice.dto';
+import { InvoicesService } from '../../sales/services/invoices.service';
+import { CreateBillDto } from '../../purchases/dto/create-bill.dto';
+import { CreateExpenseDto } from '../../purchases/dto/create-expense.dto';
+import { BillsService } from '../../purchases/services/bills.service';
+import { ExpensesService } from '../../purchases/services/expenses.service';
 
 /** Shared shape for a single line in journal/invoice/bill templates */
 interface JournalTemplateLine {
@@ -33,6 +40,7 @@ interface InvoiceTemplateLine {
 
 interface BillTemplateLine {
   itemId?: string | null;
+  accountId?: string | null;
   description: string;
   quantity?: number | string;
   rate?: number | string;
@@ -54,6 +62,7 @@ interface InvoiceTemplateData {
 
 interface BillTemplateData {
   vendorId: string;
+  notes?: string;
   lines: BillTemplateLine[];
 }
 
@@ -62,6 +71,10 @@ interface ExpenseTemplateData {
   accountId: string;
   paidThroughAccountId: string;
   amount: number | string;
+  /** VAT percentage (14 => 14%). */
+  taxRate?: number | string;
+  taxInclusive?: boolean;
+  /** Legacy templates stored a VAT amount; it is converted to a percentage of the amount. */
   taxAmount?: number | string;
   description?: string;
 }
@@ -118,6 +131,9 @@ export class RecurringProfilesService {
   constructor(
     private prisma: PrismaService,
     private journalsService: JournalsService,
+    // Resolved lazily: the sales and purchases modules import AccountingModule, so injecting
+    // their services directly would create a module cycle.
+    private moduleRef: ModuleRef,
   ) {}
 
   async create(organizationId: string, createRecurringProfileDto: CreateRecurringProfileDto) {
@@ -400,15 +416,9 @@ export class RecurringProfilesService {
           continue;
         }
 
+        // Advances nextRunDate in the same transaction as the document it creates; a failed
+        // run is recorded and retried on the next pass instead of silently skipping the date.
         await this.executeRecurringProfile(profile);
-
-        // Update next run date
-        const nextRunDate = this.calculateNextRunDate(profile.nextRunDate, profile.frequency);
-
-        await this.prisma.recurringProfile.update({
-          where: { id: profile.id },
-          data: { nextRunDate },
-        });
       } catch (error) {
         this.logger.error(
           `Failed to process recurring profile ${profile.id}: ${
@@ -448,81 +458,166 @@ export class RecurringProfilesService {
     // A manual run of a journal profile is its own explicit event, identified by the caller's
     // idempotency key (see executeJournalProfile).
     if (this.isJournalProfile(profile)) return this.executeJournalProfile(profile, idempotencyKey);
-    return this.executeRecurringProfile(profile);
+    return this.executeRecurringProfile(profile, idempotencyKey);
   }
 
-  private async executeRecurringProfile(profile: RecurringProfile): Promise<ExecutionResult> {
-    if (this.isJournalProfile(profile)) return this.executeJournalProfile(profile);
+  /**
+   * Executes an invoice, bill or expense profile through the real domain commands, as one
+   * transaction: guarded advance of nextRunDate (scheduled runs), the document (INVOICE and BILL
+   * as DRAFT, EXPENSE posts its journal), the execution record. The occurrence key
+   * `${profileId}:${YYYY-MM-DD}` (`${profileId}:manual:${key}` for a manual run) is the
+   * idempotency marker: it is the nextRunDate transition and is also written into the document
+   * (bill/expense reference, invoice notes) so a duplicate cron pass or a retried manual request
+   * returns the document already created instead of creating another.
+   */
+  private async executeRecurringProfile(
+    profile: RecurringProfile,
+    manualKey?: string,
+  ): Promise<ExecutionResult> {
+    if (this.isJournalProfile(profile)) return this.executeJournalProfile(profile, manualKey);
 
-    const templateData = profile.templateData as Record<string, unknown>;
+    const manual = manualKey !== undefined;
     const entityType: string = profile.type || profile.entityType || '';
-    let createdEntityId: string = '';
     const createdEntityType: string = entityType;
+    const occurrence = manual ? new Date() : profile.nextRunDate;
+    const sourceId = manual
+      ? `${profile.id}:manual:${manualKey}`
+      : `${profile.id}:${runDay(occurrence)}`;
+    const next = this.calculateNextRunDate(
+      profile.nextRunDate,
+      profile.frequency,
+      profile.startDate,
+    );
 
     try {
-      switch (entityType?.toLowerCase()) {
-        case 'invoice':
-          createdEntityId = await this.createInvoiceFromTemplate(
+      const kind = entityType.toLowerCase();
+      if (kind !== 'invoice' && kind !== 'bill' && kind !== 'expense') {
+        throw new BadRequestException(`Unsupported recurring type: ${entityType}`);
+      }
+      if (!manual && isPastEnd(occurrence, profile.endDate)) {
+        throw new BadRequestException('This recurring profile has passed its end date');
+      }
+      const templateData = profile.templateData as Record<string, unknown>;
+
+      const createdEntityId = await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`recurring:${sourceId}`}))`;
+
+        const existing = await this.findOccurrenceDocument(
+          tx,
+          profile.organizationId,
+          kind,
+          sourceId,
+        );
+        if (existing) return existing;
+
+        if (!manual) {
+          const { count } = await tx.recurringProfile.updateMany({
+            where: {
+              id: profile.id,
+              organizationId: profile.organizationId,
+              deletedAt: null,
+              nextRunDate: occurrence,
+            },
+            data: { nextRunDate: next },
+          });
+          if (count === 0) throw new ConflictException('This scheduled run was already executed');
+        }
+
+        let id: string;
+        if (kind === 'invoice') {
+          id = await this.createInvoiceFromTemplate(
+            tx,
             profile,
             templateData as unknown as InvoiceTemplateData,
+            occurrence,
+            sourceId,
           );
-          break;
-
-        case 'bill':
-          createdEntityId = await this.createBillFromTemplate(
+        } else if (kind === 'bill') {
+          id = await this.createBillFromTemplate(
+            tx,
             profile,
             templateData as unknown as BillTemplateData,
+            occurrence,
+            sourceId,
           );
-          break;
-
-        case 'expense':
-          createdEntityId = await this.createExpenseFromTemplate(
+        } else {
+          id = await this.createExpenseFromTemplate(
+            tx,
             profile,
             templateData as unknown as ExpenseTemplateData,
+            occurrence,
+            sourceId,
           );
-          break;
+        }
 
-        default:
-          throw new BadRequestException(`Unsupported recurring type: ${entityType}`);
-      }
-
-      // Record execution
-      await this.prisma.recurringExecution.create({
-        data: {
-          profileId: profile.id,
-          createdEntityType,
-          createdEntityId,
-          status: 'success',
-          organizationId: profile.organizationId,
-        },
-      });
-
-      // Update profile
-      await this.prisma.recurringProfile.update({
-        where: { id: profile.id },
-        data: {
-          executionCount: { increment: 1 },
-          lastExecutedAt: new Date(),
-        },
+        await tx.recurringProfile.updateMany({
+          where: { id: profile.id, organizationId: profile.organizationId },
+          data: { executionCount: { increment: 1 }, lastExecutedAt: new Date() },
+        });
+        await tx.recurringExecution.create({
+          data: {
+            profileId: profile.id,
+            createdEntityType,
+            createdEntityId: id,
+            status: 'success',
+            organizationId: profile.organizationId,
+          },
+        });
+        return id;
       });
 
       return { success: true, createdEntityType, createdEntityId };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      // Record failed execution
-      await this.prisma.recurringExecution.create({
-        data: {
-          profileId: profile.id,
-          createdEntityType,
-          createdEntityId: '',
-          status: 'failed',
-          error: errorMessage,
-          organizationId: profile.organizationId,
-        },
-      });
-
+      // An already-executed run is not a failure of the schedule; everything else is recorded.
+      if (!(error instanceof ConflictException)) {
+        await this.prisma.recurringExecution.create({
+          data: {
+            profileId: profile.id,
+            createdEntityType,
+            createdEntityId: '',
+            status: 'failed',
+            error: errorMessage,
+            organizationId: profile.organizationId,
+          },
+        });
+      }
       return { success: false, createdEntityType, createdEntityId: '', error: errorMessage };
     }
+  }
+
+  private occurrenceMarker(sourceId: string): string {
+    return `[recurring ${sourceId}]`;
+  }
+
+  /** The document an earlier run of this occurrence already created, if any. */
+  private async findOccurrenceDocument(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    kind: 'invoice' | 'bill' | 'expense',
+    sourceId: string,
+  ): Promise<string | null> {
+    const marker = this.occurrenceMarker(sourceId);
+    if (kind === 'invoice') {
+      const found = await tx.invoice.findFirst({
+        where: { organizationId, notes: { contains: marker } },
+        select: { id: true },
+      });
+      return found?.id ?? null;
+    }
+    const reference = { contains: marker };
+    if (kind === 'bill') {
+      const found = await tx.bill.findFirst({
+        where: { organizationId, reference },
+        select: { id: true },
+      });
+      return found?.id ?? null;
+    }
+    const found = await tx.expense.findFirst({
+      where: { organizationId, reference },
+      select: { id: true },
+    });
+    return found?.id ?? null;
   }
 
   /**
@@ -700,41 +795,25 @@ export class RecurringProfilesService {
     }
   }
 
+  private decimalText(value: unknown, field: string, fallback = '0'): string {
+    if (value === undefined || value === null || value === '') return fallback;
+    return toLedgerDecimal(value, field).toFixed();
+  }
+
+  private dueDateFrom(occurrence: Date, paymentTerms: number | null | undefined): Date {
+    const due = new Date(occurrence);
+    due.setUTCDate(due.getUTCDate() + (paymentTerms || 30));
+    return due;
+  }
+
   private async createInvoiceFromTemplate(
+    tx: Prisma.TransactionClient,
     profile: RecurringProfile,
     templateData: InvoiceTemplateData,
+    occurrence: Date,
+    sourceId: string,
   ): Promise<string> {
-    // Calculate totals
-    let subtotal = 0;
-    let taxAmount = 0;
-    const lines = templateData.lines.map((line: InvoiceTemplateLine) => {
-      const qty = Number(line.quantity ?? 1);
-      const rate = Number(line.rate ?? 0);
-      const discount = Number(line.discount ?? 0);
-      const taxRate = Number(line.taxRate ?? 0);
-
-      const lineTotal = qty * rate * (1 - discount / 100);
-      const lineTax = lineTotal * (taxRate / 100);
-
-      subtotal += lineTotal;
-      taxAmount += lineTax;
-
-      return {
-        itemId: line.itemId,
-        description: line.description,
-        quantity: new Decimal(qty),
-        rate: new Decimal(rate),
-        discount: new Decimal(discount),
-        taxRate: new Decimal(taxRate),
-        amount: new Decimal(lineTotal),
-      };
-    });
-
-    const shippingAmount = Number(templateData.shippingAmount ?? 0);
-    const grandTotal = subtotal + taxAmount + shippingAmount;
-
-    // Calculate due date based on customer payment terms
-    const customer = await this.prisma.customer.findFirst({
+    const customer = await tx.customer.findFirst({
       where: { id: templateData.customerId, organizationId: profile.organizationId },
     });
     if (!customer) {
@@ -742,62 +821,37 @@ export class RecurringProfilesService {
         `Customer ${templateData.customerId} not found for this organization`,
       );
     }
-    const paymentTerms = customer.paymentTerms || 30;
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + paymentTerms);
-
-    const invoice = await this.prisma.invoice.create({
-      data: {
-        invoiceNumber: await this.generateInvoiceNumber(profile.organizationId),
-        customerId: templateData.customerId,
-        date: new Date(),
-        dueDate,
-        subtotal: new Decimal(subtotal),
-        taxAmount: new Decimal(taxAmount),
-        shippingAmount: new Decimal(shippingAmount),
-        grandTotal: new Decimal(grandTotal),
-        balanceDue: new Decimal(grandTotal),
-        notes: templateData.notes,
-        terms: templateData.terms,
-        status: profile.autoPost ? 'SENT' : 'DRAFT',
-        organizationId: profile.organizationId,
-        lines: { create: lines },
-      },
-    });
-
+    const dto: CreateInvoiceDto = {
+      customerId: templateData.customerId,
+      date: occurrence.toISOString(),
+      dueDate: this.dueDateFrom(occurrence, customer.paymentTerms).toISOString(),
+      shippingAmount: this.decimalText(templateData.shippingAmount, 'shippingAmount'),
+      notes: [templateData.notes, this.occurrenceMarker(sourceId)].filter(Boolean).join('\n'),
+      terms: templateData.terms,
+      lines: templateData.lines.map((line, i) => ({
+        itemId: line.itemId ?? undefined,
+        description: line.description,
+        quantity: this.decimalText(line.quantity, `lines[${i}].quantity`, '1'),
+        rate: this.decimalText(line.rate, `lines[${i}].rate`),
+        discount: this.decimalText(line.discount, `lines[${i}].discount`),
+        taxRate: this.decimalText(line.taxRate, `lines[${i}].taxRate`),
+      })),
+    };
+    // Always a DRAFT: sending/approving is the accountant's explicit posting step.
+    const invoice = await this.moduleRef
+      .get(InvoicesService, { strict: false })
+      .create(profile.organizationId, dto, { tx });
     return invoice.id;
   }
 
   private async createBillFromTemplate(
+    tx: Prisma.TransactionClient,
     profile: RecurringProfile,
     templateData: BillTemplateData,
+    occurrence: Date,
+    sourceId: string,
   ): Promise<string> {
-    let subtotal = 0;
-    let taxAmount = 0;
-    const lines = templateData.lines.map((line: BillTemplateLine) => {
-      const qty = Number(line.quantity ?? 1);
-      const rate = Number(line.rate ?? 0);
-      const taxRate = Number(line.taxRate ?? 0);
-
-      const lineTotal = qty * rate;
-      const lineTax = lineTotal * (taxRate / 100);
-
-      subtotal += lineTotal;
-      taxAmount += lineTax;
-
-      return {
-        itemId: line.itemId,
-        description: line.description,
-        quantity: new Decimal(qty),
-        rate: new Decimal(rate),
-        taxRate: new Decimal(taxRate),
-        amount: new Decimal(lineTotal),
-      };
-    });
-
-    const grandTotal = subtotal + taxAmount;
-
-    const vendor = await this.prisma.vendor.findFirst({
+    const vendor = await tx.vendor.findFirst({
       where: { id: templateData.vendorId, organizationId: profile.organizationId },
     });
     if (!vendor) {
@@ -805,49 +859,57 @@ export class RecurringProfilesService {
         `Vendor ${templateData.vendorId} not found for this organization`,
       );
     }
-    const paymentTerms = vendor.paymentTerms || 30;
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + paymentTerms);
-
-    const bill = await this.prisma.bill.create({
-      data: {
-        billNumber: await this.generateBillNumber(profile.organizationId),
-        vendorId: templateData.vendorId,
-        date: new Date(),
-        dueDate,
-        reference: `Recurring: ${profile.name}`,
-        subtotal: new Decimal(subtotal),
-        taxAmount: new Decimal(taxAmount),
-        grandTotal: new Decimal(grandTotal),
-        balanceDue: new Decimal(grandTotal),
-        status: 'PENDING',
-        organizationId: profile.organizationId,
-        lines: { create: lines },
-      },
-    });
-
+    const dto: CreateBillDto = {
+      vendorId: templateData.vendorId,
+      date: occurrence.toISOString(),
+      dueDate: this.dueDateFrom(occurrence, vendor.paymentTerms).toISOString(),
+      reference: `Recurring: ${profile.name} ${this.occurrenceMarker(sourceId)}`,
+      notes: templateData.notes,
+      lines: templateData.lines.map((line, i) => ({
+        itemId: line.itemId ?? undefined,
+        accountId: line.accountId ?? undefined,
+        description: line.description,
+        quantity: this.decimalText(line.quantity, `lines[${i}].quantity`, '1'),
+        rate: this.decimalText(line.rate, `lines[${i}].rate`),
+        taxRate: this.decimalText(line.taxRate, `lines[${i}].taxRate`),
+      })),
+    };
+    // Always a DRAFT: approving the bill is what posts it.
+    const bill = await this.moduleRef
+      .get(BillsService, { strict: false })
+      .create(profile.organizationId, dto, { tx });
     return bill.id;
   }
 
   private async createExpenseFromTemplate(
+    tx: Prisma.TransactionClient,
     profile: RecurringProfile,
     templateData: ExpenseTemplateData,
+    occurrence: Date,
+    sourceId: string,
   ): Promise<string> {
-    const expense = await this.prisma.expense.create({
-      data: {
-        date: new Date(),
-        vendorId: templateData.vendorId,
-        accountId: templateData.accountId,
-        paidThroughAccountId: templateData.paidThroughAccountId,
-        amount: new Decimal(templateData.amount),
-        taxAmount: templateData.taxAmount ? new Decimal(templateData.taxAmount) : undefined,
-        reference: `Recurring: ${profile.name}`,
-        description: templateData.description,
-        status: profile.autoPost ? 'POSTED' : 'PENDING',
-        organizationId: profile.organizationId,
-      },
-    });
-
+    const amount = toLedgerDecimal(templateData.amount, 'amount');
+    let taxRate = this.decimalText(templateData.taxRate, 'taxRate', '');
+    if (!taxRate && templateData.taxAmount !== undefined && amount.greaterThan(0)) {
+      // Legacy template with a VAT amount: express it as a percentage of the amount.
+      const legacyTax = toLedgerDecimal(templateData.taxAmount, 'taxAmount');
+      taxRate = legacyTax.mul(100).div(amount).toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toFixed();
+    }
+    const dto: CreateExpenseDto = {
+      date: occurrence.toISOString(),
+      vendorId: templateData.vendorId,
+      accountId: templateData.accountId,
+      paidThroughAccountId: templateData.paidThroughAccountId,
+      amount: amount.toFixed(),
+      taxRate: taxRate || undefined,
+      taxInclusive: templateData.taxInclusive === true,
+      reference: `Recurring: ${profile.name} ${this.occurrenceMarker(sourceId)}`,
+      description: templateData.description,
+    };
+    // Posts Dr expense / VAT, Cr paid-through account inside this transaction.
+    const expense = await this.moduleRef
+      .get(ExpensesService, { strict: false })
+      .create(profile.organizationId, dto, { tx });
     return expense.id;
   }
 
@@ -891,36 +953,6 @@ export class RecurringProfilesService {
       Math.min(anchorDay, lastDay),
     );
     return target;
-  }
-
-  private async generateInvoiceNumber(organizationId: string): Promise<string> {
-    const lastInvoice = await this.prisma.invoice.findFirst({
-      where: { organizationId },
-      orderBy: { createdAt: 'desc' },
-      select: { invoiceNumber: true },
-    });
-
-    if (!lastInvoice) {
-      return 'INV-001';
-    }
-
-    const lastNumber = parseInt(lastInvoice.invoiceNumber.split('-')[1], 10);
-    return `INV-${String(lastNumber + 1).padStart(3, '0')}`;
-  }
-
-  private async generateBillNumber(organizationId: string): Promise<string> {
-    const lastBill = await this.prisma.bill.findFirst({
-      where: { organizationId },
-      orderBy: { createdAt: 'desc' },
-      select: { billNumber: true },
-    });
-
-    if (!lastBill) {
-      return 'BILL-001';
-    }
-
-    const lastNumber = parseInt(lastBill.billNumber.split('-')[1], 10);
-    return `BILL-${String(lastNumber + 1).padStart(3, '0')}`;
   }
 
   // ============ Statistics ============

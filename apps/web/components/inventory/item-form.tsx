@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -29,7 +30,6 @@ const itemSchema = z.object({
   purchasePrice: z.number().min(0, 'Purchase price must be positive').optional(),
   taxRateId: z.string().optional(),
   trackInventory: z.boolean().default(false),
-  openingStock: z.number().min(0).optional(),
   reorderPoint: z.number().min(0).optional(),
   reorderQuantity: z.number().min(0).optional(),
   incomeAccountId: z.string().optional(),
@@ -56,6 +56,7 @@ export function ItemForm({
   onCancel,
   isSubmitting,
 }: ItemFormProps) {
+  const tItems = useTranslations('inventory.items.form');
   const isEditing = !!item;
 
   const form = useForm<ItemFormData>({
@@ -70,7 +71,6 @@ export function ItemForm({
       purchasePrice: 0,
       taxRateId: '',
       trackInventory: true,
-      openingStock: 0,
       reorderPoint: 10,
       reorderQuantity: 20,
       incomeAccountId: '',
@@ -94,7 +94,6 @@ export function ItemForm({
         purchasePrice: item.purchasePrice ? parseFloat(item.purchasePrice) : 0,
         taxRateId: item.taxRate || '',
         trackInventory: item.trackInventory ?? true,
-        openingStock: item.currentStock || 0,
         reorderPoint: item.reorderPoint || 10,
         reorderQuantity: item.reorderLevel || 20,
         incomeAccountId: item.salesAccountId || '',
@@ -273,16 +272,9 @@ export function ItemForm({
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {!isEditing && (
-                  <div className="space-y-2">
-                    <Label htmlFor="openingStock">Opening Stock</Label>
-                    <Input
-                      id="openingStock"
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      {...form.register('openingStock', { valueAsNumber: true })}
-                    />
-                  </div>
+                  <p className="text-sm text-muted-foreground md:col-span-3">
+                    {tItems('openingStockHint')}
+                  </p>
                 )}
 
                 <div className="space-y-2">

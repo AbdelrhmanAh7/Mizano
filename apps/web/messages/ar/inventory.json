@@ -24,7 +24,8 @@
       "descriptionPlaceholder": "أدخل الوصف",
       "reorderPoint": "نقطة إعادة الطلب",
       "openingStock": "الرصيد الافتتاحي",
-      "isActive": "نشط"
+      "isActive": "نشط",
+      "openingStockHint": "أضف الرصيد الافتتاحي من خلال تسوية المخزون"
     },
     "types": {
       "goods": "سلع",
