@@ -316,9 +316,10 @@ export async function getBaseCurrency(
 ): Promise<string> {
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { currency: true },
+    select: { baseCurrency: true, currency: true },
   });
-  return (org?.currency || 'USD').toUpperCase();
+  // Onboarding stores the accountant's choice in baseCurrency; `currency` is a registration default.
+  return (org?.baseCurrency || org?.currency || 'USD').toUpperCase();
 }
 
 /**

@@ -355,6 +355,19 @@ describe('BillsService', () => {
       expect(prisma.$transaction).toHaveBeenCalled();
     });
 
+    it('should refuse to post a bill in a currency other than the base currency', async () => {
+      prisma.bill.findFirst.mockResolvedValue({ ...draftBill(), currencyCode: 'USD' } as any);
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultApAccountId: 'ap',
+        defaultVatReceivableAccountId: 'vat',
+        baseCurrency: 'EGP',
+      } as any);
+
+      await expect(service.approve(ORG_ID, 'bill-1')).rejects.toThrow('differs from the base');
+      expect(prisma.bill.updateMany).not.toHaveBeenCalled();
+      expect(journalsService.create).not.toHaveBeenCalled();
+    });
+
     it('should reject a taxed bill when no VAT receivable account is configured', async () => {
       prisma.bill.findFirst.mockResolvedValue(draftBill() as any);
       prisma.organization.findUnique.mockResolvedValue({ defaultApAccountId: 'ap' } as any);

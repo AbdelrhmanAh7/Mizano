@@ -223,10 +223,12 @@ function startsWithAny(code: string, prefixes: string[]): boolean {
 
 /** Non-current assets by default chart convention (15xx–17xx; incl. accumulated depreciation). */
 const FIXED_ASSET_PREFIXES = ['15', '16', '17'];
-const LONG_TERM_LIABILITY_PREFIXES = ['25'];
+// Seeded onboarding chart: 2500 short-term loans, 2600 long-term loans.
+const LONG_TERM_LIABILITY_PREFIXES = ['26', '27', '28', '29'];
 const COGS_PREFIXES = ['5'];
 const OTHER_EXPENSE_PREFIXES = ['7', '8', '9'];
-const OTHER_INCOME_PREFIXES = ['49'];
+// 49xx other income and the seeded 8000 interest income are non-operating.
+const OTHER_INCOME_PREFIXES = ['49', '8'];
 
 function percentOf(part: Decimal, whole: Decimal): number {
   if (whole.lessThanOrEqualTo(0)) return 0;
@@ -329,7 +331,15 @@ export class FinancialReportsService {
 
   async getBalanceSheet(organizationId: string, asOfDate?: string): Promise<BalanceSheetReport> {
     const { asOf, asOfDate: asOfIso } = resolveAsOf(asOfDate);
-    const yearStart = new Date(Date.UTC(asOf.getUTCFullYear(), 0, 1));
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { fiscalYearStartMonth: true },
+    });
+    // Fiscal year containing asOf, from the organization's configured start month (1-12).
+    const startMonth = Math.min(Math.max(org?.fiscalYearStartMonth ?? 1, 1), 12) - 1;
+    const fyYear =
+      asOf.getUTCMonth() >= startMonth ? asOf.getUTCFullYear() : asOf.getUTCFullYear() - 1;
+    const yearStart = new Date(Date.UTC(fyYear, startMonth, 1));
 
     const [currencyCode, accounts] = await Promise.all([
       getBaseCurrency(this.prisma, organizationId),

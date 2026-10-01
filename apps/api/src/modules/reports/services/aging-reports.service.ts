@@ -275,7 +275,8 @@ export class AgingReportsService {
       where: { vendorId, organizationId, date: { lt: start }, deletedAt: null },
     });
     const openingPayments = await this.prisma.paymentMade.findMany({
-      where: { vendorId, organizationId, date: { lt: start } },
+      // Voided payments are excluded; their correction is the linked ledger reversal.
+      where: { vendorId, organizationId, date: { lt: start }, deletedAt: null },
     });
 
     const openingBillTotal = openingBills.reduce(
@@ -295,13 +296,13 @@ export class AgingReportsService {
     });
 
     const payments = await this.prisma.paymentMade.findMany({
-      where: { vendorId, organizationId, date: { gte: start, lte: end } },
+      where: { vendorId, organizationId, date: { gte: start, lte: end }, deletedAt: null },
       orderBy: { date: 'asc' },
     });
 
     const transactions: StatementTransaction[] = [
       ...bills.map((b) => ({
-        date: b.billDate ?? b.date,
+        date: b.date,
         type: 'Bill' as const,
         reference: b.billNumber,
         debit: parseFloat((b.total ?? b.grandTotal).toString()),

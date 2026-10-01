@@ -30,13 +30,25 @@ import { useFieldArray, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { computeTotals, toDecimalInput } from '@/lib/money';
 
+const DECIMAL_INPUT = /^\d+(\.\d+)?$/;
+const OPTIONAL_DECIMAL_INPUT = /^(\d+(\.\d+)?)?$/;
+
 const lineSchema = z.object({
   itemId: z.string().optional(),
   accountId: z.string().optional(),
   description: z.string().min(1, 'Description is required'),
-  quantity: z.string().min(1, 'Quantity is required'),
-  rate: z.string().min(1, 'Rate is required'),
-  taxRate: z.string().default('0'),
+  // Money/quantities must be valid non-negative decimals: never coerce bad input to 0.
+  quantity: z
+    .string()
+    .trim()
+    .regex(DECIMAL_INPUT, 'Quantity must be a non-negative number')
+    .refine((v) => /[1-9]/.test(v), 'Quantity must be greater than zero'),
+  rate: z.string().trim().regex(DECIMAL_INPUT, 'Rate must be a non-negative number'),
+  taxRate: z
+    .string()
+    .trim()
+    .regex(OPTIONAL_DECIMAL_INPUT, 'Tax % must be a non-negative number')
+    .default('0'),
 });
 
 const billSchema = z.object({
@@ -189,6 +201,22 @@ export function BillForm({
   };
 
   // Exact preview; tax is a percentage per line (same rules as the API).
+  // Field-level line errors (quantity/rate/tax) shown under the table.
+  const rawLineErrors: unknown = form.formState.errors.lines;
+  const lineErrors: string[] = Array.isArray(rawLineErrors)
+    ? rawLineErrors.flatMap((lineError: unknown, index: number) =>
+        lineError && typeof lineError === 'object'
+          ? Object.values(lineError as Record<string, unknown>)
+              .map((e) =>
+                e && typeof e === 'object' && 'message' in e
+                  ? (e as { message?: unknown }).message
+                  : undefined,
+              )
+              .filter((m): m is string => typeof m === 'string')
+              .map((m) => `Line ${index + 1}: ${m}`)
+          : [],
+      )
+    : [];
   const watchLines = form.watch('lines');
   const totals = computeTotals(watchLines);
 
@@ -415,6 +443,14 @@ export function BillForm({
               })}
             </TableBody>
           </Table>
+
+          {lineErrors.length > 0 && (
+            <ul className="mt-2 space-y-1 text-sm text-destructive" role="alert">
+              {lineErrors.map((message) => (
+                <li key={message}>{message}</li>
+              ))}
+            </ul>
+          )}
 
           <Button
             type="button"

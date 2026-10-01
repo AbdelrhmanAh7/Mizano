@@ -291,8 +291,19 @@ export class BillsService {
 
       const org = await tx.organization.findUnique({
         where: { id: organizationId },
-        select: { defaultApAccountId: true, defaultVatReceivableAccountId: true },
+        select: {
+          defaultApAccountId: true,
+          defaultVatReceivableAccountId: true,
+          baseCurrency: true,
+        },
       });
+      // The ledger is single-currency: never post foreign amounts as if they were base currency.
+      const billCurrency = bill.currencyCode?.trim().toUpperCase();
+      if (billCurrency && org && billCurrency !== org.baseCurrency.toUpperCase()) {
+        throw new BadRequestException(
+          `Bill currency ${billCurrency} differs from the base currency ${org.baseCurrency}; foreign-currency bills cannot be posted yet`,
+        );
+      }
       if (!org?.defaultApAccountId) {
         throw new BadRequestException(
           'Please configure default Accounts Payable account in organization settings before approving bills',
