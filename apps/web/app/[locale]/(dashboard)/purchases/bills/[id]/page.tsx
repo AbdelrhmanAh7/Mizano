@@ -114,7 +114,9 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
               </Button>
             </>
           )}
-          {(bill.status === 'OPEN' || bill.status === 'OVERDUE' || bill.status === 'PARTIAL') && (
+          {(bill.status === 'OPEN' ||
+            bill.status === 'OVERDUE' ||
+            bill.status === 'PARTIALLY_PAID') && (
             <Button asChild>
               <Link href={`/purchases/payments/new?billId=${bill.id}&vendorId=${bill.vendorId}`}>
                 <DollarSign className="mr-2 h-4 w-4" />

@@ -77,7 +77,7 @@ function BillsPageContent() {
     { value: 'DRAFT', label: t('bills.status.draft') },
     { value: 'OPEN', label: t('bills.status.open') },
     { value: 'OVERDUE', label: t('bills.status.overdue') },
-    { value: 'PARTIAL', label: t('bills.status.partiallyPaid') },
+    { value: 'PARTIALLY_PAID', label: t('bills.status.partiallyPaid') },
     { value: 'PAID', label: t('bills.status.paid') },
   ];
 
