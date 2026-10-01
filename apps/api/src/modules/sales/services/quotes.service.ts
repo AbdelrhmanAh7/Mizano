@@ -18,6 +18,8 @@ import { UpdateQuoteDto } from '../dto/update-quote.dto';
 import {
   allocateInvoiceNumber,
   allocateQuoteNumber,
+  assertMoneyFits,
+  assertTotalsFit,
   mapDocumentNumberConflict,
   parseDocumentDate,
   startOfTodayUtc,
@@ -199,22 +201,26 @@ export class QuotesService {
         });
         if (!customer) throw new BadRequestException('Customer not found');
 
+        // The customer accepted the stored amounts: copy lines and totals verbatim rather
+        // than recomputing. A quote whose stored figures disagree with its own lines is
+        // corrupt and is rejected instead of silently invoiced at a different amount.
+        const linesNet = quote.lines.reduce((sum, l) => sum.add(l.amount), new Decimal(0));
+        if (
+          !linesNet.equals(quote.subtotal) ||
+          !quote.subtotal.add(quote.taxAmount).equals(quote.grandTotal)
+        ) {
+          throw new BadRequestException(
+            'Quote totals do not match its lines; correct the quote before converting it',
+          );
+        }
+        assertMoneyFits(quote.grandTotal, 'grand total');
+
         const { count } = await tx.quote.updateMany({
           where: { id, organizationId, status: QuoteStatus.ACCEPTED, deletedAt: null },
           data: { status: QuoteStatus.INVOICED },
         });
         if (count === 0) throw new ConflictException('Quote has already been converted');
 
-        // Totals are re-derived from the lines with the shared Decimal calculator so the
-        // invoice always reconciles with its own lines.
-        const totals = computeDocumentTotals(
-          quote.lines.map((l) => ({
-            quantity: l.quantity,
-            rate: l.rate,
-            taxRatePercent: l.taxRate,
-            discountPercent: l.discount,
-          })),
-        );
         const invoiceNumber = await allocateInvoiceNumber(tx, organizationId);
         const date = startOfTodayUtc();
         const dueDate = new Date(date);
@@ -227,11 +233,11 @@ export class QuotesService {
             quoteId: quote.id,
             date,
             dueDate,
-            subtotal: totals.subtotal,
-            taxAmount: totals.taxAmount,
-            shippingAmount: totals.shipping,
-            grandTotal: totals.grandTotal,
-            balanceDue: totals.grandTotal,
+            subtotal: quote.subtotal,
+            taxAmount: quote.taxAmount,
+            shippingAmount: new Decimal(0),
+            grandTotal: quote.grandTotal,
+            balanceDue: quote.grandTotal,
             notes: quote.notes,
             terms: quote.terms,
             organizationId,
@@ -243,7 +249,7 @@ export class QuotesService {
                 rate: line.rate,
                 discount: line.discount,
                 taxRate: line.taxRate,
-                amount: totals.lines[i].netAmount,
+                amount: line.amount,
                 sortOrder: i,
               })),
             },
@@ -385,6 +391,7 @@ export class QuotesService {
         discountPercent: l.discount,
       })),
     );
+    assertTotalsFit(totals);
     const lineData = lines.map((line, i) => ({
       itemId: line.itemId,
       description: line.description,

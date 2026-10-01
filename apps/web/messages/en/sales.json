@@ -231,7 +231,9 @@
       "reason": "Reason",
       "amount": "Amount",
       "type": "Type",
-      "applyToInvoice": "Apply to Invoice"
+      "applyToInvoice": "Apply to Invoice",
+      "noRefundAccounts": "No bank or cash accounts are set up. Ask an accountant to add a bank or cash account in Banking, or set a default bank account in Settings, then try again.",
+      "applyInvoiceRequired": "Choose which invoice to apply this credit to"
     },
     "types": {
       "refund": "Refund",

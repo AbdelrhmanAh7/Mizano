@@ -21,7 +21,7 @@ import { Invoice } from '@/lib/hooks/use-invoices';
 import {
   LineItemsForm,
   calculateLineTotals,
-  taxRateIdForPercent,
+  taxFieldsForPercent,
   toApiLines,
 } from './line-items-form';
 
@@ -32,6 +32,7 @@ const lineItemSchema = z.object({
   rate: z.string().min(1, 'Rate is required'),
   discountPercent: z.string().optional(),
   taxRateId: z.string().optional(),
+  taxPercent: z.string().optional(),
   amount: z.string(),
 });
 
@@ -128,7 +129,9 @@ export function InvoiceForm({
           quantity: line.quantity,
           rate: line.rate,
           discountPercent: line.discountPercent || line.discount || '0',
-          taxRateId: line.taxRateId || taxRateIdForPercent(line.taxRate, taxRates),
+          ...(line.taxRateId
+            ? { taxRateId: line.taxRateId }
+            : taxFieldsForPercent(line.taxRate, taxRates)),
           amount: line.amount,
         })) || [
           {

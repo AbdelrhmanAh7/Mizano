@@ -18,7 +18,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCustomers, Customer } from '@/lib/hooks/use-customers';
 import { Quote } from '@/lib/hooks/use-quotes';
-import { LineItemsForm, taxRateIdForPercent, toApiLines } from './line-items-form';
+import { LineItemsForm, taxFieldsForPercent, toApiLines } from './line-items-form';
 
 const lineItemSchema = z.object({
   itemId: z.string().optional(),
@@ -27,6 +27,7 @@ const lineItemSchema = z.object({
   rate: z.string().min(1, 'Rate is required'),
   discountPercent: z.string().optional(),
   taxRateId: z.string().optional(),
+  taxPercent: z.string().optional(),
   amount: z.string(),
 });
 
@@ -112,7 +113,9 @@ export function QuoteForm({
           quantity: line.quantity,
           rate: line.rate,
           discountPercent: line.discountPercent || line.discount || '0',
-          taxRateId: line.taxRateId || taxRateIdForPercent(line.taxRate, taxRates),
+          ...(line.taxRateId
+            ? { taxRateId: line.taxRateId }
+            : taxFieldsForPercent(line.taxRate, taxRates)),
           amount: line.amount,
         })) || [
           {

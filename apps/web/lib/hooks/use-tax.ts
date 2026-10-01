@@ -186,13 +186,23 @@ export function useTaxRates(params?: { isActive?: boolean }) {
   });
 }
 
-/** Active tax rates as { id, name, rate (percent) } options for document forms. */
+/**
+ * Active SALES/BOTH tax rates as { id, name, rate (percent) } options for sales documents.
+ * Reads the sales-authorized endpoint (sales.view), not /tax-rates (tax.view), so sales users
+ * can pick a rate; the server already excludes purchase-only rates.
+ */
 export function useTaxRateOptions(): { id: string; name: string; rate: number }[] {
-  const { data } = useTaxRates({ isActive: true });
-  return useMemo(() => {
-    const rates: TaxRate[] = data?.data ?? [];
-    return rates.map((r) => ({ id: r.id, name: r.name, rate: Number(r.rate) }));
-  }, [data]);
+  const { data } = useQuery({
+    queryKey: ['tax-rates', 'sales-options'],
+    queryFn: async () => {
+      const response = await api.get('/invoices/tax-rate-options');
+      return response.data as { id: string; name: string; rate: string }[];
+    },
+  });
+  return useMemo(
+    () => (data ?? []).map((r) => ({ id: r.id, name: r.name, rate: Number(r.rate) })),
+    [data],
+  );
 }
 
 export function useTaxRate(id: string) {

@@ -19,6 +19,9 @@ function quoteRow(overrides: Record<string, unknown> = {}) {
     notes: null,
     terms: null,
     deletedAt: null,
+    subtotal: dec('89.99'),
+    taxAmount: dec('12.6'),
+    grandTotal: dec('102.59'),
     lines: [
       {
         itemId: null,
@@ -194,12 +197,41 @@ describe('QuotesService', () => {
       expect(invoice.quoteId).toBe('q-1');
       expect(invoice.customerId).toBe('cust-test-001');
       expect(invoice.organizationId).toBe(ORG_ID);
-      // Totals are re-derived from the lines with Decimal arithmetic.
+      // The customer-accepted stored totals are copied verbatim.
       expectDecimalEqual(invoice.subtotal, '89.99');
       expectDecimalEqual(invoice.taxAmount, '12.6');
       expectDecimalEqual(invoice.grandTotal, '102.59');
       expectDecimalEqual(invoice.balanceDue, '102.59');
       expectDecimalEqual(invoice.lines.create[0].amount, '89.99');
+    });
+
+    it('copies the stored (accepted) amounts instead of recomputing them', async () => {
+      // Stored tax differs from what the calculator would give (12.60): it must still win.
+      prisma.quote.findFirst.mockResolvedValue(
+        quoteRow({
+          status: 'ACCEPTED',
+          taxAmount: dec('12.5'),
+          grandTotal: dec('102.49'),
+        }) as any,
+      );
+      const invoice: any = await service.convertToInvoice(ORG_ID, 'q-1');
+
+      expectDecimalEqual(invoice.subtotal, '89.99');
+      expectDecimalEqual(invoice.taxAmount, '12.5');
+      expectDecimalEqual(invoice.grandTotal, '102.49');
+      expectDecimalEqual(invoice.balanceDue, '102.49');
+      expectDecimalEqual(invoice.shippingAmount, '0');
+    });
+
+    it('rejects a quote whose stored totals disagree with its lines, writing nothing', async () => {
+      prisma.quote.findFirst.mockResolvedValue(
+        quoteRow({ status: 'ACCEPTED', subtotal: dec('90') }) as any,
+      );
+      await expect(service.convertToInvoice(ORG_ID, 'q-1')).rejects.toThrow(
+        'Quote totals do not match its lines',
+      );
+      expect(prisma.invoice.create).not.toHaveBeenCalled();
+      expect(prisma.quote.updateMany).not.toHaveBeenCalled();
     });
 
     it('converts exactly once: the guarded ACCEPTED -> INVOICED transition gates the invoice', async () => {

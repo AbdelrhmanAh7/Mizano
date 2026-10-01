@@ -405,6 +405,37 @@ describe('Sales AR cycle (e2e)', () => {
       const again = await a.post(`/payments-received/${payment1Id}/void`);
       expect(again.status).toBe(404);
       expect(await journalsFor(PAYMENT_RECEIVED_VOID, payment1Id)).toHaveLength(1);
+
+      // A voided payment stays readable (read-only) by id, but not in lists.
+      const voided = await a.get(`/payments-received/${payment1Id}`);
+      expect(voided.status).toBe(200);
+      expect(voided.body.deletedAt).not.toBeNull();
+    });
+
+    it('serves sales-authorized lookups: SALES/BOTH tax rates and bank/cash refund accounts', async () => {
+      const taxOptions = await a.get('/invoices/tax-rate-options');
+      expect(taxOptions.status).toBe(200);
+      expect(Array.isArray(taxOptions.body)).toBe(true);
+
+      const refundAccounts = await a.get('/credit-notes/refund-accounts');
+      expect(refundAccounts.status).toBe(200);
+      const ids = (refundAccounts.body as Array<{ id: string }>).map((r) => r.id);
+      expect(ids).toContain(accA.bank);
+      expect(ids).not.toContain(accA.ar);
+      expect(ids).not.toContain(accA.revenue);
+    });
+
+    it('rejects a REFUND paid from a non bank/cash account', async () => {
+      const res = await a.post('/credit-notes').send({
+        customerId,
+        invoiceId: inv1Id,
+        date: '2024-08-01',
+        reason: 'wrong account',
+        amount: '1',
+        type: 'REFUND',
+        refundAccountId: accA.revenue,
+      });
+      expect(res.status).toBe(400);
     });
 
     it('voids the credit note with a linked reversal and restores the full balance', async () => {

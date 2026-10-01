@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PaymentMode, Prisma } from '@prisma/client';
+import { CreditNoteType, PaymentMode, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
@@ -246,6 +246,28 @@ export class PaymentsReceivedService {
       const invoiceIds = payment.allocations.map((a) => a.invoiceId);
       await this.invoicesService.lockInvoices(tx, invoiceIds);
 
+      // Refund credit notes were capped by the money received: voiding this payment must not
+      // leave an invoice with more live refunds than live receipts.
+      for (const invoiceId of invoiceIds) {
+        const remaining = await tx.paymentAllocation.findMany({
+          where: {
+            invoiceId,
+            payment: { organizationId, deletedAt: null, id: { not: id } },
+          },
+          select: { amount: true },
+        });
+        const refunded = await tx.creditNote.aggregate({
+          where: { organizationId, invoiceId, type: CreditNoteType.REFUND, deletedAt: null },
+          _sum: { amount: true },
+        });
+        const received = remaining.reduce((s, a) => s.add(a.amount), new Decimal(0));
+        if ((refunded._sum.amount ?? new Decimal(0)).greaterThan(received)) {
+          throw new BadRequestException(
+            'Cannot void this payment: refund credit notes on the invoice depend on it; void the refund credit note first',
+          );
+        }
+      }
+
       const { count } = await tx.paymentReceived.updateMany({
         where: { id, organizationId, deletedAt: null },
         data: { deletedAt: new Date() },
@@ -335,9 +357,10 @@ export class PaymentsReceivedService {
     );
   }
 
+  /** Voided payments stay readable (read-only, `deletedAt` set); lists exclude them. */
   async findOne(organizationId: string, id: string) {
     const payment = await this.prisma.paymentReceived.findFirst({
-      where: { id, organizationId, deletedAt: null },
+      where: { id, organizationId },
       include: {
         customer: true,
         allocations: { include: { invoice: true } },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -19,7 +19,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useCustomers, Customer } from '@/lib/hooks/use-customers';
 import { useInvoices, Invoice } from '@/lib/hooks/use-invoices';
-import { useAccountsByType, Account } from '@/lib/hooks/use-accounts';
+import { useTranslations } from 'next-intl';
+import { useQuery } from '@tanstack/react-query';
+import { creditNotesApi } from '@/lib/api';
 import { CreditNoteType } from '@/lib/hooks/use-credit-notes';
 
 const creditNoteSchema = z
@@ -31,15 +33,34 @@ const creditNoteSchema = z
     amount: z
       .string()
       .trim()
-      .regex(/^\d+(\.\d{1,4})?$/, 'Enter a valid amount (up to 4 decimals)'),
+      .regex(/^\d{1,15}(\.\d{1,4})?$/, 'Enter a valid amount (up to 15 digits, 4 decimals)'),
     reason: z.string().trim().min(1, 'Reason is required').max(500),
     appliedToInvoiceId: z.string().optional(),
     refundAccountId: z.string().optional(),
   })
-  .refine((v) => v.type !== 'REFUND' || !!v.refundAccountId, {
-    message: 'Refund account is required',
-    path: ['refundAccountId'],
+  .superRefine((v, ctx) => {
+    if (v.type === 'REFUND' && !v.refundAccountId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Refund account is required',
+        path: ['refundAccountId'],
+      });
+    }
+    // No silent default: applying a credit needs an explicit target invoice.
+    if (v.type === 'APPLY_TO_INVOICE' && !v.appliedToInvoiceId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Choose the invoice to apply this credit to',
+        path: ['appliedToInvoiceId'],
+      });
+    }
   });
+
+interface RefundAccount {
+  id: string;
+  code: string;
+  name: string;
+}
 
 export type CreditNoteFormData = z.infer<typeof creditNoteSchema>;
 
@@ -75,20 +96,13 @@ export function CreditNoteForm({
     },
   });
 
-  const { data: assetAccounts } = useAccountsByType('ASSET');
-  const refundAccounts = useMemo(
-    () =>
-      (assetAccounts ?? []).filter(
-        (acc: Account) =>
-          acc.isActive &&
-          (acc.name.toLowerCase().includes('bank') ||
-            acc.name.toLowerCase().includes('cash') ||
-            acc.code.startsWith('1000') ||
-            acc.code.startsWith('1001') ||
-            acc.code.startsWith('1002')),
-      ),
-    [assetAccounts],
-  );
+  const t = useTranslations('sales');
+  // Sales-authorized lookup of bank/cash accounts (the server enforces the same rule on create).
+  const { data: refundAccountsData } = useQuery({
+    queryKey: ['credit-notes', 'refund-accounts'],
+    queryFn: async () => (await creditNotesApi.refundAccounts()).data as RefundAccount[],
+  });
+  const refundAccounts = refundAccountsData ?? [];
 
   const selectedCustomerId = form.watch('customerId');
   const selectedType = form.watch('type');
@@ -280,13 +294,16 @@ export function CreditNoteForm({
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {refundAccounts.map((account: Account) => (
+                  {refundAccounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.code} - {account.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {refundAccountsData && refundAccounts.length === 0 && (
+                <p className="text-sm text-amber-600">{t('creditNotes.form.noRefundAccounts')}</p>
+              )}
               {form.formState.errors.refundAccountId && (
                 <p className="text-sm text-red-500">
                   {form.formState.errors.refundAccountId.message}
@@ -300,7 +317,9 @@ export function CreditNoteForm({
               <Label htmlFor="appliedToInvoiceId">Apply to Invoice *</Label>
               <Select
                 value={form.watch('appliedToInvoiceId') || ''}
-                onValueChange={(value) => form.setValue('appliedToInvoiceId', value)}
+                onValueChange={(value) =>
+                  form.setValue('appliedToInvoiceId', value, { shouldValidate: true })
+                }
                 disabled={!selectedCustomerId || openInvoices.length === 0}
               >
                 <SelectTrigger>
@@ -320,6 +339,9 @@ export function CreditNoteForm({
                   ))}
                 </SelectContent>
               </Select>
+              {form.formState.errors.appliedToInvoiceId && (
+                <p className="text-sm text-red-500">{t('creditNotes.form.applyInvoiceRequired')}</p>
+              )}
               {selectedType === 'APPLY_TO_INVOICE' && openInvoices.length === 0 && (
                 <p className="text-sm text-amber-600">
                   No other open invoices available for this customer.

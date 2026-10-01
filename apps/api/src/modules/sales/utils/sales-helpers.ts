@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AccountType, BankAccountType, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { DocumentTotals } from '../../../common/utils/document-totals';
 
 /** Money columns are Decimal(19, 4): more precision than that cannot be stored. */
 const MONEY_SCALE = 4;
@@ -23,6 +24,67 @@ export function parsePositiveDecimal(value: string, field: string): Decimal {
     throw new BadRequestException(`${field} must have at most ${MONEY_SCALE} decimal places`);
   }
   return amount;
+}
+
+/** Decimal(19, 4) leaves 15 integer digits. */
+const MAX_INTEGER_DIGITS = 15;
+const MONEY_CEILING = new Decimal(10).pow(MAX_INTEGER_DIGITS);
+
+/** Rejects (400) an amount whose integer part cannot be stored in a Decimal(19, 4) column. */
+export function assertMoneyFits(value: Decimal, field: string): void {
+  if (value.abs().greaterThanOrEqualTo(MONEY_CEILING)) {
+    throw new BadRequestException(`${field} is too large (at most ${MAX_INTEGER_DIGITS} digits)`);
+  }
+}
+
+/** Every computed line amount and document total must fit Decimal(19, 4) before anything is written. */
+export function assertTotalsFit(totals: DocumentTotals): void {
+  totals.lines.forEach((line, i) => {
+    assertMoneyFits(line.netAmount, `lines[${i}] amount`);
+    assertMoneyFits(line.taxAmount, `lines[${i}] tax`);
+  });
+  assertMoneyFits(totals.subtotal, 'subtotal');
+  assertMoneyFits(totals.taxAmount, 'tax amount');
+  assertMoneyFits(totals.shipping, 'shipping');
+  assertMoneyFits(totals.grandTotal, 'grand total');
+}
+
+/**
+ * Authoritative rule for "bank or cash account" in sales: an active, non-deleted ASSET account
+ * of the organization that is either the organization's default bank/cash account, or the
+ * linked ledger account of an active bank-register account (BANK or PETTY_CASH; credit cards
+ * are liabilities and excluded). Used both to list refund accounts and to validate a REFUND.
+ */
+export async function bankCashAccountWhere(
+  db: Prisma.TransactionClient,
+  organizationId: string,
+): Promise<Prisma.AccountWhereInput> {
+  const org = await db.organization.findUnique({
+    where: { id: organizationId },
+    select: { defaultBankAccountId: true, defaultCashAccountId: true },
+  });
+  const defaultIds = [org?.defaultBankAccountId, org?.defaultCashAccountId].filter(
+    (id): id is string => !!id,
+  );
+  return {
+    organizationId,
+    deletedAt: null,
+    isActive: true,
+    type: AccountType.ASSET,
+    OR: [
+      { id: { in: defaultIds } },
+      {
+        bankAccounts: {
+          some: {
+            organizationId,
+            deletedAt: null,
+            isActive: true,
+            type: { in: [BankAccountType.BANK, BankAccountType.PETTY_CASH] },
+          },
+        },
+      },
+    ],
+  };
 }
 
 /** Parses a document date (ISO date or timestamp); throws a 400 for anything unparseable. */

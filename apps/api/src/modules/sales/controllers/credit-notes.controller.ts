@@ -62,6 +62,15 @@ export class CreditNotesController {
     return this.creditNotesService.findAllCursor(orgId, query);
   }
 
+  @Get('refund-accounts')
+  @Permissions('sales.create')
+  @ApiOperation({
+    summary: 'Bank/cash accounts a REFUND credit note can be paid from (sales.create)',
+  })
+  refundAccounts(@CurrentOrg() orgId: string) {
+    return this.creditNotesService.refundAccounts(orgId);
+  }
+
   // Bulk Operations
   @Post('bulk-delete')
   @Permissions('sales.delete')

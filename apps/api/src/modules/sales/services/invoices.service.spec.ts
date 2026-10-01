@@ -255,6 +255,24 @@ describe('InvoicesService', () => {
       },
     );
 
+    it('takes the invoice row lock before reading the draft it edits', async () => {
+      await service.update(ORG_ID, 'inv-1', { notes: 'x' });
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      expect(String((prisma.$queryRaw as jest.Mock).mock.calls[0][0])).toContain('FOR UPDATE');
+      expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.invoice.findFirst.mock.invocationCallOrder[1],
+      );
+    });
+
+    it('rejects line totals that overflow Decimal(19, 4) before writing', async () => {
+      await expect(
+        service.update(ORG_ID, 'inv-1', {
+          lines: [{ description: 'Huge', quantity: '999999999999999', rate: '999999999999999' }],
+        }),
+      ).rejects.toThrow('too large');
+      expect(prisma.invoiceLine.createMany).not.toHaveBeenCalled();
+    });
+
     it('treats another tenant invoice as not found', async () => {
       prisma.invoice.findFirst.mockResolvedValue(null);
       await expect(service.update(ORG_ID, 'foreign', {})).rejects.toThrow(NotFoundException);
@@ -334,13 +352,24 @@ describe('InvoicesService', () => {
       ];
     }
 
-    it('takes the ledger lock before reading the invoice and organization settings', async () => {
+    it('locks the invoice row, then the ledger, before reading the posted values and settings', async () => {
       await service.send(ORG_ID, 'inv-1');
 
-      expect(prisma.$executeRaw).toHaveBeenCalled();
-      expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
-        prisma.invoice.findFirst.mock.invocationCallOrder[0],
-      );
+      const rowLock = prisma.$queryRaw.mock.invocationCallOrder[0];
+      const ledgerLock = prisma.$executeRaw.mock.invocationCallOrder[0];
+      const findCalls = prisma.invoice.findFirst.mock.invocationCallOrder;
+      // findFirst[0] is the tenant-scoped ownership check, findFirst[1] the posting read.
+      expect(findCalls[0]).toBeLessThan(rowLock);
+      expect(rowLock).toBeLessThan(ledgerLock);
+      expect(ledgerLock).toBeLessThan(findCalls[1]);
+      expect(ledgerLock).toBeLessThan(prisma.organization.findUnique.mock.invocationCallOrder[0]);
+      expect(String((prisma.$queryRaw as jest.Mock).mock.calls[0][0])).toContain('FOR UPDATE');
+    });
+
+    it('treats another tenant invoice as not found without locking it', async () => {
+      prisma.invoice.findFirst.mockResolvedValue(null);
+      await expect(service.send(ORG_ID, 'foreign')).rejects.toThrow(NotFoundException);
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
     });
 
     it('refuses to post a foreign-currency invoice into the single-currency ledger', async () => {
@@ -870,6 +899,28 @@ describe('InvoicesService', () => {
     it('treats another tenant invoice as not found', async () => {
       prisma.invoice.findFirst.mockResolvedValue(null);
       await expect(service.clone(ORG_ID, 'foreign')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('taxRateOptions', () => {
+    it('returns only active, non-deleted SALES/BOTH rates of the organization as decimal strings', async () => {
+      prisma.taxRate.findMany.mockResolvedValue([
+        { id: 't1', name: 'VAT 14%', rate: dec('14') },
+        { id: 't2', name: 'Both', rate: dec('5.5') },
+      ] as any);
+
+      const result = await service.taxRateOptions(ORG_ID);
+
+      expect(result).toEqual([
+        { id: 't1', name: 'VAT 14%', rate: '14.00' },
+        { id: 't2', name: 'Both', rate: '5.50' },
+      ]);
+      expect(prisma.taxRate.findMany.mock.calls[0][0]!.where).toEqual({
+        organizationId: ORG_ID,
+        isActive: true,
+        deletedAt: null,
+        type: { in: ['SALES', 'BOTH'] },
+      });
     });
   });
 });

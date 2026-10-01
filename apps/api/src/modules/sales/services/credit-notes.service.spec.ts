@@ -410,18 +410,38 @@ describe('CreditNotesService (posting)', () => {
         ).rejects.toThrow('Only APPLY_TO_INVOICE');
       });
 
-      it('rejects a refund account from another organization or an inactive one', async () => {
+      it('only accepts an active bank/cash ASSET account of the organization as refund account', async () => {
         prisma.account.findFirst.mockResolvedValue(null);
         await expect(service.create(ORG_ID, refundDto)).rejects.toThrow(
-          'Refund account not found or inactive',
+          'active bank or cash account',
         );
-        expect(prisma.account.findFirst.mock.calls[0][0]!.where).toMatchObject({
-          id: 'bank-1',
+        const where = prisma.account.findFirst.mock.calls[0][0]!.where as any;
+        expect(where.AND[0]).toEqual({ id: 'bank-1' });
+        expect(where.AND[1]).toMatchObject({
           organizationId: ORG_ID,
           isActive: true,
           deletedAt: null,
+          type: 'ASSET',
         });
         expect(prisma.creditNote.create).not.toHaveBeenCalled();
+      });
+
+      it('stamps refundedAt with the document date in the same transaction', async () => {
+        await service.create(ORG_ID, refundDto);
+        expect(prisma.creditNote.create.mock.calls[0][0].data.refundedAt).toEqual(
+          new Date('2024-08-01'),
+        );
+      });
+
+      it('does not set refundedAt on an apply-to-invoice credit', async () => {
+        await service.create(ORG_ID, dto);
+        expect(prisma.creditNote.create.mock.calls[0][0].data.refundedAt).toBeUndefined();
+      });
+
+      it('rejects an amount beyond Decimal(19, 4) integer digits', async () => {
+        await expect(
+          service.create(ORG_ID, { ...refundDto, amount: '1000000000000000' }),
+        ).rejects.toThrow('too large');
       });
 
       it('cannot refund more than the customer paid on the invoice', async () => {
@@ -648,6 +668,36 @@ describe('CreditNotesService (posting)', () => {
     it('treats another tenant credit note as not found', async () => {
       prisma.creditNote.findFirst.mockResolvedValue(null);
       await expect(service.apply(ORG_ID, 'foreign', 'inv-1')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('refundAccounts', () => {
+    it('lists only active bank/cash asset accounts of the organization', async () => {
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultBankAccountId: 'bank-1',
+        defaultCashAccountId: 'cash-1',
+      } as any);
+      prisma.account.findMany.mockResolvedValue([
+        { id: 'bank-1', code: '1010', name: 'Bank', currency: 'EGP' },
+      ] as any);
+
+      const result = await service.refundAccounts(ORG_ID);
+
+      expect(result).toHaveLength(1);
+      const where = prisma.account.findMany.mock.calls[0][0]!.where as any;
+      expect(where).toMatchObject({
+        organizationId: ORG_ID,
+        isActive: true,
+        deletedAt: null,
+        type: 'ASSET',
+      });
+      expect(where.OR[0]).toEqual({ id: { in: ['bank-1', 'cash-1'] } });
+      expect(where.OR[1].bankAccounts.some).toMatchObject({
+        organizationId: ORG_ID,
+        isActive: true,
+        deletedAt: null,
+        type: { in: ['BANK', 'PETTY_CASH'] },
+      });
     });
   });
 });

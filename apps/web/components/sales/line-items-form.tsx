@@ -27,6 +27,11 @@ export interface LineItem {
   rate: string;
   discountPercent?: string;
   taxRateId?: string;
+  /**
+   * The line's tax percent when it has no matching tax-rate option (e.g. an item whose tax
+   * percent is not a configured rate). Used instead of silently submitting 0.
+   */
+  taxPercent?: string;
   amount: string;
 }
 
@@ -55,9 +60,31 @@ export function toApiLines(lines: LineItem[], taxRates: TaxRate[]): ApiDocumentL
       quantity: line.quantity,
       rate: line.rate,
       discount: line.discountPercent || '0',
-      taxRate: (selected ? selected.rate : 0).toFixed(2),
+      taxRate: selected ? Number(selected.rate).toFixed(2) : percentToFixed(line.taxPercent),
     };
   });
+}
+
+function percentToFixed(percent: string | undefined): string {
+  const value = Number(percent);
+  return percent && Number.isFinite(value) ? value.toFixed(2) : '0.00';
+}
+
+/**
+ * The tax fields a line gets for a stored/item percent: the matching option id when one exists,
+ * otherwise the percent itself is kept so it is never dropped to 0.
+ */
+export function taxFieldsForPercent(
+  percent: string | null | undefined,
+  taxRates: TaxRate[],
+): { taxRateId: string; taxPercent?: string } {
+  const taxRateId = taxRateIdForPercent(percent ?? undefined, taxRates);
+  if (taxRateId) return { taxRateId };
+  const value = Number(percent);
+  if (percent && Number.isFinite(value) && value > 0) {
+    return { taxRateId: '', taxPercent: value.toFixed(2) };
+  }
+  return { taxRateId: '' };
 }
 
 /** Finds the tax rate option matching a stored line percent (server stores percent, not an id). */
@@ -125,12 +152,9 @@ export function calculateLineTotals(
     totalDiscount += discountAmount;
 
     // Calculate tax if applicable
-    if (line.taxRateId && taxRates) {
-      const taxRate = taxRates.find((t) => t.id === line.taxRateId);
-      if (taxRate) {
-        totalTax += lineAmount * (taxRate.rate / 100);
-      }
-    }
+    const taxRate = line.taxRateId ? taxRates?.find((t) => t.id === line.taxRateId) : undefined;
+    const percent = taxRate ? Number(taxRate.rate) : Number(line.taxPercent) || 0;
+    totalTax += lineAmount * (percent / 100);
   });
 
   const grandTotal = subtotal - totalDiscount + totalTax;
@@ -182,9 +206,10 @@ export function LineItemsForm({
       setValue(`${name}.${index}.itemId`, itemId);
       setValue(`${name}.${index}.description`, item.description || item.name);
       setValue(`${name}.${index}.rate`, item.sellingPrice);
-      if (item.taxRate) {
-        setValue(`${name}.${index}.taxRateId`, item.taxRate);
-      }
+      // item.taxRate is a percent, not an option id: map it, or keep the percent itself.
+      const taxFields = taxFieldsForPercent(item.taxRate, taxRates);
+      setValue(`${name}.${index}.taxRateId`, taxFields.taxRateId);
+      setValue(`${name}.${index}.taxPercent`, taxFields.taxPercent ?? '');
       // Recalculate amount
       const qty = watch(`${name}.${index}.quantity`) || '1';
       const discount = watch(`${name}.${index}.discountPercent`) || '0';
@@ -225,6 +250,7 @@ export function LineItemsForm({
       rate: '0',
       discountPercent: '0',
       taxRateId: '',
+      taxPercent: '',
       amount: '0',
     });
   };
@@ -344,9 +370,11 @@ export function LineItemsForm({
               {showTax && (
                 <Select
                   value={watch(`${name}.${index}.taxRateId`) || '__none__'}
-                  onValueChange={(value) =>
-                    setValue(`${name}.${index}.taxRateId`, value === '__none__' ? '' : value)
-                  }
+                  onValueChange={(value) => {
+                    setValue(`${name}.${index}.taxRateId`, value === '__none__' ? '' : value);
+                    // An explicit choice replaces any percent carried over from the item.
+                    setValue(`${name}.${index}.taxPercent`, '');
+                  }}
                 >
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="No tax" />

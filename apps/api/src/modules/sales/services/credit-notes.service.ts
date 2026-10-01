@@ -16,6 +16,8 @@ import { CreateCreditNoteDto } from '../dto/create-credit-note.dto';
 import { CreditNoteQueryDto } from '../dto/credit-note-query.dto';
 import { UpdateCreditNoteDto } from '../dto/update-credit-note.dto';
 import {
+  assertMoneyFits,
+  bankCashAccountWhere,
   mapDocumentNumberConflict,
   nextCreditNoteNumber,
   parseDocumentDate,
@@ -45,6 +47,7 @@ export class CreditNotesService {
    */
   async create(organizationId: string, dto: CreateCreditNoteDto) {
     const amount = parsePositiveDecimal(dto.amount, 'amount');
+    assertMoneyFits(amount, 'amount');
     const date = parseDocumentDate(dto.date, 'credit note date');
 
     const isApply = dto.type === CreditNoteType.APPLY_TO_INVOICE;
@@ -97,11 +100,19 @@ export class CreditNotesService {
 
         let refundAccountId: string | undefined;
         if (!isApply) {
+          // Only a bank/cash asset account can pay a refund (revenue, expense, liability... are
+          // rejected); see bankCashAccountWhere for the authoritative rule.
           const refundAccount = await tx.account.findFirst({
-            where: { id: dto.refundAccountId, organizationId, deletedAt: null, isActive: true },
+            where: {
+              AND: [{ id: dto.refundAccountId }, await bankCashAccountWhere(tx, organizationId)],
+            },
             select: { id: true },
           });
-          if (!refundAccount) throw new BadRequestException('Refund account not found or inactive');
+          if (!refundAccount) {
+            throw new BadRequestException(
+              'Refund account must be an active bank or cash account of this organization',
+            );
+          }
           refundAccountId = refundAccount.id;
           await this.assertRefundCovered(tx, organizationId, invoice.id, amount);
         }
@@ -153,6 +164,9 @@ export class CreditNotesService {
             amount,
             type: dto.type,
             appliedToInvoiceId: applyTargetId,
+            // A REFUND pays the customer out in this same transaction, so it is refunded as of
+            // the credit note's own document date (the date its journal is posted on).
+            refundedAt: isApply ? undefined : date,
             organizationId,
           },
           include: CREDIT_NOTE_VIEW_INCLUDE,
@@ -201,6 +215,20 @@ export class CreditNotesService {
     } catch (error) {
       throw mapDocumentNumberConflict(error, 'Credit note');
     }
+  }
+
+  /**
+   * Accounts a REFUND can be paid from, for users who hold sales.create but not accounting.view.
+   * Same rule that create() enforces (see bankCashAccountWhere).
+   */
+  async refundAccounts(
+    organizationId: string,
+  ): Promise<{ id: string; code: string; name: string; currency: string }[]> {
+    return this.prisma.account.findMany({
+      where: await bankCashAccountWhere(this.prisma, organizationId),
+      select: { id: true, code: true, name: true, currency: true },
+      orderBy: { code: 'asc' },
+    });
   }
 
   async findAll(organizationId: string, query: CreditNoteQueryDto) {

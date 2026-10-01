@@ -249,6 +249,8 @@ export const invoicesApi = {
 export const creditNotesApi = {
   ...crud('/credit-notes'),
   bulkDelete: (ids: string[]) => api.post('/credit-notes/bulk-delete', { ids }),
+  /** Bank/cash accounts a REFUND can be paid from (sales.create; no accounting.view needed). */
+  refundAccounts: () => api.get('/credit-notes/refund-accounts'),
 };
 
 export const paymentsReceivedApi = {

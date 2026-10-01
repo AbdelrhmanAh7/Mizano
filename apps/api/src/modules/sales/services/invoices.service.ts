@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { InvoiceStatus, Prisma } from '@prisma/client';
+import { InvoiceStatus, Prisma, TaxType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
@@ -21,6 +21,8 @@ import { UpdateInvoiceDto } from '../dto/update-invoice.dto';
 import {
   allocateInvoiceNumber,
   mapDocumentNumberConflict,
+  assertMoneyFits,
+  assertTotalsFit,
   parseDocumentDate,
   startOfTodayUtc,
 } from '../utils/sales-helpers';
@@ -237,6 +239,9 @@ export class InvoicesService {
       dto.dueDate !== undefined ? parseDocumentDate(dto.dueDate, 'due date') : undefined;
 
     return this.prisma.$transaction(async (tx) => {
+      // Same row lock as send(): an edit and a send serialize, so a posted journal always
+      // matches the document that was sent.
+      await this.lockOwnedInvoice(tx, organizationId, id);
       const invoice = await tx.invoice.findFirst({
         where: { id, organizationId, deletedAt: null },
       });
@@ -282,6 +287,7 @@ export class InvoicesService {
         // Shipping changed on its own: lines are untouched, so re-derive the gross total.
         const { shipping } = computeDocumentTotals([], { shipping: dto.shippingAmount });
         const grandTotal = invoice.subtotal.add(invoice.taxAmount).add(shipping);
+        assertMoneyFits(grandTotal, 'grand total');
         data.shippingAmount = shipping;
         data.grandTotal = grandTotal;
         data.balanceDue = grandTotal;
@@ -298,7 +304,11 @@ export class InvoicesService {
    */
   async send(organizationId: string, id: string) {
     return this.prisma.$transaction(async (tx) => {
-      // Lock first: the currency/account checks must see the settings the journal posts under.
+      // Lock the invoice row before reading the values that get posted (a concurrent edit
+      // waits and cannot make the journal disagree with the document). Lock order is
+      // invoice -> ledger everywhere (payments, credit notes, voids), so no deadlock.
+      await this.lockOwnedInvoice(tx, organizationId, id);
+      // Then the ledger: the currency/account checks must see the settings the journal posts under.
       await lockOrganizationLedger(tx, organizationId);
       const invoice = await tx.invoice.findFirst({
         where: { id, organizationId, deletedAt: null },
@@ -515,6 +525,40 @@ export class InvoicesService {
     await tx.invoice.update({ where: { id: invoiceId }, data: { balanceDue: balance, status } });
   }
 
+  /** Locks one invoice row, but only if it belongs to the organization (404 otherwise). */
+  private async lockOwnedInvoice(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    id: string,
+  ): Promise<void> {
+    const owned = await tx.invoice.findFirst({
+      where: { id, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!owned) throw new NotFoundException('Invoice not found');
+    await this.lockInvoices(tx, [id]);
+  }
+
+  /**
+   * Active sales-side tax rates for invoice/quote/credit forms. Gated by `sales.view` (not
+   * `tax.view`) so sales users can pick a rate; purchase-only rates are never offered.
+   */
+  async taxRateOptions(
+    organizationId: string,
+  ): Promise<{ id: string; name: string; rate: string }[]> {
+    const rates = await this.prisma.taxRate.findMany({
+      where: {
+        organizationId,
+        isActive: true,
+        deletedAt: null,
+        type: { in: [TaxType.SALES, TaxType.BOTH] },
+      },
+      select: { id: true, name: true, rate: true },
+      orderBy: { name: 'asc' },
+    });
+    return rates.map((r) => ({ id: r.id, name: r.name, rate: r.rate.toFixed(2) }));
+  }
+
   /** Row-locks invoices (sorted to avoid deadlocks) for the rest of the transaction. */
   async lockInvoices(tx: Prisma.TransactionClient, invoiceIds: string[]): Promise<void> {
     for (const id of [...new Set(invoiceIds)].sort()) {
@@ -625,6 +669,7 @@ export class InvoicesService {
       })),
       { shipping },
     );
+    assertTotalsFit(totals);
     const lineData = lines.map((line, i) => ({
       itemId: line.itemId,
       description: line.description,

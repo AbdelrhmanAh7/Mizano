@@ -398,6 +398,50 @@ describe('PaymentsReceivedService', () => {
   });
 
   describe('void', () => {
+    beforeEach(() => {
+      prisma.paymentAllocation.findMany.mockResolvedValue([]);
+      prisma.creditNote.aggregate.mockResolvedValue({ _sum: { amount: null } } as any);
+    });
+
+    it('refuses to void when live refund credit notes exceed the remaining receipts', async () => {
+      prisma.paymentReceived.findFirst.mockResolvedValue({
+        id: 'pmt-1',
+        allocations: [{ invoiceId: 'inv-1' }],
+      } as any);
+      prisma.paymentAllocation.findMany.mockResolvedValue([{ amount: dec('100') }] as any);
+      prisma.creditNote.aggregate.mockResolvedValue({ _sum: { amount: dec('300') } } as any);
+
+      await expect(service.void(ORG_ID, 'pmt-1')).rejects.toThrow(
+        'void the refund credit note first',
+      );
+      expect(prisma.paymentAllocation.findMany.mock.calls[0][0]!.where).toMatchObject({
+        invoiceId: 'inv-1',
+        payment: { organizationId: ORG_ID, deletedAt: null, id: { not: 'pmt-1' } },
+      });
+      expect(prisma.creditNote.aggregate.mock.calls[0][0]!.where).toMatchObject({
+        organizationId: ORG_ID,
+        type: 'REFUND',
+        deletedAt: null,
+      });
+      expect(prisma.paymentReceived.updateMany).not.toHaveBeenCalled();
+      expect(journalsService.reverse).not.toHaveBeenCalled();
+    });
+
+    it('allows the void when remaining receipts still cover live refunds', async () => {
+      prisma.paymentReceived.findFirst.mockResolvedValue({
+        id: 'pmt-1',
+        allocations: [{ invoiceId: 'inv-1' }],
+      } as any);
+      prisma.paymentReceived.updateMany.mockResolvedValue({ count: 1 });
+      prisma.journal.findFirst.mockResolvedValue({ id: 'j1' } as any);
+      prisma.paymentAllocation.findMany.mockResolvedValue([{ amount: dec('300') }] as any);
+      prisma.creditNote.aggregate.mockResolvedValue({ _sum: { amount: dec('300') } } as any);
+
+      await expect(service.void(ORG_ID, 'pmt-1')).resolves.toMatchObject({
+        message: 'Payment voided successfully',
+      });
+    });
+
     it('restores balances, soft-deletes and posts a linked PAYMENT_RECEIVED_VOID reversal', async () => {
       prisma.paymentReceived.findFirst.mockResolvedValue({
         id: 'pmt-1',
@@ -488,7 +532,7 @@ describe('PaymentsReceivedService', () => {
       await expect(service.findOne(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
 
-    it('should filter by organizationId and exclude soft-deleted', async () => {
+    it('should filter by organizationId and still return voided payments read-only', async () => {
       prisma.paymentReceived.findFirst.mockResolvedValue(null);
 
       try {
@@ -499,7 +543,7 @@ describe('PaymentsReceivedService', () => {
 
       const findCall = prisma.paymentReceived.findFirst.mock.calls[0]![0]!;
       expect(findCall.where!.organizationId).toBe(ORG_ID);
-      expect(findCall.where!.deletedAt).toBeNull();
+      expect(findCall.where).not.toHaveProperty('deletedAt');
     });
   });
 

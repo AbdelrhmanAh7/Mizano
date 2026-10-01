@@ -104,6 +104,15 @@ export class InvoicesController {
     return this.paymentsReceivedService.bulkPayInvoices(orgId, ids, options);
   }
 
+  @Get('tax-rate-options')
+  @Permissions('sales.view')
+  @ApiOperation({
+    summary: 'Active SALES/BOTH tax rates for sales forms (sales.view, no tax.view needed)',
+  })
+  taxRateOptions(@CurrentOrg() orgId: string) {
+    return this.invoicesService.taxRateOptions(orgId);
+  }
+
   @Get(':id')
   @Permissions('sales.view')
   @ApiOperation({ summary: 'Get invoice by ID' })
