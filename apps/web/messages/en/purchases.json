@@ -332,6 +332,7 @@
     },
     "void": "Void",
     "voided": "Payment voided",
+    "voidedBadge": "Voided",
     "voidFailed": "Failed to void payment"
   },
   "lineItems": {

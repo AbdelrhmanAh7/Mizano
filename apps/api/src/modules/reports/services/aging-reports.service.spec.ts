@@ -43,7 +43,7 @@ describe('AgingReportsService.getVendorStatement (voided payments)', () => {
   it('keeps a payment voided after the period in that period', async () => {
     const jan = await service.getVendorStatement('org', 'v1', '2026-01-01', '2026-01-31');
     expect(jan?.transactions.map((t) => t.type)).toEqual(['Bill', 'Payment']);
-    expect(jan?.transactions.at(-1)?.balance).toBe(128);
+    expect(jan?.transactions.at(-1)?.balance).toBe('128.0000');
   });
 
   it('includes a void made later on the statement end date', async () => {
@@ -51,15 +51,27 @@ describe('AgingReportsService.getVendorStatement (voided payments)', () => {
     const feb = await service.getVendorStatement('org', 'v1', '2026-02-01', '2026-02-28');
     payment.deletedAt = new Date('2026-02-05');
     expect(feb?.transactions).toEqual([
-      expect.objectContaining({ type: 'Payment Void', debit: 100, balance: 228 }),
+      expect.objectContaining({ type: 'Payment Void', debit: '100.0000', balance: '228.0000' }),
     ]);
+  });
+
+  it('keeps statement money exact (no float drift)', async () => {
+    const saved = { total: bill.total, grandTotal: bill.grandTotal, amount: payment.amount };
+    bill.grandTotal = new Decimal('0.2');
+    payment.amount = new Decimal('0.1');
+    const feb = await service.getVendorStatement('org', 'v1', '2026-02-01', '2026-02-28');
+    Object.assign(bill, { grandTotal: saved.grandTotal });
+    payment.amount = saved.amount;
+    expect(feb?.openingBalance).toBe('0.1000');
+    expect(feb?.closingBalance).toBe('0.2000');
+    expect(feb?.totalDebits).toBe('0.1000');
   });
 
   it('shows the void as a debit on the date it happened', async () => {
     const feb = await service.getVendorStatement('org', 'v1', '2026-02-01', '2026-02-28');
-    expect(feb?.openingBalance).toBe(128);
+    expect(feb?.openingBalance).toBe('128.0000');
     expect(feb?.transactions).toEqual([
-      expect.objectContaining({ type: 'Payment Void', debit: 100, balance: 228 }),
+      expect.objectContaining({ type: 'Payment Void', debit: '100.0000', balance: '228.0000' }),
     ]);
   });
 });

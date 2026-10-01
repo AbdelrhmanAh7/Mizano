@@ -254,6 +254,7 @@ export class OrganizationsService {
   }
 
   async updateGeneralSettings(id: string, dto: GeneralSettingsDto) {
+    await this.assertBaseCurrencyChangeAllowed(id, dto.baseCurrency);
     return this.prisma.organization.update({
       where: { id },
       data: {
@@ -271,6 +272,30 @@ export class OrganizationsService {
       },
       select: { id: true, name: true, updatedAt: true },
     });
+  }
+
+  /**
+   * The ledger stores amounts in the base currency without conversion, so the base currency is
+   * frozen once anything is posted; changing it would relabel every historical amount.
+   */
+  private async assertBaseCurrencyChangeAllowed(
+    organizationId: string,
+    baseCurrency: string | undefined,
+  ): Promise<void> {
+    if (!baseCurrency) return;
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { baseCurrency: true },
+    });
+    if (!org || org.baseCurrency === baseCurrency) return;
+    const posted = await this.prisma.journal.count({
+      where: { organizationId, isPosted: true, deletedAt: null },
+    });
+    if (posted > 0) {
+      throw new BadRequestException(
+        'The base currency cannot be changed after journals have been posted',
+      );
+    }
   }
 
   async updateFinancialSettings(id: string, dto: FinancialSettingsDto) {
@@ -454,6 +479,7 @@ export class OrganizationsService {
   }
 
   async completeCompanyInfoStep(orgId: string, dto: CompanyInfoStepDto) {
+    await this.assertBaseCurrencyChangeAllowed(orgId, dto.baseCurrency);
     // Update organization with company info
     await this.prisma.organization.update({
       where: { id: orgId },

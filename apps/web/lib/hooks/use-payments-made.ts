@@ -28,6 +28,8 @@ export interface BillAllocation {
 export interface PaymentMade {
   id: string;
   paymentNumber: string;
+  /** Set when the payment was voided; voided payments are read-only. */
+  deletedAt?: string | null;
   vendorId: string;
   date: string;
   amount: string;

@@ -332,6 +332,7 @@
     },
     "void": "إلغاء",
     "voided": "تم إلغاء الدفعة",
+    "voidedBadge": "ملغاة",
     "voidFailed": "تعذر إلغاء الدفعة"
   },
   "lineItems": {

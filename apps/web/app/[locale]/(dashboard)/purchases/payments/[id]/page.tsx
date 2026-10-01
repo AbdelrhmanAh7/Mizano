@@ -95,6 +95,9 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
                 {payment.paymentNumber}
               </h1>
               <Badge variant="outline">{formatPaymentMode(payment.paymentMode)}</Badge>
+              {payment.deletedAt && (
+                <Badge variant="destructive">{t('payments.voidedBadge')}</Badge>
+              )}
             </div>
             <p className="text-muted-foreground">
               {t('payments.paymentTo', { name: payment.vendor?.name || '' })}
@@ -102,28 +105,35 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" className="text-red-600">
-                <Trash2 className="mr-2 h-4 w-4" />
-                {tCommon('buttons.delete')}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>{t('payments.deleteTitle')}</AlertDialogTitle>
-                <AlertDialogDescription>{t('payments.deleteConfirmation')}</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+        {!payment.deletedAt && (
+          <div className="flex items-center gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="text-destructive">
+                  <Trash2 className="mr-2 h-4 w-4" />
                   {tCommon('buttons.delete')}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('payments.deleteTitle')}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t('payments.deleteConfirmation')}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    {tCommon('buttons.delete')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        )}
       </div>
 
       {/* Summary Cards */}

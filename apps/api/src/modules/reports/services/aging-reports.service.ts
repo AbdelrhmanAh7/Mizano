@@ -291,8 +291,7 @@ export class AgingReportsService {
       values.reduce((acc, v) => acc.add(v), new Decimal(0));
     const openingBalance = sum(openingBills.map((b) => b.total ?? b.grandTotal))
       .sub(sum(openingPayments.map((p) => p.amount)))
-      .add(sum(openingVoids.map((p) => p.amount)))
-      .toNumber();
+      .add(sum(openingVoids.map((p) => p.amount)));
 
     // Period transactions
     const bills = await this.prisma.bill.findMany({
@@ -309,44 +308,51 @@ export class AgingReportsService {
       orderBy: { deletedAt: 'asc' },
     });
 
-    const transactions: StatementTransaction[] = [
+    const zero = new Decimal(0);
+    const transactions = [
       ...bills.map((b) => ({
         date: b.date,
         type: 'Bill' as const,
         reference: b.billNumber,
-        debit: (b.total ?? b.grandTotal).toNumber(),
-        credit: 0,
+        debit: b.total ?? b.grandTotal,
+        credit: zero,
       })),
       ...payments.map((p) => ({
         date: p.date,
         type: 'Payment' as const,
         reference: p.paymentNumber,
-        debit: 0,
-        credit: p.amount.toNumber(),
+        debit: zero,
+        credit: p.amount,
       })),
       ...voids.map((p) => ({
         date: p.deletedAt as Date,
         type: 'Payment Void' as const,
         reference: p.paymentNumber,
-        debit: p.amount.toNumber(),
-        credit: 0,
+        debit: p.amount,
+        credit: zero,
       })),
     ].sort((a, b) => new Date(a.date as Date).getTime() - new Date(b.date as Date).getTime());
 
+    // Exact Decimal arithmetic; money leaves the service as fixed 4-dp decimal strings.
     let runningBalance = openingBalance;
     const entries = transactions.map((t) => {
-      runningBalance += t.debit - t.credit;
-      return { ...t, balance: runningBalance };
+      runningBalance = runningBalance.add(t.debit).sub(t.credit);
+      return {
+        ...t,
+        debit: t.debit.toFixed(4),
+        credit: t.credit.toFixed(4),
+        balance: runningBalance.toFixed(4),
+      };
     });
 
     return {
       vendor: { id: vendor.id, name: vendor.name, email: vendor.email },
       period: { startDate, endDate },
-      openingBalance,
+      openingBalance: openingBalance.toFixed(4),
       transactions: entries,
-      closingBalance: runningBalance,
-      totalDebits: entries.reduce((sum, e) => sum + e.debit, 0),
-      totalCredits: entries.reduce((sum, e) => sum + e.credit, 0),
+      closingBalance: runningBalance.toFixed(4),
+      totalDebits: sum(transactions.map((t) => t.debit)).toFixed(4),
+      totalCredits: sum(transactions.map((t) => t.credit)).toFixed(4),
     };
   }
 }

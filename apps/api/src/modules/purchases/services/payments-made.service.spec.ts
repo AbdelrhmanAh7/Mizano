@@ -200,3 +200,22 @@ describe('PaymentsMadeService (posting)', () => {
     expect(journals.create).toHaveBeenCalled();
   });
 });
+
+describe('PaymentsMadeService.findOne', () => {
+  it('returns a voided payment read-only so journal source links resolve', async () => {
+    const prisma = createMockPrisma();
+    const voided = { id: 'pay-1', organizationId: 'org-1', deletedAt: new Date('2026-02-05') };
+    prisma.paymentMade.findFirst.mockResolvedValue(voided as never);
+    const service = new PaymentsMadeService(
+      prisma as unknown as PrismaService,
+      {} as BillsService,
+      {} as JournalsService,
+    );
+
+    await expect(service.findOne('org-1', 'pay-1')).resolves.toBe(voided);
+    expect(prisma.paymentMade.findFirst.mock.calls[0]![0]!.where).toEqual({
+      id: 'pay-1',
+      organizationId: 'org-1',
+    });
+  });
+});
