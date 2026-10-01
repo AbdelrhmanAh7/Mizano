@@ -13,6 +13,7 @@ import { Prisma } from '@prisma/client';
 import { BusinessRuleException } from '../exceptions/business-rule.exception';
 import { LoggerService } from '../../modules/logger/logger.service';
 import { LogLevel, LogSource } from '@mizano/shared-types';
+import { describeError, redactText, redactUrl, sanitizeStack } from '../utils/redact';
 
 interface ErrorResponse {
   statusCode: number;
@@ -250,54 +251,58 @@ export class AllExceptionsFilter implements ExceptionFilter {
     return formatted;
   }
 
-  private logError(exception: unknown, response: ErrorResponse, request: Request) {
+  /**
+   * Log the failure without request bodies, headers, query secrets or
+   * exception messages that may embed caller data (Prisma renders full query
+   * arguments; JSON.parse quotes its input). Only ids, codes and a redacted,
+   * truncated message reach stdout and the in-memory logger module.
+   */
+  private logError(exception: unknown, response: ErrorResponse, request: Request): void {
+    const user = (request as { user?: { id?: string; organizationId?: string } }).user;
+    const safePath = redactUrl(response.path) ?? '';
     const logContext = {
       statusCode: response.statusCode,
       code: response.code,
-      path: response.path,
+      path: safePath,
       method: request.method,
       requestId: response.requestId,
-      userId: (request as { user?: { id?: string; organizationId?: string } }).user?.id,
-      organizationId: (request as { user?: { id?: string; organizationId?: string } }).user
-        ?.organizationId,
+      userId: user?.id,
+      organizationId: user?.organizationId,
     };
 
     if (response.statusCode >= 500) {
-      this.logger.error(
-        `${response.code || 'ERROR'}: ${response.message}`,
-        exception instanceof Error ? exception.stack : undefined,
-        logContext,
-      );
+      const safeMessage = `${response.code || 'ERROR'}: ${describeError(exception)}`;
+      const safeStack = sanitizeStack(exception);
+      this.logger.error(safeMessage, safeStack, logContext);
       // Capture to logger module
       this.loggerService?.capture({
         level: LogLevel.ERROR,
         source: LogSource.BACKEND,
-        message: response.message,
-        stack: exception instanceof Error ? exception.stack : undefined,
+        message: safeMessage,
+        stack: safeStack,
         context: logContext,
-        url: response.path,
+        url: safePath,
         method: request.method,
         statusCode: response.statusCode,
         userAgent: request.headers['user-agent'],
-        userId: (request as { user?: { id?: string; organizationId?: string } }).user?.id,
-        organizationId: (request as { user?: { id?: string; organizationId?: string } }).user
-          ?.organizationId,
+        userId: user?.id,
+        organizationId: user?.organizationId,
       });
     } else if (response.statusCode >= 400) {
-      this.logger.warn(`${response.code || 'ERROR'}: ${response.message}`, logContext);
+      const safeMessage = `${response.code || 'ERROR'}: ${redactText(String(response.message), 300)}`;
+      this.logger.warn(safeMessage, logContext);
       // Capture warnings to logger module
       this.loggerService?.capture({
         level: LogLevel.WARN,
         source: LogSource.BACKEND,
-        message: response.message,
+        message: safeMessage,
         context: logContext,
-        url: response.path,
+        url: safePath,
         method: request.method,
         statusCode: response.statusCode,
         userAgent: request.headers['user-agent'],
-        userId: (request as { user?: { id?: string; organizationId?: string } }).user?.id,
-        organizationId: (request as { user?: { id?: string; organizationId?: string } }).user
-          ?.organizationId,
+        userId: user?.id,
+        organizationId: user?.organizationId,
       });
     }
   }
