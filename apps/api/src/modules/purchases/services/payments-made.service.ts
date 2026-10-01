@@ -42,7 +42,11 @@ export class PaymentsMadeService {
    * Records a vendor payment: allocations, bill balances and the Dr AP / Cr bank journal
    * commit in one transaction. Bills are row-locked so concurrent payments cannot overpay.
    */
-  async create(organizationId: string, dto: CreatePaymentMadeDto) {
+  async create(
+    organizationId: string,
+    dto: CreatePaymentMadeDto,
+    options: { tx?: Prisma.TransactionClient } = {},
+  ) {
     const amount = parsePositive(dto.amount, 'amount');
     const allocations = dto.allocations.map((a, i) => ({
       billId: a.billId,
@@ -60,7 +64,7 @@ export class PaymentsMadeService {
     const date = new Date(dto.date);
     if (Number.isNaN(date.getTime())) throw new BadRequestException('Invalid payment date');
 
-    return this.prisma.$transaction(async (tx) => {
+    const run = async (tx: Prisma.TransactionClient) => {
       const vendor = await tx.vendor.findFirst({
         where: { id: dto.vendorId, organizationId, deletedAt: null },
         select: { id: true },
@@ -151,7 +155,9 @@ export class PaymentsMadeService {
       );
 
       return payment;
-    });
+    };
+
+    return options.tx ? run(options.tx) : this.prisma.$transaction(run);
   }
 
   /** Pays the full remaining balance of one bill (used by bulk pay). */
@@ -232,12 +238,17 @@ export class PaymentsMadeService {
         },
         select: { id: true },
       });
-      if (journal) {
-        await this.journalsService.reverse(organizationId, journal.id, undefined, {
-          tx,
-          source: { type: JournalSourceType.PAYMENT_MADE_VOID, id },
-        });
+      if (!journal) {
+        // Legacy payments (created before journals were source-linked) cannot be voided safely:
+        // restoring the bill without reversing Dr AP / Cr bank would unbalance the ledger.
+        throw new BadRequestException(
+          'This payment has no linked ledger entry; reverse its journal manually before voiding',
+        );
       }
+      await this.journalsService.reverse(organizationId, journal.id, undefined, {
+        tx,
+        source: { type: JournalSourceType.PAYMENT_MADE_VOID, id },
+      });
 
       return { message: 'Payment voided successfully' };
     });

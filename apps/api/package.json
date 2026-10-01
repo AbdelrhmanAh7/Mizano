@@ -11,7 +11,7 @@
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json",
     "test": "jest --maxWorkers=2",
     "test:watch": "jest --watch --maxWorkers=2",
     "test:cov": "jest --coverage --maxWorkers=2",

@@ -150,6 +150,7 @@ describe('BillsService', () => {
         billPrefix: 'BILL-',
         billNextNumber: 8,
       } as any);
+      prisma.bill.count.mockResolvedValue(0);
       prisma.bill.create.mockResolvedValue(createMockBill() as any);
 
       await service.create(ORG_ID, { ...validDto, billNumber: undefined });
@@ -158,6 +159,19 @@ describe('BillsService', () => {
         expect.objectContaining({ data: { billNextNumber: { increment: 1 } } }),
       );
       expect(prisma.bill.create.mock.calls[0][0].data.billNumber).toBe('BILL-0007');
+    });
+
+    it('should skip numbers already used by existing bills', async () => {
+      prisma.vendor.findFirst.mockResolvedValue(createMockVendor() as any);
+      prisma.organization.update
+        .mockResolvedValueOnce({ billPrefix: 'BILL-', billNextNumber: 2 } as any)
+        .mockResolvedValueOnce({ billPrefix: 'BILL-', billNextNumber: 3 } as any);
+      prisma.bill.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+      prisma.bill.create.mockResolvedValue(createMockBill() as any);
+
+      await service.create(ORG_ID, { ...validDto, billNumber: undefined });
+
+      expect(prisma.bill.create.mock.calls[0][0].data.billNumber).toBe('BILL-0002');
     });
 
     it('should throw BadRequestException when vendor not found', async () => {

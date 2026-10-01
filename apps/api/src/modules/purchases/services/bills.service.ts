@@ -497,15 +497,24 @@ export class BillsService {
     }
   }
 
-  /** Atomically reserves the organization's next bill number (e.g. BILL-0007). */
+  /**
+   * Atomically reserves the organization's next bill number (e.g. BILL-0007). Numbers already
+   * used (e.g. bills created before the counter existed) are skipped.
+   */
   private async nextBillNumber(organizationId: string): Promise<string> {
-    const org = await this.prisma.organization.update({
-      where: { id: organizationId },
-      data: { billNextNumber: { increment: 1 } },
-      select: { billPrefix: true, billNextNumber: true },
-    });
-    const number = org.billNextNumber - 1;
-    return `${org.billPrefix}${String(number).padStart(4, '0')}`;
+    for (let attempt = 0; attempt < 1000; attempt++) {
+      const org = await this.prisma.organization.update({
+        where: { id: organizationId },
+        data: { billNextNumber: { increment: 1 } },
+        select: { billPrefix: true, billNextNumber: true },
+      });
+      const candidate = `${org.billPrefix}${String(org.billNextNumber - 1).padStart(4, '0')}`;
+      const taken = await this.prisma.bill.count({
+        where: { organizationId, billNumber: candidate },
+      });
+      if (taken === 0) return candidate;
+    }
+    throw new ConflictException('Could not allocate a bill number; provide one explicitly');
   }
 
   private mapUniqueViolation(error: unknown): unknown {

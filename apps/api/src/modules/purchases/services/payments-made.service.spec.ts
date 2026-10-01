@@ -184,4 +184,19 @@ describe('PaymentsMadeService (posting)', () => {
       source: { type: 'PAYMENT_MADE_VOID', id: 'p1' },
     });
   });
+
+  it('refuses to void a legacy payment with no linked journal (ledger would not reverse)', async () => {
+    prisma.paymentMade.findFirst.mockResolvedValue({ id: 'p1', allocations: [{ billId: 'b1' }] });
+    prisma.paymentMade.updateMany.mockResolvedValue({ count: 1 });
+    prisma.journal.findFirst.mockResolvedValue(null);
+
+    await expect(service.void(ORG, 'p1')).rejects.toThrow('no linked ledger entry');
+    expect(journals.reverse).not.toHaveBeenCalled();
+  });
+
+  it('runs inside a caller transaction when one is given', async () => {
+    await service.create(ORG, dto, { tx: prisma });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(journals.create).toHaveBeenCalled();
+  });
 });

@@ -417,7 +417,7 @@ export class AccountsService {
   private async linkDefaultAccounts(
     organizationId: string,
     industry: 'services' | 'retail' | 'construction',
-    accounts: { id: string; code: string }[],
+    accounts: { id: string; code: string; type: AccountType }[],
   ): Promise<void> {
     const org = await this.prisma.organization.findUnique({
       where: { id: organizationId },
@@ -437,6 +437,9 @@ export class AccountsService {
     const data: DefaultAccountSettings = {};
     for (const [field, code] of Object.entries(codes) as [keyof DefaultAccountSettings, string][]) {
       const account = accounts.find((a) => a.code === code);
+      // Input VAT is recoverable: it must be an asset, never a liability (older seeds used one).
+      if (field === 'defaultVatReceivableAccountId' && account?.type !== AccountType.ASSET)
+        continue;
       if (account && !org[field]) data[field] = account.id;
     }
     if (Object.keys(data).length > 0) {
@@ -459,7 +462,7 @@ export class AccountsService {
       { code: '2000', name: 'Accounts Payable', type: AccountType.LIABILITY, parentId: null },
       { code: '2100', name: 'Accrued Expenses', type: AccountType.LIABILITY, parentId: null },
       { code: '2200', name: 'VAT Payable', type: AccountType.LIABILITY, parentId: null },
-      { code: '2210', name: 'VAT Input', type: AccountType.LIABILITY, parentId: null },
+      { code: '2210', name: 'VAT Input', type: AccountType.ASSET, parentId: null },
       { code: '2300', name: 'Payroll Payable', type: AccountType.LIABILITY, parentId: null },
       { code: '2400', name: 'Unearned Revenue', type: AccountType.LIABILITY, parentId: null },
 
@@ -517,7 +520,7 @@ export class AccountsService {
       { code: '2150', name: 'Customer Deposits', type: AccountType.LIABILITY, parentId: null },
       { code: '2200', name: 'Sales Tax Payable', type: AccountType.LIABILITY, parentId: null },
       { code: '2210', name: 'VAT Payable', type: AccountType.LIABILITY, parentId: null },
-      { code: '2220', name: 'VAT Input', type: AccountType.LIABILITY, parentId: null },
+      { code: '2220', name: 'VAT Input', type: AccountType.ASSET, parentId: null },
       { code: '2300', name: 'Payroll Payable', type: AccountType.LIABILITY, parentId: null },
       { code: '2400', name: 'Gift Card Liability', type: AccountType.LIABILITY, parentId: null },
       { code: '2500', name: 'Short-term Loans', type: AccountType.LIABILITY, parentId: null },
@@ -620,7 +623,7 @@ export class AccountsService {
       { code: '2100', name: 'Accrued Expenses', type: AccountType.LIABILITY, parentId: null },
       { code: '2110', name: 'Retainage Payable', type: AccountType.LIABILITY, parentId: null },
       { code: '2200', name: 'VAT Payable', type: AccountType.LIABILITY, parentId: null },
-      { code: '2210', name: 'VAT Input', type: AccountType.LIABILITY, parentId: null },
+      { code: '2210', name: 'VAT Input', type: AccountType.ASSET, parentId: null },
       { code: '2300', name: 'Payroll Payable', type: AccountType.LIABILITY, parentId: null },
       { code: '2310', name: 'Union Dues Payable', type: AccountType.LIABILITY, parentId: null },
       { code: '2400', name: 'Customer Deposits', type: AccountType.LIABILITY, parentId: null },

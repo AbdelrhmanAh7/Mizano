@@ -149,7 +149,8 @@ export class BillsController {
   }
 
   @Post('bulk-pay')
-  @Permissions('purchases.edit')
+  // Records real payments: same permission as creating a payment.
+  @Permissions('purchases.create')
   @InvalidatesLedger('bills:*', 'payments-made:*')
   @ApiOperation({ summary: 'Pay the full balance of each bill (records real payments)' })
   bulkPay(@CurrentOrg() orgId: string, @Body() dto: BulkPayBillsDto) {
