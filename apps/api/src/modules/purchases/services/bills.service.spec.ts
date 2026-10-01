@@ -11,17 +11,19 @@ import { dec, expectDecimalEqual } from '../../../test/helpers/decimal.helpers';
 describe('BillsService', () => {
   let service: BillsService;
   let prisma: MockPrismaClient;
+  let journalsService: { create: jest.Mock };
 
   const ORG_ID = 'org-test-001';
 
   beforeEach(async () => {
     prisma = createMockPrisma();
+    journalsService = { create: jest.fn().mockResolvedValue({}) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BillsService,
         { provide: PrismaService, useValue: prisma },
-        { provide: JournalsService, useValue: { create: jest.fn() } },
+        { provide: JournalsService, useValue: journalsService },
       ],
     }).compile();
 
@@ -112,6 +114,36 @@ describe('BillsService', () => {
       expectDecimalEqual(data.grandTotal as any, '1000');
     });
 
+    it('should compute 2 x 100 at 14% as net 200, tax 28, gross 228 (tax is a percent)', async () => {
+      prisma.vendor.findFirst.mockResolvedValue(createMockVendor() as any);
+      prisma.bill.create.mockResolvedValue(createMockBill() as any);
+
+      await service.create(ORG_ID, {
+        ...validDto,
+        lines: [{ description: 'CPU', quantity: '2', rate: '100', taxRate: '14' }],
+      });
+
+      const data = prisma.bill.create.mock.calls[0][0].data as any;
+      expectDecimalEqual(data.subtotal, '200');
+      expectDecimalEqual(data.taxAmount, '28');
+      expectDecimalEqual(data.grandTotal, '228');
+      expectDecimalEqual(data.lines.create[0].taxRate, '14');
+      expectDecimalEqual(data.lines.create[0].amount, '200');
+    });
+
+    it('should reject an expense account from another organization', async () => {
+      prisma.vendor.findFirst.mockResolvedValue(createMockVendor() as any);
+      prisma.account.count.mockResolvedValue(0);
+
+      await expect(
+        service.create(ORG_ID, {
+          ...validDto,
+          lines: [{ accountId: 'foreign-acc', quantity: '1', rate: '1' }],
+        }),
+      ).rejects.toThrow('Account not found');
+      expect(prisma.bill.create).not.toHaveBeenCalled();
+    });
+
     it('should throw BadRequestException when vendor not found', async () => {
       prisma.vendor.findFirst.mockResolvedValue(null);
 
@@ -198,37 +230,111 @@ describe('BillsService', () => {
     it('should allow updating DRAFT bills', async () => {
       const draftBill = createMockBill({ id: 'bill-1', status: 'DRAFT' });
       prisma.bill.findFirst.mockResolvedValue(draftBill as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
       prisma.bill.update.mockResolvedValue({ ...draftBill, notes: 'updated' } as any);
 
       const result = await service.update(ORG_ID, 'bill-1', { notes: 'updated' });
       expect(result.notes).toBe('updated');
     });
+
+    it('should recalculate totals when lines are replaced', async () => {
+      prisma.bill.findFirst.mockResolvedValue(createMockBill({ status: 'DRAFT' }) as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
+      prisma.bill.update.mockResolvedValue({} as any);
+
+      await service.update(ORG_ID, 'bill-1', {
+        lines: [{ description: 'x', quantity: '2', rate: '100', taxRate: '14' }],
+      });
+
+      expect(prisma.billLine.deleteMany).toHaveBeenCalledWith({ where: { billId: 'bill-1' } });
+      const data = prisma.bill.update.mock.calls[0]![0]!.data as any;
+      expectDecimalEqual(data.subtotal, '200');
+      expectDecimalEqual(data.taxAmount, '28');
+      expectDecimalEqual(data.grandTotal, '228');
+    });
+
+    it('should reject a project from another organization', async () => {
+      prisma.bill.findFirst.mockResolvedValue(createMockBill({ status: 'DRAFT' }) as any);
+      prisma.project.findFirst.mockResolvedValue(null);
+
+      await expect(service.update(ORG_ID, 'bill-1', { projectId: 'foreign' })).rejects.toThrow(
+        'Project not found',
+      );
+      expect(prisma.bill.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('approve (status transition DRAFT -> OPEN)', () => {
-    it('should transition a DRAFT bill to OPEN', async () => {
-      const draftBill = createMockBill({
+    const draftBill = () =>
+      createMockBill({
         id: 'bill-1',
         status: 'DRAFT',
         billNumber: 'BILL-001',
+        date: new Date('2024-06-15'),
+        subtotal: dec('500'),
         grandTotal: dec('575'),
         taxAmount: dec('75'),
         lines: [{ accountId: 'acc-1', amount: dec('500'), description: 'Office supplies' }],
       });
-      prisma.bill.findFirst.mockResolvedValue(draftBill as any);
+
+    beforeEach(() => {
       prisma.organization.findUnique.mockResolvedValue({
         defaultApAccountId: 'ap-acc-1',
         defaultVatReceivableAccountId: 'vat-acc-1',
       } as any);
-      prisma.bill.update.mockResolvedValue({ ...draftBill, status: 'OPEN' } as any);
+    });
+
+    it('should transition DRAFT to OPEN and post one balanced journal in the same transaction', async () => {
+      const bill = draftBill();
+      prisma.bill.findFirst.mockResolvedValue(bill as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
+      prisma.bill.findUniqueOrThrow.mockResolvedValue({ ...bill, status: 'OPEN' } as any);
 
       const result = await service.approve(ORG_ID, 'bill-1');
       expect(result.status).toBe('OPEN');
+
+      const [orgId, dto, options] = journalsService.create.mock.calls[0];
+      expect(orgId).toBe(ORG_ID);
+      expect(options.tx).toBe(prisma);
+      expect(options.source).toEqual({ type: 'BILL_APPROVAL', id: 'bill-1' });
+      // Accounting date is the bill date, not "now"
+      expect(dto.date).toBe(new Date('2024-06-15').toISOString());
+      expect(dto.lines).toEqual([
+        expect.objectContaining({ accountId: 'acc-1', debit: '500.0000' }),
+        expect.objectContaining({ accountId: 'vat-acc-1', debit: '75.0000' }),
+        expect.objectContaining({ accountId: 'ap-acc-1', credit: '575.0000' }),
+      ]);
+    });
+
+    it('should post nothing when a concurrent approval already won', async () => {
+      prisma.bill.findFirst.mockResolvedValue(draftBill() as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.approve(ORG_ID, 'bill-1')).rejects.toThrow(
+        'Bill has already been approved',
+      );
+      expect(journalsService.create).not.toHaveBeenCalled();
+    });
+
+    it('should propagate a journal failure so the transaction rolls back', async () => {
+      prisma.bill.findFirst.mockResolvedValue(draftBill() as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
+      journalsService.create.mockRejectedValue(new Error('This period is locked'));
+
+      await expect(service.approve(ORG_ID, 'bill-1')).rejects.toThrow('This period is locked');
+      expect(prisma.$transaction).toHaveBeenCalled();
+    });
+
+    it('should reject a taxed bill when no VAT receivable account is configured', async () => {
+      prisma.bill.findFirst.mockResolvedValue(draftBill() as any);
+      prisma.organization.findUnique.mockResolvedValue({ defaultApAccountId: 'ap' } as any);
+
+      await expect(service.approve(ORG_ID, 'bill-1')).rejects.toThrow('VAT Receivable');
+      expect(prisma.bill.updateMany).not.toHaveBeenCalled();
     });
 
     it('should reject approving a non-DRAFT bill', async () => {
-      const openBill = createMockBill({ status: 'OPEN' });
-      prisma.bill.findFirst.mockResolvedValue(openBill as any);
+      prisma.bill.findFirst.mockResolvedValue(createMockBill({ status: 'OPEN' }) as any);
 
       await expect(service.approve(ORG_ID, 'bill-1')).rejects.toThrow(
         'Only draft bills can be approved',
@@ -240,105 +346,107 @@ describe('BillsService', () => {
 
       await expect(service.approve(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
+
+    it('bulkApprove should reuse approve and report per-record failures', async () => {
+      prisma.bill.findFirst
+        .mockResolvedValueOnce(draftBill() as any)
+        .mockResolvedValueOnce(createMockBill({ id: 'bill-2', status: 'OPEN' }) as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
+      prisma.bill.findUniqueOrThrow.mockResolvedValue({} as any);
+
+      const result = await service.bulkApprove(ORG_ID, ['bill-1', 'bill-2']);
+
+      expect(result.processed).toBe(1);
+      expect(result.failures).toEqual([
+        { id: 'bill-2', reason: 'Only draft bills can be approved' },
+      ]);
+      expect(journalsService.create).toHaveBeenCalledTimes(1);
+    });
   });
 
-  describe('updateBalanceDue', () => {
-    it('should mark bill as PAID when fully paid', async () => {
-      const bill = createMockBill({
-        id: 'bill-1',
-        grandTotal: dec('575'),
-        status: 'OPEN',
-        billAllocations: [{ amount: dec('575') }],
-      });
-      prisma.bill.findUnique.mockResolvedValue(bill as any);
+  describe('recalculateBalance', () => {
+    const setup = (grandTotal: string, paid: string[]) => {
+      prisma.bill.findUnique.mockResolvedValue(
+        createMockBill({
+          id: 'bill-1',
+          grandTotal: dec(grandTotal),
+          status: 'OPEN',
+          dueDate: new Date(Date.now() + 86400000),
+        }) as any,
+      );
+      prisma.billAllocation.findMany.mockResolvedValue(
+        paid.map((a) => ({ amount: dec(a) })) as any,
+      );
       prisma.bill.update.mockResolvedValue({} as any);
+    };
 
-      await service.updateBalanceDue('bill-1');
-
-      const updateCall = prisma.bill.update.mock.calls[0]![0]!;
-      expect(updateCall.data.status).toBe('PAID');
-      expectDecimalEqual(updateCall.data.balanceDue as any, '0');
+    it('should mark bill as PAID when fully paid', async () => {
+      setup('575', ['575']);
+      await service.recalculateBalance(prisma as any, 'bill-1');
+      const data = prisma.bill.update.mock.calls[0]![0]!.data as any;
+      expect(data.status).toBe('PAID');
+      expectDecimalEqual(data.balanceDue, '0');
     });
 
     it('should mark bill as PARTIALLY_PAID for partial payments', async () => {
-      const bill = createMockBill({
-        id: 'bill-1',
-        grandTotal: dec('575'),
-        status: 'OPEN',
-        billAllocations: [{ amount: dec('200') }],
+      setup('575', ['200']);
+      await service.recalculateBalance(prisma as any, 'bill-1');
+      const data = prisma.bill.update.mock.calls[0]![0]!.data as any;
+      expect(data.status).toBe('PARTIALLY_PAID');
+      expectDecimalEqual(data.balanceDue, '375');
+    });
+
+    it('should return to OPEN when all payments were voided', async () => {
+      setup('575', []);
+      await service.recalculateBalance(prisma as any, 'bill-1');
+      const data = prisma.bill.update.mock.calls[0]![0]!.data as any;
+      expect(data.status).toBe('OPEN');
+      expectDecimalEqual(data.balanceDue, '575');
+    });
+
+    it('should only count allocations of non-deleted payments', async () => {
+      setup('575', []);
+      await service.recalculateBalance(prisma as any, 'bill-1');
+      expect(prisma.billAllocation.findMany.mock.calls[0]![0]!.where).toEqual({
+        billId: 'bill-1',
+        payment: { deletedAt: null },
       });
-      prisma.bill.findUnique.mockResolvedValue(bill as any);
-      prisma.bill.update.mockResolvedValue({} as any);
-
-      await service.updateBalanceDue('bill-1');
-
-      const updateCall = prisma.bill.update.mock.calls[0]![0]!;
-      expect(updateCall.data.status).toBe('PARTIALLY_PAID');
-      expectDecimalEqual(updateCall.data.balanceDue as any, '375');
     });
 
     it('should throw NotFoundException when bill not found', async () => {
       prisma.bill.findUnique.mockResolvedValue(null);
-
-      await expect(service.updateBalanceDue('nonexistent')).rejects.toThrow(NotFoundException);
-    });
-
-    it('should handle overpayment by capping balance at zero', async () => {
-      const bill = createMockBill({
-        id: 'bill-1',
-        grandTotal: dec('500'),
-        status: 'OPEN',
-        billAllocations: [{ amount: dec('300') }, { amount: dec('300') }],
-      });
-      prisma.bill.findUnique.mockResolvedValue(bill as any);
-      prisma.bill.update.mockResolvedValue({} as any);
-
-      await service.updateBalanceDue('bill-1');
-
-      const updateCall = prisma.bill.update.mock.calls[0]![0]!;
-      expect(updateCall.data.status).toBe('PAID');
-      // Math.max(0, -100) = 0
-      expectDecimalEqual(updateCall.data.balanceDue as any, '0');
+      await expect(service.recalculateBalance(prisma as any, 'x')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
   describe('remove (soft delete)', () => {
-    it('should soft-delete a DRAFT bill', async () => {
-      const draftBill = createMockBill({ id: 'bill-1', status: 'DRAFT' });
-      prisma.bill.findFirst.mockResolvedValue(draftBill as any);
-      prisma.bill.update.mockResolvedValue({ ...draftBill, deletedAt: new Date() } as any);
+    it('should soft-delete a DRAFT bill with a guarded update', async () => {
+      prisma.bill.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.remove(ORG_ID, 'bill-1');
 
       expect(result.message).toBe('Bill deleted successfully');
-      expect(prisma.bill.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ deletedAt: expect.any(Date) }),
-        }),
-      );
+      expect(prisma.bill.updateMany).toHaveBeenCalledWith({
+        where: { id: 'bill-1', organizationId: ORG_ID, deletedAt: null, status: 'DRAFT' },
+        data: { deletedAt: expect.any(Date) },
+      });
+      expect(prisma.bill.delete).not.toHaveBeenCalled();
+      expect(prisma.bill.deleteMany).not.toHaveBeenCalled();
     });
 
     it('should reject deleting non-DRAFT bills', async () => {
-      const openBill = createMockBill({ status: 'OPEN' });
-      prisma.bill.findFirst.mockResolvedValue(openBill as any);
+      prisma.bill.updateMany.mockResolvedValue({ count: 0 });
+      prisma.bill.findFirst.mockResolvedValue({ id: 'bill-1' } as any);
 
       await expect(service.remove(ORG_ID, 'bill-1')).rejects.toThrow(
         'Only draft bills can be deleted',
       );
     });
 
-    it('should never hard-delete financial records', async () => {
-      const draftBill = createMockBill({ id: 'bill-1', status: 'DRAFT' });
-      prisma.bill.findFirst.mockResolvedValue(draftBill as any);
-      prisma.bill.update.mockResolvedValue({ ...draftBill, deletedAt: new Date() } as any);
-
-      await service.remove(ORG_ID, 'bill-1');
-
-      expect(prisma.bill.delete).not.toHaveBeenCalled();
-      expect(prisma.bill.deleteMany).not.toHaveBeenCalled();
-    });
-
     it('should throw NotFoundException for non-existent bill', async () => {
+      prisma.bill.updateMany.mockResolvedValue({ count: 0 });
       prisma.bill.findFirst.mockResolvedValue(null);
 
       await expect(service.remove(ORG_ID, 'nonexistent')).rejects.toThrow(NotFoundException);

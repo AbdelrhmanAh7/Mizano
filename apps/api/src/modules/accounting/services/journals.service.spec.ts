@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { JournalsService } from './journals.service';
+import { JournalSourceType, JournalsService } from './journals.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { OrganizationsService } from '../../organizations/organizations.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
@@ -94,8 +94,7 @@ describe('JournalsService', () => {
       );
     });
 
-    it('should allow entries within floating-point tolerance (0.0001)', async () => {
-      // Difference of exactly 0.0001 should still pass (abs <= 0.0001)
+    it('should reject entries that are off by even 0.0001 (exact Decimal balance)', async () => {
       const nearBalancedDto = {
         date: '2024-06-15T00:00:00.000Z',
         lines: [
@@ -104,23 +103,71 @@ describe('JournalsService', () => {
         ],
       };
 
+      await expect(service.create(ORG_ID, nearBalancedDto)).rejects.toThrow(
+        'Total debits must equal total credits',
+      );
+      expect(prisma.journal.create).not.toHaveBeenCalled();
+    });
+
+    it('should allow two lines that use the same account', async () => {
+      prisma.account.findMany.mockResolvedValue([
+        { id: 'acc-exp', organizationId: ORG_ID },
+        { id: 'acc-ap', organizationId: ORG_ID },
+      ] as any);
+      prisma.journal.create.mockResolvedValue(createMockJournalEntry({ lines: [] }) as any);
+
+      await service.create(ORG_ID, {
+        date: '2024-06-15T00:00:00.000Z',
+        lines: [
+          { accountId: 'acc-exp', debit: '60', credit: '0' },
+          { accountId: 'acc-exp', debit: '40', credit: '0' },
+          { accountId: 'acc-ap', debit: '0', credit: '100' },
+        ],
+      });
+
+      const findCall = prisma.account.findMany.mock.calls[0]![0]!;
+      expect((findCall.where as any).id.in).toEqual(['acc-exp', 'acc-ap']);
+      expect(prisma.journal.create).toHaveBeenCalled();
+    });
+
+    it('should reject accounts from another organization', async () => {
+      prisma.account.findMany.mockResolvedValue([{ id: 'acc-1', organizationId: ORG_ID }] as any);
+
+      await expect(service.create(ORG_ID, balancedDto)).rejects.toThrow(
+        'One or more accounts not found',
+      );
+      const findCall = prisma.account.findMany.mock.calls[0]![0]!;
+      expect(findCall.where).toMatchObject({ organizationId: ORG_ID });
+      expect(prisma.journal.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject a line with both debit and credit', async () => {
+      await expect(
+        service.create(ORG_ID, {
+          date: '2024-06-15T00:00:00.000Z',
+          lines: [
+            { accountId: 'acc-1', debit: '10', credit: '10' },
+            { accountId: 'acc-2', debit: '0', credit: '0' },
+          ],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should link the journal to its source event and run in the caller transaction', async () => {
       prisma.account.findMany.mockResolvedValue([
         { id: 'acc-1', organizationId: ORG_ID },
         { id: 'acc-2', organizationId: ORG_ID },
       ] as any);
+      prisma.journal.create.mockResolvedValue(createMockJournalEntry({ lines: [] }) as any);
 
-      const mockJournal = createMockJournalEntry({
-        journalNumber: 'JRN-001',
-        lines: [
-          createMockJournalLine({ debit: dec('1000.0001'), credit: dec('0') }),
-          createMockJournalLine({ debit: dec('0'), credit: dec('1000.0000') }),
-        ],
+      await service.create(ORG_ID, balancedDto, {
+        tx: prisma as any,
+        source: { type: JournalSourceType.BILL_APPROVAL, id: 'bill-1' },
       });
-      prisma.journal.findFirst.mockResolvedValue(null);
-      prisma.journal.create.mockResolvedValue(mockJournal as any);
 
-      const result = await service.create(ORG_ID, nearBalancedDto);
-      expect(result).toBeDefined();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      const createCall = prisma.journal.create.mock.calls[0]![0]!;
+      expect(createCall.data).toMatchObject({ sourceType: 'BILL_APPROVAL', sourceId: 'bill-1' });
     });
 
     it('should reject when referenced accounts do not exist', async () => {
@@ -159,10 +206,8 @@ describe('JournalsService', () => {
         { id: 'acc-2', organizationId: ORG_ID },
       ] as any);
 
-      // Existing journal with number JRN-042
-      prisma.journal.findFirst.mockResolvedValue({
-        journalNumber: 'JRN-042',
-      } as any);
+      // Highest existing number is JRN-042
+      (prisma.$queryRaw as jest.Mock).mockResolvedValue([{ max: 42 }]);
 
       const mockJournal = createMockJournalEntry({
         journalNumber: 'JRN-043',
@@ -334,6 +379,7 @@ describe('JournalsService', () => {
         id: 'j1',
         journalNumber: 'JRN-001',
         date: new Date('2025-06-01'),
+        isPosted: true,
         reversedBy: null,
         reversalOfId: null,
         lines: [
@@ -362,11 +408,21 @@ describe('JournalsService', () => {
       expect(result).toBeDefined();
       expect(result.totalDebit).toBe('500.0000');
       expect(result.totalCredit).toBe('500.0000');
+      const createCall = prisma.journal.create.mock.calls[0]![0]!;
+      expect(createCall.data).toMatchObject({ reversalOfId: 'j1', isPosted: true });
+    });
+
+    it('should reject reversing an unposted journal', async () => {
+      prisma.journal.findFirst.mockResolvedValue(
+        createMockJournalEntry({ id: 'j1', isPosted: false, reversedBy: null, lines: [] }) as any,
+      );
+      await expect(service.reverse(ORG_ID, 'j1')).rejects.toThrow('Only posted journals');
     });
 
     it('should reject reversing an already-reversed journal', async () => {
       const journal = createMockJournalEntry({
         id: 'j1',
+        isPosted: true,
         reversedBy: { id: 'j2' },
         reversalOfId: null,
         date: new Date('2025-06-01'),
@@ -382,6 +438,7 @@ describe('JournalsService', () => {
     it('should reject reversing a reversal journal', async () => {
       const journal = createMockJournalEntry({
         id: 'j2',
+        isPosted: true,
         reversedBy: null,
         reversalOfId: 'j1',
         date: new Date('2025-06-01'),
@@ -392,6 +449,49 @@ describe('JournalsService', () => {
       await expect(service.reverse(ORG_ID, 'j2')).rejects.toThrow(
         'Cannot reverse a reversal journal',
       );
+    });
+  });
+
+  describe('posted immutability', () => {
+    it('should reject editing a posted journal', async () => {
+      prisma.journal.findFirst.mockResolvedValue(
+        createMockJournalEntry({ id: 'j1', isPosted: true, sourceType: null }) as any,
+      );
+      await expect(service.update(ORG_ID, 'j1', { notes: 'x' })).rejects.toThrow(
+        'Posted journals cannot be edited or deleted',
+      );
+      expect(prisma.journalLine.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('should reject deleting a posted journal', async () => {
+      prisma.journal.findFirst.mockResolvedValue(
+        createMockJournalEntry({ id: 'j1', isPosted: true, sourceType: null }) as any,
+      );
+      await expect(service.remove(ORG_ID, 'j1')).rejects.toThrow(
+        'Posted journals cannot be edited or deleted',
+      );
+      expect(prisma.journal.update).not.toHaveBeenCalled();
+    });
+
+    it('bulkPost should enforce the lock date per journal and report failures', async () => {
+      organizationsService.getLockDate.mockResolvedValue(new Date('2025-01-31'));
+      prisma.journal.findFirst.mockImplementation(((args: any) =>
+        Promise.resolve(
+          createMockJournalEntry({
+            id: args.where.id,
+            isPosted: false,
+            date: args.where.id === 'locked' ? new Date('2025-01-15') : new Date('2025-02-15'),
+            lines: [],
+          }),
+        )) as any);
+      prisma.journal.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.bulkPost(ORG_ID, ['locked', 'open']);
+
+      expect(result.processed).toBe(1);
+      expect(result.failures).toEqual([
+        { id: 'locked', reason: expect.stringContaining('This period is locked') },
+      ]);
     });
   });
 

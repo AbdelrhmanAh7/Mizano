@@ -750,6 +750,10 @@ model Journal {
   notes          String?
   isPosted       Boolean   @default(true)
   reversalOfId   String?   @unique
+  // Business event that produced this journal (e.g. BILL_APPROVAL + billId).
+  // Unique per organization so a retried/concurrent command posts at most once.
+  sourceType     String?
+  sourceId       String?
   organizationId String
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -765,6 +769,7 @@ model Journal {
   workOrder             WorkOrder?
 
   @@unique([journalNumber, organizationId])
+  @@unique([organizationId, sourceType, sourceId])
   @@index([organizationId])
   @@index([date])
   @@index([organizationId, deletedAt, date])

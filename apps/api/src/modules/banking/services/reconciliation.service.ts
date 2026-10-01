@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { InvoicesService } from '../../sales/services/invoices.service';
-import { BillsService } from '../../purchases/services/bills.service';
+import { PaymentsMadeService } from '../../purchases/services/payments-made.service';
 import { ReconciliationStatus, BankTransactionType, BankTransaction } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -16,7 +16,7 @@ export class ReconciliationService {
   constructor(
     private prisma: PrismaService,
     private invoicesService: InvoicesService,
-    private billsService: BillsService,
+    private paymentsMadeService: PaymentsMadeService,
   ) {}
 
   async getSuggestions(organizationId: string, bankAccountId: string) {
@@ -111,7 +111,16 @@ export class ReconciliationService {
     if (transaction.status !== ReconciliationStatus.PENDING)
       throw new BadRequestException('Already reconciled');
 
-    // Update transaction
+    // Record the payment first: if it is rejected the transaction stays PENDING.
+    const amount = transaction.amount.abs();
+    if (entityType === 'invoice') {
+      await this.createPaymentForInvoice(organizationId, entityId, amount, transaction);
+    } else if (entityType === 'bill') {
+      await this.createPaymentForBill(organizationId, entityId, amount, transaction);
+    } else {
+      throw new BadRequestException('entityType must be invoice or bill');
+    }
+
     await this.prisma.bankTransaction.update({
       where: { id: transactionId },
       data: {
@@ -121,24 +130,18 @@ export class ReconciliationService {
       },
     });
 
-    // Create payment record
-    const amount = parseFloat(transaction.amount.toString());
-    if (entityType === 'invoice') {
-      await this.createPaymentForInvoice(organizationId, entityId, amount, transaction);
-    } else if (entityType === 'bill') {
-      await this.createPaymentForBill(organizationId, entityId, amount, transaction);
-    }
-
     return { message: 'Reconciliation confirmed' };
   }
 
   private async createPaymentForInvoice(
     organizationId: string,
     invoiceId: string,
-    amount: number,
+    amount: Decimal,
     transaction: BankTransaction,
   ) {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, organizationId, deletedAt: null },
+    });
     if (!invoice)
       throw new NotFoundException(`Invoice ${invoiceId} not found for reconciliation payment`);
 
@@ -148,41 +151,44 @@ export class ReconciliationService {
         paymentNumber,
         customerId: invoice.customerId,
         date: transaction.date,
-        amount: new Decimal(amount),
+        amount,
         paymentMode: 'BANK_TRANSFER',
         depositToAccountId: transaction.bankAccountId,
         reference: transaction.reference,
         organizationId,
-        allocations: { create: [{ invoiceId, amount: new Decimal(amount) }] },
+        allocations: { create: [{ invoiceId, amount }] },
       },
     });
     await this.invoicesService.updateBalanceDue(invoiceId);
   }
 
+  /** Goes through the standard vendor-payment command so AP, balances and the ledger agree. */
   private async createPaymentForBill(
     organizationId: string,
     billId: string,
-    amount: number,
+    amount: Decimal,
     transaction: BankTransaction,
   ) {
-    const bill = await this.prisma.bill.findUnique({ where: { id: billId } });
+    const bill = await this.prisma.bill.findFirst({
+      where: { id: billId, organizationId, deletedAt: null },
+    });
     if (!bill) throw new NotFoundException(`Bill ${billId} not found for reconciliation payment`);
 
-    const paymentNumber = await this.generatePaymentNumber(organizationId, 'VPMT');
-    await this.prisma.paymentMade.create({
-      data: {
-        paymentNumber,
-        vendorId: bill.vendorId,
-        date: transaction.date,
-        amount: new Decimal(amount),
-        paymentMode: 'BANK_TRANSFER',
-        paidFromAccountId: transaction.bankAccountId,
-        reference: transaction.reference,
-        organizationId,
-        allocations: { create: [{ billId, amount: new Decimal(amount) }] },
-      },
+    const bankAccount = await this.prisma.bankAccount.findFirst({
+      where: { id: transaction.bankAccountId, organizationId },
+      select: { linkedAccountId: true },
     });
-    await this.billsService.updateBalanceDue(billId);
+    if (!bankAccount) throw new NotFoundException('Bank account not found');
+
+    await this.paymentsMadeService.create(organizationId, {
+      vendorId: bill.vendorId,
+      date: transaction.date.toISOString(),
+      amount: amount.toFixed(4),
+      paymentMode: 'BANK_TRANSFER',
+      paidFromAccountId: bankAccount.linkedAccountId,
+      reference: transaction.reference ?? undefined,
+      allocations: [{ billId, amount: amount.toFixed(4) }],
+    });
   }
 
   async createExpenseFromTransaction(

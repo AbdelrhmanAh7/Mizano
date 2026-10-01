@@ -27,6 +27,6 @@ import { AccountingModule } from '../accounting/accounting.module';
     PaymentsMadeService,
     VendorCreditsService,
   ],
-  exports: [VendorsService, BillsService],
+  exports: [VendorsService, BillsService, PaymentsMadeService],
 })
 export class PurchasesModule {}

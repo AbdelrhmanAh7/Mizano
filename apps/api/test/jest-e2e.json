@@ -11,7 +11,7 @@
         "tsconfig": {
           "types": ["jest", "node"],
           "module": "commonjs",
-          "esModuleInterop": true,
+          "esModuleInterop": false,
           "emitDecoratorMetadata": true,
           "experimentalDecorators": true,
           "skipLibCheck": true
@@ -24,5 +24,6 @@
     "^@mizano/shared-types$": "<rootDir>/../../../packages/shared-types/src/index.ts",
     "^@mizano/validators$": "<rootDir>/../../../packages/validators/src/index.ts"
   },
-  "setupFilesAfterEnv": ["./setup-e2e.ts"]
+  "setupFilesAfterEnv": ["./setup-e2e.ts"],
+  "forceExit": true
 }

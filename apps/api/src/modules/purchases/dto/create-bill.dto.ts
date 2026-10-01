@@ -10,7 +10,7 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
-class BillLineDto {
+export class BillLineDto {
   @IsString() @IsOptional() itemId?: string;
   @IsString() @IsOptional() accountId?: string;
   @IsString() @IsOptional() description?: string;

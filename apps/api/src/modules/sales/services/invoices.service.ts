@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InvoiceStatus, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
 import { CreateInvoiceDto } from '../dto/create-invoice.dto';
@@ -30,29 +31,20 @@ export class InvoicesService {
       throw new BadRequestException('Customer not found');
     }
 
-    // Calculate totals
-    let subtotal = 0;
-    let taxAmount = 0;
-    const calculatedLines = lines.map((line) => {
-      const qty = parseFloat(line.quantity);
-      const rate = parseFloat(line.rate);
-      const discount = parseFloat(line.discount || '0');
-      const tax = parseFloat(line.taxRate || '0');
-
-      const lineTotal = qty * rate * (1 - discount / 100);
-      const lineTax = lineTotal * (tax / 100);
-
-      subtotal += lineTotal;
-      taxAmount += lineTax;
-
-      return {
-        ...line,
-        amount: lineTotal.toFixed(4),
-      };
-    });
-
-    const shipping = parseFloat(shippingAmount || '0');
-    const grandTotal = subtotal + taxAmount + shipping;
+    // Calculate totals (shared Decimal calculator — tax is a percent, discount per line)
+    const totals = computeDocumentTotals(
+      lines.map((l) => ({
+        quantity: l.quantity,
+        rate: l.rate,
+        taxRatePercent: l.taxRate,
+        discountPercent: l.discount,
+      })),
+      { shipping: shippingAmount },
+    );
+    const calculatedLines = lines.map((line, i) => ({
+      ...line,
+      amount: totals.lines[i].netAmount,
+    }));
 
     // Generate invoice number
     const invoiceNumber = await this.generateInvoiceNumber(organizationId);
@@ -65,11 +57,11 @@ export class InvoicesService {
         projectId,
         date: new Date(date),
         dueDate: new Date(dueDate),
-        subtotal: new Decimal(subtotal),
-        taxAmount: new Decimal(taxAmount),
-        shippingAmount: new Decimal(shipping),
-        grandTotal: new Decimal(grandTotal),
-        balanceDue: new Decimal(grandTotal),
+        subtotal: totals.subtotal,
+        taxAmount: totals.taxAmount,
+        shippingAmount: totals.shipping,
+        grandTotal: totals.grandTotal,
+        balanceDue: totals.grandTotal,
         notes,
         terms,
         organizationId,
@@ -81,7 +73,7 @@ export class InvoicesService {
             rate: new Decimal(line.rate),
             discount: new Decimal(line.discount || '0'),
             taxRate: new Decimal(line.taxRate || '0'),
-            amount: new Decimal(line.amount),
+            amount: line.amount,
           })),
         },
       },
@@ -251,66 +243,51 @@ export class InvoicesService {
     const { lines: dtoLines, ...restDto } = updateInvoiceDto;
     let updateData: Prisma.InvoiceUpdateInput = { ...restDto };
 
-    if (dtoLines) {
-      let subtotal = 0;
-      let taxAmount = 0;
+    return this.prisma.$transaction(async (tx) => {
+      if (dtoLines) {
+        const totals = computeDocumentTotals(
+          dtoLines.map((l) => ({
+            quantity: l.quantity,
+            rate: l.rate,
+            taxRatePercent: l.taxRate,
+            discountPercent: l.discount,
+          })),
+          { shipping: updateInvoiceDto.shippingAmount ?? invoice.shippingAmount },
+        );
 
-      const calculatedLines = dtoLines.map((line) => {
-        const qty = parseFloat(line.quantity);
-        const rate = parseFloat(line.rate);
-        const discount = parseFloat(line.discount || '0');
-        const tax = parseFloat(line.taxRate || '0');
+        await tx.invoiceLine.deleteMany({ where: { invoiceId: id } });
+        await tx.invoiceLine.createMany({
+          data: dtoLines.map((line, i) => ({
+            invoiceId: id,
+            itemId: line.itemId,
+            description: line.description,
+            quantity: new Decimal(line.quantity),
+            rate: new Decimal(line.rate),
+            discount: new Decimal(line.discount || '0'),
+            taxRate: new Decimal(line.taxRate || '0'),
+            amount: totals.lines[i].netAmount,
+          })),
+        });
 
-        const lineTotal = qty * rate * (1 - discount / 100);
-        const lineTax = lineTotal * (tax / 100);
+        updateData = {
+          ...updateData,
+          subtotal: totals.subtotal,
+          taxAmount: totals.taxAmount,
+          shippingAmount: totals.shipping,
+          grandTotal: totals.grandTotal,
+          balanceDue: totals.grandTotal,
+        };
+      }
 
-        subtotal += lineTotal;
-        taxAmount += lineTax;
-
-        return { ...line, amount: lineTotal.toFixed(4) };
+      return tx.invoice.update({
+        where: { id },
+        data: updateData,
+        include: {
+          customer: { select: { id: true, name: true } },
+          lines: true,
+        },
       });
-
-      const shipping = parseFloat(
-        updateInvoiceDto.shippingAmount || invoice.shippingAmount.toString(),
-      );
-      const grandTotal = subtotal + taxAmount + shipping;
-
-      // Delete existing lines and create new ones
-      await this.prisma.invoiceLine.deleteMany({ where: { invoiceId: id } });
-
-      updateData = {
-        ...updateData,
-        subtotal: new Decimal(subtotal),
-        taxAmount: new Decimal(taxAmount),
-        grandTotal: new Decimal(grandTotal),
-        balanceDue: new Decimal(grandTotal),
-      };
-
-      // Create new lines separately after the update
-      await this.prisma.invoiceLine.createMany({
-        data: calculatedLines.map((line) => ({
-          invoiceId: id,
-          itemId: line.itemId,
-          description: line.description,
-          quantity: new Decimal(line.quantity),
-          rate: new Decimal(line.rate),
-          discount: new Decimal(line.discount || '0'),
-          taxRate: new Decimal(line.taxRate || '0'),
-          amount: new Decimal(line.amount),
-        })),
-      });
-    }
-
-    const updatedInvoice = await this.prisma.invoice.update({
-      where: { id },
-      data: updateData,
-      include: {
-        customer: { select: { id: true, name: true } },
-        lines: true,
-      },
     });
-
-    return updatedInvoice;
   }
 
   async send(organizationId: string, id: string) {
