@@ -30,32 +30,31 @@ apps/web/app/[locale]/(dashboard)/{module}/
 
 ### For each page, create supporting files:
 
-3. **API Client** — `apps/web/lib/api/{module}.ts`:
+3. **API Client** — add an entry to `apps/web/lib/api.ts` (axios instance with the session bearer token; NestJS is called directly, there is no BFF proxy). Reuse the CRUD factory:
 
 ```typescript
-import { fetchApi } from '../fetch';
-export const {module}Api = {
-  list: (params?: ListParams) => fetchApi<PaginatedResponse<{Entity}>>('/{resource}', { params }),
-  getById: (id: string) => fetchApi<{Entity}>(`/{resource}/${id}`),
-  create: (data: Create{Entity}Dto) => fetchApi<{Entity}>('/{resource}', { method: 'POST', body: data }),
-  update: (id: string, data: Update{Entity}Dto) => fetchApi<{Entity}>(`/{resource}/${id}`, { method: 'PATCH', body: data }),
-  delete: (id: string) => fetchApi<void>(`/{resource}/${id}`, { method: 'DELETE' }),
+export const {resource}Api = {
+  ...crud('/{resource}'), // getAll, getAllCursor, getOne, create, update (PATCH), delete
+  approve: (id: string) => api.post(`/{resource}/${id}/approve`),
 };
 ```
 
-4. **React Query Hooks** — `apps/web/lib/hooks/use-{resource}.ts`:
+Larger self-contained clients may live in `apps/web/lib/api/{module}.ts` and import `api` from `@/lib/api`.
+
+4. **React Query Hooks** — `apps/web/lib/hooks/use-{resource}.ts`, preferably via the factory (toasts and cache invalidation included):
 
 ```typescript
-export function use{Resource}(params?: ListParams) {
-  return useQuery({ queryKey: ['{resource}', params], queryFn: () => {resource}Api.list(params) });
-}
-export function useCreate{Resource}() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: {resource}Api.create,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['{resource}'] }),
-  });
-}
+export const {
+  useList: use{Resource}List,
+  useOne: use{Resource},
+  useCreate: useCreate{Resource},
+  useUpdate: useUpdate{Resource},
+  useDelete: useDelete{Resource},
+} = createCrudHooks<{Entity}, Create{Entity}Data, Update{Entity}Data>({
+  queryKey: ['{resource}'],
+  api: {resource}Api,
+  entityName: '{Entity}',
+});
 ```
 
 5. **Module Components** — `apps/web/components/{module}/`:
@@ -66,14 +65,16 @@ export function useCreate{Resource}() {
 6. **i18n Translations** — Add keys to:
    - `apps/web/messages/en/{module}.json`
    - `apps/web/messages/ar/{module}.json`
+   - Register a new namespace in `apps/web/messages/{en,ar}/index.ts`
 
-7. **Every page MUST handle**:
-   - Loading skeleton
-   - Error state
-   - Empty state
+7. **Every page MUST handle** (see `docs/DESIGN-SYSTEM.md`):
+   - Loading skeleton (`components/ui/page-skeletons.tsx`)
+   - Error state (`components/shared/error-state.tsx`)
+   - Empty state (`components/shared/empty-state.tsx`)
+   - RTL (logical `ms-/me-/ps-/pe-/start-/end-` utilities) and 375px width
 
 8. Verify with lint:
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm --filter @mizano/web lint && pnpm type-check
+pnpm --filter @mizano/web lint && pnpm type-check
 ```

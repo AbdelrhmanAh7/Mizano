@@ -13,43 +13,43 @@ Determine which database operation is needed. If the user doesn't specify, ask.
 ### Generate Prisma Client (after schema changes)
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm db:generate
+pnpm db:generate
 ```
 
 ### Push Schema (sync schema to DB without migration)
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm db:push
+pnpm db:push
 ```
 
 ### Create Migration (production-safe schema changes)
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm db:migrate
+pnpm db:migrate
 ```
 
 ### Seed Database (populate with sample data)
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm db:seed
+pnpm db:seed
 ```
 
 ### Reset Database (⚠️ DESTRUCTIVE — drops all data, re-migrates, re-seeds)
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm db:reset
+pnpm db:reset
 ```
 
 ### Open Prisma Studio (visual DB browser at :5555)
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm db:studio
+pnpm db:studio
 ```
 
 ### Validate Schema
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm db:check
+pnpm db:check
 ```
 
 ## Common Workflow After Schema Changes

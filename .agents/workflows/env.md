@@ -11,27 +11,27 @@ description: Environment management — check, switch, validate env vars, compar
 ### Check Current Environment
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && pnpm env:check
+pnpm env:check
 ```
 
 ### Check a Specific Environment
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && APP_ENV=dev pnpm env:check
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && APP_ENV=sit pnpm env:check
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && APP_ENV=prod pnpm env:check
+APP_ENV=dev pnpm env:check
+APP_ENV=sit pnpm env:check
+APP_ENV=prod pnpm env:check
 ```
 
 ### View Environment File Contents (redacted)
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && grep -E "^[A-Z]" .env.local | sed 's/=.*/=***/'
+grep -E "^[A-Z]" .env.local | sed 's/=.*/=***/'
 ```
 
 ### Compare Two Environment Files (keys only)
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && diff <(grep -E "^[A-Z]" .env.local | cut -d= -f1 | sort) <(grep -E "^[A-Z]" .env.prod | cut -d= -f1 | sort)
+diff <(grep -E "^[A-Z]" .env.local | cut -d= -f1 | sort) <(grep -E "^[A-Z]" .env.prod | cut -d= -f1 | sort)
 ```
 
 ## Environment System (4-env)
@@ -58,4 +58,4 @@ NEXT_PUBLIC_API_URL — Backend URL (client-side)
 
 ## Note
 
-The API resolves env files as: `.env.${APP_ENV}` → `.env`. See `docs/environment-guide.md` for full details.
+The API resolves env files as: `.env.${APP_ENV}` → `.env`. See [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md#environments) for full details.

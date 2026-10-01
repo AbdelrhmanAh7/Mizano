@@ -1,3 +1,5 @@
+> Archived March 2026 deployment notes (Kamatera VPS, GPU/Ollama sizing). Superseded by the CPU-only demo mandate in [AGENTS.md](../../AGENTS.md) and the current [deployment section](../DEVELOPMENT.md#deployment); production now deploys through `.github/workflows/deploy.yml`. Scripts named here (for example `scripts/kamatera-server-setup.sh`) have been removed. Kept for history only.
+
 # Mizano ERP — VPS Deployment Requirements
 
 ## Quick Answer: What to Buy

@@ -11,25 +11,25 @@ description: Git operations — add, commit (conventional commits), push, branch
 ### Check Status
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && git status
+git status
 ```
 
 ### View Recent Commits
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && git log --oneline -10
+git log --oneline -10
 ```
 
 ### Stage Changes
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && git add .
+git add .
 ```
 
 ### Stage Specific Files
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && git add <file-path>
+git add <file-path>
 ```
 
 ### Commit (Conventional Commits — enforced by commitlint)
@@ -39,7 +39,7 @@ Format: `type(scope): description`
 Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && git commit -m "feat(sales): add invoice PDF export"
+git commit -m "feat(sales): add invoice PDF export"
 ```
 
 Examples:
@@ -53,7 +53,7 @@ Examples:
 ### Push
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && git push
+git push
 ```
 
 **Note:** Pre-push hook runs `pnpm ci:full`. All checks must pass.
@@ -61,13 +61,13 @@ cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && git push
 ### Create Branch
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && git checkout -b feature/<branch-name>
+git checkout -b feature/<branch-name>
 ```
 
 ### View Diff
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano && git diff --stat
+git diff --stat
 ```
 
 ## Git Hooks (Husky)

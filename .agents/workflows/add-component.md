@@ -13,13 +13,13 @@ description: Add shadcn/ui components to the project
 2. Add the component using the shadcn CLI:
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web && npx shadcn@latest add <component-name>
+cd apps/web && npx shadcn@latest add <component-name>
 ```
 
 For multiple components at once:
 
 ```bash
-cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web && npx shadcn@latest add button card dialog table form input select
+cd apps/web && npx shadcn@latest add button card dialog table form input select
 ```
 
 3. Components are installed to `apps/web/components/ui/`
@@ -27,7 +27,7 @@ cd /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web && npx shad
 4. Verify the component was added:
 
 ```bash
-ls -la /mnt/c/Users/Abdelrahman/Desktop/Personal_Project/Mizano/apps/web/components/ui/
+ls -la apps/web/components/ui/
 ```
 
 ## Available Components
