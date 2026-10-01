@@ -359,12 +359,28 @@ export class DashboardService {
     return parseFloat(invoices._sum.balanceDue?.toString() || '0');
   }
 
+  /**
+   * AP total = balances of bills posted to AP minus live, unapplied, unrefunded vendor credits
+   * (they debited AP without reducing any bill), so it matches the AP control account.
+   */
   private async getTotalPayables(organizationId: string) {
-    const bills = await this.prisma.bill.aggregate({
-      where: { organizationId, deletedAt: null, balanceDue: { gt: 0 } },
-      _sum: { balanceDue: true },
-    });
-    return parseFloat(bills._sum.balanceDue?.toString() || '0');
+    const [bills, credits] = await Promise.all([
+      this.prisma.bill.aggregate({
+        where: {
+          organizationId,
+          deletedAt: null,
+          balanceDue: { gt: 0 },
+          status: { in: ['OPEN', 'PARTIALLY_PAID', 'OVERDUE'] },
+        },
+        _sum: { balanceDue: true },
+      }),
+      this.prisma.vendorCredit.aggregate({
+        where: { organizationId, deletedAt: null, appliedToBillId: null, refundedAt: null },
+        _sum: { amount: true },
+      }),
+    ]);
+    const net = new Decimal(bills._sum.balanceDue ?? 0).sub(credits._sum.amount ?? 0);
+    return net.toNumber();
   }
 
   private async getMonthlyRevenue(organizationId: string, startOfMonth: Date) {

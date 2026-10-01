@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AccountType, BillStatus, Prisma } from '@prisma/client';
+import { BillStatus, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
@@ -51,13 +51,17 @@ export class VendorCreditsService {
    * credits of one bill never exceed the bill VAT. The credit stays unapplied until it is
    * applied to a bill (no journal: AP is already debited) or refunded.
    */
-  async create(organizationId: string, dto: CreateVendorCreditDto) {
+  async create(
+    organizationId: string,
+    dto: CreateVendorCreditDto,
+    options: { tx?: Prisma.TransactionClient } = {},
+  ) {
     const amount = parsePositiveDecimal(dto.amount, 'amount');
     assertMoneyFits(amount, 'amount');
     const date = dto.date ? parseDocumentDate(dto.date, 'vendor credit date') : new Date();
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const run = async (tx: Prisma.TransactionClient) => {
         const owned = await tx.bill.count({
           where: { id: dto.billId, organizationId, deletedAt: null },
         });
@@ -120,7 +124,6 @@ export class VendorCreditsService {
           bill,
           alreadyCredited,
           amount,
-          org.defaultVatReceivableAccountId,
         );
         if (tax.greaterThan(0) && !org.defaultVatReceivableAccountId) {
           throw new BadRequestException(
@@ -177,19 +180,24 @@ export class VendorCreditsService {
         );
 
         return credit;
-      });
+      };
+      return await (options.tx ? run(options.tx) : this.prisma.$transaction(run));
     } catch (error) {
       throw mapDocumentNumberConflict(error, 'Vendor credit');
     }
   }
 
-  /** Accounts a credit can be posted to, for users who hold purchases.create only. */
-  async creditAccounts(organizationId: string): Promise<LookupAccount[]> {
-    return this.prisma.account.findMany({
-      where: { organizationId, deletedAt: null, isActive: true, type: AccountType.EXPENSE },
+  /** Accounts on a bill's lines (purchases.create): the accounts its credit may be posted to. */
+  async creditAccounts(organizationId: string, billId: string): Promise<LookupAccount[]> {
+    const ids = await this.billLineAccountIds(this.prisma, organizationId, billId);
+    if (ids.length === 0) return [];
+    const accounts = await this.prisma.account.findMany({
+      where: { id: { in: ids }, organizationId, deletedAt: null },
       select: { id: true, code: true, name: true },
-      orderBy: { code: 'asc' },
     });
+    return ids
+      .map((id) => accounts.find((a) => a.id === id))
+      .filter((a): a is LookupAccount => !!a);
   }
 
   /** Accounts a refund can be received into (same rule refund() enforces). */
@@ -335,13 +343,20 @@ export class VendorCreditsService {
           'Refund account must be an active bank or cash account of this organization',
         );
       }
-      const org = await tx.organization.findUnique({
-        where: { id: organizationId },
-        select: { defaultApAccountId: true },
+      // Credit the AP account this credit actually debited (the default may have changed since).
+      const creditJournal = await tx.journal.findFirst({
+        where: {
+          organizationId,
+          sourceType: JournalSourceType.VENDOR_CREDIT,
+          sourceId: id,
+          deletedAt: null,
+        },
+        include: { lines: true },
       });
-      if (!org?.defaultApAccountId) {
+      const apLine = creditJournal?.lines.find((l) => l.debit.greaterThan(0));
+      if (!apLine) {
         throw new BadRequestException(
-          'Please configure the default Accounts Payable account in organization settings before refunding vendor credits',
+          'This vendor credit has no linked ledger entry; it cannot be refunded',
         );
       }
 
@@ -365,7 +380,7 @@ export class VendorCreditsService {
               description: `${credit.creditNumber} - Refund received`,
             },
             {
-              accountId: org.defaultApAccountId,
+              accountId: apLine.accountId,
               debit: '0',
               credit: credit.amount.toFixed(4),
               description: `${credit.creditNumber} - Accounts Payable`,
@@ -443,42 +458,40 @@ export class VendorCreditsService {
     await tx.$queryRaw`SELECT id FROM "vendor_credits" WHERE id = ${id} AND "organizationId" = ${organizationId} FOR UPDATE`;
   }
 
-  /** The requested account (must be an active expense account) or the bill's largest expense line account. */
+  /**
+   * Accounts a credit may be posted to: the accounts on the bill's own lines, whatever their type
+   * (a bill line may sit on inventory or a prepaid asset), largest line first.
+   */
+  private async billLineAccountIds(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    billId: string,
+  ): Promise<string[]> {
+    const lines = await tx.billLine.findMany({
+      where: { billId, accountId: { not: null }, bill: { organizationId, deletedAt: null } },
+      orderBy: [{ amount: 'desc' }, { id: 'asc' }],
+      select: { accountId: true },
+    });
+    return [...new Set(lines.map((l) => l.accountId).filter((id): id is string => !!id))];
+  }
+
   private async resolveCreditAccount(
     tx: Prisma.TransactionClient,
     organizationId: string,
     billId: string,
     requested: string | undefined,
   ): Promise<string> {
+    const allowed = await this.billLineAccountIds(tx, organizationId, billId);
     if (requested) {
-      const account = await tx.account.findFirst({
-        where: {
-          id: requested,
-          organizationId,
-          deletedAt: null,
-          isActive: true,
-          type: AccountType.EXPENSE,
-        },
-        select: { id: true },
-      });
-      if (!account) {
-        throw new BadRequestException('Credit account must be an active expense account');
+      if (!allowed.includes(requested)) {
+        throw new BadRequestException('Credit account must be one of the accounts on the bill');
       }
-      return account.id;
+      return requested;
     }
-    const line = await tx.billLine.findFirst({
-      where: {
-        billId,
-        accountId: { not: null },
-        account: { organizationId, deletedAt: null, isActive: true, type: AccountType.EXPENSE },
-      },
-      orderBy: [{ amount: 'desc' }, { id: 'asc' }],
-      select: { accountId: true },
-    });
-    if (!line?.accountId) {
-      throw new BadRequestException('Choose the expense account the credit is posted to');
+    if (allowed.length === 0) {
+      throw new BadRequestException('The bill has no account lines to credit');
     }
-    return line.accountId;
+    return allowed[0];
   }
 
   /**
@@ -492,18 +505,20 @@ export class VendorCreditsService {
     bill: { id: string; taxAmount: Decimal; grandTotal: Decimal },
     creditedBefore: Decimal,
     amount: Decimal,
-    vatAccountId: string | null | undefined,
   ): Promise<Decimal> {
     if (bill.taxAmount.lessThanOrEqualTo(0)) return new Decimal(0);
     const live = await tx.vendorCredit.findMany({
       where: { organizationId, billId: bill.id, deletedAt: null },
       select: { id: true },
     });
+    // VAT already credited by this bill's live credits is read from their own VENDOR_CREDIT
+    // journals by line description ("<number> - VAT Receivable"), not by the current default VAT
+    // account: the organization may have changed that default since those credits were posted.
     let previous = new Decimal(0);
-    if (live.length > 0 && vatAccountId) {
+    if (live.length > 0) {
       const posted = await tx.journalLine.aggregate({
         where: {
-          accountId: vatAccountId,
+          description: { endsWith: '- VAT Receivable' },
           journal: {
             organizationId,
             sourceType: JournalSourceType.VENDOR_CREDIT,

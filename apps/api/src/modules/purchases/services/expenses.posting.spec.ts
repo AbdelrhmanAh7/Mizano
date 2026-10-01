@@ -35,7 +35,12 @@ describe('ExpensesService (posting)', () => {
       defaultCashAccountId: null,
       baseCurrency: 'EGP',
     });
-    prisma.expense.create.mockResolvedValue({ id: 'exp-123456' });
+    // The created row echoes the stored values: the journal is built from the row.
+    prisma.expense.create.mockImplementation(async ({ data }: any) => ({
+      id: 'exp-123456',
+      ...data,
+      description: data.description ?? null,
+    }));
   });
 
   it('posts Dr expense / Dr VAT receivable / Cr bank in one journal on the expense date', async () => {

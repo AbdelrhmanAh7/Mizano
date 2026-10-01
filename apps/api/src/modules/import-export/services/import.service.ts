@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { CreditNoteType, PaymentMode } from '@prisma/client';
+import { CreditNoteType, PaymentMode, Prisma } from '@prisma/client';
+import { createHash } from 'crypto';
 import { Decimal } from '@prisma/client/runtime/library';
 import * as csv from 'csv-parser';
 import { Readable } from 'stream';
@@ -27,6 +28,20 @@ import {
 /** Loosely-typed row coming from CSV/Excel/OFX parsing. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ImportRow = Record<string, any>;
+
+type DocumentKind =
+  | 'invoice'
+  | 'bill'
+  | 'expense'
+  | 'vendorCredit'
+  | 'creditNote'
+  | 'paymentMade'
+  | 'paymentReceived';
+
+interface RowContext {
+  tx: Prisma.TransactionClient;
+  marker: string;
+}
 
 @Injectable()
 export class ImportService {
@@ -324,6 +339,9 @@ export class ImportService {
     }
 
     const rows = await this.getAllRows(buffer, filename);
+    // Stable per-row idempotency key: the same file re-run produces the same keys, so money-bearing
+    // rows already imported are skipped (see importOnce).
+    const fileHash = createHash('sha256').update(buffer).digest('hex');
     const result: ImportResultDto = {
       success: true,
       totalProcessed: 0,
@@ -345,6 +363,10 @@ export class ImportService {
           transformed,
           config.updateExisting,
           config.matchField,
+          createHash('sha256')
+            .update(`${fileHash}:${config.entityType}:sheet0:${i}`)
+            .digest('hex')
+            .slice(0, 32),
         );
 
         result.totalProcessed++;
@@ -374,6 +396,7 @@ export class ImportService {
     data: ImportRow,
     updateExisting: boolean = false,
     matchField?: string,
+    rowKey: string = createHash('sha256').update(JSON.stringify(data)).digest('hex').slice(0, 32),
   ): Promise<'created' | 'updated' | 'skipped'> {
     switch (entityType) {
       case ImportEntityType.CUSTOMERS:
@@ -389,23 +412,37 @@ export class ImportService {
       case ImportEntityType.BANK_TRANSACTIONS:
         return this.importBankTransaction(organizationId, data);
       case ImportEntityType.INVOICES:
-        return this.importInvoice(organizationId, data);
+        return this.importOnce(organizationId, 'invoice', rowKey, (ctx) =>
+          this.importInvoice(organizationId, data, ctx),
+        );
       case ImportEntityType.QUOTES:
         return this.importQuote(organizationId, data);
       case ImportEntityType.CREDIT_NOTES:
-        return this.importCreditNote(organizationId, data);
+        return this.importOnce(organizationId, 'creditNote', rowKey, (ctx) =>
+          this.importCreditNote(organizationId, data, ctx),
+        );
       case ImportEntityType.PAYMENTS_RECEIVED:
-        return this.importPaymentReceived(organizationId, data);
+        return this.importOnce(organizationId, 'paymentReceived', rowKey, (ctx) =>
+          this.importPaymentReceived(organizationId, data, ctx),
+        );
       case ImportEntityType.DELIVERY_CHALLANS:
         return this.importDeliveryChallan(organizationId, data);
       case ImportEntityType.BILLS:
-        return this.importBill(organizationId, data);
+        return this.importOnce(organizationId, 'bill', rowKey, (ctx) =>
+          this.importBill(organizationId, data, ctx),
+        );
       case ImportEntityType.EXPENSES:
-        return this.importExpense(organizationId, data);
+        return this.importOnce(organizationId, 'expense', rowKey, (ctx) =>
+          this.importExpense(organizationId, data, ctx),
+        );
       case ImportEntityType.VENDOR_CREDITS:
-        return this.importVendorCredit(organizationId, data);
+        return this.importOnce(organizationId, 'vendorCredit', rowKey, (ctx) =>
+          this.importVendorCredit(organizationId, data, ctx),
+        );
       case ImportEntityType.PAYMENTS_MADE:
-        return this.importPaymentMade(organizationId, data);
+        return this.importOnce(organizationId, 'paymentMade', rowKey, (ctx) =>
+          this.importPaymentMade(organizationId, data, ctx),
+        );
       default:
         throw new BadRequestException(`Import for ${entityType} not yet implemented`);
     }
@@ -803,6 +840,58 @@ export class ImportService {
   // === Money-bearing imports go through the same domain commands as the UI/API ===
   // (tenant checks, Decimal math, document numbering and, where the command posts, the journal).
 
+  // === Idempotent money-bearing rows ===
+
+  /** Marker written into the created document so a re-run of the same row is recognised. */
+  private tag(text: string | undefined, ctx: RowContext): string {
+    return [text, ctx.marker].filter(Boolean).join(' ');
+  }
+
+  /**
+   * Runs one money-bearing row in its own transaction under an advisory lock on the row key: if a
+   * document carrying the row's marker already exists in the organization the row is skipped,
+   * otherwise the domain command creates it (with the marker) inside the same transaction.
+   */
+  private async importOnce(
+    organizationId: string,
+    kind: DocumentKind,
+    rowKey: string,
+    create: (ctx: RowContext) => Promise<'created' | 'updated' | 'skipped'>,
+  ): Promise<'created' | 'updated' | 'skipped'> {
+    const marker = `[import ${rowKey}]`;
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`import:${organizationId}:${rowKey}`}))`;
+      if (await this.markerExists(tx, organizationId, kind, marker)) return 'skipped';
+      return create({ tx, marker });
+    });
+  }
+
+  private async markerExists(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    kind: DocumentKind,
+    marker: string,
+  ): Promise<boolean> {
+    const contains = { contains: marker };
+    const where = { organizationId };
+    switch (kind) {
+      case 'invoice':
+        return (await tx.invoice.count({ where: { ...where, notes: contains } })) > 0;
+      case 'bill':
+        return (await tx.bill.count({ where: { ...where, reference: contains } })) > 0;
+      case 'expense':
+        return (await tx.expense.count({ where: { ...where, reference: contains } })) > 0;
+      case 'vendorCredit':
+        return (await tx.vendorCredit.count({ where: { ...where, reason: contains } })) > 0;
+      case 'creditNote':
+        return (await tx.creditNote.count({ where: { ...where, reason: contains } })) > 0;
+      case 'paymentMade':
+        return (await tx.paymentMade.count({ where: { ...where, reference: contains } })) > 0;
+      case 'paymentReceived':
+        return (await tx.paymentReceived.count({ where: { ...where, reference: contains } })) > 0;
+    }
+  }
+
   private cell(value: unknown): string | undefined {
     if (value === undefined || value === null) return undefined;
     const text = String(value).trim();
@@ -888,6 +977,7 @@ export class ImportService {
   private async importCreditNote(
     organizationId: string,
     data: ImportRow,
+    ctx: RowContext,
   ): Promise<'created' | 'updated' | 'skipped'> {
     const customerId = await this.customerIdByEmail(organizationId, data.customerEmail);
     const invoice = await this.invoiceByNumber(organizationId, data.invoiceNumber);
@@ -896,24 +986,33 @@ export class ImportService {
       throw new BadRequestException('type must be REFUND or APPLY_TO_INVOICE');
     }
     // Posts Dr Sales Returns / VAT, Cr AR (or the refund account) and applies the balance.
-    await this.creditNotesService.create(organizationId, {
-      customerId,
-      invoiceId: invoice.id,
-      date: this.isoDate(data.date, 'date'),
-      reason: this.cell(data.reason) ?? 'Imported credit note',
-      amount: this.decimalCell(data.amount, 'amount'),
-      type: type as CreditNoteType,
-      refundAccountId:
-        type === 'REFUND'
-          ? await this.accountIdByCode(organizationId, data.refundAccountCode, 'refundAccountCode')
-          : undefined,
-    });
+    await this.creditNotesService.create(
+      organizationId,
+      {
+        customerId,
+        invoiceId: invoice.id,
+        date: this.isoDate(data.date, 'date'),
+        reason: this.tag(this.cell(data.reason) ?? 'Imported credit note', ctx),
+        amount: this.decimalCell(data.amount, 'amount'),
+        type: type as CreditNoteType,
+        refundAccountId:
+          type === 'REFUND'
+            ? await this.accountIdByCode(
+                organizationId,
+                data.refundAccountCode,
+                'refundAccountCode',
+              )
+            : undefined,
+      },
+      { tx: ctx.tx },
+    );
     return 'created';
   }
 
   private async importPaymentReceived(
     organizationId: string,
     data: ImportRow,
+    ctx: RowContext,
   ): Promise<'created' | 'updated' | 'skipped'> {
     const customerId = await this.customerIdByEmail(organizationId, data.customerEmail);
     const depositToAccountId = await this.accountIdByCode(
@@ -929,16 +1028,20 @@ export class ImportService {
     const invoice = await this.invoiceByNumber(organizationId, data.invoiceNumber);
     const amount = this.decimalCell(data.amount, 'amount');
     // Posts Dr bank / Cr AR and reduces the invoice balance.
-    await this.paymentsReceivedService.create(organizationId, {
-      customerId,
-      date: this.isoDate(data.date, 'date'),
-      amount,
-      paymentMode: String(data.paymentMode).toUpperCase() as PaymentMode,
-      depositToAccountId,
-      reference: this.cell(data.reference),
-      notes: this.cell(data.notes),
-      allocations: [{ invoiceId: invoice.id, amount }],
-    });
+    await this.paymentsReceivedService.create(
+      organizationId,
+      {
+        customerId,
+        date: this.isoDate(data.date, 'date'),
+        amount,
+        paymentMode: String(data.paymentMode).toUpperCase() as PaymentMode,
+        depositToAccountId,
+        reference: this.tag(this.cell(data.reference), ctx),
+        notes: this.cell(data.notes),
+        allocations: [{ invoiceId: invoice.id, amount }],
+      },
+      { tx: ctx.tx },
+    );
     return 'created';
   }
 
@@ -1026,57 +1129,68 @@ export class ImportService {
   private async importInvoice(
     organizationId: string,
     data: ImportRow,
+    ctx: RowContext,
   ): Promise<'created' | 'updated' | 'skipped'> {
     const customerId = await this.customerIdByEmail(organizationId, data.customerEmail);
     const item = await this.itemBySku(organizationId, data.itemSku);
     const date = this.isoDate(data.date, 'date');
     // A DRAFT invoice with server-computed totals; it posts when it is sent.
-    await this.invoicesService.create(organizationId, {
-      customerId,
-      date,
-      dueDate: data.dueDate ? this.isoDate(data.dueDate, 'dueDate') : date,
-      notes: this.cell(data.notes),
-      lines: [
-        {
-          itemId: item.id,
-          description: item.name,
-          quantity: this.decimalCell(data.quantity, 'quantity'),
-          rate: this.decimalCell(data.rate, 'rate'),
-        },
-      ],
-    });
+    await this.invoicesService.create(
+      organizationId,
+      {
+        customerId,
+        date,
+        dueDate: data.dueDate ? this.isoDate(data.dueDate, 'dueDate') : date,
+        notes: this.tag(this.cell(data.notes), ctx),
+        lines: [
+          {
+            itemId: item.id,
+            description: item.name,
+            quantity: this.decimalCell(data.quantity, 'quantity'),
+            rate: this.decimalCell(data.rate, 'rate'),
+          },
+        ],
+      },
+      { tx: ctx.tx },
+    );
     return 'created';
   }
 
   private async importBill(
     organizationId: string,
     data: ImportRow,
+    ctx: RowContext,
   ): Promise<'created' | 'updated' | 'skipped'> {
     const vendorId = await this.vendorIdByEmail(organizationId, data.vendorEmail);
     const item = await this.itemBySku(organizationId, data.itemSku);
     const date = this.isoDate(data.date, 'date');
     // A DRAFT bill with server-computed totals; it posts when it is approved.
-    await this.billsService.create(organizationId, {
-      vendorId,
-      date,
-      dueDate: data.dueDate ? this.isoDate(data.dueDate, 'dueDate') : date,
-      reference: this.cell(data.reference),
-      notes: this.cell(data.notes),
-      lines: [
-        {
-          itemId: item.id,
-          description: item.name,
-          quantity: this.decimalCell(data.quantity, 'quantity'),
-          rate: this.decimalCell(data.rate, 'rate'),
-        },
-      ],
-    });
+    await this.billsService.create(
+      organizationId,
+      {
+        vendorId,
+        date,
+        dueDate: data.dueDate ? this.isoDate(data.dueDate, 'dueDate') : date,
+        reference: this.tag(this.cell(data.reference), ctx),
+        notes: this.cell(data.notes),
+        lines: [
+          {
+            itemId: item.id,
+            description: item.name,
+            quantity: this.decimalCell(data.quantity, 'quantity'),
+            rate: this.decimalCell(data.rate, 'rate'),
+          },
+        ],
+      },
+      { tx: ctx.tx },
+    );
     return 'created';
   }
 
   private async importExpense(
     organizationId: string,
     data: ImportRow,
+    ctx: RowContext,
   ): Promise<'created' | 'updated' | 'skipped'> {
     if (this.cell(data.taxAmount)) {
       throw new BadRequestException(
@@ -1111,39 +1225,49 @@ export class ImportService {
       : undefined;
 
     // Posts Dr expense / VAT, Cr paid-through account.
-    await this.expensesService.create(organizationId, {
-      date: this.isoDate(data.date, 'date'),
-      accountId,
-      vendorId,
-      amount: this.decimalCell(data.amount, 'amount'),
-      taxRate: this.cell(data.taxRate) ? this.decimalCell(data.taxRate, 'taxRate') : undefined,
-      paidThroughAccountId,
-      description: this.cell(data.description),
-      reference: this.cell(data.reference),
-    });
+    await this.expensesService.create(
+      organizationId,
+      {
+        date: this.isoDate(data.date, 'date'),
+        accountId,
+        vendorId,
+        amount: this.decimalCell(data.amount, 'amount'),
+        taxRate: this.cell(data.taxRate) ? this.decimalCell(data.taxRate, 'taxRate') : undefined,
+        paidThroughAccountId,
+        description: this.cell(data.description),
+        reference: this.tag(this.cell(data.reference), ctx),
+      },
+      { tx: ctx.tx },
+    );
     return 'created';
   }
 
   private async importVendorCredit(
     organizationId: string,
     data: ImportRow,
+    ctx: RowContext,
   ): Promise<'created' | 'updated' | 'skipped'> {
     const vendorId = await this.vendorIdByEmail(organizationId, data.vendorEmail);
     const bill = await this.billByNumber(organizationId, data.billNumber);
     // Posts Dr AP / Cr expense (and VAT) against the posted bill.
-    await this.vendorCreditsService.create(organizationId, {
-      vendorId,
-      billId: bill.id,
-      date: data.date ? this.isoDate(data.date, 'date') : undefined,
-      reason: this.cell(data.reason) ?? 'Imported vendor credit',
-      amount: this.decimalCell(data.amount, 'amount'),
-    });
+    await this.vendorCreditsService.create(
+      organizationId,
+      {
+        vendorId,
+        billId: bill.id,
+        date: data.date ? this.isoDate(data.date, 'date') : undefined,
+        reason: this.tag(this.cell(data.reason) ?? 'Imported vendor credit', ctx),
+        amount: this.decimalCell(data.amount, 'amount'),
+      },
+      { tx: ctx.tx },
+    );
     return 'created';
   }
 
   private async importPaymentMade(
     organizationId: string,
     data: ImportRow,
+    ctx: RowContext,
   ): Promise<'created' | 'updated' | 'skipped'> {
     const vendorId = await this.vendorIdByEmail(organizationId, data.vendorEmail);
     const paidFromAccountId = await this.accountIdByCode(
@@ -1159,16 +1283,20 @@ export class ImportService {
     const bill = await this.billByNumber(organizationId, data.billNumber);
     const amount = this.decimalCell(data.amount, 'amount');
     // Posts Dr AP / Cr bank and reduces the bill balance.
-    await this.paymentsMadeService.create(organizationId, {
-      vendorId,
-      date: this.isoDate(data.date, 'date'),
-      amount,
-      paymentMode: String(data.paymentMode).toUpperCase() as PaymentMode,
-      paidFromAccountId,
-      reference: this.cell(data.reference),
-      notes: this.cell(data.notes),
-      allocations: [{ billId: bill.id, amount }],
-    });
+    await this.paymentsMadeService.create(
+      organizationId,
+      {
+        vendorId,
+        date: this.isoDate(data.date, 'date'),
+        amount,
+        paymentMode: String(data.paymentMode).toUpperCase() as PaymentMode,
+        paidFromAccountId,
+        reference: this.tag(this.cell(data.reference), ctx),
+        notes: this.cell(data.notes),
+        allocations: [{ billId: bill.id, amount }],
+      },
+      { tx: ctx.tx },
+    );
     return 'created';
   }
 

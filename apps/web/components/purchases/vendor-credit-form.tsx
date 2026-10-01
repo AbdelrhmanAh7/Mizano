@@ -96,9 +96,10 @@ export function VendorCreditForm({
     enabled: !!vendorId,
   });
   const accountsQuery = useQuery({
-    queryKey: ['vendor-credits', 'credit-accounts'],
+    queryKey: ['vendor-credits', 'credit-accounts', billId],
     queryFn: async (): Promise<CreditAccount[]> =>
-      (await vendorCreditsApi.creditAccounts()).data as CreditAccount[],
+      (await vendorCreditsApi.creditAccounts(billId)).data as CreditAccount[],
+    enabled: !!billId,
   });
 
   const bills = billsQuery.data ?? [];
@@ -151,7 +152,10 @@ export function VendorCreditForm({
               <Label htmlFor="billId">{t('bill')} *</Label>
               <Select
                 value={billId}
-                onValueChange={(value) => form.setValue('billId', value)}
+                onValueChange={(value) => {
+                  form.setValue('billId', value);
+                  form.setValue('accountId', '');
+                }}
                 disabled={!vendorId || billsQuery.isLoading || bills.length === 0}
               >
                 <SelectTrigger id="billId">

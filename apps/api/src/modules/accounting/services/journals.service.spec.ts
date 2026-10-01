@@ -434,6 +434,41 @@ describe('JournalsService', () => {
       expect(createCall.data).toMatchObject({ reversalOfId: 'j1', isPosted: true });
     });
 
+    describe('default reversal date', () => {
+      const reverseWithDate = async (original: Date): Promise<Date> => {
+        const journal = createMockJournalEntry({
+          id: 'j1',
+          journalNumber: 'JRN-001',
+          date: original,
+          isPosted: true,
+          reversedBy: null,
+          reversalOfId: null,
+          lines: [
+            createMockJournalLine({ accountId: 'acc-1', debit: dec('5'), credit: dec('0') }),
+            createMockJournalLine({ accountId: 'acc-2', debit: dec('0'), credit: dec('5') }),
+          ],
+        });
+        prisma.journal.findFirst.mockResolvedValue(journal as any);
+        prisma.journal.create.mockResolvedValue(
+          createMockJournalEntry({ id: 'j2', lines: [] }) as any,
+        );
+        await service.reverse(ORG_ID, 'j1');
+        return prisma.journal.create.mock.calls[0]![0]!.data.date as Date;
+      };
+
+      it('dates a reversal of a past journal today', async () => {
+        const before = Date.now();
+        const date = await reverseWithDate(new Date('2020-01-01'));
+        expect(date.getTime()).toBeGreaterThanOrEqual(before);
+      });
+
+      it('never dates a reversal before a future-dated source journal', async () => {
+        const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        const date = await reverseWithDate(future);
+        expect(date.getTime()).toBe(future.getTime());
+      });
+    });
+
     it('should reject reversing an unposted journal', async () => {
       prisma.journal.findFirst.mockResolvedValue(
         createMockJournalEntry({ id: 'j1', isPosted: false, reversedBy: null, lines: [] }) as any,

@@ -151,7 +151,11 @@
     "empty": {
       "title": "No expenses yet",
       "description": "Record your first expense to start tracking"
-    }
+    },
+    "voided": "Voided",
+    "pending": "Pending",
+    "post": "Post expense",
+    "posting": "Posting..."
   },
   "bills": {
     "title": "Bills",

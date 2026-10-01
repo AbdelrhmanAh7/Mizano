@@ -33,11 +33,14 @@ import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { InvalidatesLedger } from '../../../common/decorators';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 
 @ApiTags('Import')
 @ApiBearerAuth()
 @Controller('import')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseInterceptors(CacheInvalidationInterceptor)
 export class ImportController {
   constructor(private readonly importService: ImportService) {}
 
@@ -169,6 +172,20 @@ export class ImportController {
     },
   })
   @ApiResponse({ status: 200, type: ImportResultDto })
+  @InvalidatesLedger(
+    'import:*',
+    'invoices:*',
+    'bills:*',
+    'expenses:*',
+    'vendor-credits:*',
+    'credit-notes:*',
+    'payments-made:*',
+    'payments-received:*',
+    'accounts:*',
+    'customers:*',
+    'vendors:*',
+    'items:*',
+  )
   async executeImport(
     @CurrentOrg() orgId: string,
     @UploadedFile() file: Express.Multer.File,

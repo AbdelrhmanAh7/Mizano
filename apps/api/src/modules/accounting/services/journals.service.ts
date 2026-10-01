@@ -326,7 +326,14 @@ export class JournalsService {
         );
       }
 
-      const reversalDate = dto?.date ? new Date(dto.date) : new Date();
+      // Without an explicit date the reversal is dated max(today, original date), so a reversal
+      // never precedes the entry it reverses (e.g. voiding a future-dated document).
+      const now = new Date();
+      const reversalDate = dto?.date
+        ? new Date(dto.date)
+        : journal.date.getTime() > now.getTime()
+          ? journal.date
+          : now;
       await this.checkLockDate(organizationId, reversalDate);
 
       await this.lockJournalSequence(tx, organizationId);

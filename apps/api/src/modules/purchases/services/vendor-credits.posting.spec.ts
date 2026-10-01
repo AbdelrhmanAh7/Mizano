@@ -56,7 +56,7 @@ describe('VendorCreditsService (posting)', () => {
     });
     prisma.vendorCredit.aggregate.mockResolvedValue({ _sum: { amount: null } });
     prisma.vendorCredit.findMany.mockResolvedValue([]);
-    prisma.billLine.findFirst.mockResolvedValue({ accountId: 'exp-acc' });
+    prisma.billLine.findMany.mockResolvedValue([{ accountId: 'exp-acc' }]);
     prisma.$queryRaw.mockResolvedValue([{ max: 4 }]);
     prisma.vendorCredit.create.mockResolvedValue({ id: 'c1', creditNumber: 'VC-005' });
     prisma.account.findFirst.mockResolvedValue({ id: 'bank-acc' });
@@ -125,15 +125,50 @@ describe('VendorCreditsService (posting)', () => {
       await expect(service.create(ORG, dto)).rejects.toThrow(/base currency/);
     });
 
-    it('rejects a credit account that is not an expense account of the organization', async () => {
-      prisma.account.findFirst.mockResolvedValue(null);
+    it('rejects an explicit credit account that is not on the bill lines', async () => {
       await expect(service.create(ORG, { ...dto, accountId: 'liab' })).rejects.toThrow(
-        /expense account/,
+        /accounts on the bill/,
       );
-      expect(prisma.account.findFirst.mock.calls[0][0].where).toMatchObject({
-        organizationId: ORG,
-        type: 'EXPENSE',
+      expect(prisma.billLine.findMany.mock.calls[0][0].where).toMatchObject({
+        billId: 'b1',
+        bill: { organizationId: ORG },
       });
+      expect(journals.create).not.toHaveBeenCalled();
+    });
+
+    it('credits an asset account that sits on the bill lines (default = largest line)', async () => {
+      prisma.billLine.findMany.mockResolvedValue([
+        { accountId: 'inventory-asset' },
+        { accountId: 'exp-acc' },
+      ]);
+      await service.create(ORG, dto);
+      expect(journals.create.mock.calls[0][1].lines[1]).toEqual(
+        expect.objectContaining({ accountId: 'inventory-asset', credit: '50.0000' }),
+      );
+
+      journals.create.mockClear();
+      await service.create(ORG, { ...dto, accountId: 'exp-acc' });
+      expect(journals.create.mock.calls[0][1].lines[1].accountId).toBe('exp-acc');
+    });
+
+    it('counts VAT already credited by earlier credits whatever the current default VAT account is', async () => {
+      prisma.vendorCredit.aggregate.mockResolvedValue({ _sum: { amount: dec('57') } });
+      prisma.vendorCredit.findMany.mockResolvedValue([{ id: 'older' }]);
+      prisma.journalLine.aggregate.mockResolvedValue({ _sum: { credit: dec('7') } });
+      // The default VAT account was changed after the first credit was posted.
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultApAccountId: 'ap',
+        defaultVatReceivableAccountId: 'new-vat',
+        baseCurrency: 'EGP',
+      });
+
+      await service.create(ORG, dto);
+
+      const where = prisma.journalLine.aggregate.mock.calls[0][0].where;
+      expect(where.description).toEqual({ endsWith: '- VAT Receivable' });
+      expect(where).not.toHaveProperty('accountId');
+      const lines = journals.create.mock.calls[0][1].lines;
+      expect(lines[2]).toEqual(expect.objectContaining({ accountId: 'new-vat', credit: '7.0000' }));
     });
 
     it.each(['0', '-1', 'x', '1.23456'])('rejects the invalid amount %s', async (amount) => {
@@ -211,6 +246,43 @@ describe('VendorCreditsService (posting)', () => {
       prisma.vendorCredit.findFirst.mockResolvedValue(credit);
       prisma.vendorCredit.updateMany.mockResolvedValue({ count: 1 });
       prisma.vendorCredit.findUniqueOrThrow.mockResolvedValue({ ...credit });
+      prisma.journal.findFirst.mockResolvedValue({
+        id: 'j1',
+        lines: [{ accountId: 'ap', debit: dec('57'), credit: dec('0') }],
+      });
+    });
+
+    it('credits the AP account the credit itself debited, not the current default', async () => {
+      prisma.journal.findFirst.mockResolvedValue({
+        id: 'j1',
+        lines: [
+          { accountId: 'old-ap', debit: dec('57'), credit: dec('0') },
+          { accountId: 'exp-acc', debit: dec('0'), credit: dec('50') },
+        ],
+      });
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultApAccountId: 'changed-ap',
+        defaultBankAccountId: 'bank-acc',
+        defaultCashAccountId: null,
+        baseCurrency: 'EGP',
+      });
+      await service.refund(ORG, 'c1', { bankAccountId: 'bank-acc' });
+      expect(journals.create.mock.calls[0][1].lines[1]).toEqual(
+        expect.objectContaining({ accountId: 'old-ap', credit: '57.0000' }),
+      );
+      expect(prisma.journal.findFirst.mock.calls[0][0].where).toMatchObject({
+        organizationId: ORG,
+        sourceType: 'VENDOR_CREDIT',
+        sourceId: 'c1',
+      });
+    });
+
+    it('rejects a refund of a credit without a linked ledger entry', async () => {
+      prisma.journal.findFirst.mockResolvedValue(null);
+      await expect(service.refund(ORG, 'c1', { bankAccountId: 'bank-acc' })).rejects.toThrow(
+        /no linked ledger entry/,
+      );
+      expect(journals.create).not.toHaveBeenCalled();
     });
 
     it('posts Dr bank / Cr AP once on the refund date to an eligible account', async () => {

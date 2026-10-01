@@ -173,7 +173,7 @@ describe('RecurringProfilesService (invoice, bill and expense profiles)', () => 
     expect(result.createdEntityId).toBe('exp-1');
     const [org, dto, options] = expenses.create.mock.calls[0];
     expect(org).toBe(ORG);
-    expect(options).toEqual({ tx: prisma });
+    expect(options).toEqual({ tx: prisma, post: true });
     expect(dto).toMatchObject({
       date: OCCURRENCE.toISOString(),
       amount: '1500.5',
@@ -182,6 +182,17 @@ describe('RecurringProfilesService (invoice, bill and expense profiles)', () => 
       paidThroughAccountId: 'bank-acc',
     });
     expect(prisma.expense.create).not.toHaveBeenCalled();
+  });
+
+  it('creates the expense without posting when the profile is not autoPost', async () => {
+    const p = profile('expense', {
+      accountId: 'exp-acc',
+      paidThroughAccountId: 'bank-acc',
+      amount: '10',
+    });
+    p.autoPost = false;
+    await run(p);
+    expect(expenses.create.mock.calls[0][2]).toEqual({ tx: prisma, post: false });
   });
 
   it('converts a legacy template VAT amount into a percentage without float math', async () => {

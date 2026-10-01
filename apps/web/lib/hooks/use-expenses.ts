@@ -135,6 +135,32 @@ export function useCreateExpense() {
 }
 
 /**
+ * Hook to post a pending expense
+ */
+export function usePostExpense() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await expensesApi.post(id);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast({ title: 'Expense posted', description: 'The expense was posted to the ledger.' });
+    },
+    onError: (error: ApiError) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error posting expense',
+        description: error.response?.data?.message || 'An error occurred',
+      });
+    },
+  });
+}
+
+/**
  * Hook to delete an expense
  */
 export function useDeleteExpense() {

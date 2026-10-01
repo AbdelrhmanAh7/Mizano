@@ -906,10 +906,11 @@ export class RecurringProfilesService {
       reference: `Recurring: ${profile.name} ${this.occurrenceMarker(sourceId)}`,
       description: templateData.description,
     };
-    // Posts Dr expense / VAT, Cr paid-through account inside this transaction.
+    // autoPost posts Dr expense / VAT, Cr paid-through account inside this transaction; without
+    // it the expense is created PENDING with no journal until it is posted explicitly.
     const expense = await this.moduleRef
       .get(ExpensesService, { strict: false })
-      .create(profile.organizationId, dto, { tx });
+      .create(profile.organizationId, dto, { tx, post: profile.autoPost });
     return expense.id;
   }
 

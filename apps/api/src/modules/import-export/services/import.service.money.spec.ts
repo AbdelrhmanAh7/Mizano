@@ -17,6 +17,13 @@ describe('ImportService money-bearing imports', () => {
   let paymentsMade: { create: jest.Mock };
   let service: ImportService;
 
+  const importRowKeyed = (
+    type: keyof typeof ImportEntityType,
+    row: Record<string, unknown>,
+    key: string,
+  ): Promise<string> =>
+    (service as any).importSingleRow(ORG, ImportEntityType[type], row, false, undefined, key);
+
   const importRow = (
     type: keyof typeof ImportEntityType,
     row: Record<string, unknown>,
@@ -79,16 +86,20 @@ describe('ImportService money-bearing imports', () => {
 
     it('creates the expense through ExpensesService (posting) with decimal strings', async () => {
       await importRow('EXPENSES', { ...row, paidThroughAccountCode: '1000' });
-      expect(expenses.create).toHaveBeenCalledWith(ORG, {
-        date: new Date('2026-03-05').toISOString(),
-        accountId: 'acc-6000',
-        vendorId: undefined,
-        amount: '100.50',
-        taxRate: '14',
-        paidThroughAccountId: 'acc-1000',
-        description: undefined,
-        reference: undefined,
-      });
+      expect(expenses.create).toHaveBeenCalledWith(
+        ORG,
+        {
+          date: new Date('2026-03-05').toISOString(),
+          accountId: 'acc-6000',
+          vendorId: undefined,
+          amount: '100.50',
+          taxRate: '14',
+          paidThroughAccountId: 'acc-1000',
+          description: undefined,
+          reference: expect.stringMatching(/^\[import [0-9a-f]{32}\]$/),
+        },
+        { tx: prisma },
+      );
       expect(prisma.expense.create).not.toHaveBeenCalled();
     });
 
@@ -238,6 +249,70 @@ describe('ImportService money-bearing imports', () => {
         amount: '10',
       });
       expect(prisma.creditNote.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('idempotency', () => {
+    const row = {
+      date: '2026-03-05',
+      accountCode: '6000',
+      amount: '10',
+      paidThroughAccountCode: '1000',
+    };
+
+    it('skips a row whose marker already exists in the organization and creates nothing', async () => {
+      prisma.expense.count.mockResolvedValue(1);
+      const result = await importRowKeyed('EXPENSES', row, 'k1');
+      expect(result).toBe('skipped');
+      expect(expenses.create).not.toHaveBeenCalled();
+      expect(prisma.expense.count.mock.calls[0][0].where).toEqual({
+        organizationId: ORG,
+        reference: { contains: '[import k1]' },
+      });
+      expect(prisma.$executeRaw).toHaveBeenCalled(); // advisory lock on the row key
+    });
+
+    it('creates the row once with the marker in the document reference', async () => {
+      prisma.expense.count.mockResolvedValue(0);
+      expect(await importRowKeyed('EXPENSES', row, 'k2')).toBe('created');
+      expect(expenses.create.mock.calls[0][1].reference).toBe('[import k2]');
+    });
+
+    it('a re-run of the same file imports zero new rows', async () => {
+      const buffer = Buffer.from(
+        ['date,accountCode,amount,paidThroughAccountCode', '2026-03-05,6000,10,1000', ''].join(
+          '\n',
+        ),
+      );
+      const config = {
+        entityType: ImportEntityType.EXPENSES,
+        columnMappings: [
+          { sourceColumn: 'date', targetField: 'date' },
+          { sourceColumn: 'accountCode', targetField: 'accountCode' },
+          { sourceColumn: 'amount', targetField: 'amount' },
+          { sourceColumn: 'paidThroughAccountCode', targetField: 'paidThroughAccountCode' },
+        ],
+        skipRows: 0,
+        updateExisting: false,
+        stopOnError: false,
+      } as never;
+      jest.spyOn(service as any, 'validateImport').mockResolvedValue({ valid: true, errors: [] });
+      const markers: string[] = [];
+      expenses.create.mockImplementation(async (_org: string, dto: { reference: string }) => {
+        markers.push(dto.reference);
+        return { id: 'e1' };
+      });
+      prisma.expense.count.mockImplementation(async ({ where }: any) =>
+        markers.some((m) => m === where.reference.contains) ? 1 : 0,
+      );
+
+      const first = await service.importData(ORG, buffer, 'e.csv', config);
+      const second = await service.importData(ORG, buffer, 'e.csv', config);
+
+      expect(first.created).toBe(1);
+      expect(second.created).toBe(0);
+      expect(second.skipped).toBe(1);
+      expect(expenses.create).toHaveBeenCalledTimes(1);
     });
   });
 });

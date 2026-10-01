@@ -79,6 +79,14 @@ export class ExpensesController {
     return this.expensesService.findOne(orgId, id);
   }
 
+  @Post(':id/post')
+  @Permissions('purchases.edit')
+  @InvalidatesLedger('expenses:*')
+  @ApiOperation({ summary: 'Post a pending expense (Dr expense / VAT, Cr bank or cash)' })
+  post(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.expensesService.post(orgId, id);
+  }
+
   @Delete(':id')
   @Permissions('purchases.delete')
   @InvalidatesLedger('expenses:*')
@@ -105,8 +113,8 @@ export class ExpensesController {
 
   @Post('bulk-approve')
   @Permissions('purchases.edit')
-  @InvalidateCache('expenses:*')
-  @ApiOperation({ summary: 'Bulk approve expenses' })
+  @InvalidatesLedger('expenses:*')
+  @ApiOperation({ summary: 'Bulk post pending expenses (per-record outcomes)' })
   bulkApprove(@CurrentOrg() orgId: string, @Body() dto: BulkIdsDto) {
     return this.expensesService.bulkApprove(orgId, dto.ids);
   }

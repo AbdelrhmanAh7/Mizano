@@ -297,10 +297,78 @@ describe('Purchases expenses and vendor credits (e2e)', () => {
 
       const row = await prisma.expense.findUniqueOrThrow({ where: { id } });
       expect(row.deletedAt).not.toBeNull();
-      expect((await a.get(`/expenses/${id}`)).status).toBe(404);
+      // A voided expense stays readable (read-only) so journal source links resolve.
+      const readBack = await a.get(`/expenses/${id}`);
+      expect(readBack.status).toBe(200);
+      expect(readBack.body.deletedAt).toBeTruthy();
       // A second void loses the guarded transition and posts nothing more.
       expect((await a.delete(`/expenses/${id}`)).status).toBe(404);
       expect(await journalsFor(EXPENSE_VOID, id)).toHaveLength(1);
+    });
+
+    it('a recurring expense without autoPost stays PENDING with no journal until it is posted', async () => {
+      const profile = await a.post('/recurring-profiles').send({
+        name: `Rent ${uniqueSuffix()}`,
+        entityType: 'expense',
+        type: 'EXPENSE',
+        frequency: 'MONTHLY',
+        startDate: day,
+        autoPost: false,
+        templateData: {
+          accountId: acc.rent,
+          paidThroughAccountId: acc.bank,
+          amount: '200',
+          taxRate: '14',
+          description: 'Recurring rent',
+        },
+      });
+      expect(profile.status).toBe(201);
+      const key = '6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f';
+      const run = await a.post(`/recurring-profiles/${profile.body.id}/execute`).send({
+        idempotencyKey: key,
+      });
+      expect(run.status).toBe(201);
+      expect(run.body.success).toBe(true);
+      const id = run.body.createdEntityId as string;
+
+      const row = await prisma.expense.findUniqueOrThrow({ where: { id } });
+      expect(row.status).toBe('PENDING');
+      expect(await journalsFor(EXPENSE, id)).toHaveLength(0);
+
+      // Voiding a pending expense reverses nothing, so test posting on a second one.
+      const second = await a.post(`/recurring-profiles/${profile.body.id}/execute`).send({
+        idempotencyKey: '7a1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f',
+      });
+      const secondId = second.body.createdEntityId as string;
+
+      const posted = await a.post(`/expenses/${id}/post`);
+      expect(posted.status).toBe(201);
+      expect(posted.body.status).toBe('POSTED');
+      const journals = await journalsFor(EXPENSE, id);
+      expect(journals).toHaveLength(1);
+      expect(lineSignature(dbLines(journals[0].lines))).toEqual(
+        lineSignature([
+          { accountId: acc.rent, debit: '200', credit: '0' },
+          { accountId: acc.vatInput, debit: '28', credit: '0' },
+          { accountId: acc.bank, debit: '0', credit: '228' },
+        ]),
+      );
+      // Posting again is rejected and posts nothing more.
+      expect((await a.post(`/expenses/${id}/post`)).status).toBe(400);
+      expect(await journalsFor(EXPENSE, id)).toHaveLength(1);
+
+      // Bulk approve posts through the same command with per-record outcomes.
+      const bulk = await a.post('/expenses/bulk-approve').send({ ids: [secondId, id] });
+      expect(bulk.status).toBe(201);
+      expect(bulk.body.processed).toBe(1);
+      expect(bulk.body.failures.map((f: { id: string }) => f.id)).toEqual([id]);
+      expect(await journalsFor(EXPENSE, secondId)).toHaveLength(1);
+
+      // A voided expense stays readable, read-only.
+      expect((await a.delete(`/expenses/${secondId}`)).status).toBe(200);
+      const voided = await a.get(`/expenses/${secondId}`);
+      expect(voided.status).toBe(200);
+      expect(voided.body.deletedAt).toBeTruthy();
     });
 
     it('bulk void reports per-record outcomes, and bulk re-categorise is rejected per record', async () => {
@@ -549,6 +617,19 @@ describe('Purchases expenses and vendor credits (e2e)', () => {
       expect(unappliedTotal.toString()).toBe('200');
       expect(apCredit.toString()).toBe(openTotal.sub(unappliedTotal).toString());
       expect(apCredit.toString()).toBe('170');
+
+      // Every payables view reconciles to the AP control account once the open credit is netted.
+      const aging = await a.get('/reports/payables-aging');
+      expect(aging.status).toBe(200);
+      expect(decimalEquals(aging.body.summary.unappliedCredits, '200')).toBe(true);
+      expect(decimalEquals(aging.body.summary.netTotal, '170')).toBe(true);
+      const dashboard = await a.get('/reports/dashboard');
+      expect(dashboard.status).toBe(200);
+      expect(decimalEquals(dashboard.body.overview.totalPayables, '170')).toBe(true);
+      const byVendor = await a.get('/reports/purchases-by-vendor');
+      expect(byVendor.status).toBe(200);
+      expect(decimalEquals(byVendor.body.totalUnappliedCredits, '200')).toBe(true);
+      expect(decimalEquals(byVendor.body.totalNetPayable, '170')).toBe(true);
 
       const report = await a.get('/reports/trial-balance').query({ asOfDate: isoDay(0) });
       expect(report.status).toBe(200);

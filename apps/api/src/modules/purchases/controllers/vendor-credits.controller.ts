@@ -71,9 +71,11 @@ export class VendorCreditsController {
 
   @Get('credit-accounts')
   @Permissions('purchases.create')
-  @ApiOperation({ summary: 'Expense accounts a vendor credit can be posted to (purchases.create)' })
-  creditAccounts(@CurrentOrg() orgId: string) {
-    return this.vendorCreditsService.creditAccounts(orgId);
+  @ApiOperation({
+    summary: 'Accounts on a bill that its vendor credit can post to (purchases.create)',
+  })
+  creditAccounts(@CurrentOrg() orgId: string, @Query('billId') billId: string) {
+    return this.vendorCreditsService.creditAccounts(orgId, billId);
   }
 
   @Get('refund-accounts')

@@ -99,4 +99,42 @@ describe('ReconciliationService.createExpenseFromTransaction', () => {
       organizationId: ORG,
     });
   });
+
+  describe('direction and currency guards', () => {
+    it('rejects matching a withdrawal to an invoice and a deposit to a bill before posting', async () => {
+      prisma.bankTransaction.findFirst.mockResolvedValue(transaction); // WITHDRAWAL
+      await expect(service.confirmMatch(ORG, 't1', 'invoice', 'inv1')).rejects.toThrow(
+        /Only deposits/,
+      );
+      prisma.bankTransaction.findFirst.mockResolvedValue({ ...transaction, type: 'DEPOSIT' });
+      await expect(service.confirmMatch(ORG, 't1', 'bill', 'bill1')).rejects.toThrow(
+        /Only withdrawals/,
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.bankTransaction.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects a transaction on a bank account whose currency differs from the base currency', async () => {
+      prisma.bankAccount.findFirst.mockResolvedValue({ currency: 'usd', linkedAccountId: 'l' });
+      prisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'EGP' });
+
+      prisma.bankTransaction.findFirst.mockResolvedValue({ ...transaction, type: 'DEPOSIT' });
+      await expect(service.confirmMatch(ORG, 't1', 'invoice', 'inv1')).rejects.toThrow(
+        /base currency/,
+      );
+      prisma.bankTransaction.findFirst.mockResolvedValue(transaction);
+      await expect(service.createExpenseFromTransaction(ORG, 't1', 'exp-acc')).rejects.toThrow(
+        /base currency/,
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(expenses.create).not.toHaveBeenCalled();
+    });
+
+    it('accepts a bank account in the base currency regardless of case', async () => {
+      prisma.bankAccount.findFirst.mockResolvedValue({ currency: 'egp', linkedAccountId: 'l' });
+      prisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'EGP' });
+      await service.createExpenseFromTransaction(ORG, 't1', 'exp-acc');
+      expect(expenses.create).toHaveBeenCalledTimes(1);
+    });
+  });
 });

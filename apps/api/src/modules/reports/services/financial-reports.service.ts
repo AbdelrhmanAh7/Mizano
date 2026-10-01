@@ -163,6 +163,10 @@ export interface PurchasesByVendorEntry {
   totalAmount: string;
   paidAmount: string;
   balanceDue: string;
+  /** Live, unapplied, unrefunded vendor credits: debited from AP but not yet netted on any bill. */
+  unappliedCredits: string;
+  /** balanceDue - unappliedCredits: what the vendor's AP actually stands at. */
+  netPayable: string;
   currencyCode: string;
 }
 
@@ -171,6 +175,8 @@ export interface PurchasesByVendorReport {
   totalAmount: string;
   totalPaid: string;
   totalBalance: string;
+  totalUnappliedCredits: string;
+  totalNetPayable: string;
   currencyCode: string;
   otherCurrencies: string[];
   period: { startDate: string; endDate: string };
@@ -907,22 +913,54 @@ export class FinancialReportsService {
       byVendor.set(bill.vendorId, row);
     }
 
+    // Vendor credits are base-currency ledger documents, so they only apply to the base-currency
+    // report. They are all-time live balances, like bill balances, so vendors with a credit but no
+    // bill in the period still appear (with zero bills) and the totals reconcile to AP.
+    const creditsByVendor = new Map<string, Decimal>();
+    if (reportCurrency === base) {
+      const credits = await this.prisma.vendorCredit.findMany({
+        where: { organizationId, deletedAt: null, appliedToBillId: null, refundedAt: null },
+        select: { vendorId: true, amount: true },
+      });
+      for (const c of credits) {
+        creditsByVendor.set(c.vendorId, (creditsByVendor.get(c.vendorId) ?? ZERO).add(c.amount));
+      }
+      const missing = [...creditsByVendor.keys()].filter((id) => !byVendor.has(id));
+      if (missing.length > 0) {
+        const vendors = await this.prisma.vendor.findMany({
+          where: { organizationId, id: { in: missing } },
+          select: { id: true, name: true },
+        });
+        for (const v of vendors) {
+          byVendor.set(v.id, { name: v.name, count: 0, total: ZERO, balance: ZERO });
+        }
+      }
+    }
+
     const rows = [...byVendor.entries()].sort((a, b) => b[1].total.comparedTo(a[1].total));
     const totalAmount = rows.reduce((s, [, r]) => s.add(r.total), ZERO);
     const totalBalance = rows.reduce((s, [, r]) => s.add(r.balance), ZERO);
+    const totalCredits = rows.reduce((s, [id]) => s.add(creditsByVendor.get(id) ?? ZERO), ZERO);
     return {
-      entries: rows.map(([vendorId, r]) => ({
-        vendorId,
-        vendorName: r.name,
-        billCount: r.count,
-        totalAmount: money(r.total),
-        paidAmount: money(r.total.sub(r.balance)),
-        balanceDue: money(r.balance),
-        currencyCode: reportCurrency,
-      })),
+      entries: rows.map(([vendorId, r]) => {
+        const credits = creditsByVendor.get(vendorId) ?? ZERO;
+        return {
+          vendorId,
+          vendorName: r.name,
+          billCount: r.count,
+          totalAmount: money(r.total),
+          paidAmount: money(r.total.sub(r.balance)),
+          balanceDue: money(r.balance),
+          unappliedCredits: money(credits),
+          netPayable: money(r.balance.sub(credits)),
+          currencyCode: reportCurrency,
+        };
+      }),
       totalAmount: money(totalAmount),
       totalPaid: money(totalAmount.sub(totalBalance)),
       totalBalance: money(totalBalance),
+      totalUnappliedCredits: money(totalCredits),
+      totalNetPayable: money(totalBalance.sub(totalCredits)),
       currencyCode: reportCurrency,
       otherCurrencies,
       period: { startDate: period.startDate, endDate: period.endDate },

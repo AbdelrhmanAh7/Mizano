@@ -48,6 +48,7 @@ describe('DashboardService', () => {
       overdueInvoices?: number;
       overdueBills?: number;
       activeProjects?: number;
+      unappliedVendorCredits?: number;
     } = {},
   ) {
     const {
@@ -63,6 +64,7 @@ describe('DashboardService', () => {
       overdueInvoices = 0,
       overdueBills = 0,
       activeProjects = 0,
+      unappliedVendorCredits = 0,
     } = overrides;
 
     // invoice.aggregate is called multiple times: receivables, revenueInRange (current, prev, yearly)
@@ -71,6 +73,11 @@ describe('DashboardService', () => {
       .mockResolvedValueOnce({ _sum: { grandTotal: new Decimal(currentRevenue) } } as any) // current revenue
       .mockResolvedValueOnce({ _sum: { grandTotal: new Decimal(prevRevenue) } } as any) // prev revenue
       .mockResolvedValueOnce({ _sum: { grandTotal: new Decimal(yearlyRevenue) } } as any); // yearly revenue
+
+    // live, unapplied, unrefunded vendor credits are netted out of payables
+    prisma.vendorCredit.aggregate.mockResolvedValue({
+      _sum: { amount: new Decimal(unappliedVendorCredits) },
+    } as any);
 
     // bill.aggregate: payables, current expenses from bills, prev expenses from bills
     prisma.bill.aggregate
@@ -132,6 +139,21 @@ describe('DashboardService', () => {
       expect(result.overview.totalReceivables).toBe(15000);
       expect(result.overview.totalPayables).toBe(8000);
       expect(result.overview.netPosition).toBe(7000); // 15000 - 8000
+    });
+
+    it('subtracts live unapplied vendor credits from total payables (AP control balance)', async () => {
+      setupDashboardMocks({ receivables: 15000, payables: 8000, unappliedVendorCredits: 1250.5 });
+
+      const result = await service.getDashboardOverview(ORG_ID);
+
+      expect(result.overview.totalPayables).toBe(6749.5);
+      expect(result.overview.netPosition).toBe(8250.5);
+      expect(prisma.vendorCredit.aggregate.mock.calls[0]![0]!.where).toEqual({
+        organizationId: ORG_ID,
+        deletedAt: null,
+        appliedToBillId: null,
+        refundedAt: null,
+      });
     });
 
     it('should compute trend percentages correctly', async () => {

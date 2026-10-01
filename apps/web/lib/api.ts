@@ -284,6 +284,8 @@ export const expensesApi = {
     api.post('/expenses/bulk-categorize', { ids, accountId }),
   bulkApprove: (ids: string[]) => api.post('/expenses/bulk-approve', { ids }),
   /** Expense-type accounts for the expense form (purchases.create; no accounting.view needed). */
+  /** Posts a pending expense (Dr expense / VAT, Cr bank or cash). */
+  post: (id: string) => api.post(`/expenses/${id}/post`),
   expenseAccounts: () => api.get('/expenses/expense-accounts'),
   /** Bank/cash accounts an expense can be paid from (purchases.create). */
   paidThroughAccounts: () => api.get('/expenses/paid-through-accounts'),
@@ -325,8 +327,9 @@ export const vendorCreditsApi = {
   /** Voids an unapplied, unrefunded credit (posts a reversal journal). */
   void: (id: string) => api.delete(`/vendor-credits/${id}`),
   bulkDelete: (ids: string[]) => api.post('/vendor-credits/bulk-delete', { ids }),
-  /** Expense accounts a credit can be posted to (purchases.create). */
-  creditAccounts: () => api.get('/vendor-credits/credit-accounts'),
+  /** Accounts on a bill's lines: where its credit can be posted (purchases.create). */
+  creditAccounts: (billId: string) =>
+    api.get('/vendor-credits/credit-accounts', { params: { billId } }),
   /** Bank/cash accounts a refund can be received into (purchases.edit). */
   refundAccounts: () => api.get('/vendor-credits/refund-accounts'),
 };

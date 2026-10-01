@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { AccountType, ExpenseStatus, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
@@ -47,8 +52,11 @@ export class ExpensesService {
   async create(
     organizationId: string,
     dto: CreateExpenseDto,
-    options: { tx?: Prisma.TransactionClient } = {},
+    options: { tx?: Prisma.TransactionClient; post?: boolean } = {},
   ) {
+    // post=false records a PENDING expense with no journal (recurring profiles without autoPost);
+    // it reaches the ledger only through post().
+    const posting = options.post !== false;
     const entered = parsePositiveDecimal(dto.amount, 'amount');
     assertMoneyFits(entered, 'amount');
     const rate = dto.taxRate ? new Decimal(dto.taxRate) : new Decimal(0);
@@ -109,15 +117,7 @@ export class ExpensesService {
         if (!project) throw new BadRequestException('Project not found');
       }
 
-      const org = await tx.organization.findUnique({
-        where: { id: organizationId },
-        select: { defaultVatReceivableAccountId: true },
-      });
-      if (taxAmount.greaterThan(0) && !org?.defaultVatReceivableAccountId) {
-        throw new BadRequestException(
-          'Please configure the default VAT Receivable account in organization settings before recording taxed expenses',
-        );
-      }
+      const vatAccountId = posting ? await this.vatAccountFor(tx, organizationId, taxAmount) : null;
 
       const expense = await tx.expense.create({
         data: {
@@ -131,51 +131,143 @@ export class ExpensesService {
           description: dto.description,
           reference: dto.reference,
           projectId: dto.projectId,
-          status: ExpenseStatus.POSTED,
+          status: posting ? ExpenseStatus.POSTED : ExpenseStatus.PENDING,
           organizationId,
         },
         include: EXPENSE_VIEW_INCLUDE,
       });
 
-      const label = dto.description || 'General expense';
-      const lines = [
-        {
-          accountId: dto.accountId,
-          debit: net.toFixed(4),
-          credit: '0',
-          description: `Expense - ${label}`,
-        },
-      ];
-      if (taxAmount.greaterThan(0)) {
-        lines.push({
-          accountId: org?.defaultVatReceivableAccountId as string,
-          debit: taxAmount.toFixed(4),
-          credit: '0',
-          description: 'Expense - VAT Receivable',
-        });
-      }
-      lines.push({
-        accountId: dto.paidThroughAccountId,
-        debit: '0',
-        credit: gross.toFixed(4),
-        description: 'Expense - Payment',
-      });
-
-      await this.journalsService.create(
-        organizationId,
-        {
-          date: date.toISOString(),
-          reference: `Expense ${expense.id.slice(-6)}`,
-          notes: `Expense entry - ${label}`,
-          lines,
-        },
-        { tx, source: { type: JournalSourceType.EXPENSE, id: expense.id } },
-      );
-
+      if (posting) await this.postJournal(tx, organizationId, expense, vatAccountId);
       return expense;
     };
 
     return options.tx ? run(options.tx) : this.prisma.$transaction(run);
+  }
+
+  /** The VAT Receivable account when the expense carries VAT (rejects when unconfigured). */
+  private async vatAccountFor(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    taxAmount: Decimal,
+  ): Promise<string | null> {
+    if (!taxAmount.greaterThan(0)) return null;
+    const org = await tx.organization.findUnique({
+      where: { id: organizationId },
+      select: { defaultVatReceivableAccountId: true },
+    });
+    if (!org?.defaultVatReceivableAccountId) {
+      throw new BadRequestException(
+        'Please configure the default VAT Receivable account in organization settings before recording taxed expenses',
+      );
+    }
+    return org.defaultVatReceivableAccountId;
+  }
+
+  /** Dr expense (net) / Dr VAT (tax) / Cr paid-through (gross), dated on the expense date. */
+  private async postJournal(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    expense: {
+      id: string;
+      date: Date;
+      accountId: string;
+      paidThroughAccountId: string;
+      description: string | null;
+      amount: Decimal;
+      taxAmount: Decimal;
+    },
+    vatAccountId: string | null,
+  ): Promise<void> {
+    const label = expense.description || 'General expense';
+    const gross = expense.amount.add(expense.taxAmount);
+    const lines = [
+      {
+        accountId: expense.accountId,
+        debit: expense.amount.toFixed(4),
+        credit: '0',
+        description: `Expense - ${label}`,
+      },
+    ];
+    if (expense.taxAmount.greaterThan(0)) {
+      lines.push({
+        accountId: vatAccountId as string,
+        debit: expense.taxAmount.toFixed(4),
+        credit: '0',
+        description: 'Expense - VAT Receivable',
+      });
+    }
+    lines.push({
+      accountId: expense.paidThroughAccountId,
+      debit: '0',
+      credit: gross.toFixed(4),
+      description: 'Expense - Payment',
+    });
+    await this.journalsService.create(
+      organizationId,
+      {
+        date: expense.date.toISOString(),
+        reference: `Expense ${expense.id.slice(-6)}`,
+        notes: `Expense entry - ${label}`,
+        lines,
+      },
+      { tx, source: { type: JournalSourceType.EXPENSE, id: expense.id } },
+    );
+  }
+
+  /**
+   * Posts a PENDING expense (guarded PENDING -> POSTED) through the same journal as create().
+   * Lock order: expense -> ledger.
+   */
+  async post(organizationId: string, id: string) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "expenses" WHERE id = ${id} AND "organizationId" = ${organizationId} FOR UPDATE`;
+      const expense = await tx.expense.findFirst({
+        where: { id, organizationId, deletedAt: null },
+      });
+      if (!expense) throw new NotFoundException('Expense not found');
+      if (expense.status !== ExpenseStatus.PENDING) {
+        throw new BadRequestException('Only pending expenses can be posted');
+      }
+
+      await lockOrganizationLedger(tx, organizationId);
+      const expenseAccount = await tx.account.findFirst({
+        where: {
+          id: expense.accountId,
+          organizationId,
+          deletedAt: null,
+          isActive: true,
+          type: AccountType.EXPENSE,
+        },
+        select: { id: true },
+      });
+      if (!expenseAccount) {
+        throw new BadRequestException('Expense account must be an active expense account');
+      }
+      const paidThrough = await tx.account.findFirst({
+        where: {
+          AND: [
+            { id: expense.paidThroughAccountId },
+            await bankCashAccountWhere(tx, organizationId),
+          ],
+        },
+        select: { id: true },
+      });
+      if (!paidThrough) {
+        throw new BadRequestException(
+          'Paid-through account must be an active bank or cash account of this organization',
+        );
+      }
+      const vatAccountId = await this.vatAccountFor(tx, organizationId, expense.taxAmount);
+
+      const { count } = await tx.expense.updateMany({
+        where: { id, organizationId, deletedAt: null, status: ExpenseStatus.PENDING },
+        data: { status: ExpenseStatus.POSTED },
+      });
+      if (count === 0) throw new ConflictException('Expense was changed concurrently');
+
+      await this.postJournal(tx, organizationId, expense, vatAccountId);
+      return tx.expense.findUniqueOrThrow({ where: { id }, include: EXPENSE_VIEW_INCLUDE });
+    });
   }
 
   /** Expense accounts for the expense form (purchases.create without accounting.view). */
@@ -246,8 +338,9 @@ export class ExpensesService {
   }
 
   async findOne(organizationId: string, id: string) {
+    // Voided expenses stay readable (with deletedAt set) so journal source links resolve.
     const expense = await this.prisma.expense.findFirst({
-      where: { id, organizationId, deletedAt: null },
+      where: { id, organizationId },
       include: { account: true, vendor: true, paidThroughAccount: true },
     });
     if (!expense) throw new NotFoundException('Expense not found');
@@ -264,7 +357,7 @@ export class ExpensesService {
       await tx.$queryRaw`SELECT id FROM "expenses" WHERE id = ${id} AND "organizationId" = ${organizationId} FOR UPDATE`;
       const expense = await tx.expense.findFirst({
         where: { id, organizationId, deletedAt: null },
-        select: { id: true },
+        select: { id: true, status: true },
       });
       if (!expense) throw new NotFoundException('Expense not found');
 
@@ -273,6 +366,10 @@ export class ExpensesService {
         data: { deletedAt: new Date(), status: ExpenseStatus.CANCELLED },
       });
       if (count === 0) throw new NotFoundException('Expense not found');
+      // A pending expense was never posted: there is nothing to reverse.
+      if (expense.status === ExpenseStatus.PENDING) {
+        return { message: 'Expense voided successfully' };
+      }
 
       const journal = await tx.journal.findFirst({
         where: {
@@ -324,17 +421,8 @@ export class ExpensesService {
     });
   }
 
-  /** Status-only approval of legacy RECORDED expenses; new expenses are posted on creation. */
-  async bulkApprove(organizationId: string, ids: string[]) {
-    const result = await this.prisma.expense.updateMany({
-      where: {
-        id: { in: ids },
-        organizationId,
-        deletedAt: null,
-        status: ExpenseStatus.RECORDED,
-      },
-      data: { status: ExpenseStatus.POSTED },
-    });
-    return { approved: result.count, total: ids.length };
+  /** Posts each pending expense through the same command as POST /expenses/:id/post. */
+  bulkApprove(organizationId: string, ids: string[]): Promise<BulkResultDto> {
+    return runBulk(ids, (id) => this.post(organizationId, id));
   }
 }

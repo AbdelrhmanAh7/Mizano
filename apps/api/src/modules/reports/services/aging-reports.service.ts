@@ -116,6 +116,33 @@ export class AgingReportsService {
       },
     });
 
+    // Live, unapplied, unrefunded vendor credits already debited AP but reduced no bill: they are
+    // shown per vendor and netted in `summary.netTotal`, which reconciles to the AP control account.
+    const credits = await this.prisma.vendorCredit.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+        appliedToBillId: null,
+        refundedAt: null,
+        date: { lte: date },
+      },
+      select: { vendorId: true, amount: true, vendor: { select: { id: true, name: true } } },
+    });
+    const creditsByVendor = new Map<string, { vendorName: string; amount: Decimal }>();
+    for (const credit of credits) {
+      const row = creditsByVendor.get(credit.vendorId) ?? {
+        vendorName: credit.vendor.name,
+        amount: new Decimal(0),
+      };
+      row.amount = row.amount.add(credit.amount);
+      creditsByVendor.set(credit.vendorId, row);
+    }
+    const unappliedTotal = [...creditsByVendor.values()].reduce(
+      (sum, r) => sum.add(r.amount),
+      new Decimal(0),
+    );
+    const billsTotal = bills.reduce((sum, b) => sum.add(b.balanceDue), new Decimal(0));
+
     const buckets = {
       current: [] as AgingItem[],
       days1_30: [] as AgingItem[],
@@ -161,7 +188,19 @@ export class AgingReportsService {
     return {
       asOfDate: date,
       buckets,
-      summary,
+      summary: {
+        ...summary,
+        unappliedCredits: unappliedTotal.toFixed(4),
+        netTotal: billsTotal.sub(unappliedTotal).toFixed(4),
+      },
+      unappliedCredits: {
+        total: unappliedTotal.toFixed(4),
+        vendors: [...creditsByVendor.entries()].map(([vendorId, r]) => ({
+          vendorId,
+          vendorName: r.vendorName,
+          amount: r.amount.toFixed(4),
+        })),
+      },
       vendorCount: new Set(bills.map((b) => b.vendorId)).size,
       billCount: bills.length,
     };

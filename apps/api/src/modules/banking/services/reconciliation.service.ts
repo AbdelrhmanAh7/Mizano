@@ -123,6 +123,19 @@ export class ReconciliationService {
       throw new BadRequestException('entityType must be invoice or bill');
     }
 
+    // Money direction must agree with the entity: a deposit settles an invoice, a withdrawal pays
+    // a bill. A mismatch would post the opposite entry, so it is rejected before anything is posted.
+    const expected =
+      entityType === 'invoice' ? BankTransactionType.DEPOSIT : BankTransactionType.WITHDRAWAL;
+    if (transaction.type !== expected) {
+      throw new BadRequestException(
+        entityType === 'invoice'
+          ? 'Only deposits can be matched to an invoice payment'
+          : 'Only withdrawals can be matched to a bill payment',
+      );
+    }
+    await this.assertBaseCurrencyAccount(organizationId, transaction.bankAccountId);
+
     // One transaction: the guarded PENDING -> MATCHED transition happens first, so a retried or
     // concurrent confirmation cannot create a second payment; any failure rolls both back.
     const amount = transaction.amount.abs();
@@ -239,6 +252,8 @@ export class ReconciliationService {
       throw new BadRequestException('Only withdrawals can be recorded as expenses');
     }
 
+    await this.assertBaseCurrencyAccount(organizationId, transaction.bankAccountId);
+
     await this.prisma.$transaction(async (tx) => {
       const { count } = await tx.bankTransaction.updateMany({
         where: { id: transactionId, organizationId, status: ReconciliationStatus.PENDING },
@@ -268,6 +283,36 @@ export class ReconciliationService {
     });
 
     return { message: 'Expense created' };
+  }
+
+  /**
+   * The ledger is single-currency and nothing is converted: a transaction on a bank account whose
+   * currency differs from the organization's base currency cannot be posted.
+   */
+  private async assertBaseCurrencyAccount(
+    organizationId: string,
+    bankAccountId: string,
+  ): Promise<void> {
+    const [bankAccount, org] = await Promise.all([
+      this.prisma.bankAccount.findFirst({
+        where: { id: bankAccountId, organizationId },
+        select: { currency: true },
+      }),
+      this.prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { baseCurrency: true },
+      }),
+    ]);
+    if (!bankAccount) throw new NotFoundException('Bank account not found');
+    if (
+      bankAccount.currency &&
+      org &&
+      bankAccount.currency.trim().toUpperCase() !== org.baseCurrency.trim().toUpperCase()
+    ) {
+      throw new BadRequestException(
+        `Bank account currency ${bankAccount.currency} differs from the base currency ${org.baseCurrency}; foreign-currency transactions cannot be posted yet`,
+      );
+    }
   }
 
   async getSummary(organizationId: string, bankAccountId: string) {

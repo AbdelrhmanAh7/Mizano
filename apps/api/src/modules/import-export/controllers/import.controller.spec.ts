@@ -5,6 +5,7 @@ import { ImportService } from '../services/import.service';
 import { ENTITY_FIELD_DEFINITIONS, ImportEntityType } from '../dto/import-export.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 
 describe('ImportController', () => {
   let controller: ImportController;
@@ -35,6 +36,8 @@ describe('ImportController', () => {
       .useValue({ canActivate: () => true })
       .overrideGuard(PermissionsGuard)
       .useValue({ canActivate: () => true })
+      .overrideInterceptor(CacheInvalidationInterceptor)
+      .useValue({ intercept: (_ctx: unknown, next: { handle: () => unknown }) => next.handle() })
       .compile();
 
     controller = module.get<ImportController>(ImportController);
