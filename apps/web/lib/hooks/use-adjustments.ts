@@ -7,45 +7,37 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 type ApiError = { response?: { data?: { message?: string } } };
 
-// Types
+// Types (mirror the API: one item per adjustment; status is derived from the ledger)
 export type AdjustmentType = 'INCREASE' | 'DECREASE';
-export type AdjustmentReason = 'STOCKTAKE' | 'DAMAGE' | 'THEFT' | 'RETURN' | 'OTHER';
-export type AdjustmentStatus = 'DRAFT' | 'POSTED';
-
-export interface AdjustmentLine {
-  id: string;
-  adjustmentId: string;
-  itemId: string;
-  warehouseId: string;
-  quantityBefore: number;
-  quantityAdjusted: number;
-  quantityAfter: number;
-  item: {
-    id: string;
-    name: string;
-    sku: string | null;
-    unit: string | null;
-  };
-  warehouse: {
-    id: string;
-    name: string;
-    code: string;
-  };
-}
+export type AdjustmentReason =
+  | 'DAMAGED'
+  | 'STOLEN'
+  | 'STOCKTAKE'
+  | 'RETURNED'
+  | 'EXPIRED'
+  | 'OTHER';
+export type AdjustmentStatus = 'POSTED' | 'VOIDED';
 
 export interface Adjustment {
   id: string;
   adjustmentNumber: string;
   date: string;
   type: AdjustmentType;
+  quantity: number;
   reason: AdjustmentReason;
-  status: AdjustmentStatus;
-  description: string | null;
-  reference: string | null;
+  notes: string | null;
   organizationId: string;
   createdAt: string;
   updatedAt: string;
-  lines?: AdjustmentLine[];
+  status: AdjustmentStatus;
+  /** Value of the stock change as a decimal string. */
+  value: string | null;
+  journalId: string | null;
+  journalNumber: string | null;
+  voidJournalId: string | null;
+  item: { id: string; name: string; sku: string | null; unit: string | null };
+  warehouse: { id: string; name: string; code: string };
+  account: { id: string; name: string; code: string };
 }
 
 export interface AdjustmentParams {
@@ -53,21 +45,36 @@ export interface AdjustmentParams {
   limit?: number;
   search?: string;
   type?: AdjustmentType;
-  status?: AdjustmentStatus;
-  reason?: AdjustmentReason;
 }
 
+/** Exact payload of POST /inventory-adjustments. */
 export interface CreateAdjustmentData {
   date: string;
+  warehouseId: string;
+  itemId: string;
   type: AdjustmentType;
+  quantity: number;
   reason: AdjustmentReason;
-  description?: string;
-  reference?: string;
-  lines: Array<{
-    itemId: string;
-    warehouseId: string;
-    quantityAdjusted: number;
-  }>;
+  accountId: string;
+  notes?: string;
+}
+
+export interface AdjustmentAccountOption {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+}
+
+/** Accounts that may take the other side of an adjustment (needs inventory.create only). */
+export function useAdjustmentAccountOptions() {
+  return useQuery({
+    queryKey: ['adjustments', 'account-options'],
+    queryFn: async (): Promise<AdjustmentAccountOption[]> => {
+      const response = await adjustmentsApi.accountOptions();
+      return response.data;
+    },
+  });
 }
 
 /**
@@ -129,8 +136,8 @@ export function useCreateAdjustment() {
       queryClient.invalidateQueries({ queryKey: ['items'] });
       queryClient.invalidateQueries({ queryKey: ['warehouses'] });
       toast({
-        title: 'Adjustment created',
-        description: 'The inventory adjustment has been created.',
+        title: 'Adjustment posted',
+        description: 'Stock updated and the journal entry posted.',
       });
     },
     onError: (error: ApiError) => {
@@ -144,121 +151,67 @@ export function useCreateAdjustment() {
 }
 
 /**
- * Hook to post an adjustment
+ * Hook to void an adjustment (reverses the journal and restores stock)
  */
-export function usePostAdjustment() {
+export function useVoidAdjustment() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await adjustmentsApi.post(id);
+      const response = await adjustmentsApi.void(id);
       return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adjustments'] });
       queryClient.invalidateQueries({ queryKey: ['items'] });
       queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+      queryClient.invalidateQueries({ queryKey: ['journals'] });
       toast({
-        title: 'Adjustment posted',
-        description: 'The inventory adjustment has been posted and stock levels updated.',
+        title: 'Adjustment voided',
+        description: 'The journal was reversed and stock restored.',
       });
     },
     onError: (error: ApiError) => {
       toast({
         variant: 'destructive',
-        title: 'Error posting adjustment',
+        title: 'Error voiding adjustment',
         description: error.response?.data?.message || 'An error occurred',
       });
     },
   });
 }
 
-/**
- * Hook to delete an adjustment
- */
-export function useDeleteAdjustment() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
+/** Reason options for dropdowns */
+export const reasonOptions: Array<{ value: AdjustmentReason; label: string }> = [
+  { value: 'STOCKTAKE', label: 'Stocktake / Physical Count' },
+  { value: 'DAMAGED', label: 'Damaged Goods' },
+  { value: 'STOLEN', label: 'Stolen / Lost' },
+  { value: 'RETURNED', label: 'Customer Return' },
+  { value: 'EXPIRED', label: 'Expired' },
+  { value: 'OTHER', label: 'Other' },
+];
 
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await adjustmentsApi.delete(id);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['adjustments'] });
-      toast({
-        title: 'Adjustment deleted',
-        description: 'The inventory adjustment has been deleted.',
-      });
-    },
-    onError: (error: ApiError) => {
-      toast({
-        variant: 'destructive',
-        title: 'Error deleting adjustment',
-        description: error.response?.data?.message || 'An error occurred',
-      });
-    },
-  });
-}
-
-/**
- * Get type badge color
- */
 export function getTypeColor(type: AdjustmentType): string {
   return type === 'INCREASE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
 }
 
-/**
- * Get type display text
- */
 export function getTypeText(type: AdjustmentType): string {
   return type === 'INCREASE' ? 'Increase' : 'Decrease';
 }
 
-/**
- * Get status badge variant
- */
-export function getStatusVariant(status: AdjustmentStatus): 'default' | 'secondary' {
-  return status === 'POSTED' ? 'default' : 'secondary';
-}
-
-/**
- * Get status display text
- */
 export function getStatusText(status: AdjustmentStatus): string {
-  return status === 'POSTED' ? 'Posted' : 'Draft';
+  return status === 'VOIDED' ? 'Voided' : 'Posted';
 }
 
-/**
- * Get reason display text
- */
 export function getReasonText(reason: AdjustmentReason): string {
-  const reasons: Record<AdjustmentReason, string> = {
-    STOCKTAKE: 'Stocktake',
-    DAMAGE: 'Damage',
-    THEFT: 'Theft',
-    RETURN: 'Return',
-    OTHER: 'Other',
-  };
-  return reasons[reason] || reason;
+  const found = reasonOptions.find((o) => o.value === reason);
+  return found ? found.label : reason;
 }
 
 // Alias functions for backward compatibility
 export const getReasonLabel = getReasonText;
 export const getAdjustmentStatusLabel = getStatusText;
 export function getAdjustmentStatusColor(status: AdjustmentStatus): string {
-  return status === 'POSTED' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+  return status === 'VOIDED' ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800';
 }
-
-/**
- * Reason options for dropdowns
- */
-export const reasonOptions = [
-  { value: 'STOCKTAKE', label: 'Stocktake / Physical Count' },
-  { value: 'DAMAGE', label: 'Damaged Goods' },
-  { value: 'THEFT', label: 'Theft / Loss' },
-  { value: 'RETURN', label: 'Customer Return' },
-  { value: 'OTHER', label: 'Other' },
-];

@@ -20,6 +20,7 @@ export class ItemsService {
   async create(organizationId: string, dto: CreateItemDto) {
     const existing = await this.prisma.item.findFirst({ where: { sku: dto.sku, organizationId } });
     if (existing) throw new ConflictException('SKU already exists');
+    await this.assertAccountsBelongToOrg(organizationId, dto);
 
     return this.prisma.item.create({
       data: {
@@ -97,6 +98,7 @@ export class ItemsService {
       });
       if (existing) throw new ConflictException('SKU already exists');
     }
+    await this.assertAccountsBelongToOrg(organizationId, dto);
     return this.prisma.item.update({ where: { id }, data: dto });
   }
 
@@ -112,14 +114,22 @@ export class ItemsService {
     return { message: 'Item deleted' };
   }
 
-  async updateStock(itemId: string, quantity: number, type: 'increase' | 'decrease') {
-    const item = await this.prisma.item.findUnique({ where: { id: itemId } });
-    if (!item) throw new NotFoundException(`Item ${itemId} not found for stock update`);
-    const newStock =
-      type === 'increase' ? item.currentStock + quantity : item.currentStock - quantity;
-    await this.prisma.item.update({
-      where: { id: itemId },
-      data: { currentStock: Math.max(0, newStock) },
+  /** Sales, purchase and inventory accounts must belong to the caller's organization. */
+  private async assertAccountsBelongToOrg(
+    organizationId: string,
+    dto: Pick<CreateItemDto, 'salesAccountId' | 'purchaseAccountId' | 'inventoryAccountId'>,
+  ): Promise<void> {
+    const ids = [
+      ...new Set(
+        [dto.salesAccountId, dto.purchaseAccountId, dto.inventoryAccountId].filter(
+          (id): id is string => !!id,
+        ),
+      ),
+    ];
+    if (ids.length === 0) return;
+    const found = await this.prisma.account.count({
+      where: { id: { in: ids }, organizationId, deletedAt: null },
     });
+    if (found !== ids.length) throw new BadRequestException('Account not found');
   }
 }

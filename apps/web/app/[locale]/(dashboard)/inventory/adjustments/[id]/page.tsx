@@ -1,20 +1,9 @@
 'use client';
 
+import { format } from 'date-fns';
+import { ArrowDown, ArrowLeft, ArrowUp, Undo2 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { format } from 'date-fns';
-import { ArrowLeft, CheckCircle, ArrowUp, ArrowDown } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,28 +15,37 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 import {
-  useAdjustment,
-  usePostAdjustment,
-  getAdjustmentStatusLabel,
   getAdjustmentStatusColor,
+  getAdjustmentStatusLabel,
   getReasonLabel,
+  useAdjustment,
+  useVoidAdjustment,
 } from '@/lib/hooks/use-adjustments';
+import { usePermissions } from '@/lib/hooks/use-permissions';
+import { cn } from '@/lib/utils';
 
 interface AdjustmentDetailPageProps {
   params: { id: string };
 }
 
-export default function AdjustmentDetailPage({ params }: AdjustmentDetailPageProps) {
+export default function AdjustmentDetailPage({ params }: AdjustmentDetailPageProps): JSX.Element {
   const t = useTranslations('inventory');
   const { id } = params;
-  const { data: adjustment, isLoading } = useAdjustment(id);
-  const postAdjustment = usePostAdjustment();
+  const { hasPermission } = usePermissions();
+  const { data: adjustment, isLoading, isError } = useAdjustment(id);
+  const voidAdjustment = useVoidAdjustment();
 
-  const handlePost = async () => {
-    await postAdjustment.mutateAsync(id);
+  const handleVoid = async (): Promise<void> => {
+    try {
+      await voidAdjustment.mutateAsync(id);
+    } catch {
+      // The mutation toast shows the API error
+    }
   };
 
   if (isLoading) {
@@ -59,16 +57,17 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
           <Skeleton className="h-32" />
           <Skeleton className="h-32" />
         </div>
-        <Skeleton className="h-64" />
       </div>
     );
   }
 
-  if (!adjustment) {
+  if (isError || !adjustment) {
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground">
-          {t('adjustments.title')} {t('common.notFound')}
+          {isError
+            ? t('adjustments.loadError')
+            : `${t('adjustments.title')} ${t('common.notFound')}`}
         </p>
         <Button asChild className="mt-4">
           <Link href="/inventory/adjustments">
@@ -79,15 +78,11 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
     );
   }
 
-  const totalQty =
-    adjustment.lines?.reduce(
-      (sum: number, line: { quantityAdjusted?: number }) => sum + (line.quantityAdjusted || 0),
-      0,
-    ) || 0;
+  const increase = adjustment.type === 'INCREASE';
+  const tone = increase ? 'text-green-600' : 'text-red-600';
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
@@ -108,180 +103,105 @@ export default function AdjustmentDetailPage({ params }: AdjustmentDetailPagePro
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {adjustment.status === 'DRAFT' && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Post Adjustment
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Post Adjustment</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will update the stock levels for all items in this adjustment. This action
-                    cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handlePost}>Post Adjustment</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-        </div>
+        {adjustment.status === 'POSTED' && hasPermission('inventory.delete') && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" disabled={voidAdjustment.isPending}>
+                <Undo2 className="mr-2 h-4 w-4" />
+                {t('adjustments.void.action')}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t('adjustments.void.title')}</AlertDialogTitle>
+                <AlertDialogDescription>{t('adjustments.void.description')}</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                <AlertDialogAction onClick={() => void handleVoid()}>
+                  {t('adjustments.void.action')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div
-                className={cn(
-                  'p-2 rounded-lg',
-                  adjustment.type === 'INCREASE' ? 'bg-green-100' : 'bg-red-100',
-                )}
-              >
-                {adjustment.type === 'INCREASE' ? (
-                  <ArrowUp className="h-5 w-5 text-green-600" />
-                ) : (
-                  <ArrowDown className="h-5 w-5 text-red-600" />
-                )}
-              </div>
+              {increase ? (
+                <ArrowUp className="h-5 w-5 text-green-600" />
+              ) : (
+                <ArrowDown className="h-5 w-5 text-red-600" />
+              )}
               <div>
-                <p className="text-sm text-muted-foreground">Type</p>
-                <p
-                  className={cn(
-                    'text-lg font-semibold',
-                    adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
-                  )}
-                >
-                  {adjustment.type === 'INCREASE' ? 'Increase Stock' : 'Decrease Stock'}
+                <p className="text-sm text-muted-foreground">{t('adjustments.table.type')}</p>
+                <p className={cn('text-lg font-semibold', tone)}>
+                  {increase ? t('adjustments.types.increase') : t('adjustments.types.decrease')}
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Reason</p>
+            <p className="text-sm text-muted-foreground">{t('adjustments.table.reason')}</p>
             <p className="text-lg font-semibold">{getReasonLabel(adjustment.reason)}</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Items Adjusted</p>
-            <p className="text-2xl font-bold">{adjustment.lines?.length || 0}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Total Quantity</p>
-            <p
-              className={cn(
-                'text-2xl font-bold font-mono',
-                adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
-              )}
-            >
-              {adjustment.type === 'INCREASE' ? '+' : '-'}
-              {totalQty}
+            <p className="text-sm text-muted-foreground">{t('adjustments.table.quantity')}</p>
+            <p className={cn('text-2xl font-bold font-mono', tone)}>
+              {increase ? '+' : '-'}
+              {adjustment.quantity}
             </p>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Details */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle>{t('adjustments.adjustmentDetails')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Adjustment Number</span>
-              <span className="font-mono">{adjustment.adjustmentNumber}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Date</span>
-              <span>{format(new Date(adjustment.date), 'MMM d, yyyy')}</span>
-            </div>
-            {adjustment.reference && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Reference</span>
-                <span>{adjustment.reference}</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Status</span>
-              <Badge variant="outline" className={getAdjustmentStatusColor(adjustment.status)}>
-                {getAdjustmentStatusLabel(adjustment.status)}
-              </Badge>
-            </div>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">{t('adjustments.value')}</p>
+            <p className="text-2xl font-bold font-mono">{adjustment.value ?? '-'}</p>
           </CardContent>
         </Card>
-
-        {adjustment.description && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Description</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm">{adjustment.description}</p>
-            </CardContent>
-          </Card>
-        )}
       </div>
 
-      {/* Line Items */}
       <Card>
         <CardHeader>
-          <CardTitle>Adjusted Items</CardTitle>
+          <CardTitle>{t('adjustments.adjustmentDetails')}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead>SKU</TableHead>
-                <TableHead>Warehouse</TableHead>
-                <TableHead className="text-right">Quantity Adjusted</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(
-                adjustment.lines as {
-                  id: string;
-                  item?: { name?: string; sku?: string };
-                  warehouse?: { name?: string };
-                  quantityAdjusted: number;
-                }[]
-              )?.map((line) => (
-                <TableRow key={line.id}>
-                  <TableCell className="font-medium">{line.item?.name || '-'}</TableCell>
-                  <TableCell className="font-mono text-sm">{line.item?.sku || '-'}</TableCell>
-                  <TableCell>{line.warehouse?.name || '-'}</TableCell>
-                  <TableCell className="text-right">
-                    <span
-                      className={cn(
-                        'font-mono font-medium',
-                        adjustment.type === 'INCREASE' ? 'text-green-600' : 'text-red-600',
-                      )}
-                    >
-                      {adjustment.type === 'INCREASE' ? '+' : '-'}
-                      {line.quantityAdjusted}
-                    </span>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <CardContent className="space-y-4">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">{t('adjustments.table.item')}</span>
+            <span>
+              {adjustment.item.name}
+              {adjustment.item.sku ? ` (${adjustment.item.sku})` : ''}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">{t('adjustments.table.warehouse')}</span>
+            <span>{adjustment.warehouse.name}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">{t('adjustments.form.account')}</span>
+            <span>
+              {adjustment.account.code} - {adjustment.account.name}
+            </span>
+          </div>
+          {adjustment.journalNumber && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">{t('adjustments.journal')}</span>
+              <span className="font-mono">{adjustment.journalNumber}</span>
+            </div>
+          )}
+          {adjustment.notes && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">{t('adjustments.form.notes')}</span>
+              <span>{adjustment.notes}</span>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

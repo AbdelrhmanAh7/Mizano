@@ -28,7 +28,6 @@ import {
   CompanyInfoStepDto,
   ChartOfAccountsStepDto,
   TaxConfigStepDto,
-  OpeningBalancesStepDto,
   ImportDataStepDto,
   AiFeaturesStepDto,
   SkipStepDto,
@@ -243,13 +242,6 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Complete tax configuration onboarding step' })
   completeTaxConfigStep(@CurrentOrg() orgId: string, @Body() dto: TaxConfigStepDto) {
     return this.organizationsService.completeTaxConfigStep(orgId, dto);
-  }
-
-  @Post('onboarding/opening-balances')
-  @Permissions('settings.edit')
-  @ApiOperation({ summary: 'Complete opening balances onboarding step' })
-  completeOpeningBalancesStep(@CurrentOrg() orgId: string, @Body() dto: OpeningBalancesStepDto) {
-    return this.organizationsService.completeOpeningBalancesStep(orgId, dto);
   }
 
   @Post('onboarding/import-data')

@@ -166,7 +166,8 @@ const vatReturnsApi = {
 const vatPaymentsApi = {
   recordPayment: async (data: {
     vatReturnId: string;
-    amount: number;
+    /** Exact net payable as a decimal string (max 4 decimals). */
+    amount: string;
     date: string;
     paidFromAccountId: string;
     reference?: string;
@@ -310,6 +311,33 @@ export function useFileVATReturn() {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['vat-returns'] });
       queryClient.invalidateQueries({ queryKey: ['vat-returns', id] });
+      queryClient.invalidateQueries({ queryKey: ['tax-dashboard-stats'] });
+    },
+  });
+}
+
+/** Bank/cash accounts a VAT payment can be made from (GET /vat-returns/payment-accounts). */
+export function useVatPaymentAccounts(enabled = true) {
+  return useQuery({
+    queryKey: ['vat-returns', 'payment-accounts'],
+    enabled,
+    queryFn: async (): Promise<Array<{ id: string; code: string; name: string }>> => {
+      const response = await api.get('/vat-returns/payment-accounts');
+      return response.data;
+    },
+  });
+}
+
+/** Marks a submitted zero/refundable return as filed (no journal; payment files the others). */
+export function useMarkVATReturnFiled() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post(`/vat-returns/${id}/file`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vat-returns'] });
       queryClient.invalidateQueries({ queryKey: ['tax-dashboard-stats'] });
     },
   });

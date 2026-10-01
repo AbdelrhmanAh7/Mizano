@@ -91,8 +91,10 @@ function VATReturnsPageContent() {
   const deleteReturn = useDeleteVATReturn();
   const fileReturn = useFileVATReturn();
 
-  const rawReturns: VATReturn[] = returnsData?.data || returnsData || [];
-  const returns = useMemo(() => rawReturns.map(normalizeVATReturn), [rawReturns]);
+  const returns = useMemo(() => {
+    const rawReturns: VATReturn[] = returnsData?.data || returnsData || [];
+    return rawReturns.map(normalizeVATReturn);
+  }, [returnsData]);
 
   // Client-side search
   const filteredReturns = useMemo(() => {
@@ -119,7 +121,7 @@ function VATReturnsPageContent() {
   const netPosition = totalOutputVat - totalInputVat;
 
   const canCreate = hasPermission('tax.create');
-  const canEdit = hasPermission('tax.edit');
+  const canSubmit = hasPermission('tax.submit');
   const canDelete = hasPermission('tax.delete');
 
   // Bulk action state
@@ -140,7 +142,7 @@ function VATReturnsPageContent() {
   });
 
   const bulkActions = [
-    ...(canEdit
+    ...(canSubmit
       ? [
           {
             label: t('returns.fileReturns'),
@@ -317,7 +319,7 @@ function VATReturnsPageContent() {
                   {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
-              {canEdit && (isDraft || isCalculated) && (
+              {canSubmit && isCalculated && (
                 <DropdownMenuItem onClick={() => handleFile(vatReturn)}>
                   <FileCheck className="mr-2 h-4 w-4" />
                   {t('returns.submitReturn')}

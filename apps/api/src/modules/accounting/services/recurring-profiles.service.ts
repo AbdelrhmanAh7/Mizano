@@ -1,6 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { JournalSourceType, JournalsService } from './journals.service';
 import { CreateRecurringProfileDto } from '../dto/create-recurring-profile.dto';
 import { RecurringProfileQueryDto } from '../dto/recurring-profile-query.dto';
 import { UpdateRecurringProfileDto } from '../dto/update-recurring-profile.dto';
@@ -66,9 +73,52 @@ export interface ExecutionResult {
   error?: string;
 }
 
+/** Upper bound of missed scheduled runs one profile may catch up on in a single cron pass. */
+const MAX_CATCH_UP_RUNS = 12;
+
+/** UTC calendar day (YYYY-MM-DD) of a scheduled run: the idempotency key of that run. */
+/** First instant after the end date's whole (UTC) day. */
+function endOfEndDay(endDate: Date): Date {
+  return new Date(
+    Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate() + 1),
+  );
+}
+
+/** An occurrence is past the end when it falls after the end date's last day (inclusive). */
+function isPastEnd(occurrence: Date, endDate: Date | null): boolean {
+  return endDate !== null && occurrence >= endOfEndDay(endDate);
+}
+
+function runDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function toLedgerDecimal(value: unknown, field: string): Decimal {
+  if (value === undefined || value === null || value === '') return new Decimal(0);
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    throw new BadRequestException(`${field} must be a decimal amount`);
+  }
+  let amount: Decimal;
+  try {
+    // Numbers in stored templates are converted through their decimal text, never arithmetic.
+    amount = new Decimal(typeof value === 'number' ? value.toString() : value);
+  } catch {
+    throw new BadRequestException(`${field} must be a valid decimal amount`);
+  }
+  if (!amount.isFinite() || amount.isNegative()) {
+    throw new BadRequestException(`${field} must be a non-negative decimal amount`);
+  }
+  return amount;
+}
+
 @Injectable()
 export class RecurringProfilesService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(RecurringProfilesService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private journalsService: JournalsService,
+  ) {}
 
   async create(organizationId: string, createRecurringProfileDto: CreateRecurringProfileDto) {
     const {
@@ -89,6 +139,11 @@ export class RecurringProfilesService {
     const mappedType = type
       ? this.mapEntityTypeToRecurringType(type)
       : this.mapEntityTypeToRecurringType(entityType);
+
+    // A journal template that can never post must fail now, not every night.
+    if (mappedType === RecurringType.JOURNAL) {
+      await this.assertValidJournalTemplate(organizationId, templateData);
+    }
 
     const profile = await this.prisma.recurringProfile.create({
       data: {
@@ -245,6 +300,17 @@ export class RecurringProfilesService {
         ? this.mapEntityTypeToRecurringType(entityType)
         : undefined;
 
+    // Whenever the resulting profile is a journal profile (changed or unchanged type), the
+    // effective template (new or retained) must be a valid journal template.
+    const effectiveType =
+      mappedType ?? profile.type ?? this.mapEntityTypeToRecurringType(profile.entityType ?? '');
+    if (effectiveType === RecurringType.JOURNAL) {
+      await this.assertValidJournalTemplate(
+        organizationId,
+        restDto.templateData ?? (profile.templateData as Record<string, unknown>),
+      );
+    }
+
     // Build update payload, converting templateData to Prisma-compatible type
     const updateData: Prisma.RecurringProfileUpdateInput = {
       ...(restDto.name !== undefined && { name: restDto.name }),
@@ -306,23 +372,34 @@ export class RecurringProfilesService {
     return { message: 'Recurring profile deleted successfully' };
   }
 
-  // Run daily at midnight to process recurring profiles
+  /**
+   * Runs every due profile. Journal profiles are idempotent per scheduled run (see
+   * executeJournalProfile) and catch up on missed runs oldest-first, stopping at the first
+   * failure. The other types keep their original one-run-per-night behavior.
+   */
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
-  async processRecurringProfiles() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  async processRecurringProfiles(): Promise<void> {
+    const now = new Date();
 
-    const profiles = await this.prisma.recurringProfile.findMany({
+    // Due means nextRunDate <= now. The end date is inclusive of its whole day and only limits
+    // which occurrences may run (nextRunDate before the end of the end date), so missed runs are
+    // still caught up after the end date has passed.
+    const due = await this.prisma.recurringProfile.findMany({
       where: {
         isActive: true,
         deletedAt: null,
-        nextRunDate: { lte: today },
-        OR: [{ endDate: null }, { endDate: { gte: today } }],
+        nextRunDate: { lte: now },
       },
     });
+    const profiles = due.filter((p) => !isPastEnd(p.nextRunDate, p.endDate));
 
     for (const profile of profiles) {
       try {
+        if (this.isJournalProfile(profile)) {
+          await this.catchUpJournalProfile(profile, now);
+          continue;
+        }
+
         await this.executeRecurringProfile(profile);
 
         // Update next run date
@@ -333,17 +410,50 @@ export class RecurringProfilesService {
           data: { nextRunDate },
         });
       } catch (error) {
-        console.error(`Failed to process recurring profile ${profile.id}:`, error);
+        this.logger.error(
+          `Failed to process recurring profile ${profile.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
       }
     }
   }
 
-  async executeProfile(organizationId: string, profileId: string): Promise<ExecutionResult> {
+  private isJournalProfile(profile: RecurringProfile): boolean {
+    return (profile.type ?? profile.entityType ?? '').toLowerCase() === 'journal';
+  }
+
+  /** Executes each due occurrence of a journal profile, oldest first, until one fails. */
+  private async catchUpJournalProfile(profile: RecurringProfile, asOf: Date): Promise<void> {
+    let current: RecurringProfile = profile;
+    for (let run = 0; run < MAX_CATCH_UP_RUNS; run++) {
+      if (current.nextRunDate > asOf) return;
+      if (isPastEnd(current.nextRunDate, current.endDate)) return;
+      const result = await this.executeJournalProfile(current);
+      if (!result.success) return;
+      const refreshed = await this.prisma.recurringProfile.findFirst({
+        where: { id: profile.id, organizationId: profile.organizationId, deletedAt: null },
+      });
+      if (!refreshed || !refreshed.isActive) return;
+      current = refreshed;
+    }
+  }
+
+  async executeProfile(
+    organizationId: string,
+    profileId: string,
+    idempotencyKey: string,
+  ): Promise<ExecutionResult> {
     const profile = await this.findOne(organizationId, profileId);
+    // A manual run of a journal profile is its own explicit event, identified by the caller's
+    // idempotency key (see executeJournalProfile).
+    if (this.isJournalProfile(profile)) return this.executeJournalProfile(profile, idempotencyKey);
     return this.executeRecurringProfile(profile);
   }
 
   private async executeRecurringProfile(profile: RecurringProfile): Promise<ExecutionResult> {
+    if (this.isJournalProfile(profile)) return this.executeJournalProfile(profile);
+
     const templateData = profile.templateData as Record<string, unknown>;
     const entityType: string = profile.type || profile.entityType || '';
     let createdEntityId: string = '';
@@ -351,13 +461,6 @@ export class RecurringProfilesService {
 
     try {
       switch (entityType?.toLowerCase()) {
-        case 'journal':
-          createdEntityId = await this.createJournalFromTemplate(
-            profile,
-            templateData as unknown as JournalTemplateData,
-          );
-          break;
-
         case 'invoice':
           createdEntityId = await this.createInvoiceFromTemplate(
             profile,
@@ -422,29 +525,179 @@ export class RecurringProfilesService {
     }
   }
 
-  private async createJournalFromTemplate(
+  /**
+   * Executes the profile's next scheduled run (nextRunDate) as one transaction:
+   *
+   *  1. guarded advance of nextRunDate (updateMany where nextRunDate is still this occurrence),
+   *  2. the journal through JournalsService.create, source (RECURRING_JOURNAL, `${profileId}:${YYYY-MM-DD}`),
+   *  3. the execution record.
+   *
+   * The journal is dated on the scheduled run date. A duplicate or concurrent run loses the
+   * guard (or the source uniqueness) and posts nothing. autoPost=false keeps the entry as an
+   * unposted draft for review (it never reaches the ledger until posted).
+   */
+  private async executeJournalProfile(
     profile: RecurringProfile,
-    templateData: JournalTemplateData,
-  ): Promise<string> {
-    const journal = await this.prisma.journal.create({
-      data: {
-        journalNumber: await this.generateJournalNumber(profile.organizationId),
-        date: new Date(),
-        reference: `Recurring: ${profile.name}`,
-        notes: templateData.notes,
-        isPosted: profile.autoPost,
-        organizationId: profile.organizationId,
-        lines: {
-          create: templateData.lines.map((line: JournalTemplateLine) => ({
-            accountId: line.accountId,
-            debit: new Decimal(line.debit || 0),
-            credit: new Decimal(line.credit || 0),
-            description: line.description,
-          })),
+    manualKey?: string,
+  ): Promise<ExecutionResult> {
+    const manual = manualKey !== undefined;
+    // A manual run is dated at execution time, never advances nextRunDate and never consumes a
+    // scheduled run; each one is a separate event with its own source id.
+    const occurrence = manual ? new Date() : profile.nextRunDate;
+    const createdEntityType: string = profile.type || profile.entityType || '';
+    const sourceId = manual
+      ? `${profile.id}:manual:${manualKey}`
+      : `${profile.id}:${runDay(occurrence)}`;
+    const next = this.calculateNextRunDate(
+      profile.nextRunDate,
+      profile.frequency,
+      profile.startDate,
+    );
+
+    // A retried manual request (same key) returns the journal it already posted.
+    const replay = async (): Promise<ExecutionResult | null> => {
+      const existing = await this.prisma.journal.findFirst({
+        where: {
+          organizationId: profile.organizationId,
+          sourceType: JournalSourceType.RECURRING_JOURNAL,
+          sourceId,
         },
-      },
+        select: { id: true },
+      });
+      return existing ? { success: true, createdEntityType, createdEntityId: existing.id } : null;
+    };
+    if (manual) {
+      const already = await replay();
+      if (already) return already;
+    }
+
+    try {
+      if (!manual && isPastEnd(occurrence, profile.endDate)) {
+        throw new BadRequestException('This recurring profile has passed its end date');
+      }
+      const template = profile.templateData as unknown as JournalTemplateData;
+      const lines = this.journalLinesFromTemplate(template);
+
+      const journalId = await this.prisma.$transaction(async (tx) => {
+        if (!manual) {
+          const { count } = await tx.recurringProfile.updateMany({
+            where: {
+              id: profile.id,
+              organizationId: profile.organizationId,
+              deletedAt: null,
+              nextRunDate: occurrence,
+            },
+            data: {
+              nextRunDate: next,
+              executionCount: { increment: 1 },
+              lastExecutedAt: new Date(),
+            },
+          });
+          if (count === 0) throw new ConflictException('This scheduled run was already executed');
+        }
+
+        const journal = await this.journalsService.create(
+          profile.organizationId,
+          {
+            date: occurrence.toISOString(),
+            reference: `Recurring: ${profile.name}`,
+            notes: template.notes,
+            lines,
+          },
+          { tx, source: { type: JournalSourceType.RECURRING_JOURNAL, id: sourceId } },
+        );
+        if (!profile.autoPost) {
+          // Same transaction: the entry is never visible as posted to anyone else.
+          await tx.journal.update({ where: { id: journal.id }, data: { isPosted: false } });
+        }
+
+        await tx.recurringExecution.create({
+          data: {
+            profileId: profile.id,
+            createdEntityType,
+            createdEntityId: journal.id,
+            status: 'success',
+            organizationId: profile.organizationId,
+          },
+        });
+        return journal.id;
+      });
+
+      return { success: true, createdEntityType, createdEntityId: journalId };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (manual && error instanceof ConflictException) {
+        // A concurrent request with the same key won the race: return its journal.
+        const already = await replay();
+        if (already) return already;
+      }
+      // An already-executed run is not a failure of the schedule; everything else is recorded.
+      if (!(error instanceof ConflictException)) {
+        await this.prisma.recurringExecution.create({
+          data: {
+            profileId: profile.id,
+            createdEntityType,
+            createdEntityId: '',
+            status: 'failed',
+            error: errorMessage,
+            organizationId: profile.organizationId,
+          },
+        });
+      }
+      return { success: false, createdEntityType, createdEntityId: '', error: errorMessage };
+    }
+  }
+
+  /** Template lines as ledger lines: exact decimal strings, no float arithmetic. */
+  private journalLinesFromTemplate(
+    template: JournalTemplateData,
+  ): { accountId: string; debit: string; credit: string; description?: string }[] {
+    if (!template || !Array.isArray(template.lines)) {
+      throw new BadRequestException('Journal template has no lines');
+    }
+    return template.lines.map((line, i) => ({
+      accountId: line.accountId,
+      debit: toLedgerDecimal(line.debit, `lines[${i}].debit`).toFixed(4),
+      credit: toLedgerDecimal(line.credit, `lines[${i}].credit`).toFixed(4),
+      description: line.description,
+    }));
+  }
+
+  /** A journal template must be balanced, have valid amounts and reference tenant accounts. */
+  private async assertValidJournalTemplate(
+    organizationId: string,
+    templateData: Record<string, unknown>,
+  ): Promise<void> {
+    const template = templateData as unknown as JournalTemplateData;
+    const lines = this.journalLinesFromTemplate(template);
+    if (lines.length < 2) {
+      throw new BadRequestException('A journal template needs at least two lines');
+    }
+
+    let debit = new Decimal(0);
+    let credit = new Decimal(0);
+    lines.forEach((line, i) => {
+      const d = new Decimal(line.debit);
+      const c = new Decimal(line.credit);
+      if (d.isZero() === c.isZero()) {
+        throw new BadRequestException(
+          `lines[${i}] must have either a debit or a credit amount (not both)`,
+        );
+      }
+      debit = debit.add(d);
+      credit = credit.add(c);
     });
-    return journal.id;
+    if (!debit.equals(credit)) {
+      throw new BadRequestException('Journal template debits must equal credits');
+    }
+
+    const accountIds = [...new Set(lines.map((l) => l.accountId))];
+    const found = await this.prisma.account.count({
+      where: { id: { in: accountIds }, organizationId, deletedAt: null },
+    });
+    if (found !== accountIds.length) {
+      throw new BadRequestException('One or more accounts not found');
+    }
   }
 
   private async createInvoiceFromTemplate(
@@ -598,40 +851,46 @@ export class RecurringProfilesService {
     return expense.id;
   }
 
-  private calculateNextRunDate(fromDate: Date, frequency: RecurringFrequency): Date {
+  /**
+   * The occurrence after `fromDate`. Month-based frequencies keep the day of `anchor` (the
+   * profile start date) and clamp to the month's last day, so Jan 31 -> Feb 28 -> Mar 31.
+   */
+  private calculateNextRunDate(
+    fromDate: Date,
+    frequency: RecurringFrequency,
+    anchor: Date = fromDate,
+  ): Date {
     const nextDate = new Date(fromDate);
 
     switch (frequency) {
       case RecurringFrequency.DAILY:
-        nextDate.setDate(nextDate.getDate() + 1);
+        nextDate.setUTCDate(nextDate.getUTCDate() + 1);
         break;
       case RecurringFrequency.WEEKLY:
-        nextDate.setDate(nextDate.getDate() + 7);
+        nextDate.setUTCDate(nextDate.getUTCDate() + 7);
         break;
       case RecurringFrequency.MONTHLY:
-        nextDate.setMonth(nextDate.getMonth() + 1);
-        break;
+        return this.addMonths(fromDate, 1, anchor.getUTCDate());
+      case RecurringFrequency.QUARTERLY:
+        return this.addMonths(fromDate, 3, anchor.getUTCDate());
       case RecurringFrequency.YEARLY:
-        nextDate.setFullYear(nextDate.getFullYear() + 1);
-        break;
+        return this.addMonths(fromDate, 12, anchor.getUTCDate());
     }
 
     return nextDate;
   }
 
-  private async generateJournalNumber(organizationId: string): Promise<string> {
-    const lastJournal = await this.prisma.journal.findFirst({
-      where: { organizationId },
-      orderBy: { createdAt: 'desc' },
-      select: { journalNumber: true },
-    });
-
-    if (!lastJournal) {
-      return 'JRN-001';
-    }
-
-    const lastNumber = parseInt(lastJournal.journalNumber.split('-')[1], 10);
-    return `JRN-${String(lastNumber + 1).padStart(3, '0')}`;
+  private addMonths(date: Date, months: number, anchorDay: number): Date {
+    const target = new Date(date);
+    const lastDay = new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months + 1, 0),
+    ).getUTCDate();
+    target.setUTCFullYear(
+      date.getUTCFullYear(),
+      date.getUTCMonth() + months,
+      Math.min(anchorDay, lastDay),
+    );
+    return target;
   }
 
   private async generateInvoiceNumber(organizationId: string): Promise<string> {

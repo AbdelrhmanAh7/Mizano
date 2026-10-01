@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import { AccountType, BankAccountType, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { DocumentTotals } from '../../../common/utils/document-totals';
 
@@ -47,50 +47,6 @@ export function assertTotalsFit(totals: DocumentTotals): void {
   assertMoneyFits(totals.taxAmount, 'tax amount');
   assertMoneyFits(totals.shipping, 'shipping');
   assertMoneyFits(totals.grandTotal, 'grand total');
-}
-
-/**
- * Authoritative rule for "bank or cash account" in sales: an active, non-deleted ASSET account
- * of the organization that is either the organization's default bank/cash account, or the
- * linked ledger account of an active bank-register account (BANK or PETTY_CASH; credit cards
- * are liabilities and excluded). Account (and bank-register) currency must equal the
- * organization's base currency. Used both to list refund accounts and to validate a REFUND.
- */
-export async function bankCashAccountWhere(
-  db: Prisma.TransactionClient,
-  organizationId: string,
-): Promise<Prisma.AccountWhereInput> {
-  const org = await db.organization.findUnique({
-    where: { id: organizationId },
-    select: { defaultBankAccountId: true, defaultCashAccountId: true, baseCurrency: true },
-  });
-  const baseCurrency = org?.baseCurrency;
-  const defaultIds = [org?.defaultBankAccountId, org?.defaultCashAccountId].filter(
-    (id): id is string => !!id,
-  );
-  return {
-    organizationId,
-    deletedAt: null,
-    isActive: true,
-    type: AccountType.ASSET,
-    // The ledger is single-currency: a refund account in another currency would post foreign
-    // amounts as base currency.
-    ...(baseCurrency ? { currency: { equals: baseCurrency, mode: 'insensitive' } } : {}),
-    OR: [
-      { id: { in: defaultIds } },
-      {
-        bankAccounts: {
-          some: {
-            organizationId,
-            deletedAt: null,
-            isActive: true,
-            ...(baseCurrency ? { currency: { equals: baseCurrency, mode: 'insensitive' } } : {}),
-            type: { in: [BankAccountType.BANK, BankAccountType.PETTY_CASH] },
-          },
-        },
-      },
-    ],
-  };
 }
 
 /** Parses a document date (ISO date or timestamp); throws a 400 for anything unparseable. */

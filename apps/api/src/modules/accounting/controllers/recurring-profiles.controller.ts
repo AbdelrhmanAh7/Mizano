@@ -13,6 +13,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { RecurringProfilesService } from '../services/recurring-profiles.service';
 import { CreateRecurringProfileDto } from '../dto/create-recurring-profile.dto';
 import { RecurringProfileQueryDto } from '../dto/recurring-profile-query.dto';
+import { ExecuteRecurringProfileDto } from '../dto/execute-recurring-profile.dto';
 import { UpdateRecurringProfileDto } from '../dto/update-recurring-profile.dto';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -74,8 +75,12 @@ export class RecurringProfilesController {
   @Post(':id/execute')
   @Permissions('accounting.edit')
   @ApiOperation({ summary: 'Manually execute a recurring profile' })
-  executeProfile(@CurrentOrg() orgId: string, @Param('id') id: string) {
-    return this.recurringProfilesService.executeProfile(orgId, id);
+  executeProfile(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Body() dto: ExecuteRecurringProfileDto,
+  ) {
+    return this.recurringProfilesService.executeProfile(orgId, id, dto.idempotencyKey);
   }
 
   @Get(':id')

@@ -110,7 +110,16 @@
     "empty": {
       "title": "No adjustments yet",
       "description": "Inventory adjustments will appear here"
-    }
+    },
+    "loadError": "Could not load adjustments",
+    "value": "Value",
+    "journal": "Journal",
+    "void": {
+      "action": "Void adjustment",
+      "title": "Void this adjustment?",
+      "description": "This reverses the journal entry and restores the stock. It cannot be undone."
+    },
+    "accountsLoadError": "Could not load the adjustment accounts"
   },
   "priceLists": {
     "title": "Price Lists",

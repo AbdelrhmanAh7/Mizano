@@ -11,7 +11,7 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { PaymentMode } from '@prisma/client';
-import { IsDecimalString } from './decimal-string';
+import { IsDecimalString } from '../../../common/dto/decimal-string';
 
 export class PaymentAllocationDto {
   @IsString() invoiceId: string;

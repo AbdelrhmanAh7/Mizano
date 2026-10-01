@@ -142,7 +142,10 @@
       "netPayable": "Net Payable",
       "status": "Status",
       "dueDate": "Due Date"
-    }
+    },
+    "markFiled": "Mark as filed",
+    "markFiledSuccess": "VAT return marked as filed",
+    "markFiledFail": "Failed to mark the VAT return as filed"
   },
   "generate": {
     "title": "Generate VAT Return",
@@ -187,6 +190,11 @@
       "amount": "Amount",
       "date": "Date",
       "reference": "Reference"
-    }
+    },
+    "exactAmountHint": "The payment must equal the VAT payable exactly; partial payments are not supported.",
+    "paidFrom": "Paid from account",
+    "paidFromPlaceholder": "Select bank or cash account",
+    "noPaidFromAccounts": "No bank or cash accounts available",
+    "paidFromLoadError": "Could not load the bank and cash accounts"
   }
 }

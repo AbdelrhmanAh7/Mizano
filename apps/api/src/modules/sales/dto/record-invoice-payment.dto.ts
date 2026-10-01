@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaymentMode } from '@prisma/client';
 import { IsDateString, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
-import { IsDecimalString } from './decimal-string';
+import { IsDecimalString } from '../../../common/dto/decimal-string';
 
 /** Body of POST /invoices/:id/record-payment: one payment allocated to that single invoice. */
 export class RecordInvoicePaymentDto {
