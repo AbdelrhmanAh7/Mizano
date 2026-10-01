@@ -81,7 +81,7 @@ describe('PaymentsReceivedService', () => {
       await service.create(ORG_ID, validDto);
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-      expect(invoicesService.lockInvoices).toHaveBeenCalledWith(prisma, ['inv-1']);
+      expect(invoicesService.lockInvoices).toHaveBeenCalledWith(prisma, ORG_ID, ['inv-1']);
       expect(invoicesService.recalculateBalance).toHaveBeenCalledWith(prisma, 'inv-1');
       const createData = prisma.paymentReceived.create.mock.calls[0][0].data as any;
       expect(createData.paymentNumber).toBe('PMT-005');
@@ -453,7 +453,7 @@ describe('PaymentsReceivedService', () => {
       const result = await service.void(ORG_ID, 'pmt-1');
 
       expect(result.message).toBe('Payment voided successfully');
-      expect(invoicesService.lockInvoices).toHaveBeenCalledWith(prisma, ['inv-1', 'inv-2']);
+      expect(invoicesService.lockInvoices).toHaveBeenCalledWith(prisma, ORG_ID, ['inv-1', 'inv-2']);
       expect(invoicesService.recalculateBalance).toHaveBeenCalledWith(prisma, 'inv-1');
       expect(invoicesService.recalculateBalance).toHaveBeenCalledWith(prisma, 'inv-2');
       expect(prisma.paymentReceived.updateMany.mock.calls[0][0]).toMatchObject({

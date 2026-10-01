@@ -45,6 +45,7 @@ export interface MoneyLineInput {
   quantity?: string | number | null;
   rate?: string | number | null;
   taxRate?: string | number | null; // percent
+  discountPercent?: string | number | null; // percent, applied to the line before tax
 }
 
 export interface MoneyTotals {
@@ -60,7 +61,13 @@ export function computeTotals(lines: MoneyLineInput[]): MoneyTotals {
   let subtotal = ZERO;
   let tax = ZERO;
   const out = lines.map((line) => {
-    const netCents = divRound(toScaled(line.quantity) * toScaled(line.rate), toCentsFromScale8);
+    // net = qty x rate x (100 - discount) / 100, rounded once to cents (as the API does).
+    const rawFactor = HUNDRED * pow10(SCALE) - toScaled(line.discountPercent);
+    const factor = rawFactor < ZERO ? ZERO : rawFactor;
+    const netCents = divRound(
+      toScaled(line.quantity) * toScaled(line.rate) * factor,
+      toCentsFromScale8 * HUNDRED * pow10(SCALE),
+    );
     // percent is scale 4; net × pct / 100 -> divide by 100 × 10^4
     const taxCents = divRound(netCents * toScaled(line.taxRate), HUNDRED * pow10(SCALE));
     subtotal += netCents;

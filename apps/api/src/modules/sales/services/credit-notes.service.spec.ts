@@ -158,6 +158,8 @@ describe('CreditNotesService (posting)', () => {
         })) as any);
       prisma.paymentAllocation.findMany.mockResolvedValue([{ amount: dec('1140') }] as any);
       prisma.account.findFirst.mockResolvedValue({ id: 'bank-1' } as any);
+      prisma.creditNote.findMany.mockResolvedValue([]);
+      prisma.journalLine.aggregate.mockResolvedValue({ _sum: { debit: null } } as any);
       prisma.organization.findUnique.mockResolvedValue(orgAccounts as any);
       prisma.$queryRaw.mockResolvedValue([{ max: 2 }] as any);
       prisma.creditNote.create.mockImplementation((async (args: any) => ({
@@ -197,6 +199,58 @@ describe('CreditNotesService (posting)', () => {
       expect(journalsService.create).toHaveBeenCalledTimes(1);
     });
 
+    it('splits VAT cumulatively: three 38s on a 114 invoice with 14 VAT sum to exactly 14', async () => {
+      const vat: string[] = [];
+      let credited = new Decimal(0);
+      let postedVat = new Decimal(0);
+      for (let i = 0; i < 3; i++) {
+        existingCredits = credited.isZero() ? null : credited;
+        prisma.invoice.findFirst.mockResolvedValue(
+          invoiceRow({
+            subtotal: dec('100'),
+            taxAmount: dec('14'),
+            grandTotal: dec('114'),
+            balanceDue: dec('114').sub(credited),
+          }) as any,
+        );
+        prisma.creditNote.findMany.mockResolvedValue(
+          Array.from({ length: i }, (_, n) => ({ id: `cn-${n}` })) as any,
+        );
+        prisma.journalLine.aggregate.mockResolvedValue({
+          _sum: { debit: postedVat.isZero() ? null : postedVat },
+        } as any);
+        journalsService.create.mockClear();
+
+        await service.create(ORG_ID, { ...dto, amount: '38' });
+
+        const line = journalCall()[1].lines.find((l) => l.accountId === 'vat');
+        vat.push(line?.debit ?? '0');
+        postedVat = postedVat.add(line?.debit ?? 0);
+        credited = credited.add(38);
+      }
+      expect(vat).toEqual(['4.6667', '4.6666', '4.6667']);
+      expect(postedVat.toFixed(4)).toBe('14.0000');
+      // Previous VAT is read from this invoice's live credit-note journals on the VAT account.
+      expect(prisma.journalLine.aggregate.mock.calls[1][0]!.where).toMatchObject({
+        accountId: 'vat',
+        journal: { organizationId: ORG_ID, sourceType: 'CREDIT_NOTE', deletedAt: null },
+      });
+    });
+
+    it('lets the note that exhausts the invoice take exactly the remaining VAT', async () => {
+      existingCredits = dec('76');
+      prisma.invoice.findFirst.mockResolvedValue(
+        invoiceRow({ taxAmount: dec('14'), grandTotal: dec('114'), balanceDue: dec('38') }) as any,
+      );
+      prisma.creditNote.findMany.mockResolvedValue([{ id: 'a' }, { id: 'b' }] as any);
+      prisma.journalLine.aggregate.mockResolvedValue({ _sum: { debit: dec('9.3333') } } as any);
+
+      await service.create(ORG_ID, { ...dto, amount: '38' });
+
+      const line = journalCall()[1].lines.find((l) => l.accountId === 'vat');
+      expect(line?.debit).toBe('4.6667');
+    });
+
     it('numbers the note CN-nnn from the per-organization maximum and stores Decimal', async () => {
       await service.create(ORG_ID, dto);
 
@@ -210,7 +264,7 @@ describe('CreditNotesService (posting)', () => {
     it('applies to the invoice: locks it, then recalculates the balance', async () => {
       await service.create(ORG_ID, dto);
 
-      expect(invoicesService.lockInvoices).toHaveBeenCalledWith(prisma, ['inv-1']);
+      expect(invoicesService.lockInvoices).toHaveBeenCalledWith(prisma, ORG_ID, ['inv-1']);
       expect(invoicesService.recalculateBalance).toHaveBeenCalledWith(prisma, 'inv-1');
     });
 
@@ -331,7 +385,10 @@ describe('CreditNotesService (posting)', () => {
 
         await service.create(ORG_ID, { ...dto, appliedToInvoiceId: 'inv-2' });
 
-        expect(invoicesService.lockInvoices).toHaveBeenCalledWith(prisma, ['inv-1', 'inv-2']);
+        expect(invoicesService.lockInvoices).toHaveBeenCalledWith(prisma, ORG_ID, [
+          'inv-1',
+          'inv-2',
+        ]);
         expect(prisma.creditNote.create.mock.calls[0][0].data).toMatchObject({
           invoiceId: 'inv-1',
           appliedToInvoiceId: 'inv-2',
@@ -522,7 +579,7 @@ describe('CreditNotesService (posting)', () => {
       const result = await service.remove(ORG_ID, 'cn-1');
 
       expect(result.message).toBe('Credit note voided successfully');
-      expect(invoicesService.lockInvoices).toHaveBeenCalledWith(prisma, ['inv-1']);
+      expect(invoicesService.lockInvoices).toHaveBeenCalledWith(prisma, ORG_ID, ['inv-1']);
       expect(prisma.creditNote.updateMany).toHaveBeenCalledWith({
         where: { id: 'cn-1', organizationId: ORG_ID, deletedAt: null },
         data: { deletedAt: expect.any(Date) },
@@ -537,6 +594,19 @@ describe('CreditNotesService (posting)', () => {
         tx: prisma,
         source: { type: 'CREDIT_NOTE_VOID', id: 'cn-1' },
       });
+    });
+
+    it('locks the credit note (org-scoped) before reading it, then the invoice', async () => {
+      await service.void(ORG_ID, 'cn-1');
+
+      const raw = prisma.$queryRaw as jest.Mock;
+      expect(raw.mock.calls[0][0].join('?')).toMatch(
+        /FROM "credit_notes" WHERE id = \? AND "organizationId" = \? FOR UPDATE/,
+      );
+      expect(raw.mock.calls[0].slice(1)).toEqual(['cn-1', ORG_ID]);
+      const noteLock = raw.mock.invocationCallOrder[0];
+      expect(noteLock).toBeLessThan(prisma.creditNote.findFirst.mock.invocationCallOrder[0]);
+      expect(noteLock).toBeLessThan(invoicesService.lockInvoices.mock.invocationCallOrder[0]);
     });
 
     it('does not lock or recalculate for a refund note that was never applied', async () => {
@@ -602,10 +672,21 @@ describe('CreditNotesService (posting)', () => {
       prisma.creditNote.findUniqueOrThrow.mockResolvedValue({ id: 'cn-1' } as any);
     });
 
+    it('takes the credit-note row lock first, then the invoice lock', async () => {
+      await service.apply(ORG_ID, 'cn-1', 'inv-1');
+
+      const raw = prisma.$queryRaw as jest.Mock;
+      expect(raw.mock.calls[0][0].join('?')).toContain('"credit_notes"');
+      expect(raw.mock.calls[0].slice(1)).toEqual(['cn-1', ORG_ID]);
+      expect(raw.mock.invocationCallOrder[0]).toBeLessThan(
+        invoicesService.lockInvoices.mock.invocationCallOrder[0],
+      );
+    });
+
     it('attaches the note to the invoice and recalculates without posting a journal', async () => {
       await service.apply(ORG_ID, 'cn-1', 'inv-1');
 
-      expect(invoicesService.lockInvoices).toHaveBeenCalledWith(prisma, ['inv-1']);
+      expect(invoicesService.lockInvoices).toHaveBeenCalledWith(prisma, ORG_ID, ['inv-1']);
       expect(prisma.creditNote.updateMany).toHaveBeenCalledWith({
         where: {
           id: 'cn-1',
@@ -676,6 +757,7 @@ describe('CreditNotesService (posting)', () => {
       prisma.organization.findUnique.mockResolvedValue({
         defaultBankAccountId: 'bank-1',
         defaultCashAccountId: 'cash-1',
+        baseCurrency: 'EGP',
       } as any);
       prisma.account.findMany.mockResolvedValue([
         { id: 'bank-1', code: '1010', name: 'Bank', currency: 'EGP' },
@@ -690,6 +772,12 @@ describe('CreditNotesService (posting)', () => {
         isActive: true,
         deletedAt: null,
         type: 'ASSET',
+      });
+      // Only base-currency accounts (the ledger is single-currency).
+      expect(where.currency).toEqual({ equals: 'EGP', mode: 'insensitive' });
+      expect(where.OR[1].bankAccounts.some.currency).toEqual({
+        equals: 'EGP',
+        mode: 'insensitive',
       });
       expect(where.OR[0]).toEqual({ id: { in: ['bank-1', 'cash-1'] } });
       expect(where.OR[1].bankAccounts.some).toMatchObject({

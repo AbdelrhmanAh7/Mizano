@@ -19,7 +19,7 @@ export default function EditInvoicePage() {
 
   const { data: invoice, isLoading } = useInvoice(invoiceId);
   const updateInvoice = useUpdateInvoice();
-  const taxRates = useTaxRateOptions();
+  const taxRateLookup = useTaxRateOptions();
 
   const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
@@ -129,7 +129,8 @@ export default function EditInvoicePage() {
 
       {/* Form */}
       <InvoiceForm
-        taxRates={taxRates}
+        taxRates={taxRateLookup.options}
+        taxRatesStatus={{ isLoading: taxRateLookup.isLoading, isError: taxRateLookup.isError }}
         invoice={formInvoice as Invoice}
         onSubmit={handleSubmit}
         onCancel={handleCancel}

@@ -16,7 +16,7 @@ export default function NewInvoicePage() {
   const customerId = searchParams.get('customerId') || undefined;
 
   const createInvoice = useCreateInvoice();
-  const taxRates = useTaxRateOptions();
+  const taxRateLookup = useTaxRateOptions();
 
   const handleSubmit = async (formData: Record<string, unknown>) => {
     try {
@@ -50,7 +50,8 @@ export default function NewInvoicePage() {
 
       {/* Form */}
       <InvoiceForm
-        taxRates={taxRates}
+        taxRates={taxRateLookup.options}
+        taxRatesStatus={{ isLoading: taxRateLookup.isLoading, isError: taxRateLookup.isError }}
         customerId={customerId}
         onSubmit={handleSubmit}
         onCancel={handleCancel}

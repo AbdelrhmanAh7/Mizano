@@ -253,7 +253,7 @@ export function CreditNoteForm({
               <RadioGroupItem value="REFUND" id="refund" />
               <div>
                 <Label htmlFor="refund" className="font-medium cursor-pointer">
-                  Refund
+                  {t('creditNotes.form.refundLabel')}
                 </Label>
                 <p className="text-sm text-muted-foreground">
                   Issue a refund to the customer. The credit will reduce their account balance.
@@ -288,8 +288,8 @@ export function CreditNoteForm({
                   <SelectValue
                     placeholder={
                       refundAccounts.length === 0
-                        ? 'No bank or cash accounts available'
-                        : 'Select bank or cash account'
+                        ? t('creditNotes.form.noRefundAccountOption')
+                        : t('creditNotes.form.selectRefundAccount')
                     }
                   />
                 </SelectTrigger>
@@ -326,8 +326,8 @@ export function CreditNoteForm({
                   <SelectValue
                     placeholder={
                       openInvoices.length === 0
-                        ? 'No open invoices available'
-                        : 'Select an invoice to apply credit'
+                        ? t('creditNotes.form.noOpenInvoices')
+                        : t('creditNotes.form.selectInvoiceToApply')
                     }
                   />
                 </SelectTrigger>

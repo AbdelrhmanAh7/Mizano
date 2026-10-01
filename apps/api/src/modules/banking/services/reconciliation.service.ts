@@ -130,7 +130,7 @@ export class ReconciliationService {
       if (count === 0) throw new BadRequestException('Already reconciled');
 
       if (entityType === 'invoice') {
-        await this.invoicesService.lockInvoices(tx, [entityId]);
+        await this.invoicesService.lockInvoices(tx, organizationId, [entityId]);
         await this.createPaymentForInvoice(tx, organizationId, entityId, amount, transaction);
         await this.invoicesService.recalculateBalance(tx, entityId);
       } else {

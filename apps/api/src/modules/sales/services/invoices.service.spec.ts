@@ -767,11 +767,21 @@ describe('InvoicesService', () => {
 
   describe('lockInvoices / updateBalanceDue', () => {
     it('locks distinct ids in sorted order to avoid deadlocks', async () => {
-      await service.lockInvoices(prisma, ['b', 'a', 'b']);
+      await service.lockInvoices(prisma, ORG_ID, ['b', 'a', 'b']);
 
       const calls = (prisma.$queryRaw as jest.Mock).mock.calls;
       expect(calls.map((c) => c[1])).toEqual(['a', 'b']);
-      expect(calls[0][0].join('?')).toMatch(/FROM "invoices" WHERE id = \? FOR UPDATE/);
+      expect(calls[0][0].join('?')).toMatch(
+        /FROM "invoices" WHERE id = \? AND "organizationId" = \? FOR UPDATE/,
+      );
+    });
+
+    it('scopes every lock to the organization so a foreign invoice id locks nothing', async () => {
+      await service.lockInvoices(prisma, ORG_ID, ['foreign-inv']);
+
+      const [, id, org] = (prisma.$queryRaw as jest.Mock).mock.calls[0];
+      expect(id).toBe('foreign-inv');
+      expect(org).toBe(ORG_ID);
     });
 
     it('updateBalanceDue locks and recalculates inside one transaction (legacy callers)', async () => {
@@ -781,7 +791,7 @@ describe('InvoicesService', () => {
       prisma.paymentAllocation.findMany.mockResolvedValue([{ amount: dec('100') }] as any);
       prisma.creditNote.findMany.mockResolvedValue([] as any);
 
-      await service.updateBalanceDue('inv-1');
+      await service.updateBalanceDue(ORG_ID, 'inv-1');
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(prisma.$queryRaw).toHaveBeenCalled();

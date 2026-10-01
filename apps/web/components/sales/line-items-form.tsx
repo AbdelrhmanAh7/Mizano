@@ -10,8 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { computeTotals } from '@/lib/money';
 import { Item, useActiveItems } from '@/lib/hooks/use-items';
 import { Plus, Trash2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import {
   Control,
   FieldValues,
@@ -101,6 +103,7 @@ interface LineItemsFormProps {
   setValue: UseFormSetValue<FieldValues>;
   name: string;
   taxRates?: TaxRate[];
+  taxRatesStatus?: { isLoading: boolean; isError: boolean };
   currency?: string;
   showTax?: boolean;
   showDiscount?: boolean;
@@ -135,35 +138,31 @@ export function calculateLineTotals(
   totalTax: number;
   grandTotal: number;
 } {
-  let subtotal = 0;
-  let totalDiscount = 0;
-  let totalTax = 0;
-
-  lines.forEach((line) => {
-    const qty = parseFloat(line.quantity) || 0;
-    const rate = parseFloat(line.rate) || 0;
-    const discount = parseFloat(line.discountPercent || '0') || 0;
-    const lineAmount = parseFloat(line.amount) || 0;
-
-    const grossAmount = qty * rate;
-    const discountAmount = grossAmount * (discount / 100);
-
-    subtotal += grossAmount;
-    totalDiscount += discountAmount;
-
-    // Calculate tax if applicable
-    const taxRate = line.taxRateId ? taxRates?.find((t) => t.id === line.taxRateId) : undefined;
-    const percent = taxRate ? Number(taxRate.rate) : Number(line.taxPercent) || 0;
-    totalTax += lineAmount * (percent / 100);
-  });
-
-  const grandTotal = subtotal - totalDiscount + totalTax;
-
+  // Per-line rounding to 2 dp (half up) exactly like the server's computeDocumentTotals, so the
+  // preview equals the stored totals. Exact integer arithmetic via lib/money (no float drift).
+  const percentFor = (line: LineItem): string => {
+    const option = line.taxRateId ? taxRates?.find((t) => t.id === line.taxRateId) : undefined;
+    return String(option ? option.rate : line.taxPercent || '0');
+  };
+  const gross = computeTotals(
+    lines.map((l) => ({ quantity: l.quantity, rate: l.rate, discountPercent: '0' })),
+  );
+  const net = computeTotals(
+    lines.map((l) => ({
+      quantity: l.quantity,
+      rate: l.rate,
+      discountPercent: l.discountPercent || '0',
+      taxRate: percentFor(l),
+    })),
+  );
+  const subtotal = Number(gross.subtotal);
+  const totalDiscount = Number(gross.subtotal) - Number(net.subtotal);
+  const totalTax = Number(net.taxAmount);
   return {
     subtotal,
-    totalDiscount,
+    totalDiscount: Math.round(totalDiscount * 100) / 100,
     totalTax,
-    grandTotal,
+    grandTotal: Number(net.grandTotal),
   };
 }
 
@@ -182,10 +181,12 @@ export function LineItemsForm({
   setValue,
   name,
   taxRates = [],
+  taxRatesStatus,
   currency = 'USD',
   showTax = true,
   showDiscount = true,
 }: LineItemsFormProps) {
+  const t = useTranslations('sales');
   const { data: items = [] } = useActiveItems();
 
   const { fields, append, remove } = useFieldArray({
@@ -278,6 +279,14 @@ export function LineItemsForm({
         </div>
       </CardHeader>
       <CardContent>
+        {taxRatesStatus?.isError && (
+          <p role="alert" className="mb-3 text-sm text-red-600">
+            {t('lineItems.taxLoadFailed')}
+          </p>
+        )}
+        {taxRatesStatus?.isLoading && (
+          <p className="mb-3 text-sm text-muted-foreground">{t('lineItems.taxLoading')}</p>
+        )}
         {/* Table Header */}
         <div
           className="grid gap-2 mb-2 text-sm font-medium text-muted-foreground"
@@ -369,6 +378,7 @@ export function LineItemsForm({
               {/* Tax */}
               {showTax && (
                 <Select
+                  disabled={taxRatesStatus?.isLoading || taxRatesStatus?.isError}
                   value={watch(`${name}.${index}.taxRateId`) || '__none__'}
                   onValueChange={(value) => {
                     setValue(`${name}.${index}.taxRateId`, value === '__none__' ? '' : value);

@@ -34,6 +34,7 @@ import {
 } from '@/lib/hooks/use-payments-received';
 import { PaymentModeBadge } from '@/components/sales/status-badge';
 import { format } from 'date-fns';
+import { usePermissions } from '@/lib/hooks/use-permissions';
 
 export default function PaymentReceivedDetailPage() {
   const params = useParams();
@@ -43,6 +44,8 @@ export default function PaymentReceivedDetailPage() {
 
   const { data: payment, isLoading } = usePaymentReceived(paymentId);
   const voidPayment = useVoidPaymentReceived();
+  const { hasPermission } = usePermissions();
+  const canVoid = hasPermission('sales.delete');
 
   const formatCurrency = (amount: string | number, currency: string = 'USD') => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -124,7 +127,7 @@ export default function PaymentReceivedDetailPage() {
           </div>
         </div>
 
-        {!payment.deletedAt && (
+        {!payment.deletedAt && canVoid && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button

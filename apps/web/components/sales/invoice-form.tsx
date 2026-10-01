@@ -56,6 +56,8 @@ interface InvoiceFormProps {
   invoice?: Invoice | null;
   customerId?: string;
   taxRates?: { id: string; name: string; rate: number }[];
+  /** State of the tax-rate lookup; a failed lookup blocks saving. */
+  taxRatesStatus?: { isLoading: boolean; isError: boolean };
   onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -73,6 +75,7 @@ export function InvoiceForm({
   invoice,
   customerId,
   taxRates = NO_TAX_RATES,
+  taxRatesStatus,
   onSubmit,
   onCancel,
   isSubmitting,
@@ -188,6 +191,8 @@ export function InvoiceForm({
   }, [selectedCustomer]);
 
   const handleSubmit = (data: InvoiceFormData) => {
+    // Never save lines against a tax lookup that failed or has not finished.
+    if (taxRatesStatus?.isError || taxRatesStatus?.isLoading) return;
     // Exactly the CreateInvoiceDto shape: totals are computed by the server from the lines.
     onSubmit({
       customerId: data.customerId,
@@ -293,6 +298,7 @@ export function InvoiceForm({
         setValue={form.setValue as unknown as UseFormSetValue<FieldValues>}
         name="lines"
         taxRates={taxRates}
+        taxRatesStatus={taxRatesStatus}
         currency={selectedCustomer?.currency || 'USD'}
         showTax={true}
         showDiscount={true}

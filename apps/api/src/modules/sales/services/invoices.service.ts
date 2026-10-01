@@ -411,7 +411,7 @@ export class InvoicesService {
       });
       if (!exists) throw new NotFoundException('Invoice not found');
 
-      await this.lockInvoices(tx, [id]);
+      await this.lockInvoices(tx, organizationId, [id]);
       const invoice = await tx.invoice.findFirst({
         where: { id, organizationId, deletedAt: null },
         select: { id: true, status: true },
@@ -536,7 +536,7 @@ export class InvoicesService {
       select: { id: true },
     });
     if (!owned) throw new NotFoundException('Invoice not found');
-    await this.lockInvoices(tx, [id]);
+    await this.lockInvoices(tx, organizationId, [id]);
   }
 
   /**
@@ -559,10 +559,17 @@ export class InvoicesService {
     return rates.map((r) => ({ id: r.id, name: r.name, rate: r.rate.toFixed(2) }));
   }
 
-  /** Row-locks invoices (sorted to avoid deadlocks) for the rest of the transaction. */
-  async lockInvoices(tx: Prisma.TransactionClient, invoiceIds: string[]): Promise<void> {
+  /**
+   * Row-locks invoices (sorted to avoid deadlocks) for the rest of the transaction. Scoped by
+   * organization: another tenant's invoice id matches nothing and is never locked.
+   */
+  async lockInvoices(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    invoiceIds: string[],
+  ): Promise<void> {
     for (const id of [...new Set(invoiceIds)].sort()) {
-      await tx.$queryRaw`SELECT id FROM "invoices" WHERE id = ${id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "invoices" WHERE id = ${id} AND "organizationId" = ${organizationId} FOR UPDATE`;
     }
   }
 
@@ -572,9 +579,9 @@ export class InvoicesService {
    * @deprecated Call lockInvoices + recalculateBalance inside the transaction that wrote the
    * payment so the allocation and the balance commit together.
    */
-  async updateBalanceDue(invoiceId: string): Promise<void> {
+  async updateBalanceDue(organizationId: string, invoiceId: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      await this.lockInvoices(tx, [invoiceId]);
+      await this.lockInvoices(tx, organizationId, [invoiceId]);
       await this.recalculateBalance(tx, invoiceId);
     });
   }

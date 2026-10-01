@@ -22,7 +22,7 @@ export default function EditQuotePage() {
   const { data: quote, isLoading } = useQuote(quoteId);
   const updateQuote = useUpdateQuote();
 
-  const taxRates = useTaxRateOptions();
+  const taxRateLookup = useTaxRateOptions();
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
@@ -124,7 +124,8 @@ export default function EditQuotePage() {
       {/* Form */}
       <QuoteForm
         quote={quote}
-        taxRates={taxRates}
+        taxRates={taxRateLookup.options}
+        taxRatesStatus={{ isLoading: taxRateLookup.isLoading, isError: taxRateLookup.isError }}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         isSubmitting={updateQuote.isPending}

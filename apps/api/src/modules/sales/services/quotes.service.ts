@@ -231,6 +231,9 @@ export class QuotesService {
             invoiceNumber,
             customerId: quote.customerId,
             quoteId: quote.id,
+            // The quote's currency travels with it so a foreign-currency quote is never
+            // silently invoiced as base currency (send() rejects foreign currencies).
+            currencyCode: quote.currencyCode,
             date,
             dueDate,
             subtotal: quote.subtotal,

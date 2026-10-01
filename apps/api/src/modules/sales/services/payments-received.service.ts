@@ -84,7 +84,7 @@ export class PaymentsReceivedService {
         );
       }
 
-      await this.invoicesService.lockInvoices(tx, invoiceIds);
+      await this.invoicesService.lockInvoices(tx, organizationId, invoiceIds);
       const invoices = await tx.invoice.findMany({
         where: { id: { in: invoiceIds }, organizationId, deletedAt: null },
       });
@@ -244,7 +244,7 @@ export class PaymentsReceivedService {
       if (!payment) throw new NotFoundException('Payment not found');
 
       const invoiceIds = payment.allocations.map((a) => a.invoiceId);
-      await this.invoicesService.lockInvoices(tx, invoiceIds);
+      await this.invoicesService.lockInvoices(tx, organizationId, invoiceIds);
 
       // Refund credit notes were capped by the money received: voiding this payment must not
       // leave an invoice with more live refunds than live receipts.

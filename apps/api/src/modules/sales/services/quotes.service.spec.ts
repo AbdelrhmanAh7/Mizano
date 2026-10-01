@@ -223,6 +223,14 @@ describe('QuotesService', () => {
       expectDecimalEqual(invoice.shippingAmount, '0');
     });
 
+    it('carries the quote currency onto the invoice', async () => {
+      prisma.quote.findFirst.mockResolvedValue(
+        quoteRow({ status: 'ACCEPTED', currencyCode: 'EUR' }) as any,
+      );
+      const invoice: any = await service.convertToInvoice(ORG_ID, 'q-1');
+      expect(invoice.currencyCode).toBe('EUR');
+    });
+
     it('rejects a quote whose stored totals disagree with its lines, writing nothing', async () => {
       prisma.quote.findFirst.mockResolvedValue(
         quoteRow({ status: 'ACCEPTED', subtotal: dec('90') }) as any,

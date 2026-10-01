@@ -19,7 +19,7 @@ export default function NewQuotePage() {
   const customerId = searchParams.get('customerId') || undefined;
   const createQuote = useCreateQuote();
 
-  const taxRates = useTaxRateOptions();
+  const taxRateLookup = useTaxRateOptions();
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
@@ -64,7 +64,8 @@ export default function NewQuotePage() {
       {/* Form */}
       <QuoteForm
         customerId={customerId}
-        taxRates={taxRates}
+        taxRates={taxRateLookup.options}
+        taxRatesStatus={{ isLoading: taxRateLookup.isLoading, isError: taxRateLookup.isError }}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         isSubmitting={createQuote.isPending}

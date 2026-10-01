@@ -75,7 +75,7 @@ export class CreditNotesService {
 
         // Serialize with payments, voids and other credit notes on the same invoice(s), then
         // read the rows fresh so balances and statuses cannot be stale.
-        await this.invoicesService.lockInvoices(tx, invoiceIds);
+        await this.invoicesService.lockInvoices(tx, organizationId, invoiceIds);
         const invoice = await tx.invoice.findFirst({
           where: { id: dto.invoiceId, organizationId, deletedAt: null },
         });
@@ -142,10 +142,14 @@ export class CreditNotesService {
           );
         }
 
-        const tax = amount
-          .mul(invoice.taxAmount)
-          .div(invoice.grandTotal)
-          .toDecimalPlaces(4, Decimal.ROUND_HALF_UP);
+        const tax = await this.cumulativeCreditTax(
+          tx,
+          organizationId,
+          invoice,
+          alreadyCredited,
+          amount,
+          org.defaultVatPayableAccountId,
+        );
         if (tax.greaterThan(0) && !org.defaultVatPayableAccountId) {
           throw new BadRequestException(
             'Please configure the default VAT Payable account in organization settings before crediting taxed invoices',
@@ -304,6 +308,9 @@ export class CreditNotesService {
    */
   async void(organizationId: string, id: string) {
     return this.prisma.$transaction(async (tx) => {
+      // Lock order everywhere: credit note -> invoice -> ledger. The note is locked before its
+      // appliedToInvoiceId is read, so a concurrent apply cannot change the invoice under us.
+      await this.lockCreditNote(tx, organizationId, id);
       const creditNote = await tx.creditNote.findFirst({
         where: { id, organizationId, deletedAt: null },
         select: { id: true, appliedToInvoiceId: true },
@@ -311,7 +318,7 @@ export class CreditNotesService {
       if (!creditNote) throw new NotFoundException('Credit note not found');
 
       const lockIds = creditNote.appliedToInvoiceId ? [creditNote.appliedToInvoiceId] : [];
-      await this.invoicesService.lockInvoices(tx, lockIds);
+      await this.invoicesService.lockInvoices(tx, organizationId, lockIds);
 
       const { count } = await tx.creditNote.updateMany({
         where: { id, organizationId, deletedAt: null },
@@ -359,6 +366,7 @@ export class CreditNotesService {
    */
   async apply(organizationId: string, id: string, invoiceId: string) {
     return this.prisma.$transaction(async (tx) => {
+      await this.lockCreditNote(tx, organizationId, id);
       const creditNote = await tx.creditNote.findFirst({
         where: { id, organizationId, deletedAt: null },
       });
@@ -374,7 +382,7 @@ export class CreditNotesService {
         where: { id: invoiceId, organizationId, deletedAt: null },
       });
       if (owned === 0) throw new BadRequestException('Invoice not found');
-      await this.invoicesService.lockInvoices(tx, [invoiceId]);
+      await this.invoicesService.lockInvoices(tx, organizationId, [invoiceId]);
       const invoice = await tx.invoice.findFirst({
         where: { id: invoiceId, organizationId, deletedAt: null },
       });
@@ -409,6 +417,61 @@ export class CreditNotesService {
   }
 
   // === Helpers ===
+
+  /** Row-locks one credit note (scoped by organization) until the transaction ends. */
+  private async lockCreditNote(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    id: string,
+  ): Promise<void> {
+    await tx.$queryRaw`SELECT id FROM "credit_notes" WHERE id = ${id} AND "organizationId" = ${organizationId} FOR UPDATE`;
+  }
+
+  /**
+   * VAT for this credit, computed cumulatively so the notes on one invoice always sum to the
+   * invoice VAT: round4(invoiceVat x credited-so-far-including-this / grandTotal) minus the VAT
+   * already posted by the invoice's live credit notes. A note that exhausts the invoice gross
+   * takes exactly what is left.
+   */
+  private async cumulativeCreditTax(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    invoice: { id: string; taxAmount: Decimal; grandTotal: Decimal },
+    creditedBefore: Decimal,
+    amount: Decimal,
+    vatAccountId: string | null | undefined,
+  ): Promise<Decimal> {
+    if (invoice.taxAmount.lessThanOrEqualTo(0)) return new Decimal(0);
+    const live = await tx.creditNote.findMany({
+      where: { organizationId, invoiceId: invoice.id, deletedAt: null },
+      select: { id: true },
+    });
+    let previous = new Decimal(0);
+    if (live.length > 0 && vatAccountId) {
+      const posted = await tx.journalLine.aggregate({
+        where: {
+          accountId: vatAccountId,
+          journal: {
+            organizationId,
+            sourceType: JournalSourceType.CREDIT_NOTE,
+            sourceId: { in: live.map((n) => n.id) },
+            deletedAt: null,
+          },
+        },
+        _sum: { debit: true },
+      });
+      previous = posted._sum.debit ?? new Decimal(0);
+    }
+    const creditedAfter = creditedBefore.add(amount);
+    const cumulative = creditedAfter.greaterThanOrEqualTo(invoice.grandTotal)
+      ? invoice.taxAmount
+      : invoice.taxAmount
+          .mul(creditedAfter)
+          .div(invoice.grandTotal)
+          .toDecimalPlaces(4, Decimal.ROUND_HALF_UP);
+    const tax = cumulative.sub(previous);
+    return tax.isNegative() ? new Decimal(0) : tax;
+  }
 
   /** The target must be the customer's open invoice with enough balance left for the credit. */
   private assertApplicable(
