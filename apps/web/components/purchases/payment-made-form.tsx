@@ -207,15 +207,28 @@ export function PaymentMadeForm({
   };
 
   const handleSubmit = (data: PaymentMadeFormData) => {
+    // Money crosses the API as 2-dp decimal strings; compare in integer cents (no float drift).
+    const toCents = (n: number): number => Math.round(n * 100);
+    const centsToString = (c: number): string => (c / 100).toFixed(2);
     const selectedAllocations = allocations
-      .filter((a) => a.allocated > 0)
-      .map((a) => ({
-        billId: a.billId,
-        amount: a.allocated,
-      }));
+      .filter((a) => toCents(a.allocated) > 0)
+      .map((a) => ({ billId: a.billId, amount: centsToString(toCents(a.allocated)) }));
+
+    const amountCents = toCents(data.amount);
+    const allocatedCents = selectedAllocations.reduce(
+      (sum, a) => sum + toCents(Number(a.amount)),
+      0,
+    );
+    if (selectedAllocations.length === 0 || allocatedCents !== amountCents) {
+      form.setError('amount', {
+        message: `Allocated ${centsToString(allocatedCents)} must equal the payment amount ${centsToString(amountCents)}`,
+      });
+      return;
+    }
 
     onSubmit({
       ...data,
+      amount: centsToString(amountCents),
       date: format(data.date, 'yyyy-MM-dd'),
       allocations: selectedAllocations,
     });

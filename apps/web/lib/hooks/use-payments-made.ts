@@ -30,7 +30,7 @@ export interface PaymentMade {
   vendorId: string;
   date: string;
   amount: string;
-  paymentMode: 'CASH' | 'CHECK' | 'BANK_TRANSFER' | 'CREDIT_CARD' | 'OTHER';
+  paymentMode: 'CASH' | 'CHEQUE' | 'BANK_TRANSFER' | 'CREDIT_CARD' | 'OTHER';
   paidFromAccountId: string;
   reference: string | null;
   notes: string | null;
@@ -206,7 +206,7 @@ export function useDeletePaymentMade() {
 export function formatPaymentMode(mode: string): string {
   const modes: Record<string, string> = {
     CASH: 'Cash',
-    CHECK: 'Check',
+    CHEQUE: 'Cheque',
     BANK_TRANSFER: 'Bank Transfer',
     CREDIT_CARD: 'Credit Card',
     OTHER: 'Other',
@@ -230,7 +230,7 @@ export function formatCurrency(amount: string | number, currency: string = 'USD'
  */
 export const paymentModeOptions = [
   { value: 'CASH', label: 'Cash' },
-  { value: 'CHECK', label: 'Check' },
+  { value: 'CHEQUE', label: 'Cheque' },
   { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
   { value: 'CREDIT_CARD', label: 'Credit Card' },
   { value: 'OTHER', label: 'Other' },
