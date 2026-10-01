@@ -85,7 +85,12 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
   });
 
   // Bank/cash accounts a refund can be received into (role-scoped lookup, purchases.edit)
-  const { data: refundAccounts = [] } = useQuery({
+  const {
+    data: refundAccounts = [],
+    isLoading: refundAccountsLoading,
+    isError: refundAccountsError,
+    refetch: refetchRefundAccounts,
+  } = useQuery({
     queryKey: ['vendor-credits', 'refund-accounts'],
     queryFn: async (): Promise<Array<{ id: string; code: string; name: string }>> =>
       (await vendorCreditsApi.refundAccounts()).data,
@@ -119,6 +124,8 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
     setRefundDialogOpen(false);
     setSelectedAccountId('');
   };
+
+  const isVoided = !!credit?.deletedAt;
 
   if (isLoading) {
     return (
@@ -158,9 +165,13 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight font-mono">{credit.creditNumber}</h1>
-              <Badge variant={credit.appliedToBillId ? 'secondary' : 'default'}>
-                {credit.appliedToBillId ? 'Applied' : credit.refundedAt ? 'Refunded' : 'Open'}
-              </Badge>
+              {isVoided ? (
+                <Badge variant="destructive">{t('credits.voided')}</Badge>
+              ) : (
+                <Badge variant={credit.appliedToBillId ? 'secondary' : 'default'}>
+                  {credit.appliedToBillId ? 'Applied' : credit.refundedAt ? 'Refunded' : 'Open'}
+                </Badge>
+              )}
             </div>
             <p className="text-muted-foreground">
               {t('credits.creditFrom', { name: credit.vendor?.name || '' })}
@@ -169,7 +180,7 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
         </div>
 
         {/* Actions */}
-        {!credit.appliedToBillId && !credit.refundedAt && (canEdit || canDelete) && (
+        {!isVoided && !credit.appliedToBillId && !credit.refundedAt && (canEdit || canDelete) && (
           <div className="flex items-center gap-2">
             {canEdit && (
               <Dialog open={applyDialogOpen} onOpenChange={setApplyDialogOpen}>
@@ -256,11 +267,29 @@ export default function VendorCreditDetailPage({ params }: VendorCreditDetailPag
                         </SelectContent>
                       </Select>
                     </div>
-                    {refundAccounts.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        {t('credits.noRefundAccounts')}
-                      </p>
+                    {refundAccountsLoading && <Skeleton className="h-10 w-full" />}
+                    {refundAccountsError && (
+                      <div className="flex items-center justify-between gap-2" role="alert">
+                        <p className="text-sm text-destructive">
+                          {t('credits.refundAccountsError')}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void refetchRefundAccounts()}
+                        >
+                          {t('credits.retry')}
+                        </Button>
+                      </div>
                     )}
+                    {!refundAccountsLoading &&
+                      !refundAccountsError &&
+                      refundAccounts.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          {t('credits.noRefundAccounts')}
+                        </p>
+                      )}
                     <div className="p-4 bg-muted rounded-lg">
                       <p className="text-sm text-muted-foreground">{t('credits.refundAmount')}</p>
                       <p className="text-2xl font-bold font-mono">

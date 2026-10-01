@@ -125,10 +125,28 @@ export class VendorCreditsService {
           alreadyCredited,
           amount,
         );
-        if (tax.greaterThan(0) && !org.defaultVatReceivableAccountId) {
-          throw new BadRequestException(
-            'Please configure the default VAT Receivable account in organization settings before crediting taxed bills',
+        // Credit the VAT account the bill's own approval debited (the default may have changed
+        // since); the default is only a fallback for a bill without a readable approval journal.
+        let vatAccountId: string | null = null;
+        if (tax.greaterThan(0)) {
+          const approval = await tx.journal.findFirst({
+            where: {
+              organizationId,
+              sourceType: JournalSourceType.BILL_APPROVAL,
+              sourceId: bill.id,
+              deletedAt: null,
+            },
+            include: { lines: true },
+          });
+          const vatLine = approval?.lines.find(
+            (l) => l.debit.greaterThan(0) && l.description?.endsWith('- VAT Receivable'),
           );
+          vatAccountId = vatLine?.accountId ?? org.defaultVatReceivableAccountId ?? null;
+          if (!vatAccountId) {
+            throw new BadRequestException(
+              'Please configure the default VAT Receivable account in organization settings before crediting taxed bills',
+            );
+          }
         }
         const net = amount.sub(tax);
 
@@ -162,7 +180,7 @@ export class VendorCreditsService {
         ];
         if (tax.greaterThan(0)) {
           lines.push({
-            accountId: org.defaultVatReceivableAccountId as string,
+            accountId: vatAccountId as string,
             debit: '0',
             credit: tax.toFixed(4),
             description: `${creditNumber} - VAT Receivable`,
@@ -248,8 +266,9 @@ export class VendorCreditsService {
   }
 
   async findOne(organizationId: string, id: string) {
+    // Voided credits stay readable (with deletedAt set) so journal source links resolve.
     const credit = await this.prisma.vendorCredit.findFirst({
-      where: { id, organizationId, deletedAt: null },
+      where: { id, organizationId },
       include: {
         vendor: { select: { id: true, name: true, email: true } },
         bill: { select: { id: true, billNumber: true, total: true, status: true } },
@@ -317,13 +336,20 @@ export class VendorCreditsService {
    * Accounts Payable dated on the refund date. Lock order: credit -> ledger.
    */
   async refund(organizationId: string, id: string, dto: RefundVendorCreditDto) {
-    const date = dto.date ? parseDocumentDate(dto.date, 'refund date') : new Date();
+    const explicitDate = dto.date ? parseDocumentDate(dto.date, 'refund date') : null;
     return this.prisma.$transaction(async (tx) => {
       await this.lockCredit(tx, organizationId, id);
       const credit = await tx.vendorCredit.findFirst({
         where: { id, organizationId, deletedAt: null },
       });
       if (!credit) throw new NotFoundException('Vendor credit not found');
+      // A refund never precedes the credit it refunds: default max(today, credit date), and an
+      // explicit earlier date is rejected.
+      if (explicitDate && explicitDate.getTime() < credit.date.getTime()) {
+        throw new BadRequestException('The refund date cannot be earlier than the credit date');
+      }
+      const now = new Date();
+      const date = explicitDate ?? (credit.date.getTime() > now.getTime() ? credit.date : now);
       if (credit.refundedAt) {
         throw new BadRequestException('Vendor credit has already been refunded');
       }

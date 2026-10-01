@@ -198,12 +198,13 @@ describe('ExpensesService (posting)', () => {
     });
 
     it('bulkCategorize rejects posted expenses per record instead of drifting the ledger', async () => {
-      prisma.expense.findFirst.mockResolvedValue({ id: 'e1' });
+      prisma.expense.findFirst.mockResolvedValue({ id: 'e1', status: 'POSTED' });
+      prisma.expense.updateMany.mockResolvedValue({ count: 0 });
       const result = await service.bulkCategorize(ORG, ['e1'], 'other-acc');
       expect(result.processed).toBe(0);
       expect(result.failures?.[0]?.reason).toMatch(/cannot be re-categorised/);
       expect(prisma.expense.update).not.toHaveBeenCalled();
-      expect(prisma.expense.updateMany).not.toHaveBeenCalled();
+      expect(prisma.expense.update).not.toHaveBeenCalled();
     });
   });
 });

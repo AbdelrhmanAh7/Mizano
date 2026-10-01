@@ -548,7 +548,7 @@ export const ENTITY_FIELD_DEFINITIONS: Record<ImportEntityType, EntityFieldDefin
     {
       field: 'invoiceNumber',
       label: 'Invoice Number',
-      required: false,
+      required: true,
       type: 'string',
       description: 'Optional allocation',
     },
@@ -643,7 +643,7 @@ export const ENTITY_FIELD_DEFINITIONS: Record<ImportEntityType, EntityFieldDefin
     {
       field: 'billNumber',
       label: 'Bill Number',
-      required: false,
+      required: true,
       type: 'string',
       description: 'Optional allocation',
     },

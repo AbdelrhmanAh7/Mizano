@@ -31,6 +31,7 @@ describe('VendorCreditsService (posting)', () => {
     vendorId: 'v1',
     billId: 'b1',
     amount: dec('57'),
+    date: new Date('2026-03-12T00:00:00.000Z'),
     appliedToBillId: null,
     refundedAt: null,
   };

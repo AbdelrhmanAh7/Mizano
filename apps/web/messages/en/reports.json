@@ -101,7 +101,11 @@
   },
   "purchasesByVendor": {
     "title": "Purchases by Vendor",
-    "description": "Purchases breakdown by vendor"
+    "description": "Purchases breakdown by vendor",
+    "unappliedCredits": "Unapplied Credits",
+    "netPayable": "Net Payable",
+    "totalUnappliedCredits": "Unapplied Vendor Credits",
+    "totalNetPayable": "Net Payable"
   },
   "inventoryValuation": {
     "title": "Inventory Valuation",

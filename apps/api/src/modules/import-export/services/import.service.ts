@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { CreditNoteType, PaymentMode, Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -6,6 +6,7 @@ import * as csv from 'csv-parser';
 import { Readable } from 'stream';
 import * as XLSX from 'xlsx';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { bankCashAccountWhere } from '../../../common/utils/bank-cash-accounts';
 import { CreditNotesService } from '../../sales/services/credit-notes.service';
 import { InvoicesService } from '../../sales/services/invoices.service';
 import { PaymentsReceivedService } from '../../sales/services/payments-received.service';
@@ -40,8 +41,10 @@ type DocumentKind =
 
 interface RowContext {
   tx: Prisma.TransactionClient;
-  marker: string;
 }
+
+/** AuditLog.entityType of the per-row idempotency record of a money-bearing import. */
+export const IMPORT_ROW_ENTITY = 'IMPORT_ROW';
 
 @Injectable()
 export class ImportService {
@@ -235,6 +238,8 @@ export class ImportService {
         }
       }
 
+      rowErrors.push(...this.conditionalErrors(config.entityType, mappedRow, rowNum));
+
       if (rowErrors.length > 0) {
         invalidRows++;
         errors.push(...rowErrors);
@@ -255,6 +260,29 @@ export class ImportService {
       errors: errors.slice(0, 100), // Limit to first 100 errors
       warnings: warnings.slice(0, 50),
     };
+  }
+
+  /** Columns that execution requires only for some rows (so the field table cannot say so). */
+  private conditionalErrors(
+    entityType: ImportEntityType,
+    row: ImportRow,
+    rowNum: number,
+  ): ValidationErrorDto[] {
+    if (
+      entityType === ImportEntityType.CREDIT_NOTES &&
+      String(row.type ?? '').toUpperCase() === 'REFUND' &&
+      !this.cell(row.refundAccountCode)
+    ) {
+      return [
+        {
+          row: rowNum,
+          field: 'refundAccountCode',
+          value: row.refundAccountCode,
+          error: 'Refund Account Code is required for REFUND credit notes',
+        },
+      ];
+    }
+    return [];
   }
 
   private validateFieldType(
@@ -323,11 +351,59 @@ export class ImportService {
 
   // ============ Import Execution ============
 
+  /** Permission the single-record create route of each entity requires. */
+  static readonly CREATE_PERMISSION: Record<ImportEntityType, string> = {
+    [ImportEntityType.CUSTOMERS]: 'sales.create',
+    [ImportEntityType.INVOICES]: 'sales.create',
+    [ImportEntityType.QUOTES]: 'sales.create',
+    [ImportEntityType.CREDIT_NOTES]: 'sales.create',
+    [ImportEntityType.PAYMENTS_RECEIVED]: 'sales.create',
+    [ImportEntityType.DELIVERY_CHALLANS]: 'sales.create',
+    [ImportEntityType.VENDORS]: 'purchases.create',
+    [ImportEntityType.BILLS]: 'purchases.create',
+    [ImportEntityType.EXPENSES]: 'purchases.create',
+    [ImportEntityType.VENDOR_CREDITS]: 'purchases.create',
+    [ImportEntityType.PAYMENTS_MADE]: 'purchases.create',
+    [ImportEntityType.ITEMS]: 'inventory.create',
+    [ImportEntityType.ACCOUNTS]: 'accounting.create',
+    [ImportEntityType.JOURNALS]: 'accounting.create',
+    [ImportEntityType.BANK_TRANSACTIONS]: 'banking.create',
+    [ImportEntityType.EMPLOYEES]: 'hr.create',
+  };
+
+  /**
+   * An import creates the same records as the single-record routes, so the caller needs that
+   * route's create permission as well as settings.manage; a missing one rejects the whole import
+   * (403 listing what is missing) before any row is processed. Admin bypasses, like the guard.
+   */
+  async assertCanImport(roleId: string | undefined, entityType: ImportEntityType): Promise<void> {
+    const required = [ImportService.CREATE_PERMISSION[entityType], 'settings.manage'].filter(
+      (p): p is string => !!p,
+    );
+    const role = roleId
+      ? await this.prisma.role.findUnique({
+          where: { id: roleId },
+          include: { permissions: true },
+        })
+      : null;
+    if (!role) throw new ForbiddenException('Access denied');
+    if (role.name === 'Admin') return;
+    const missing = required.filter((permission) => {
+      const [module, action] = permission.split('.');
+      const granted = role.permissions.find((p) => p.module === module);
+      return !granted || !granted.actions.includes(action);
+    });
+    if (missing.length > 0) {
+      throw new ForbiddenException(`Missing permission: ${missing.join(', ')}`);
+    }
+  }
+
   async importData(
     organizationId: string,
     buffer: Buffer,
     filename: string,
     config: ImportConfigDto,
+    actorUserId: string,
   ): Promise<ImportResultDto> {
     // Validate first
     const validation = await this.validateImport(organizationId, buffer, filename, config);
@@ -367,6 +443,7 @@ export class ImportService {
             .update(`${fileHash}:${config.entityType}:sheet0:${i}`)
             .digest('hex')
             .slice(0, 32),
+          actorUserId,
         );
 
         result.totalProcessed++;
@@ -397,6 +474,7 @@ export class ImportService {
     updateExisting: boolean = false,
     matchField?: string,
     rowKey: string = createHash('sha256').update(JSON.stringify(data)).digest('hex').slice(0, 32),
+    actorUserId: string = '',
   ): Promise<'created' | 'updated' | 'skipped'> {
     switch (entityType) {
       case ImportEntityType.CUSTOMERS:
@@ -412,35 +490,35 @@ export class ImportService {
       case ImportEntityType.BANK_TRANSACTIONS:
         return this.importBankTransaction(organizationId, data);
       case ImportEntityType.INVOICES:
-        return this.importOnce(organizationId, 'invoice', rowKey, (ctx) =>
+        return this.importOnce(organizationId, 'invoice', rowKey, actorUserId, (ctx) =>
           this.importInvoice(organizationId, data, ctx),
         );
       case ImportEntityType.QUOTES:
         return this.importQuote(organizationId, data);
       case ImportEntityType.CREDIT_NOTES:
-        return this.importOnce(organizationId, 'creditNote', rowKey, (ctx) =>
+        return this.importOnce(organizationId, 'creditNote', rowKey, actorUserId, (ctx) =>
           this.importCreditNote(organizationId, data, ctx),
         );
       case ImportEntityType.PAYMENTS_RECEIVED:
-        return this.importOnce(organizationId, 'paymentReceived', rowKey, (ctx) =>
+        return this.importOnce(organizationId, 'paymentReceived', rowKey, actorUserId, (ctx) =>
           this.importPaymentReceived(organizationId, data, ctx),
         );
       case ImportEntityType.DELIVERY_CHALLANS:
         return this.importDeliveryChallan(organizationId, data);
       case ImportEntityType.BILLS:
-        return this.importOnce(organizationId, 'bill', rowKey, (ctx) =>
+        return this.importOnce(organizationId, 'bill', rowKey, actorUserId, (ctx) =>
           this.importBill(organizationId, data, ctx),
         );
       case ImportEntityType.EXPENSES:
-        return this.importOnce(organizationId, 'expense', rowKey, (ctx) =>
+        return this.importOnce(organizationId, 'expense', rowKey, actorUserId, (ctx) =>
           this.importExpense(organizationId, data, ctx),
         );
       case ImportEntityType.VENDOR_CREDITS:
-        return this.importOnce(organizationId, 'vendorCredit', rowKey, (ctx) =>
+        return this.importOnce(organizationId, 'vendorCredit', rowKey, actorUserId, (ctx) =>
           this.importVendorCredit(organizationId, data, ctx),
         );
       case ImportEntityType.PAYMENTS_MADE:
-        return this.importOnce(organizationId, 'paymentMade', rowKey, (ctx) =>
+        return this.importOnce(organizationId, 'paymentMade', rowKey, actorUserId, (ctx) =>
           this.importPaymentMade(organizationId, data, ctx),
         );
       default:
@@ -842,54 +920,40 @@ export class ImportService {
 
   // === Idempotent money-bearing rows ===
 
-  /** Marker written into the created document so a re-run of the same row is recognised. */
-  private tag(text: string | undefined, ctx: RowContext): string {
-    return [text, ctx.marker].filter(Boolean).join(' ');
-  }
-
   /**
-   * Runs one money-bearing row in its own transaction under an advisory lock on the row key: if a
-   * document carrying the row's marker already exists in the organization the row is skipped,
-   * otherwise the domain command creates it (with the marker) inside the same transaction.
+   * Runs one money-bearing row in its own transaction under an advisory lock on the row key. The
+   * idempotency record is an append-only AuditLog row (entityType IMPORT_ROW, entityId = row key)
+   * written in the same transaction as the document: unlike a marker inside the document's own
+   * notes/reference it cannot be edited or erased by a user, so a retry after the document text
+   * changed is still skipped. (There is no dedicated import-history model, and drafts such as
+   * invoices and bills have no journal to key on.)
    */
   private async importOnce(
     organizationId: string,
     kind: DocumentKind,
     rowKey: string,
+    actorUserId: string,
     create: (ctx: RowContext) => Promise<'created' | 'updated' | 'skipped'>,
   ): Promise<'created' | 'updated' | 'skipped'> {
-    const marker = `[import ${rowKey}]`;
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`import:${organizationId}:${rowKey}`}))`;
-      if (await this.markerExists(tx, organizationId, kind, marker)) return 'skipped';
-      return create({ tx, marker });
+      const seen = await tx.auditLog.count({
+        where: { organizationId, entityType: IMPORT_ROW_ENTITY, entityId: rowKey },
+      });
+      if (seen > 0) return 'skipped';
+      const outcome = await create({ tx });
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          userId: actorUserId,
+          action: 'CREATE',
+          entityType: IMPORT_ROW_ENTITY,
+          entityId: rowKey,
+          newValues: { document: kind },
+        },
+      });
+      return outcome;
     });
-  }
-
-  private async markerExists(
-    tx: Prisma.TransactionClient,
-    organizationId: string,
-    kind: DocumentKind,
-    marker: string,
-  ): Promise<boolean> {
-    const contains = { contains: marker };
-    const where = { organizationId };
-    switch (kind) {
-      case 'invoice':
-        return (await tx.invoice.count({ where: { ...where, notes: contains } })) > 0;
-      case 'bill':
-        return (await tx.bill.count({ where: { ...where, reference: contains } })) > 0;
-      case 'expense':
-        return (await tx.expense.count({ where: { ...where, reference: contains } })) > 0;
-      case 'vendorCredit':
-        return (await tx.vendorCredit.count({ where: { ...where, reason: contains } })) > 0;
-      case 'creditNote':
-        return (await tx.creditNote.count({ where: { ...where, reason: contains } })) > 0;
-      case 'paymentMade':
-        return (await tx.paymentMade.count({ where: { ...where, reference: contains } })) > 0;
-      case 'paymentReceived':
-        return (await tx.paymentReceived.count({ where: { ...where, reference: contains } })) > 0;
-    }
   }
 
   private cell(value: unknown): string | undefined {
@@ -921,6 +985,7 @@ export class ImportService {
     organizationId: string,
     code: unknown,
     label: string,
+    options: { bankCash?: boolean } = {},
   ): Promise<string> {
     const text = this.cell(code);
     if (!text) throw new BadRequestException(`${label} is required`);
@@ -929,6 +994,20 @@ export class ImportService {
       select: { id: true },
     });
     if (!account) throw new BadRequestException(`Account not found with code: ${text}`);
+    if (options.bankCash) {
+      // Payments move money through bank/cash: apply the shared eligibility rule before posting.
+      const eligible = await this.prisma.account.findFirst({
+        where: {
+          AND: [{ id: account.id }, await bankCashAccountWhere(this.prisma, organizationId)],
+        },
+        select: { id: true },
+      });
+      if (!eligible) {
+        throw new BadRequestException(
+          `${label} ${text} must be an active bank or cash account of this organization`,
+        );
+      }
+    }
     return account.id;
   }
 
@@ -992,7 +1071,7 @@ export class ImportService {
         customerId,
         invoiceId: invoice.id,
         date: this.isoDate(data.date, 'date'),
-        reason: this.tag(this.cell(data.reason) ?? 'Imported credit note', ctx),
+        reason: this.cell(data.reason) ?? 'Imported credit note',
         amount: this.decimalCell(data.amount, 'amount'),
         type: type as CreditNoteType,
         refundAccountId:
@@ -1019,6 +1098,7 @@ export class ImportService {
       organizationId,
       data.depositAccountCode,
       'depositAccountCode',
+      { bankCash: true },
     );
     if (!this.cell(data.invoiceNumber)) {
       throw new BadRequestException(
@@ -1036,7 +1116,7 @@ export class ImportService {
         amount,
         paymentMode: String(data.paymentMode).toUpperCase() as PaymentMode,
         depositToAccountId,
-        reference: this.tag(this.cell(data.reference), ctx),
+        reference: this.cell(data.reference),
         notes: this.cell(data.notes),
         allocations: [{ invoiceId: invoice.id, amount }],
       },
@@ -1141,7 +1221,7 @@ export class ImportService {
         customerId,
         date,
         dueDate: data.dueDate ? this.isoDate(data.dueDate, 'dueDate') : date,
-        notes: this.tag(this.cell(data.notes), ctx),
+        notes: this.cell(data.notes),
         lines: [
           {
             itemId: item.id,
@@ -1171,7 +1251,7 @@ export class ImportService {
         vendorId,
         date,
         dueDate: data.dueDate ? this.isoDate(data.dueDate, 'dueDate') : date,
-        reference: this.tag(this.cell(data.reference), ctx),
+        reference: this.cell(data.reference),
         notes: this.cell(data.notes),
         lines: [
           {
@@ -1235,7 +1315,7 @@ export class ImportService {
         taxRate: this.cell(data.taxRate) ? this.decimalCell(data.taxRate, 'taxRate') : undefined,
         paidThroughAccountId,
         description: this.cell(data.description),
-        reference: this.tag(this.cell(data.reference), ctx),
+        reference: this.cell(data.reference),
       },
       { tx: ctx.tx },
     );
@@ -1256,7 +1336,7 @@ export class ImportService {
         vendorId,
         billId: bill.id,
         date: data.date ? this.isoDate(data.date, 'date') : undefined,
-        reason: this.tag(this.cell(data.reason) ?? 'Imported vendor credit', ctx),
+        reason: this.cell(data.reason) ?? 'Imported vendor credit',
         amount: this.decimalCell(data.amount, 'amount'),
       },
       { tx: ctx.tx },
@@ -1274,6 +1354,7 @@ export class ImportService {
       organizationId,
       data.paidFromAccountCode,
       'paidFromAccountCode',
+      { bankCash: true },
     );
     if (!this.cell(data.billNumber)) {
       throw new BadRequestException(
@@ -1291,7 +1372,7 @@ export class ImportService {
         amount,
         paymentMode: String(data.paymentMode).toUpperCase() as PaymentMode,
         paidFromAccountId,
-        reference: this.tag(this.cell(data.reference), ctx),
+        reference: this.cell(data.reference),
         notes: this.cell(data.notes),
         allocations: [{ billId: bill.id, amount }],
       },

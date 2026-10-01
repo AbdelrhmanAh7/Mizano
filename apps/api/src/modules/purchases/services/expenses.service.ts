@@ -401,23 +401,39 @@ export class ExpensesService {
   }
 
   /**
-   * Re-categorising a posted expense would move its posted amount between accounts without a
-   * journal, so it is rejected per record: void the expense and enter it again instead.
+   * Re-categorises each expense. A PENDING expense has no journal, so its account can change
+   * (guarded on the status). A POSTED expense would move its posted amount between accounts
+   * without a journal, so it is rejected per record: void it and enter it again.
    */
-  bulkCategorize(
-    organizationId: string,
-    ids: string[],
-    _accountId: string,
-  ): Promise<BulkResultDto> {
+  bulkCategorize(organizationId: string, ids: string[], accountId: string): Promise<BulkResultDto> {
     return runBulk(ids, async (id) => {
-      const expense = await this.prisma.expense.findFirst({
-        where: { id, organizationId, deletedAt: null },
+      const account = await this.prisma.account.findFirst({
+        where: {
+          id: accountId,
+          organizationId,
+          deletedAt: null,
+          isActive: true,
+          type: AccountType.EXPENSE,
+        },
         select: { id: true },
       });
+      if (!account) {
+        throw new BadRequestException('Expense account must be an active expense account');
+      }
+      const expense = await this.prisma.expense.findFirst({
+        where: { id, organizationId, deletedAt: null },
+        select: { id: true, status: true },
+      });
       if (!expense) throw new NotFoundException('Expense not found');
-      throw new BadRequestException(
-        'Posted expenses cannot be re-categorised; void the expense and enter it again',
-      );
+      const { count } = await this.prisma.expense.updateMany({
+        where: { id, organizationId, deletedAt: null, status: ExpenseStatus.PENDING },
+        data: { accountId },
+      });
+      if (count === 0) {
+        throw new BadRequestException(
+          'Posted expenses cannot be re-categorised; void the expense and enter it again',
+        );
+      }
     });
   }
 

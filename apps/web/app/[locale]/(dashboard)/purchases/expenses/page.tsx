@@ -40,6 +40,7 @@ import {
 import { useExportAll } from '@/lib/hooks/use-export-all';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
+import { sumDecimals } from '@/lib/decimal';
 import { useTableParams } from '@/lib/hooks/use-table-params';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
@@ -222,8 +223,8 @@ function ExpensesPageContent() {
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono font-medium' },
       cell: ({ row }) => {
         const expense = row.original;
-        const total = parseFloat(expense.amount) + parseFloat(expense.taxAmount || '0');
-        return formatCurrency(expense.taxInclusive ? expense.amount : total);
+        // `amount` is stored net of VAT for inclusive and exclusive entries alike.
+        return formatCurrency(sumDecimals([expense.amount, expense.taxAmount || '0']));
       },
     },
     {

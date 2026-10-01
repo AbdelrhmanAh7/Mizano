@@ -536,7 +536,10 @@ describe('Purchases expenses and vendor credits (e2e)', () => {
       // The credit's Dr AP 50 is reversed by a Cr AP 50.
       const apAfter = await accountBalance(prisma, tenantA.organizationId, acc.ap);
       expect(apAfter.sub(apBefore).equals('-50')).toBe(true);
-      expect((await a.get(`/vendor-credits/${credit3Id}`)).status).toBe(404);
+      // A voided credit stays readable (read-only) so journal source links resolve.
+      const readBack = await a.get(`/vendor-credits/${credit3Id}`);
+      expect(readBack.status).toBe(200);
+      expect(readBack.body.deletedAt).toBeTruthy();
       expect((await a.delete(`/vendor-credits/${credit3Id}`)).status).toBe(404);
       expect(await journalsFor(VENDOR_CREDIT_VOID, credit3Id)).toHaveLength(1);
     });

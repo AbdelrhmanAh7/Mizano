@@ -309,7 +309,10 @@
     "voidDescription": "Voiding reverses the credit's journal. Only credits that are not applied to a bill or refunded can be voided.",
     "voiding": "Voiding...",
     "noRefundAccounts": "No bank or cash account is available. Add one in Banking.",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "voided": "Voided",
+    "refundAccountsError": "Could not load the bank and cash accounts.",
+    "retry": "Retry"
   },
   "payments": {
     "title": "Payments Made",

@@ -914,12 +914,19 @@ export class FinancialReportsService {
     }
 
     // Vendor credits are base-currency ledger documents, so they only apply to the base-currency
-    // report. They are all-time live balances, like bill balances, so vendors with a credit but no
-    // bill in the period still appear (with zero bills) and the totals reconcile to AP.
+    // report. Like the bills (filtered by bill date), only live unapplied credits whose credit
+    // date falls inside the requested period count, so the figures describe the same period;
+    // vendors with a credit but no bill in the period still appear (with zero bills).
     const creditsByVendor = new Map<string, Decimal>();
     if (reportCurrency === base) {
       const credits = await this.prisma.vendorCredit.findMany({
-        where: { organizationId, deletedAt: null, appliedToBillId: null, refundedAt: null },
+        where: {
+          organizationId,
+          deletedAt: null,
+          appliedToBillId: null,
+          refundedAt: null,
+          date: { gte: period.start, lte: period.end },
+        },
         select: { vendorId: true, amount: true },
       });
       for (const c of credits) {

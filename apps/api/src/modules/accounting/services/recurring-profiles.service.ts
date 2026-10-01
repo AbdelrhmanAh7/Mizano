@@ -891,9 +891,15 @@ export class RecurringProfilesService {
     const amount = toLedgerDecimal(templateData.amount, 'amount');
     let taxRate = this.decimalText(templateData.taxRate, 'taxRate', '');
     if (!taxRate && templateData.taxAmount !== undefined && amount.greaterThan(0)) {
-      // Legacy template with a VAT amount: express it as a percentage of the amount.
+      // Legacy template with a VAT amount: express it as the percentage that reproduces it.
+      // Exclusive: the amount is net, so rate = tax / amount. Inclusive: the amount is gross, so
+      // the net is amount - tax and rate = tax / (amount - tax).
       const legacyTax = toLedgerDecimal(templateData.taxAmount, 'taxAmount');
-      taxRate = legacyTax.mul(100).div(amount).toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toFixed();
+      const base = templateData.taxInclusive === true ? amount.sub(legacyTax) : amount;
+      if (!base.greaterThan(0)) {
+        throw new BadRequestException('taxAmount must be less than the inclusive amount');
+      }
+      taxRate = legacyTax.mul(100).div(base).toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toFixed();
     }
     const dto: CreateExpenseDto = {
       date: occurrence.toISOString(),

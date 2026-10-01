@@ -30,6 +30,7 @@ import {
   ImportResultDto,
 } from '../dto/import-export.dto';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
+import { CurrentUser, CurrentUserData } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -188,6 +189,7 @@ export class ImportController {
   )
   async executeImport(
     @CurrentOrg() orgId: string,
+    @CurrentUser() user: CurrentUserData,
     @UploadedFile() file: Express.Multer.File,
     @Body('config') configJson: string,
   ): Promise<ImportResultDto> {
@@ -200,6 +202,8 @@ export class ImportController {
     }
 
     const config: ImportConfigDto = JSON.parse(configJson);
-    return this.importService.importData(orgId, file.buffer, file.originalname, config);
+    // The same create permission as the single-record route of this entity, on top of settings.manage.
+    await this.importService.assertCanImport(user?.roleId, config.entityType);
+    return this.importService.importData(orgId, file.buffer, file.originalname, config, user.id);
   }
 }
