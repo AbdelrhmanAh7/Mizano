@@ -220,6 +220,22 @@ describe('BillsService', () => {
       expect(result).toBeDefined();
     });
 
+    it('includes each allocation payment so clients need no paged payment lookup', async () => {
+      prisma.bill.findFirst.mockResolvedValue(createMockBill({ billAllocations: [] }) as any);
+
+      await service.findOne(ORG_ID, 'bill-test-001');
+
+      const include = prisma.bill.findFirst.mock.calls[0]![0]!.include as {
+        billAllocations: { include: { payment: { select: Record<string, boolean> } } };
+      };
+      expect(include.billAllocations.include.payment.select).toMatchObject({
+        id: true,
+        paymentNumber: true,
+        date: true,
+        deletedAt: true,
+      });
+    });
+
     it('should throw NotFoundException for non-existent bill', async () => {
       prisma.bill.findFirst.mockResolvedValue(null);
 
