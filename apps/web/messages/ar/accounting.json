@@ -78,7 +78,34 @@
     "empty": {
       "title": "لا توجد قيود يومية بعد",
       "description": "أنشئ أول قيد يومية"
-    }
+    },
+    "source": {
+      "manual": "قيد يدوي",
+      "reversal": "قيد عكسي",
+      "system": "قيد نظام",
+      "billApproval": "فاتورة مورد",
+      "paymentMade": "دفعة مسددة",
+      "paymentMadeVoid": "دفعة مسددة ملغاة",
+      "invoice": "فاتورة",
+      "invoiceVoid": "فاتورة ملغاة",
+      "paymentReceived": "دفعة مستلمة",
+      "paymentReceivedVoid": "دفعة مستلمة ملغاة",
+      "creditNote": "إشعار دائن",
+      "expense": "مصروف",
+      "vendorCredit": "رصيد مورد",
+      "vatReturn": "إقرار ضريبة القيمة المضافة",
+      "inventoryAdjustment": "تسوية مخزون",
+      "openingBalance": "رصيد افتتاحي"
+    },
+    "sourceLabel": "المصدر",
+    "systemNote": "تم ترحيل هذا القيد تلقائيًا من مستند تجاري. لا يمكن تعديله أو عكسه هنا؛ قم بإلغاء أو تصحيح المستند المصدر بدلاً من ذلك.",
+    "viewSource": "عرض المستند المصدر",
+    "reversalOf": "عكس للقيد الأصلي",
+    "reverse": "عكس",
+    "reverseTitle": "عكس قيد اليومية",
+    "reverseConfirm": "سيتم ترحيل قيد جديد يعكس جميع بنود {number}. يبقى القيد الأصلي دون تغيير.",
+    "reversed": "تم ترحيل القيد العكسي",
+    "reverseFailed": "تعذر عكس القيد"
   },
   "recurring": {
     "title": "الملفات المتكررة",

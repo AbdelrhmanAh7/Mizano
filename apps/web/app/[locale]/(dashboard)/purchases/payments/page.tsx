@@ -22,21 +22,24 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useToast } from '@/components/ui/use-toast';
 import { paymentsMadeApi } from '@/lib/api';
+import { getApiErrorMessage } from '@/lib/api-error';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
+import { LEDGER_QUERY_KEYS, invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import {
   formatCurrency,
   formatPaymentMode,
   PaymentMade,
-  useDeletePaymentMade,
   useInfinitePaymentsMade,
 } from '@/lib/hooks/use-payments-made';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { useTableParams } from '@/lib/hooks/use-table-params';
+import { useQueryClient } from '@tanstack/react-query';
 import { type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { Eye, Plus, Trash2, Upload } from 'lucide-react';
+import { Ban, Eye, Plus, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
 
@@ -44,10 +47,13 @@ function PaymentsMadePageContent() {
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
   const [importOpen, setImportOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isVoiding, setIsVoiding] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkSelectedRows, setBulkSelectedRows] = useState<PaymentMade[]>([]);
 
@@ -62,22 +68,20 @@ function PaymentsMadePageContent() {
   } = useInfinitePaymentsMade({
     ...tableParams.queryParams,
   });
-  const deletePayment = useDeletePaymentMade();
-
   const canDelete = hasPermission('purchases.delete');
 
   const bulkDeleteAction = useBulkAction({
-    mutationFn: (ids) => paymentsMadeApi.bulkDelete(ids).then((r) => r.data),
-    queryKeys: [['payments-made']],
-    successMessage: '{count} payments deleted',
+    mutationFn: (ids) => paymentsMadeApi.bulkVoid(ids).then((r) => r.data),
+    queryKeys: LEDGER_QUERY_KEYS,
+    successMessage: '{count} payments voided',
   });
 
   const bulkActions = [
     ...(canDelete
       ? [
           {
-            label: 'Delete',
-            icon: Trash2,
+            label: t('payments.void'),
+            icon: Ban,
             variant: 'destructive' as const,
             onClick: (rows: PaymentMade[]) => {
               setBulkSelectedRows(rows);
@@ -88,9 +92,21 @@ function PaymentsMadePageContent() {
       : []),
   ];
 
-  const handleDelete = async () => {
-    if (deleteId) {
-      await deletePayment.mutateAsync(deleteId);
+  const handleVoid = async () => {
+    if (!deleteId) return;
+    setIsVoiding(true);
+    try {
+      await paymentsMadeApi.void(deleteId);
+      await invalidateLedgerQueries(queryClient);
+      toast({ title: t('payments.voided') });
+    } catch (error) {
+      toast({
+        title: t('payments.voidFailed'),
+        description: getApiErrorMessage(error, t('payments.voidFailed')),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsVoiding(false);
       setDeleteId(null);
     }
   };
@@ -180,10 +196,15 @@ function PaymentsMadePageContent() {
                   {tCommon('buttons.view')}
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(payment.id)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                {tCommon('buttons.delete')}
-              </DropdownMenuItem>
+              {canDelete && (
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() => setDeleteId(payment.id)}
+                >
+                  <Ban className="mr-2 h-4 w-4" />
+                  {t('payments.void')}
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -259,10 +280,10 @@ function PaymentsMadePageContent() {
       <BulkActionConfirmDialog
         open={bulkDeleteOpen}
         onOpenChange={setBulkDeleteOpen}
-        action="delete"
+        action="void"
         count={bulkSelectedRows.length}
         itemType="payments"
-        description="Selected payments will be permanently deleted."
+        description={t('payments.deleteConfirmation')}
         destructive
         isLoading={bulkDeleteAction.isLoading}
         onConfirm={async () => {
@@ -281,8 +302,11 @@ function PaymentsMadePageContent() {
         onComplete={() => refetch()}
       />
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+      {/* Void Confirmation */}
+      <AlertDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && !isVoiding && setDeleteId(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('payments.deleteTitle')}</AlertDialogTitle>
@@ -290,8 +314,12 @@ function PaymentsMadePageContent() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{tCommon('buttons.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              {tCommon('buttons.delete')}
+            <AlertDialogAction
+              onClick={handleVoid}
+              disabled={isVoiding}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t('payments.void')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Edit, CheckCircle, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit, CheckCircle, Trash2, Undo2, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -33,7 +33,14 @@ import {
   formatJournalAmount,
   getStatusColor,
   calculateJournalTotals,
+  useReverseJournal,
+  isJournalEditable,
+  isSystemJournal,
+  canReverseJournal,
+  getJournalSourceInfo,
 } from '@/lib/hooks/use-journals';
+import { getApiErrorMessage } from '@/lib/api-error';
+import { isPositiveDecimal } from '@/lib/decimal';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { format } from 'date-fns';
 import { useState } from 'react';
@@ -48,10 +55,12 @@ export default function JournalDetailPage() {
   const journalId = params.id as string;
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [reverseDialogOpen, setReverseDialogOpen] = useState(false);
 
   const { data: journal, isLoading } = useJournal(journalId);
   const deleteJournal = useDeleteJournal();
   const postJournal = usePostJournal();
+  const reverseJournal = useReverseJournal();
 
   const canEdit = hasPermission('accounting.edit');
   const canDelete = hasPermission('accounting.delete');
@@ -66,7 +75,7 @@ export default function JournalDetailPage() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to post journal.',
+        description: getApiErrorMessage(error, 'Failed to post journal.'),
         variant: 'destructive',
       });
     }
@@ -83,11 +92,26 @@ export default function JournalDetailPage() {
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to delete journal.',
+        description: getApiErrorMessage(error, 'Failed to delete journal.'),
         variant: 'destructive',
       });
     }
     setDeleteDialogOpen(false);
+  };
+
+  const confirmReverse = async () => {
+    try {
+      const reversal = await reverseJournal.mutateAsync({ id: journalId });
+      toast({ title: t('journals.reversed'), description: reversal.journalNumber });
+      router.push(`/accounting/journals/${reversal.id}`);
+    } catch (error) {
+      toast({
+        title: t('journals.reverseFailed'),
+        description: getApiErrorMessage(error, t('journals.reverseFailed')),
+        variant: 'destructive',
+      });
+    }
+    setReverseDialogOpen(false);
   };
 
   if (isLoading) {
@@ -131,6 +155,10 @@ export default function JournalDetailPage() {
   }
 
   const lines = journal.lines || [];
+  const editable = isJournalEditable(journal);
+  const systemJournal = isSystemJournal(journal);
+  const reversible = canReverseJournal(journal) && !systemJournal;
+  const sourceInfo = getJournalSourceInfo(journal);
   const totals = calculateJournalTotals(
     lines.map((l) => ({ debit: l.debit || '0', credit: l.credit || '0' })),
   );
@@ -156,7 +184,7 @@ export default function JournalDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {canEdit && journal.status === 'DRAFT' && (
+          {canEdit && editable && (
             <>
               <Button variant="outline" asChild>
                 <Link href={`/accounting/journals/${journalId}/edit`}>
@@ -164,20 +192,62 @@ export default function JournalDetailPage() {
                   {t('journals.editJournal')}
                 </Link>
               </Button>
-              <Button onClick={handlePost}>
+              <Button onClick={handlePost} disabled={postJournal.isPending}>
                 <CheckCircle className="mr-2 h-4 w-4" />
                 Post
               </Button>
             </>
           )}
-          {canDelete && journal.status === 'DRAFT' && (
+          {canDelete && editable && (
             <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
               {t('journals.deleteJournal')}
             </Button>
           )}
+          {canEdit && reversible && (
+            <Button
+              variant="outline"
+              onClick={() => setReverseDialogOpen(true)}
+              disabled={reverseJournal.isPending}
+            >
+              <Undo2 className="mr-2 h-4 w-4" />
+              {t('journals.reverse')}
+            </Button>
+          )}
         </div>
       </div>
+
+      {systemJournal && (
+        <Card>
+          <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="font-medium">
+                  {t('journals.sourceLabel')}: {t(`journals.source.${sourceInfo.labelKey}`)}
+                </p>
+                <p className="text-sm text-muted-foreground">{t('journals.systemNote')}</p>
+              </div>
+            </div>
+            {sourceInfo.href && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={sourceInfo.href}>{t('journals.viewSource')}</Link>
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {journal.reversalOfId && (
+        <p className="text-sm">
+          <Link
+            href={`/accounting/journals/${journal.reversalOfId}`}
+            className="text-primary underline-offset-4 hover:underline"
+          >
+            {t('journals.reversalOf')}
+          </Link>
+        </p>
+      )}
 
       {/* Journal Details */}
       <Card>
@@ -253,14 +323,10 @@ export default function JournalDetailPage() {
                   </TableCell>
                   <TableCell>{line.description || '-'}</TableCell>
                   <TableCell className="text-right font-mono">
-                    {parseFloat(line.debit || '0') > 0
-                      ? formatJournalAmount(parseFloat(line.debit))
-                      : '-'}
+                    {isPositiveDecimal(line.debit || '0') ? formatJournalAmount(line.debit) : '-'}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {parseFloat(line.credit || '0') > 0
-                      ? formatJournalAmount(parseFloat(line.credit))
-                      : '-'}
+                    {isPositiveDecimal(line.credit || '0') ? formatJournalAmount(line.credit) : '-'}
                   </TableCell>
                 </TableRow>
               ))}
@@ -290,8 +356,29 @@ export default function JournalDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reverse Confirmation Dialog */}
+      <AlertDialog open={reverseDialogOpen} onOpenChange={setReverseDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('journals.reverseTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('journals.reverseConfirm', { number: journal.journalNumber })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReverse} disabled={reverseJournal.isPending}>
+              {t('journals.reverse')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

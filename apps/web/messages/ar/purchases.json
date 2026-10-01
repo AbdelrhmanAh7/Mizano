@@ -183,7 +183,17 @@
     "empty": {
       "title": "لا توجد فواتير بعد",
       "description": "سجل أول فاتورة لتتبع المستحقات"
-    }
+    },
+    "approvePost": "اعتماد وترحيل",
+    "approved": "تم اعتماد الفاتورة وترحيلها",
+    "approveFailed": "تعذر اعتماد الفاتورة",
+    "payments": "المدفوعات",
+    "noPayments": "لا توجد مدفوعات مسجلة لهذه الفاتورة",
+    "voidPayment": "إلغاء",
+    "voidPaymentTitle": "إلغاء الدفعة",
+    "voidPaymentConfirm": "إلغاء {number} يعيد رصيد هذه الفاتورة ويرحّل قيدًا عكسيًا.",
+    "paymentVoided": "تم إلغاء الدفعة",
+    "voidFailed": "تعذر إلغاء الدفعة"
   },
   "credits": {
     "title": "ائتمانات الموردين",
@@ -260,7 +270,7 @@
     "allPayments": "جميع المدفوعات",
     "newPayment": "دفعة جديدة",
     "editPayment": "تعديل الدفعة",
-    "deletePayment": "حذف الدفعة",
+    "deletePayment": "إلغاء الدفعة",
     "paymentDetails": "تفاصيل الدفعة",
     "paymentNotFound": "الدفعة غير موجودة",
     "backToPayments": "العودة للمدفوعات",
@@ -279,8 +289,8 @@
     "notes": "ملاحظات",
     "billAllocations": "توزيع الفواتير",
     "noBillAllocations": "لا توجد توزيعات فواتير",
-    "deleteTitle": "حذف الدفعة",
-    "deleteConfirmation": "هل أنت متأكد من حذف هذه الدفعة؟ سيتم أيضاً تحديث أرصدة الفواتير المرتبطة. لا يمكن التراجع عن هذا الإجراء.",
+    "deleteTitle": "إلغاء الدفعة",
+    "deleteConfirmation": "إلغاء هذه الدفعة يعيد أرصدة الفواتير التي سددتها ويرحّل قيدًا عكسيًا. تبقى الدفعة محفوظة في سجل التدقيق.",
     "form": {
       "vendor": "المورد",
       "vendorPlaceholder": "اختر مورداً",
@@ -306,7 +316,10 @@
     "empty": {
       "title": "لا توجد مدفوعات بعد",
       "description": "ستظهر المدفوعات هنا عند تسجيلها"
-    }
+    },
+    "void": "إلغاء",
+    "voided": "تم إلغاء الدفعة",
+    "voidFailed": "تعذر إلغاء الدفعة"
   },
   "lineItems": {
     "title": "البنود",

@@ -183,7 +183,17 @@
     "empty": {
       "title": "No bills yet",
       "description": "Record your first bill to track payables"
-    }
+    },
+    "approvePost": "Approve & post",
+    "approved": "Bill approved and posted",
+    "approveFailed": "Failed to approve bill",
+    "payments": "Payments",
+    "noPayments": "No payments recorded for this bill",
+    "voidPayment": "Void",
+    "voidPaymentTitle": "Void payment",
+    "voidPaymentConfirm": "Voiding {number} restores this bill's balance and posts a reversing journal entry.",
+    "paymentVoided": "Payment voided",
+    "voidFailed": "Failed to void payment"
   },
   "credits": {
     "title": "Vendor Credits",
@@ -260,7 +270,7 @@
     "allPayments": "All Payments",
     "newPayment": "New Payment",
     "editPayment": "Edit Payment",
-    "deletePayment": "Delete Payment",
+    "deletePayment": "Void Payment",
     "paymentDetails": "Payment Details",
     "paymentNotFound": "Payment not found",
     "backToPayments": "Back to Payments",
@@ -279,8 +289,8 @@
     "notes": "Notes",
     "billAllocations": "Bill Allocations",
     "noBillAllocations": "No bill allocations",
-    "deleteTitle": "Delete Payment",
-    "deleteConfirmation": "Are you sure you want to delete this payment? This will also update the associated bill balances. This action cannot be undone.",
+    "deleteTitle": "Void Payment",
+    "deleteConfirmation": "Voiding this payment restores the balances of the bills it paid and posts a reversing journal entry. The payment is kept for the audit trail.",
     "form": {
       "vendor": "Vendor",
       "vendorPlaceholder": "Select a vendor",
@@ -306,7 +316,10 @@
     "empty": {
       "title": "No payments yet",
       "description": "Payments will appear here when recorded"
-    }
+    },
+    "void": "Void",
+    "voided": "Payment voided",
+    "voidFailed": "Failed to void payment"
   },
   "lineItems": {
     "title": "Line Items",
