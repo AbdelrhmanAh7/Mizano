@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { OrganizationsService } from '../../organizations/organizations.service';
@@ -439,7 +440,7 @@ export class JournalsService {
     tx: Prisma.TransactionClient,
     organizationId: string,
   ): Promise<void> {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`journal:${organizationId}`}))`;
+    await lockOrganizationLedger(tx, organizationId);
   }
 
   private async nextJournalNumber(

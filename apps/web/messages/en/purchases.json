@@ -333,7 +333,12 @@
     "void": "Void",
     "voided": "Payment voided",
     "voidedBadge": "Voided",
-    "voidFailed": "Failed to void payment"
+    "voidFailed": "Failed to void payment",
+    "bulkVoid": {
+      "title": "Void {count} payments?",
+      "description": "Each payment is voided as a whole: every bill it paid is reopened and a linked reversal is posted to the ledger.",
+      "confirm": "Void {count} payments"
+    }
   },
   "lineItems": {
     "title": "Line Items",

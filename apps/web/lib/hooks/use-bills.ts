@@ -143,14 +143,6 @@ interface CreateBillData {
 
 type UpdateBillData = Partial<CreateBillData>;
 
-/** Document currency for display: bill currency, then vendor currency, then fallback. */
-export function billCurrency(
-  bill: Pick<Bill, 'currencyCode' | 'vendor'>,
-  fallback = 'USD',
-): string {
-  return bill.currencyCode || bill.vendor?.currency || fallback;
-}
-
 /**
  * Hook to fetch all bills with pagination
  */

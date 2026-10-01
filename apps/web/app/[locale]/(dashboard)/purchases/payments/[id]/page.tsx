@@ -34,6 +34,7 @@ import {
   formatPaymentMode,
   formatCurrency,
 } from '@/lib/hooks/use-payments-made';
+import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
 
 interface PaymentDetailPageProps {
   params: { id: string };
@@ -42,12 +43,14 @@ interface PaymentDetailPageProps {
 export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
   const { id } = params;
   const t = useTranslations('purchases');
+  const baseCurrency = useBaseCurrency();
   const tCommon = useTranslations('common');
   const router = useRouter();
   const { data: payment, isLoading } = usePaymentMade(id);
   const deletePayment = useDeletePaymentMade();
 
-  const currency = payment?.vendor?.currency || 'USD';
+  // Payments are recorded and posted in the organization base currency.
+  const currency = baseCurrency;
 
   const handleDelete = async () => {
     await deletePayment.mutateAsync(id);

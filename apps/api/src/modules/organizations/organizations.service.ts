@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { lockOrganizationLedger } from '../../common/utils/ledger-lock';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { UpdateAccountSettingsDto } from './dto/update-account-settings.dto';
@@ -254,23 +256,26 @@ export class OrganizationsService {
   }
 
   async updateGeneralSettings(id: string, dto: GeneralSettingsDto) {
-    await this.assertBaseCurrencyChangeAllowed(id, dto.baseCurrency);
-    return this.prisma.organization.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        logoUrl: dto.logoUrl,
-        address: dto.address,
-        phone: dto.phone,
-        email: dto.email,
-        website: dto.website,
-        taxRegistrationNumber: dto.taxRegistrationNumber,
-        industry: dto.industry,
-        // Legacy `currency` mirrors the base currency so the two can never drift apart.
-        baseCurrency: dto.baseCurrency,
-        currency: dto.baseCurrency,
-      },
-      select: { id: true, name: true, updatedAt: true },
+    // Guard and update commit together under the ledger lock (see assertBaseCurrencyChangeAllowed).
+    return this.prisma.$transaction(async (tx) => {
+      await this.assertBaseCurrencyChangeAllowed(tx, id, dto.baseCurrency);
+      return tx.organization.update({
+        where: { id },
+        data: {
+          name: dto.name,
+          logoUrl: dto.logoUrl,
+          address: dto.address,
+          phone: dto.phone,
+          email: dto.email,
+          website: dto.website,
+          taxRegistrationNumber: dto.taxRegistrationNumber,
+          industry: dto.industry,
+          // Legacy `currency` mirrors the base currency so the two can never drift apart.
+          baseCurrency: dto.baseCurrency,
+          currency: dto.baseCurrency,
+        },
+        select: { id: true, name: true, updatedAt: true },
+      });
     });
   }
 
@@ -279,16 +284,19 @@ export class OrganizationsService {
    * frozen once anything is posted; changing it would relabel every historical amount.
    */
   private async assertBaseCurrencyChangeAllowed(
+    tx: Prisma.TransactionClient,
     organizationId: string,
     baseCurrency: string | undefined,
   ): Promise<void> {
     if (!baseCurrency) return;
-    const org = await this.prisma.organization.findUnique({
+    // Same lock as journal posting: no journal can commit between this check and the update.
+    await lockOrganizationLedger(tx, organizationId);
+    const org = await tx.organization.findUnique({
       where: { id: organizationId },
       select: { baseCurrency: true },
     });
     if (!org || org.baseCurrency === baseCurrency) return;
-    const posted = await this.prisma.journal.count({
+    const posted = await tx.journal.count({
       where: { organizationId, isPosted: true, deletedAt: null },
     });
     if (posted > 0) {
@@ -479,19 +487,21 @@ export class OrganizationsService {
   }
 
   async completeCompanyInfoStep(orgId: string, dto: CompanyInfoStepDto) {
-    await this.assertBaseCurrencyChangeAllowed(orgId, dto.baseCurrency);
-    // Update organization with company info
-    await this.prisma.organization.update({
-      where: { id: orgId },
-      data: {
-        name: dto.name,
-        industry: dto.industry,
-        logoUrl: dto.logoUrl,
-        baseCurrency: dto.baseCurrency,
-        currency: dto.baseCurrency,
-        address: dto.address,
-        phone: dto.phone,
-      },
+    // Guard and update commit together under the ledger lock (see assertBaseCurrencyChangeAllowed).
+    await this.prisma.$transaction(async (tx) => {
+      await this.assertBaseCurrencyChangeAllowed(tx, orgId, dto.baseCurrency);
+      await tx.organization.update({
+        where: { id: orgId },
+        data: {
+          name: dto.name,
+          industry: dto.industry,
+          logoUrl: dto.logoUrl,
+          baseCurrency: dto.baseCurrency,
+          currency: dto.baseCurrency,
+          address: dto.address,
+          phone: dto.phone,
+        },
+      });
     });
 
     // Mark step as complete

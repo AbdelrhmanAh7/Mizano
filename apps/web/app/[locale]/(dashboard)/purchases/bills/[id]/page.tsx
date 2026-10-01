@@ -48,6 +48,7 @@ import {
 import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
+import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
 
 const PAYABLE_STATUSES = ['OPEN', 'OVERDUE', 'PARTIALLY_PAID'];
 
@@ -67,6 +68,7 @@ interface BillDetailPageProps {
 export default function BillDetailPage({ params }: BillDetailPageProps) {
   const { id } = params;
   const t = useTranslations('purchases');
+  const baseCurrency = useBaseCurrency();
   const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();
   const { toast } = useToast();
@@ -160,8 +162,8 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
   });
   const isOverdue =
     bill.status === 'OVERDUE' || (bill.status === 'OPEN' && new Date(bill.dueDate) < new Date());
-  // The bill's own currency wins over the vendor default.
-  const currency = bill.currencyCode || bill.vendor?.currency || 'USD';
+  // A bill without its own currency is posted in the base currency, so it is shown in it.
+  const currency = documentCurrency(bill.currencyCode, baseCurrency);
 
   return (
     <div className="space-y-6">

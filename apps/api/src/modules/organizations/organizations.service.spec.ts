@@ -75,6 +75,12 @@ const mockPrisma = {
   journal: {
     count: jest.fn(),
   },
+  $executeRaw: jest.fn(),
+};
+// Interactive transactions run against the same mock client.
+const prismaWithTx = {
+  ...mockPrisma,
+  $transaction: jest.fn(async (fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma)),
 };
 
 describe('OrganizationsService', () => {
@@ -83,7 +89,7 @@ describe('OrganizationsService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      providers: [OrganizationsService, { provide: PrismaService, useValue: mockPrisma }],
+      providers: [OrganizationsService, { provide: PrismaService, useValue: prismaWithTx }],
     }).compile();
 
     service = module.get<OrganizationsService>(OrganizationsService);
@@ -214,6 +220,7 @@ describe('OrganizationsService', () => {
       expect(mockPrisma.journal.count).toHaveBeenCalledWith({
         where: { organizationId: ORG_ID, isPosted: true, deletedAt: null },
       });
+      expect(mockPrisma.$executeRaw).toHaveBeenCalled(); // ledger lock taken before the check
       expect(mockPrisma.organization.update).not.toHaveBeenCalled();
     });
 

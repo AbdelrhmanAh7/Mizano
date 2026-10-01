@@ -278,6 +278,22 @@ export function useOrganization() {
   });
 }
 
+/**
+ * The organization's base (ledger) currency. AP/AR documents without an explicit currency are
+ * posted in it, so they must be displayed in it too, never in the counterparty's default.
+ */
+export function useBaseCurrency(): string | undefined {
+  return useOrganization().data?.baseCurrency;
+}
+
+/** Display currency of a document: its own currency, else the organization base currency. */
+export function documentCurrency(
+  currencyCode: string | null | undefined,
+  baseCurrency: string | undefined,
+): string | undefined {
+  return currencyCode || baseCurrency;
+}
+
 export function useAllSettings() {
   return useQuery({
     queryKey: ['organization-settings'],

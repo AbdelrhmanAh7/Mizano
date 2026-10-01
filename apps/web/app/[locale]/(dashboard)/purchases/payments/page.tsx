@@ -42,9 +42,11 @@ import { format } from 'date-fns';
 import { Ban, Eye, Plus, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
+import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
 
 function PaymentsMadePageContent() {
   const t = useTranslations('purchases');
+  const baseCurrency = useBaseCurrency();
   const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();
   const { toast } = useToast();
@@ -173,8 +175,7 @@ function PaymentsMadePageContent() {
         />
       ),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono font-medium' },
-      cell: ({ row }) =>
-        formatCurrency(row.original.amount, row.original.vendor?.currency || 'USD'),
+      cell: ({ row }) => formatCurrency(row.original.amount, baseCurrency),
     },
     {
       id: 'actions',
@@ -283,7 +284,10 @@ function PaymentsMadePageContent() {
         action="void"
         count={bulkSelectedRows.length}
         itemType="payments"
-        description={t('payments.deleteConfirmation')}
+        title={t('payments.bulkVoid.title', { count: bulkSelectedRows.length })}
+        description={t('payments.bulkVoid.description')}
+        confirmLabel={t('payments.bulkVoid.confirm', { count: bulkSelectedRows.length })}
+        cancelLabel={tCommon('buttons.cancel')}
         destructive
         isLoading={bulkDeleteAction.isLoading}
         onConfirm={async () => {
