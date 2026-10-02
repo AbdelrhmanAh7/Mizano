@@ -1,0 +1,9 @@
+[Unit]
+Description=Mizano nightly backup at 02:30 Africa/Cairo
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 Africa/Cairo
+Persistent=true
+
+[Install]
+WantedBy=timers.target

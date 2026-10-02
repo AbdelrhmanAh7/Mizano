@@ -160,3 +160,5 @@ The workflow still pulls an Ollama vision model on the host; the CPU-only demo m
 **Operations.** Back up PostgreSQL daily, for example `docker exec mizano-postgres pg_dump -U mizano mizano_db | gzip > /backups/mizano-$(date +%Y%m%d).sql.gz`, and keep uploaded originals with the same retention. Generate secrets with `openssl rand -base64 48`; never commit them or paste them into issues.
 
 Historical VPS sizing and provider notes: [archive/deployment-requirements-2026-03.md](archive/deployment-requirements-2026-03.md).
+
+**Raspberry Pi 5.** The tiny live deployment (compose, Cloudflare Tunnel, digest deploys, encrypted backups, monitoring) is documented in [deploy/pi/README.md](../deploy/pi/README.md).
