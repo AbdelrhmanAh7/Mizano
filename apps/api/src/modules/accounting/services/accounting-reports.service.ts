@@ -1,94 +1,104 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { AccountType, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
+import {
+  isDebitNormal,
+  money,
+  naturalBalance,
+  parseReportDate,
+  postedJournalWhere,
+  sumPostedLinesByAccount,
+  toDecimal,
+} from '../../reports/utils/report-utils';
 
+export interface TrialBalanceAccountRow {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  /** Exact Decimal; serialized as a plain decimal string (JSON). */
+  debit: Decimal;
+  credit: Decimal;
+}
+
+export interface TrialBalanceResult {
+  accounts: TrialBalanceAccountRow[];
+  totals: { totalDebits: Decimal; totalCredits: Decimal };
+  isBalanced: boolean;
+  asOfDate: string | null;
+}
+
+export interface GeneralLedgerEntry {
+  date: Date;
+  journalId: string;
+  journalNumber: string;
+  description: string;
+  debit: string;
+  credit: string;
+  runningBalance: string;
+}
+
+export interface GeneralLedgerResult {
+  account: { id: string; code: string; name: string; type: string };
+  openingBalance: string;
+  entries: GeneralLedgerEntry[];
+  closingBalance: string;
+  dateFrom: string | null;
+  dateTo: string | null;
+}
+
+/**
+ * Ledger reports derived only from posted, non-deleted journal lines. Opening balances are posted
+ * journals (see OpeningBalancesService), so `Account.openingBalance` is never added here.
+ */
 @Injectable()
 export class AccountingReportsService {
   constructor(private prisma: PrismaService) {}
 
-  async getTrialBalance(organizationId: string, asOfDate?: string) {
-    const accounts = await this.prisma.account.findMany({
-      where: { organizationId, deletedAt: null, isActive: true },
-      orderBy: { code: 'asc' },
-    });
+  async getTrialBalance(organizationId: string, asOfDate?: string): Promise<TrialBalanceResult> {
+    const asOf = parseReportDate(asOfDate, 'end', 'asOfDate');
 
-    const dateFilter: Prisma.JournalWhereInput = {};
-    if (asOfDate) {
-      dateFilter.date = { lte: new Date(asOfDate) };
-    }
-
-    const debitNormalTypes: string[] = [AccountType.ASSET, AccountType.EXPENSE];
+    const [accounts, totals] = await Promise.all([
+      this.prisma.account.findMany({
+        where: { organizationId, deletedAt: null },
+        orderBy: { code: 'asc' },
+        select: { id: true, code: true, name: true, type: true },
+      }),
+      sumPostedLinesByAccount(this.prisma, organizationId, asOf ? { lte: asOf } : undefined),
+    ]);
 
     let totalDebits = new Decimal(0);
     let totalCredits = new Decimal(0);
+    const rows: TrialBalanceAccountRow[] = [];
 
-    const trialBalanceAccounts = await Promise.all(
-      accounts.map(async (account) => {
-        const aggregation = await this.prisma.journalLine.aggregate({
-          where: {
-            accountId: account.id,
-            journal: {
-              organizationId,
-              isPosted: true,
-              deletedAt: null,
-              ...dateFilter,
-            },
-          },
-          _sum: {
-            debit: true,
-            credit: true,
-          },
-        });
+    for (const account of accounts) {
+      const t = totals.get(account.id);
+      if (!t) continue;
+      const net = naturalBalance(account.type, t.debit, t.credit);
+      if (net.isZero()) continue;
 
-        const sumDebits = new Decimal(aggregation._sum.debit?.toString() || '0');
-        const sumCredits = new Decimal(aggregation._sum.credit?.toString() || '0');
-        const openingBalance = new Decimal(account.openingBalance?.toString() || '0');
-
-        const isDebitNormal = debitNormalTypes.includes(account.type);
-        const netBalance = isDebitNormal
-          ? sumDebits.minus(sumCredits).plus(openingBalance)
-          : sumCredits.minus(sumDebits).plus(openingBalance);
-
-        let debit = new Decimal(0);
-        let credit = new Decimal(0);
-
-        if (netBalance.greaterThan(0)) {
-          if (isDebitNormal) {
-            debit = netBalance;
-          } else {
-            credit = netBalance;
-          }
-        } else if (netBalance.lessThan(0)) {
-          if (isDebitNormal) {
-            credit = netBalance.abs();
-          } else {
-            debit = netBalance.abs();
-          }
-        }
-
-        totalDebits = totalDebits.plus(debit);
-        totalCredits = totalCredits.plus(credit);
-
-        return {
-          id: account.id,
-          code: account.code,
-          name: account.name,
-          type: account.type,
-          debit,
-          credit,
-        };
-      }),
-    );
-
-    // Filter out zero-balance accounts
-    const nonZeroAccounts = trialBalanceAccounts.filter(
-      (a) => !a.debit.isZero() || !a.credit.isZero(),
-    );
+      // A negative natural balance sits on the opposite side of the account's normal side.
+      const onDebitSide = isDebitNormal(account.type) ? net.greaterThan(0) : net.lessThan(0);
+      const amount = net.abs();
+      const debit = onDebitSide ? amount : new Decimal(0);
+      const credit = onDebitSide ? new Decimal(0) : amount;
+      totalDebits = totalDebits.add(debit);
+      totalCredits = totalCredits.add(credit);
+      rows.push({
+        id: account.id,
+        code: account.code,
+        name: account.name,
+        type: account.type,
+        debit,
+        credit,
+      });
+    }
 
     return {
-      accounts: nonZeroAccounts,
+      accounts: rows,
       totals: { totalDebits, totalCredits },
+      isBalanced: totalDebits.equals(totalCredits),
       asOfDate: asOfDate || null,
     };
   }
@@ -98,7 +108,7 @@ export class AccountingReportsService {
     accountId: string,
     dateFrom?: string,
     dateTo?: string,
-  ) {
+  ): Promise<GeneralLedgerResult> {
     const account = await this.prisma.account.findFirst({
       where: { id: accountId, organizationId, deletedAt: null },
     });
@@ -107,98 +117,56 @@ export class AccountingReportsService {
       throw new NotFoundException('Account not found');
     }
 
-    const debitNormalTypes: string[] = [AccountType.ASSET, AccountType.EXPENSE];
-    const isDebitNormal = debitNormalTypes.includes(account.type);
+    const from = parseReportDate(dateFrom, 'start', 'dateFrom');
+    const to = parseReportDate(dateTo, 'end', 'dateTo');
 
-    // Calculate opening balance: all posted lines before dateFrom + openingBalance
-    const openingBalanceBase = new Decimal(account.openingBalance?.toString() || '0');
-    let openingBalance = openingBalanceBase;
-
-    if (dateFrom) {
-      const priorAggregation = await this.prisma.journalLine.aggregate({
-        where: {
-          accountId,
-          journal: {
-            organizationId,
-            isPosted: true,
-            deletedAt: null,
-            date: { lt: new Date(dateFrom) },
-          },
-        },
-        _sum: { debit: true, credit: true },
-      });
-
-      const priorDebits = new Decimal(priorAggregation._sum.debit?.toString() || '0');
-      const priorCredits = new Decimal(priorAggregation._sum.credit?.toString() || '0');
-
-      openingBalance = isDebitNormal
-        ? priorDebits.minus(priorCredits).plus(openingBalanceBase)
-        : priorCredits.minus(priorDebits).plus(openingBalanceBase);
+    let openingBalance = new Decimal(0);
+    if (from) {
+      const prior = await sumPostedLinesByAccount(this.prisma, organizationId, { lt: from }, [
+        accountId,
+      ]);
+      const t = prior.get(accountId);
+      if (t) openingBalance = naturalBalance(account.type, t.debit, t.credit);
     }
 
-    // Get journal lines in date range
-    const dateFilter: Prisma.JournalWhereInput = {};
-    if (dateFrom || dateTo) {
-      dateFilter.date = {};
-      if (dateFrom) dateFilter.date.gte = new Date(dateFrom);
-      if (dateTo) dateFilter.date.lte = new Date(dateTo);
-    }
+    const range: Prisma.DateTimeFilter = {};
+    if (from) range.gte = from;
+    if (to) range.lte = to;
 
     const journalLines = await this.prisma.journalLine.findMany({
       where: {
         accountId,
-        journal: {
-          organizationId,
-          isPosted: true,
-          deletedAt: null,
-          ...dateFilter,
-        },
+        journal: postedJournalWhere(organizationId, from || to ? range : undefined),
       },
       include: {
         journal: {
-          select: {
-            id: true,
-            journalNumber: true,
-            date: true,
-            notes: true,
-          },
+          select: { id: true, journalNumber: true, date: true, notes: true },
         },
       },
-      orderBy: { journal: { date: 'asc' } },
+      orderBy: [{ journal: { date: 'asc' } }, { journalId: 'asc' }, { id: 'asc' }],
     });
 
     let runningBalance = openingBalance;
-    const entries = journalLines.map((line) => {
-      const debit = new Decimal(line.debit.toString());
-      const credit = new Decimal(line.credit.toString());
-
-      if (isDebitNormal) {
-        runningBalance = runningBalance.plus(debit).minus(credit);
-      } else {
-        runningBalance = runningBalance.plus(credit).minus(debit);
-      }
-
+    const entries = journalLines.map((line): GeneralLedgerEntry => {
+      const debit = toDecimal(line.debit);
+      const credit = toDecimal(line.credit);
+      runningBalance = runningBalance.add(naturalBalance(account.type, debit, credit));
       return {
         date: line.journal.date,
         journalId: line.journal.id,
         journalNumber: line.journal.journalNumber,
         description: line.description || line.journal.notes || '',
-        debit,
-        credit,
-        runningBalance,
+        debit: money(debit),
+        credit: money(credit),
+        runningBalance: money(runningBalance),
       };
     });
 
     return {
-      account: {
-        id: account.id,
-        code: account.code,
-        name: account.name,
-        type: account.type,
-      },
-      openingBalance,
+      account: { id: account.id, code: account.code, name: account.name, type: account.type },
+      openingBalance: money(openingBalance),
       entries,
-      closingBalance: runningBalance,
+      closingBalance: money(runningBalance),
       dateFrom: dateFrom || null,
       dateTo: dateTo || null,
     };

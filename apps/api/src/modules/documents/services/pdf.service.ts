@@ -613,7 +613,12 @@ export class PdfService {
       tot = eb();
     if (type === 'receivables') {
       const inv = await this.prisma.invoice.findMany({
-        where: { organizationId, deletedAt: null, balanceDue: { gt: 0 } },
+        where: {
+          organizationId,
+          deletedAt: null,
+          balanceDue: { gt: 0 },
+          status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] },
+        },
         include: { customer: { select: { name: true } } },
       });
       for (const i of inv) {
@@ -629,7 +634,12 @@ export class PdfService {
       }
     } else {
       const bills = await this.prisma.bill.findMany({
-        where: { organizationId, deletedAt: null, balanceDue: { gt: 0 } },
+        where: {
+          organizationId,
+          deletedAt: null,
+          balanceDue: { gt: 0 },
+          status: { in: ['OPEN', 'PARTIALLY_PAID', 'OVERDUE'] },
+        },
         include: { vendor: { select: { name: true } } },
       });
       for (const bl of bills) {

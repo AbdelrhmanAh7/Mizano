@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -21,6 +22,7 @@ import {
   getAccountTypeColor,
   getAccountTypeLabel,
 } from '@/lib/hooks/use-accounts';
+import { moneyToNumber } from '@/lib/money';
 import { useJournals, formatJournalAmount } from '@/lib/hooks/use-journals';
 import { format } from 'date-fns';
 
@@ -29,7 +31,12 @@ export default function AccountDetailPage() {
   const accountId = params.id as string;
 
   const { data: account, isLoading: accountLoading } = useAccount(accountId);
-  const { data: balance, isLoading: balanceLoading } = useAccountBalance(accountId);
+  const tc = useTranslations('common');
+  const {
+    data: balance,
+    isLoading: balanceLoading,
+    isError: balanceError,
+  } = useAccountBalance(accountId);
   const { data: journalsData } = useJournals({ limit: 10, sortBy: 'date', sortOrder: 'desc' });
 
   if (accountLoading) {
@@ -157,6 +164,10 @@ export default function AccountDetailPage() {
           <CardContent>
             {balanceLoading ? (
               <Skeleton className="h-16 w-32" />
+            ) : balanceError ? (
+              <p className="text-muted-foreground" role="alert">
+                {tc('table.error')}
+              </p>
             ) : balance ? (
               <div className="space-y-4">
                 <div>
@@ -165,19 +176,21 @@ export default function AccountDetailPage() {
                     {new Intl.NumberFormat('en-US', {
                       style: 'currency',
                       currency: account.currency || 'USD',
-                    }).format(parseFloat(balance.balance ?? balance ?? '0'))}
+                    }).format(moneyToNumber(balance.balance))}
                   </p>
                 </div>
-                {balance.debitTotal !== undefined && (
+                {balance.totalDebits !== undefined && (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Total Debits</p>
-                      <p className="text-lg font-mono">{formatJournalAmount(balance.debitTotal)}</p>
+                      <p className="text-lg font-mono">
+                        {formatJournalAmount(balance.totalDebits)}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Total Credits</p>
                       <p className="text-lg font-mono">
-                        {formatJournalAmount(balance.creditTotal)}
+                        {formatJournalAmount(balance.totalCredits)}
                       </p>
                     </div>
                   </div>

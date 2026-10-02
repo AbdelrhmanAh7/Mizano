@@ -3,6 +3,7 @@ import {
   AccountType,
   AttendanceStatus,
   BillStatus,
+  CreditNoteType,
   DealStage,
   InvoiceStatus,
   LeadSource,
@@ -16,7 +17,42 @@ import {
 import { Decimal } from '@prisma/client/runtime/library';
 import { CacheService } from '../../../cache/cache.service';
 import { ReadReplicaService } from '../../../prisma/read-replica.service';
+import {
+  POSTED_BILL_STATUSES,
+  POSTED_EXPENSE_STATUSES,
+  POSTED_INVOICE_STATUSES,
+  endOfUtcDay,
+  isIncomeType,
+  lastMonths,
+  money,
+  monthKey,
+  naturalBalance,
+  parseReportDate,
+  postedLineRows,
+  resolveCashAccountIds,
+  startOfUtcDay,
+  sumDecimals,
+  sumPostedLinesByAccount,
+  toDecimal,
+  toIsoDate,
+} from '../utils/report-utils';
 
+const ZERO = new Decimal(0);
+const COGS_PREFIX = '5';
+
+interface PlAccount {
+  id: string;
+  code: string;
+  name: string;
+  type: AccountType;
+}
+
+/**
+ * Dashboard figures follow the same rules as the financial reports: ledger figures (revenue,
+ * expenses, cash, account balances) come only from posted, non-deleted journal lines; document
+ * figures (receivables, payables, status charts) exclude DRAFT, VOID and soft-deleted records.
+ * All sums are exact Decimal and money leaves as fixed 4-dp strings.
+ */
 @Injectable()
 export class DashboardService {
   constructor(
@@ -40,27 +76,26 @@ export class DashboardService {
     endDate?: string,
   ) {
     const today = new Date();
-    const periodStart = startDate
-      ? new Date(startDate)
-      : new Date(today.getFullYear(), today.getMonth(), 1);
-    const periodEnd = endDate ? new Date(endDate) : today;
+    const periodEnd = parseReportDate(endDate, 'end', 'endDate') ?? endOfUtcDay(today);
+    const periodStart =
+      parseReportDate(startDate, 'start', 'startDate') ??
+      new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
 
     // Compute equivalent previous period for trend comparison
     const periodMs = periodEnd.getTime() - periodStart.getTime();
     const prevPeriodEnd = new Date(periodStart.getTime() - 1);
     const prevPeriodStart = new Date(prevPeriodEnd.getTime() - periodMs);
-    const startOfYear = new Date(today.getFullYear(), 0, 1);
+    const startOfYear = new Date(Date.UTC(today.getUTCFullYear(), 0, 1));
 
-    // Get key metrics in parallel (current + previous period for trends)
+    const accounts = await this.getPlAccounts(organizationId);
+
     const [
       totalReceivables,
       totalPayables,
-      periodRevenue,
-      periodExpenses,
-      prevPeriodRevenue,
-      prevPeriodExpenses,
-      yearlyRevenue,
-      bankBalances,
+      period,
+      previous,
+      yearly,
+      cash,
       overdueInvoices,
       overdueBills,
       recentInvoices,
@@ -70,12 +105,10 @@ export class DashboardService {
     ] = await Promise.all([
       this.getTotalReceivables(organizationId),
       this.getTotalPayables(organizationId),
-      this.getRevenueInRange(organizationId, periodStart, periodEnd),
-      this.getExpensesInRange(organizationId, periodStart, periodEnd),
-      this.getRevenueInRange(organizationId, prevPeriodStart, prevPeriodEnd),
-      this.getExpensesInRange(organizationId, prevPeriodStart, prevPeriodEnd),
-      this.getYearlyRevenue(organizationId, startOfYear),
-      this.getBankBalances(organizationId),
+      this.getLedgerProfitAndLoss(organizationId, accounts, periodStart, periodEnd),
+      this.getLedgerProfitAndLoss(organizationId, accounts, prevPeriodStart, prevPeriodEnd),
+      this.getLedgerProfitAndLoss(organizationId, accounts, startOfYear, endOfUtcDay(today)),
+      this.getCashAndBank(organizationId),
       this.getOverdueInvoicesCount(organizationId),
       this.getOverdueBillsCount(organizationId),
       this.getRecentInvoices(organizationId, 5),
@@ -84,22 +117,23 @@ export class DashboardService {
       this.getUpcomingPayments(organizationId, 7),
     ]);
 
-    const periodProfit = periodRevenue - periodExpenses;
-    const prevProfit = prevPeriodRevenue - prevPeriodExpenses;
+    const periodProfit = period.revenue.sub(period.expenses);
+    const prevProfit = previous.revenue.sub(previous.expenses);
 
     return {
       overview: {
-        totalReceivables,
-        totalPayables,
-        netPosition: totalReceivables - totalPayables,
-        monthlyRevenue: periodRevenue,
-        monthlyExpenses: periodExpenses,
-        monthlyProfit: periodProfit,
-        yearlyRevenue,
+        totalReceivables: money(totalReceivables),
+        totalPayables: money(totalPayables),
+        netPosition: money(totalReceivables.sub(totalPayables)),
+        monthlyRevenue: money(period.revenue),
+        monthlyExpenses: money(period.expenses),
+        monthlyProfit: money(periodProfit),
+        yearlyRevenue: money(yearly.revenue),
+        cashBalance: money(cash.total),
       },
       trends: {
-        revenue: this.computeTrend(periodRevenue, prevPeriodRevenue),
-        expenses: this.computeTrend(periodExpenses, prevPeriodExpenses),
+        revenue: this.computeTrend(period.revenue, previous.revenue),
+        expenses: this.computeTrend(period.expenses, previous.expenses),
         profit: this.computeTrend(periodProfit, prevProfit),
       },
       alerts: {
@@ -107,12 +141,100 @@ export class DashboardService {
         overdueBills,
         activeProjects,
       },
-      bankBalances,
+      bankBalances: cash.accounts,
       recentActivity: {
         invoices: recentInvoices,
         bills: recentBills,
       },
       upcomingPayments,
+    };
+  }
+
+  /** Revenue/income and expense accounts of the tenant (the P&L universe). */
+  private async getPlAccounts(organizationId: string): Promise<PlAccount[]> {
+    return this.prisma.account.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+        type: { in: [AccountType.REVENUE, AccountType.INCOME, AccountType.EXPENSE] },
+      },
+      select: { id: true, code: true, name: true, type: true },
+      orderBy: { code: 'asc' },
+    });
+  }
+
+  /** Posted-ledger revenue and expenses between two instants (one grouped query). */
+  private async getLedgerProfitAndLoss(
+    organizationId: string,
+    accounts: PlAccount[],
+    start: Date,
+    end: Date,
+  ): Promise<{ revenue: Decimal; expenses: Decimal }> {
+    const totals = await sumPostedLinesByAccount(
+      this.prisma,
+      organizationId,
+      { gte: start, lte: end },
+      accounts.map((a) => a.id),
+    );
+    let revenue = ZERO;
+    let expenses = ZERO;
+    for (const account of accounts) {
+      const t = totals.get(account.id);
+      if (!t) continue;
+      const value = naturalBalance(account.type, t.debit, t.credit);
+      if (isIncomeType(account.type)) revenue = revenue.add(value);
+      else expenses = expenses.add(value);
+    }
+    return { revenue, expenses };
+  }
+
+  /**
+   * Cash and bank from the posted ledger: the total over every cash/bank ledger account plus each
+   * active bank account's ledger balance (its stored balance only when nothing is linked).
+   */
+  private async getCashAndBank(organizationId: string): Promise<{
+    total: Decimal;
+    accounts: Array<{
+      id: string;
+      name: string;
+      currency: string;
+      linkedAccountId: string;
+      systemBalance: string;
+      bankBalance: string;
+    }>;
+  }> {
+    const [cashIds, bankAccounts] = await Promise.all([
+      resolveCashAccountIds(this.prisma, organizationId),
+      this.prisma.bankAccount.findMany({
+        where: { organizationId, isActive: true, deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          systemBalance: true,
+          bankBalance: true,
+          currency: true,
+          linkedAccountId: true,
+        },
+      }),
+    ]);
+    const linkedIds = bankAccounts.map((b) => b.linkedAccountId);
+    const totals = await sumPostedLinesByAccount(this.prisma, organizationId, undefined, [
+      ...new Set([...cashIds, ...linkedIds]),
+    ]);
+    const balance = (accountId: string): Decimal => {
+      const t = totals.get(accountId);
+      return t ? t.debit.sub(t.credit) : ZERO;
+    };
+    return {
+      total: sumDecimals(cashIds.map(balance)),
+      accounts: bankAccounts.map((b) => ({
+        id: b.id,
+        name: b.name,
+        currency: b.currency,
+        linkedAccountId: b.linkedAccountId,
+        systemBalance: money(balance(b.linkedAccountId)),
+        bankBalance: money(b.bankBalance),
+      })),
     };
   }
 
@@ -126,164 +248,158 @@ export class DashboardService {
     );
   }
 
-  private async computeRevenueChart(organizationId: string, months: number = 12) {
-    const today = new Date();
-    const startDate = new Date(today.getFullYear(), today.getMonth() - months + 1, 1);
-
-    // 3 aggregate queries instead of months * 3 individual queries
-    const [invoicesByMonth, expensesByMonth, billsByMonth] = await Promise.all([
-      this.prisma.invoice.groupBy({
-        by: ['date'],
-        where: { organizationId, deletedAt: null, date: { gte: startDate } },
-        _sum: { grandTotal: true },
-      }),
-      this.prisma.expense.groupBy({
-        by: ['date'],
-        where: { organizationId, date: { gte: startDate } },
-        _sum: { amount: true },
-      }),
-      this.prisma.bill.groupBy({
-        by: ['date'],
-        where: { organizationId, deletedAt: null, date: { gte: startDate } },
-        _sum: { grandTotal: true },
-      }),
-    ]);
-
-    // Bucket by month
-    const revenueByMonth: Record<string, number> = {};
-    const expenseByMonth: Record<string, number> = {};
-
-    for (const inv of invoicesByMonth) {
-      const key = `${inv.date.getFullYear()}-${inv.date.getMonth()}`;
-      revenueByMonth[key] =
-        (revenueByMonth[key] || 0) + parseFloat(inv._sum.grandTotal?.toString() || '0');
+  /** Posted-ledger revenue, COGS and other expenses per UTC month (one journal-line query). */
+  private async monthlyLedgerPl(
+    organizationId: string,
+    months: number,
+  ): Promise<{
+    buckets: ReturnType<typeof lastMonths>;
+    byMonth: Map<string, { revenue: Decimal; expenses: Decimal; cogs: Decimal }>;
+  }> {
+    const buckets = lastMonths(months);
+    const accounts = await this.getPlAccounts(organizationId);
+    const byId = new Map(accounts.map((a) => [a.id, a]));
+    const rows = await postedLineRows(
+      this.prisma,
+      organizationId,
+      accounts.map((a) => a.id),
+      { gte: buckets[0].start, lte: buckets[buckets.length - 1].end },
+    );
+    const byMonth = new Map<string, { revenue: Decimal; expenses: Decimal; cogs: Decimal }>();
+    for (const row of rows) {
+      const account = byId.get(row.accountId);
+      if (!account) continue;
+      const key = monthKey(row.date);
+      const entry = byMonth.get(key) ?? { revenue: ZERO, expenses: ZERO, cogs: ZERO };
+      const value = naturalBalance(account.type, row.debit, row.credit);
+      if (isIncomeType(account.type)) entry.revenue = entry.revenue.add(value);
+      else {
+        entry.expenses = entry.expenses.add(value);
+        if (account.code.startsWith(COGS_PREFIX)) entry.cogs = entry.cogs.add(value);
+      }
+      byMonth.set(key, entry);
     }
-    for (const exp of expensesByMonth) {
-      const key = `${exp.date.getFullYear()}-${exp.date.getMonth()}`;
-      expenseByMonth[key] =
-        (expenseByMonth[key] || 0) + parseFloat(exp._sum.amount?.toString() || '0');
-    }
-    for (const bill of billsByMonth) {
-      const key = `${bill.date.getFullYear()}-${bill.date.getMonth()}`;
-      expenseByMonth[key] =
-        (expenseByMonth[key] || 0) + parseFloat(bill._sum.grandTotal?.toString() || '0');
-    }
-
-    // Build the result array
-    const data = [];
-    for (let i = months - 1; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${d.getMonth()}`;
-      const revenue = revenueByMonth[key] || 0;
-      const expenses = expenseByMonth[key] || 0;
-      data.push({
-        month: d.toLocaleString('default', { month: 'short', year: 'numeric' }),
-        revenue,
-        expenses,
-        profit: revenue - expenses,
-      });
-    }
-
-    return data;
+    return { buckets, byMonth };
   }
 
+  private async computeRevenueChart(organizationId: string, months: number = 12) {
+    const { buckets, byMonth } = await this.monthlyLedgerPl(organizationId, months);
+    return buckets.map((b) => {
+      const entry = byMonth.get(b.key);
+      const revenue = entry?.revenue ?? ZERO;
+      const expenses = entry?.expenses ?? ZERO;
+      return {
+        month: b.label,
+        revenue: money(revenue),
+        expenses: money(expenses),
+        profit: money(revenue.sub(expenses)),
+      };
+    });
+  }
+
+  /**
+   * Daily cash movement of the cash/bank ledger accounts. Each journal contributes its net effect
+   * on cash once (a transfer between two bank accounts is neither in nor out).
+   */
   async getCashFlowChart(organizationId: string, days: number = 30) {
     const today = new Date();
-    const startDate = new Date(today);
-    startDate.setDate(startDate.getDate() - days + 1);
-    startDate.setHours(0, 0, 0, 0);
+    const start = startOfUtcDay(new Date(today.getTime() - (days - 1) * 86_400_000));
+    const cashIds = await resolveCashAccountIds(this.prisma, organizationId);
+    const rows = await postedLineRows(this.prisma, organizationId, cashIds, {
+      gte: start,
+      lte: endOfUtcDay(today),
+    });
 
-    // 3 range queries instead of days * 3 individual queries
-    const [paymentsIn, paymentsOut, expenses] = await Promise.all([
-      this.prisma.paymentReceived.findMany({
-        where: { organizationId, date: { gte: startDate } },
-        select: { date: true, amount: true },
-      }),
-      this.prisma.paymentMade.findMany({
-        where: { organizationId, date: { gte: startDate } },
-        select: { date: true, amount: true },
-      }),
-      this.prisma.expense.findMany({
-        where: { organizationId, date: { gte: startDate } },
-        select: { date: true, amount: true },
-      }),
-    ]);
-
-    // Bucket by date
-    const cashInByDate: Record<string, number> = {};
-    const cashOutByDate: Record<string, number> = {};
-
-    for (const p of paymentsIn) {
-      const key = p.date.toISOString().split('T')[0];
-      cashInByDate[key] = (cashInByDate[key] || 0) + parseFloat(p.amount.toString());
+    const netByJournal = new Map<string, { day: string; net: Decimal }>();
+    for (const row of rows) {
+      const entry = netByJournal.get(row.journalId) ?? { day: toIsoDate(row.date), net: ZERO };
+      entry.net = entry.net.add(row.debit).sub(row.credit);
+      netByJournal.set(row.journalId, entry);
     }
-    for (const p of paymentsOut) {
-      const key = p.date.toISOString().split('T')[0];
-      cashOutByDate[key] = (cashOutByDate[key] || 0) + parseFloat(p.amount.toString());
-    }
-    for (const e of expenses) {
-      const key = e.date.toISOString().split('T')[0];
-      cashOutByDate[key] = (cashOutByDate[key] || 0) + parseFloat(e.amount.toString());
+    const cashIn = new Map<string, Decimal>();
+    const cashOut = new Map<string, Decimal>();
+    for (const { day, net } of netByJournal.values()) {
+      if (net.greaterThan(0)) cashIn.set(day, (cashIn.get(day) ?? ZERO).add(net));
+      else if (net.lessThan(0)) cashOut.set(day, (cashOut.get(day) ?? ZERO).add(net.abs()));
     }
 
-    // Build daily array
     const data = [];
     for (let i = days - 1; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const key = date.toISOString().split('T')[0];
-      const cashIn = cashInByDate[key] || 0;
-      const cashOut = cashOutByDate[key] || 0;
-      data.push({ date: key, cashIn, cashOut, net: cashIn - cashOut });
+      const day = toIsoDate(new Date(today.getTime() - i * 86_400_000));
+      const inflow = cashIn.get(day) ?? ZERO;
+      const outflow = cashOut.get(day) ?? ZERO;
+      data.push({
+        date: day,
+        cashIn: money(inflow),
+        cashOut: money(outflow),
+        net: money(inflow.sub(outflow)),
+      });
     }
-
     return data;
   }
 
   async getTopCustomers(organizationId: string, limit: number = 5) {
-    const customers = await this.prisma.customer.findMany({
-      where: { organizationId, deletedAt: null },
-      include: {
-        invoices: {
-          where: { deletedAt: null },
-          select: { grandTotal: true },
-        },
-      },
-    });
-
-    const customerRevenue = customers.map((c) => ({
-      id: c.id,
-      name: c.name,
-      totalRevenue: c.invoices.reduce(
-        (sum, inv) => sum + parseFloat((inv.grandTotal ?? 0).toString()),
-        0,
-      ),
-      invoiceCount: c.invoices.length,
-    }));
-
-    return customerRevenue.sort((a, b) => b.totalRevenue - a.totalRevenue).slice(0, limit);
-  }
-
-  async getExpensesByCategory(organizationId: string, startDate: string, endDate: string) {
-    const expenses = await this.prisma.expense.findMany({
+    const groups = await this.prisma.invoice.groupBy({
+      by: ['customerId'],
       where: {
         organizationId,
-        date: { gte: new Date(startDate), lte: new Date(endDate) },
+        deletedAt: null,
+        status: { in: POSTED_INVOICE_STATUSES },
       },
-      include: {
-        account: { select: { id: true, name: true } },
-      },
+      _sum: { grandTotal: true },
+      _count: { id: true },
     });
+    const top = groups
+      .map((g) => ({
+        customerId: g.customerId,
+        total: toDecimal(g._sum.grandTotal),
+        count: g._count.id,
+      }))
+      .sort((a, b) => b.total.comparedTo(a.total))
+      .slice(0, limit);
 
-    const byCategory: Record<string, number> = {};
-    for (const expense of expenses) {
-      const category = expense.account?.name || 'Uncategorized';
-      byCategory[category] = (byCategory[category] || 0) + parseFloat(expense.amount.toString());
-    }
+    const customers =
+      top.length > 0
+        ? await this.prisma.customer.findMany({
+            where: { organizationId, id: { in: top.map((t) => t.customerId) } },
+            select: { id: true, name: true },
+          })
+        : [];
+    const names = new Map(customers.map((c) => [c.id, c.name]));
 
-    return Object.entries(byCategory)
-      .map(([category, amount]) => ({ category, amount }))
-      .sort((a, b) => b.amount - a.amount);
+    return top.map((t) => ({
+      id: t.customerId,
+      name: names.get(t.customerId) ?? '',
+      totalRevenue: money(t.total),
+      invoiceCount: t.count,
+    }));
+  }
+
+  /** Expense totals per expense account from the posted ledger. */
+  async getExpensesByCategory(organizationId: string, startDate: string, endDate: string) {
+    const start = parseReportDate(startDate, 'start', 'startDate');
+    const end = parseReportDate(endDate, 'end', 'endDate');
+    const accounts = (await this.getPlAccounts(organizationId)).filter(
+      (a) => a.type === AccountType.EXPENSE,
+    );
+    const totals = await sumPostedLinesByAccount(
+      this.prisma,
+      organizationId,
+      { ...(start ? { gte: start } : {}), ...(end ? { lte: end } : {}) },
+      accounts.map((a) => a.id),
+    );
+
+    return accounts
+      .map((a) => {
+        const t = totals.get(a.id);
+        return {
+          category: a.name,
+          value: t ? naturalBalance(a.type, t.debit, t.credit) : ZERO,
+        };
+      })
+      .filter((c) => !c.value.isZero())
+      .sort((a, b) => b.value.comparedTo(a.value))
+      .map((c) => ({ category: c.category, amount: money(c.value) }));
   }
 
   async getProjectsOverview(organizationId: string) {
@@ -291,7 +407,9 @@ export class DashboardService {
       where: { organizationId },
       include: {
         timesheetEntries: true,
-        invoices: { where: { deletedAt: null } },
+        invoices: {
+          where: { deletedAt: null, status: { in: POSTED_INVOICE_STATUSES } },
+        },
       },
     });
 
@@ -300,70 +418,72 @@ export class DashboardService {
         (sum, t) => sum + parseFloat((t.hours ?? t.duration).toString()),
         0,
       );
-      const revenue = p.invoices.reduce(
-        (sum, inv) => sum + parseFloat(inv.grandTotal.toString()),
-        0,
-      );
-      const budget = p.budget ? parseFloat(p.budget.toString()) : 0;
+      const revenue = sumDecimals(p.invoices.map((inv) => inv.grandTotal));
+      const budget = toDecimal(p.budget);
 
       return {
         id: p.id,
         name: p.name,
         status: p.status,
         hoursLogged,
-        revenue,
-        budget,
-        budgetUsedPercent: budget > 0 ? (revenue / budget) * 100 : 0,
+        revenue: money(revenue),
+        budget: money(budget),
+        budgetUsedPercent: budget.greaterThan(0) ? revenue.div(budget).mul(100).toNumber() : 0,
       };
     });
   }
 
-  private computeTrend(current: number, previous: number): { value: number; isPositive: boolean } {
-    if (previous === 0) {
-      return { value: current > 0 ? 100 : 0, isPositive: current >= 0 };
+  private computeTrend(
+    current: Decimal,
+    previous: Decimal,
+  ): { value: number; isPositive: boolean } {
+    if (previous.isZero()) {
+      return {
+        value: current.greaterThan(0) ? 100 : 0,
+        isPositive: current.greaterThanOrEqualTo(0),
+      };
     }
-    const change = ((current - previous) / Math.abs(previous)) * 100;
-    return { value: Math.round(Math.abs(change)), isPositive: change >= 0 };
+    const change = current.sub(previous).div(previous.abs()).mul(100);
+    return {
+      value: change.abs().toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber(),
+      isPositive: change.greaterThanOrEqualTo(0),
+    };
   }
 
-  private async getRevenueInRange(organizationId: string, start: Date, end: Date) {
-    const invoices = await this.prisma.invoice.aggregate({
-      where: { organizationId, deletedAt: null, date: { gte: start, lte: end } },
-      _sum: { grandTotal: true },
-    });
-    return parseFloat(invoices._sum.grandTotal?.toString() || '0');
-  }
-
-  private async getExpensesInRange(organizationId: string, start: Date, end: Date) {
-    const [expenses, bills] = await Promise.all([
-      this.prisma.expense.aggregate({
-        where: { organizationId, date: { gte: start, lte: end } },
+  /**
+   * AR total = balances of issued invoices minus live APPLY_TO_INVOICE credit notes that are not
+   * yet applied (they credited AR without reducing any invoice), so it matches the AR control
+   * account. DRAFT, VOID and deleted records never count.
+   */
+  private async getTotalReceivables(organizationId: string): Promise<Decimal> {
+    const [invoices, credits] = await Promise.all([
+      this.prisma.invoice.aggregate({
+        where: {
+          organizationId,
+          deletedAt: null,
+          balanceDue: { gt: 0 },
+          status: { in: POSTED_INVOICE_STATUSES },
+        },
+        _sum: { balanceDue: true },
+      }),
+      this.prisma.creditNote.aggregate({
+        where: {
+          organizationId,
+          deletedAt: null,
+          type: CreditNoteType.APPLY_TO_INVOICE,
+          appliedToInvoiceId: null,
+        },
         _sum: { amount: true },
       }),
-      this.prisma.bill.aggregate({
-        where: { organizationId, deletedAt: null, date: { gte: start, lte: end } },
-        _sum: { grandTotal: true },
-      }),
     ]);
-    return (
-      parseFloat(expenses._sum.amount?.toString() || '0') +
-      parseFloat(bills._sum.grandTotal?.toString() || '0')
-    );
-  }
-
-  private async getTotalReceivables(organizationId: string) {
-    const invoices = await this.prisma.invoice.aggregate({
-      where: { organizationId, deletedAt: null, balanceDue: { gt: 0 } },
-      _sum: { balanceDue: true },
-    });
-    return parseFloat(invoices._sum.balanceDue?.toString() || '0');
+    return toDecimal(invoices._sum.balanceDue).sub(toDecimal(credits._sum.amount));
   }
 
   /**
    * AP total = balances of bills posted to AP minus live, unapplied, unrefunded vendor credits
    * (they debited AP without reducing any bill), so it matches the AP control account.
    */
-  private async getTotalPayables(organizationId: string) {
+  private async getTotalPayables(organizationId: string): Promise<Decimal> {
     const [bills, credits] = await Promise.all([
       this.prisma.bill.aggregate({
         where: {
@@ -379,51 +499,7 @@ export class DashboardService {
         _sum: { amount: true },
       }),
     ]);
-    const net = new Decimal(bills._sum.balanceDue ?? 0).sub(credits._sum.amount ?? 0);
-    return net.toNumber();
-  }
-
-  private async getMonthlyRevenue(organizationId: string, startOfMonth: Date) {
-    const invoices = await this.prisma.invoice.aggregate({
-      where: { organizationId, deletedAt: null, date: { gte: startOfMonth } },
-      _sum: { grandTotal: true },
-    });
-    return parseFloat(invoices._sum.grandTotal?.toString() || '0');
-  }
-
-  private async getMonthlyExpenses(organizationId: string, startOfMonth: Date) {
-    const expenses = await this.prisma.expense.aggregate({
-      where: { organizationId, date: { gte: startOfMonth } },
-      _sum: { amount: true },
-    });
-    const bills = await this.prisma.bill.aggregate({
-      where: { organizationId, deletedAt: null, date: { gte: startOfMonth } },
-      _sum: { grandTotal: true },
-    });
-    return (
-      parseFloat(expenses._sum.amount?.toString() || '0') +
-      parseFloat(bills._sum.grandTotal?.toString() || '0')
-    );
-  }
-
-  private async getYearlyRevenue(organizationId: string, startOfYear: Date) {
-    const invoices = await this.prisma.invoice.aggregate({
-      where: { organizationId, deletedAt: null, date: { gte: startOfYear } },
-      _sum: { grandTotal: true },
-    });
-    return parseFloat(invoices._sum.grandTotal?.toString() || '0');
-  }
-
-  private async getBankBalances(organizationId: string) {
-    const accounts = await this.prisma.bankAccount.findMany({
-      where: { organizationId, isActive: true },
-      select: { id: true, name: true, systemBalance: true, bankBalance: true, currency: true },
-    });
-    return accounts.map((a) => ({
-      ...a,
-      systemBalance: parseFloat(a.systemBalance.toString()),
-      bankBalance: parseFloat(a.bankBalance.toString()),
-    }));
+    return toDecimal(bills._sum.balanceDue).sub(toDecimal(credits._sum.amount));
   }
 
   private async getOverdueInvoicesCount(organizationId: string) {
@@ -439,21 +515,31 @@ export class DashboardService {
   }
 
   private async getRecentInvoices(organizationId: string, limit: number) {
-    return this.prisma.invoice.findMany({
-      where: { organizationId, deletedAt: null },
+    const invoices = await this.prisma.invoice.findMany({
+      where: { organizationId, deletedAt: null, status: { in: POSTED_INVOICE_STATUSES } },
       include: { customer: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
       take: limit,
     });
+    return invoices.map((i) => ({
+      ...i,
+      grandTotal: money(i.grandTotal),
+      balanceDue: money(i.balanceDue),
+    }));
   }
 
   private async getRecentBills(organizationId: string, limit: number) {
-    return this.prisma.bill.findMany({
-      where: { organizationId, deletedAt: null },
+    const bills = await this.prisma.bill.findMany({
+      where: { organizationId, deletedAt: null, status: { in: POSTED_BILL_STATUSES } },
       include: { vendor: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
       take: limit,
     });
+    return bills.map((b) => ({
+      ...b,
+      grandTotal: money(b.grandTotal),
+      balanceDue: money(b.balanceDue),
+    }));
   }
 
   private async getActiveProjectsCount(organizationId: string) {
@@ -471,6 +557,7 @@ export class DashboardService {
         organizationId,
         deletedAt: null,
         balanceDue: { gt: 0 },
+        status: { in: ['OPEN', 'PARTIALLY_PAID', 'OVERDUE'] },
         dueDate: { lte: futureDate },
       },
       include: { vendor: { select: { name: true } } },
@@ -484,48 +571,33 @@ export class DashboardService {
       reference: b.billNumber,
       vendorName: b.vendor.name,
       dueDate: b.dueDate,
-      amount: parseFloat(b.balanceDue.toString()),
+      amount: money(b.balanceDue),
     }));
   }
 
+  /** Month-end balance of the cash/bank ledger accounts (opening from posted journals). */
   async getBankBalanceTrend(organizationId: string, months: number = 6) {
-    const today = new Date();
+    const buckets = lastMonths(months);
+    const cashIds = await resolveCashAccountIds(this.prisma, organizationId);
+    const [before, rows] = await Promise.all([
+      sumPostedLinesByAccount(this.prisma, organizationId, { lt: buckets[0].start }, cashIds),
+      postedLineRows(this.prisma, organizationId, cashIds, {
+        gte: buckets[0].start,
+        lte: buckets[buckets.length - 1].end,
+      }),
+    ]);
 
-    // Fetch all active bank accounts and ALL their transactions in 2 queries
-    const bankAccounts = await this.prisma.bankAccount.findMany({
-      where: { organizationId, isActive: true },
-      select: { id: true },
-    });
-
-    const accountIds = bankAccounts.map((a) => a.id);
-    const allTransactions =
-      accountIds.length > 0
-        ? await this.prisma.bankTransaction.findMany({
-            where: { bankAccountId: { in: accountIds } },
-            select: { date: true, type: true, amount: true },
-            orderBy: { date: 'asc' },
-          })
-        : [];
-
-    // Compute cumulative balance up to end of each month
-    const data = [];
-    for (let i = months - 1; i >= 0; i--) {
-      const monthEnd = new Date(today.getFullYear(), today.getMonth() - i + 1, 0);
-      let balance = 0;
-      for (const tx of allTransactions) {
-        if (tx.date <= monthEnd) {
-          const amount = parseFloat(tx.amount.toString());
-          balance += tx.type === 'DEPOSIT' ? amount : -amount;
-        }
-      }
-      const monthStart = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      data.push({
-        month: monthStart.toLocaleString('default', { month: 'short', year: 'numeric' }),
-        balance,
-      });
+    const netByMonth = new Map<string, Decimal>();
+    for (const row of rows) {
+      const key = monthKey(row.date);
+      netByMonth.set(key, (netByMonth.get(key) ?? ZERO).add(row.debit).sub(row.credit));
     }
 
-    return data;
+    let running = sumDecimals([...before.values()].map((t) => t.debit.sub(t.credit)));
+    return buckets.map((b) => {
+      running = running.add(netByMonth.get(b.key) ?? ZERO);
+      return { month: b.label, balance: money(running) };
+    });
   }
 
   async getInventoryValueTrend(organizationId: string, months: number = 6) {
@@ -610,52 +682,21 @@ export class DashboardService {
   }
 
   private async computeGrossMarginTrend(organizationId: string, months: number) {
-    const today = new Date();
-    const startDate = new Date(today.getFullYear(), today.getMonth() - months + 1, 1);
-
-    const [invoicesByMonth, billsByMonth] = await Promise.all([
-      this.prisma.invoice.groupBy({
-        by: ['date'],
-        where: { organizationId, deletedAt: null, date: { gte: startDate } },
-        _sum: { grandTotal: true },
-      }),
-      this.prisma.bill.groupBy({
-        by: ['date'],
-        where: { organizationId, deletedAt: null, date: { gte: startDate } },
-        _sum: { grandTotal: true },
-      }),
-    ]);
-
-    const revenueByMonth: Record<string, number> = {};
-    const cogsByMonth: Record<string, number> = {};
-
-    for (const inv of invoicesByMonth) {
-      const key = `${inv.date.getFullYear()}-${inv.date.getMonth()}`;
-      revenueByMonth[key] =
-        (revenueByMonth[key] || 0) + parseFloat(inv._sum.grandTotal?.toString() || '0');
-    }
-    for (const bill of billsByMonth) {
-      const key = `${bill.date.getFullYear()}-${bill.date.getMonth()}`;
-      cogsByMonth[key] =
-        (cogsByMonth[key] || 0) + parseFloat(bill._sum.grandTotal?.toString() || '0');
-    }
-
-    const data = [];
-    for (let i = months - 1; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${d.getMonth()}`;
-      const revenue = revenueByMonth[key] || 0;
-      const cogs = cogsByMonth[key] || 0;
-      const margin = revenue > 0 ? ((revenue - cogs) / revenue) * 100 : 0;
-      data.push({
-        month: d.toLocaleString('default', { month: 'short', year: 'numeric' }),
-        revenue,
-        cogs,
-        marginPercent: Math.round(margin * 100) / 100,
-      });
-    }
-
-    return data;
+    const { buckets, byMonth } = await this.monthlyLedgerPl(organizationId, months);
+    return buckets.map((b) => {
+      const entry = byMonth.get(b.key);
+      const revenue = entry?.revenue ?? ZERO;
+      const cogs = entry?.cogs ?? ZERO;
+      const margin = revenue.greaterThan(0)
+        ? revenue.sub(cogs).div(revenue).mul(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+        : ZERO;
+      return {
+        month: b.label,
+        revenue: money(revenue),
+        cogs: money(cogs),
+        marginPercent: margin.toNumber(),
+      };
+    });
   }
 
   async getRevenueYoY(organizationId: string) {
@@ -667,41 +708,35 @@ export class DashboardService {
   }
 
   private async computeRevenueYoY(organizationId: string) {
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const startDate = new Date(currentYear - 1, 0, 1);
+    const currentYear = new Date().getUTCFullYear();
+    const accounts = (await this.getPlAccounts(organizationId)).filter((a) => isIncomeType(a.type));
+    const rows = await postedLineRows(
+      this.prisma,
+      organizationId,
+      accounts.map((a) => a.id),
+      { gte: new Date(Date.UTC(currentYear - 1, 0, 1)), lte: endOfUtcDay(new Date()) },
+    );
 
-    const invoicesByMonth = await this.prisma.invoice.groupBy({
-      by: ['date'],
-      where: { organizationId, deletedAt: null, date: { gte: startDate } },
-      _sum: { grandTotal: true },
-    });
-
-    const currentYearData: Record<number, number> = {};
-    const previousYearData: Record<number, number> = {};
-
-    for (const inv of invoicesByMonth) {
-      const year = inv.date.getFullYear();
-      const month = inv.date.getMonth();
-      const amount = parseFloat(inv._sum.grandTotal?.toString() || '0');
-      if (year === currentYear) {
-        currentYearData[month] = (currentYearData[month] || 0) + amount;
+    const currentYearData: Decimal[] = Array.from({ length: 12 }, () => ZERO);
+    const previousYearData: Decimal[] = Array.from({ length: 12 }, () => ZERO);
+    for (const row of rows) {
+      const month = row.date.getUTCMonth();
+      const value = row.credit.sub(row.debit);
+      if (row.date.getUTCFullYear() === currentYear) {
+        currentYearData[month] = currentYearData[month].add(value);
       } else {
-        previousYearData[month] = (previousYearData[month] || 0) + amount;
+        previousYearData[month] = previousYearData[month].add(value);
       }
     }
 
-    const data = [];
-    for (let m = 0; m < 12; m++) {
-      const d = new Date(currentYear, m, 1);
-      data.push({
-        month: d.toLocaleString('default', { month: 'short' }),
-        currentYear: currentYearData[m] || 0,
-        previousYear: previousYearData[m] || 0,
-      });
-    }
-
-    return data;
+    return currentYearData.map((current, m) => ({
+      month: new Date(Date.UTC(currentYear, m, 1)).toLocaleString('en-US', {
+        month: 'short',
+        timeZone: 'UTC',
+      }),
+      currentYear: money(current),
+      previousYear: money(previousYearData[m]),
+    }));
   }
 
   async getAccountBalances(organizationId: string) {
@@ -712,24 +747,29 @@ export class DashboardService {
     });
   }
 
+  /** Natural balance per account type, summed from posted journal lines (no stored balances). */
   private async computeAccountBalances(organizationId: string) {
-    const accounts = await this.prisma.account.findMany({
-      where: { organizationId, deletedAt: null, isActive: true },
-      select: { type: true, openingBalance: true },
-    });
+    const [accounts, totals] = await Promise.all([
+      this.prisma.account.findMany({
+        where: { organizationId, deletedAt: null },
+        select: { id: true, type: true, isActive: true },
+      }),
+      sumPostedLinesByAccount(this.prisma, organizationId),
+    ]);
 
-    const balancesByType: Record<string, { balance: number; count: number }> = {};
+    const byType = new Map<AccountType, { balance: Decimal; count: number }>();
     for (const acc of accounts) {
-      const balance = parseFloat((acc.openingBalance ?? 0).toString());
-      if (!balancesByType[acc.type]) balancesByType[acc.type] = { balance: 0, count: 0 };
-      balancesByType[acc.type].balance += balance;
-      balancesByType[acc.type].count++;
+      const entry = byType.get(acc.type) ?? { balance: ZERO, count: 0 };
+      const t = totals.get(acc.id);
+      if (t) entry.balance = entry.balance.add(naturalBalance(acc.type, t.debit, t.credit));
+      if (acc.isActive) entry.count++;
+      byType.set(acc.type, entry);
     }
 
     return Object.values(AccountType).map((type) => ({
       type,
-      balance: balancesByType[type]?.balance || 0,
-      count: balancesByType[type]?.count || 0,
+      balance: money(byType.get(type)?.balance ?? ZERO),
+      count: byType.get(type)?.count ?? 0,
     }));
   }
 
@@ -784,10 +824,11 @@ export class DashboardService {
     });
   }
 
+  /** Issued invoices by status; DRAFT and VOID are not receivables and are left out. */
   private async computeInvoiceStatus(organizationId: string) {
     const counts = await this.prisma.invoice.groupBy({
       by: ['status'],
-      where: { organizationId, deletedAt: null },
+      where: { organizationId, deletedAt: null, status: { in: POSTED_INVOICE_STATUSES } },
       _count: { id: true },
       _sum: { grandTotal: true },
     });
@@ -795,7 +836,7 @@ export class DashboardService {
     return counts.map((c) => ({
       status: c.status,
       count: c._count.id,
-      amount: parseFloat(c._sum.grandTotal?.toString() || '0'),
+      amount: money(c._sum.grandTotal),
     }));
   }
 
@@ -844,34 +885,33 @@ export class DashboardService {
   }
 
   private async computeInvoiceVolume(organizationId: string, months: number) {
-    const today = new Date();
-    const startDate = new Date(today.getFullYear(), today.getMonth() - months + 1, 1);
-
-    const invoices = await this.prisma.invoice.findMany({
-      where: { organizationId, deletedAt: null, date: { gte: startDate } },
-      select: { date: true, grandTotal: true },
+    const buckets = lastMonths(months);
+    const groups = await this.prisma.invoice.groupBy({
+      by: ['date'],
+      where: {
+        organizationId,
+        deletedAt: null,
+        status: { in: POSTED_INVOICE_STATUSES },
+        date: { gte: buckets[0].start, lte: buckets[buckets.length - 1].end },
+      },
+      _sum: { grandTotal: true },
+      _count: { id: true },
     });
 
-    const monthlyData: Record<string, { count: number; total: number }> = {};
-    for (const inv of invoices) {
-      const key = `${inv.date.getFullYear()}-${inv.date.getMonth()}`;
-      if (!monthlyData[key]) monthlyData[key] = { count: 0, total: 0 };
-      monthlyData[key].count++;
-      monthlyData[key].total += parseFloat(inv.grandTotal.toString());
+    const monthly = new Map<string, { count: number; total: Decimal }>();
+    for (const g of groups) {
+      const key = monthKey(g.date);
+      const entry = monthly.get(key) ?? { count: 0, total: ZERO };
+      entry.count += g._count.id;
+      entry.total = entry.total.add(toDecimal(g._sum.grandTotal));
+      monthly.set(key, entry);
     }
 
-    const data = [];
-    for (let i = months - 1; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${d.getMonth()}`;
-      data.push({
-        month: d.toLocaleString('default', { month: 'short', year: 'numeric' }),
-        count: monthlyData[key]?.count || 0,
-        amount: monthlyData[key]?.total || 0,
-      });
-    }
-
-    return data;
+    return buckets.map((b) => ({
+      month: b.label,
+      count: monthly.get(b.key)?.count ?? 0,
+      amount: money(monthly.get(b.key)?.total),
+    }));
   }
 
   async getPaymentCollection(organizationId: string, months: number = 6) {
@@ -883,32 +923,26 @@ export class DashboardService {
     );
   }
 
+  /** Customer receipts per month; voided (soft-deleted) payments are excluded. */
   private async computePaymentCollection(organizationId: string, months: number) {
-    const today = new Date();
-    const startDate = new Date(today.getFullYear(), today.getMonth() - months + 1, 1);
-
-    const payments = await this.prisma.paymentReceived.findMany({
-      where: { organizationId, date: { gte: startDate } },
-      select: { date: true, amount: true },
+    const buckets = lastMonths(months);
+    const groups = await this.prisma.paymentReceived.groupBy({
+      by: ['date'],
+      where: {
+        organizationId,
+        deletedAt: null,
+        date: { gte: buckets[0].start, lte: buckets[buckets.length - 1].end },
+      },
+      _sum: { amount: true },
     });
 
-    const monthlyData: Record<string, number> = {};
-    for (const p of payments) {
-      const key = `${p.date.getFullYear()}-${p.date.getMonth()}`;
-      monthlyData[key] = (monthlyData[key] || 0) + parseFloat(p.amount.toString());
+    const monthly = new Map<string, Decimal>();
+    for (const g of groups) {
+      const key = monthKey(g.date);
+      monthly.set(key, (monthly.get(key) ?? ZERO).add(toDecimal(g._sum.amount)));
     }
 
-    const data = [];
-    for (let i = months - 1; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${d.getMonth()}`;
-      data.push({
-        month: d.toLocaleString('default', { month: 'short', year: 'numeric' }),
-        amount: monthlyData[key] || 0,
-      });
-    }
-
-    return data;
+    return buckets.map((b) => ({ month: b.label, amount: money(monthly.get(b.key)) }));
   }
 
   async getChurnRisk(organizationId: string) {
@@ -983,10 +1017,11 @@ export class DashboardService {
     });
   }
 
+  /** Posted bills by status; DRAFT/PENDING/VOID are not payables and are left out. */
   private async computeBillStatus(organizationId: string) {
     const counts = await this.prisma.bill.groupBy({
       by: ['status'],
-      where: { organizationId, deletedAt: null },
+      where: { organizationId, deletedAt: null, status: { in: POSTED_BILL_STATUSES } },
       _count: { id: true },
       _sum: { grandTotal: true },
     });
@@ -994,7 +1029,7 @@ export class DashboardService {
     return counts.map((c) => ({
       status: c.status,
       count: c._count.id,
-      amount: parseFloat(c._sum.grandTotal?.toString() || '0'),
+      amount: money(c._sum.grandTotal),
     }));
   }
 
@@ -1008,27 +1043,36 @@ export class DashboardService {
   }
 
   private async computeTopVendors(organizationId: string, limit: number) {
-    const vendors = await this.prisma.vendor.findMany({
-      where: { organizationId, deletedAt: null },
-      include: {
-        bills: {
-          where: { deletedAt: null },
-          select: { grandTotal: true },
-        },
-      },
+    const groups = await this.prisma.bill.groupBy({
+      by: ['vendorId'],
+      where: { organizationId, deletedAt: null, status: { in: POSTED_BILL_STATUSES } },
+      _sum: { grandTotal: true },
+      _count: { id: true },
     });
+    const top = groups
+      .map((g) => ({
+        vendorId: g.vendorId,
+        total: toDecimal(g._sum.grandTotal),
+        count: g._count.id,
+      }))
+      .sort((a, b) => b.total.comparedTo(a.total))
+      .slice(0, limit);
 
-    const vendorSpend = vendors.map((v) => ({
-      id: v.id,
-      name: v.name,
-      totalAmount: v.bills.reduce(
-        (sum, bill) => sum + parseFloat((bill.grandTotal ?? 0).toString()),
-        0,
-      ),
-      billCount: v.bills.length,
+    const vendors =
+      top.length > 0
+        ? await this.prisma.vendor.findMany({
+            where: { organizationId, id: { in: top.map((t) => t.vendorId) } },
+            select: { id: true, name: true },
+          })
+        : [];
+    const names = new Map(vendors.map((v) => [v.id, v.name]));
+
+    return top.map((t) => ({
+      id: t.vendorId,
+      name: names.get(t.vendorId) ?? '',
+      totalAmount: money(t.total),
+      billCount: t.count,
     }));
-
-    return vendorSpend.sort((a, b) => b.totalAmount - a.totalAmount).slice(0, limit);
   }
 
   async getPurchaseTrend(organizationId: string, months: number = 6) {
@@ -1041,45 +1085,53 @@ export class DashboardService {
   }
 
   private async computePurchaseTrend(organizationId: string, months: number) {
-    const today = new Date();
-    const startDate = new Date(today.getFullYear(), today.getMonth() - months + 1, 1);
+    const buckets = lastMonths(months);
+    const range = { gte: buckets[0].start, lte: buckets[buckets.length - 1].end };
 
     const [bills, expenses] = await Promise.all([
-      this.prisma.bill.findMany({
-        where: { organizationId, deletedAt: null, date: { gte: startDate } },
-        select: { date: true, grandTotal: true },
+      this.prisma.bill.groupBy({
+        by: ['date'],
+        where: {
+          organizationId,
+          deletedAt: null,
+          status: { in: POSTED_BILL_STATUSES },
+          date: range,
+        },
+        _sum: { grandTotal: true },
       }),
-      this.prisma.expense.findMany({
-        where: { organizationId, date: { gte: startDate } },
-        select: { date: true, amount: true },
+      this.prisma.expense.groupBy({
+        by: ['date'],
+        where: {
+          organizationId,
+          deletedAt: null,
+          status: { in: POSTED_EXPENSE_STATUSES },
+          date: range,
+        },
+        _sum: { amount: true },
       }),
     ]);
 
-    const billsByMonth: Record<string, number> = {};
-    const expensesByMonth: Record<string, number> = {};
-
+    const billsByMonth = new Map<string, Decimal>();
+    const expensesByMonth = new Map<string, Decimal>();
     for (const b of bills) {
-      const key = `${b.date.getFullYear()}-${b.date.getMonth()}`;
-      billsByMonth[key] = (billsByMonth[key] || 0) + parseFloat(b.grandTotal.toString());
+      const key = monthKey(b.date);
+      billsByMonth.set(key, (billsByMonth.get(key) ?? ZERO).add(toDecimal(b._sum.grandTotal)));
     }
     for (const e of expenses) {
-      const key = `${e.date.getFullYear()}-${e.date.getMonth()}`;
-      expensesByMonth[key] = (expensesByMonth[key] || 0) + parseFloat(e.amount.toString());
+      const key = monthKey(e.date);
+      expensesByMonth.set(key, (expensesByMonth.get(key) ?? ZERO).add(toDecimal(e._sum.amount)));
     }
 
-    const data = [];
-    for (let i = months - 1; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${d.getMonth()}`;
-      data.push({
-        month: d.toLocaleString('default', { month: 'short', year: 'numeric' }),
-        bills: billsByMonth[key] || 0,
-        expenses: expensesByMonth[key] || 0,
-        total: (billsByMonth[key] || 0) + (expensesByMonth[key] || 0),
-      });
-    }
-
-    return data;
+    return buckets.map((b) => {
+      const billTotal = billsByMonth.get(b.key) ?? ZERO;
+      const expenseTotal = expensesByMonth.get(b.key) ?? ZERO;
+      return {
+        month: b.label,
+        bills: money(billTotal),
+        expenses: money(expenseTotal),
+        total: money(billTotal.add(expenseTotal)),
+      };
+    });
   }
 
   async getExpenseTrend(organizationId: string, months: number = 6) {
@@ -1092,39 +1144,47 @@ export class DashboardService {
   }
 
   private async computeExpenseTrend(organizationId: string, months: number) {
-    const today = new Date();
-    const startDate = new Date(today.getFullYear(), today.getMonth() - months + 1, 1);
-
-    const expenses = await this.prisma.expense.findMany({
-      where: { organizationId, date: { gte: startDate } },
-      include: { account: { select: { name: true } } },
+    const buckets = lastMonths(months);
+    const groups = await this.prisma.expense.groupBy({
+      by: ['date', 'accountId'],
+      where: {
+        organizationId,
+        deletedAt: null,
+        status: { in: POSTED_EXPENSE_STATUSES },
+        date: { gte: buckets[0].start, lte: buckets[buckets.length - 1].end },
+      },
+      _sum: { amount: true },
     });
+    const accountIds = [...new Set(groups.map((g) => g.accountId))];
+    const accounts =
+      accountIds.length > 0
+        ? await this.prisma.account.findMany({
+            where: { organizationId, id: { in: accountIds } },
+            select: { id: true, name: true },
+          })
+        : [];
+    const names = new Map(accounts.map((a) => [a.id, a.name]));
 
-    const monthlyCategories: Record<string, Record<string, number>> = {};
-
-    for (const e of expenses) {
-      const key = `${e.date.getFullYear()}-${e.date.getMonth()}`;
-      const category = e.account?.name || 'Uncategorized';
-      if (!monthlyCategories[key]) monthlyCategories[key] = {};
-      monthlyCategories[key][category] =
-        (monthlyCategories[key][category] || 0) + parseFloat(e.amount.toString());
+    const monthly = new Map<string, Map<string, Decimal>>();
+    for (const g of groups) {
+      const key = monthKey(g.date);
+      const category = names.get(g.accountId) || 'Uncategorized';
+      const categories = monthly.get(key) ?? new Map<string, Decimal>();
+      categories.set(category, (categories.get(category) ?? ZERO).add(toDecimal(g._sum.amount)));
+      monthly.set(key, categories);
     }
 
-    const data = [];
-    for (let i = months - 1; i >= 0; i--) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${d.getMonth()}`;
-      const catObj = monthlyCategories[key] || {};
-      const amount = Object.values(catObj).reduce((sum, v) => sum + v, 0);
-      const categories = Object.entries(catObj).map(([name, amt]) => ({ name, amount: amt }));
-      data.push({
-        month: d.toLocaleString('default', { month: 'short', year: 'numeric' }),
-        amount,
-        categories,
-      });
-    }
-
-    return data;
+    return buckets.map((b) => {
+      const categories = monthly.get(b.key) ?? new Map<string, Decimal>();
+      return {
+        month: b.label,
+        amount: money(sumDecimals([...categories.values()])),
+        categories: [...categories.entries()].map(([name, amount]) => ({
+          name,
+          amount: money(amount),
+        })),
+      };
+    });
   }
 
   async getVendorPaymentTime(organizationId: string, limit: number = 10) {

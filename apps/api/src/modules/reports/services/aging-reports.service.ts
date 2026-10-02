@@ -1,7 +1,20 @@
+import { CreditNoteType, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { Injectable } from '@nestjs/common';
 import { ReadReplicaService } from '../../../prisma/read-replica.service';
-import { endOfUtcDay } from '../utils/report-utils';
+import {
+  AgingBucketKey,
+  POSTED_BILL_STATUSES,
+  POSTED_INVOICE_STATUSES,
+  agingBucket,
+  daysPastDue,
+  endOfUtcDay,
+  money,
+  parseReportDate,
+  resolveAsOf,
+  sumDecimals,
+  toDecimal,
+} from '../utils/report-utils';
 
 export interface AgingItem {
   invoiceId?: string;
@@ -19,80 +32,124 @@ export interface AgingItem {
   balanceDue: number;
 }
 
+/** Receivables aging row: money is a fixed 4-dp decimal string. */
+export type ReceivableAgingItem = Omit<AgingItem, 'balanceDue'> & { balanceDue: string };
+
 export interface StatementTransaction {
-  date: Date | null;
+  date: Date;
   type: string;
   reference: string;
-  debit: number;
-  credit: number;
+  debit: Decimal;
+  credit: Decimal;
 }
 
 @Injectable()
 export class AgingReportsService {
   constructor(private prisma: ReadReplicaService) {}
 
+  /**
+   * Receivables aging. Only issued invoices count (DRAFT and VOID never do). Unapplied
+   * APPLY_TO_INVOICE credit notes credited the AR control account without reducing any invoice,
+   * so they are shown per customer and netted in `summary.netTotal`, which reconciles to the AR
+   * control account (mirrors the payables aging with vendor credits).
+   */
   async getReceivablesAging(organizationId: string, asOfDate?: string) {
-    const date = asOfDate ? new Date(asOfDate) : new Date();
-    date.setHours(23, 59, 59, 999);
+    const { asOf } = resolveAsOf(asOfDate);
 
-    const invoices = await this.prisma.invoice.findMany({
-      where: {
-        organizationId,
-        deletedAt: null,
-        balanceDue: { gt: 0 },
-        issueDate: { lte: date },
-      },
-      include: {
-        customer: { select: { id: true, name: true } },
-      },
-    });
+    const [invoices, credits] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where: {
+          organizationId,
+          deletedAt: null,
+          balanceDue: { gt: 0 },
+          status: { in: POSTED_INVOICE_STATUSES },
+          date: { lte: asOf },
+        },
+        include: {
+          customer: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.creditNote.findMany({
+        where: {
+          organizationId,
+          deletedAt: null,
+          type: CreditNoteType.APPLY_TO_INVOICE,
+          appliedToInvoiceId: null,
+          date: { lte: asOf },
+        },
+        select: {
+          customerId: true,
+          amount: true,
+          customer: { select: { id: true, name: true } },
+        },
+      }),
+    ]);
 
-    const buckets = {
-      current: [] as AgingItem[],
-      days1_30: [] as AgingItem[],
-      days31_60: [] as AgingItem[],
-      days61_90: [] as AgingItem[],
-      over90: [] as AgingItem[],
+    const creditsByCustomer = new Map<string, { customerName: string; amount: Decimal }>();
+    for (const credit of credits) {
+      const row = creditsByCustomer.get(credit.customerId) ?? {
+        customerName: credit.customer.name,
+        amount: new Decimal(0),
+      };
+      row.amount = row.amount.add(credit.amount);
+      creditsByCustomer.set(credit.customerId, row);
+    }
+    const unappliedTotal = sumDecimals([...creditsByCustomer.values()].map((r) => r.amount));
+
+    const buckets: Record<AgingBucketKey, ReceivableAgingItem[]> = {
+      current: [],
+      days1_30: [],
+      days31_60: [],
+      days61_90: [],
+      over90: [],
+    };
+    const bucketTotals: Record<AgingBucketKey, Decimal> = {
+      current: new Decimal(0),
+      days1_30: new Decimal(0),
+      days31_60: new Decimal(0),
+      days61_90: new Decimal(0),
+      over90: new Decimal(0),
     };
 
     for (const invoice of invoices) {
-      const dueDate = invoice.dueDate;
-      const daysOverdue = Math.floor((date.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-      const balanceDue = parseFloat(invoice.balanceDue.toString());
-
-      const item: AgingItem = {
+      const days = daysPastDue(invoice.dueDate, asOf);
+      const key = agingBucket(days);
+      buckets[key].push({
         invoiceId: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
         customerId: invoice.customer.id,
         customerName: invoice.customer.name,
         issueDate: invoice.issueDate,
         dueDate: invoice.dueDate,
-        daysOverdue: Math.max(0, daysOverdue),
-        balanceDue,
-      };
-
-      if (daysOverdue <= 0) buckets.current.push(item);
-      else if (daysOverdue <= 30) buckets.days1_30.push(item);
-      else if (daysOverdue <= 60) buckets.days31_60.push(item);
-      else if (daysOverdue <= 90) buckets.days61_90.push(item);
-      else buckets.over90.push(item);
+        daysOverdue: Math.max(0, days),
+        balanceDue: money(invoice.balanceDue),
+      });
+      bucketTotals[key] = bucketTotals[key].add(invoice.balanceDue);
     }
 
-    const summary = {
-      current: buckets.current.reduce((sum, i) => sum + i.balanceDue, 0),
-      days1_30: buckets.days1_30.reduce((sum, i) => sum + i.balanceDue, 0),
-      days31_60: buckets.days31_60.reduce((sum, i) => sum + i.balanceDue, 0),
-      days61_90: buckets.days61_90.reduce((sum, i) => sum + i.balanceDue, 0),
-      over90: buckets.over90.reduce((sum, i) => sum + i.balanceDue, 0),
-      total: 0,
-    };
-    summary.total =
-      summary.current + summary.days1_30 + summary.days31_60 + summary.days61_90 + summary.over90;
+    const invoicesTotal = sumDecimals(Object.values(bucketTotals));
 
     return {
-      asOfDate: date,
+      asOfDate: asOf,
       buckets,
-      summary,
+      summary: {
+        current: money(bucketTotals.current),
+        days1_30: money(bucketTotals.days1_30),
+        days31_60: money(bucketTotals.days31_60),
+        days61_90: money(bucketTotals.days61_90),
+        over90: money(bucketTotals.over90),
+        total: money(invoicesTotal),
+        unappliedCredits: money(unappliedTotal),
+        netTotal: money(invoicesTotal.sub(unappliedTotal)),
+      },
+      unappliedCredits: {
+        total: money(unappliedTotal),
+        customers: [...creditsByCustomer.entries()].map(([customerId, r]) => ({
+          customerId,
+          customerName: r.customerName,
+          amount: money(r.amount),
+        })),
+      },
       customerCount: new Set(invoices.map((i) => i.customerId)).size,
       invoiceCount: invoices.length,
     };
@@ -206,6 +263,14 @@ export class AgingReportsService {
     };
   }
 
+  /**
+   * Customer statement in exact Decimal. Issued invoices are debits; payments and applied credit
+   * notes are credits. A voided payment keeps its original credit on its own date and shows a
+   * separate debit on the date it was voided, so later corrections never rewrite an earlier
+   * period. A REFUND credit note is paid out in cash, so it is a credit plus an equal refund debit
+   * (no net effect on what the customer owes, as in the ledger). DRAFT and VOID invoices and
+   * deleted credit notes never appear.
+   */
   async getCustomerStatement(
     organizationId: string,
     customerId: string,
@@ -217,84 +282,133 @@ export class AgingReportsService {
     });
     if (!customer) return null;
 
-    const start = new Date(startDate);
+    const start = parseReportDate(startDate, 'start', 'startDate') ?? new Date(0);
     // A date-only end must include that whole day (voids/payments later on the end date).
-    const end = endOfUtcDay(new Date(endDate));
+    const end = parseReportDate(endDate, 'end', 'endDate') ?? endOfUtcDay(new Date());
 
-    // Get opening balance (sum of all invoices minus payments before start date)
-    const openingInvoices = await this.prisma.invoice.findMany({
-      where: { customerId, organizationId, issueDate: { lt: start }, deletedAt: null },
-    });
-    const openingPayments = await this.prisma.paymentReceived.findMany({
-      where: { customerId, organizationId, date: { lt: start } },
-    });
+    const invoiceBase = {
+      customerId,
+      organizationId,
+      deletedAt: null,
+      status: { in: POSTED_INVOICE_STATUSES },
+    } satisfies Prisma.InvoiceWhereInput;
+    const creditBase = { customerId, organizationId, deletedAt: null };
 
-    const openingInvoiceTotal = openingInvoices.reduce(
-      (sum, i) => sum + parseFloat((i.total ?? i.grandTotal).toString()),
-      0,
-    );
-    const openingPaymentTotal = openingPayments.reduce(
-      (sum, p) => sum + parseFloat(p.amount.toString()),
-      0,
-    );
-    const openingBalance = openingInvoiceTotal - openingPaymentTotal;
+    const [
+      openingInvoices,
+      openingPayments,
+      openingVoids,
+      openingCredits,
+      invoices,
+      payments,
+      voids,
+      creditNotes,
+    ] = await Promise.all([
+      this.prisma.invoice.findMany({ where: { ...invoiceBase, date: { lt: start } } }),
+      this.prisma.paymentReceived.findMany({
+        where: { customerId, organizationId, date: { lt: start } },
+      }),
+      this.prisma.paymentReceived.findMany({
+        where: { customerId, organizationId, deletedAt: { lt: start } },
+      }),
+      this.prisma.creditNote.findMany({ where: { ...creditBase, date: { lt: start } } }),
+      this.prisma.invoice.findMany({
+        where: { ...invoiceBase, date: { gte: start, lte: end } },
+        orderBy: { date: 'asc' },
+      }),
+      this.prisma.paymentReceived.findMany({
+        where: { customerId, organizationId, date: { gte: start, lte: end } },
+        orderBy: { date: 'asc' },
+      }),
+      this.prisma.paymentReceived.findMany({
+        where: { customerId, organizationId, deletedAt: { gte: start, lte: end } },
+        orderBy: { deletedAt: 'asc' },
+      }),
+      this.prisma.creditNote.findMany({
+        where: { ...creditBase, date: { gte: start, lte: end } },
+        orderBy: { date: 'asc' },
+      }),
+    ]);
 
-    // Get transactions in period
-    const invoices = await this.prisma.invoice.findMany({
-      where: { customerId, organizationId, issueDate: { gte: start, lte: end }, deletedAt: null },
-      orderBy: { issueDate: 'asc' },
-    });
+    // Payments count on their own date even if voided later; a void is a separate debit.
+    // A refund credit note nets to zero (credit + refund debit); only APPLY notes move the balance.
+    const openingBalance = sumDecimals(openingInvoices.map((i) => i.total ?? i.grandTotal))
+      .sub(sumDecimals(openingPayments.map((p) => p.amount)))
+      .add(sumDecimals(openingVoids.map((p) => p.amount)))
+      .sub(
+        sumDecimals(
+          openingCredits
+            .filter((cn) => cn.type === CreditNoteType.APPLY_TO_INVOICE)
+            .map((cn) => cn.total ?? cn.amount),
+        ),
+      );
 
-    const payments = await this.prisma.paymentReceived.findMany({
-      where: { customerId, organizationId, date: { gte: start, lte: end } },
-      orderBy: { date: 'asc' },
-    });
-
-    const creditNotes = await this.prisma.creditNote.findMany({
-      where: { customerId, organizationId, issueDate: { gte: start, lte: end }, deletedAt: null },
-      orderBy: { issueDate: 'asc' },
-    });
-
-    // Combine and sort by date
+    const zero = new Decimal(0);
     const transactions: StatementTransaction[] = [
       ...invoices.map((i) => ({
-        date: i.issueDate ?? i.date,
-        type: 'Invoice' as const,
+        date: i.date,
+        type: 'Invoice',
         reference: i.invoiceNumber,
-        debit: parseFloat((i.total ?? i.grandTotal).toString()),
-        credit: 0,
+        debit: toDecimal(i.total ?? i.grandTotal),
+        credit: zero,
       })),
       ...payments.map((p) => ({
         date: p.date,
-        type: 'Payment' as const,
+        type: 'Payment',
         reference: p.paymentNumber,
-        debit: 0,
-        credit: parseFloat(p.amount.toString()),
+        debit: zero,
+        credit: toDecimal(p.amount),
       })),
-      ...creditNotes.map((cn) => ({
-        date: cn.issueDate ?? cn.date,
-        type: 'Credit Note' as const,
-        reference: cn.creditNoteNumber,
-        debit: 0,
-        credit: parseFloat((cn.total ?? cn.amount).toString()),
+      ...voids.map((p) => ({
+        date: p.deletedAt as Date,
+        type: 'Payment Void',
+        reference: p.paymentNumber,
+        debit: toDecimal(p.amount),
+        credit: zero,
       })),
-    ].sort((a, b) => new Date(a.date as Date).getTime() - new Date(b.date as Date).getTime());
+      ...creditNotes.flatMap((cn): StatementTransaction[] => {
+        const amount = toDecimal(cn.total ?? cn.amount);
+        const rows: StatementTransaction[] = [
+          {
+            date: cn.date,
+            type: 'Credit Note',
+            reference: cn.creditNoteNumber,
+            debit: zero,
+            credit: amount,
+          },
+        ];
+        if (cn.type === CreditNoteType.REFUND) {
+          rows.push({
+            date: cn.date,
+            type: 'Credit Note Refund',
+            reference: cn.creditNoteNumber,
+            debit: amount,
+            credit: zero,
+          });
+        }
+        return rows;
+      }),
+    ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    // Add running balance
     let runningBalance = openingBalance;
     const entries = transactions.map((t) => {
-      runningBalance += t.debit - t.credit;
-      return { ...t, balance: runningBalance };
+      runningBalance = runningBalance.add(t.debit).sub(t.credit);
+      return {
+        ...t,
+        debit: money(t.debit),
+        credit: money(t.credit),
+        balance: money(runningBalance),
+      };
     });
 
     return {
       customer: { id: customer.id, name: customer.name, email: customer.email },
       period: { startDate, endDate },
-      openingBalance,
+      openingBalance: money(openingBalance),
       transactions: entries,
-      closingBalance: runningBalance,
-      totalDebits: entries.reduce((sum, e) => sum + e.debit, 0),
-      totalCredits: entries.reduce((sum, e) => sum + e.credit, 0),
+      closingBalance: money(runningBalance),
+      totalDebits: money(sumDecimals(transactions.map((t) => t.debit))),
+      totalCredits: money(sumDecimals(transactions.map((t) => t.credit))),
     };
   }
 
@@ -315,7 +429,13 @@ export class AgingReportsService {
 
     // Opening balance
     const openingBills = await this.prisma.bill.findMany({
-      where: { vendorId, organizationId, date: { lt: start }, deletedAt: null },
+      where: {
+        vendorId,
+        organizationId,
+        date: { lt: start },
+        deletedAt: null,
+        status: { in: POSTED_BILL_STATUSES },
+      },
     });
     // Payments count on their own date even if voided later; a void is a separate debit on the
     // date it happened. Later corrections therefore never rewrite an earlier period.
@@ -334,7 +454,13 @@ export class AgingReportsService {
 
     // Period transactions
     const bills = await this.prisma.bill.findMany({
-      where: { vendorId, organizationId, date: { gte: start, lte: end }, deletedAt: null },
+      where: {
+        vendorId,
+        organizationId,
+        date: { gte: start, lte: end },
+        deletedAt: null,
+        status: { in: POSTED_BILL_STATUSES },
+      },
       orderBy: { date: 'asc' },
     });
 

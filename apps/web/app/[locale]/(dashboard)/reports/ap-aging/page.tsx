@@ -32,7 +32,13 @@ export default function APAgingReportPage() {
   const [asOfDate, setAsOfDate] = useState(new Date());
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null);
 
-  const { data: report, isLoading } = useAPAgingReport(format(asOfDate, 'yyyy-MM-dd'));
+  const tc = useTranslations('common');
+  const {
+    data: report,
+    isLoading,
+    isError,
+    refetch,
+  } = useAPAgingReport(format(asOfDate, 'yyyy-MM-dd'));
 
   if (isLoading) {
     return (
@@ -41,6 +47,18 @@ export default function APAgingReportPage() {
         <Skeleton className="h-12 w-full max-w-md" />
         <Skeleton className="h-96" />
       </div>
+    );
+  }
+  if (isError) {
+    return (
+      <Card>
+        <CardContent className="pt-6 text-center space-y-4" role="alert">
+          <p className="text-muted-foreground">{tc('table.error')}</p>
+          <Button variant="outline" onClick={() => void refetch()}>
+            {tc('dashboard.tryAgain')}
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -81,6 +99,13 @@ export default function APAgingReportPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Total Payable</p>
                 <p className="text-2xl font-bold font-mono">{formatCurrency(reportData.total)}</p>
+                {report && report.unappliedCredits > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {t('agingUnappliedCredits', {
+                      amount: formatCurrency(report.unappliedCredits),
+                    })}
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>

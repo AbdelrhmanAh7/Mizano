@@ -234,6 +234,44 @@ export async function sumPostedLinesByAccount(
   return totals;
 }
 
+export interface PostedLineRow {
+  accountId: string;
+  journalId: string;
+  date: Date;
+  debit: Decimal;
+  credit: Decimal;
+}
+
+/**
+ * Posted journal lines of the given accounts with their journal date (one query), for reports that
+ * bucket by day/month. Prefer {@link sumPostedLinesByAccount} when no time bucketing is needed.
+ */
+export async function postedLineRows(
+  prisma: ReportPrisma,
+  organizationId: string,
+  accountIds: string[],
+  date?: Prisma.DateTimeFilter,
+): Promise<PostedLineRow[]> {
+  if (accountIds.length === 0) return [];
+  const lines = await prisma.journalLine.findMany({
+    where: { accountId: { in: accountIds }, journal: postedJournalWhere(organizationId, date) },
+    select: {
+      accountId: true,
+      journalId: true,
+      debit: true,
+      credit: true,
+      journal: { select: { date: true } },
+    },
+  });
+  return lines.map((l) => ({
+    accountId: l.accountId,
+    journalId: l.journalId,
+    date: l.journal.date,
+    debit: toDecimal(l.debit),
+    credit: toDecimal(l.credit),
+  }));
+}
+
 /**
  * Ledger accounts that represent cash or bank: accounts linked to bank accounts, the
  * organisation's default bank/cash accounts and ASSET accounts whose subType is cash/bank. Falls

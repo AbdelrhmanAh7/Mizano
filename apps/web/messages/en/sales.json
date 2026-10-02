@@ -60,6 +60,31 @@
       "createError": "Failed to create customer.",
       "updateError": "Failed to update customer.",
       "deleteError": "Failed to delete customer. They may have associated transactions."
+    },
+    "statement": {
+      "title": "Statement of account",
+      "totalInvoiced": "Total Invoiced",
+      "totalPaid": "Total Paid and Credited",
+      "outstanding": "Outstanding Balance",
+      "openingBalance": "Opening Balance",
+      "history": "Transaction History",
+      "noTransactions": "No transactions found",
+      "balanceDue": "Balance Due",
+      "columns": {
+        "date": "Date",
+        "type": "Type",
+        "reference": "Reference",
+        "debit": "Debit",
+        "credit": "Credit",
+        "balance": "Balance"
+      },
+      "types": {
+        "Invoice": "Invoice",
+        "Payment": "Payment",
+        "Payment Void": "Payment voided",
+        "Credit Note": "Credit note",
+        "Credit Note Refund": "Credit note refund"
+      }
     }
   },
   "quotes": {

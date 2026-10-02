@@ -78,7 +78,12 @@ export interface AgingBucket {
 
 export interface AgingReport {
   buckets: AgingBucket[];
+  /** Control-account total: open balances minus unapplied credit notes. */
   total: number;
+  /** Open document balances before unapplied credit notes (the sum of the buckets). */
+  grossTotal: number;
+  /** Credit notes/vendor credits that reduced the control account but no document. */
+  unappliedCredits: number;
   totalCount: number;
   asOfDate: string;
 }
@@ -271,22 +276,22 @@ interface RawAgingItem {
   customerName?: string;
   vendorName?: string;
   counterpartyName?: string;
-  amount?: number;
-  balanceDue?: number;
+  amount?: string | number;
+  balanceDue?: string | number;
   daysOverdue?: number;
 }
 
 interface RawAgingBucket {
   range?: string;
-  amount?: number;
+  amount?: string | number;
   count?: number;
   items?: RawAgingItem[];
 }
 
 interface RawAgingData {
   buckets?: RawAgingBucket[] | Record<string, RawAgingItem[]>;
-  summary?: Record<string, number>;
-  total?: number;
+  summary?: Record<string, string | number>;
+  total?: string | number;
   totalCount?: number;
   invoiceCount?: number;
   billCount?: number;
@@ -488,26 +493,29 @@ function transformAgingReport(
 ): AgingReport {
   // If already in the expected array format
   if (Array.isArray(raw.buckets)) {
+    const total = toNum(raw.total ?? raw.summary?.total);
     return {
       buckets: raw.buckets.map((b: RawAgingBucket) => ({
         range: b.range ?? '',
-        amount: b.amount ?? 0,
+        amount: toNum(b.amount),
         count: b.count ?? 0,
         items: Array.isArray(b.items) ? (b.items as AgingBucket['items']) : [],
       })),
-      total: raw.total ?? raw.summary?.total ?? 0,
+      total,
+      grossTotal: total,
+      unappliedCredits: 0,
       totalCount: raw.totalCount ?? raw.invoiceCount ?? raw.billCount ?? 0,
       asOfDate: raw.asOfDate ?? '',
     };
   }
 
-  // Transform named-bucket object format from backend
+  // Transform named-bucket object format from backend (money as decimal strings)
   const namedBuckets = raw.buckets as Record<string, RawAgingItem[]> | undefined;
   const buckets: AgingBucket[] = AGING_BUCKET_MAP.map(({ key, range }) => {
     const items = Array.isArray(namedBuckets?.[key]) ? namedBuckets![key] : [];
     return {
       range,
-      amount: raw.summary?.[key] ?? 0,
+      amount: toNum(raw.summary?.[key]),
       count: items.length,
       items: items.map((item: RawAgingItem) => ({
         id: item.invoiceId || item.billId || '',
@@ -515,8 +523,8 @@ function transformAgingReport(
         date: item.issueDate || item.billDate || '',
         dueDate: item.dueDate || '',
         counterpartyName: item[counterpartyField] || item.counterpartyName || '',
-        amount: item.amount ?? item.balanceDue ?? 0,
-        balanceDue: item.balanceDue ?? 0,
+        amount: toNum(item.amount ?? item.balanceDue),
+        balanceDue: toNum(item.balanceDue),
         daysOverdue: item.daysOverdue ?? 0,
       })),
     };
@@ -524,7 +532,10 @@ function transformAgingReport(
 
   return {
     buckets,
-    total: raw.summary?.total ?? 0,
+    // The API's netTotal reconciles to the AR/AP control account.
+    total: toNum(raw.summary?.netTotal ?? raw.summary?.total),
+    grossTotal: toNum(raw.summary?.total),
+    unappliedCredits: toNum(raw.summary?.unappliedCredits),
     totalCount: raw.invoiceCount ?? raw.billCount ?? 0,
     asOfDate: raw.asOfDate ?? '',
   };

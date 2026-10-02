@@ -60,6 +60,31 @@
       "createError": "فشل في إنشاء العميل.",
       "updateError": "فشل في تحديث العميل.",
       "deleteError": "فشل في حذف العميل. قد يكون له معاملات مرتبطة."
+    },
+    "statement": {
+      "title": "كشف حساب",
+      "totalInvoiced": "إجمالي الفواتير",
+      "totalPaid": "إجمالي المدفوع والمخصوم",
+      "outstanding": "الرصيد المستحق",
+      "openingBalance": "الرصيد الافتتاحي",
+      "history": "سجل المعاملات",
+      "noTransactions": "لا توجد معاملات",
+      "balanceDue": "الرصيد المستحق",
+      "columns": {
+        "date": "التاريخ",
+        "type": "النوع",
+        "reference": "المرجع",
+        "debit": "مدين",
+        "credit": "دائن",
+        "balance": "الرصيد"
+      },
+      "types": {
+        "Invoice": "فاتورة",
+        "Payment": "دفعة",
+        "Payment Void": "دفعة ملغاة",
+        "Credit Note": "إشعار دائن",
+        "Credit Note Refund": "استرداد إشعار دائن"
+      }
     }
   },
   "quotes": {

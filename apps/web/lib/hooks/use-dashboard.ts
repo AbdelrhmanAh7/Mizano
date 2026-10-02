@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { moneyToNumber } from '@/lib/money';
 
 // Types
 export interface DashboardStats {
@@ -138,8 +139,8 @@ interface DashboardOverviewResponse {
   bankBalances?: Array<{
     id?: string;
     name?: string;
-    systemBalance?: number;
-    bankBalance?: number;
+    systemBalance?: string | number;
+    bankBalance?: string | number;
     currency?: string;
   }>;
   alerts?: { overdueInvoices?: number; overdueBills?: number; activeProjects?: number };
@@ -162,13 +163,15 @@ interface DashboardOverviewResponse {
     }>;
   };
   overview?: {
-    monthlyRevenue?: number;
-    monthlyExpenses?: number;
-    monthlyProfit?: number;
-    totalReceivables?: number;
-    totalPayables?: number;
-    yearlyRevenue?: number;
-    netPosition?: number;
+    monthlyRevenue?: string | number;
+    monthlyExpenses?: string | number;
+    monthlyProfit?: string | number;
+    totalReceivables?: string | number;
+    totalPayables?: string | number;
+    yearlyRevenue?: string | number;
+    netPosition?: string | number;
+    /** Posted-ledger total of every cash and bank account. */
+    cashBalance?: string | number;
   };
   trends?: { revenue?: Trend; expenses?: Trend; profit?: Trend };
   upcomingPayments?: Array<{
@@ -177,7 +180,7 @@ interface DashboardOverviewResponse {
     reference: string;
     vendorName: string;
     dueDate: string;
-    amount: number;
+    amount: string | number;
   }>;
 }
 
@@ -186,12 +189,14 @@ export function transformDashboardOverview(
 ): DashboardStatsResult {
   const now = new Date();
 
-  const bankBalanceTotal = Array.isArray(overview.bankBalances)
-    ? overview.bankBalances.reduce(
-        (sum: number, b: { systemBalance?: number }) => sum + (b.systemBalance || 0),
-        0,
-      )
-    : 0;
+  // Cash KPI is the posted-ledger total of all cash and bank accounts (falls back to the sum of
+  // the listed bank accounts for older responses).
+  const bankBalanceTotal =
+    overview.overview?.cashBalance !== undefined
+      ? moneyToNumber(overview.overview.cashBalance)
+      : Array.isArray(overview.bankBalances)
+        ? overview.bankBalances.reduce((sum, b) => sum + moneyToNumber(b.systemBalance), 0)
+        : 0;
 
   // Build alerts from overview
   const alerts: AIAlert[] = [];
@@ -221,8 +226,8 @@ export function transformDashboardOverview(
     ? overview.bankBalances.map((b) => ({
         id: b.id || '',
         name: b.name || 'Unknown',
-        systemBalance: b.systemBalance || 0,
-        bankBalance: b.bankBalance || 0,
+        systemBalance: moneyToNumber(b.systemBalance),
+        bankBalance: moneyToNumber(b.bankBalance),
         currency: b.currency || 'USD',
       }))
     : [];
@@ -234,7 +239,7 @@ export function transformDashboardOverview(
         reference: p.reference,
         vendorName: p.vendorName,
         dueDate: typeof p.dueDate === 'string' ? p.dueDate : new Date(p.dueDate).toISOString(),
-        amount: p.amount || 0,
+        amount: moneyToNumber(p.amount),
         link: `/purchases/bills/${p.id}`,
       }))
     : [];
@@ -248,7 +253,7 @@ export function transformDashboardOverview(
         type: 'INVOICE',
         reference: inv.invoiceNumber,
         description: `Invoice to ${inv.customer?.name || 'Unknown'}`,
-        amount: parseFloat(inv.grandTotal?.toString() || inv.total?.toString() || '0'),
+        amount: moneyToNumber(inv.grandTotal ?? inv.total),
         date: inv.createdAt,
         link: `/sales/invoices/${inv.id}`,
       });
@@ -261,7 +266,7 @@ export function transformDashboardOverview(
         type: 'BILL',
         reference: bill.billNumber,
         description: `Bill from ${bill.vendor?.name || 'Unknown'}`,
-        amount: -parseFloat(bill.grandTotal?.toString() || bill.total?.toString() || '0'),
+        amount: -moneyToNumber(bill.grandTotal ?? bill.total),
         date: bill.createdAt,
         link: `/purchases/bills/${bill.id}`,
       });
@@ -271,12 +276,12 @@ export function transformDashboardOverview(
 
   return {
     stats: {
-      revenue: overview.overview?.monthlyRevenue || 0,
-      expenses: overview.overview?.monthlyExpenses || 0,
-      netProfit: overview.overview?.monthlyProfit || 0,
+      revenue: moneyToNumber(overview.overview?.monthlyRevenue),
+      expenses: moneyToNumber(overview.overview?.monthlyExpenses),
+      netProfit: moneyToNumber(overview.overview?.monthlyProfit),
       bankBalance: bankBalanceTotal,
-      totalReceivables: overview.overview?.totalReceivables || 0,
-      totalPayables: overview.overview?.totalPayables || 0,
+      totalReceivables: moneyToNumber(overview.overview?.totalReceivables),
+      totalPayables: moneyToNumber(overview.overview?.totalPayables),
       overdueInvoices: overview.alerts?.overdueInvoices || 0,
       overdueBills: overview.alerts?.overdueBills || 0,
       activeProjects: overview.alerts?.activeProjects || 0,
@@ -287,15 +292,15 @@ export function transformDashboardOverview(
       profit: overview.trends?.profit || { value: 0, isPositive: true },
     },
     receivablesVsPayables: {
-      receivables: overview.overview?.totalReceivables || 0,
-      payables: overview.overview?.totalPayables || 0,
+      receivables: moneyToNumber(overview.overview?.totalReceivables),
+      payables: moneyToNumber(overview.overview?.totalPayables),
     },
     alerts,
     recentTransactions,
     upcomingPayments,
     bankAccounts,
-    yearlyRevenue: overview.overview?.yearlyRevenue || 0,
-    netPosition: overview.overview?.netPosition || 0,
+    yearlyRevenue: moneyToNumber(overview.overview?.yearlyRevenue),
+    netPosition: moneyToNumber(overview.overview?.netPosition),
   };
 }
 
@@ -333,11 +338,16 @@ export function useDashboardRevenue() {
       const data = res.data?.data ?? res.data;
       return Array.isArray(data)
         ? data.map(
-            (r: { month: string; revenue?: number; expenses?: number; profit?: number }) => ({
+            (r: {
+              month: string;
+              revenue?: string | number;
+              expenses?: string | number;
+              profit?: string | number;
+            }) => ({
               month: r.month,
-              revenue: r.revenue || 0,
-              expenses: r.expenses || 0,
-              profit: r.profit || 0,
+              revenue: moneyToNumber(r.revenue),
+              expenses: moneyToNumber(r.expenses),
+              profit: moneyToNumber(r.profit),
             }),
           )
         : [];
@@ -381,14 +391,17 @@ export function useDashboardExpenses() {
         `/reports/dashboard/expenses-by-category?startDate=${startOfMonth}&endDate=${endOfMonth}`,
       );
       const data = res.data?.data ?? res.data;
-      const expenseArray: Array<{ category?: string; amount?: number }> = Array.isArray(data)
+      const expenseArray: Array<{ category?: string; amount?: string | number }> = Array.isArray(
+        data,
+      )
         ? data
         : [];
-      const total = expenseArray.reduce((sum: number, e) => sum + (e.amount || 0), 0);
+      // Percentages are a display ratio of API-computed amounts, not money arithmetic.
+      const total = expenseArray.reduce((sum: number, e) => sum + moneyToNumber(e.amount), 0);
       return expenseArray.slice(0, 5).map((e) => ({
         name: e.category || 'Other',
-        amount: e.amount || 0,
-        percentage: total > 0 ? Math.round(((e.amount || 0) / total) * 100) : 0,
+        amount: moneyToNumber(e.amount),
+        percentage: total > 0 ? Math.round((moneyToNumber(e.amount) / total) * 100) : 0,
       }));
     },
     refetchInterval: REFETCH_INTERVAL,
@@ -407,10 +420,15 @@ export function useDashboardCustomers() {
       const data = res.data?.data ?? res.data;
       return Array.isArray(data)
         ? data.map(
-            (c: { id: string; name: string; totalRevenue?: number; invoiceCount?: number }) => ({
+            (c: {
+              id: string;
+              name: string;
+              totalRevenue?: string | number;
+              invoiceCount?: number;
+            }) => ({
               id: c.id,
               name: c.name,
-              totalRevenue: c.totalRevenue || 0,
+              totalRevenue: moneyToNumber(c.totalRevenue),
               invoiceCount: c.invoiceCount || 0,
             }),
           )
@@ -431,9 +449,9 @@ export function useDashboardBanking() {
       const res = await api.get('/reports/dashboard/bank-balance-trend?months=6');
       const data = res.data?.data ?? res.data;
       return Array.isArray(data)
-        ? data.map((b: { month: string; balance?: number }) => ({
+        ? data.map((b: { month: string; balance?: string | number }) => ({
             month: b.month,
-            balance: b.balance || 0,
+            balance: moneyToNumber(b.balance),
           }))
         : [];
     },
@@ -480,16 +498,16 @@ export function useDashboardProjects() {
               name: string;
               status?: string;
               hoursLogged?: number;
-              revenue?: number;
-              budget?: number;
+              revenue?: string | number;
+              budget?: string | number;
               budgetUsedPercent?: number;
             }) => ({
               id: p.id,
               name: p.name,
               status: p.status || 'UNKNOWN',
               hoursLogged: p.hoursLogged || 0,
-              revenue: p.revenue || 0,
-              budget: p.budget || 0,
+              revenue: moneyToNumber(p.revenue),
+              budget: moneyToNumber(p.budget),
               budgetUsedPercent: p.budgetUsedPercent || 0,
             }),
           )
@@ -539,7 +557,7 @@ export function useDashboard() {
  * Aggregate daily cash flow data into monthly buckets.
  */
 function aggregateCashFlowByMonth(
-  daily: Array<{ date: string; cashIn?: number; cashOut?: number }>,
+  daily: Array<{ date: string; cashIn?: string | number; cashOut?: string | number }>,
 ): CashFlowPoint[] {
   const byMonth: Record<string, { inflow: number; outflow: number }> = {};
   const monthFormatter = new Intl.DateTimeFormat('default', { month: 'short' });
@@ -550,8 +568,8 @@ function aggregateCashFlowByMonth(
     if (!byMonth[key]) {
       byMonth[key] = { inflow: 0, outflow: 0 };
     }
-    byMonth[key].inflow += day.cashIn || 0;
-    byMonth[key].outflow += day.cashOut || 0;
+    byMonth[key].inflow += moneyToNumber(day.cashIn);
+    byMonth[key].outflow += moneyToNumber(day.cashOut);
   }
 
   return Object.entries(byMonth).map(([month, data]) => ({

@@ -91,3 +91,13 @@ export function toDecimalInput(value: string | number | null | undefined, fallba
   const text = value === null || value === undefined ? '' : String(value).trim();
   return DECIMAL_RE.test(text) ? text : fallback;
 }
+
+/**
+ * Converts an API money value (a fixed-scale decimal string, or a legacy number) to a number for
+ * DISPLAY and chart plotting only. The API computes every sum in exact Decimal; never add or
+ * compare money with the result, and never send it back to the API.
+ */
+export function moneyToNumber(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
