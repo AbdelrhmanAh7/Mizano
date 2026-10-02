@@ -1,6 +1,8 @@
 # Four-provider operating guide
 
-Read [AGENTS.md](../../AGENTS.md) and [the ten-day plan](../roadmap.md). This is an executable handover specification for the coordinator; it does not claim the local providers or daily timer are already running.
+Read [AGENTS.md](../../AGENTS.md) and [the Raspberry Pi live plan](../roadmap.md). This is an executable handover specification for the coordinator; it does not claim the local providers or daily timer are already running.
+
+Current goal: a tiny live deployment on a Raspberry Pi 5 (8GB, arm64), tracked by epic #45. This guide asserts no completed progress.
 
 ## Roles and ownership
 
@@ -11,7 +13,7 @@ Read [AGENTS.md](../../AGENTS.md) and [the ten-day plan](../roadmap.md). This is
 | GLM         | CPU extraction implementation              | Parser/OCR adapter, field rules, fixtures and benchmark     | Codex                |
 | Antigravity | Accountant UX and charts                   | Inbox, preview/corrections, RTL/mobile, report presentation | Claude or Codex      |
 
-Either Claude or Codex can receive the entry prompt and coordinate. If Codex coordinates, it delegates its implementation work to a separate worker and Claude independently reviews those changes. The coordinator may implement bounded integration work, but cannot approve its own changes as independent review. Roles are defaults; use demonstrated availability and task fit. The P0 backlog alone is estimated at 21 agent-hours, so it cannot all sit with one Codex worker during the first two days. Split non-overlapping implementation across available providers (for example frontend session isolation, backend tenancy and the shared tax calculator), while the coordinator serializes shared-schema and posting integration. Treat early milestone dates as at-risk forecasts until Day 1 capacity and reproduction results are known; retain the Day 10 release target and report any miss honestly. Do not invent model IDs or pretend current ChatGPT subagents are the four external products.
+Either Claude or Codex can receive the entry prompt and coordinate. If Codex coordinates, it delegates its implementation work to a separate worker and Claude independently reviews those changes. The coordinator may implement bounded integration work, but cannot approve its own changes as independent review. Roles are defaults; use demonstrated availability and task fit. The P0 backlog alone is estimated at 21 agent-hours, so it cannot all sit with one Codex worker during the first two days. Split non-overlapping implementation across available providers (for example frontend session isolation, backend tenancy and the shared tax calculator), while the coordinator serializes shared-schema and posting integration. The ten-day demo schedule is superseded by the Pi plan (#45); milestone status requires current issue and acceptance evidence. Do not invent model IDs or pretend current ChatGPT subagents are the four external products.
 
 Shared contract owner: coordinator. Freeze document/job/result schemas before parallel integration. Shared schema/migrations, package locks, workflow files and root instructions have one active owner at a time. Workers coordinate schema requests through the coordinator instead of independently editing Prisma. Use branches `demo/<issue>-<topic>` from the current baseline and isolated `git worktree` directories.
 
@@ -25,7 +27,7 @@ Shared contract owner: coordinator. Freeze document/job/result schemas before pa
 
 ## Daily budget and scheduling
 
-Proposed local schedule: **19:00 Africa/Cairo**, 150-minute session, 180-minute hard ceiling, daily through 14 September 2026. This is a default for the operator-host runner, not an activated ChatGPT reminder. On first activation, confirm the actual host timezone and timer output, and record next run; if today's window passed, start a bounded catch-up session without silently extending the deadline. The continuously running invoice service is separate from this development schedule.
+Proposed local schedule: **19:00 Africa/Cairo**, 150-minute session, 180-minute hard ceiling, for the Raspberry Pi live plan (#45), with dates set by the operator. This is a default for the operator-host runner, not an activated ChatGPT reminder. On first activation, confirm the actual host timezone and timer output, and record next run; if today's window passed, start a bounded catch-up session and record the actual run. The continuously running invoice service is separate from this development schedule.
 
 - 00–15m: fetch GitHub truth, triage new blockers, identify ready dependencies, assign one issue per lane and acquire lease.
 - 15–110m: bounded parallel implementation; compact each worker context around its issue and changed files.

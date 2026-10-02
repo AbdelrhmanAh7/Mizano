@@ -61,6 +61,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **When a form needs data the role can't read, add a narrow lookup endpoint guarded by the form's own permission,** for example `/invoices/tax-rate-options` (`sales.view`) or `/inventory-adjustments/account-options` (`inventory.create`). Never widen permissions.
 - **Gate UI actions with exactly the API route's permission.**
 - **Money-bearing imports require the same per-entity create permission as the single-record routes.**
+- **Adding auth to a server endpoint or socket changes its contract: update every client in the same PR** (send the token, handle expiry and reconnect). A server-only change silently breaks the client. _(events gateway vs `use-realtime`)_
 
 ## 8. Voided and deleted records
 

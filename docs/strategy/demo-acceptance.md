@@ -1,6 +1,8 @@
 # Demo acceptance contract
 
-Target: 14 September 2026, 23:59 Africa/Cairo. This is a proposed test/release contract, not an assertion of passing results. All checks apply to the exact candidate SHA on the actual CPU demo environment.
+> **Pi note (2 October 2026):** this acceptance contract now applies to the Raspberry Pi live deployment; tracking in #44.
+
+Target: a tiny live deployment on a Raspberry Pi 5 (8GB, arm64), tracked by epic #45. The ten-day demo target is superseded by the Pi plan (#45). This is a proposed test/release contract, not an assertion of passing results. All checks apply to the exact candidate SHA on the actual CPU demo environment.
 
 ## Required journey
 
@@ -16,27 +18,27 @@ Target: 14 September 2026, 23:59 Africa/Cairo. This is a proposed test/release c
 
 ## Pass criteria and evidence
 
-| Gate | Required evidence |
-| --- | --- |
-| Security/identity | Seeded anonymous/two-tenant/API/SSE tests, cross-reference rejection and concurrent refresh tests; no invoice/auth payload in captured logs |
-| Accounting | Exact Decimal fixture totals, balanced journals, transactional failure injection, idempotency/concurrency, bulk/single parity, period locks and reversal tests |
-| Format completeness | Every declared format and mixed-page test; no silent text/page truncation; explicit encrypted/corrupt/oversized behavior |
+| Gate                    | Required evidence                                                                                                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Security/identity       | Seeded anonymous/two-tenant/API/SSE tests, cross-reference rejection and concurrent refresh tests; no invoice/auth payload in captured logs                                     |
+| Accounting              | Exact Decimal fixture totals, balanced journals, transactional failure injection, idempotency/concurrency, bulk/single parity, period locks and reversal tests                  |
+| Format completeness     | Every declared format and mixed-page test; no silent text/page truncation; explicit encrypted/corrupt/oversized behavior                                                        |
 | Automation and recovery | Zero clicks from configured Telegram channel to draft; <=1 batch approval action for ready invoices; bounded retries/dead-letter, 20-document batch and restart/replay evidence |
-| OCR quality | Labelled dev/holdout corpus; >=95% critical-header exact-match target on readable holdout, numerator/denominator and slices; all uncertain monetary fields repairable |
-| CPU performance | Actual hardware/model versions; warm/cold p50/p95, RAM and batch throughput. Provisional warm p95 <=30s for supported <=3-page invoices, no out-of-memory/crash |
-| Delivery | Required CI/build and strict seeded API/browser journeys; exact-head independent review; tested immutable deploy, health and restore/rollback evidence |
-| UX | Arabic/English RTL, 375px and desktop, keyboard/source preview, loading/empty/error/reconnect states |
+| OCR quality             | Labelled dev/holdout corpus; >=95% critical-header exact-match target on readable holdout, numerator/denominator and slices; all uncertain monetary fields repairable           |
+| CPU performance         | Actual hardware/model versions; warm/cold p50/p95, RAM and batch throughput. Provisional warm p95 <=30s for supported <=3-page invoices, no out-of-memory/crash                 |
+| Delivery                | Required CI/build and strict seeded API/browser journeys; exact-head independent review; tested immutable deploy, health and restore/rollback evidence                          |
+| UX                      | Arabic/English RTL, 375px and desktop, keyboard/source preview, loading/empty/error/reconnect states                                                                            |
 
 On a target miss, publish measured result and impact; do not redefine the metric after seeing data. Average OCR accuracy never authorizes a wrong posting. Time/size limits reject or mark review-required rather than dropping data. Local hardware and an accountant-labelled corpus are Day 1 prerequisites; absent evidence keeps the applicable gate open.
 
 ## Useful charts for the first demo
 
-| Chart/view | Definition and source | Accountant action |
-| --- | --- | --- |
-| AP aging | Remaining supplier balances by not-due, 1–30, 31–60, 61–90, >90 days at explicit as-of date; exclude void/deleted records consistently | Select a bucket → outstanding bill list and original documents |
-| Posted income versus expenses | Period buckets from posted ledger account classifications; drafts excluded; explicit sign rules and currency | Drill to general-ledger lines and sources; reconcile sums |
-| Cash movements | Actual posted cash/bank inflows and outflows by period; not an AI forecast or claim of live bank balance | Inspect payments, transfers and supporting records |
-| Intake operations | Counts by queued/running/ready/review-required/failed; duplicate rate, correction time and processing p95 from durable job events | Open exceptions/retry, identify poor source documents |
+| Chart/view                    | Definition and source                                                                                                                  | Accountant action                                              |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| AP aging                      | Remaining supplier balances by not-due, 1–30, 31–60, 61–90, >90 days at explicit as-of date; exclude void/deleted records consistently | Select a bucket → outstanding bill list and original documents |
+| Posted income versus expenses | Period buckets from posted ledger account classifications; drafts excluded; explicit sign rules and currency                           | Drill to general-ledger lines and sources; reconcile sums      |
+| Cash movements                | Actual posted cash/bank inflows and outflows by period; not an AI forecast or claim of live bank balance                               | Inspect payments, transfers and supporting records             |
+| Intake operations             | Counts by queued/running/ready/review-required/failed; duplicate rate, correction time and processing p95 from durable job events      | Open exceptions/retry, identify poor source documents          |
 
 Use 2–3 accountant charts plus the intake status strip first; additional category/vendor breakdown is stretch. Prefer simple bars/lines and accessible data tables, clear zero/empty states, date/tenant filters and source drill-through. Never sum EGP/SAR/AED without a documented dated FX conversion. Figures on screen must reconcile with an API/export query, not a mocked presentation fixture.
 
