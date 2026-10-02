@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { io, Socket } from 'socket.io-client';
-import { useSession } from 'next-auth/react';
+import { getSession, useSession } from 'next-auth/react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6001/api';
 // Strip the /api path to get the base WS URL
@@ -55,7 +55,7 @@ const FINANCIAL_ENTITIES = new Set([
 /**
  * Socket.IO disconnect reasons that are auto-recoverable.
  * Socket.IO will reconnect automatically for these — no warning needed.
- * Only `io server disconnect` requires manual attention (server forcefully
+ * Only `io server disconnect` requires manual reconnection (server forcefully
  * kicked the client and auto-reconnect is disabled for that reason).
  */
 const AUTO_RECOVERABLE_REASONS = new Set(['transport close', 'transport error', 'ping timeout']);
@@ -77,7 +77,19 @@ export function useRealtime() {
   useEffect(() => {
     if (!userId) return;
 
+    let disposed = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+
     const socket = io(`${WS_URL}/events`, {
+      auth: (cb) => {
+        getSession()
+          .then((freshSession) => {
+            if (!disposed) cb({ token: freshSession?.accessToken });
+          })
+          .catch(() => {
+            if (!disposed) cb({});
+          });
+      },
       transports: ['polling', 'websocket'],
       upgrade: true,
       autoConnect: true,
@@ -123,10 +135,25 @@ export function useRealtime() {
         // Socket.IO will auto-reconnect — no action needed
         return;
       }
-      // Truly unexpected (e.g., io server disconnect) — handled silently
+      if (reason === 'io server disconnect' && !disposed && reconnectTimer === undefined) {
+        reconnectTimer = setTimeout(() => {
+          getSession()
+            .then((freshSession) => {
+              if (!disposed && freshSession?.accessToken) socket.connect();
+            })
+            .catch(() => {
+              // A failed session refresh leaves the socket disconnected.
+            })
+            .finally(() => {
+              reconnectTimer = undefined;
+            });
+        }, 1000);
+      }
     });
 
     return () => {
+      disposed = true;
+      if (reconnectTimer !== undefined) clearTimeout(reconnectTimer);
       socket.disconnect();
       socketRef.current = null;
     };
