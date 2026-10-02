@@ -70,6 +70,10 @@ export interface DocumentIntakeResult {
 
   /** Per-field confidence (0-1) */
   fieldConfidence: Record<string, number>;
+  /** Rules strategy only: source line per field (document content). */
+  fieldEvidence?: Record<string, { text: string; lineIndex: number }>;
+  /** Rules strategy only: failed consistency checks as machine codes. */
+  extractionWarnings?: string[];
   ocrConfidence: number;
 
   /** Vendor matching */
@@ -108,7 +112,13 @@ export interface DocumentIntakeResult {
   } | null;
 
   /** Which AI engine extracted the data */
-  extractionMethod: 'ollama-vision' | 'ollama-text' | 'ocr-llm' | 'hybrid-ocr' | 'hybrid-vlm';
+  extractionMethod:
+    | 'ollama-vision'
+    | 'ollama-text'
+    | 'ocr-llm'
+    | 'hybrid-ocr'
+    | 'hybrid-vlm'
+    | 'rules';
 }
 
 /**
@@ -400,6 +410,8 @@ export class DocumentIntakeService {
         lineItems: extraction.lineItems,
       },
       fieldConfidence: extraction.fieldConfidence,
+      fieldEvidence: extraction.fieldEvidence,
+      extractionWarnings: extraction.extractionWarnings,
       ocrConfidence: extraction.ocrConfidence,
       matchedVendor,
       vendorCandidates,
@@ -718,6 +730,7 @@ export class DocumentIntakeService {
     if (result.strategyUsed === 'hybrid') {
       return result.subPathUsed === 'vlm-fallback' ? 'hybrid-vlm' : 'hybrid-ocr';
     }
+    if (result.strategyUsed === 'rules') return 'rules';
     if (result.strategyUsed === 'vlm') return 'ollama-vision';
     if (result.strategyUsed === 'ocr-llm') return 'ocr-llm';
     return 'ocr-llm';

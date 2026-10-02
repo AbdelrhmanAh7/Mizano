@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { describeError } from '../../../common/utils/redact';
 import {
   ExtractionContext,
   ExtractionStrategy,
@@ -9,6 +10,7 @@ import {
 import { VlmStrategy } from './vlm-strategy.service';
 import { OcrLlmStrategy } from './ocr-llm-strategy.service';
 import { HybridStrategy } from './hybrid-strategy.service';
+import { RulesStrategy } from './rules-strategy.service';
 
 /**
  * Resolves and executes the appropriate extraction strategy.
@@ -30,6 +32,7 @@ export class ExtractionStrategyResolver {
     private vlmStrategy: VlmStrategy,
     private ocrLlmStrategy: OcrLlmStrategy,
     private hybridStrategy: HybridStrategy,
+    private rulesStrategy: RulesStrategy,
   ) {
     this.defaultStrategy = this.configService.get<string>(
       'EXTRACTION_STRATEGY',
@@ -49,12 +52,40 @@ export class ExtractionStrategyResolver {
     context: ExtractionContext,
     requested?: string,
   ): Promise<StrategyExtractionResult | null> {
-    const strategyName = (requested || this.defaultStrategy) as ExtractionStrategyOption;
+    // INTAKE_EXTRACTION_STRATEGY=rules|llm. Unset: LLM path, with the CPU rules
+    // baseline when no model produced a result (Ollama unreachable or empty).
+    const intakeMode = this.configService.get<string>('INTAKE_EXTRACTION_STRATEGY');
+    const strategyName = (requested ||
+      (intakeMode === 'rules' ? 'rules' : this.defaultStrategy)) as ExtractionStrategyOption;
 
     this.logger.log(
       `Resolving strategy: requested=${requested}, default=${this.defaultStrategy}, resolved=${strategyName}`,
     );
 
+    if (strategyName === 'rules') {
+      return this.rulesStrategy.extract(context);
+    }
+
+    if (intakeMode === 'llm') {
+      return this.resolveLlm(context, strategyName);
+    }
+
+    try {
+      const llmResult = await this.resolveLlm(context, strategyName);
+      if (llmResult) return llmResult;
+      this.logger.warn('LLM extraction returned nothing; using rules baseline');
+    } catch (error) {
+      this.logger.warn(
+        `LLM extraction failed (${describeError(error, { includeMessage: false })}); using rules baseline`,
+      );
+    }
+    return this.rulesStrategy.extract(context);
+  }
+
+  private async resolveLlm(
+    context: ExtractionContext,
+    strategyName: ExtractionStrategyOption,
+  ): Promise<StrategyExtractionResult | null> {
     if (strategyName === 'auto') {
       return this.autoSelect(context);
     }
@@ -112,6 +143,8 @@ export class ExtractionStrategyResolver {
         return this.ocrLlmStrategy;
       case 'hybrid':
         return this.hybridStrategy;
+      case 'rules':
+        return this.rulesStrategy;
       default:
         return this.ocrLlmStrategy;
     }
