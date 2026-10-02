@@ -167,6 +167,24 @@ describe('DashboardService', () => {
       const result = await service.getDashboardOverview(ORG_ID);
 
       expect(result.overview.cashBalance).toBe('4886.5000');
+      // Current cash counts nothing dated after the end of today (UTC): no future-dated entries.
+      const cashQuery = prisma.journalLine.groupBy.mock.calls.find(([args]) =>
+        (args.where as { accountId?: { in: string[] } }).accountId?.in?.includes('cash'),
+      );
+      const date = (cashQuery?.[0].where as { journal: { date: { lte: Date; gte?: Date } } })
+        .journal.date;
+      expect(date.gte).toBeUndefined();
+      expect(date.lte.getTime()).toBe(
+        Date.UTC(
+          new Date().getUTCFullYear(),
+          new Date().getUTCMonth(),
+          new Date().getUTCDate(),
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
       expect(result.bankBalances[0].systemBalance).toBe('4886.5000');
       expect(result.bankBalances[0].bankBalance).toBe('2.0000');
     });

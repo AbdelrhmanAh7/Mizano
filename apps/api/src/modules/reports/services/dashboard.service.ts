@@ -219,9 +219,13 @@ export class DashboardService {
       }),
     ]);
     const linkedIds = bankAccounts.map((b) => b.linkedAccountId);
-    const totals = await sumPostedLinesByAccount(this.prisma, organizationId, undefined, [
-      ...new Set([...cashIds, ...linkedIds]),
-    ]);
+    // Current balance: nothing dated after the end of today (UTC) counts yet.
+    const totals = await sumPostedLinesByAccount(
+      this.prisma,
+      organizationId,
+      { lte: endOfUtcDay(new Date()) },
+      [...new Set([...cashIds, ...linkedIds])],
+    );
     const balance = (accountId: string): Decimal => {
       const t = totals.get(accountId);
       return t ? t.debit.sub(t.credit) : ZERO;

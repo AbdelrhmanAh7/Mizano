@@ -270,6 +270,8 @@ interface RawAgingItem {
   billId?: string;
   invoiceNumber?: string;
   billNumber?: string;
+  /** Accounting date; preferred over issueDate/billDate. */
+  date?: string;
   issueDate?: string;
   billDate?: string;
   dueDate?: string;
@@ -520,7 +522,7 @@ function transformAgingReport(
       items: items.map((item: RawAgingItem) => ({
         id: item.invoiceId || item.billId || '',
         number: item.invoiceNumber || item.billNumber || '',
-        date: item.issueDate || item.billDate || '',
+        date: item.date || item.issueDate || item.billDate || '',
         dueDate: item.dueDate || '',
         counterpartyName: item[counterpartyField] || item.counterpartyName || '',
         amount: toNum(item.amount ?? item.balanceDue),

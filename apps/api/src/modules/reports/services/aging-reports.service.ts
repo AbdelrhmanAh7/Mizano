@@ -25,6 +25,8 @@ export interface AgingItem {
   customerName?: string;
   vendorId?: string;
   vendorName?: string;
+  /** Accounting date of the document. */
+  date?: Date | null;
   issueDate?: Date | null;
   billDate?: Date | null;
   dueDate: Date;
@@ -122,6 +124,8 @@ export class AgingReportsService {
         invoiceNumber: invoice.invoiceNumber,
         customerId: invoice.customer.id,
         customerName: invoice.customer.name,
+        // Accounting date (what the aging cut-off uses); issueDate stays as an extra field.
+        date: invoice.date,
         issueDate: invoice.issueDate,
         dueDate: invoice.dueDate,
         daysOverdue: Math.max(0, days),
@@ -282,7 +286,7 @@ export class AgingReportsService {
     endDate: string,
   ) {
     const customer = await this.prisma.customer.findFirst({
-      where: { id: customerId, organizationId },
+      where: { id: customerId, organizationId, deletedAt: null },
     });
     if (!customer) return null;
 

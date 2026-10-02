@@ -11,6 +11,7 @@ describe('receivables aging', () => {
     id,
     invoiceNumber: id,
     customerId,
+    date: new Date('2026-01-03'),
     issueDate: new Date('2026-01-01'),
     dueDate: new Date(due),
     balanceDue: new Decimal(balance),
@@ -68,6 +69,8 @@ describe('receivables aging', () => {
     expect(report.summary.over90).toBe('100.0000');
     expect(report.summary.total).toBe('100.3000');
     expect(report.buckets.days1_30[0]).toMatchObject({ balanceDue: '0.2000', daysOverdue: 30 });
+    // Rows carry the accounting date (the cut-off field), not the issue date.
+    expect(report.buckets.days1_30[0].date).toEqual(new Date('2026-01-03'));
     expect(report.invoiceCount).toBe(3);
     expect(report.customerCount).toBe(2);
   });
@@ -307,12 +310,20 @@ describe('customer statement', () => {
     expect(jan?.totalDebits).toBe('0.3200');
   });
 
+  it('returns null for a soft-deleted customer (the lookup requires deletedAt: null)', async () => {
+    (prisma.customer.findFirst as jest.Mock).mockImplementationOnce(
+      async ({ where }: { where: { deletedAt?: null } }) =>
+        where.deletedAt === null ? null : { id: 'c1' },
+    );
+    expect(await service.getCustomerStatement(ORG, 'c1', '2026-01-01', '2026-01-31')).toBeNull();
+  });
+
   it('returns null for a customer of another organization', async () => {
     (prisma.customer.findFirst as jest.Mock).mockResolvedValueOnce(null);
     expect(
       await service.getCustomerStatement('other', 'c1', '2026-01-01', '2026-01-31'),
     ).toBeNull();
     const where = (prisma.customer.findFirst as jest.Mock).mock.calls.at(-1)[0].where;
-    expect(where).toEqual({ id: 'c1', organizationId: 'other' });
+    expect(where).toEqual({ id: 'c1', organizationId: 'other', deletedAt: null });
   });
 });

@@ -9,14 +9,12 @@ import { BankTransactionsService } from './services/bank-transactions.service';
 import { BankStatementImportService } from './services/bank-statement-import.service';
 import { BankRulesService } from './services/bank-rules.service';
 import { ReconciliationService } from './services/reconciliation.service';
-import { AccountingModule } from '../accounting/accounting.module';
 import { SalesModule } from '../sales/sales.module';
 import { PurchasesModule } from '../purchases/purchases.module';
 import { ImportExportModule } from '../import-export/import-export.module';
 
 @Module({
   imports: [
-    AccountingModule,
     SalesModule,
     PurchasesModule,
     ImportExportModule,

@@ -4,7 +4,6 @@ import {
   IsOptional,
   IsEnum,
   IsBoolean,
-  IsDateString,
   Length,
   MaxLength,
 } from 'class-validator';
@@ -38,11 +37,6 @@ export class CreateBankAccountDto {
   @IsString()
   @IsOptional()
   openingBalance?: string;
-
-  @ApiProperty({ required: false, example: '2026-01-01' })
-  @IsDateString()
-  @IsOptional()
-  openingDate?: string;
 
   @ApiProperty()
   @IsString()

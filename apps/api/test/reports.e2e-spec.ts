@@ -121,32 +121,32 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       acc.rent = list.body.data.find((x: { code: string }) => x.code === '6100').id;
       for (const id of Object.values(acc)) expect(id).toEqual(expect.any(String));
 
-      const opening = await a.post('/organization/onboarding/opening-balances').send({
-        openingDate: isoDay(-200),
-        balances: [{ accountId: acc.bank, amount: '5000.50' }],
-      });
-      expect(opening.status).toBe(201);
-
-      // A bank account with an opening balance posts its own journal against account 3900.
-      const linked = await createAccount(a, '1050', 'Savings Bank', 'ASSET');
-      const bankAccount = await a.post('/bank-accounts').send({
+      // Bank accounts cannot carry an opening balance themselves: it is rejected and recorded
+      // through Opening Balances instead (below), so the ledger stays the single source.
+      const savings = await createAccount(a, '1050', 'Savings Bank', 'ASSET');
+      const rejected = await a.post('/bank-accounts').send({
         name: 'Savings',
         type: 'BANK',
-        linkedAccountId: linked,
+        linkedAccountId: savings,
         openingBalance: '250.25',
-        openingDate: isoDay(-100),
       });
+      expect(rejected.status).toBe(400);
+      expect(rejected.body.message).toMatch(/Opening Balances/);
+      const bankAccount = await a
+        .post('/bank-accounts')
+        .send({ name: 'Savings', type: 'BANK', linkedAccountId: savings });
       expect(bankAccount.status).toBe(201);
-      const linkedBalance = await a.get(`/accounts/${linked}/balance`);
-      expect(linkedBalance.body.balance).toBe('250.2500');
-      const sourced = await prisma.journal.count({
-        where: {
-          organizationId: tenantA.organizationId,
-          sourceType: 'OPENING_BALANCE',
-          sourceId: `bank-account:${bankAccount.body.id}`,
-        },
+
+      const opening = await a.post('/organization/onboarding/opening-balances').send({
+        openingDate: isoDay(-200),
+        balances: [
+          { accountId: acc.bank, amount: '5000.50' },
+          { accountId: savings, amount: '250.25' },
+        ],
       });
-      expect(sourced).toBe(1);
+      expect(opening.status).toBe(201);
+      const savingsBalance = await a.get(`/accounts/${savings}/balance`);
+      expect(savingsBalance.body.balance).toBe('250.2500');
 
       const c1 = await a.post('/customers').send({ name: 'Nile Trading', currency: 'EGP' });
       const c2 = await a.post('/customers').send({ name: 'Delta Retail', currency: 'EGP' });

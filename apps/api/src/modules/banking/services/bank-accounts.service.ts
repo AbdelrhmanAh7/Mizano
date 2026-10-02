@@ -1,103 +1,44 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { AccountType, BankAccountType, Prisma } from '@prisma/client';
+import { BankAccountType, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
 import { BankAccountQueryDto } from '../dto/bank-account-query.dto';
 import { CreateBankAccountDto } from '../dto/create-bank-account.dto';
 import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
 
-const OPENING_BALANCE_EQUITY_CODE = '3900';
-
 @Injectable()
 export class BankAccountsService {
-  constructor(
-    private prisma: PrismaService,
-    private journalsService: JournalsService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   /**
-   * Creates a bank account. A non-zero opening balance is posted in the same transaction as a
-   * journal between the linked ledger account and Opening Balance Equity (account 3900), so the
-   * ledger, trial balance and cash KPIs carry it; the stored balance is only a cache of it.
+   * Creates a bank account. A non-zero opening balance is rejected: opening balances are posted
+   * journals, recorded in one place (Accounting > Opening Balances) so the ledger, trial balance
+   * and cash KPIs all agree. Stored balances are never a source of truth.
    */
   async create(organizationId: string, dto: CreateBankAccountDto) {
     const opening = new Decimal(dto.openingBalance || '0');
-    const openingDate = dto.openingDate ? new Date(dto.openingDate) : new Date();
-    if (Number.isNaN(openingDate.getTime())) {
-      throw new BadRequestException('openingDate must be a valid date');
+    if (!opening.isZero()) {
+      throw new BadRequestException(
+        'Record opening bank balances through Opening Balances (Accounting → Opening Balances)',
+      );
     }
+    const linked = await this.prisma.account.findFirst({
+      where: { id: dto.linkedAccountId, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!linked) throw new BadRequestException('Linked ledger account not found');
 
-    return this.prisma.$transaction(async (tx) => {
-      await lockOrganizationLedger(tx, organizationId);
-
-      const linked = await tx.account.findFirst({
-        where: { id: dto.linkedAccountId, organizationId, deletedAt: null },
-        select: { id: true, type: true },
-      });
-      if (!linked) throw new BadRequestException('Linked ledger account not found');
-
-      const account = await tx.bankAccount.create({
-        data: {
-          name: dto.name,
-          accountNumber: dto.accountNumber,
-          currency: dto.currency || 'USD',
-          type: dto.type,
-          systemBalance: opening,
-          bankBalance: opening,
-          linkedAccountId: dto.linkedAccountId,
-          organizationId,
-        },
-      });
-
-      if (!opening.isZero()) {
-        const equity = await tx.account.findFirst({
-          where: { organizationId, code: OPENING_BALANCE_EQUITY_CODE, deletedAt: null },
-          select: { id: true },
-        });
-        if (!equity) {
-          throw new BadRequestException(
-            `Create the Opening Balance Equity account (code ${OPENING_BALANCE_EQUITY_CODE}) before adding a bank account with an opening balance`,
-          );
-        }
-        // The opening balance is the natural balance of the linked account.
-        const debitNormal =
-          linked.type === AccountType.ASSET || linked.type === AccountType.EXPENSE;
-        const linkedDebit = debitNormal ? opening.greaterThan(0) : opening.lessThan(0);
-        const amount = opening.abs().toFixed(4);
-        const side = (debit: boolean): { debit: string; credit: string } =>
-          debit ? { debit: amount, credit: '0' } : { debit: '0', credit: amount };
-        await this.journalsService.create(
-          organizationId,
-          {
-            date: openingDate.toISOString(),
-            reference: `Opening balance - ${dto.name}`,
-            notes: `Opening balance of bank account ${dto.name}`,
-            lines: [
-              {
-                accountId: linked.id,
-                ...side(linkedDebit),
-                description: `Opening balance - ${dto.name}`,
-              },
-              {
-                accountId: equity.id,
-                ...side(!linkedDebit),
-                description: 'Opening Balance Equity',
-              },
-            ],
-          },
-          {
-            tx,
-            source: {
-              type: JournalSourceType.OPENING_BALANCE,
-              id: `bank-account:${account.id}`,
-            },
-          },
-        );
-      }
-
-      return account;
+    return this.prisma.bankAccount.create({
+      data: {
+        name: dto.name,
+        accountNumber: dto.accountNumber,
+        currency: dto.currency || 'USD',
+        type: dto.type,
+        systemBalance: new Decimal(0),
+        bankBalance: new Decimal(0),
+        linkedAccountId: dto.linkedAccountId,
+        organizationId,
+      },
     });
   }
 
