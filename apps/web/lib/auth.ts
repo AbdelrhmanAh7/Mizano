@@ -162,6 +162,12 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
+  events: {
+    // Logout clears only this session's single-flight and cooldown state.
+    signOut({ token }) {
+      tokenRefresher.forget(token?.refreshToken);
+    },
+  },
   pages: {
     signIn: '/login',
     error: '/login',

@@ -166,6 +166,35 @@ describe('refreshAccessToken (per-session isolation)', () => {
   });
 });
 
+describe('logout clears session state', () => {
+  it('forget removes only that session cooldown, letting it retry', async () => {
+    const refresh = jest.fn<Promise<RefreshedTokens | null>, [string]>();
+    refresh.mockResolvedValueOnce(null);
+    const r = createTokenRefresher({ refresh, cooldownMs: 60_000 });
+    await r.refresh('rt-A');
+    await r.refresh('rt-B');
+    expect(r.size().cooldowns).toBe(2);
+
+    r.forget('rt-A');
+    expect(r.size().cooldowns).toBe(1);
+
+    refresh.mockResolvedValueOnce({ accessToken: 'a2', refreshToken: 'r2' });
+    expect(await r.refresh('rt-A')).toEqual({ accessToken: 'a2', refreshToken: 'r2' });
+    expect(await r.refresh('rt-B')).toBeNull();
+  });
+
+  it('authOptions signOut event forgets the session', async () => {
+    const { authOptions } = await import('./auth');
+    const spy = jest.spyOn(tokenRefresher, 'forget');
+    authOptions.events?.signOut?.({
+      token: { ...jwtFor('A', 'rt-A') },
+      session: undefined as never,
+    });
+    expect(spy).toHaveBeenCalledWith('rt-A');
+    spy.mockRestore();
+  });
+});
+
 describe('createTokenRefresher', () => {
   it('keys state by a hash, not the raw token', () => {
     const key = sessionRefreshKey('raw-token');
