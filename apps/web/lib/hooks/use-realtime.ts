@@ -105,6 +105,10 @@ export function useRealtime() {
     socketRef.current = socket;
 
     socket.on('connect', () => {
+      reconnectDelay = 1000;
+      recovering = false;
+      if (reconnectTimer !== undefined) clearTimeout(reconnectTimer);
+      reconnectTimer = undefined;
       if (orgId) {
         socket.emit('join-org', orgId);
       }
@@ -140,12 +144,11 @@ export function useRealtime() {
           // Retry temporary session failures with backoff.
         }
         if (disposed) return;
+        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
         if (hasToken) {
           recovering = false;
-          reconnectDelay = 1000;
           socket.connect();
         } else {
-          reconnectDelay = Math.min(reconnectDelay * 2, 30000);
           scheduleRecovery();
         }
       }, reconnectDelay);

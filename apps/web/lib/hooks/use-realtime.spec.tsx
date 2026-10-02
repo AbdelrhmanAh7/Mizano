@@ -271,6 +271,64 @@ describe('useRealtime', () => {
     }
   });
 
+  it('backs off token-bearing rejected handshakes and resets only on connect', async () => {
+    jest.useFakeTimers();
+    try {
+      mockUseSession.mockReturnValue({ data: { user: { id: 'user-1' } } });
+      mockGetSession.mockResolvedValue({ accessToken: 'rejected-token' });
+      mockSocket.active = false;
+      const { Wrapper } = createWrapper();
+      const { unmount } = renderHook(() => useRealtime(), { wrapper: Wrapper });
+      const auth = (io as jest.Mock).mock.calls[0][1].auth;
+      const cb = jest.fn();
+      mockConnect.mockImplementation(() => auth(cb));
+
+      const delays = [1000, 2000, 4000, 8000, 16000, 30000, 30000];
+      for (let index = 0; index < delays.length; index++) {
+        const delay = delays[index];
+        getHandler('connect_error')!();
+        getHandler('connect_error')!();
+        getHandler('disconnect')!('io server disconnect');
+        expect(jest.getTimerCount()).toBe(1);
+        await act(async () => {
+          jest.advanceTimersByTime(delay - 1);
+        });
+        expect(mockConnect).toHaveBeenCalledTimes(index);
+        await act(async () => {
+          jest.advanceTimersByTime(1);
+        });
+        expect(mockConnect).toHaveBeenCalledTimes(index + 1);
+        expect(cb).toHaveBeenLastCalledWith({ token: 'rejected-token' });
+        expect(jest.getTimerCount()).toBe(0);
+      }
+
+      getHandler('connect_error')!();
+      expect(jest.getTimerCount()).toBe(1);
+      getHandler('connect')!();
+      expect(jest.getTimerCount()).toBe(0);
+      getHandler('disconnect')!('io server disconnect');
+      await act(async () => {
+        jest.advanceTimersByTime(999);
+      });
+      expect(mockConnect).toHaveBeenCalledTimes(7);
+      await act(async () => {
+        jest.advanceTimersByTime(1);
+      });
+      expect(mockConnect).toHaveBeenCalledTimes(8);
+
+      getHandler('connect_error')!();
+      expect(jest.getTimerCount()).toBe(1);
+      unmount();
+      expect(jest.getTimerCount()).toBe(0);
+      await act(async () => {
+        jest.advanceTimersByTime(30000);
+      });
+      expect(mockConnect).toHaveBeenCalledTimes(8);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('leaves active handshake errors to automatic reconnection', async () => {
     jest.useFakeTimers();
     try {
