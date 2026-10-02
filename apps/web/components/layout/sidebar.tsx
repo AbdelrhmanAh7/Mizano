@@ -30,6 +30,7 @@ import {
   DollarSign,
   Factory,
   FileText,
+  Inbox,
   Landmark,
   Layers,
   LayoutDashboard,
@@ -85,6 +86,7 @@ const navigationConfig: NavItem[] = [
     children: [
       { nameKey: 'purchases.vendors', href: '/purchases/vendors', icon: Users },
       { nameKey: 'purchases.expenses', href: '/purchases/expenses', icon: Receipt },
+      { nameKey: 'purchases.inbox', href: '/purchases/inbox', icon: Inbox },
       { nameKey: 'purchases.bills', href: '/purchases/bills', icon: FileText },
       { nameKey: 'purchases.payments', href: '/purchases/payments', icon: Banknote },
       { nameKey: 'purchases.credits', href: '/purchases/credits', icon: CreditCard },

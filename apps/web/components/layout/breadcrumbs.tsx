@@ -51,6 +51,7 @@ const segmentLabels: Record<string, string> = {
   rates: 'Tax Rates',
   returns: 'VAT Returns',
   scan: 'Scan Document',
+  inbox: 'Invoice inbox',
   performance: 'Performance',
   'audit-logs': 'Audit Logs',
   'price-lists': 'Price Lists',

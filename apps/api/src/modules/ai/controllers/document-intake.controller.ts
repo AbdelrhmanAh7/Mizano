@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  ConflictException,
   NotFoundException,
   Sse,
   StreamableFile,
@@ -25,7 +26,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { IntakeJobStatus } from '@prisma/client';
+import { IntakeJobStatus, IntakeSource } from '@prisma/client';
 import { Observable } from 'rxjs';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { OrganizationGuard } from '../../../common/guards/organization.guard';
@@ -34,6 +35,7 @@ import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
 import {
+  ConfirmIntakeInput,
   DocumentIntakeResult,
   DocumentIntakeService,
   IntakeProgressEvent,
@@ -49,7 +51,11 @@ import {
   ProcessDocumentDto,
   ConfirmIntakeDto,
   ListIntakeJobsDto,
+  BulkApproveIntakeDto,
 } from '../dto/document-intake.dto';
+import { buildBillConfirmation } from '../intake/intake-bulk-approve';
+import { runBulk } from '../../../common/utils/run-bulk';
+import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { createOcrFileFilter } from '../utils/file-upload.util';
 
 interface MessageEvent {
@@ -154,7 +160,11 @@ export class DocumentIntakeController {
     @Query() query: ListIntakeJobsDto,
   ): ReturnType<IntakeJobsService['list']> {
     return this.jobs.list(orgId, {
-      status: query.status as IntakeJobStatus | undefined,
+      status: query.status as IntakeJobStatus[] | undefined,
+      source: query.source as IntakeSource | undefined,
+      from: query.from,
+      to: query.to,
+      search: query.search,
       page: query.page,
       limit: query.limit,
     });
@@ -310,7 +320,47 @@ export class DocumentIntakeController {
     if (!jobId) {
       return { data: await this.intakeService.confirmAndCreate(orgId, input) };
     }
-    // Replay-safe: only one confirm can move the job to APPROVED.
+    return { data: await this.confirmJob(orgId, jobId, input) };
+  }
+
+  /**
+   * Approve many ready jobs at once. Each record goes through the same claim + confirm command
+   * as POST /confirm, so ledger/tenant checks are identical and a job approves exactly once.
+   */
+  @Post('jobs/bulk-approve')
+  @Permissions('purchases.create')
+  @ApiOperation({
+    summary: 'Bulk approve complete EXTRACTED intake jobs (creates draft bills)',
+  })
+  async bulkApprove(
+    @CurrentOrg() orgId: string,
+    @Body() dto: BulkApproveIntakeDto,
+  ): Promise<BulkResultDto> {
+    // Single-currency ledger: a document in another currency stays in the inbox as an exception.
+    const baseCurrency = await this.jobs.baseCurrency(orgId);
+    return runBulk(dto.jobIds, async (jobId) => {
+      const job = await this.jobs.getForOrg(jobId, orgId);
+      if (job.status !== IntakeJobStatus.EXTRACTED) {
+        throw new ConflictException(
+          job.status === IntakeJobStatus.APPROVED
+            ? 'Already approved'
+            : `Only ready (extracted) jobs can be approved, this one is ${job.status}`,
+        );
+      }
+      const confirmation = buildBillConfirmation(job.result as DocumentIntakeResult | null, {
+        baseCurrency,
+      });
+      if (!confirmation.ok) throw new BadRequestException(confirmation.reason);
+      return this.confirmJob(orgId, jobId, confirmation.input);
+    });
+  }
+
+  /** Replay-safe: only one confirm can move the job to APPROVED. */
+  private async confirmJob(
+    orgId: string,
+    jobId: string,
+    input: ConfirmIntakeInput,
+  ): Promise<{ type: 'bill' | 'invoice'; id: string; number: string }> {
     const restore = await this.jobs.claimForApproval(jobId, orgId);
     try {
       const result = await this.intakeService.confirmAndCreate(orgId, input);
@@ -319,7 +369,7 @@ export class DocumentIntakeController {
       await this.jobs.linkDraft(jobId, orgId, { type: result.type, id: result.id }).catch(() => {
         this.logger.error(`Could not link draft ${result.id} to intake job ${jobId}`);
       });
-      return { data: result };
+      return result;
     } catch (error) {
       await this.jobs.releaseApproval(jobId, orgId, restore);
       throw error;

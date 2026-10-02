@@ -25,7 +25,10 @@ describe('IntakeJobsService', () => {
     };
     config = { get: jest.fn() };
     service = new IntakeJobsService(
-      { intakeJob: table.delegate } as unknown as PrismaService,
+      {
+        intakeJob: table.delegate,
+        organization: { findUnique: jest.fn(async () => ({ baseCurrency: 'EGP' })) },
+      } as unknown as PrismaService,
       storage,
       queue as unknown as IntakeQueueService,
       config as unknown as ConfigService,

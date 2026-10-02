@@ -10,9 +10,12 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IntakeJob, IntakeJobStatus, IntakeSource, Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { describeError } from '../../../common/utils/redact';
+import { endOfUtcDay } from '../../reports/utils/report-utils';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { IntakeStage } from '../services/document-intake.service';
+import { DocumentIntakeResult, IntakeStage } from '../services/document-intake.service';
+import { buildBillConfirmation, IntakeBlockerCode } from './intake-bulk-approve';
 import { IntakeQueueService } from './intake-queue.service';
 import { buildIntakeStorageKey, IntakeStorage, sha256Hex } from './intake-storage';
 
@@ -21,6 +24,34 @@ export type IntakeJobView = Omit<IntakeJob, 'storageKey' | 'deletedAt' | 'result
   result?: Prisma.JsonValue | null;
   stage: IntakeStage;
 };
+
+/** Inbox row data derived from the stored result; never includes raw document text. */
+export interface IntakeJobSummary {
+  documentType: string | null;
+  vendorName: string | null;
+  documentNumber: string | null;
+  date: string | null;
+  /** Fixed 4-dp decimal string. */
+  total: string | null;
+  currency: string | null;
+  confidence: number | null;
+  /** EXTRACTED and complete enough for bulk approval. */
+  readyToApprove: boolean;
+  blocker: IntakeBlockerCode | null;
+}
+
+export type IntakeJobListItem = Omit<IntakeJobView, 'result'> & { summary: IntakeJobSummary };
+
+export interface ListIntakeJobsQuery {
+  status?: IntakeJobStatus | IntakeJobStatus[];
+  source?: IntakeSource;
+  /** Inclusive date-only bounds on createdAt. */
+  from?: string;
+  to?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
 
 export interface CreateIntakeUpload {
   organizationId: string;
@@ -254,21 +285,82 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
     return job;
   }
 
+  /** Base currency of the organization; drafts in another currency are never bulk-approved. */
+  async baseCurrency(organizationId: string): Promise<string | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { baseCurrency: true },
+    });
+    return org?.baseCurrency ?? null;
+  }
+
+  summarize(job: IntakeJob, baseCurrency: string | null): IntakeJobSummary {
+    const result = (job.result ?? null) as DocumentIntakeResult | null;
+    const fields = result?.extractedFields;
+    let total: string | null = null;
+    if (fields?.total !== null && fields?.total !== undefined) {
+      try {
+        total = new Decimal(String(fields.total)).toFixed(4);
+      } catch {
+        total = null;
+      }
+    }
+    const confirmation =
+      job.status === IntakeJobStatus.EXTRACTED
+        ? buildBillConfirmation(result, { baseCurrency })
+        : null;
+    return {
+      documentType: result?.documentType ?? null,
+      vendorName: result?.matchedVendor?.name ?? fields?.vendorName ?? null,
+      documentNumber: fields?.documentNumber ?? null,
+      date: fields?.date ?? null,
+      total,
+      currency: fields?.currency ?? null,
+      confidence: typeof result?.ocrConfidence === 'number' ? result.ocrConfidence : null,
+      readyToApprove: confirmation?.ok === true,
+      blocker: confirmation && !confirmation.ok ? confirmation.code : null,
+    };
+  }
+
   async list(
     organizationId: string,
-    query: { status?: IntakeJobStatus; page?: number; limit?: number },
+    query: ListIntakeJobsQuery,
   ): Promise<{
-    data: IntakeJobView[];
+    data: IntakeJobListItem[];
     meta: { page: number; limit: number; total: number; totalPages: number };
   }> {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 20));
+    const search = query.search?.trim();
+    // JSON string filters are case-sensitive in Prisma, so match ids with ILIKE (org-scoped).
+    let searchIds: string[] | null = null;
+    if (search) {
+      const pattern = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
+      const matches = await this.prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+        SELECT "id" FROM "intake_jobs"
+        WHERE "organizationId" = ${organizationId} AND "deletedAt" IS NULL AND (
+          "originalFileName" ILIKE ${pattern}
+          OR "result"->'extractedFields'->>'vendorName' ILIKE ${pattern}
+          OR "result"->'matchedVendor'->>'name' ILIKE ${pattern}
+          OR "result"->'extractedFields'->>'documentNumber' ILIKE ${pattern}
+        )`);
+      searchIds = matches.map((m) => m.id);
+    }
+    const createdAt: Prisma.DateTimeFilter = {};
+    if (query.from) createdAt.gte = new Date(query.from);
+    if (query.to) createdAt.lte = endOfUtcDay(new Date(query.to));
+    // An empty status list (`?status=`) means "no status filter", not "no rows".
+    const statuses = Array.isArray(query.status) ? query.status : [query.status];
+    const statusFilter = statuses.filter((s): s is IntakeJobStatus => Boolean(s));
     const where: Prisma.IntakeJobWhereInput = {
       organizationId,
       deletedAt: null,
-      ...(query.status ? { status: query.status } : {}),
+      ...(statusFilter.length > 0 ? { status: { in: statusFilter } } : {}),
+      ...(query.source ? { source: query.source } : {}),
+      ...(query.from || query.to ? { createdAt } : {}),
+      ...(searchIds ? { id: { in: searchIds } } : {}),
     };
-    const [rows, total] = await Promise.all([
+    const [rows, total, baseCurrency] = await Promise.all([
       this.prisma.intakeJob.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -276,9 +368,13 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
         take: limit,
       }),
       this.prisma.intakeJob.count({ where }),
+      this.baseCurrency(organizationId),
     ]);
     return {
-      data: rows.map((row) => this.toView(row, false)),
+      data: rows.map((row) => ({
+        ...this.toView(row, false),
+        summary: this.summarize(row, baseCurrency),
+      })),
       meta: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
     };
   }
