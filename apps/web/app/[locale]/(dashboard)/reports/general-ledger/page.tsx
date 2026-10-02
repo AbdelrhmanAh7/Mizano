@@ -40,6 +40,8 @@ export default function GeneralLedgerPage() {
     startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
     endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
   });
+  // Report amounts are labelled with the currency the API returns, never a default.
+  const currencyCode = ledger?.currencyCode;
 
   const accountList = accounts?.data || accounts || [];
 
@@ -109,13 +111,17 @@ export default function GeneralLedgerPage() {
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">{t('cashFlow.openingBalance')}</p>
-                <p className="text-2xl font-bold font-mono">{formatCurrency(openingBalance)}</p>
+                <p className="text-2xl font-bold font-mono">
+                  {formatCurrency(openingBalance, currencyCode)}
+                </p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">{t('cashFlow.closingBalance')}</p>
-                <p className="text-2xl font-bold font-mono">{formatCurrency(closingBalance)}</p>
+                <p className="text-2xl font-bold font-mono">
+                  {formatCurrency(closingBalance, currencyCode)}
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -172,13 +178,13 @@ export default function GeneralLedgerPage() {
                           </TableCell>
                           <TableCell>{entry.description || entry.reference || '-'}</TableCell>
                           <TableCell className="text-right font-mono">
-                            {entry.debit > 0 ? formatCurrency(entry.debit) : '-'}
+                            {entry.debit > 0 ? formatCurrency(entry.debit, currencyCode) : '-'}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {entry.credit > 0 ? formatCurrency(entry.credit) : '-'}
+                            {entry.credit > 0 ? formatCurrency(entry.credit, currencyCode) : '-'}
                           </TableCell>
                           <TableCell className="text-right font-mono font-medium">
-                            {formatCurrency(entry.runningBalance || 0)}
+                            {formatCurrency(entry.runningBalance || 0, currencyCode)}
                           </TableCell>
                         </TableRow>
                       ),

@@ -32,6 +32,8 @@ function SalesByItemContent() {
   );
 
   const { data, isLoading } = useSalesByItemReport(params);
+  // Report amounts are labelled with the currency the API returns, never a default.
+  const currencyCode = data?.currencyCode;
 
   const columns: ColumnDef<SalesByItemEntry>[] = useMemo(
     () => [
@@ -56,19 +58,21 @@ function SalesByItemContent() {
       {
         accessorKey: 'averagePrice',
         header: 'Avg. Price',
-        cell: ({ row }) => formatCurrency(row.original.averagePrice),
+        cell: ({ row }) => formatCurrency(row.original.averagePrice, currencyCode),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'totalAmount',
         header: 'Total Amount',
         cell: ({ row }) => (
-          <span className="font-medium">{formatCurrency(row.original.totalAmount)}</span>
+          <span className="font-medium">
+            {formatCurrency(row.original.totalAmount, currencyCode)}
+          </span>
         ),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
     ],
-    [],
+    [currencyCode],
   );
 
   return (
@@ -89,7 +93,9 @@ function SalesByItemContent() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(data.totalAmount)}</div>
+              <div className="text-2xl font-bold">
+                {formatCurrency(data.totalAmount, currencyCode)}
+              </div>
             </CardContent>
           </Card>
           <Card>

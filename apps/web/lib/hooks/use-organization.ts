@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSession } from 'next-auth/react';
 import api from '@/lib/api';
 
 // ============ Types ============
@@ -136,6 +137,12 @@ const organizationApi = {
     return response.data;
   },
 
+  // Readable by every authenticated member (no settings.view needed).
+  getBaseCurrency: async (): Promise<{ baseCurrency: string }> => {
+    const response = await api.get('/organization/base-currency');
+    return response.data;
+  },
+
   // All Settings
   getAllSettings: async (): Promise<AllSettings> => {
     const response = await api.get('/organization/settings');
@@ -233,7 +240,7 @@ const organizationApi = {
     return response.data;
   },
   completeOpeningBalances: async (data: {
-    balances: Array<{ accountId: string; amount: number; isDebit?: boolean }>;
+    balances: Array<{ accountId: string; amount: string; isDebit?: boolean }>;
     openingDate: string;
   }) => {
     const response = await api.post('/organization/onboarding/opening-balances', data);
@@ -283,7 +290,18 @@ export function useOrganization() {
  * posted in it, so they must be displayed in it too, never in the counterparty's default.
  */
 export function useBaseCurrency(): string | undefined {
-  return useOrganization().data?.baseCurrency;
+  // Its own lookup instead of GET /organization, which needs settings.view: an AP-only role must
+  // still see the real currency. Fetched through the authenticated client (token refresh and
+  // expiry handled there) and refreshed whenever an ['organization', ...] query is invalidated,
+  // e.g. after the base currency is chosen in settings or onboarding.
+  // Keyed by organization so signing in to another organization never reuses a cached value.
+  const organizationId = useSession().data?.user?.organizationId;
+  return useQuery({
+    queryKey: ['organization', 'base-currency', organizationId],
+    queryFn: organizationApi.getBaseCurrency,
+    enabled: !!organizationId,
+    staleTime: 5 * 60 * 1000,
+  }).data?.baseCurrency;
 }
 
 /** Display currency of a document: its own currency, else the organization base currency. */

@@ -9,6 +9,7 @@ import {
   agingBucket,
   daysPastDue,
   endOfUtcDay,
+  getBaseCurrency,
   money,
   parseReportDate,
   resolveAsOf,
@@ -61,7 +62,8 @@ export class AgingReportsService {
   async getReceivablesAging(organizationId: string, asOfDate?: string) {
     const { asOf } = resolveAsOf(asOfDate);
 
-    const [invoices, credits] = await Promise.all([
+    const [currencyCode, invoices, credits] = await Promise.all([
+      getBaseCurrency(this.prisma, organizationId),
       this.prisma.invoice.findMany({
         where: {
           organizationId,
@@ -138,6 +140,7 @@ export class AgingReportsService {
 
     return {
       asOfDate: asOf,
+      currencyCode,
       buckets,
       summary: {
         current: money(bucketTotals.current),
@@ -251,6 +254,7 @@ export class AgingReportsService {
 
     return {
       asOfDate: date,
+      currencyCode: await getBaseCurrency(this.prisma, organizationId),
       buckets,
       summary: {
         ...summary,

@@ -22,6 +22,7 @@ describe('payables reports net unapplied vendor credits', () => {
 
   it('AP aging: summary.netTotal = open bill balances - unapplied credits, per vendor and in total', async () => {
     const prisma = {
+      organization: { findUnique: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }) },
       bill: {
         findMany: jest.fn().mockResolvedValue([bill('b1', 'v1', '114'), bill('b2', 'v1', '142')]),
       },
@@ -32,6 +33,8 @@ describe('payables reports net unapplied vendor credits', () => {
     const service = new AgingReportsService(prisma as unknown as ReadReplicaService);
 
     const report = await service.getPayablesAging(ORG);
+
+    expect(report.currencyCode).toBe('EGP');
 
     expect(prisma.vendorCredit.findMany.mock.calls[0][0].where).toMatchObject({
       organizationId: ORG,

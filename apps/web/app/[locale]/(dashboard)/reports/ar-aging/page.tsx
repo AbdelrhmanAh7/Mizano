@@ -39,6 +39,8 @@ export default function ARAgingReportPage() {
     isError,
     refetch,
   } = useARAgingReport(format(asOfDate, 'yyyy-MM-dd'));
+  // Report amounts are labelled with the currency the API returns, never a default.
+  const currencyCode = report?.currencyCode;
 
   if (isLoading) {
     return (
@@ -108,11 +110,13 @@ export default function ARAgingReportPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">{t('arAging.total')}</p>
-                    <p className="text-2xl font-bold font-mono">{formatCurrency(total)}</p>
+                    <p className="text-2xl font-bold font-mono">
+                      {formatCurrency(total, currencyCode)}
+                    </p>
                     {report && report.unappliedCredits > 0 && (
                       <p className="text-xs text-muted-foreground">
                         {t('agingUnappliedCredits', {
-                          amount: formatCurrency(report.unappliedCredits),
+                          amount: formatCurrency(report.unappliedCredits, currencyCode),
                         })}
                       </p>
                     )}
@@ -151,7 +155,7 @@ export default function ARAgingReportPage() {
                   >
                     <p className="text-sm font-medium">{getAgingBucketLabel(bucket.range)}</p>
                     <p className="text-xl font-bold font-mono mt-1">
-                      {formatCurrency(bucket.amount)}
+                      {formatCurrency(bucket.amount, currencyCode)}
                     </p>
                     <p className="text-xs mt-1">{bucket.count} invoices</p>
                   </button>
@@ -207,10 +211,10 @@ export default function ARAgingReportPage() {
                               <TableCell>{format(new Date(item.date), 'MMM d, yyyy')}</TableCell>
                               <TableCell>{format(new Date(item.dueDate), 'MMM d, yyyy')}</TableCell>
                               <TableCell className="text-right font-mono">
-                                {formatCurrency(item.amount)}
+                                {formatCurrency(item.amount, currencyCode)}
                               </TableCell>
                               <TableCell className="text-right font-mono font-medium">
-                                {formatCurrency(item.balanceDue)}
+                                {formatCurrency(item.balanceDue, currencyCode)}
                               </TableCell>
                               <TableCell className="text-center">
                                 <Badge

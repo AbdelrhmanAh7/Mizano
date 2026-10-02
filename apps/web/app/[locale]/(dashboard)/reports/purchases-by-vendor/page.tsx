@@ -32,6 +32,8 @@ function PurchasesByVendorContent() {
   );
 
   const { data, isLoading } = usePurchasesByVendorReport(params);
+  // Report amounts are labelled with the currency the API returns, never a default.
+  const currencyCode = data?.currencyCode;
 
   const columns: ColumnDef<PurchasesByVendorEntry>[] = useMemo(
     () => [
@@ -49,13 +51,13 @@ function PurchasesByVendorContent() {
       {
         accessorKey: 'totalAmount',
         header: 'Total Amount',
-        cell: ({ row }) => formatCurrency(row.original.totalAmount),
+        cell: ({ row }) => formatCurrency(row.original.totalAmount, currencyCode),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'paidAmount',
         header: 'Paid',
-        cell: ({ row }) => formatCurrency(row.original.paidAmount),
+        cell: ({ row }) => formatCurrency(row.original.paidAmount, currencyCode),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
@@ -63,7 +65,7 @@ function PurchasesByVendorContent() {
         header: 'Balance Due',
         cell: ({ row }) => (
           <span className={row.original.balanceDue > 0 ? 'text-red-600 font-medium' : ''}>
-            {formatCurrency(row.original.balanceDue)}
+            {formatCurrency(row.original.balanceDue, currencyCode)}
           </span>
         ),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
@@ -71,19 +73,21 @@ function PurchasesByVendorContent() {
       {
         accessorKey: 'unappliedCredits',
         header: t('purchasesByVendor.unappliedCredits'),
-        cell: ({ row }) => formatCurrency(row.original.unappliedCredits),
+        cell: ({ row }) => formatCurrency(row.original.unappliedCredits, currencyCode),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'netPayable',
         header: t('purchasesByVendor.netPayable'),
         cell: ({ row }) => (
-          <span className="font-medium">{formatCurrency(row.original.netPayable)}</span>
+          <span className="font-medium">
+            {formatCurrency(row.original.netPayable, currencyCode)}
+          </span>
         ),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
     ],
-    [t],
+    [t, currencyCode],
   );
 
   return (
@@ -104,7 +108,9 @@ function PurchasesByVendorContent() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(data.totalAmount)}</div>
+              <div className="text-2xl font-bold">
+                {formatCurrency(data.totalAmount, currencyCode)}
+              </div>
             </CardContent>
           </Card>
           <Card>
@@ -114,7 +120,7 @@ function PurchasesByVendorContent() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(data.totalPaid)}
+                {formatCurrency(data.totalPaid, currencyCode)}
               </div>
             </CardContent>
           </Card>
@@ -125,7 +131,7 @@ function PurchasesByVendorContent() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(data.totalBalance)}
+                {formatCurrency(data.totalBalance, currencyCode)}
               </div>
             </CardContent>
           </Card>
@@ -137,7 +143,9 @@ function PurchasesByVendorContent() {
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(data.totalUnappliedCredits)}</div>
+              <div className="text-2xl font-bold">
+                {formatCurrency(data.totalUnappliedCredits, currencyCode)}
+              </div>
             </CardContent>
           </Card>
           <Card>
@@ -149,7 +157,7 @@ function PurchasesByVendorContent() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(data.totalNetPayable)}
+                {formatCurrency(data.totalNetPayable, currencyCode)}
               </div>
             </CardContent>
           </Card>

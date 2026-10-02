@@ -31,6 +31,8 @@ export default function CashFlowReportPage() {
     endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
   });
 
+  const currencyCode = report?.currencyCode;
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -80,7 +82,7 @@ export default function CashFlowReportPage() {
                     item.amount >= 0 ? 'text-green-600' : 'text-red-600',
                   )}
                 >
-                  {formatCurrency(Math.abs(item.amount))}
+                  {formatCurrency(Math.abs(item.amount), currencyCode)}
                 </span>
               </div>
             ))}
@@ -89,7 +91,7 @@ export default function CashFlowReportPage() {
         <div className="flex justify-between pt-3 mt-3 border-t font-semibold">
           <span>Total</span>
           <span className={cn('font-mono', section.total >= 0 ? 'text-green-600' : 'text-red-600')}>
-            {formatCurrency(Math.abs(section.total))}
+            {formatCurrency(Math.abs(section.total), currencyCode)}
           </span>
         </div>
       </CardContent>
@@ -121,7 +123,9 @@ export default function CashFlowReportPage() {
               <TrendingUp className="h-4 w-4" />
               {t('cashFlow.openingBalance')}
             </div>
-            <p className="text-2xl font-bold font-mono">{formatCurrency(data.openingBalance)}</p>
+            <p className="text-2xl font-bold font-mono">
+              {formatCurrency(data.openingBalance, currencyCode)}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -137,7 +141,7 @@ export default function CashFlowReportPage() {
               )}
             >
               {data.netCashFlow >= 0 ? '+' : '-'}
-              {formatCurrency(Math.abs(data.netCashFlow))}
+              {formatCurrency(Math.abs(data.netCashFlow), currencyCode)}
             </p>
           </CardContent>
         </Card>
@@ -147,7 +151,9 @@ export default function CashFlowReportPage() {
               <TrendingDown className="h-4 w-4" />
               {t('cashFlow.closingBalance')}
             </div>
-            <p className="text-2xl font-bold font-mono">{formatCurrency(data.closingBalance)}</p>
+            <p className="text-2xl font-bold font-mono">
+              {formatCurrency(data.closingBalance, currencyCode)}
+            </p>
           </CardContent>
         </Card>
       </div>

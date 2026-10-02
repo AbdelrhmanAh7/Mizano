@@ -24,6 +24,7 @@ export interface ProfitLossReport {
   totalExpenses: number;
   netProfit: number;
   period: DateRange;
+  currencyCode: string;
 }
 
 export interface BalanceSheetReport {
@@ -38,26 +39,26 @@ export interface BalanceSheetReport {
   /** Decided by the API with exact Decimal comparison. */
   isBalanced: boolean;
   asOfDate: string;
+  currencyCode: string;
 }
 
 export interface CashFlowReport {
-  operations: {
-    netIncome: number;
-    adjustments: Array<{ key?: string; name: string; amount: number }>;
-    total: number;
-  };
-  investing: {
+  operatingActivities: {
     items: Array<{ key?: string; name: string; amount: number }>;
     total: number;
   };
-  financing: {
+  investingActivities: {
     items: Array<{ key?: string; name: string; amount: number }>;
     total: number;
   };
-  netChange: number;
+  financingActivities: {
+    items: Array<{ key?: string; name: string; amount: number }>;
+    total: number;
+  };
+  netCashFlow: number;
   openingBalance: number;
   closingBalance: number;
-  period: DateRange;
+  currencyCode: string;
 }
 
 export interface AgingBucket {
@@ -86,6 +87,7 @@ export interface AgingReport {
   unappliedCredits: number;
   totalCount: number;
   asOfDate: string;
+  currencyCode: string;
 }
 
 export interface GeneralLedgerEntry {
@@ -111,6 +113,7 @@ export interface GeneralLedgerReport {
   totalDebits: number;
   totalCredits: number;
   period: DateRange;
+  currencyCode: string;
 }
 
 export interface TrialBalanceAccount {
@@ -128,6 +131,7 @@ export interface TrialBalanceReport {
   totalCredits: number;
   isBalanced: boolean;
   asOfDate: string;
+  currencyCode: string;
 }
 
 // API functions — URLs aligned with backend controller routes
@@ -161,6 +165,7 @@ export interface SalesByCustomerReport {
   totalPaid: number;
   totalBalance: number;
   period: DateRange;
+  currencyCode: string;
 }
 
 export interface SalesByItemEntry {
@@ -177,6 +182,7 @@ export interface SalesByItemReport {
   totalAmount: number;
   totalQuantity: number;
   period: DateRange;
+  currencyCode: string;
 }
 
 export interface PurchasesByVendorEntry {
@@ -201,6 +207,7 @@ export interface PurchasesByVendorReport {
   totalUnappliedCredits: string;
   totalNetPayable: string;
   period: DateRange;
+  currencyCode: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -232,6 +239,7 @@ interface RawBalanceSheetData {
   totalLiabilitiesAndEquity?: number | string;
   isBalanced?: boolean;
   asOfDate?: string;
+  currencyCode?: string;
 }
 
 interface RawProfitLossData {
@@ -244,6 +252,7 @@ interface RawProfitLossData {
   totalExpenses?: number | string;
   netProfit?: number | string;
   period?: DateRange;
+  currencyCode?: string;
 }
 
 interface RawTrialBalanceAccount {
@@ -263,6 +272,7 @@ interface RawTrialBalanceData {
   totals?: { debit?: number; credit?: number };
   isBalanced?: boolean;
   asOfDate?: string;
+  currencyCode?: string;
 }
 
 interface RawAgingItem {
@@ -298,6 +308,7 @@ interface RawAgingData {
   invoiceCount?: number;
   billCount?: number;
   asOfDate?: string;
+  currencyCode?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -422,6 +433,7 @@ function transformBalanceSheet(raw: RawBalanceSheetData): BalanceSheetReport {
     totalLiabilitiesAndEquity: String(raw.totalLiabilitiesAndEquity ?? '0'),
     isBalanced: raw.isBalanced === true,
     asOfDate: raw.asOfDate ?? '',
+    currencyCode: raw.currencyCode ?? '',
   };
 }
 
@@ -457,6 +469,7 @@ function transformProfitLoss(raw: RawProfitLossData): ProfitLossReport {
     totalExpenses,
     netProfit: raw.netProfit !== undefined ? toNum(raw.netProfit) : totalIncome - totalExpenses,
     period: raw.period ?? { startDate: '', endDate: '' },
+    currencyCode: raw.currencyCode ?? '',
   };
 }
 
@@ -478,6 +491,7 @@ function transformTrialBalance(raw: RawTrialBalanceData): TrialBalanceReport {
     totalCredits: toNum(raw.totalCredits ?? raw.totals?.credit),
     isBalanced: raw.isBalanced ?? false,
     asOfDate: raw.asOfDate ?? '',
+    currencyCode: raw.currencyCode ?? '',
   };
 }
 
@@ -508,6 +522,7 @@ function transformAgingReport(
       unappliedCredits: 0,
       totalCount: raw.totalCount ?? raw.invoiceCount ?? raw.billCount ?? 0,
       asOfDate: raw.asOfDate ?? '',
+      currencyCode: raw.currencyCode ?? '',
     };
   }
 
@@ -540,6 +555,7 @@ function transformAgingReport(
     unappliedCredits: toNum(raw.summary?.unappliedCredits),
     totalCount: raw.invoiceCount ?? raw.billCount ?? 0,
     asOfDate: raw.asOfDate ?? '',
+    currencyCode: raw.currencyCode ?? '',
   };
 }
 
@@ -569,19 +585,6 @@ export function useBalanceSheetReport(asOfDate: string) {
   });
 }
 
-interface CashFlowSection {
-  items: Array<{ key?: string; name: string; amount: number }>;
-  total: number;
-}
-interface TransformedCashFlowReport {
-  operatingActivities: CashFlowSection;
-  investingActivities: CashFlowSection;
-  financingActivities: CashFlowSection;
-  netCashFlow: number;
-  openingBalance: number;
-  closingBalance: number;
-}
-
 interface CashFlowApiResponse {
   openingCashBalance?: number | string;
   operating?: {
@@ -605,9 +608,10 @@ interface CashFlowApiResponse {
   };
   netCashChange?: number | string;
   closingCashBalance?: number | string;
+  currencyCode?: string;
 }
 
-function transformCashFlow(raw: CashFlowApiResponse): TransformedCashFlowReport {
+function transformCashFlow(raw: CashFlowApiResponse): CashFlowReport {
   const opAdj = raw.operating?.adjustments ?? {};
   return {
     operatingActivities: {
@@ -657,11 +661,12 @@ function transformCashFlow(raw: CashFlowApiResponse): TransformedCashFlowReport 
     netCashFlow: toNum(raw.netCashChange),
     openingBalance: toNum(raw.openingCashBalance),
     closingBalance: toNum(raw.closingCashBalance),
+    currencyCode: raw.currencyCode ?? '',
   };
 }
 
 export function useCashFlowReport(params: DateRange) {
-  return useQuery<TransformedCashFlowReport>({
+  return useQuery<CashFlowReport>({
     queryKey: ['reports', 'cash-flow', params],
     queryFn: async () => {
       const response = await reportsApi.getCashFlow(params);
@@ -749,13 +754,25 @@ export function usePurchasesByVendorReport(params: DateRange) {
 }
 
 // Helper functions
-export function formatCurrency(amount: number | string | null | undefined): string {
-  if (amount === null || amount === undefined) return '$0.00';
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(num);
+
+/**
+ * Formats a report amount in the report's own currency: the `currencyCode` the API returns with
+ * every report (the organization base currency). There is deliberately no default currency;
+ * without a code the amount is shown as a plain number rather than mislabelled as dollars.
+ */
+export function formatCurrency(
+  amount: number | string | null | undefined,
+  currencyCode: string | undefined,
+): string {
+  const value = amount === null || amount === undefined ? 0 : Number(amount);
+  const num = Number.isFinite(value) ? value : 0;
+  if (!currencyCode) {
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(num);
+  }
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode }).format(num);
 }
 
 export function getAgingBucketLabel(bucket: string): string {

@@ -25,6 +25,8 @@ export default function ProfitLossReportPage() {
     endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
   });
 
+  const currencyCode = report?.currencyCode;
+
   const renderAccountRow = (account: ReportAccount, level = 0) => (
     <div key={account.id}>
       <div
@@ -39,7 +41,7 @@ export default function ProfitLossReportPage() {
           <span className="text-muted-foreground font-mono">{account.code}</span>
           {account.name}
         </span>
-        <span className="font-mono">{formatCurrency(account.balance)}</span>
+        <span className="font-mono">{formatCurrency(account.balance, currencyCode)}</span>
       </div>
       {account.children?.map((child) => renderAccountRow(child, level + 1))}
     </div>
@@ -97,7 +99,7 @@ export default function ProfitLossReportPage() {
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">{t('profitLoss.revenue')}</p>
                 <p className="text-2xl font-bold font-mono text-green-600">
-                  {formatCurrency(totalIncome)}
+                  {formatCurrency(totalIncome, currencyCode)}
                 </p>
               </CardContent>
             </Card>
@@ -105,7 +107,7 @@ export default function ProfitLossReportPage() {
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">{t('profitLoss.operatingExpenses')}</p>
                 <p className="text-2xl font-bold font-mono text-red-600">
-                  {formatCurrency(totalExpenses)}
+                  {formatCurrency(totalExpenses, currencyCode)}
                 </p>
               </CardContent>
             </Card>
@@ -118,7 +120,7 @@ export default function ProfitLossReportPage() {
                     netProfit >= 0 ? 'text-green-600' : 'text-red-600',
                   )}
                 >
-                  {formatCurrency(netProfit)}
+                  {formatCurrency(netProfit, currencyCode)}
                 </p>
               </CardContent>
             </Card>
@@ -133,7 +135,9 @@ export default function ProfitLossReportPage() {
               {income.map((account: ReportAccount) => renderAccountRow(account))}
               <div className="flex justify-between py-3 border-t-2 font-bold">
                 <span>{t('profitLoss.revenue')}</span>
-                <span className="font-mono text-green-600">{formatCurrency(totalIncome)}</span>
+                <span className="font-mono text-green-600">
+                  {formatCurrency(totalIncome, currencyCode)}
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -146,7 +150,9 @@ export default function ProfitLossReportPage() {
               {expenses.map((account: ReportAccount) => renderAccountRow(account))}
               <div className="flex justify-between py-3 border-t-2 font-bold">
                 <span>{t('profitLoss.operatingExpenses')}</span>
-                <span className="font-mono text-red-600">{formatCurrency(totalExpenses)}</span>
+                <span className="font-mono text-red-600">
+                  {formatCurrency(totalExpenses, currencyCode)}
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -161,7 +167,7 @@ export default function ProfitLossReportPage() {
                     netProfit >= 0 ? 'text-green-600' : 'text-red-600',
                   )}
                 >
-                  {formatCurrency(netProfit)}
+                  {formatCurrency(netProfit, currencyCode)}
                 </span>
               </div>
             </CardContent>

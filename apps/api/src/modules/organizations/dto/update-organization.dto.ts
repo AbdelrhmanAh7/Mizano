@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsEmail, MaxLength, Length } from 'class-validator';
+import { IsOptional, IsString, IsEmail, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateOrganizationDto {
@@ -24,12 +24,6 @@ export class UpdateOrganizationDto {
   @IsString()
   @MaxLength(500)
   address?: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  @Length(3, 3)
-  currency?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()

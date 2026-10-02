@@ -16,7 +16,8 @@ import { LogLevel, LogSource, LogEntry } from '@mizano/shared-types';
 import { ApiHelper } from './helpers/api-client.helper';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { TEST_PASSWORD, registerTenant, TestTenant } from './helpers/tenant.helper';
-import { eventually } from './helpers/journey.helper';
+import { eventually, isoDay } from './helpers/journey.helper';
+import { seedChart } from './helpers/postings.helper';
 
 interface SocketOutcome {
   connected: boolean;
@@ -475,5 +476,99 @@ describe('Audit trail (e2e)', () => {
     // none of the response's columns were copied
     expect(stored).not.toContain('createdAt');
     expect(stored).not.toContain('organizationId');
+  });
+});
+
+describe('Organization currency (e2e)', () => {
+  let app: INestApplication;
+  let anon: ApiHelper;
+  let tenant: TestTenant;
+
+  /** A real user of `tenant` whose custom role only has `purchases.view` (no settings access). */
+  async function loginPurchasesViewer(): Promise<ApiHelper> {
+    const prisma = getPrisma(app);
+    const role = await prisma.role.create({
+      data: {
+        name: `AP-Viewer-${uniqueSuffix()}`,
+        organizationId: tenant.organizationId,
+        permissions: { create: [{ module: 'purchases', actions: ['view'] }] },
+      },
+    });
+    const email = `e2e-ap-viewer-${uniqueSuffix()}@mizano.test`;
+    await prisma.user.create({
+      data: {
+        email,
+        name: 'E2E AP Viewer',
+        passwordHash: await bcrypt.hash(TEST_PASSWORD, 10),
+        roleId: role.id,
+        organizationId: tenant.organizationId,
+      },
+    });
+    const login = await anon.post('/auth/login').send({ email, password: TEST_PASSWORD });
+    expect(login.status).toBe(200);
+    expect(login.body.organization.baseCurrency).toBe('EGP');
+    return anon.withToken(login.body.tokens.accessToken as string);
+  }
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    anon = ApiHelper.anonymous(app);
+    tenant = await registerTenant(app, 'Currency');
+    // Before anything is posted the base currency may still be chosen (guarded settings path).
+    const general = await tenant.api
+      .patch('/organization/settings/general')
+      .send({ baseCurrency: 'EGP' });
+    expect(general.status).toBe(200);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('serves the base currency to a purchases.view-only user without settings access', async () => {
+    const viewer = await loginPurchasesViewer();
+    expect((await viewer.get('/organization')).status).toBe(403);
+    expect((await viewer.get('/bills')).status).toBe(200);
+
+    const res = await viewer.get('/organization/base-currency');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ baseCurrency: 'EGP' });
+  });
+
+  it('rejects anonymous callers of the base-currency lookup', async () => {
+    expect((await anon.get('/organization/base-currency')).status).toBe(401);
+  });
+
+  it('cannot change the currency through PATCH /organization once journals exist', async () => {
+    const chart = await seedChart(tenant.api);
+    const created = await tenant.api.post('/journals').send({
+      date: isoDay(-1),
+      reference: `CUR-${uniqueSuffix()}`,
+      lines: [
+        { accountId: chart.bank, debit: '100' },
+        { accountId: chart.revenue, credit: '100' },
+      ],
+    });
+    expect(created.status).toBe(201);
+    if (!created.body.isPosted) {
+      expect((await tenant.api.post(`/journals/${created.body.id}/post`)).status).toBe(201);
+    }
+
+    const legacy = await tenant.api.patch('/organization').send({ currency: 'USD' });
+    expect(legacy.status).toBe(400);
+    const guarded = await tenant.api
+      .patch('/organization/settings/general')
+      .send({ baseCurrency: 'USD' });
+    expect(guarded.status).toBe(400);
+
+    const stored = await getPrisma(app).organization.findUniqueOrThrow({
+      where: { id: tenant.organizationId },
+      select: { currency: true, baseCurrency: true },
+    });
+    expect(stored).toEqual({ currency: 'EGP', baseCurrency: 'EGP' });
+    // The legacy route still edits the non-currency fields.
+    expect((await tenant.api.patch('/organization').send({ phone: '+20100000000' })).status).toBe(
+      200,
+    );
   });
 });

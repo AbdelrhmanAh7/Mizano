@@ -32,6 +32,8 @@ export default function TrialBalanceReportPage() {
 
   const { data: report, isLoading } = useTrialBalanceReport(format(asOfDate, 'yyyy-MM-dd'));
 
+  const currencyCode = report?.currencyCode;
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -107,7 +109,7 @@ export default function TrialBalanceReportPage() {
                     <p className="text-sm text-muted-foreground">
                       {isBalanced
                         ? 'Total debits equal total credits'
-                        : `Difference: ${formatCurrency(Math.abs(totalDebits - totalCredits))}`}
+                        : `Difference: ${formatCurrency(Math.abs(totalDebits - totalCredits), currencyCode)}`}
                     </p>
                   </div>
                 </div>
@@ -117,13 +119,17 @@ export default function TrialBalanceReportPage() {
                       <p className="text-sm text-muted-foreground">
                         {t('trialBalance.totalDebit')}
                       </p>
-                      <p className="text-xl font-bold font-mono">{formatCurrency(totalDebits)}</p>
+                      <p className="text-xl font-bold font-mono">
+                        {formatCurrency(totalDebits, currencyCode)}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">
                         {t('trialBalance.totalCredit')}
                       </p>
-                      <p className="text-xl font-bold font-mono">{formatCurrency(totalCredits)}</p>
+                      <p className="text-xl font-bold font-mono">
+                        {formatCurrency(totalCredits, currencyCode)}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -158,10 +164,10 @@ export default function TrialBalanceReportPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {account.debit > 0 ? formatCurrency(account.debit) : '-'}
+                        {account.debit > 0 ? formatCurrency(account.debit, currencyCode) : '-'}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {account.credit > 0 ? formatCurrency(account.credit) : '-'}
+                        {account.credit > 0 ? formatCurrency(account.credit, currencyCode) : '-'}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -170,10 +176,10 @@ export default function TrialBalanceReportPage() {
                   <TableRow className="font-bold">
                     <TableCell colSpan={3}>Total</TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(totalDebits)}
+                      {formatCurrency(totalDebits, currencyCode)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(totalCredits)}
+                      {formatCurrency(totalCredits, currencyCode)}
                     </TableCell>
                   </TableRow>
                 </TableFooter>
