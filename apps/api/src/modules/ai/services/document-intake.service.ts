@@ -14,6 +14,8 @@ import {
 } from '../extraction/extraction-strategy.interface';
 import { extractTextFromPdf } from '../utils/pdf-extractor.util';
 import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.util';
+import { ExtractionValidation, validateExtraction } from '../validation/extraction-validation';
+import { normalizeDigits } from '../extraction/rules/rules-normalize';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 
 // ---------------------------------------------------------------------------
@@ -74,6 +76,8 @@ export interface DocumentIntakeResult {
   fieldEvidence?: Record<string, { text: string; lineIndex: number }>;
   /** Rules strategy only: failed consistency checks as machine codes. */
   extractionWarnings?: string[];
+  /** Per-field validation (status, reason codes, source evidence). */
+  validation?: ExtractionValidation;
   ocrConfidence: number;
 
   /** Vendor matching */
@@ -355,6 +359,8 @@ export class DocumentIntakeService {
       );
     }
 
+    const validation = await this.validateFields(organizationId, extraction);
+
     // Step 6: Use extracted dueDate, fall back to +30 days from invoice date
     let dueDate: string | null = extraction.dueDate;
     if (!dueDate && extraction.date) {
@@ -412,6 +418,7 @@ export class DocumentIntakeService {
       fieldConfidence: extraction.fieldConfidence,
       fieldEvidence: extraction.fieldEvidence,
       extractionWarnings: extraction.extractionWarnings,
+      validation,
       ocrConfidence: extraction.ocrConfidence,
       matchedVendor,
       vendorCandidates,
@@ -423,6 +430,31 @@ export class DocumentIntakeService {
       suggestCreateVendor,
       extractionMethod,
     };
+  }
+
+  /** Field validation for any strategy; vendor match is by tax ID within the organization. */
+  private async validateFields(
+    organizationId: string,
+    extraction: DocumentExtractionResult,
+  ): Promise<ExtractionValidation> {
+    const org = await this.prisma.organization.findFirst({
+      where: { id: organizationId },
+      select: { baseCurrency: true },
+    });
+    const taxId = extraction.vendorTaxId?.trim();
+    const digits = taxId ? normalizeDigits(taxId).replace(/[\s\-.]/g, '') : undefined;
+    let vendorMatchedByTaxId = false;
+    if (taxId && digits) {
+      const vendor = await this.prisma.vendor.findFirst({
+        where: { organizationId, deletedAt: null, taxId: { in: [...new Set([taxId, digits])] } },
+        select: { id: true },
+      });
+      vendorMatchedByTaxId = vendor !== null;
+    }
+    return validateExtraction(
+      { ...extraction },
+      { baseCurrency: org?.baseCurrency ?? 'SAR', vendorMatchedByTaxId },
+    );
   }
 
   /**

@@ -30,6 +30,12 @@ import {
 import { useCreateVendor } from '@/lib/hooks/use-vendors';
 import { resolveScanLineTaxes, toDecimalString } from '@/lib/document-intake-tax';
 import { BillForm, type BillFormDefaultValues } from '@/components/purchases/bill-form';
+import { IntakeFieldValidation } from '@/components/purchases/intake-field-validation';
+import {
+  partitionBlocking,
+  uncorrectedBlockingFields,
+  warningFields,
+} from '@/lib/intake-validation';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
@@ -66,6 +72,10 @@ export default function ScanBillPage() {
   const [scanMode, setScanMode] = useState<'fast' | 'slow'>('fast');
   const [unresolvedTaxLines, setUnresolvedTaxLines] = useState<UnresolvedTaxLine[]>([]);
   const [taxReviewed, setTaxReviewed] = useState(false);
+  const [warningsShown, setWarningsShown] = useState(false);
+  const [amountsAcknowledged, setAmountsAcknowledged] = useState(false);
+  const [dateAcknowledged, setDateAcknowledged] = useState(false);
+  const tv = useTranslations('ai.intake.validation');
 
   // SSE-based document intake
   const intake = useDocumentIntakeStream();
@@ -214,6 +224,40 @@ export default function ScanBillPage() {
       );
       return;
     }
+    const validation = localResult?.validation;
+    if (validation && localResult) {
+      const blocked = uncorrectedBlockingFields(validation, localResult.extractedFields, {
+        date: String(formData.date ?? ''),
+        currencyCode: String(formData.currencyCode ?? ''),
+        lines:
+          (formData.lines as Array<{ quantity: string | number; rate: string | number }>) ?? [],
+        prefilledDate: scanDefaults?.date,
+      });
+      const { hard, amounts, missingDate } = partitionBlocking(blocked, validation);
+      if (hard.length > 0) {
+        setLocalError(
+          tv('blockedInvalid', { fields: hard.map((f) => tv(`fields.${f}`)).join(', ') }),
+        );
+        return;
+      }
+      if (amounts.length > 0 && !amountsAcknowledged) {
+        setAmountsAcknowledged(true);
+        setLocalError(
+          tv('confirmAmounts', { fields: amounts.map((f) => tv(`fields.${f}`)).join(', ') }),
+        );
+        return;
+      }
+      if (missingDate && !dateAcknowledged) {
+        setDateAcknowledged(true);
+        setLocalError(tv('confirmMissingDate'));
+        return;
+      }
+      if (warningFields(validation).length > 0 && !warningsShown) {
+        setWarningsShown(true);
+        setLocalError(tv('warnBeforeConfirm'));
+        return;
+      }
+    }
     try {
       const lines = (
         formData.lines as Array<{
@@ -269,6 +313,9 @@ export default function ScanBillPage() {
   const handleReupload = () => {
     setStep('upload');
     setLocalResult(null);
+    setWarningsShown(false);
+    setAmountsAcknowledged(false);
+    setDateAcknowledged(false);
     setScanDefaults(null);
     setLocalError(null);
     setUnresolvedTaxLines([]);
@@ -792,6 +839,8 @@ export default function ScanBillPage() {
               </CardContent>
             </Card>
           )}
+
+          {result.validation && <IntakeFieldValidation validation={result.validation} />}
 
           {/* Bill Form — same as New Bill */}
           <BillForm

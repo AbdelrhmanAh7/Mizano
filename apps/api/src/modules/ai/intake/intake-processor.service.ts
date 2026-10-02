@@ -20,7 +20,8 @@ export function needsReview(result: DocumentIntakeResult): boolean {
     fields.total === null ||
     fields.date === null ||
     result.documentType === 'OTHER' ||
-    result.duplicateWarning?.isDuplicate === true
+    result.duplicateWarning?.isDuplicate === true ||
+    result.validation?.requiresReview === true
   );
 }
 
