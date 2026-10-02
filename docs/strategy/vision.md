@@ -1,6 +1,6 @@
 # Mizano: vision, mission and product decisions
 
-Decision date: 5 September 2026. Audience: the product owner, accountants and engineering agents.
+Original vision decision date: 5 September 2026. Audience: the product owner, accountants and engineering agents.
 
 ## Vision
 
@@ -23,7 +23,7 @@ Start with an Egypt-based service/trading SMB and EGP purchase bills. Sales invo
 
 ## Raspberry Pi live outcome
 
-The current goal is a tiny live deployment on a **Raspberry Pi 5 (8GB, arm64)**, tracked by epic **#45**, with core ledger (AP/AR, reports, Arabic/English), invoice intake and Telegram ingestion: Telegram/web ? stored original ? CPU extraction ? validated draft ? one accountant batch approval ? ledger ? partial payment ? reconciled reports. The ten-day demo target is superseded by the Pi plan (#45).
+The current goal is a tiny live deployment on a **Raspberry Pi 5 (8GB, arm64)**, tracked by epic **#45**, with core ledger (AP/AR, reports, Arabic/English), invoice intake and Telegram ingestion: Telegram/web → stored original → CPU extraction → validated draft → one accountant batch approval → ledger → partial payment → reconciled reports. The ten-day demo target is superseded by the Pi plan (#45).
 
 This is a committed scope and target, not an assertion that the work is already implemented. The release is blocked if accounting or tenant-isolation gates fail. Cut optional polish, vendor layouts or extra charts first; never silently cut the connected journey or change a failed gate to green.
 
