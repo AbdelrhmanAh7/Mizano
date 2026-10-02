@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { AssetStatus, Prisma } from '@prisma/client';
+import { describeError } from '../../../common/utils/redact';
 
 @Injectable()
 export class DepreciationService {
@@ -37,7 +38,7 @@ export class DepreciationService {
           `Org ${org.id}: ${result.processed} assets, ${result.journalsCreated} journals created`,
         );
       } catch (error) {
-        this.logger.error(`Failed to run depreciation for org ${org.id}: ${error.message}`);
+        this.logger.error(`Failed to run depreciation for org ${org.id}: ${describeError(error)}`);
       }
     }
   }
@@ -158,7 +159,9 @@ export class DepreciationService {
         processed++;
         totalDepreciation += depreciationAmount.toNumber();
       } catch (error) {
-        this.logger.error(`Failed to process depreciation for asset ${asset.id}: ${error.message}`);
+        this.logger.error(
+          `Failed to process depreciation for asset ${asset.id}: ${describeError(error)}`,
+        );
       }
     }
 

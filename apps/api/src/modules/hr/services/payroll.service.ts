@@ -353,25 +353,49 @@ export class PayrollService {
     return payrollRun;
   }
 
-  async getPayslip(organizationId: string, id: string) {
+  async getPayslip(
+    organizationId: string,
+    id: string,
+  ): Promise<
+    Prisma.PayslipGetPayload<{
+      include: {
+        employee: true;
+        payrollRun: true;
+      };
+    }>
+  > {
     const payslip = await this.prisma.payslip.findFirst({
-      where: { id },
+      where: { id, payrollRun: { organizationId } },
       include: {
         employee: true,
         payrollRun: true,
       },
     });
     if (!payslip) throw new NotFoundException('Payslip not found');
-    // Verify organization through payroll run
-    if (payslip.payrollRun.organizationId !== organizationId) {
-      throw new NotFoundException('Payslip not found');
-    }
     return payslip;
   }
 
-  async getEmployeePayslips(organizationId: string, employeeId: string) {
+  async getEmployeePayslips(
+    organizationId: string,
+    employeeId: string,
+  ): Promise<
+    Prisma.PayslipGetPayload<{
+      include: { payrollRun: { select: { month: true; year: true; status: true } } };
+    }>[]
+  > {
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: employeeId, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!employee) {
+      throw new NotFoundException('Employee not found');
+    }
+
     return this.prisma.payslip.findMany({
-      where: { employeeId },
+      where: {
+        employeeId: employee.id,
+        payrollRun: { organizationId },
+      },
       orderBy: { payrollRun: { year: 'desc' } },
       include: { payrollRun: { select: { month: true, year: true, status: true } } },
     });

@@ -5,6 +5,7 @@ import { tap } from 'rxjs/operators';
 import { CacheService } from '../../cache/cache.service';
 import { CACHE_RESPONSE_KEY } from '../decorators/cache-response.decorator';
 import { CACHE_TTL_KEY } from '../decorators/cache-ttl.decorator';
+import { describeError } from '../utils/redact';
 
 const DEFAULT_TTL_SECONDS = 300; // 5 minutes
 
@@ -55,7 +56,7 @@ export class CacheResponseInterceptor implements NestInterceptor {
         return of(cached);
       }
     } catch (error) {
-      this.logger.warn(`Cache read error for ${cacheKey}: ${error}`);
+      this.logger.warn(`Cache read error for ${cacheKey}: ${describeError(error)}`);
     }
 
     // 2. Execute handler + cache result
@@ -73,7 +74,7 @@ export class CacheResponseInterceptor implements NestInterceptor {
             });
             this.logger.debug(`Cache SET: ${cacheKey} (TTL ${ttl}s)`);
           } catch (error) {
-            this.logger.warn(`Cache write error for ${cacheKey}: ${error}`);
+            this.logger.warn(`Cache write error for ${cacheKey}: ${describeError(error)}`);
           }
         })();
       }),

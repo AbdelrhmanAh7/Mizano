@@ -11,6 +11,7 @@ import {
   QueryStatsResponseDto,
   TimeTrendItemDto,
 } from '../dto/query-metrics.dto';
+import { describeError } from '../../../common/utils/redact';
 
 @Injectable()
 export class QueryMetricsService {
@@ -111,7 +112,7 @@ export class QueryMetricsService {
       primaryLatencyMs = Math.round((performance.now() - start) * 100) / 100;
       primaryConnected = true;
     } catch (error) {
-      this.logger.error('Primary database health check failed', error);
+      this.logger.error(`Primary database health check failed: ${describeError(error)}`);
     }
 
     const replicaConfigured = this.readReplica.isUsingReplica();
@@ -125,7 +126,7 @@ export class QueryMetricsService {
         replicaLatencyMs = Math.round((performance.now() - start) * 100) / 100;
         replicaConnected = true;
       } catch (error) {
-        this.logger.error('Read replica health check failed', error);
+        this.logger.error(`Read replica health check failed: ${describeError(error)}`);
       }
     }
 
