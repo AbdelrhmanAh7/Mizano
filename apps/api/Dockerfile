@@ -14,7 +14,7 @@ RUN apk add --no-cache openssl \
   && corepack enable && corepack prepare pnpm@8.14.0 --activate
 
 WORKDIR /app
-ENV HUSKY=0 PUPPETEER_SKIP_DOWNLOAD=true ONNXRUNTIME_NODE_INSTALL=skip
+ENV HUSKY=0 PUPPETEER_SKIP_DOWNLOAD=true
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc ./
 COPY apps/api/package.json ./apps/api/
@@ -25,9 +25,15 @@ RUN pnpm install --frozen-lockfile
 COPY apps/api ./apps/api
 COPY packages ./packages
 
-# Generates the client plus engines for every binaryTarget in schema.prisma
+# Generates the client plus engines for every binaryTarget in schema.prisma,
+# then keeps only the TARGET musl engine (each engine is ~15 MB) and drops the
+# 10 MB type declarations, which nothing reads at runtime.
+ARG TARGETARCH
 RUN cd apps/api && pnpm exec prisma generate \
-  && find /app/node_modules/.prisma/client -name 'libquery_engine-*' ! -name '*musl*' -delete
+  && if [ "$TARGETARCH" = arm64 ]; then keep=linux-musl-arm64-openssl; else keep=linux-musl-openssl; fi \
+  && find /app/node_modules/.prisma/client -name 'libquery_engine-*' ! -name "*${keep}*" -delete \
+  && rm -f /app/node_modules/.prisma/client/index.d.ts \
+  && test "$(find /app/node_modules/.prisma/client -name 'libquery_engine-*' | wc -l)" = 1
 RUN pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/validators build
 RUN pnpm --filter api build
 
@@ -47,7 +53,7 @@ RUN apk add --no-cache openssl python3 make g++ \
   && corepack enable && corepack prepare pnpm@8.14.0 --activate
 
 WORKDIR /app
-ENV HUSKY=0 PUPPETEER_SKIP_DOWNLOAD=true ONNXRUNTIME_NODE_INSTALL=skip
+ENV HUSKY=0 PUPPETEER_SKIP_DOWNLOAD=true
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/api/package.json ./apps/api/
@@ -61,13 +67,23 @@ COPY --from=build /app/packages/validators/dist ./packages/validators/dist
 # scripts are skipped (root `husky`, puppeteer Chrome download); native modules
 # are then built/fetched for THIS (target) architecture.
 # Isolated linker: with `hoisted`, pnpm deploy does not materialise top-level deps.
+#
+# Image-size trims, each followed by a require() check:
+# - .npmrc lists both libc variants, so pnpm also materialises the glibc
+#   sharp/libvips packages (~33 MB) that alpine (musl) can never load.
+# - pdf-parse 1.1.1 bundles four pdf.js builds plus test PDFs (~35 MB); the
+#   api calls it without a `version` option, so only v1.10.100 is ever loaded.
+# - natural requires wordnet-db (34 MB) lazily, inside the WordNet
+#   constructor; the api never uses WordNet.
 RUN npm_config_node_linker=isolated pnpm --filter api deploy --prod --ignore-scripts /out \
   && cd /out/node_modules \
   && (cd bcrypt && npm run install) \
-  && node -e "require('sharp')" \
-  && arch="$(node -p process.arch)" \
-  && rm -rf onnxruntime-node/bin/napi-v6/darwin onnxruntime-node/bin/napi-v6/win32 \
-  && find onnxruntime-node/bin/napi-v6/linux -mindepth 1 -maxdepth 1 ! -name "$arch" -exec rm -rf {} +
+  && rm -rf @img/sharp-linux-* @img/sharp-libvips-linux-* \
+       .pnpm/@img+sharp-linux-* .pnpm/@img+sharp-libvips-linux-* \
+  && rm -rf .pnpm/pdf-parse@*/node_modules/pdf-parse/test \
+  && find .pnpm/pdf-parse@*/node_modules/pdf-parse/lib/pdf.js -mindepth 1 -maxdepth 1 -type d ! -name v1.10.100 -exec rm -rf {} + \
+  && rm -rf wordnet-db .pnpm/wordnet-db@* \
+  && node -e "require('bcrypt'); require('sharp'); require('pdf-parse'); require('natural'); require('puppeteer'); require('tesseract.js')"
 
 # Prisma CLI in an isolated prefix, only used for `prisma migrate deploy`
 ARG PRISMA_VERSION=5.22.0
@@ -101,7 +117,7 @@ COPY --chown=nestjs:nodejs --from=deps /app/packages/shared-types/package.json .
 COPY --chown=nestjs:nodejs --from=deps /app/packages/validators/package.json ./packages/validators/package.json
 COPY --chown=nestjs:nodejs --from=build /app/packages/shared-types/dist ./packages/shared-types/dist
 COPY --chown=nestjs:nodejs --from=build /app/packages/validators/dist ./packages/validators/dist
-# Generated Prisma client (musl engines only: arm64 + amd64)
+# Generated Prisma client (target musl engine only)
 COPY --chown=nestjs:nodejs --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --chown=nestjs:nodejs --from=build /app/apps/api/dist ./apps/api/dist
 COPY --chown=nestjs:nodejs --from=build /app/apps/api/prisma ./apps/api/prisma
