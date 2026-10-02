@@ -25,7 +25,7 @@ mkdir -p "$DATA_DIR"
 touch "$logfile"
 
 # Is there a previous good deployment to fall back to?
-prev_ok="$(grep -c ' OK ' "$logfile" || true)"
+prev_ok="$(grep -cE ' (OK|ROLLBACK) ' "$logfile" || true)"
 
 export MIZANO_API_IMAGE="$api_repo@$api_digest"
 export MIZANO_WEB_IMAGE="$web_repo@$web_digest"
@@ -43,6 +43,7 @@ dc up -d --remove-orphans
 
 if wait_healthy 300; then
   record OK
+  persist_deployment "$sha" "$MIZANO_API_IMAGE" "$MIZANO_WEB_IMAGE"
   log "deploy OK $sha"
   exit 0
 fi

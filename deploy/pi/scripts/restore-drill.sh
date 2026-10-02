@@ -26,11 +26,16 @@ chmod 755 "$work"
 drill_pw="$(head -c 18 /dev/urandom | base64 | tr -d '/+=')"
 docker run -d --name "$name" -e POSTGRES_PASSWORD="$drill_pw" -e POSTGRES_DB=drill \
   -v "$work:/restore:ro" postgres:16 >/dev/null
-for _ in $(seq 1 30); do
-  if docker exec "$name" pg_isready -U postgres -d drill >/dev/null 2>&1; then break; fi
+# Probe over TCP: the temporary init server only listens on the unix socket.
+ready=0
+for _ in $(seq 1 60); do
+  if docker exec "$name" pg_isready -h 127.0.0.1 -U postgres -d drill >/dev/null 2>&1; then
+    ready=1
+    break
+  fi
   sleep 2
 done
-docker exec "$name" pg_isready -U postgres -d drill >/dev/null
+[ "$ready" -eq 1 ] || { echo "DRILL FAILED: postgres not ready" >&2; exit 1; }
 
 docker exec "$name" pg_restore -U postgres -d drill --no-owner --exit-on-error /restore/db.dump
 psql_q() { docker exec "$name" psql -U postgres -d drill -tA -c "$1"; }

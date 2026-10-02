@@ -46,3 +46,17 @@ wait_healthy() {
   done
   return 1
 }
+
+# Persist the deployed image refs and SHA into the env file so later plain
+# `docker compose up` uses them. Rewrites only those keys, atomically, keeping
+# every other line and the file mode. Args: sha api-image web-image.
+persist_deployment() {
+  local tmp
+  tmp="$(mktemp "$ENV_FILE.XXXXXX")"
+  chmod --reference="$ENV_FILE" "$tmp"
+  {
+    grep -vE '^(MIZANO_API_IMAGE|MIZANO_WEB_IMAGE|MIZANO_DEPLOYED_SHA)=' "$ENV_FILE" || true
+    printf 'MIZANO_API_IMAGE=%s\nMIZANO_WEB_IMAGE=%s\nMIZANO_DEPLOYED_SHA=%s\n' "$2" "$3" "$1"
+  } >"$tmp"
+  mv "$tmp" "$ENV_FILE"
+}
