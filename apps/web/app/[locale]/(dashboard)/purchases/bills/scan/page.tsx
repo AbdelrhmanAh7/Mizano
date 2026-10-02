@@ -550,6 +550,11 @@ export default function ScanBillPage() {
       {/* Step 3: Review */}
       {step === 'review' && result && scanDefaults && (
         <div className="space-y-6">
+          {intake.isDuplicate && (
+            <p className="text-sm text-muted-foreground" role="status">
+              {t('duplicate')}
+            </p>
+          )}
           {/* AI Context Panel */}
           {intake.jobStatus === 'NEEDS_REVIEW' && (
             <Card className="border-yellow-500" role="status">

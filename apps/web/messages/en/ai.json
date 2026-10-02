@@ -209,6 +209,8 @@
     "stageWinRates": "Stage Win Rates"
   },
   "intake": {
+    "retryUnavailable": "This scan can no longer be retried.",
+    "retryFailed": "Could not retry the scan. Please try again.",
     "retry": "Retry scan",
     "duplicate": "This file was already uploaded. Showing the existing scan.",
     "needsReviewNotice": "Some values are missing or uncertain. Review every field before creating the draft.",

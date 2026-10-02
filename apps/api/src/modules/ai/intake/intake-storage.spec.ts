@@ -19,6 +19,7 @@ describe('LocalFsIntakeStorage', () => {
   });
 
   afterEach(async () => {
+    jest.restoreAllMocks();
     await fs.rm(root, { recursive: true, force: true });
   });
 
@@ -42,6 +43,30 @@ describe('LocalFsIntakeStorage', () => {
     const key = buildIntakeStorageKey('org-a');
     await storage.put(key, Buffer.from('one'));
     await expect(storage.put(key, Buffer.from('two'))).rejects.toThrow();
+  });
+
+  it('removes partial temporary bytes after a write failure', async () => {
+    const key = buildIntakeStorageKey('org-a');
+    const open = fs.open.bind(fs);
+    jest.spyOn(fs, 'open').mockImplementationOnce(async (...args) => {
+      const file = await open(...args);
+      jest.spyOn(file, 'writeFile').mockImplementationOnce(async () => {
+        await file.write(Buffer.from('partial'));
+        throw new Error('write failed');
+      });
+      return file;
+    });
+    await expect(storage.put(key, Buffer.from('original'))).rejects.toThrow('write failed');
+    await expect(fs.stat(path.join(root, key))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await fs.readdir(path.dirname(path.join(root, key)))).toEqual([]);
+  });
+
+  it('removes the temporary file after publication fails', async () => {
+    const key = buildIntakeStorageKey('org-a');
+    jest.spyOn(fs, 'link').mockRejectedValueOnce(new Error('link failed'));
+    await expect(storage.put(key, Buffer.from('original'))).rejects.toThrow('link failed');
+    await expect(fs.stat(path.join(root, key))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await fs.readdir(path.dirname(path.join(root, key)))).toEqual([]);
   });
 
   it('refuses keys that escape the storage root', async () => {

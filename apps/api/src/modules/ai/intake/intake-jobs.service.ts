@@ -36,6 +36,7 @@ export interface CreateIntakeUpload {
 
 const DEFAULT_MAX_ACTIVE_PER_ORG = 50;
 const DEFAULT_LEASE_MS = 5 * 60 * 1000;
+const DEFAULT_RETRY_BASE_MS = 5000;
 
 /** How long a PROCESSING job may go without an update before another worker may take it over. */
 export function intakeLeaseMs(config: ConfigService): number {
@@ -124,7 +125,7 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
               },
             ],
           },
-          select: { id: true, organizationId: true, attempts: true, status: true },
+          select: { id: true, organizationId: true, attempts: true, status: true, updatedAt: true },
           orderBy: { id: 'asc' },
           take: RECOVERY_BATCH,
         });
@@ -133,7 +134,21 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
             job.status === IntakeJobStatus.PROCESSING
               ? `${job.id}-s${job.attempts}`
               : queueJobId(job.id, job.attempts);
-          await this.queue.enqueue({ jobId: job.id, organizationId: job.organizationId }, queueId);
+          let delay = 0;
+          if (job.status === IntakeJobStatus.FAILED) {
+            const configured = Number(this.config.get<string>('INTAKE_RETRY_BASE_MS'));
+            const base =
+              Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_RETRY_BASE_MS;
+            delay = Math.max(
+              0,
+              base * 2 ** (job.attempts - 1) - (Date.now() - job.updatedAt.getTime()),
+            );
+          }
+          await this.queue.enqueue(
+            { jobId: job.id, organizationId: job.organizationId },
+            queueId,
+            delay,
+          );
           enqueued += 1;
         }
         if (batch.length < RECOVERY_BATCH) break;

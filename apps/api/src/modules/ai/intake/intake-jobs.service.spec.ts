@@ -211,6 +211,57 @@ describe('IntakeJobsService', () => {
       expect(queue.enqueue).toHaveBeenCalledTimes(285);
     });
 
+    it.each([
+      [undefined, 1, 1000, 4000],
+      ['2000', 3, 1500, 6500],
+      ['2000', 2, 4000, 0],
+      ['2000', 2, 5000, 0],
+      ['0', 2, 1000, 9000],
+      ['invalid', 2, 1000, 9000],
+    ])(
+      'preserves FAILED backoff (base=%s, attempts=%s, elapsed=%s)',
+      async (base, attempts, elapsed, expectedDelay) => {
+        jest.useFakeTimers().setSystemTime(new Date('2026-10-02T12:00:00Z'));
+        try {
+          config.get.mockImplementation((key: string) =>
+            key === 'INTAKE_RETRY_BASE_MS' ? base : undefined,
+          );
+          await seedRows(1, IntakeJobStatus.FAILED, {
+            attempts,
+            updatedAt: new Date(Date.now() - elapsed),
+          });
+          expect(await service.recoverJobs()).toBe(1);
+          const job = table.rows[0];
+          expect(table.delegate.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({ select: expect.objectContaining({ updatedAt: true }) }),
+          );
+          expect(queue.enqueue).toHaveBeenCalledWith(
+            { jobId: job.id, organizationId: ORG_A },
+            `${job.id}-a${attempts}`,
+            expectedDelay,
+          );
+        } finally {
+          jest.useRealTimers();
+        }
+      },
+    );
+
+    it('recovers QUEUED and lease-expired PROCESSING rows immediately', async () => {
+      await seedRows(1, IntakeJobStatus.QUEUED, { attempts: 2 });
+      await seedRows(1, IntakeJobStatus.PROCESSING, {
+        attempts: 2,
+        leaseExpiresAt: new Date(Date.now() - 1000),
+      });
+      expect(await service.recoverJobs()).toBe(2);
+      for (const job of table.rows) {
+        expect(queue.enqueue).toHaveBeenCalledWith(
+          { jobId: job.id, organizationId: ORG_A },
+          `${job.id}-${job.status === IntakeJobStatus.PROCESSING ? 's' : 'a'}2`,
+          0,
+        );
+      }
+    });
+
     it('skips soft-deleted rows', async () => {
       await seedRows(2, IntakeJobStatus.QUEUED, { deletedAt: new Date() });
       expect(await service.recoverJobs()).toBe(0);

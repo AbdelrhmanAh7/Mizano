@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSession } from 'next-auth/react';
 import api from '@/lib/api';
+import { useTranslations } from 'next-intl';
 
 // ============ Types ============
 
@@ -281,6 +282,7 @@ export function useDocumentIntakeStream(): {
   retry: () => Promise<void>;
   reset: () => void;
 } {
+  const t = useTranslations('ai.intake');
   const [stage, setStage] = useState<IntakeStage | null>(null);
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
@@ -502,15 +504,30 @@ export function useDocumentIntakeStream(): {
       setJobStatus('QUEUED');
     } catch (err) {
       const status = (err as { response?: { status?: number } }).response?.status;
-      fail(
-        status === 409
-          ? 'This scan can no longer be retried.'
-          : 'Could not retry the scan. Please try again.',
-      );
+      if (status === 409) {
+        try {
+          const job = (await documentIntakeApi.getResult(jobId)).data;
+          setJobStatus(job.status);
+          if (job.status === 'QUEUED' || job.status === 'PROCESSING') {
+            setStage(job.stage);
+            setProgress(job.progress);
+            await followJob(jobId);
+            return;
+          }
+          // The server refused the transition; do not offer the same retry again.
+          if (RETRYABLE_INTAKE_STATUSES.includes(job.status)) setJobStatus(null);
+          fail(t('retryUnavailable'));
+        } catch {
+          setJobStatus(null);
+          fail(t('retryFailed'));
+        }
+      } else {
+        fail(t('retryFailed'));
+      }
       return;
     }
     await followJob(jobId);
-  }, [jobId, stopAll, fail, followJob]);
+  }, [jobId, stopAll, fail, followJob, t]);
 
   return {
     processDocument,

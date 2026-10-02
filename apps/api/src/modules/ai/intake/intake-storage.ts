@@ -57,9 +57,23 @@ export class LocalFsIntakeStorage extends IntakeStorage {
   async put(key: string, data: Buffer): Promise<void> {
     const full = this.resolveKey(key);
     await fs.mkdir(path.dirname(full), { recursive: true, mode: 0o700 });
-    // 'wx' refuses to overwrite; mode applies at creation only, so chmod explicitly too.
-    await fs.writeFile(full, data, { flag: 'wx', mode: 0o600 });
-    await fs.chmod(full, 0o600);
+    const tmp = path.join(path.dirname(full), `.intake-${randomBytes(24).toString('hex')}.tmp`);
+    try {
+      const file = await fs.open(tmp, 'wx', 0o600);
+      try {
+        await file.writeFile(data);
+        await file.chmod(0o600);
+        await file.sync();
+      } finally {
+        await file.close();
+      }
+      // Publish complete bytes atomically without ever replacing an existing original.
+      await fs.link(tmp, full);
+    } finally {
+      await fs.unlink(tmp).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+    }
   }
 
   async get(key: string, expectedSha256: string): Promise<Buffer> {

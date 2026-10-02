@@ -3,6 +3,16 @@ import { TextDecoder as NodeTextDecoder, TextEncoder as NodeTextEncoder } from '
 
 // ── Mocks ──────────────────────────────────────────────────────
 
+jest.mock('next-intl', () => ({
+  useTranslations: () => (key: string) =>
+    (
+      ({
+        retryUnavailable: 'This scan can no longer be retried.',
+        retryFailed: 'Could not retry the scan. Please try again.',
+      }) as Record<string, string>
+    )[key],
+}));
+
 jest.mock('next-auth/react', () => ({
   getSession: jest.fn().mockResolvedValue({ accessToken: 'token-123' }),
 }));
@@ -199,7 +209,7 @@ describe('useDocumentIntakeStream', () => {
     expect(result.current.canRetry).toBe(false);
   });
 
-  it('surfaces a 409 from retry as an error', async () => {
+  it.each(['EXTRACTED', 'PROCESSING'])('reconciles %s after a retry conflict', async (status) => {
     fetchMock.mockResolvedValue({
       ok: true,
       status: 200,
@@ -214,10 +224,33 @@ describe('useDocumentIntakeStream', () => {
       await result.current.processDocument(new FormData());
     });
     mockPost.mockRejectedValueOnce({ response: { status: 409 } });
+    mockGet.mockResolvedValueOnce({
+      data: {
+        data: {
+          status,
+          stage: status === 'PROCESSING' ? 'extracting' : 'complete',
+          progress: 50,
+          result: RESULT,
+          lastError: null,
+        },
+      },
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, body: fakeBody([]) });
+    mockGet.mockResolvedValue({ data: { data: { status, stage: 'extracting', progress: 50 } } });
     await act(async () => {
       await result.current.retry();
     });
-    expect(result.current.error).toMatch(/can no longer be retried/);
+    expect(mockGet).toHaveBeenLastCalledWith('/ai/document-intake/intake_1/result');
+    expect(result.current.jobStatus).toBe(status);
+    expect(result.current.canRetry).toBe(false);
+    if (status === 'PROCESSING') {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(result.current.isProcessing).toBe(true);
+      expect(result.current.error).toBeNull();
+    } else {
+      expect(result.current.error).toMatch(/can no longer be retried/);
+      expect(result.current.isProcessing).toBe(false);
+    }
   });
 
   it('shows the existing draft for a duplicate of an APPROVED job, without following the stream', async () => {
