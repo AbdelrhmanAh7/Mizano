@@ -15,6 +15,18 @@ export type IntakeStage =
   | 'complete'
   | 'error';
 
+/** Durable server-side job status (PostgreSQL), distinct from the progress stage. */
+export type IntakeJobStatus =
+  | 'QUEUED'
+  | 'PROCESSING'
+  | 'EXTRACTED'
+  | 'NEEDS_REVIEW'
+  | 'FAILED'
+  | 'DEAD_LETTER'
+  | 'APPROVED';
+
+export const RETRYABLE_INTAKE_STATUSES: IntakeJobStatus[] = ['FAILED', 'DEAD_LETTER'];
+
 export interface VendorCandidate {
   id: string;
   name: string;
@@ -117,6 +129,8 @@ export interface ConfirmIntakeData {
   notes?: string;
   projectId?: string;
   corrections?: Record<string, unknown>;
+  /** Intake job this draft came from; the server approves it once and links the draft. */
+  jobId?: string;
 }
 
 export interface ConfirmIntakeResponse {
@@ -127,6 +141,7 @@ export interface ConfirmIntakeResponse {
 
 export interface IntakeProgressEvent {
   stage: IntakeStage;
+  status?: IntakeJobStatus;
   progress: number;
   message?: string;
   result?: DocumentIntakeResult;
@@ -147,14 +162,19 @@ const documentIntakeApi = {
     jobId: string,
   ): Promise<{
     data: {
-      jobId: string;
-      status: IntakeStage;
+      id: string;
+      status: IntakeJobStatus;
+      stage: IntakeStage;
       progress: number;
       result: DocumentIntakeResult | null;
-      error: string | null;
+      lastError: string | null;
     };
   }> => {
     const response = await api.get(`/ai/document-intake/${encodeURIComponent(jobId)}/result`);
+    return response.data;
+  },
+  retry: async (jobId: string) => {
+    const response = await api.post(`/ai/document-intake/${encodeURIComponent(jobId)}/retry`);
     return response.data;
   },
   confirmIntake: async (data: ConfirmIntakeData) => {
@@ -250,6 +270,11 @@ export function useDocumentIntakeStream(): {
   error: string | null;
   isProcessing: boolean;
   isReconnecting: boolean;
+  jobId: string | null;
+  jobStatus: IntakeJobStatus | null;
+  isDuplicate: boolean;
+  canRetry: boolean;
+  retry: () => Promise<void>;
   reset: () => void;
 } {
   const [stage, setStage] = useState<IntakeStage | null>(null);
@@ -259,6 +284,9 @@ export function useDocumentIntakeStream(): {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobStatus, setJobStatus] = useState<IntakeJobStatus | null>(null);
+  const [isDuplicate, setIsDuplicate] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -284,12 +312,16 @@ export function useDocumentIntakeStream(): {
     setError(null);
     setIsProcessing(false);
     setIsReconnecting(false);
+    setJobId(null);
+    setJobStatus(null);
+    setIsDuplicate(false);
   }, [stopAll]);
 
   /** Apply an event; returns true when the job reached a terminal state. */
   const handleProgressEvent = useCallback((event: IntakeProgressEvent): boolean => {
     setStage(event.stage);
     setProgress(event.progress);
+    if (event.status) setJobStatus(event.status);
     if (event.message) setMessage(event.message);
 
     if (event.stage === 'complete') {
@@ -328,10 +360,11 @@ export function useDocumentIntakeStream(): {
           failures = 0;
           setIsReconnecting(false);
           const terminal = handleProgressEvent({
-            stage: job.status,
+            stage: job.stage,
+            status: job.status,
             progress: job.progress,
             result: job.result ?? undefined,
-            error: job.error ?? undefined,
+            error: job.lastError ?? undefined,
           });
           if (terminal) return;
         } catch (err) {
@@ -389,32 +422,15 @@ export function useDocumentIntakeStream(): {
     [handleProgressEvent],
   );
 
-  const processDocument = useCallback(
-    async (formData: FormData) => {
-      reset();
-      setIsProcessing(true);
-      setStage('received');
-      setProgress(5);
-      setMessage('Uploading document...');
-
-      let jobId: string;
-      try {
-        // Step 1: POST file → get jobId
-        const response = await documentIntakeApi.processDocument(formData);
-        jobId = response.data.jobId;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        fail(msg || 'Failed to process document');
-        return;
-      }
-
-      // Step 2: authenticated progress stream, polling as the reconnect path
+  /** Authenticated progress stream, polling as the reconnect path. */
+  const followJob = useCallback(
+    async (id: string) => {
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        const terminal = await streamProgress(jobId, controller.signal);
+        const terminal = await streamProgress(id, controller.signal);
         if (!terminal && !controller.signal.aborted) {
-          startPolling(jobId, controller.signal);
+          startPolling(id, controller.signal);
         }
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -424,11 +440,60 @@ export function useDocumentIntakeStream(): {
         }
         // Network drop, 401 (token refresh is handled by the API client), proxy
         // buffering, etc. — continue via polling.
-        startPolling(jobId, controller.signal);
+        startPolling(id, controller.signal);
       }
     },
-    [reset, fail, streamProgress, startPolling],
+    [streamProgress, startPolling, fail],
   );
+
+  const processDocument = useCallback(
+    async (formData: FormData) => {
+      reset();
+      setIsProcessing(true);
+      setStage('received');
+      setProgress(5);
+      setMessage('Uploading document...');
+
+      let newJobId: string;
+      try {
+        // Step 1: POST file → job (an identical earlier upload returns the existing job)
+        const response = await documentIntakeApi.processDocument(formData);
+        newJobId = response.data.jobId;
+        setJobId(newJobId);
+        setJobStatus(response.data.status ?? null);
+        setIsDuplicate(response.data.duplicate === true);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        fail(msg || 'Failed to process document');
+        return;
+      }
+
+      await followJob(newJobId);
+    },
+    [reset, fail, followJob],
+  );
+
+  const retry = useCallback(async () => {
+    if (!jobId) return;
+    stopAll();
+    setError(null);
+    setStage('received');
+    setProgress(0);
+    setIsProcessing(true);
+    try {
+      await documentIntakeApi.retry(jobId);
+      setJobStatus('QUEUED');
+    } catch (err) {
+      const status = (err as { response?: { status?: number } }).response?.status;
+      fail(
+        status === 409
+          ? 'This scan can no longer be retried.'
+          : 'Could not retry the scan. Please try again.',
+      );
+      return;
+    }
+    await followJob(jobId);
+  }, [jobId, stopAll, fail, followJob]);
 
   return {
     processDocument,
@@ -439,6 +504,11 @@ export function useDocumentIntakeStream(): {
     error,
     isProcessing,
     isReconnecting,
+    jobId,
+    jobStatus,
+    isDuplicate,
+    canRetry: jobId !== null && jobStatus !== null && RETRYABLE_INTAKE_STATUSES.includes(jobStatus),
+    retry,
     reset,
   };
 }

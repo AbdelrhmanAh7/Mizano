@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -52,6 +53,7 @@ function toConfirmDecimal(value: unknown, field: string, lineNumber: number): st
 
 export default function ScanBillPage() {
   const router = useRouter();
+  const t = useTranslations('ai.intake');
 
   const [step, setStep] = useState<Step>('upload');
   const [dragOver, setDragOver] = useState(false);
@@ -237,6 +239,7 @@ export default function ScanBillPage() {
         lines,
         notes: (formData.notes as string) || undefined,
         projectId: (formData.projectId as string) || undefined,
+        jobId: intake.jobId ?? undefined,
         corrections: localResult
           ? {
               vendorName: localResult.extractedFields.vendorName || '',
@@ -330,6 +333,24 @@ export default function ScanBillPage() {
             <div className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-4 w-4" />
               <p>{error}</p>
+              {intake.jobStatus && (
+                <Badge variant="destructive" data-testid="intake-job-status">
+                  {t(`status.${intake.jobStatus}`)}
+                </Badge>
+              )}
+              {intake.canRetry && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setLocalError(null);
+                    setStep('processing');
+                    void intake.retry();
+                  }}
+                >
+                  {t('retry')}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -492,6 +513,16 @@ export default function ScanBillPage() {
                 <p className="text-sm text-muted-foreground">
                   AI is processing your document. You&apos;ll see live progress below.
                 </p>
+                {intake.isDuplicate && (
+                  <p className="text-xs text-muted-foreground" role="status">
+                    {t('duplicate')}
+                  </p>
+                )}
+                {intake.jobStatus && (
+                  <Badge variant="secondary" data-testid="intake-job-status">
+                    {t(`status.${intake.jobStatus}`)}
+                  </Badge>
+                )}
                 {intake.isReconnecting && (
                   <p className="text-xs text-yellow-600" role="status">
                     Connection interrupted — reconnecting...
@@ -515,6 +546,14 @@ export default function ScanBillPage() {
       {step === 'review' && result && scanDefaults && (
         <div className="space-y-6">
           {/* AI Context Panel */}
+          {intake.jobStatus === 'NEEDS_REVIEW' && (
+            <Card className="border-yellow-500" role="status">
+              <CardContent className="flex items-center gap-2 pt-6 text-yellow-700">
+                <AlertTriangle className="h-4 w-4" />
+                <p>{t('needsReviewNotice')}</p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Extraction Results header */}
           <Card>

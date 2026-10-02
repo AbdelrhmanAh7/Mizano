@@ -20,6 +20,12 @@ import { OcrLlmStrategy } from '../extraction/ocr-llm-strategy.service';
 import { HybridStrategy } from '../extraction/hybrid-strategy.service';
 import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-resolver.service';
 
+import { IntakeJobOwnerGuard } from '../intake/intake-job-owner.guard';
+import { IntakeJobsService } from '../intake/intake-jobs.service';
+import { IntakeProcessorService } from '../intake/intake-processor.service';
+import { IntakeQueueService } from '../intake/intake-queue.service';
+import { IntakeStorage, LocalFsIntakeStorage } from '../intake/intake-storage';
+
 // Operations Controllers
 import { DocumentIntakeController } from '../controllers/document-intake.controller';
 import { ReorderPointsController } from '../controllers/reorder-points.controller';
@@ -46,6 +52,11 @@ import { OllamaTunnelController } from '../controllers/ollama-tunnel.controller'
     HybridStrategy,
     ExtractionStrategyResolver,
     DocumentIntakeService,
+    IntakeJobsService,
+    IntakeJobOwnerGuard,
+    IntakeProcessorService,
+    IntakeQueueService,
+    { provide: IntakeStorage, useClass: LocalFsIntakeStorage },
     ReorderPointsService,
     PatternDetectionService,
     AnomalyDetectionService,
