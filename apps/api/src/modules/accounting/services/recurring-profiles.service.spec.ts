@@ -3,7 +3,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { createMockPrisma } from '../../../test/mocks/prisma.mock';
 import { JournalsService } from './journals.service';
-import { RecurringProfilesService } from './recurring-profiles.service';
+import {
+  RecurringProfilesService,
+  RECURRING_OCCURRENCE_ENTITY,
+} from './recurring-profiles.service';
+import { InvoicesService } from '../../sales/services/invoices.service';
 
 const ORG = 'org-1';
 const OCCURRENCE = new Date('2026-03-01T00:00:00.000Z');
@@ -165,8 +169,8 @@ describe('RecurringProfilesService (journal profiles)', () => {
 
     it('a manual run is dated now, keeps the schedule and uses the key as its source id', async () => {
       const before = Date.now();
-      const first = await service.executeProfile(ORG, 'prof-1', KEY_1);
-      const second = await service.executeProfile(ORG, 'prof-1', KEY_2);
+      const first = await service.executeProfile(ORG, 'prof-1', KEY_1, 'user-1');
+      const second = await service.executeProfile(ORG, 'prof-1', KEY_2, 'user-1');
 
       expect(first.success).toBe(true);
       expect(second.success).toBe(true);
@@ -182,7 +186,7 @@ describe('RecurringProfilesService (journal profiles)', () => {
 
     it('a retried manual request (same key) returns the existing journal and posts nothing', async () => {
       prisma.journal.findFirst.mockResolvedValue({ id: 'j-existing' });
-      const res = await service.executeProfile(ORG, 'prof-1', KEY_1);
+      const res = await service.executeProfile(ORG, 'prof-1', KEY_1, 'user-1');
       expect(res).toEqual({
         success: true,
         createdEntityType: 'JOURNAL',
@@ -203,13 +207,13 @@ describe('RecurringProfilesService (journal profiles)', () => {
       journals.create.mockRejectedValue(
         new ConflictException('This transaction has already been posted'),
       );
-      const res = await service.executeProfile(ORG, 'prof-1', KEY_1);
+      const res = await service.executeProfile(ORG, 'prof-1', KEY_1, 'user-1');
       expect(res).toEqual(expect.objectContaining({ success: true, createdEntityId: 'j-winner' }));
     });
 
     it('is tenant scoped', async () => {
       prisma.recurringProfile.findFirst.mockResolvedValue(null);
-      await expect(service.executeProfile('other-org', 'prof-1', KEY_1)).rejects.toThrow(
+      await expect(service.executeProfile('other-org', 'prof-1', KEY_1, 'user-1')).rejects.toThrow(
         'not found',
       );
       expect(prisma.recurringProfile.findFirst.mock.calls[0][0].where.organizationId).toBe(
@@ -424,6 +428,136 @@ describe('RecurringProfilesService (journal profiles)', () => {
         }),
       );
       expect(prisma.recurringProfile.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('invoice profile recurring replay', () => {
+    let invoicesService: { create: jest.Mock };
+
+    beforeEach(async () => {
+      invoicesService = { create: jest.fn().mockResolvedValue({ id: 'inv-1' }) };
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          RecurringProfilesService,
+          { provide: PrismaService, useValue: prisma },
+          { provide: JournalsService, useValue: journals },
+          { provide: InvoicesService, useValue: invoicesService },
+        ],
+      }).compile();
+      service = module.get(RecurringProfilesService);
+    });
+
+    it('recurring replay after notes edit returns the same doc', async () => {
+      const invProfile = {
+        id: 'prof-inv-1',
+        name: 'Monthly subscription',
+        type: 'INVOICE',
+        entityType: 'invoice',
+        frequency: 'MONTHLY',
+        startDate: new Date('2026-01-01'),
+        nextRunDate: new Date('2026-03-01'),
+        isActive: true,
+        templateData: {
+          customerId: 'cust-1',
+          lines: [{ description: 'SaaS', quantity: 1, rate: 100 }],
+        },
+        organizationId: ORG,
+      };
+
+      prisma.recurringProfile.findFirst.mockResolvedValue(invProfile);
+      prisma.customer.findFirst.mockResolvedValue({ id: 'cust-1', paymentTerms: 30 });
+
+      // First run: no occurrence row yet, the invoice is created and the row is written in the
+      // same transaction, attributed to the requesting user (no org-user lookup).
+      prisma.auditLog.findFirst.mockResolvedValue(null);
+      prisma.invoice.findFirst.mockResolvedValue(null);
+
+      const res1 = await service.executeProfile(ORG, 'prof-inv-1', 'key-replay-1', 'user-1');
+      expect(res1).toEqual({
+        success: true,
+        createdEntityType: 'INVOICE',
+        createdEntityId: 'inv-1',
+      });
+      expect(invoicesService.create).toHaveBeenCalledTimes(1);
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            organizationId: ORG,
+            userId: 'user-1',
+            action: 'CREATE',
+            entityType: RECURRING_OCCURRENCE_ENTITY,
+            entityId: 'prof-inv-1:manual:key-replay-1',
+            newValues: { documentId: 'inv-1', kind: 'invoice' },
+          },
+        }),
+      );
+      expect(prisma.user.findFirst).not.toHaveBeenCalled();
+
+      // An accountant then edits the invoice notes, so the text marker no longer matches
+      // (invoice.findFirst keeps returning null); the occurrence row still resolves the document.
+      prisma.auditLog.findFirst.mockResolvedValue({
+        newValues: { documentId: 'inv-1', kind: 'invoice' },
+      } as any);
+
+      // Second run (replay with same idempotency key)
+      const res2 = await service.executeProfile(ORG, 'prof-inv-1', 'key-replay-1', 'user-1');
+      expect(res2).toEqual({
+        success: true,
+        createdEntityType: 'INVOICE',
+        createdEntityId: 'inv-1',
+      });
+      // InvoicesService.create was NOT called again, and the occurrence row is not duplicated.
+      expect(invoicesService.create).toHaveBeenCalledTimes(1);
+      expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+      expect(prisma.auditLog.findFirst.mock.calls[1][0].where).toEqual({
+        organizationId: ORG,
+        entityType: RECURRING_OCCURRENCE_ENTITY,
+        entityId: 'prof-inv-1:manual:key-replay-1',
+      });
+    });
+
+    it('a scheduled run records the occurrence under the oldest active org user', async () => {
+      const invProfile = {
+        id: 'prof-inv-2',
+        name: 'Monthly subscription',
+        type: 'INVOICE',
+        entityType: 'invoice',
+        frequency: 'MONTHLY',
+        startDate: new Date('2026-01-01'),
+        nextRunDate: new Date('2026-03-01'),
+        endDate: null,
+        isActive: true,
+        templateData: {
+          customerId: 'cust-1',
+          lines: [{ description: 'SaaS', quantity: 1, rate: 100 }],
+        },
+        organizationId: ORG,
+      };
+      prisma.recurringProfile.findMany.mockResolvedValue([invProfile] as any);
+      prisma.recurringProfile.updateMany.mockResolvedValue({ count: 1 });
+      prisma.customer.findFirst.mockResolvedValue({ id: 'cust-1', paymentTerms: 30 } as any);
+      prisma.auditLog.findFirst.mockResolvedValue(null);
+      prisma.invoice.findFirst.mockResolvedValue(null);
+      prisma.user.findFirst.mockResolvedValue({ id: 'founder' } as any);
+
+      await service.processRecurringProfiles();
+
+      expect(invoicesService.create).toHaveBeenCalledTimes(1);
+      expect(prisma.user.findFirst).toHaveBeenCalledWith({
+        where: { organizationId: ORG, status: 'ACTIVE' },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          organizationId: ORG,
+          userId: 'founder',
+          action: 'CREATE',
+          entityType: RECURRING_OCCURRENCE_ENTITY,
+          entityId: 'prof-inv-2:2026-03-01',
+          newValues: { documentId: 'inv-1', kind: 'invoice' },
+        },
+      });
     });
   });
 });

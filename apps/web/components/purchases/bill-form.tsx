@@ -45,7 +45,12 @@ const lineSchema = z.object({
     .regex(DECIMAL_INPUT, 'quantityInvalid')
     .refine((v) => /[1-9]/.test(v), 'quantityPositive'),
   rate: z.string().trim().regex(DECIMAL_INPUT, 'rateInvalid'),
-  taxRate: z.string().trim().regex(OPTIONAL_DECIMAL_INPUT, 'taxInvalid').default('0'),
+  taxRate: z
+    .string()
+    .trim()
+    .regex(OPTIONAL_DECIMAL_INPUT, 'taxInvalid')
+    .refine((v) => !v || Number(v) <= 100, 'taxInvalid')
+    .default('0'),
 });
 
 const billSchema = z.object({

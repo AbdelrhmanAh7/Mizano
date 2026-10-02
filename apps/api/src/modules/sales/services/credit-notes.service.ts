@@ -118,7 +118,7 @@ export class CreditNotesService {
             );
           }
           refundAccountId = refundAccount.id;
-          await this.assertRefundCovered(tx, organizationId, invoice.id, amount);
+          await this.assertRefundCovered(tx, organizationId, invoice.id, amount, date);
         }
 
         if (applyTargetId) {
@@ -152,7 +152,6 @@ export class CreditNotesService {
           invoice,
           alreadyCredited,
           amount,
-          org.defaultVatPayableAccountId,
         );
         if (tax.greaterThan(0) && !org.defaultVatPayableAccountId) {
           throw new BadRequestException(
@@ -437,6 +436,10 @@ export class CreditNotesService {
    * invoice VAT: round4(invoiceVat x credited-so-far-including-this / grandTotal) minus the VAT
    * already posted by the invoice's live credit notes. A note that exhausts the invoice gross
    * takes exactly what is left.
+   *
+   * The VAT already posted is read from the "- VAT Payable" line of each live note's journal,
+   * whatever account that line used: the default VAT account can change between notes, and the
+   * VAT a former default carried must still count.
    */
   private async cumulativeCreditTax(
     tx: Prisma.TransactionClient,
@@ -444,7 +447,6 @@ export class CreditNotesService {
     invoice: { id: string; taxAmount: Decimal; grandTotal: Decimal },
     creditedBefore: Decimal,
     amount: Decimal,
-    vatAccountId: string | null | undefined,
   ): Promise<Decimal> {
     if (invoice.taxAmount.lessThanOrEqualTo(0)) return new Decimal(0);
     const live = await tx.creditNote.findMany({
@@ -452,10 +454,10 @@ export class CreditNotesService {
       select: { id: true },
     });
     let previous = new Decimal(0);
-    if (live.length > 0 && vatAccountId) {
+    if (live.length > 0) {
       const posted = await tx.journalLine.aggregate({
         where: {
-          accountId: vatAccountId,
+          description: { endsWith: '- VAT Payable' },
           journal: {
             organizationId,
             sourceType: JournalSourceType.CREDIT_NOTE,
@@ -505,32 +507,40 @@ export class CreditNotesService {
   }
 
   /**
-   * A refund pays money back, so it cannot exceed what the customer has actually paid on the
-   * invoice (live payments) minus refunds already issued against it.
+   * A refund pays money back, so it cannot exceed what the customer had actually paid on the
+   * invoice as of the refund date (live payments dated on or before it) minus the refunds already
+   * issued by then. The check is repeated at every later existing refund, so a backdated refund
+   * can neither precede the receipt that funds it nor leave a later refund uncovered.
    */
   private async assertRefundCovered(
     tx: Prisma.TransactionClient,
     organizationId: string,
     invoiceId: string,
     amount: Decimal,
+    refundDate: Date,
   ): Promise<void> {
     const allocations = await tx.paymentAllocation.findMany({
       where: { invoiceId, payment: { organizationId, deletedAt: null } },
-      select: { amount: true },
+      select: { amount: true, payment: { select: { date: true } } },
     });
-    const refunded = await tx.creditNote.aggregate({
-      where: {
-        organizationId,
-        invoiceId,
-        type: CreditNoteType.REFUND,
-        deletedAt: null,
-      },
-      _sum: { amount: true },
+    const refunds = await tx.creditNote.findMany({
+      where: { organizationId, invoiceId, type: CreditNoteType.REFUND, deletedAt: null },
+      select: { amount: true, date: true },
     });
-    const paid = allocations.reduce((s, a) => s.add(a.amount), new Decimal(0));
-    const refundable = paid.sub(refunded._sum.amount ?? new Decimal(0));
-    if (amount.greaterThan(refundable)) {
-      throw new BadRequestException('Refund exceeds the amount received on this invoice');
+    const checkpoints = [
+      refundDate,
+      ...refunds.map((r) => r.date).filter((d) => d.getTime() > refundDate.getTime()),
+    ];
+    for (const asOf of checkpoints) {
+      const paid = allocations
+        .filter((a) => a.payment.date.getTime() <= asOf.getTime())
+        .reduce((s, a) => s.add(a.amount), new Decimal(0));
+      const refunded = refunds
+        .filter((r) => r.date.getTime() <= asOf.getTime())
+        .reduce((s, r) => s.add(r.amount), new Decimal(0));
+      if (amount.greaterThan(paid.sub(refunded))) {
+        throw new BadRequestException('Refund exceeds the amount received on this invoice');
+      }
     }
   }
 }

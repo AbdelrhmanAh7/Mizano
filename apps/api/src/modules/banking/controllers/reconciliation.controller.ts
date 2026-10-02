@@ -1,11 +1,6 @@
 import { Body, Controller, Get, Param, Post, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import {
-  CurrentOrg,
-  InvalidateCache,
-  InvalidatesLedger,
-  Permissions,
-} from '../../../common/decorators';
+import { CurrentOrg, InvalidatesLedger, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
@@ -58,7 +53,7 @@ export class ReconciliationController {
 
   @Post('create-expense')
   @Permissions('banking.create')
-  @InvalidateCache('reconciliation:*', 'bank-transactions:*', 'expenses:*')
+  @InvalidatesLedger('reconciliation:*', 'bank-transactions:*', 'expenses:*')
   @ApiOperation({ summary: 'Create expense from unmatched transaction' })
   createExpense(
     @CurrentOrg() orgId: string,

@@ -396,5 +396,22 @@ describe('QuotesService', () => {
         organizationId: ORG_ID,
       });
     });
+
+    it('clone keeps currencyCode', async () => {
+      prisma.quote.findFirst.mockResolvedValue(
+        quoteRow({ status: 'SENT', currencyCode: 'EUR' }) as any,
+      );
+      prisma.organization.update.mockResolvedValue({
+        quotePrefix: 'QT-',
+        quoteNextNumber: 3,
+      } as any);
+      prisma.quote.count.mockResolvedValue(0);
+      prisma.quote.create.mockResolvedValue(quoteRow() as any);
+
+      await service.clone(ORG_ID, 'q-1');
+
+      const data = prisma.quote.create.mock.calls[0][0].data as any;
+      expect(data.currencyCode).toBe('EUR');
+    });
   });
 });

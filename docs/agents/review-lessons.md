@@ -18,6 +18,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Every state change is a guarded transition:** `updateMany({ where: { id, organizationId, status: FROM } })` plus a `count` check that throws `ConflictException`. Journal idempotency is the tenant-scoped unique key `(organizationId, sourceType, sourceId)`.
 - **An idempotency key must stay the same across retries of one action.** Generating a fresh random id on the server for each request defeats it. A client UUID created once per user action and reused on every retry is fine (`idempotencyKeyFor`); so are `profileId:YYYY-MM-DD` or a sha256 of file + row. _(manual recurring execute, import retries)_
 - **Store idempotency markers where users cannot edit them.** Notes, reason and reference text get edited; use an append-only store such as AuditLog `IMPORT_ROW`. _(import markers)_
+- **An append-only marker row needs a real actor.** `AuditLog.userId` is a required FK: pass the requesting user from the controller, and have a scheduled job resolve a deterministic org user, never a placeholder like `'system'`. _(recurring occurrence key)_
 - **Bulk operations reuse the single-record command through `runBulk`** and report `{ processed, total, failures }`. Never write a bulk `updateMany` that skips the posting logic.
 
 ## 3. Use the accounts that were actually posted
@@ -29,6 +30,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **A journal is dated on the document date.**
 - **A reversal or refund never precedes its source.** Default to `max(today, sourceDate)` and reject an earlier explicit date. _(JournalsService.reverse, vendor-credit refund)_
+- **A date-aware coverage check must hold at every later checkpoint.** Check paid − refunded at the new refund's date and at each later existing refund date; filtering issued refunds by `<= date` lets a backdated refund slip under a later one. _(credit-note refund)_
 - **A date-only end bound means end of day** (`endOfUtcDay`). A void at 10:00 on the end date belongs to that period.
 - **Web defaults use the user's local calendar date** (`format(d, 'yyyy-MM-dd')`), never `toISOString()`, which gives yesterday in UTC+ zones such as Cairo.
 - **"Current" figures exclude future-dated entries.** Cash today means lines dated ≤ end of today.
@@ -92,6 +94,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included.
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
+- **A mock that keys on the exact filter you expect proves nothing.** Drive fakes from the data (dates, amounts), not from the where-clause shape, so a changed query still has to produce the right answer. _(credit-note refund spec)_
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
 

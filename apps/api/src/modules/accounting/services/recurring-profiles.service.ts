@@ -87,6 +87,8 @@ export interface ExecutionResult {
   error?: string;
 }
 
+export const RECURRING_OCCURRENCE_ENTITY = 'RECURRING_OCCURRENCE';
+
 /** Upper bound of missed scheduled runs one profile may catch up on in a single cron pass. */
 const MAX_CATCH_UP_RUNS = 12;
 
@@ -452,12 +454,13 @@ export class RecurringProfilesService {
     organizationId: string,
     profileId: string,
     idempotencyKey: string,
+    actorUserId: string,
   ): Promise<ExecutionResult> {
     const profile = await this.findOne(organizationId, profileId);
     // A manual run of a journal profile is its own explicit event, identified by the caller's
     // idempotency key (see executeJournalProfile).
     if (this.isJournalProfile(profile)) return this.executeJournalProfile(profile, idempotencyKey);
-    return this.executeRecurringProfile(profile, idempotencyKey);
+    return this.executeRecurringProfile(profile, { key: idempotencyKey, userId: actorUserId });
   }
 
   /**
@@ -465,22 +468,24 @@ export class RecurringProfilesService {
    * transaction: guarded advance of nextRunDate (scheduled runs), the document (INVOICE and BILL
    * as DRAFT, EXPENSE posts its journal), the execution record. The occurrence key
    * `${profileId}:${YYYY-MM-DD}` (`${profileId}:manual:${key}` for a manual run) is the
-   * idempotency marker: it is the nextRunDate transition and is also written into the document
-   * (bill/expense reference, invoice notes) so a duplicate cron pass or a retried manual request
-   * returns the document already created instead of creating another.
+   * idempotency marker: it is the nextRunDate transition and is also recorded, with the created
+   * document id, as an append-only AuditLog row (entityType RECURRING_OCCURRENCE) in the same
+   * transaction, so a duplicate cron pass or a retried manual request returns the document
+   * already created instead of creating another. Users can edit the document's notes/reference,
+   * so the marker written there is informational only (and a fallback for documents created
+   * before the audit row existed).
    */
   private async executeRecurringProfile(
     profile: RecurringProfile,
-    manualKey?: string,
+    manual?: { key: string; userId: string },
   ): Promise<ExecutionResult> {
-    if (this.isJournalProfile(profile)) return this.executeJournalProfile(profile, manualKey);
+    if (this.isJournalProfile(profile)) return this.executeJournalProfile(profile, manual?.key);
 
-    const manual = manualKey !== undefined;
     const entityType: string = profile.type || profile.entityType || '';
     const createdEntityType: string = entityType;
     const occurrence = manual ? new Date() : profile.nextRunDate;
     const sourceId = manual
-      ? `${profile.id}:manual:${manualKey}`
+      ? `${profile.id}:manual:${manual.key}`
       : `${profile.id}:${runDay(occurrence)}`;
     const next = this.calculateNextRunDate(
       profile.nextRunDate,
@@ -549,6 +554,8 @@ export class RecurringProfilesService {
           );
         }
 
+        await this.recordOccurrence(tx, profile.organizationId, sourceId, id, kind, manual?.userId);
+
         await tx.recurringProfile.updateMany({
           where: { id: profile.id, organizationId: profile.organizationId },
           data: { executionCount: { increment: 1 }, lastExecutedAt: new Date() },
@@ -589,13 +596,64 @@ export class RecurringProfilesService {
     return `[recurring ${sourceId}]`;
   }
 
-  /** The document an earlier run of this occurrence already created, if any. */
+  /**
+   * Records that this occurrence created `documentId`, as an append-only AuditLog row keyed by
+   * the occurrence (tenant-scoped), in the same transaction as the document. A manual run is
+   * attributed to the user who requested it; a scheduled run to the organization's oldest
+   * active user, since AuditLog requires one. Without any user the row is skipped: a scheduled
+   * run is still protected by the guarded nextRunDate transition.
+   */
+  private async recordOccurrence(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    sourceId: string,
+    documentId: string,
+    kind: 'invoice' | 'bill' | 'expense',
+    actorUserId?: string,
+  ): Promise<void> {
+    let userId = actorUserId;
+    if (!userId) {
+      const user = await tx.user.findFirst({
+        where: { organizationId, status: 'ACTIVE' },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      userId = user?.id;
+    }
+    if (!userId) return;
+    await tx.auditLog.create({
+      data: {
+        organizationId,
+        userId,
+        action: 'CREATE',
+        entityType: RECURRING_OCCURRENCE_ENTITY,
+        entityId: sourceId,
+        newValues: { documentId, kind },
+      },
+    });
+  }
+
+  /**
+   * The document an earlier run of this occurrence already created, if any: the audit row
+   * written by recordOccurrence (which users cannot edit), else the legacy marker in the
+   * document text for occurrences recorded before the audit row existed.
+   */
   private async findOccurrenceDocument(
     tx: Prisma.TransactionClient,
     organizationId: string,
     kind: 'invoice' | 'bill' | 'expense',
     sourceId: string,
   ): Promise<string | null> {
+    const logged = await tx.auditLog.findFirst({
+      where: { organizationId, entityType: RECURRING_OCCURRENCE_ENTITY, entityId: sourceId },
+      select: { newValues: true },
+    });
+    const values = logged?.newValues;
+    if (values && typeof values === 'object' && !Array.isArray(values)) {
+      const documentId = (values as { documentId?: unknown }).documentId;
+      if (typeof documentId === 'string' && documentId) return documentId;
+    }
+
     const marker = this.occurrenceMarker(sourceId);
     if (kind === 'invoice') {
       const found = await tx.invoice.findFirst({
