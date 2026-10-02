@@ -7,6 +7,8 @@ reviews:
   poem: false
   auto_review:
     enabled: true
+    # One review per PR; follow-up pushes do not consume the hourly review allowance.
+    auto_incremental_review: false
     drafts: false
     base_branches:
       - master

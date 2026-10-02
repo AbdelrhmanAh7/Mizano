@@ -1,6 +1,6 @@
 # CLAUDE.md — Mizano ERP
 
-Accountant-first accounting ERP for Egypt, Saudi Arabia and the UAE. Current goal: the ten-day CPU invoice demo. Read [AGENTS.md](AGENTS.md), [agent operations](docs/agents/README.md) and [review lessons](docs/agents/review-lessons.md) first; these supersede historical product/deployment assumptions below.
+Accountant-first accounting ERP for Egypt, Saudi Arabia and the UAE. Current goal: a tiny live deployment on a Raspberry Pi 5 (8GB, arm64) with the full accountant flow (ledger, invoice intake, Telegram ingestion). Read [AGENTS.md](AGENTS.md), [agent operations](docs/agents/README.md) and [review lessons](docs/agents/review-lessons.md) first; these supersede historical product/deployment assumptions below.
 
 ## Tech Stack
 
@@ -275,6 +275,6 @@ services (Docker) → ollama-proxy:11434 → Cloudflare tunnel → Colab (Ollama
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                         | System design, modules, domain rules, folder structure, adding code |
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)                           | Setup, 4-env system, database, testing, CI, hooks, deployment       |
 | [`docs/DESIGN-SYSTEM.md`](docs/DESIGN-SYSTEM.md)                       | Tokens, components, UI patterns, RTL, money display                 |
-| [`docs/roadmap.md`](docs/roadmap.md)                                   | Ten-day CPU invoice demo plan                                       |
+| [`docs/roadmap.md`](docs/roadmap.md)                                   | Raspberry Pi live plan (milestones P1–P4)                           |
 | [`docs/strategy/demo-acceptance.md`](docs/strategy/demo-acceptance.md) | Demo go/no-go contract                                              |
 | [`docs/strategy/`](docs/strategy/)                                     | Vision, repository review, extraction and regional research         |
