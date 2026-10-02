@@ -215,3 +215,5 @@ validation and the size limits. It does not push images; publishing SHA tags/dig
 cold-start/health evidence remain release work.
 
 Historical VPS sizing and provider notes: [archive/deployment-requirements-2026-03.md](archive/deployment-requirements-2026-03.md).
+
+**Raspberry Pi 5.** The tiny live deployment (compose, Cloudflare Tunnel, digest deploys, encrypted backups, monitoring) is documented in [deploy/pi/README.md](../deploy/pi/README.md).

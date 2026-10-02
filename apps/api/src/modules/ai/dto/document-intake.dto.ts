@@ -6,6 +6,9 @@ import {
   Matches,
   ArrayMinSize,
   IsObject,
+  IsInt,
+  Min,
+  Max,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -185,4 +188,41 @@ export class ConfirmIntakeDto {
   @IsObject()
   @IsOptional()
   corrections?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description: 'Intake job this draft comes from; it is marked APPROVED and linked to the draft',
+  })
+  @IsString()
+  @IsOptional()
+  jobId?: string;
+}
+
+export const INTAKE_JOB_STATUSES = [
+  'QUEUED',
+  'PROCESSING',
+  'EXTRACTED',
+  'NEEDS_REVIEW',
+  'FAILED',
+  'DEAD_LETTER',
+  'APPROVED',
+] as const;
+
+export class ListIntakeJobsDto {
+  @ApiPropertyOptional({ enum: INTAKE_JOB_STATUSES })
+  @IsIn(INTAKE_JOB_STATUSES)
+  @IsOptional()
+  status?: (typeof INTAKE_JOB_STATUSES)[number];
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  page?: number;
+
+  @ApiPropertyOptional({ example: 20 })
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @IsOptional()
+  limit?: number;
 }

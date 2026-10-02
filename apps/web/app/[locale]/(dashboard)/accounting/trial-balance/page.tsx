@@ -17,6 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useTranslations } from 'next-intl';
+import { moneyToNumber } from '@/lib/money';
 import { useTrialBalance } from '@/lib/hooks/use-accounting-reports';
 
 interface TrialBalanceRow {
@@ -24,12 +26,31 @@ interface TrialBalanceRow {
   accountCode: string;
   accountName: string;
   accountType: string;
-  debit: number | string;
-  credit: number | string;
+  /** Exact decimal strings from the API. */
+  debit: string;
+  credit: string;
 }
 
-const formatAmount = (amount: number | string): string => {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+interface TrialBalanceResponse {
+  accounts?: Array<{
+    id?: string;
+    accountId?: string;
+    code?: string;
+    accountCode?: string;
+    name?: string;
+    accountName?: string;
+    type?: string;
+    accountType?: string;
+    debit?: string | number;
+    credit?: string | number;
+  }>;
+  totals?: { totalDebits?: string | number; totalCredits?: string | number };
+  isBalanced?: boolean;
+}
+
+/** Formats an API decimal string for display only (all sums are computed by the API). */
+const formatAmount = (amount: string | number | undefined): string => {
+  const num = moneyToNumber(amount);
   if (num === 0) return '-';
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
@@ -38,30 +59,23 @@ const formatAmount = (amount: number | string): string => {
 };
 
 export default function TrialBalancePage() {
+  const tc = useTranslations('common');
   const [asOfDate, setAsOfDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const { data, isLoading } = useTrialBalance(asOfDate);
+  const { data, isLoading, isError, refetch } = useTrialBalance(asOfDate);
 
-  const rows: TrialBalanceRow[] = Array.isArray(data)
-    ? data
-    : (data?.accounts || data?.rows || []).map((a: Record<string, unknown>) => ({
-        accountId: a.id || a.accountId,
-        accountCode: a.code || a.accountCode,
-        accountName: a.name || a.accountName,
-        accountType: a.type || a.accountType,
-        debit: a.debit,
-        credit: a.credit,
-      }));
-  const totalDebit = rows.reduce(
-    (sum, row) =>
-      sum + (typeof row.debit === 'string' ? parseFloat(row.debit) : Number(row.debit) || 0),
-    0,
-  );
-  const totalCredit = rows.reduce(
-    (sum, row) =>
-      sum + (typeof row.credit === 'string' ? parseFloat(row.credit) : Number(row.credit) || 0),
-    0,
-  );
-  const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
+  const response = (data ?? {}) as TrialBalanceResponse;
+  const rows: TrialBalanceRow[] = (response.accounts ?? []).map((a) => ({
+    accountId: a.id ?? a.accountId ?? '',
+    accountCode: a.code ?? a.accountCode ?? '',
+    accountName: a.name ?? a.accountName ?? '',
+    accountType: a.type ?? a.accountType ?? '',
+    debit: String(a.debit ?? '0'),
+    credit: String(a.credit ?? '0'),
+  }));
+  // Totals and the balanced flag come from the API's exact Decimal computation.
+  const totalDebit = String(response.totals?.totalDebits ?? '0');
+  const totalCredit = String(response.totals?.totalCredits ?? '0');
+  const isBalanced = response.isBalanced ?? false;
 
   return (
     <div className="space-y-6">
@@ -103,7 +117,7 @@ export default function TrialBalancePage() {
               ) : (
                 <Badge className="bg-red-100 text-red-800">
                   <AlertTriangle className="mr-1 h-3 w-3" />
-                  Out of Balance: {formatAmount(Math.abs(totalDebit - totalCredit))}
+                  Out of Balance: {formatAmount(totalDebit)} / {formatAmount(totalCredit)}
                 </Badge>
               )}
             </div>
@@ -122,6 +136,13 @@ export default function TrialBalancePage() {
               {Array.from({ length: 8 }).map((_, i) => (
                 <Skeleton key={i} className="h-10 w-full" />
               ))}
+            </div>
+          ) : isError ? (
+            <div className="py-8 text-center space-y-4" role="alert">
+              <p className="text-sm text-muted-foreground">{tc('table.error')}</p>
+              <Button variant="outline" onClick={() => void refetch()}>
+                {tc('dashboard.tryAgain')}
+              </Button>
             </div>
           ) : rows.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">

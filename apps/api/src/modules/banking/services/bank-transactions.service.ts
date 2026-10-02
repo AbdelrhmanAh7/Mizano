@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
@@ -31,7 +31,17 @@ export interface BulkImportTransactionDto {
 export class BankTransactionsService {
   constructor(private prisma: PrismaService) {}
 
+  /** A referenced bank account must belong to the caller's organization (body ids → 400). */
+  private async assertOwnBankAccount(organizationId: string, bankAccountId: string): Promise<void> {
+    const account = await this.prisma.bankAccount.findFirst({
+      where: { id: bankAccountId, organizationId },
+      select: { id: true },
+    });
+    if (!account) throw new BadRequestException('Bank account not found');
+  }
+
   async create(organizationId: string, dto: CreateBankTransactionDto) {
+    await this.assertOwnBankAccount(organizationId, dto.bankAccountId);
     return this.prisma.bankTransaction.create({
       data: {
         bankAccountId: dto.bankAccountId,
@@ -51,6 +61,7 @@ export class BankTransactionsService {
     bankAccountId: string,
     transactions: BulkImportTransactionDto[],
   ) {
+    await this.assertOwnBankAccount(organizationId, bankAccountId);
     const created = await this.prisma.bankTransaction.createMany({
       data: transactions.map((t) => ({
         bankAccountId,

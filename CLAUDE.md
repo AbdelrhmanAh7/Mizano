@@ -1,6 +1,6 @@
 # CLAUDE.md — Mizano ERP
 
-Accountant-first accounting ERP for Egypt, Saudi Arabia and the UAE. Current goal: the ten-day CPU invoice demo. Read [AGENTS.md](AGENTS.md) and [agent operations](docs/agents/README.md) first; these supersede historical product/deployment assumptions below.
+Accountant-first accounting ERP for Egypt, Saudi Arabia and the UAE. Current goal: the ten-day CPU invoice demo. Read [AGENTS.md](AGENTS.md), [agent operations](docs/agents/README.md) and [review lessons](docs/agents/review-lessons.md) first; these supersede historical product/deployment assumptions below.
 
 ## Tech Stack
 

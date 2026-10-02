@@ -1,0 +1,26 @@
+# CodeRabbit configuration: https://docs.coderabbit.ai/reference/configuration
+language: en-US
+reviews:
+  profile: assertive
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - master
+  path_instructions:
+    - path: '**/*'
+      instructions: >-
+        Review against docs/agents/review-lessons.md and AGENTS.md. Every rule there is a past
+        review finding; flag any change that repeats one of those root causes, even in a
+        different module (lock order, original-journal accounts, dates, single-currency ledger,
+        Decimal money, tenant scoping, voided records, report reconciliation, logging, en/ar
+        strings, error vs empty states).
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - docs/agents/review-lessons.md
+      - AGENTS.md

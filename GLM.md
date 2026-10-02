@@ -1,6 +1,6 @@
 # GLM entrypoint for Mizano
 
-Read [AGENTS.md](AGENTS.md), [agent operations](docs/agents/README.md), [roadmap](docs/roadmap.md) and your assigned GitHub issue before editing.
+Read [AGENTS.md](AGENTS.md), [agent operations](docs/agents/README.md), [review lessons](docs/agents/review-lessons.md), [roadmap](docs/roadmap.md) and your assigned GitHub issue before editing.
 
 Role: CPU document parsing/OCR, deterministic field extraction, fixtures and measured benchmark.
 

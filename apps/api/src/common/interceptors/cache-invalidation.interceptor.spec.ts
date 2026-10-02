@@ -1,4 +1,4 @@
-import { ExecutionContext } from '@nestjs/common';
+import { ExecutionContext, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { lastValueFrom, of } from 'rxjs';
@@ -55,5 +55,35 @@ describe('CacheInvalidationInterceptor', () => {
     await expect(
       lastValueFrom(interceptor.intercept(ctx, { handle: () => of('ok') })),
     ).resolves.toBe('ok');
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('logs error using describeError and never passes a raw error object', async () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const rawError = new Error('redis timeout connection refused');
+    const cache = {
+      deletePattern: jest.fn().mockRejectedValue(rawError),
+    } as unknown as CacheService;
+    const interceptor = new CacheInvalidationInterceptor(
+      cache,
+      new Reflector(),
+      new EventEmitter2(),
+    );
+
+    await lastValueFrom(interceptor.intercept(ctx, { handle: () => of('ok') }));
+
+    expect(warnSpy).toHaveBeenCalled();
+    for (const call of warnSpy.mock.calls) {
+      for (const arg of call) {
+        expect(arg).not.toBe(rawError);
+        expect(arg).not.toBeInstanceOf(Error);
+        expect(typeof arg).toBe('string');
+        expect(arg).not.toContain(rawError.message);
+      }
+    }
+    expect(warnSpy).toHaveBeenCalledWith('Cache invalidation error: Error');
   });
 });

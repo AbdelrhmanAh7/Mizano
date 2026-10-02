@@ -98,6 +98,13 @@ export class AccountsController {
     return this.accountsService.findByType(orgId, type);
   }
 
+  @Get('balances')
+  @Permissions('accounting.view')
+  @ApiOperation({ summary: 'Posted-ledger balances of every account (decimal strings)' })
+  getBalances(@CurrentOrg() orgId: string, @Query('asOfDate') asOfDate?: string) {
+    return this.accountsService.getBalances(orgId, asOfDate);
+  }
+
   @Get(':id/balance')
   @Permissions('accounting.view')
   @ApiOperation({ summary: 'Get account balance' })

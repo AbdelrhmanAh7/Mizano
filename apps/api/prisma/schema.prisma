@@ -473,6 +473,7 @@ model Organization {
 
   // Relations
   users                 User[]
+  intakeJobs            IntakeJob[]
   roles                 Role[]
   accounts              Account[]
   journals              Journal[]
@@ -2995,4 +2996,65 @@ model DocumentSequence {
 
   @@unique([organizationId, prefix])
   @@map("document_sequences")
+}
+
+// ============================================
+// DOCUMENT INTAKE (durable jobs)
+// ============================================
+
+enum IntakeSource {
+  WEB
+  TELEGRAM
+  EMAIL
+  IMPORT
+}
+
+enum IntakeJobStatus {
+  QUEUED
+  PROCESSING
+  EXTRACTED
+  NEEDS_REVIEW
+  FAILED
+  DEAD_LETTER
+  APPROVED
+}
+
+model IntakeJob {
+  id                String          @id @default(cuid())
+  organizationId    String
+  createdById       String
+  source            IntakeSource    @default(WEB)
+  status            IntakeJobStatus @default(QUEUED)
+  progress          Int             @default(0)
+  originalFileName  String
+  mimeType          String
+  sizeBytes         Int
+  sha256            String
+  storageKey        String
+  attempts          Int             @default(0)
+  maxAttempts       Int             @default(3)
+  /// Redacted short text; never document content.
+  lastError         String?
+  /// Extraction result and evidence. May contain document data; never logged.
+  result            Json?
+  forceType         String?
+  strategy          String?
+  language          String?
+  /// Worker lease: a random token and expiry renewed by heartbeat while PROCESSING.
+  leaseToken        String?
+  leaseExpiresAt    DateTime?
+  draftDocumentType String?
+  draftDocumentId   String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  deletedAt         DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Dedup is a PARTIAL unique index created in SQL (migration 20261003000000_intake_jobs):
+  // UNIQUE ("organizationId", "sha256") WHERE "deletedAt" IS NULL. Prisma cannot express it.
+  @@index([organizationId, sha256])
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+  @@map("intake_jobs")
 }

@@ -166,6 +166,151 @@ describe('refreshAccessToken (per-session isolation)', () => {
   });
 });
 
+describe('logout clears session state', () => {
+  it('refreshes an expired access token before logging out with the new token', async () => {
+    const { authOptions } = await import('./auth');
+    tokenRefresher.reset();
+    const postSpy = jest
+      .spyOn(axios, 'post')
+      .mockResolvedValueOnce({
+        data: { tokens: { accessToken: 'new-access-A', refreshToken: 'rt-A2' } },
+      })
+      .mockResolvedValueOnce({ data: {} });
+    try {
+      await authOptions.events?.signOut?.({
+        token: jwtFor('A', 'rt-A'),
+        session: undefined as never,
+      });
+      const api =
+        process.env.API_INTERNAL_URL ||
+        process.env.NEXT_PUBLIC_API_URL ||
+        'http://localhost:6001/api';
+      expect(postSpy).toHaveBeenCalledTimes(2);
+      expect(postSpy).toHaveBeenNthCalledWith(
+        1,
+        `${api}/auth/refresh`,
+        { refreshToken: 'rt-A' },
+        {
+          headers: { Authorization: 'Bearer rt-A', 'Content-Type': 'application/json' },
+        },
+      );
+      expect(postSpy).toHaveBeenNthCalledWith(2, `${api}/auth/logout`, undefined, {
+        headers: { Authorization: 'Bearer new-access-A' },
+        timeout: 3_000,
+      });
+      expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0 });
+    } finally {
+      postSpy.mockRestore();
+      tokenRefresher.reset();
+    }
+  });
+
+  it('skips logout and clears local state when refreshing an expired token fails', async () => {
+    const { authOptions } = await import('./auth');
+    tokenRefresher.reset();
+    const postSpy = jest.spyOn(axios, 'post').mockRejectedValue(
+      Object.assign(new Error('secret-refresh-token'), {
+        isAxiosError: true,
+        config: { headers: { Authorization: 'Bearer secret-refresh-token' } },
+        response: { status: 401 },
+      }),
+    );
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const forgetSpy = jest.spyOn(tokenRefresher, 'forget');
+    try {
+      await authOptions.events?.signOut?.({
+        token: jwtFor('A', 'secret-refresh-token'),
+        session: undefined as never,
+      });
+      expect(postSpy).toHaveBeenCalledTimes(1);
+      expect(postSpy.mock.calls[0][0]).toMatch(/\/auth\/refresh$/);
+      expect(forgetSpy).toHaveBeenCalledWith('secret-refresh-token');
+      expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0 });
+      expect(errorSpy).toHaveBeenCalledWith('Failed to refresh access token: HTTP 401');
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('secret-refresh-token');
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('Bearer');
+    } finally {
+      postSpy.mockRestore();
+      errorSpy.mockRestore();
+      forgetSpy.mockRestore();
+      tokenRefresher.reset();
+    }
+  });
+
+  it('forget removes only that session cooldown, letting it retry', async () => {
+    const refresh = jest.fn<Promise<RefreshedTokens | null>, [string]>();
+    refresh.mockResolvedValueOnce(null);
+    const r = createTokenRefresher({ refresh, cooldownMs: 60_000 });
+    await r.refresh('rt-A');
+    await r.refresh('rt-B');
+    expect(r.size().cooldowns).toBe(2);
+
+    r.forget('rt-A');
+    expect(r.size().cooldowns).toBe(1);
+
+    refresh.mockResolvedValueOnce({ accessToken: 'a2', refreshToken: 'r2' });
+    expect(await r.refresh('rt-A')).toEqual({ accessToken: 'a2', refreshToken: 'r2' });
+    expect(await r.refresh('rt-B')).toBeNull();
+  });
+
+  it('authOptions signOut revokes API tokens with the session access token', async () => {
+    const { authOptions } = await import('./auth');
+    const postSpy = jest.spyOn(axios, 'post').mockResolvedValue({ data: {} });
+    const spy = jest.spyOn(tokenRefresher, 'forget');
+    try {
+      await authOptions.events?.signOut?.({
+        token: { ...jwtFor('A', 'rt-A'), accessTokenExpires: Date.now() + 120_000 },
+        session: undefined as never,
+      });
+      expect(postSpy).toHaveBeenCalledWith(
+        `${process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6001/api'}/auth/logout`,
+        undefined,
+        { headers: { Authorization: 'Bearer old-access-A' }, timeout: 3_000 },
+      );
+      expect(spy).toHaveBeenCalledWith('rt-A');
+    } finally {
+      postSpy.mockRestore();
+      spy.mockRestore();
+    }
+  });
+
+  it('a failed API logout still clears state and logs only a redacted error', async () => {
+    const { authOptions } = await import('./auth');
+    tokenRefresher.reset();
+    const postSpy = jest.spyOn(axios, 'post').mockRejectedValue(
+      Object.assign(new Error('secret-refresh-token secret-access-token'), {
+        isAxiosError: true,
+        config: { headers: { Authorization: 'Bearer secret-access-token' } },
+        response: { status: 503 },
+      }),
+    );
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      await tokenRefresher.refresh('secret-refresh-token');
+      expect(tokenRefresher.size().cooldowns).toBe(1);
+      errorSpy.mockClear();
+      await authOptions.events?.signOut?.({
+        token: {
+          ...jwtFor('A', 'secret-refresh-token'),
+          accessToken: 'secret-access-token',
+          accessTokenExpires: Date.now() + 120_000,
+        },
+        session: undefined as never,
+      });
+      expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0 });
+      expect(errorSpy).toHaveBeenCalledWith('Logout error: HTTP 503');
+      const logged = JSON.stringify(errorSpy.mock.calls);
+      expect(logged).not.toContain('secret-refresh-token');
+      expect(logged).not.toContain('secret-access-token');
+      expect(logged).not.toContain('Bearer');
+    } finally {
+      postSpy.mockRestore();
+      errorSpy.mockRestore();
+      tokenRefresher.reset();
+    }
+  });
+});
+
 describe('createTokenRefresher', () => {
   it('keys state by a hash, not the raw token', () => {
     const key = sessionRefreshKey('raw-token');

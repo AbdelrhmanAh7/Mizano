@@ -9,6 +9,7 @@ import { AgingReportsService } from '../services/aging-reports.service';
 import { DashboardService } from '../services/dashboard.service';
 import { FinancialReportsService } from '../services/financial-reports.service';
 import { FinancialNarrativeService } from '../../ai/services/financial-narrative.service';
+import { MAX_DAYS, MAX_MONTHS, clampInt } from '../utils/report-utils';
 
 @ApiTags('Reports')
 @ApiBearerAuth()
@@ -43,7 +44,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get revenue chart data' })
   getRevenueChart(@CurrentOrg() orgId: string, @Query('months') months?: string) {
-    return this.dashboardService.getRevenueChart(orgId, months ? parseInt(months) : 12);
+    return this.dashboardService.getRevenueChart(orgId, clampInt(months, 12, 1, MAX_MONTHS));
   }
 
   @Get('dashboard/cash-flow-chart')
@@ -52,7 +53,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get cash flow chart data' })
   getCashFlowChart(@CurrentOrg() orgId: string, @Query('days') days?: string) {
-    return this.dashboardService.getCashFlowChart(orgId, days ? parseInt(days) : 30);
+    return this.dashboardService.getCashFlowChart(orgId, clampInt(days, 30, 1, MAX_DAYS));
   }
 
   @Get('dashboard/top-customers')
@@ -92,7 +93,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get bank balance trend over time' })
   getBankBalanceTrend(@CurrentOrg() orgId: string, @Query('months') months?: string) {
-    return this.dashboardService.getBankBalanceTrend(orgId, months ? parseInt(months) : 6);
+    return this.dashboardService.getBankBalanceTrend(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
   @Get('dashboard/inventory-value-trend')
@@ -101,7 +102,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get inventory value trend over time' })
   getInventoryValueTrend(@CurrentOrg() orgId: string, @Query('months') months?: string) {
-    return this.dashboardService.getInventoryValueTrend(orgId, months ? parseInt(months) : 6);
+    return this.dashboardService.getInventoryValueTrend(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
   // ============ Financial (Tab 2) ============
@@ -112,7 +113,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get gross margin trend' })
   getGrossMarginTrend(@CurrentOrg() orgId: string, @Query('months') months?: string) {
-    return this.dashboardService.getGrossMarginTrend(orgId, months ? parseInt(months) : 6);
+    return this.dashboardService.getGrossMarginTrend(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
   @Get('dashboard/revenue-yoy')
@@ -168,7 +169,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get monthly invoice volume and amount' })
   getInvoiceVolume(@CurrentOrg() orgId: string, @Query('months') months?: string) {
-    return this.dashboardService.getInvoiceVolume(orgId, months ? parseInt(months) : 6);
+    return this.dashboardService.getInvoiceVolume(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
   @Get('dashboard/payment-collection')
@@ -177,7 +178,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get monthly payment collection amounts' })
   getPaymentCollection(@CurrentOrg() orgId: string, @Query('months') months?: string) {
-    return this.dashboardService.getPaymentCollection(orgId, months ? parseInt(months) : 6);
+    return this.dashboardService.getPaymentCollection(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
   @Get('dashboard/churn-risk')
@@ -224,7 +225,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get monthly purchase trend' })
   getPurchaseTrend(@CurrentOrg() orgId: string, @Query('months') months?: string) {
-    return this.dashboardService.getPurchaseTrend(orgId, months ? parseInt(months) : 6);
+    return this.dashboardService.getPurchaseTrend(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
   @Get('dashboard/expense-trend')
@@ -233,7 +234,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get monthly expense trend with categories' })
   getExpenseTrend(@CurrentOrg() orgId: string, @Query('months') months?: string) {
-    return this.dashboardService.getExpenseTrend(orgId, months ? parseInt(months) : 6);
+    return this.dashboardService.getExpenseTrend(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
   @Get('dashboard/vendor-payment-time')
@@ -253,7 +254,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get monthly payroll trend' })
   getPayrollTrend(@CurrentOrg() orgId: string, @Query('months') months?: string) {
-    return this.dashboardService.getPayrollTrend(orgId, months ? parseInt(months) : 6);
+    return this.dashboardService.getPayrollTrend(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
   @Get('dashboard/department-headcount')
@@ -271,7 +272,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get attendance status overview' })
   getAttendanceOverview(@CurrentOrg() orgId: string, @Query('days') days?: string) {
-    return this.dashboardService.getAttendanceOverview(orgId, days ? parseInt(days) : 30);
+    return this.dashboardService.getAttendanceOverview(orgId, clampInt(days, 30, 1, MAX_DAYS));
   }
 
   @Get('dashboard/salary-distribution')
@@ -309,7 +310,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get monthly inventory movements' })
   getInventoryMovements(@CurrentOrg() orgId: string, @Query('months') months?: string) {
-    return this.dashboardService.getInventoryMovements(orgId, months ? parseInt(months) : 6);
+    return this.dashboardService.getInventoryMovements(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
   @Get('dashboard/reorder-alerts')
@@ -336,7 +337,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get monthly production efficiency' })
   getProductionEfficiency(@CurrentOrg() orgId: string, @Query('months') months?: string) {
-    return this.dashboardService.getProductionEfficiency(orgId, months ? parseInt(months) : 6);
+    return this.dashboardService.getProductionEfficiency(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
   // ============ Projects (Tab 7) ============
@@ -356,7 +357,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get monthly billable vs non-billable hours' })
   getBillableHours(@CurrentOrg() orgId: string, @Query('months') months?: string) {
-    return this.dashboardService.getBillableHours(orgId, months ? parseInt(months) : 6);
+    return this.dashboardService.getBillableHours(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
   @Get('dashboard/task-status')
@@ -403,7 +404,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get monthly lead conversion count' })
   getLeadConversionTrend(@CurrentOrg() orgId: string, @Query('months') months?: string) {
-    return this.dashboardService.getLeadConversionTrend(orgId, months ? parseInt(months) : 6);
+    return this.dashboardService.getLeadConversionTrend(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
   @Get('dashboard/deal-win-rate')
@@ -412,7 +413,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get monthly deal win rate' })
   getDealWinRate(@CurrentOrg() orgId: string, @Query('months') months?: string) {
-    return this.dashboardService.getDealWinRate(orgId, months ? parseInt(months) : 6);
+    return this.dashboardService.getDealWinRate(orgId, clampInt(months, 6, 1, MAX_MONTHS));
   }
 
   // ============ AI (Tab 9) ============
@@ -423,7 +424,7 @@ export class ReportsController {
   @CacheTTL(300)
   @ApiOperation({ summary: 'Get AI anomaly timeline' })
   getAnomalyTimeline(@CurrentOrg() orgId: string, @Query('days') days?: string) {
-    return this.dashboardService.getAnomalyTimeline(orgId, days ? parseInt(days) : 90);
+    return this.dashboardService.getAnomalyTimeline(orgId, clampInt(days, 90, 1, MAX_DAYS));
   }
 
   // Financial Reports

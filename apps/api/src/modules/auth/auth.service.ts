@@ -1,10 +1,26 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+
+/**
+ * Refresh tokens are stored as SHA-256 digests. bcrypt is unsuitable here: it only
+ * reads the first 72 bytes, and every JWT of one user shares that prefix, so a
+ * rotated-out token would still verify.
+ */
+function hashRefreshToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function refreshTokenMatches(token: string, storedHash: string): boolean {
+  const a = Buffer.from(hashRefreshToken(token));
+  const b = Buffer.from(storedHash);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 @Injectable()
 export class AuthService {
@@ -94,7 +110,7 @@ export class AuthService {
     // Save refresh token
     await this.prisma.user.update({
       where: { id: result.user.id },
-      data: { refreshToken: await bcrypt.hash(tokens.refreshToken, 10) },
+      data: { refreshToken: hashRefreshToken(tokens.refreshToken) },
     });
 
     return {
@@ -152,7 +168,7 @@ export class AuthService {
     // Save refresh token
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { refreshToken: await bcrypt.hash(tokens.refreshToken, 10) },
+      data: { refreshToken: hashRefreshToken(tokens.refreshToken) },
     });
 
     return {
@@ -190,11 +206,11 @@ export class AuthService {
       where: { id: userId },
     });
 
-    if (!user || !user.refreshToken) {
+    if (!user || !user.refreshToken || user.status !== 'ACTIVE') {
       throw new UnauthorizedException('Access denied');
     }
 
-    const isRefreshTokenValid = await bcrypt.compare(refreshToken, user.refreshToken);
+    const isRefreshTokenValid = refreshTokenMatches(refreshToken, user.refreshToken);
     if (!isRefreshTokenValid) {
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -208,11 +224,15 @@ export class AuthService {
       user.roleId,
     );
 
-    // Save new refresh token
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { refreshToken: await bcrypt.hash(tokens.refreshToken, 10) },
+    // Rotate atomically: only the request that still holds the stored token wins.
+    // A replayed or concurrent use of the same refresh token matches no row.
+    const rotated = await this.prisma.user.updateMany({
+      where: { id: user.id, refreshToken: user.refreshToken, status: 'ACTIVE' },
+      data: { refreshToken: hashRefreshToken(tokens.refreshToken) },
     });
+    if (rotated.count !== 1) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
 
     return { tokens };
   }
@@ -249,7 +269,9 @@ export class AuthService {
         secret: this.configService.get('JWT_SECRET'),
         expiresIn: this.configService.get('JWT_EXPIRATION', '15m'),
       }),
+      // Unique jti so two refresh tokens minted in the same second never collide.
       this.jwtService.signAsync(payload, {
+        jwtid: randomUUID(),
         secret: this.configService.get('JWT_REFRESH_SECRET'),
         expiresIn: this.configService.get('JWT_REFRESH_EXPIRATION', '7d'),
       }),

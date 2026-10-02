@@ -5,13 +5,17 @@ import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
 import { runBulk } from '../../../common/utils/run-bulk';
+import { AgingReportsService } from '../../reports/services/aging-reports.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateCustomerDto } from '../dto/create-customer.dto';
 import { UpdateCustomerDto } from '../dto/update-customer.dto';
 
 @Injectable()
 export class CustomersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private agingReports: AgingReportsService,
+  ) {}
 
   async create(organizationId: string, createCustomerDto: CreateCustomerDto) {
     const customer = await this.prisma.customer.create({
@@ -132,53 +136,20 @@ export class CustomersService {
     return { ...customer, outstandingBalance };
   }
 
-  async getStatement(organizationId: string, id: string) {
-    const customer = await this.findOne(organizationId, id);
-
-    const [invoices, payments, creditNotes] = await Promise.all([
-      this.prisma.invoice.findMany({
-        where: { customerId: id, deletedAt: null },
-        orderBy: { date: 'desc' },
-        select: {
-          id: true,
-          invoiceNumber: true,
-          date: true,
-          dueDate: true,
-          grandTotal: true,
-          balanceDue: true,
-          status: true,
-        },
-      }),
-      this.prisma.paymentReceived.findMany({
-        where: { customerId: id, deletedAt: null },
-        orderBy: { date: 'desc' },
-        select: {
-          id: true,
-          paymentNumber: true,
-          date: true,
-          amount: true,
-          paymentMode: true,
-        },
-      }),
-      this.prisma.creditNote.findMany({
-        where: { customerId: id, deletedAt: null },
-        orderBy: { date: 'desc' },
-        select: {
-          id: true,
-          creditNoteNumber: true,
-          date: true,
-          amount: true,
-          type: true,
-        },
-      }),
-    ]);
-
-    return {
-      customer,
-      invoices,
-      payments,
-      creditNotes,
-    };
+  /**
+   * Statement of account for the sales UI. Delegates to the reconciling reports service so the
+   * figures match the AR ledger (exact Decimal, voids on their own date). Defaults to the full
+   * history up to today.
+   */
+  async getStatement(organizationId: string, id: string, startDate?: string, endDate?: string) {
+    const statement = await this.agingReports.getCustomerStatement(
+      organizationId,
+      id,
+      startDate || '2000-01-01',
+      endDate || new Date().toISOString().slice(0, 10),
+    );
+    if (!statement) throw new NotFoundException('Customer not found');
+    return statement;
   }
 
   async update(organizationId: string, id: string, updateCustomerDto: UpdateCustomerDto) {

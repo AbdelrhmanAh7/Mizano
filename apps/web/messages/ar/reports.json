@@ -1,6 +1,7 @@
 {
   "title": "التقارير",
   "description": "التقارير المالية والتحليلات",
+  "agingUnappliedCredits": "بعد خصم {amount} من الإشعارات الدائنة غير المطبقة",
   "categories": {
     "financial": "التقارير المالية",
     "sales": "تقارير المبيعات",

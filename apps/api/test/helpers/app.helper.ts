@@ -1,5 +1,5 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -20,11 +20,13 @@ class UnlimitedThrottlerStorage implements ThrottlerStorage {
  * so request validation and response shapes match production. The `/api` global prefix is not
  * applied: routes are addressed as `/bills`, `/journals`, ...
  */
-export async function createTestApp(): Promise<INestApplication> {
-  const moduleFixture = await Test.createTestingModule({ imports: [AppModule] })
+export async function createTestApp(
+  configure: (builder: TestingModuleBuilder) => TestingModuleBuilder = (builder) => builder,
+): Promise<INestApplication> {
+  const builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(ThrottlerStorage)
-    .useValue(new UnlimitedThrottlerStorage())
-    .compile();
+    .useValue(new UnlimitedThrottlerStorage());
+  const moduleFixture = await configure(builder).compile();
 
   const app = moduleFixture.createNestApplication();
   app.useGlobalPipes(

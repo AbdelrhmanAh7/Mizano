@@ -1,0 +1,9 @@
+[Unit]
+Description=Mizano health and resource check
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/mizano/deploy/pi/scripts/healthcheck.sh
+# Exit 1 only means problems were found; the script already alerted.
+SuccessExitStatus=1
