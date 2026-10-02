@@ -240,6 +240,7 @@ describe('Document intake (e2e)', () => {
   });
 
   it('a job whose worker died mid-run is recovered after restart and finishes once', async () => {
+    const before = stub.calls;
     const bytes = pdfFixture(`CRASH-${uniqueSuffix()}`);
     const storage = app.get(IntakeStorage);
     const storageKey = `${tenantA.organizationId}/2026/09/crash-${uniqueSuffix()}`;
@@ -255,10 +256,10 @@ describe('Document intake (e2e)', () => {
         storageKey,
         status: IntakeJobStatus.PROCESSING,
         attempts: 1,
+        leaseToken: 'dead-worker',
+        leaseExpiresAt: new Date(Date.now() + 1500), // expires while the app is restarting
       },
     });
-    await new Promise((r) => setTimeout(r, 1200)); // let the lease expire
-    const before = stub.calls;
 
     await app.close();
     app = await boot(); // bootstrap recovery re-enqueues the orphan
@@ -313,5 +314,53 @@ describe('Document intake (e2e)', () => {
       draftDocumentId: first.body.data.id,
     });
     expect(await prisma.bill.count({ where: { organizationId: tenantA.organizationId } })).toBe(1);
+  });
+
+  it('a soft-deleted job does not block re-uploading the same file (partial unique index)', async () => {
+    const bytes = pdfFixture(`DEL-${uniqueSuffix()}`);
+    const first = await upload(a, bytes);
+    const firstId = first.body.data.jobId as string;
+    await waitForStatus(firstId, IntakeJobStatus.EXTRACTED);
+    await prisma.intakeJob.update({ where: { id: firstId }, data: { deletedAt: new Date() } });
+    const again = await upload(a, bytes);
+    expect(again.status).toBe(201);
+    expect(again.body.data.duplicate).toBe(false);
+    expect(again.body.data.jobId).not.toBe(firstId);
+    // The live-row uniqueness still holds at the database level.
+    await expect(
+      prisma.intakeJob.create({
+        data: {
+          organizationId: tenantA.organizationId,
+          createdById: tenantA.userId,
+          originalFileName: 'x.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 1,
+          sha256: sha256Hex(bytes),
+          storageKey: 'x',
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('a FAILED job is re-enqueued by the periodic sweep and finishes', async () => {
+    const bytes = pdfFixture(`SWEEP-${uniqueSuffix()}`);
+    const storage = app.get(IntakeStorage);
+    const storageKey = `${tenantA.organizationId}/2026/09/sweep-${uniqueSuffix()}`;
+    await storage.put(storageKey, bytes);
+    const failed = await prisma.intakeJob.create({
+      data: {
+        organizationId: tenantA.organizationId,
+        createdById: tenantA.userId,
+        originalFileName: 'sweep.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: bytes.length,
+        sha256: sha256Hex(bytes),
+        storageKey,
+        status: IntakeJobStatus.FAILED,
+        attempts: 1,
+      },
+    });
+    const done = await waitForStatus(failed.id, IntakeJobStatus.EXTRACTED);
+    expect(done?.attempts).toBe(2);
   });
 });

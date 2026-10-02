@@ -3038,6 +3038,10 @@ model IntakeJob {
   result            Json?
   forceType         String?
   strategy          String?
+  language          String?
+  /// Worker lease: a random token and expiry renewed by heartbeat while PROCESSING.
+  leaseToken        String?
+  leaseExpiresAt    DateTime?
   draftDocumentType String?
   draftDocumentId   String?
   createdAt         DateTime        @default(now())
@@ -3046,7 +3050,9 @@ model IntakeJob {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, sha256])
+  // Dedup is a PARTIAL unique index created in SQL (migration 20261003000000_intake_jobs):
+  // UNIQUE ("organizationId", "sha256") WHERE "deletedAt" IS NULL. Prisma cannot express it.
+  @@index([organizationId, sha256])
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
   @@map("intake_jobs")

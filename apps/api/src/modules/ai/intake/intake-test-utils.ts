@@ -9,9 +9,10 @@ function matches(row: Row, where: Where): boolean {
     if (key === 'OR') return (cond as Where[]).some((w) => matches(row, w));
     const value = row[key];
     if (cond !== null && typeof cond === 'object' && !(cond instanceof Date)) {
-      const c = cond as { in?: unknown[]; lt?: Date };
+      const c = cond as { in?: unknown[]; lt?: Date; gt?: string };
       if (c.in) return c.in.includes(value);
-      if (c.lt) return (value as Date).getTime() < c.lt.getTime();
+      if (c.lt) return value instanceof Date && value.getTime() < c.lt.getTime();
+      if (c.gt !== undefined) return String(value) > c.gt;
     }
     return value === cond;
   });
@@ -33,12 +34,17 @@ export class FakeIntakeJobTable {
     ),
     findMany: jest.fn(
       async ({ where, skip = 0, take }: { where: Where; skip?: number; take?: number }) =>
-        this.select(where).slice(skip, take === undefined ? undefined : skip + take),
+        this.select(where)
+          .sort((x, y) => x.id.localeCompare(y.id))
+          .slice(skip, take === undefined ? undefined : skip + take),
     ),
     count: jest.fn(async ({ where }: { where: Where }) => this.select(where).length),
     create: jest.fn(async ({ data }: { data: Partial<IntakeJob> }) => {
       const dup = this.rows.find(
-        (r) => r.organizationId === data.organizationId && r.sha256 === data.sha256,
+        (r) =>
+          r.organizationId === data.organizationId &&
+          r.sha256 === data.sha256 &&
+          r.deletedAt === null,
       );
       if (dup) {
         throw new Prisma.PrismaClientKnownRequestError('unique', {
@@ -64,6 +70,9 @@ export class FakeIntakeJobTable {
         result: null,
         forceType: null,
         strategy: null,
+        language: null,
+        leaseToken: null,
+        leaseExpiresAt: null,
         draftDocumentType: null,
         draftDocumentId: null,
         createdAt: new Date(),

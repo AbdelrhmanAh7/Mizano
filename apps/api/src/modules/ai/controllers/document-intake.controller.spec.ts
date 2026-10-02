@@ -1,10 +1,11 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, Logger, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { IntakeJob, IntakeJobStatus } from '@prisma/client';
 import { firstValueFrom, toArray } from 'rxjs';
 import { DocumentIntakeController } from './document-intake.controller';
 import { DocumentIntakeService } from '../services/document-intake.service';
+import { IntakeJobOwnerGuard } from '../intake/intake-job-owner.guard';
 import { IntakeJobsService } from '../intake/intake-jobs.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { OrganizationGuard } from '../../../common/guards/organization.guard';
@@ -35,6 +36,9 @@ function makeJob(overrides: Partial<IntakeJob> = {}): IntakeJob {
     result: { documentType: 'BILL' },
     forceType: null,
     strategy: null,
+    language: null,
+    leaseToken: null,
+    leaseExpiresAt: null,
     draftDocumentType: null,
     draftDocumentId: null,
     createdAt: new Date(),
@@ -175,10 +179,12 @@ describe('DocumentIntakeController', () => {
   });
 
   describe('streamProgress', () => {
-    it('responds 404 for another organization before opening the stream', async () => {
-      await expect(controller.streamProgress(ORG_B, 'job-1')).rejects.toBeInstanceOf(
-        NotFoundException,
+    it('is protected by IntakeJobOwnerGuard (404 before the stream opens)', () => {
+      const guards = Reflect.getMetadata(
+        GUARDS_METADATA,
+        DocumentIntakeController.prototype.streamProgress,
       );
+      expect(guards).toEqual([IntakeJobOwnerGuard]);
     });
 
     it('emits the terminal state with the result for the owner, then completes', async () => {
@@ -227,6 +233,22 @@ describe('DocumentIntakeController', () => {
       );
       expect(jobs.releaseApproval).toHaveBeenCalledWith('job-1', ORG_A, IntakeJobStatus.EXTRACTED);
     });
+  });
+
+  it('keeps the job APPROVED (never reopens it) when linking a committed draft fails', async () => {
+    jobs.linkDraft.mockRejectedValue(new Error('db down'));
+    const dto = {
+      type: 'BILL',
+      vendorId: 'v1',
+      date: '2026-09-01',
+      dueDate: '2026-10-01',
+      lines: [{ description: 'CPU', quantity: '2', rate: '100', taxRatePercent: '14' }],
+      jobId: 'job-1',
+    } as ConfirmIntakeDto;
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const res = await controller.confirmDocument(ORG_A, dto);
+    expect(res.data.id).toBe('b1');
+    expect(jobs.releaseApproval).not.toHaveBeenCalled();
   });
 
   it('retry delegates to the org-scoped service', async () => {

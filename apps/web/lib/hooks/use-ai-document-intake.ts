@@ -163,6 +163,8 @@ const documentIntakeApi = {
   ): Promise<{
     data: {
       id: string;
+      draftDocumentType?: string | null;
+      draftDocumentId?: string | null;
       status: IntakeJobStatus;
       stage: IntakeStage;
       progress: number;
@@ -273,6 +275,8 @@ export function useDocumentIntakeStream(): {
   jobId: string | null;
   jobStatus: IntakeJobStatus | null;
   isDuplicate: boolean;
+  /** Set when an identical file was already approved: the draft it produced. */
+  existingDraft: { type: string; id: string } | null;
   canRetry: boolean;
   retry: () => Promise<void>;
   reset: () => void;
@@ -287,6 +291,7 @@ export function useDocumentIntakeStream(): {
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<IntakeJobStatus | null>(null);
   const [isDuplicate, setIsDuplicate] = useState(false);
+  const [existingDraft, setExistingDraft] = useState<{ type: string; id: string } | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -315,6 +320,7 @@ export function useDocumentIntakeStream(): {
     setJobId(null);
     setJobStatus(null);
     setIsDuplicate(false);
+    setExistingDraft(null);
   }, [stopAll]);
 
   /** Apply an event; returns true when the job reached a terminal state. */
@@ -462,6 +468,17 @@ export function useDocumentIntakeStream(): {
         setJobId(newJobId);
         setJobStatus(response.data.status ?? null);
         setIsDuplicate(response.data.duplicate === true);
+        if (response.data.status === 'APPROVED') {
+          // Already approved: show the draft it produced, never a second review form.
+          const job = (await documentIntakeApi.getResult(newJobId)).data;
+          if (job.draftDocumentId && job.draftDocumentType) {
+            setExistingDraft({ type: job.draftDocumentType, id: job.draftDocumentId });
+          }
+          setStage('complete');
+          setProgress(100);
+          setIsProcessing(false);
+          return;
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         fail(msg || 'Failed to process document');
@@ -507,6 +524,7 @@ export function useDocumentIntakeStream(): {
     jobId,
     jobStatus,
     isDuplicate,
+    existingDraft,
     canRetry: jobId !== null && jobStatus !== null && RETRYABLE_INTAKE_STATUSES.includes(jobStatus),
     retry,
     reset,

@@ -39,7 +39,8 @@ export class IntakeQueueService implements OnModuleDestroy {
   private queue: Queue<IntakeQueuePayload> | null = null;
   private worker: Worker<IntakeQueuePayload> | null = null;
   private handler: IntakeQueueHandler | null = null;
-  private readonly timers = new Set<NodeJS.Timeout>();
+  /** In-process fallback timers keyed by queue job id (same dedup semantics as BullMQ). */
+  private readonly timers = new Map<string, NodeJS.Timeout>();
 
   constructor(private readonly config: ConfigService) {}
 
@@ -91,8 +92,9 @@ export class IntakeQueueService implements OnModuleDestroy {
   async enqueue(payload: IntakeQueuePayload, queueJobId: string, delayMs = 0): Promise<void> {
     const url = this.redisUrl;
     if (!url) {
+      if (this.timers.has(queueJobId)) return;
       const timer = setTimeout(() => {
-        this.timers.delete(timer);
+        this.timers.delete(queueJobId);
         const handler = this.handler;
         if (!handler) return;
         handler(payload).catch((error: unknown) => {
@@ -101,10 +103,27 @@ export class IntakeQueueService implements OnModuleDestroy {
           );
         });
       }, delayMs);
-      this.timers.add(timer);
+      timer.unref();
+      this.timers.set(queueJobId, timer);
       return;
     }
     await this.getQueue(url).add('process', payload, { jobId: queueJobId, delay: delayMs });
+  }
+
+  /** Drop a pending (delayed/waiting) queue entry, e.g. a backoff retry superseded by a manual retry. */
+  async cancel(queueJobId: string): Promise<void> {
+    const timer = this.timers.get(queueJobId);
+    if (timer) {
+      clearTimeout(timer);
+      this.timers.delete(queueJobId);
+    }
+    const url = this.redisUrl;
+    if (!url) return;
+    try {
+      await this.getQueue(url).remove(queueJobId);
+    } catch {
+      // Active jobs cannot be removed; the processor's guarded claim makes them harmless.
+    }
   }
 
   async onModuleDestroy(): Promise<void> {

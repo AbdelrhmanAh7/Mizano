@@ -220,6 +220,8 @@
       "FAILED": "Failed",
       "DEAD_LETTER": "Failed after retries",
       "APPROVED": "Approved"
-    }
+    },
+    "existingDraft": "This document was already approved. Its draft already exists.",
+    "openDraft": "Open draft"
   }
 }

@@ -6,6 +6,7 @@ import {
   Logger,
   NotFoundException,
   OnApplicationBootstrap,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IntakeJob, IntakeJobStatus, IntakeSource, Prisma } from '@prisma/client';
@@ -30,6 +31,7 @@ export interface CreateIntakeUpload {
   source?: IntakeSource;
   forceType?: 'BILL' | 'INVOICE';
   strategy?: string;
+  language?: string;
 }
 
 const DEFAULT_MAX_ACTIVE_PER_ORG = 50;
@@ -51,10 +53,9 @@ export function stageFor(
     case IntakeJobStatus.APPROVED:
       return 'complete';
     case IntakeJobStatus.DEAD_LETTER:
-      return 'error';
     case IntakeJobStatus.FAILED:
-      // FAILED with attempts left is retried automatically.
-      return job.attempts >= job.maxAttempts ? 'error' : 'received';
+      // FAILED is terminal for the UI (it offers Retry) even though a backoff retry may follow.
+      return 'error';
     case IntakeJobStatus.PROCESSING:
       return job.progress >= 80 ? 'matching' : job.progress >= 60 ? 'classifying' : 'extracting';
     default:
@@ -70,9 +71,13 @@ export function queueJobId(jobId: string, attempts: number): string {
   return `${jobId}-a${attempts}`;
 }
 
+const RECOVERY_BATCH = 200;
+const MAX_SWEEP_INTERVAL_MS = 30_000;
+
 @Injectable()
-export class IntakeJobsService implements OnApplicationBootstrap {
+export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(IntakeJobsService.name);
+  private sweepTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -81,42 +86,66 @@ export class IntakeJobsService implements OnApplicationBootstrap {
     private readonly config: ConfigService,
   ) {}
 
-  /**
-   * Re-enqueue QUEUED (and lease-expired PROCESSING) jobs after a restart or a lost queue entry. This is a
-   * deliberate system-level sweep across tenants; each payload carries its own
-   * organizationId and the processor re-checks it. Queue job ids make
-   * duplicates collapse.
-   */
   async onApplicationBootstrap(): Promise<void> {
+    await this.recoverJobs();
+    // Periodic sweep (interval <= lease) so a crashed worker's job is always reclaimed.
+    const interval = Math.max(500, Math.min(MAX_SWEEP_INTERVAL_MS, intakeLeaseMs(this.config) / 2));
+    this.sweepTimer = setInterval(() => void this.recoverJobs(), interval);
+    this.sweepTimer.unref();
+  }
+
+  onModuleDestroy(): void {
+    if (this.sweepTimer) clearInterval(this.sweepTimer);
+    this.sweepTimer = null;
+  }
+
+  /**
+   * Re-enqueue QUEUED jobs, FAILED jobs awaiting a retry and PROCESSING jobs whose lease
+   * expired. A deliberate system-level sweep across tenants: every payload carries its own
+   * organizationId and the processor re-checks it. Queue job ids make duplicates collapse.
+   * Pages through all recoverable rows. Returns the number of jobs enqueued.
+   */
+  async recoverJobs(): Promise<number> {
+    let enqueued = 0;
     try {
-      const queued = await this.prisma.intakeJob.findMany({
-        where: {
-          deletedAt: null,
-          OR: [
-            { status: IntakeJobStatus.QUEUED },
-            // A worker that died mid-job leaves PROCESSING behind; reclaim once its lease expired.
-            {
-              status: IntakeJobStatus.PROCESSING,
-              updatedAt: { lt: new Date(Date.now() - intakeLeaseMs(this.config)) },
-            },
-          ],
-        },
-        select: { id: true, organizationId: true, attempts: true },
-        take: 200,
-        orderBy: { createdAt: 'asc' },
-      });
-      for (const job of queued) {
-        await this.queue.enqueue(
-          { jobId: job.id, organizationId: job.organizationId },
-          queueJobId(job.id, job.attempts),
-        );
+      let after = '';
+      for (;;) {
+        const now = new Date();
+        const batch = await this.prisma.intakeJob.findMany({
+          where: {
+            deletedAt: null,
+            id: { gt: after },
+            OR: [
+              { status: IntakeJobStatus.QUEUED },
+              { status: IntakeJobStatus.FAILED },
+              {
+                status: IntakeJobStatus.PROCESSING,
+                OR: [{ leaseExpiresAt: null }, { leaseExpiresAt: { lt: now } }],
+              },
+            ],
+          },
+          select: { id: true, organizationId: true, attempts: true, status: true },
+          orderBy: { id: 'asc' },
+          take: RECOVERY_BATCH,
+        });
+        for (const job of batch) {
+          const queueId =
+            job.status === IntakeJobStatus.PROCESSING
+              ? `${job.id}-s${job.attempts}`
+              : queueJobId(job.id, job.attempts);
+          await this.queue.enqueue({ jobId: job.id, organizationId: job.organizationId }, queueId);
+          enqueued += 1;
+        }
+        if (batch.length < RECOVERY_BATCH) break;
+        after = batch[batch.length - 1].id;
       }
-      if (queued.length > 0) this.logger.log(`Re-enqueued ${queued.length} intake job(s)`);
+      if (enqueued > 0) this.logger.log(`Re-enqueued ${enqueued} intake job(s)`);
     } catch (error) {
       this.logger.error(
         `Intake recovery failed: ${describeError(error, { includeMessage: false })}`,
       );
     }
+    return enqueued;
   }
 
   toView(job: IntakeJob, includeResult: boolean): IntakeJobView {
@@ -130,9 +159,9 @@ export class IntakeJobsService implements OnApplicationBootstrap {
   ): Promise<{ job: IntakeJob; duplicate: boolean }> {
     const sha256 = sha256Hex(input.buffer);
     const existing = await this.prisma.intakeJob.findFirst({
-      where: { organizationId: input.organizationId, sha256 },
+      where: { organizationId: input.organizationId, sha256, deletedAt: null },
     });
-    if (existing) return { job: this.assertNotDeleted(existing), duplicate: true };
+    if (existing) return { job: existing, duplicate: true };
 
     const configured = Number(this.config.get<string>('INTAKE_MAX_ACTIVE_JOBS'));
     const maxActive =
@@ -168,15 +197,16 @@ export class IntakeJobsService implements OnApplicationBootstrap {
           storageKey,
           forceType: input.forceType ?? null,
           strategy: input.strategy ?? null,
+          language: input.language ?? null,
         },
       });
     } catch (error) {
       await this.storage.delete(storageKey);
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const winner = await this.prisma.intakeJob.findFirst({
-          where: { organizationId: input.organizationId, sha256 },
+          where: { organizationId: input.organizationId, sha256, deletedAt: null },
         });
-        if (winner) return { job: this.assertNotDeleted(winner), duplicate: true };
+        if (winner) return { job: winner, duplicate: true };
       }
       throw error;
     }
@@ -185,22 +215,13 @@ export class IntakeJobsService implements OnApplicationBootstrap {
     return { job, duplicate: false };
   }
 
-  private assertNotDeleted(job: IntakeJob): IntakeJob {
-    if (job.deletedAt) {
-      throw new ConflictException('This document was previously removed');
-    }
-    return job;
-  }
-
   /** The DB row stays QUEUED if the queue is down; bootstrap recovery picks it up. */
   private async enqueueSafely(
     job: Pick<IntakeJob, 'id' | 'organizationId' | 'attempts'>,
+    queueId: string = queueJobId(job.id, job.attempts),
   ): Promise<void> {
     try {
-      await this.queue.enqueue(
-        { jobId: job.id, organizationId: job.organizationId },
-        queueJobId(job.id, job.attempts),
-      );
+      await this.queue.enqueue({ jobId: job.id, organizationId: job.organizationId }, queueId);
     } catch (error) {
       this.logger.error(
         `Enqueue failed for intake job ${job.id}: ${describeError(error, { includeMessage: false })}`,
@@ -258,7 +279,8 @@ export class IntakeJobsService implements OnApplicationBootstrap {
 
   /** FAILED/DEAD_LETTER -> QUEUED as a guarded transition; dead letters get a fresh attempt budget. */
   async retry(jobId: string, organizationId: string): Promise<IntakeJob> {
-    await this.getForOrg(jobId, organizationId);
+    const before = await this.getForOrg(jobId, organizationId);
+    const pendingQueueId = queueJobId(before.id, before.attempts);
     const fromDead = await this.prisma.intakeJob.updateMany({
       where: { id: jobId, organizationId, deletedAt: null, status: IntakeJobStatus.DEAD_LETTER },
       data: { status: IntakeJobStatus.QUEUED, attempts: 0, progress: 0, lastError: null },
@@ -274,13 +296,17 @@ export class IntakeJobsService implements OnApplicationBootstrap {
       throw new ConflictException('Only failed intake jobs can be retried');
     }
     const job = await this.getForOrg(jobId, organizationId);
-    await this.enqueueSafely(job);
+    // Supersede a pending backoff entry, and use a fresh queue id so the retry can never
+    // collapse into a stale entry for the same attempt number.
+    await this.queue.cancel(pendingQueueId);
+    await this.enqueueSafely(job, `${job.id}-r${Date.now()}`);
     return job;
   }
 
   /** EXTRACTED/NEEDS_REVIEW -> APPROVED; returns the status to restore if the draft fails. */
   async claimForApproval(jobId: string, organizationId: string): Promise<IntakeJobStatus> {
-    const previous = (await this.getForOrg(jobId, organizationId)).status;
+    const current = await this.getForOrg(jobId, organizationId);
+    const previous = current.status;
     const claimed = await this.prisma.intakeJob.updateMany({
       where: {
         id: jobId,
@@ -291,7 +317,11 @@ export class IntakeJobsService implements OnApplicationBootstrap {
       data: { status: IntakeJobStatus.APPROVED },
     });
     if (claimed.count === 0) {
-      throw new ConflictException('This intake job cannot be approved in its current state');
+      throw new ConflictException({
+        message: 'This intake job cannot be approved in its current state',
+        draftDocumentType: current.draftDocumentType,
+        draftDocumentId: current.draftDocumentId,
+      });
     }
     return previous;
   }

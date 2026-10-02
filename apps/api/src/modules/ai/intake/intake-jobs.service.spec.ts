@@ -12,14 +12,17 @@ const ORG_B = 'org-b';
 describe('IntakeJobsService', () => {
   let table: FakeIntakeJobTable;
   let storage: MemoryIntakeStorage;
-  let queue: { enqueue: jest.Mock };
+  let queue: { enqueue: jest.Mock; cancel: jest.Mock };
   let config: { get: jest.Mock };
   let service: IntakeJobsService;
 
   beforeEach(() => {
     table = new FakeIntakeJobTable();
     storage = new MemoryIntakeStorage();
-    queue = { enqueue: jest.fn().mockResolvedValue(undefined) };
+    queue = {
+      enqueue: jest.fn().mockResolvedValue(undefined),
+      cancel: jest.fn().mockResolvedValue(undefined),
+    };
     config = { get: jest.fn() };
     service = new IntakeJobsService(
       { intakeJob: table.delegate } as unknown as PrismaService,
@@ -115,6 +118,9 @@ describe('IntakeJobsService', () => {
       expect(retried.status).toBe(IntakeJobStatus.QUEUED);
       expect(retried.attempts).toBe(0);
       expect(queue.enqueue).toHaveBeenCalledTimes(1);
+      // Pending backoff entry for the old attempt is cancelled; the retry uses a fresh id.
+      expect(queue.cancel).toHaveBeenCalledWith(`${job.id}-a3`);
+      expect(queue.enqueue.mock.calls[0][1]).toMatch(new RegExp(`^${job.id}-r[0-9]+$`));
       await expect(service.retry(job.id, ORG_A)).rejects.toBeInstanceOf(ConflictException);
     });
 
@@ -152,7 +158,71 @@ describe('IntakeJobsService', () => {
     expect(stageFor({ ...base, status: IntakeJobStatus.QUEUED })).toBe('received');
     expect(stageFor({ ...base, status: IntakeJobStatus.NEEDS_REVIEW })).toBe('complete');
     expect(stageFor({ ...base, status: IntakeJobStatus.DEAD_LETTER })).toBe('error');
-    expect(stageFor({ ...base, status: IntakeJobStatus.FAILED })).toBe('received');
-    expect(stageFor({ ...base, attempts: 3, status: IntakeJobStatus.FAILED })).toBe('error');
+    // FAILED is terminal for the UI (Retry offered) even when a backoff retry is pending.
+    expect(stageFor({ ...base, status: IntakeJobStatus.FAILED })).toBe('error');
+  });
+
+  it('dedup ignores soft-deleted jobs: the same file can be uploaded again', async () => {
+    const first = await upload(ORG_A);
+    table.rows[0].deletedAt = new Date();
+    const again = await upload(ORG_A);
+    expect(again.duplicate).toBe(false);
+    expect(again.job.id).not.toBe(first.job.id);
+  });
+
+  it('passes the requested language to the job', async () => {
+    const { job } = await service.createFromUpload({
+      organizationId: ORG_A,
+      userId: 'u1',
+      buffer: Buffer.from('lang'),
+      mimeType: 'application/pdf',
+      fileName: 'a.pdf',
+      language: 'ara',
+    });
+    expect(job.language).toBe('ara');
+  });
+
+  describe('recoverJobs', () => {
+    async function seedRows(n: number, status: IntakeJobStatus, extra = {}) {
+      for (let i = 0; i < n; i += 1) {
+        await table.delegate.create({
+          data: {
+            organizationId: ORG_A,
+            sha256: `${status}-${i}-${Math.random()}`,
+            status,
+            ...extra,
+          },
+        });
+      }
+    }
+
+    it('pages through every QUEUED, FAILED and lease-expired PROCESSING row', async () => {
+      await seedRows(250, IntakeJobStatus.QUEUED);
+      await seedRows(30, IntakeJobStatus.FAILED);
+      await seedRows(5, IntakeJobStatus.PROCESSING, {
+        leaseExpiresAt: new Date(Date.now() - 1000),
+      });
+      await seedRows(4, IntakeJobStatus.PROCESSING, {
+        leaseExpiresAt: new Date(Date.now() + 60000),
+      });
+      await seedRows(3, IntakeJobStatus.DEAD_LETTER);
+      await seedRows(3, IntakeJobStatus.EXTRACTED);
+      expect(await service.recoverJobs()).toBe(285);
+      expect(queue.enqueue).toHaveBeenCalledTimes(285);
+    });
+
+    it('skips soft-deleted rows', async () => {
+      await seedRows(2, IntakeJobStatus.QUEUED, { deletedAt: new Date() });
+      expect(await service.recoverJobs()).toBe(0);
+    });
+  });
+
+  it('a second approval is refused with the existing draft id', async () => {
+    const { job } = await upload(ORG_A);
+    table.rows[0].status = IntakeJobStatus.APPROVED;
+    table.rows[0].draftDocumentId = 'bill-9';
+    await expect(service.claimForApproval(job.id, ORG_A)).rejects.toMatchObject({
+      response: { draftDocumentId: 'bill-9' },
+    });
   });
 });

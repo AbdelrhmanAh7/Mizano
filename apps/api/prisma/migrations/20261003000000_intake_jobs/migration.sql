@@ -23,6 +23,9 @@ CREATE TABLE "intake_jobs" (
     "result" JSONB,
     "forceType" TEXT,
     "strategy" TEXT,
+    "language" TEXT,
+    "leaseToken" TEXT,
+    "leaseExpiresAt" TIMESTAMP(3),
     "draftDocumentType" TEXT,
     "draftDocumentId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -38,8 +41,12 @@ CREATE INDEX "intake_jobs_organizationId_status_idx" ON "intake_jobs"("organizat
 -- CreateIndex
 CREATE INDEX "intake_jobs_organizationId_createdAt_idx" ON "intake_jobs"("organizationId", "createdAt");
 
--- CreateIndex
-CREATE UNIQUE INDEX "intake_jobs_organizationId_sha256_key" ON "intake_jobs"("organizationId", "sha256");
+-- CreateIndex (lookup)
+CREATE INDEX "intake_jobs_organizationId_sha256_idx" ON "intake_jobs"("organizationId", "sha256");
+
+-- Dedup only among live rows: a soft-deleted job must not block re-uploading the same file.
+-- Partial indexes cannot be expressed in schema.prisma.
+CREATE UNIQUE INDEX "intake_jobs_organizationId_sha256_live_key" ON "intake_jobs"("organizationId", "sha256") WHERE "deletedAt" IS NULL;
 
 -- AddForeignKey
 ALTER TABLE "intake_jobs" ADD CONSTRAINT "intake_jobs_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;

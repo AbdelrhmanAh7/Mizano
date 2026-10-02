@@ -33,7 +33,7 @@ import { BillForm, type BillFormDefaultValues } from '@/components/purchases/bil
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
-type Step = 'upload' | 'processing' | 'review' | 'confirmed';
+type Step = 'upload' | 'processing' | 'review' | 'confirmed' | 'existing';
 
 interface UnresolvedTaxLine {
   lineNumber: number;
@@ -123,6 +123,11 @@ export default function ScanBillPage() {
       setStep('review');
     }
   }, [intake.result, step]);
+
+  // An identical file was already approved: show its draft instead of a review form.
+  useEffect(() => {
+    if (intake.existingDraft && step === 'processing') setStep('existing');
+  }, [intake.existingDraft, step]);
 
   // Handle errors
   useEffect(() => {
@@ -795,6 +800,28 @@ export default function ScanBillPage() {
       )}
 
       {/* Step 4: Confirmed */}
+      {step === 'existing' && intake.existingDraft && (
+        <Card>
+          <CardContent className="py-16">
+            <div className="text-center space-y-4">
+              <CheckCircle2 className="h-16 w-16 mx-auto text-green-500" />
+              <p className="text-lg font-medium">{t('existingDraft')}</p>
+              <Button asChild>
+                <Link
+                  href={
+                    intake.existingDraft.type === 'invoice'
+                      ? `/sales/invoices/${intake.existingDraft.id}`
+                      : `/purchases/bills/${intake.existingDraft.id}`
+                  }
+                >
+                  {t('openDraft')}
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {step === 'confirmed' && (
         <Card>
           <CardContent className="py-16">

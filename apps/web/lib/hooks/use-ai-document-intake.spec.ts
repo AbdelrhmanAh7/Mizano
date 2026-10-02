@@ -219,4 +219,34 @@ describe('useDocumentIntakeStream', () => {
     });
     expect(result.current.error).toMatch(/can no longer be retried/);
   });
+
+  it('shows the existing draft for a duplicate of an APPROVED job, without following the stream', async () => {
+    mockPost.mockResolvedValue({
+      data: { data: { jobId: 'intake_1', status: 'APPROVED', duplicate: true } },
+    });
+    mockGet.mockResolvedValue({
+      data: {
+        data: {
+          id: 'intake_1',
+          status: 'APPROVED',
+          stage: 'complete',
+          progress: 100,
+          result: RESULT,
+          lastError: null,
+          draftDocumentType: 'bill',
+          draftDocumentId: 'bill_9',
+        },
+      },
+    });
+
+    const { result } = renderHook(() => useDocumentIntakeStream());
+    await act(async () => {
+      await result.current.processDocument(new FormData());
+    });
+
+    expect(result.current.existingDraft).toEqual({ type: 'bill', id: 'bill_9' });
+    expect(result.current.result).toBeNull();
+    expect(result.current.isProcessing).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

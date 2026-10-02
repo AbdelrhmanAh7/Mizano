@@ -31,6 +31,7 @@ describe('IntakeProcessorService', () => {
   let intake: { processDocument: jest.Mock };
   let queue: { enqueue: jest.Mock; registerHandler: jest.Mock };
   let processor: IntakeProcessorService;
+  let config: { get: jest.Mock };
   let logSpies: jest.SpyInstance[];
   const body = Buffer.from(SECRET_TEXT);
 
@@ -39,12 +40,13 @@ describe('IntakeProcessorService', () => {
     storage = new MemoryIntakeStorage();
     intake = { processDocument: jest.fn().mockResolvedValue(result()) };
     queue = { enqueue: jest.fn().mockResolvedValue(undefined), registerHandler: jest.fn() };
+    config = { get: jest.fn() };
     processor = new IntakeProcessorService(
       { intakeJob: table.delegate } as unknown as PrismaService,
       storage,
       intake as unknown as DocumentIntakeService,
       queue as unknown as IntakeQueueService,
-      { get: jest.fn() } as unknown as ConfigService,
+      config as unknown as ConfigService,
     );
     logSpies = (['log', 'warn', 'error', 'debug', 'verbose'] as const).map((m) =>
       jest.spyOn(Logger.prototype, m).mockImplementation(() => undefined),
@@ -118,7 +120,7 @@ describe('IntakeProcessorService', () => {
 
   it('reclaims a PROCESSING job whose worker died (expired lease)', async () => {
     const job = await seed({ status: IntakeJobStatus.PROCESSING, attempts: 1 });
-    table.rows[0].updatedAt = new Date(Date.now() - 60 * 60 * 1000);
+    table.rows[0].leaseExpiresAt = new Date(Date.now() - 1000);
     await processor.handle({ jobId: job.id, organizationId: ORG_A });
     expect(table.rows[0].status).toBe(IntakeJobStatus.EXTRACTED);
     expect(table.rows[0].attempts).toBe(2);
@@ -179,5 +181,59 @@ describe('IntakeProcessorService', () => {
     await processor.handle({ jobId: job.id, organizationId: ORG_A });
     expect(table.rows[0].status).toBe(IntakeJobStatus.FAILED);
     expect(intake.processDocument).not.toHaveBeenCalled();
+  });
+
+  it('passes the requested language through to extraction', async () => {
+    const job = await seed({ language: 'ara' });
+    await processor.handle({ jobId: job.id, organizationId: ORG_A });
+    expect(intake.processDocument.mock.calls[0][4]).toBe('ara');
+  });
+
+  it('a delivery that finds a live lease reschedules a check at lease expiry', async () => {
+    const expires = new Date(Date.now() + 30_000);
+    const job = await seed({ status: IntakeJobStatus.PROCESSING, attempts: 1 });
+    table.rows[0].leaseExpiresAt = expires;
+    await processor.handle({ jobId: job.id, organizationId: ORG_A });
+    expect(intake.processDocument).not.toHaveBeenCalled();
+    expect(queue.enqueue).toHaveBeenCalledTimes(1);
+    const [payload, id, delay] = queue.enqueue.mock.calls[0];
+    expect(payload).toEqual({ jobId: job.id, organizationId: ORG_A });
+    expect(id).toBe(`${job.id}-l${expires.getTime()}`);
+    expect(delay).toBeGreaterThan(25_000);
+  });
+
+  describe('lease heartbeat', () => {
+    beforeEach(() =>
+      config.get.mockImplementation((k: string) => (k === 'INTAKE_LEASE_MS' ? '300' : undefined)),
+    );
+
+    it('renews the lease while extraction runs', async () => {
+      const job = await seed();
+      intake.processDocument.mockImplementation(
+        () => new Promise<DocumentIntakeResult>((r) => setTimeout(() => r(result()), 450)),
+      );
+      const run = processor.handle({ jobId: job.id, organizationId: ORG_A });
+      await new Promise((r) => setTimeout(r, 20));
+      const firstExpiry = table.rows[0].leaseExpiresAt?.getTime() ?? 0;
+      await new Promise((r) => setTimeout(r, 250));
+      expect(table.rows[0].leaseExpiresAt?.getTime() ?? 0).toBeGreaterThan(firstExpiry);
+      await run;
+      expect(table.rows[0].status).toBe(IntakeJobStatus.EXTRACTED);
+      expect(table.rows[0].leaseToken).toBeNull();
+    });
+
+    it('abandons the run and writes nothing when the lease was taken over', async () => {
+      const job = await seed();
+      intake.processDocument.mockImplementation(
+        () => new Promise<DocumentIntakeResult>((r) => setTimeout(() => r(result()), 600)),
+      );
+      const run = processor.handle({ jobId: job.id, organizationId: ORG_A });
+      await new Promise((r) => setTimeout(r, 20));
+      table.rows[0].leaseToken = 'someone-else'; // another worker reclaimed the job
+      await run;
+      expect(table.rows[0].leaseToken).toBe('someone-else');
+      expect(table.rows[0].status).toBe(IntakeJobStatus.PROCESSING);
+      expect(table.rows[0].result).toBeNull();
+    });
   });
 });

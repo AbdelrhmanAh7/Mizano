@@ -1,5 +1,6 @@
 import {
   Controller,
+  Logger,
   Post,
   Get,
   Body,
@@ -66,6 +67,8 @@ const SSE_MAX_DURATION_MS = 10 * 60 * 1000;
 @Controller('ai/document-intake')
 @UseGuards(JwtAuthGuard, OrganizationGuard, PermissionsGuard)
 export class DocumentIntakeController {
+  private readonly logger = new Logger(DocumentIntakeController.name);
+
   constructor(
     private intakeService: DocumentIntakeService,
     private jobs: IntakeJobsService,
@@ -137,6 +140,7 @@ export class DocumentIntakeController {
       fileName: file.originalname,
       forceType: dto.forceType,
       strategy: dto.strategy,
+      language: dto.language,
     });
 
     return { data: { jobId: job.id, status: job.status, duplicate } };
@@ -172,8 +176,7 @@ export class DocumentIntakeController {
     @CurrentOrg() orgId: string,
     @Param('jobId') jobId: string,
   ): Promise<Observable<MessageEvent>> {
-    await this.jobs.getForOrg(jobId, orgId); // 404 before the stream opens
-
+    // Ownership is enforced by IntakeJobOwnerGuard (404 before the stream opens).
     return new Observable<MessageEvent>((subscriber) => {
       let closed = false;
       let timer: NodeJS.Timeout | undefined;
@@ -311,7 +314,11 @@ export class DocumentIntakeController {
     const restore = await this.jobs.claimForApproval(jobId, orgId);
     try {
       const result = await this.intakeService.confirmAndCreate(orgId, input);
-      await this.jobs.linkDraft(jobId, orgId, { type: result.type, id: result.id });
+      // The draft is committed: from here on the job is never reopened. If linking fails the
+      // job stays APPROVED, so a second confirm is refused (409) instead of creating a duplicate.
+      await this.jobs.linkDraft(jobId, orgId, { type: result.type, id: result.id }).catch(() => {
+        this.logger.error(`Could not link draft ${result.id} to intake job ${jobId}`);
+      });
       return { data: result };
     } catch (error) {
       await this.jobs.releaseApproval(jobId, orgId, restore);
