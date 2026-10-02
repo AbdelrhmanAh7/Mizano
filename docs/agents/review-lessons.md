@@ -55,6 +55,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 7. Tenancy, roles and validation
 
 - **Scope every tenant resource by `organizationId`** in queries, locks and lookups. Child rows are scoped through their tenant-scoped parent, and pre-authentication lookups such as login by email are the documented exception. Another tenant's ids return 404 (or 400 when they come from the body), and soft-deleted parents return 404.
+- **Ownership checks for `@Sse` routes live in a guard, not the handler.** Once the stream starts the status is already 200, so a `NotFoundException` thrown in the handler arrives as an in-band error event and the tenant probe sees 200. `IntakeJobOwnerGuard` returns the real 404. _(intake progress SSE)_
 - **Validate the role of every referenced account, not only ownership.** Refund, payment and paid-from accounts must pass the bank/cash rule (`common/utils/bank-cash-accounts.ts`). Expense offsets must be `EXPENSE`. Credit accounts must come from the source document's lines.
 - **Validate direction and type.** A withdrawal can't settle an invoice, and switching a recurring profile to JOURNAL must validate the journal template.
 - **When a form needs data the role can't read, add a narrow lookup endpoint guarded by the form's own permission,** for example `/invoices/tax-rate-options` (`sales.view`) or `/inventory-adjustments/account-options` (`inventory.create`). Never widen permissions.

@@ -1,7 +1,5 @@
-import { randomUUID } from 'crypto';
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiFeature, AiFeedbackAction } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -16,7 +14,6 @@ import {
 } from '../extraction/extraction-strategy.interface';
 import { extractTextFromPdf } from '../utils/pdf-extractor.util';
 import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.util';
-import { BoundedCache } from '../utils/bounded-cache.util';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 
 // ---------------------------------------------------------------------------
@@ -186,20 +183,6 @@ export interface IntakeProgressEvent {
   error?: string;
 }
 
-export interface IntakeJob {
-  jobId: string;
-  /** Tenant that owns the job. Jobs are never visible to another organization. */
-  organizationId: string;
-  /** User who uploaded the document (audit only). */
-  userId: string;
-  forceType: 'BILL' | 'INVOICE' | null;
-  status: IntakeStage;
-  progress: number;
-  result: DocumentIntakeResult | null;
-  error: string | null;
-  createdAt: number;
-}
-
 /** Truncate PDF raw text to this length before sending to Ollama (speeds up inference). */
 const PDF_TEXT_TRUNCATION_LIMIT = 4000;
 
@@ -215,9 +198,6 @@ function uniqueIds(values: Array<string | undefined>): string[] {
 export class DocumentIntakeService {
   private readonly logger = new Logger(DocumentIntakeService.name);
 
-  /** In-memory job store with bounded size and TTL */
-  private readonly jobs = new BoundedCache<IntakeJob>(200, 30 * 60 * 1000);
-
   constructor(
     private prisma: PrismaService,
     private ollamaService: OllamaService,
@@ -226,136 +206,7 @@ export class DocumentIntakeService {
     private entityExtractionService: EntityExtractionService,
     private feedbackService: AiFeedbackService,
     private configService: ConfigService,
-    private eventEmitter: EventEmitter2,
   ) {}
-
-  // ---------------------------------------------------------------------------
-  // Async job management
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Start document processing as a background job.
-   * Returns a jobId immediately so the caller can stream progress via SSE.
-   */
-  processDocumentAsync(
-    owner: { organizationId: string; userId: string },
-    fileBuffer: Buffer,
-    mimeType: string,
-    options: {
-      filename?: string;
-      language?: string;
-      strategy?: string;
-      forceType?: 'BILL' | 'INVOICE';
-    } = {},
-  ): string {
-    const { organizationId, userId } = owner;
-    if (!organizationId || !userId) {
-      throw new BadRequestException('Authenticated organization and user are required');
-    }
-    const { filename, language = 'eng+ara', strategy, forceType } = options;
-    // Unguessable job id; ownership is still enforced on every lookup.
-    const jobId = `intake_${randomUUID()}`;
-
-    const job: IntakeJob = {
-      jobId,
-      organizationId,
-      userId,
-      forceType: forceType ?? null,
-      status: 'received',
-      progress: 5,
-      result: null,
-      error: null,
-      createdAt: Date.now(),
-    };
-    this.jobs.set(jobId, job);
-
-    // Emit initial received event
-    this.emitProgress(jobId, { stage: 'received', progress: 5, message: 'File accepted' });
-
-    // Fire off the pipeline in the background (non-blocking)
-    void this.runAsyncPipeline(
-      jobId,
-      organizationId,
-      fileBuffer,
-      mimeType,
-      filename,
-      language,
-      strategy,
-    );
-
-    return jobId;
-  }
-
-  /**
-   * Retrieve a job owned by the given organization.
-   * Returns undefined both when the job does not exist and when it belongs to
-   * another tenant, so callers respond 404 and never leak job existence.
-   */
-  getJob(jobId: string, organizationId: string): IntakeJob | undefined {
-    if (!organizationId) return undefined;
-    const job = this.jobs.get(jobId);
-    if (!job || job.organizationId !== organizationId) return undefined;
-    return job;
-  }
-
-  private emitProgress(jobId: string, event: IntakeProgressEvent): void {
-    // Update in-memory job
-    const job = this.jobs.get(jobId);
-    if (job) {
-      job.status = event.stage;
-      job.progress = event.progress;
-      if (event.result) job.result = event.result;
-      if (event.error) job.error = event.error;
-      this.jobs.set(jobId, job);
-    }
-    this.eventEmitter.emit(`document-intake.progress.${jobId}`, event);
-  }
-
-  private async runAsyncPipeline(
-    jobId: string,
-    organizationId: string,
-    fileBuffer: Buffer,
-    mimeType: string,
-    filename?: string,
-    language?: string,
-    strategy?: string,
-  ): Promise<void> {
-    try {
-      this.emitProgress(jobId, {
-        stage: 'extracting',
-        progress: 20,
-        message: 'AI is reading your document...',
-      });
-
-      const result = await this.processDocument(
-        organizationId,
-        fileBuffer,
-        mimeType,
-        filename,
-        language,
-        (stage, progress, message) => this.emitProgress(jobId, { stage, progress, message }),
-        strategy,
-      );
-
-      this.emitProgress(jobId, {
-        stage: 'complete',
-        progress: 100,
-        message: 'Processing complete',
-        result,
-      });
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      // Extractor errors may quote document text; log the error type only.
-      this.logger.error(
-        `Async intake pipeline failed for job ${jobId}: ${error instanceof Error ? error.name : 'unknown error'}`,
-      );
-      this.emitProgress(jobId, {
-        stage: 'error',
-        progress: 0,
-        error: msg,
-      });
-    }
-  }
 
   /**
    * Process a document through the AI intake pipeline (powered by Ollama).

@@ -207,5 +207,23 @@
     "avgWinRate": "Avg Win Rate",
     "acrossAllStages": "Across all stages",
     "stageWinRates": "Stage Win Rates"
+  },
+  "intake": {
+    "retryUnavailable": "This scan can no longer be retried.",
+    "retryFailed": "Could not retry the scan. Please try again.",
+    "retry": "Retry scan",
+    "duplicate": "This file was already uploaded. Showing the existing scan.",
+    "needsReviewNotice": "Some values are missing or uncertain. Review every field before creating the draft.",
+    "status": {
+      "QUEUED": "Queued",
+      "PROCESSING": "Processing",
+      "EXTRACTED": "Extracted",
+      "NEEDS_REVIEW": "Needs review",
+      "FAILED": "Failed",
+      "DEAD_LETTER": "Failed after retries",
+      "APPROVED": "Approved"
+    },
+    "existingDraft": "This document was already approved. Its draft already exists.",
+    "openDraft": "Open draft"
   }
 }

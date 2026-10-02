@@ -1,6 +1,5 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { DocumentIntakeService, ConfirmIntakeInput } from './document-intake.service';
@@ -106,7 +105,6 @@ describe('DocumentIntakeService', () => {
       {} as EntityExtractionService,
       feedback as unknown as AiFeedbackService,
       {} as ConfigService,
-      new EventEmitter2(),
     );
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
@@ -114,52 +112,6 @@ describe('DocumentIntakeService', () => {
   });
 
   afterEach(() => jest.restoreAllMocks());
-
-  describe('job ownership', () => {
-    function startJob(org: string): string {
-      // Prevent the background pipeline from running in unit tests.
-      jest
-        .spyOn(service as unknown as { runAsyncPipeline: () => Promise<void> }, 'runAsyncPipeline')
-        .mockResolvedValue(undefined);
-      return service.processDocumentAsync(
-        { organizationId: org, userId: 'user-1' },
-        Buffer.from('x'),
-        'image/png',
-        { forceType: 'BILL' },
-      );
-    }
-
-    it('records organization, user and forceType on the job', () => {
-      const jobId = startJob(ORG_A);
-      const job = service.getJob(jobId, ORG_A);
-      expect(job).toMatchObject({
-        organizationId: ORG_A,
-        userId: 'user-1',
-        forceType: 'BILL',
-        status: 'received',
-      });
-    });
-
-    it('hides a job from another organization', () => {
-      const jobId = startJob(ORG_A);
-      expect(service.getJob(jobId, ORG_B)).toBeUndefined();
-      expect(service.getJob(jobId, '')).toBeUndefined();
-    });
-
-    it('returns undefined for unknown job ids', () => {
-      expect(service.getJob('intake_missing', ORG_A)).toBeUndefined();
-    });
-
-    it('rejects job creation without an authenticated owner', () => {
-      expect(() =>
-        service.processDocumentAsync(
-          { organizationId: '', userId: 'user-1' },
-          Buffer.from('x'),
-          'image/png',
-        ),
-      ).toThrow(BadRequestException);
-    });
-  });
 
   describe('confirmAndCreate — tax arithmetic', () => {
     it('2 x 100 at 14% => net 200, tax 28, gross 228 (bill)', async () => {
