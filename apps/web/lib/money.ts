@@ -7,6 +7,8 @@
  * Values are decimal strings and arithmetic uses scaled BigInt, never floating point.
  */
 
+import Decimal from 'decimal.js';
+
 const SCALE = 4; // internal fixed-point scale for inputs
 const DECIMAL_RE = /^\s*(\d+)(?:\.(\d+))?\s*$/;
 const ZERO = BigInt(0);
@@ -118,8 +120,8 @@ export interface ExtractedTotalsInput {
   total?: string | number | null;
 }
 
-/** Largest accepted gap between an extracted and a computed total (0.01), in scale-4 units. */
-const DISCREPANCY_TOLERANCE = BigInt(100);
+/** Largest accepted gap between an extracted and a computed total. */
+const DISCREPANCY_TOLERANCE = new Decimal('0.01');
 
 /**
  * Compares document-level totals read by extraction with the totals computed from the reviewed
@@ -138,8 +140,12 @@ export function findTotalsDiscrepancies(
   const out: TotalsDiscrepancy[] = [];
   for (const [field, raw, computedText] of pairs) {
     if (raw === null || raw === undefined || !DECIMAL_RE.test(String(raw))) continue;
-    const diff = toScaled(raw) - toScaled(computedText);
-    if ((diff < ZERO ? -diff : diff) > DISCREPANCY_TOLERANCE) {
+    // Size the arithmetic precision to retain every extracted digit, including large totals.
+    const ExactDecimal = Decimal.clone({
+      precision: Math.max(String(raw).length, computedText.length) + 2,
+    });
+    const diff = new ExactDecimal(String(raw).trim()).minus(new ExactDecimal(computedText)).abs();
+    if (diff.gt(DISCREPANCY_TOLERANCE)) {
       out.push({ field, extracted: String(raw).trim(), computed: computedText });
     }
   }

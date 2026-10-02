@@ -420,7 +420,7 @@ export function BillForm({
                       <Input
                         {...form.register(`lines.${index}.quantity`)}
                         type="number"
-                        step="0.01"
+                        step="0.0001"
                         className="h-8"
                       />
                     </TableCell>
@@ -428,7 +428,7 @@ export function BillForm({
                       <Input
                         {...form.register(`lines.${index}.rate`)}
                         type="number"
-                        step="0.01"
+                        step="0.0001"
                         className="h-8"
                       />
                     </TableCell>

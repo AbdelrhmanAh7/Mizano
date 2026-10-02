@@ -53,6 +53,20 @@ describe('BillForm scan review totals', () => {
     expect(screen.getByTestId('totals-discrepancy')).toHaveTextContent('discrepancyDiscount');
   });
 
+  it('allows four-decimal quantity and rate without native step mismatches', () => {
+    renderForm({});
+    const quantity = document.querySelector<HTMLInputElement>('input[name="lines.0.quantity"]')!;
+    const rate = document.querySelector<HTMLInputElement>('input[name="lines.0.rate"]')!;
+    for (const [input, value] of [
+      [quantity, '1.3751'],
+      [rate, '19.9999'],
+    ] as const) {
+      input.value = value;
+      expect(input.step).toBe('0.0001');
+      expect(input.validity.stepMismatch).toBe(false);
+    }
+  });
+
   it('has the discrepancy copy in English and Arabic', () => {
     for (const intake of [enAi.intake, arAi.intake]) {
       for (const key of [

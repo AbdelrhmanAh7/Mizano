@@ -254,6 +254,7 @@
       "fileTooLarge": "File too large. Maximum size is 15MB.",
       "heicFailed": "Failed to convert HEIC image. Please convert it manually to JPEG or PNG.",
       "taxNotReviewed": "Some tax rates could not be determined from the document. Review the tax % on the flagged lines and tick the confirmation before creating the bill.",
+      "currencyMismatch": "The document currency differs from your organization's base currency. Foreign-currency documents are not supported yet.",
       "createFailed": "Failed to create the bill. Please try again.",
       "lineValueInvalid": "Line {line}: {field} must be a non-negative number",
       "fields": {

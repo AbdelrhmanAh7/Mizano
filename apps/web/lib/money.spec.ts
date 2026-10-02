@@ -75,6 +75,19 @@ describe('findTotalsDiscrepancies', () => {
     ]);
   });
 
+  it.each(['28.01001', '27.98999'])('preserves full precision beyond the tolerance: %s', (tax) => {
+    expect(findTotalsDiscrepancies(computed, { tax })).toEqual([
+      { field: 'tax', extracted: tax, computed: '28.00' },
+    ]);
+  });
+
+  it.each(['28.01000', '27.99000', '28.00999'])(
+    'accepts values at or within tolerance: %s',
+    (tax) => {
+      expect(findTotalsDiscrepancies(computed, { tax })).toEqual([]);
+    },
+  );
+
   it('does not flag missing extracted values', () => {
     expect(
       findTotalsDiscrepancies(computed, { subtotal: null, tax: undefined, total: null }),

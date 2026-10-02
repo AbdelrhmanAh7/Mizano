@@ -31,7 +31,7 @@ import { useCreateVendor } from '@/lib/hooks/use-vendors';
 import { resolveScanLineTaxes, toDecimalString } from '@/lib/document-intake-tax';
 import { BillForm, type BillFormDefaultValues } from '@/components/purchases/bill-form';
 import { cn } from '@/lib/utils';
-import { getApiErrorMessage } from '@/lib/api-error';
+import { getScanReviewErrorMessage } from '@/lib/scan-review-error';
 import { format } from 'date-fns';
 
 type Step = 'upload' | 'processing' | 'review' | 'confirmed' | 'existing';
@@ -275,7 +275,7 @@ export default function ScanBillPage() {
       setLocalError(
         err instanceof ConfirmLineValueError
           ? ts('lineValueInvalid', { line: err.line, field: ts(`fields.${err.field}`) })
-          : getApiErrorMessage(err, ts('createFailed')),
+          : getScanReviewErrorMessage(err, ts('createFailed'), ts('currencyMismatch')),
       );
     }
   };
