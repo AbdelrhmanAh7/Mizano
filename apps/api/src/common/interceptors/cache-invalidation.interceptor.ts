@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 import { mergeMap } from 'rxjs/operators';
 import { CacheService } from '../../cache/cache.service';
 import { INVALIDATE_CACHE_KEY } from '../decorators/invalidate-cache.decorator';
+import { describeError } from '../utils/redact';
 
 /**
  * Cache invalidation event payload emitted after successful write operations.
@@ -77,7 +78,9 @@ export class CacheInvalidationInterceptor implements NestInterceptor {
           this.eventEmitter.emit('cache.invalidated', event);
         } catch (error) {
           // Never fail the request due to cache invalidation errors
-          this.logger.warn(`Cache invalidation error: ${error}`);
+          this.logger.warn(
+            `Cache invalidation error: ${describeError(error, { includeMessage: false })}`,
+          );
         }
         return response;
       }),
