@@ -195,3 +195,68 @@ jobs:
         run: pnpm build
         env:
           NEXT_PUBLIC_API_URL: https://api.example.com
+
+  # ==========================================
+  # Docker Multi-Architecture Build
+  # ==========================================
+  docker-multiarch:
+    name: Docker Multi-Arch Build (amd64 + arm64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      max-parallel: 1
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU for ARM64
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image for amd64 and arm64
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./apps/api/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          push: false
+          load: true
+          tags: mizano-api:${{ matrix.arch }}
+          cache-from: type=gha,scope=api-multiarch
+          cache-to: type=gha,mode=max,scope=api-multiarch
+
+      - name: Build Web image for amd64 and arm64
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./apps/web/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          push: false
+          load: true
+          tags: mizano-web:${{ matrix.arch }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.example.com/api
+          cache-from: type=gha,scope=web-multiarch
+          cache-to: type=gha,mode=max,scope=web-multiarch
+
+      - name: Verify target binaries, offline Prisma CLI and image sizes
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          for image in mizano-api mizano-web; do
+            actual=$(docker run --rm --network none --platform "linux/$TARGET_ARCH" --entrypoint node "$image:$TARGET_ARCH" -p process.arch)
+            expected="$TARGET_ARCH"
+            if [ "$expected" = amd64 ]; then expected=x64; fi
+            test "$actual" = "$expected"
+          done
+          docker run --rm --network none --platform "linux/$TARGET_ARCH" --entrypoint node "mizano-api:$TARGET_ARCH" -e "require('bcrypt'); require('sharp'); require('@prisma/client')"
+          docker run --rm --network none --platform "linux/$TARGET_ARCH" --entrypoint node "mizano-web:$TARGET_ARCH" -e "require('sharp')"
+          docker run --rm --network none --platform "linux/$TARGET_ARCH" -e DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/validation "mizano-api:$TARGET_ARCH" npx --no-install prisma validate
+          test "$(docker image inspect --format '{{.Size}}' "mizano-api:$TARGET_ARCH")" -lt 1000000000
+          test "$(docker image inspect --format '{{.Size}}' "mizano-web:$TARGET_ARCH")" -lt 500000000
+          docker image ls

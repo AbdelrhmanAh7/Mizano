@@ -159,4 +159,59 @@ The workflow still pulls an Ollama vision model on the host; the CPU-only demo m
 
 **Operations.** Back up PostgreSQL daily, for example `docker exec mizano-postgres pg_dump -U mizano mizano_db | gzip > /backups/mizano-$(date +%Y%m%d).sql.gz`, and keep uploaded originals with the same retention. Generate secrets with `openssl rand -base64 48`; never commit them or paste them into issues.
 
+## Building for Raspberry Pi (arm64)
+
+API and web builders use `FROM --platform=$BUILDPLATFORM node:20-alpine`:
+pnpm installation, shared packages, Prisma generation, Nest and Next builds run
+on the build host. The API production dependency stage and both runtimes use
+target-platform `node:20-alpine`. API dependencies are deployed with pnpm 8.14.0
+in an isolated production tree; bcrypt and sharp are checked on the target.
+The web runtime contains Next standalone, static files, public assets and a
+target-platform sharp installation. Prisma includes both Alpine OpenSSL 3 musl
+engines. Both containers use non-root users and `NODE_ENV=production`.
+
+Build one architecture at a time to load it into the local Docker image store:
+
+```bash
+docker buildx build --platform linux/arm64 -f apps/api/Dockerfile -t mizano-api:arm64 --load .
+docker buildx build --platform linux/arm64 -f apps/web/Dockerfile -t mizano-web:arm64 --build-arg NEXT_PUBLIC_API_URL=https://api.example.com/api --load .
+docker run --rm --platform linux/arm64 --entrypoint node mizano-api:arm64 -p process.arch
+docker run --rm --platform linux/arm64 --network none -e DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/validation mizano-api:arm64 npx --no-install prisma validate
+docker image ls mizano-api
+docker image ls mizano-web
+```
+
+The architecture probe must print `arm64`. Repeat the two builds with
+`--platform linux/amd64` and `:amd64` tags. Set `NEXT_PUBLIC_API_URL` to the
+browser-accessible API URL **at build time**; changing the runtime environment
+does not rebuild the client bundle. For an `exec format error` on arm64, install
+emulation once: `docker run --privileged --rm tonistiigi/binfmt --install arm64`.
+
+Image sizes: verification pending in this worktree; targets are API <1 GB and
+web <500 MB. Use `docker image inspect --format '{{.Size}}' IMAGE` for exact
+local byte sizes; registry transfer sizes and Docker's displayed disk usage can
+differ. Recorded measurements and limitations are in the issue-38 checkpoint.
+
+API migrations use the image's bundled Prisma CLI and target schema engine:
+`npx prisma migrate deploy` from `/app/apps/api`. No npm installation is needed;
+`npm_config_offline=true` prevents npx from fetching a missing package. The
+schema and migrations are under `/app/apps/api/prisma`. Supply the authorized
+`DATABASE_URL` through the deployment's normal secret mechanism. Health checks
+probe `http://127.0.0.1:6001/api/health` and
+`http://127.0.0.1:5001/robots.txt`; Next binds to `0.0.0.0`.
+
+Image startup, Prisma and installed native dependencies need no runtime
+package downloads. OCR/PDF acceptance remains separate: Chromium and pinned English/Arabic
+traineddata are bundled, and Tesseract reads those language files from its default working-directory
+cache. Verify cold OCR with networking disabled before release. Bundled
+`onnxruntime-node` Linux binaries require glibc rather than Alpine musl. These
+images alone do not establish the complete offline intake-worker acceptance
+from issue #38.
+
+CI's `docker-multiarch` job serially builds and loads API and web for
+`linux/amd64,linux/arm64` with separate cache scopes and an explicit web API
+build argument. It checks architecture, native dependencies, offline Prisma
+validation and the size limits. It does not push images; publishing SHA tags/digests and Pi
+cold-start/health evidence remain release work.
+
 Historical VPS sizing and provider notes: [archive/deployment-requirements-2026-03.md](archive/deployment-requirements-2026-03.md).

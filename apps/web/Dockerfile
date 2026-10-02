@@ -4,19 +4,20 @@
 # ============================================
 
 # Stage 1: Builder
-FROM node:20-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@8.14.0 --activate
 
 WORKDIR /app
 
 # Copy package files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/validators/package.json ./packages/validators/
 
-# Install dependencies
+# Install dependencies (HUSKY=0 disables the husky prepare hook)
+ENV HUSKY=0
 RUN pnpm install --frozen-lockfile
 
 # Copy source code
@@ -33,7 +34,17 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 RUN pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/validators build
 
 # Build the application
-RUN pnpm --filter web build
+RUN pnpm --filter @mizano/web build \
+  && rm -rf apps/web/.next/standalone/node_modules/sharp \
+    apps/web/.next/standalone/node_modules/@img \
+    apps/web/.next/standalone/apps/web/node_modules/sharp \
+    apps/web/.next/standalone/apps/web/node_modules/@img
+
+# Install image processing binaries on the target, without retaining npm cache.
+FROM node:20-alpine AS native-deps
+ARG SHARP_VERSION=0.34.5
+RUN npm install --prefix /opt/sharp --no-audit --no-fund sharp@${SHARP_VERSION} \
+  && cd /opt/sharp && node -e "require('sharp')"
 
 # ============================================
 # Stage 2: Production
@@ -45,18 +56,23 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=5001
+# Bind all interfaces: standalone defaults to the container hostname, which breaks localhost healthchecks
+ENV HOSTNAME=0.0.0.0
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 # Copy standalone build
-COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --chown=nextjs:nodejs --from=builder /app/apps/web/.next/standalone ./
+COPY --chown=nextjs:nodejs --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --chown=nextjs:nodejs --from=builder /app/apps/web/public ./apps/web/public
 
-# Change ownership
-RUN chown -R nextjs:nodejs /app
+# Target-native sharp replaces the build-host package removed from standalone.
+COPY --from=native-deps /opt/sharp/node_modules/ ./node_modules/
+
+# Writable next/image cache (no recursive chown: it would duplicate every layer)
+RUN mkdir -p apps/web/.next/cache && chown nextjs:nodejs apps/web/.next/cache
 
 USER nextjs
 
@@ -65,7 +81,7 @@ EXPOSE 5001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:5001/api/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:5001/robots.txt || exit 1
 
 # Start the application
 CMD ["node", "apps/web/server.js"]

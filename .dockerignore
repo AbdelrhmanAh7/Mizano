@@ -8,8 +8,7 @@ dist
 **/dist
 
 # Next.js
-apps/web/.next/cache
-apps/web/.next/trace
+**/.next
 
 # Git
 .git
@@ -29,7 +28,6 @@ apps/web/.next/trace
 # Environment
 .env
 .env.*
-!.env.example
 
 # Logs
 *.log
