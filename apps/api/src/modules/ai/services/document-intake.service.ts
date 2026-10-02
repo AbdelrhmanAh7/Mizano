@@ -1,8 +1,9 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { AiFeature, AiFeedbackAction } from '@prisma/client';
+import { AiFeature, AiFeedbackAction, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { INTAKE_DRAFT_ENTITY } from '../intake/intake-jobs.service';
 import { OllamaService, DocumentExtractionResult } from './ollama.service';
 import { DocumentClassificationService, DocumentCategory } from './document-classification.service';
 import { EntityExtractionService } from './entity-extraction.service';
@@ -140,6 +141,8 @@ export interface ConfirmIntakeInput {
   projectId?: string;
   /** User corrections for AI learning */
   corrections?: Record<string, unknown>;
+  jobId?: string;
+  userId?: string;
 }
 
 /** A confirmed line after tenant validation and Decimal computation. */
@@ -603,6 +606,38 @@ export class DocumentIntakeService {
     };
   }
 
+  /**
+   * Append-only idempotency record of the draft created for an intake job. Written in the same
+   * transaction as the draft, so recovery can link a draft whose job update was lost.
+   */
+  private async writeDraftMarker(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    dto: ConfirmIntakeInput,
+    draft: { type: 'bill' | 'invoice'; id: string },
+  ): Promise<void> {
+    if (!dto.jobId) return;
+    let actorUserId = dto.userId;
+    if (!actorUserId) {
+      const job = await tx.intakeJob.findFirst({
+        where: { id: dto.jobId, organizationId, deletedAt: null },
+        select: { createdById: true },
+      });
+      if (!job) throw new BadRequestException('Intake job not found');
+      actorUserId = job.createdById;
+    }
+    await tx.auditLog.create({
+      data: {
+        organizationId,
+        userId: actorUserId,
+        action: 'CREATE',
+        entityType: INTAKE_DRAFT_ENTITY,
+        entityId: dto.jobId,
+        newValues: { draftType: draft.type, draftId: draft.id },
+      },
+    });
+  }
+
   private async createDraftBill(
     organizationId: string,
     dto: ConfirmIntakeInput,
@@ -612,35 +647,41 @@ export class DocumentIntakeService {
 
     const billNumber = dto.documentNumber || (await this.generateBillNumber(organizationId));
 
-    const bill = await this.prisma.bill.create({
-      data: {
-        billNumber,
-        vendorId,
-        date: new Date(dto.date),
-        dueDate: new Date(dto.dueDate),
-        subtotal: resolved.subtotal,
-        taxAmount: resolved.taxAmount,
-        grandTotal: resolved.grandTotal,
-        balanceDue: resolved.grandTotal,
-        reference: dto.reference,
-        currencyCode: dto.currencyCode,
-        notes: dto.notes || 'Created from document scan',
-        projectId: dto.projectId || null,
-        organizationId,
-        lines: {
-          create: resolved.lines.map((line) => ({
-            itemId: line.itemId,
-            accountId: line.accountId,
-            taxRateId: line.taxRateId,
-            description: line.description,
-            quantity: line.quantity,
-            rate: line.rate,
-            taxRate: line.taxRatePercent,
-            amount: line.netAmount,
-          })),
+    const bill = await this.prisma.$transaction(async (tx) => {
+      const b = await tx.bill.create({
+        data: {
+          billNumber,
+          vendorId,
+          date: new Date(dto.date),
+          dueDate: new Date(dto.dueDate),
+          subtotal: resolved.subtotal,
+          taxAmount: resolved.taxAmount,
+          grandTotal: resolved.grandTotal,
+          balanceDue: resolved.grandTotal,
+          reference: dto.reference,
+          currencyCode: dto.currencyCode,
+          notes: dto.notes || 'Created from document scan',
+          projectId: dto.projectId || null,
+          organizationId,
+          lines: {
+            create: resolved.lines.map((line) => ({
+              itemId: line.itemId,
+              accountId: line.accountId,
+              taxRateId: line.taxRateId,
+              description: line.description,
+              quantity: line.quantity,
+              rate: line.rate,
+              taxRate: line.taxRatePercent,
+              amount: line.netAmount,
+            })),
+          },
         },
-      },
-      select: { id: true },
+        select: { id: true },
+      });
+
+      await this.writeDraftMarker(tx, organizationId, dto, { type: 'bill', id: b.id });
+
+      return b;
     });
 
     // Log feedback for AI improvement
@@ -674,35 +715,41 @@ export class DocumentIntakeService {
 
     const invoiceNumber = await this.generateInvoiceNumber(organizationId);
 
-    const invoice = await this.prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        customerId,
-        projectId: dto.projectId || null,
-        date: new Date(dto.date),
-        dueDate: new Date(dto.dueDate),
-        subtotal: resolved.subtotal,
-        taxAmount: resolved.taxAmount,
-        shippingAmount: new Decimal(0),
-        grandTotal: resolved.grandTotal,
-        balanceDue: resolved.grandTotal,
-        notes: dto.notes || 'Created from document scan',
-        organizationId,
-        lines: {
-          // InvoiceLine has no accountId column; a supplied account is only validated.
-          create: resolved.lines.map((line) => ({
-            itemId: line.itemId,
-            taxRateId: line.taxRateId,
-            description: line.description,
-            quantity: line.quantity,
-            rate: line.rate,
-            discount: line.discountPercent,
-            taxRate: line.taxRatePercent,
-            amount: line.netAmount,
-          })),
+    const invoice = await this.prisma.$transaction(async (tx) => {
+      const inv = await tx.invoice.create({
+        data: {
+          invoiceNumber,
+          customerId,
+          projectId: dto.projectId || null,
+          date: new Date(dto.date),
+          dueDate: new Date(dto.dueDate),
+          subtotal: resolved.subtotal,
+          taxAmount: resolved.taxAmount,
+          shippingAmount: new Decimal(0),
+          grandTotal: resolved.grandTotal,
+          balanceDue: resolved.grandTotal,
+          notes: dto.notes || 'Created from document scan',
+          organizationId,
+          lines: {
+            // InvoiceLine has no accountId column; a supplied account is only validated.
+            create: resolved.lines.map((line) => ({
+              itemId: line.itemId,
+              taxRateId: line.taxRateId,
+              description: line.description,
+              quantity: line.quantity,
+              rate: line.rate,
+              discount: line.discountPercent,
+              taxRate: line.taxRatePercent,
+              amount: line.netAmount,
+            })),
+          },
         },
-      },
-      select: { id: true },
+        select: { id: true },
+      });
+
+      await this.writeDraftMarker(tx, organizationId, dto, { type: 'invoice', id: inv.id });
+
+      return inv;
     });
 
     this.logger.log(

@@ -2,15 +2,24 @@ import { ConflictException, HttpException, NotFoundException } from '@nestjs/com
 import { ConfigService } from '@nestjs/config';
 import { IntakeJobStatus } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { IntakeJobsService, stageFor } from './intake-jobs.service';
+import { INTAKE_DRAFT_ENTITY, IntakeJobsService, stageFor } from './intake-jobs.service';
 import { IntakeQueueService } from './intake-queue.service';
-import { FakeIntakeJobTable, MemoryIntakeStorage } from './intake-test-utils';
+import {
+  FakeAuditLogTable,
+  FakeDocumentTable,
+  FakeIntakeJobTable,
+  MemoryIntakeStorage,
+} from './intake-test-utils';
 
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
 
 describe('IntakeJobsService', () => {
   let table: FakeIntakeJobTable;
+  let auditLogs: FakeAuditLogTable;
+  let bills: FakeDocumentTable;
+  let invoices: FakeDocumentTable;
+  let expenses: FakeDocumentTable;
   let storage: MemoryIntakeStorage;
   let queue: { enqueue: jest.Mock; cancel: jest.Mock };
   let config: { get: jest.Mock };
@@ -18,6 +27,10 @@ describe('IntakeJobsService', () => {
 
   beforeEach(() => {
     table = new FakeIntakeJobTable();
+    auditLogs = new FakeAuditLogTable();
+    bills = new FakeDocumentTable();
+    invoices = new FakeDocumentTable();
+    expenses = new FakeDocumentTable();
     storage = new MemoryIntakeStorage();
     queue = {
       enqueue: jest.fn().mockResolvedValue(undefined),
@@ -25,7 +38,13 @@ describe('IntakeJobsService', () => {
     };
     config = { get: jest.fn() };
     service = new IntakeJobsService(
-      { intakeJob: table.delegate } as unknown as PrismaService,
+      {
+        intakeJob: table.delegate,
+        auditLog: auditLogs.delegate,
+        bill: bills.delegate,
+        invoice: invoices.delegate,
+        expense: expenses.delegate,
+      } as unknown as PrismaService,
       storage,
       queue as unknown as IntakeQueueService,
       config as unknown as ConfigService,
@@ -274,6 +293,198 @@ describe('IntakeJobsService', () => {
     table.rows[0].draftDocumentId = 'bill-9';
     await expect(service.claimForApproval(job.id, ORG_A)).rejects.toMatchObject({
       response: { draftDocumentId: 'bill-9' },
+    });
+  });
+
+  describe('recoverApprovedJobs', () => {
+    it('link found: links the draft when marker and draft exist for older APPROVED job', async () => {
+      const past = new Date(Date.now() - 10 * 60 * 1000);
+      const job = await table.delegate.create({
+        data: {
+          organizationId: ORG_A,
+          status: IntakeJobStatus.APPROVED,
+          draftDocumentId: null,
+          updatedAt: past,
+        },
+      });
+
+      bills.rows.push({ id: 'bill-1', organizationId: ORG_A, deletedAt: null });
+      await auditLogs.delegate.create({
+        data: {
+          organizationId: ORG_A,
+          userId: 'u1',
+          action: 'CREATE',
+          entityType: INTAKE_DRAFT_ENTITY,
+          entityId: job.id,
+          newValues: { draftType: 'bill', draftId: 'bill-1' },
+        },
+      });
+
+      const result = await service.recoverApprovedJobs();
+      expect(result).toEqual({ linked: 1, reopened: 0 });
+
+      const updated = table.rows.find((r) => r.id === job.id);
+      expect(updated?.status).toBe(IntakeJobStatus.APPROVED);
+      expect(updated?.draftDocumentType).toBe('bill');
+      expect(updated?.draftDocumentId).toBe('bill-1');
+    });
+
+    it('no draft -> reopen: marks job back to EXTRACTED with redacted lastError when no draft exists', async () => {
+      const past = new Date(Date.now() - 10 * 60 * 1000);
+      const job = await table.delegate.create({
+        data: {
+          organizationId: ORG_A,
+          status: IntakeJobStatus.APPROVED,
+          draftDocumentId: null,
+          updatedAt: past,
+        },
+      });
+
+      const result = await service.recoverApprovedJobs();
+      expect(result).toEqual({ linked: 0, reopened: 1 });
+
+      const updated = table.rows.find((r) => r.id === job.id);
+      expect(updated?.status).toBe(IntakeJobStatus.EXTRACTED);
+      expect(updated?.draftDocumentId).toBeNull();
+      expect(updated?.lastError).toBe(
+        'Approval interrupted before draft creation; ready to confirm again',
+      );
+    });
+
+    it('ignores a marker written under another organization', async () => {
+      const past = new Date(Date.now() - 10 * 60 * 1000);
+      const job = await table.delegate.create({
+        data: { organizationId: ORG_A, status: IntakeJobStatus.APPROVED, updatedAt: past },
+      });
+      bills.rows.push({ id: 'bill-a', organizationId: ORG_A, deletedAt: null });
+      await auditLogs.delegate.create({
+        data: {
+          organizationId: ORG_B,
+          userId: 'u2',
+          action: 'CREATE',
+          entityType: INTAKE_DRAFT_ENTITY,
+          entityId: job.id,
+          newValues: { draftType: 'bill', draftId: 'bill-a' },
+        },
+      });
+
+      expect(await service.recoverApprovedJobs()).toEqual({ linked: 0, reopened: 1 });
+      expect(table.rows.find((r) => r.id === job.id)?.draftDocumentId).toBeNull();
+    });
+
+    it('does not relink a job that was linked after the scan', async () => {
+      const past = new Date(Date.now() - 10 * 60 * 1000);
+      const job = await table.delegate.create({
+        data: { organizationId: ORG_A, status: IntakeJobStatus.APPROVED, updatedAt: past },
+      });
+      bills.rows.push({ id: 'bill-new', organizationId: ORG_A, deletedAt: null });
+      await auditLogs.delegate.create({
+        data: {
+          organizationId: ORG_A,
+          userId: 'u1',
+          action: 'CREATE',
+          entityType: INTAKE_DRAFT_ENTITY,
+          entityId: job.id,
+          newValues: { draftType: 'bill', draftId: 'bill-new' },
+        },
+      });
+      // The confirm request links its draft between the sweep's scan and its guarded update.
+      bills.delegate.findFirst.mockImplementationOnce(async () => {
+        const row = table.rows.find((r) => r.id === job.id);
+        if (row) Object.assign(row, { draftDocumentType: 'bill', draftDocumentId: 'bill-live' });
+        return { id: 'bill-new', organizationId: ORG_A, deletedAt: null };
+      });
+
+      expect(await service.recoverApprovedJobs()).toEqual({ linked: 0, reopened: 0 });
+      expect(table.rows.find((r) => r.id === job.id)?.draftDocumentId).toBe('bill-live');
+    });
+
+    it('within grace period untouched: leaves recently approved jobs alone', async () => {
+      const recent = new Date(Date.now() - 60 * 1000);
+      const job = await table.delegate.create({
+        data: {
+          organizationId: ORG_A,
+          status: IntakeJobStatus.APPROVED,
+          draftDocumentId: null,
+          updatedAt: recent,
+        },
+      });
+
+      const result = await service.recoverApprovedJobs();
+      expect(result).toEqual({ linked: 0, reopened: 0 });
+
+      const updated = table.rows.find((r) => r.id === job.id);
+      expect(updated?.status).toBe(IntakeJobStatus.APPROVED);
+      expect(updated?.draftDocumentId).toBeNull();
+      expect(updated?.lastError).toBeNull();
+    });
+
+    it('other tenant untouched: strictly org-scopes draft lookups and recovery', async () => {
+      const past = new Date(Date.now() - 10 * 60 * 1000);
+
+      const jobA = await table.delegate.create({
+        data: {
+          organizationId: ORG_A,
+          status: IntakeJobStatus.APPROVED,
+          draftDocumentId: null,
+          updatedAt: past,
+        },
+      });
+      const jobB = await table.delegate.create({
+        data: {
+          organizationId: ORG_B,
+          status: IntakeJobStatus.APPROVED,
+          draftDocumentId: null,
+          updatedAt: past,
+        },
+      });
+
+      bills.rows.push({ id: 'bill-b', organizationId: ORG_B, deletedAt: null });
+
+      // Marker for jobA attempts to point to bill-b (belonging to ORG_B)
+      await auditLogs.delegate.create({
+        data: {
+          organizationId: ORG_A,
+          userId: 'u1',
+          action: 'CREATE',
+          entityType: INTAKE_DRAFT_ENTITY,
+          entityId: jobA.id,
+          newValues: { draftType: 'bill', draftId: 'bill-b' },
+        },
+      });
+
+      // Marker for jobB points to bill-b
+      await auditLogs.delegate.create({
+        data: {
+          organizationId: ORG_B,
+          userId: 'u2',
+          action: 'CREATE',
+          entityType: INTAKE_DRAFT_ENTITY,
+          entityId: jobB.id,
+          newValues: { draftType: 'bill', draftId: 'bill-b' },
+        },
+      });
+
+      // Recover only ORG_A: ORG_B must not be touched
+      const resultA = await service.recoverApprovedJobs({ organizationId: ORG_A });
+      // Since bill-b does not belong to ORG_A, jobA cannot link it and is reopened
+      expect(resultA).toEqual({ linked: 0, reopened: 1 });
+
+      const updatedA = table.rows.find((r) => r.id === jobA.id);
+      expect(updatedA?.status).toBe(IntakeJobStatus.EXTRACTED);
+
+      // Job B in ORG_B was untouched during ORG_A recovery
+      const untouchedB = table.rows.find((r) => r.id === jobB.id);
+      expect(untouchedB?.status).toBe(IntakeJobStatus.APPROVED);
+      expect(untouchedB?.draftDocumentId).toBeNull();
+
+      // Now recover ORG_B: jobB links bill-b
+      const resultB = await service.recoverApprovedJobs({ organizationId: ORG_B });
+      expect(resultB).toEqual({ linked: 1, reopened: 0 });
+
+      const updatedB = table.rows.find((r) => r.id === jobB.id);
+      expect(updatedB?.status).toBe(IntakeJobStatus.APPROVED);
+      expect(updatedB?.draftDocumentId).toBe('bill-b');
     });
   });
 });

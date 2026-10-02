@@ -305,6 +305,7 @@ export class DocumentIntakeController {
   async confirmDocument(
     @CurrentOrg() orgId: string,
     @Body() dto: ConfirmIntakeDto,
+    @CurrentUser('id') userId?: string,
   ): Promise<{ data: { type: 'bill' | 'invoice'; id: string; number: string } }> {
     const { jobId, ...input } = dto;
     if (!jobId) {
@@ -313,7 +314,11 @@ export class DocumentIntakeController {
     // Replay-safe: only one confirm can move the job to APPROVED.
     const restore = await this.jobs.claimForApproval(jobId, orgId);
     try {
-      const result = await this.intakeService.confirmAndCreate(orgId, input);
+      const result = await this.intakeService.confirmAndCreate(orgId, {
+        ...input,
+        jobId,
+        ...(userId ? { userId } : {}),
+      });
       // The draft is committed: from here on the job is never reopened. If linking fails the
       // job stays APPROVED, so a second confirm is refused (409) instead of creating a duplicate.
       await this.jobs.linkDraft(jobId, orgId, { type: result.type, id: result.id }).catch(() => {

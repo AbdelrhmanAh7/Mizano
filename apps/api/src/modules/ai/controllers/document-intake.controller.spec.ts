@@ -214,7 +214,7 @@ describe('DocumentIntakeController', () => {
     it('claims the job once, creates the draft and links it', async () => {
       await controller.confirmDocument(ORG_A, { ...dto, jobId: 'job-1' });
       expect(jobs.claimForApproval).toHaveBeenCalledWith('job-1', ORG_A);
-      expect(service.confirmAndCreate).toHaveBeenCalledWith(ORG_A, dto);
+      expect(service.confirmAndCreate).toHaveBeenCalledWith(ORG_A, { ...dto, jobId: 'job-1' });
       expect(jobs.linkDraft).toHaveBeenCalledWith('job-1', ORG_A, { type: 'bill', id: 'b1' });
     });
 
