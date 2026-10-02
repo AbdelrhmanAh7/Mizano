@@ -1,3 +1,4 @@
+import { signedMovementQuantity } from '../../inventory/utils/movement-sign';
 import { Injectable } from '@nestjs/common';
 import {
   AccountType,
@@ -652,9 +653,9 @@ export class DashboardService {
     const monthlyDelta: Record<string, number> = {};
     for (const mv of movements) {
       const key = `${mv.createdAt.getFullYear()}-${mv.createdAt.getMonth()}`;
-      const qty = parseFloat(mv.quantity.toString());
+      const qty = signedMovementQuantity(mv.quantity, mv.movementType);
       const cost = parseFloat((mv.costPerUnit ?? 0).toString());
-      const valueDelta = qty * cost * (mv.movementType === 'IN' ? 1 : -1);
+      const valueDelta = qty * cost;
       monthlyDelta[key] = (monthlyDelta[key] || 0) + valueDelta;
     }
 
@@ -1476,11 +1477,11 @@ export class DashboardService {
 
     for (const mv of movements) {
       const key = `${mv.createdAt.getFullYear()}-${mv.createdAt.getMonth()}`;
-      const qty = parseFloat(mv.quantity.toString());
-      if (mv.movementType === 'IN') {
+      const qty = signedMovementQuantity(mv.quantity, mv.movementType);
+      if (qty > 0) {
         inByMonth[key] = (inByMonth[key] || 0) + qty;
       } else {
-        outByMonth[key] = (outByMonth[key] || 0) + qty;
+        outByMonth[key] = (outByMonth[key] || 0) + Math.abs(qty);
       }
     }
 

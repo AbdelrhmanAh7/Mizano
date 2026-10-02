@@ -444,6 +444,47 @@ describe('DashboardService', () => {
     });
   });
 
+  describe('getInventoryValueTrend', () => {
+    it.each([
+      ['legacy OUT', -3, 'OUT', 80],
+      ['new OUT', 3, 'OUT', 80],
+      ['legacy production IN', 5, null, 0],
+      ['new IN', 5, 'IN', 0],
+      ['legacy consumption', -2, null, 70],
+    ])(
+      '%s affects the returned previous month',
+      async (_label, quantity, movementType, expected) => {
+        const now = new Date();
+        prisma.item.findMany.mockResolvedValue([
+          {
+            id: 'item-1',
+            costPrice: D('10'),
+            inventoryLevels: [{ quantity: D('5') }],
+          },
+        ] as never);
+        prisma.inventoryMovement.findMany.mockResolvedValue([
+          {
+            createdAt: new Date(now.getFullYear(), now.getMonth(), 1),
+            quantity: D(String(quantity)),
+            movementType,
+            costPerUnit: D('10'),
+          },
+        ] as never);
+        const result = await service.getInventoryValueTrend(ORG_ID, 2);
+        expect(result.map((row) => row.value)).toEqual([expected, 50]);
+      },
+    );
+    it('counts legacy OUT magnitudes and untyped production in movement totals', async () => {
+      prisma.inventoryMovement.findMany.mockResolvedValue([
+        { createdAt: new Date(), quantity: D('-3'), movementType: 'OUT' },
+        { createdAt: new Date(), quantity: D('3'), movementType: 'OUT' },
+        { createdAt: new Date(), quantity: D('5'), movementType: null },
+      ] as never);
+      const result = await service.getInventoryMovements(ORG_ID, 1);
+      expect(result[0]).toEqual(expect.objectContaining({ inQty: 5, outQty: 6 }));
+    });
+  });
+
   describe('getProjectsOverview', () => {
     it('sums issued invoices exactly and returns money as strings', async () => {
       prisma.project.findMany.mockResolvedValue([
