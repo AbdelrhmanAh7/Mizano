@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { CurrentUser, CurrentUserData } from '../../common/decorators';
@@ -45,6 +46,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout and invalidate refresh token' })
   @ApiBearerAuth()

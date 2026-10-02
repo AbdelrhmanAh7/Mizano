@@ -123,6 +123,41 @@ describe('Auth (e2e)', () => {
     });
   });
 
+  describe('POST /auth/refresh', () => {
+    const refresh = (token: string) =>
+      anon.withToken(token).post('/auth/refresh').send({ refreshToken: token });
+
+    it('rotates two users concurrently, each only gets their own session, replay and logout are rejected', async () => {
+      const a = await registerTenant(app, 'RefA');
+      const b = await registerTenant(app, 'RefB');
+
+      const [ra, rb] = await Promise.all([refresh(a.refreshToken), refresh(b.refreshToken)]);
+      expect(ra.status).toBe(200);
+      expect(rb.status).toBe(200);
+      const tokensA = ra.body.tokens as { accessToken: string; refreshToken: string };
+      const tokensB = rb.body.tokens as { accessToken: string; refreshToken: string };
+      expect(tokensA.refreshToken).not.toEqual(tokensB.refreshToken);
+
+      // Each rotated token belongs to its own user.
+      const subOf = (jwt: string): string =>
+        (JSON.parse(Buffer.from(jwt.split('.')[1], 'base64url').toString()) as { sub: string }).sub;
+      expect(subOf(tokensA.accessToken)).toBe(a.userId);
+      expect(subOf(tokensA.refreshToken)).toBe(a.userId);
+      expect(subOf(tokensB.accessToken)).toBe(b.userId);
+      expect(subOf(tokensB.refreshToken)).toBe(b.userId);
+
+      // Replaying A's old refresh token fails and does not affect B.
+      expect((await refresh(a.refreshToken)).status).toBe(401);
+      expect((await refresh(tokensB.refreshToken)).status).toBe(200);
+
+      // Logout revokes A's current refresh token.
+      expect((await anon.withToken(tokensA.accessToken).post('/auth/logout')).status).toBe(200);
+      expect((await refresh(tokensA.refreshToken)).status).toBe(401);
+      // Logout without a token is rejected, not a 500.
+      expect((await anon.post('/auth/logout')).status).toBe(401);
+    });
+  });
+
   describe('Protected endpoints', () => {
     it('rejects requests without a token', async () => {
       expect((await anon.get('/users/me')).status).toBe(401);
