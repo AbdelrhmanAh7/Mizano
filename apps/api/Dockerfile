@@ -26,16 +26,16 @@ COPY apps/api ./apps/api
 COPY packages ./packages
 
 # Generates the client plus engines for every binaryTarget in schema.prisma,
-# then keeps only the TARGET musl engine (each engine is ~15 MB) and drops the
-# 10 MB type declarations, which nothing reads at runtime.
+# then keeps only the TARGET musl engine (each engine is ~15 MB).
 ARG TARGETARCH
 RUN cd apps/api && pnpm exec prisma generate \
   && if [ "$TARGETARCH" = arm64 ]; then keep=linux-musl-arm64-openssl; else keep=linux-musl-openssl; fi \
   && find /app/node_modules/.prisma/client -name 'libquery_engine-*' ! -name "*${keep}*" -delete \
-  && rm -f /app/node_modules/.prisma/client/index.d.ts \
   && test "$(find /app/node_modules/.prisma/client -name 'libquery_engine-*' | wc -l)" = 1
 RUN pnpm --filter @mizano/shared-types build && pnpm --filter @mizano/validators build
-RUN pnpm --filter api build
+# tsc needs the 10 MB client type declarations; the runtime never reads them.
+RUN pnpm --filter api build \
+  && rm -f /app/node_modules/.prisma/client/index.d.ts
 
 # Pinned Arabic/English assets are unpacked on the build host, never at runtime.
 FROM --platform=$BUILDPLATFORM node:20-alpine AS ocr-assets
