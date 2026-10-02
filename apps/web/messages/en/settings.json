@@ -262,6 +262,7 @@
     "edit": "Edit",
     "delete": "Delete",
     "export": "Export",
+    "submit": "Submit",
     "selectAll": "All",
     "teamMembers": "Team Members",
     "teamMembersDescription": "People with access to this organization",

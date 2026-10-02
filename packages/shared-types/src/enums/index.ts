@@ -25,6 +25,7 @@ export enum Permission {
   EDIT = 'edit',
   DELETE = 'delete',
   EXPORT = 'export',
+  SUBMIT = 'submit',
 }
 
 // --- Accounting ---

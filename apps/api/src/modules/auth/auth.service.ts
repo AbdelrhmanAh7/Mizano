@@ -75,7 +75,7 @@ export class AuthService {
               { module: 'hr', actions: ['view', 'create', 'edit', 'delete', 'export'] },
               { module: 'manufacturing', actions: ['view', 'create', 'edit', 'delete', 'export'] },
               { module: 'projects', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-              { module: 'tax', actions: ['view', 'create', 'edit', 'delete', 'export'] },
+              { module: 'tax', actions: ['view', 'create', 'edit', 'delete', 'export', 'submit'] },
               { module: 'reports', actions: ['view', 'export'] },
               { module: 'crm', actions: ['view', 'create', 'edit', 'delete', 'export'] },
               { module: 'settings', actions: ['view', 'create', 'edit', 'delete'] },
