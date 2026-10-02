@@ -81,10 +81,9 @@ describe('CacheInvalidationInterceptor', () => {
         expect(arg).not.toBe(rawError);
         expect(arg).not.toBeInstanceOf(Error);
         expect(typeof arg).toBe('string');
+        expect(arg).not.toContain(rawError.message);
       }
     }
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Cache invalidation error: Error: redis timeout connection refused'),
-    );
+    expect(warnSpy).toHaveBeenCalledWith('Cache invalidation error: Error');
   });
 });

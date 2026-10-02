@@ -112,7 +112,9 @@ export class QueryMetricsService {
       primaryLatencyMs = Math.round((performance.now() - start) * 100) / 100;
       primaryConnected = true;
     } catch (error) {
-      this.logger.error(`Primary database health check failed: ${describeError(error)}`);
+      this.logger.error(
+        `Primary database health check failed: ${describeError(error, { includeMessage: false })}`,
+      );
     }
 
     const replicaConfigured = this.readReplica.isUsingReplica();
@@ -126,7 +128,9 @@ export class QueryMetricsService {
         replicaLatencyMs = Math.round((performance.now() - start) * 100) / 100;
         replicaConnected = true;
       } catch (error) {
-        this.logger.error(`Read replica health check failed: ${describeError(error)}`);
+        this.logger.error(
+          `Read replica health check failed: ${describeError(error, { includeMessage: false })}`,
+        );
       }
     }
 

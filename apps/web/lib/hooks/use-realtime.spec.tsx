@@ -228,13 +228,32 @@ describe('useRealtime', () => {
         if (session === 'rejected') mockGetSession.mockRejectedValue(new Error('unavailable'));
         else mockGetSession.mockResolvedValue(session);
         const { Wrapper } = createWrapper();
-        renderHook(() => useRealtime(), { wrapper: Wrapper });
+        const { unmount } = renderHook(() => useRealtime(), { wrapper: Wrapper });
         getHandler('disconnect')!('io server disconnect');
         await act(async () => {
           jest.advanceTimersByTime(1000);
         });
         expect(mockConnect).not.toHaveBeenCalled();
+        expect(jest.getTimerCount()).toBe(1);
+        for (const delay of [2000, 4000, 8000, 16000, 30000, 30000]) {
+          const calls = mockGetSession.mock.calls.length;
+          await act(async () => {
+            jest.advanceTimersByTime(delay - 1);
+          });
+          expect(mockGetSession).toHaveBeenCalledTimes(calls);
+          await act(async () => {
+            jest.advanceTimersByTime(1);
+          });
+          expect(mockGetSession).toHaveBeenCalledTimes(calls + 1);
+          expect(mockConnect).not.toHaveBeenCalled();
+        }
+        mockGetSession.mockResolvedValue({ accessToken: 'recovered-token' });
+        await act(async () => {
+          jest.advanceTimersByTime(30000);
+        });
+        expect(mockConnect).toHaveBeenCalledTimes(1);
         expect(jest.getTimerCount()).toBe(0);
+        unmount();
       } finally {
         jest.useRealTimers();
       }

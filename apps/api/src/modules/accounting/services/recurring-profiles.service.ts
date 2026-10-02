@@ -422,7 +422,7 @@ export class RecurringProfilesService {
         await this.executeRecurringProfile(profile);
       } catch (error) {
         this.logger.error(
-          `Failed to process recurring profile ${profile.id}: ${describeError(error)}`,
+          `Failed to process recurring profile ${profile.id}: ${describeError(error, { includeMessage: false })}`,
         );
       }
     }

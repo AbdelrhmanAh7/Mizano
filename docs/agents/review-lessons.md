@@ -75,7 +75,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 10. Logging, audit and secrets
 
-- **Never log or audit values:** no document text, amounts, tax ids, LLM output, query parameters or raw error objects. Log metadata instead (ids, counts, lengths, durations, field names, status), and use `describeError` for errors. `redactText` only masks credential-shaped strings, so it does not make document text safe to log.
+- **Never log or audit values:** no document text, amounts, tax ids, LLM output, query parameters or raw error objects. Log metadata instead (ids, counts, lengths, durations, field names, status), and use `describeError(error, { includeMessage: false })` wherever an error message could contain document or user data. `redactText` only masks credential-shaped strings, so it does not make document text safe to log.
 - **Clients can't claim trusted provenance.** HTTP log captures are forced to `FRONTEND`.
 - **Compare secrets in constant time, with no default secrets.** Re-apply file permissions on files that already exist.
 

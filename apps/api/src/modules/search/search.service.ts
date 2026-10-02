@@ -121,7 +121,9 @@ export class SearchService {
             if (errMsg.includes('function similarity') || errMsg.includes('pg_trgm')) {
               hasTrgm = false;
             }
-            this.logger.warn(`Fuzzy search failed for ${config.type}: ${describeError(err)}`);
+            this.logger.warn(
+              `Fuzzy search failed for ${config.type}: ${describeError(err, { includeMessage: false })}`,
+            );
             return { config, rows: [] };
           }
         }),
@@ -185,7 +187,7 @@ export class SearchService {
         totalResults: allResults.length,
       };
     } catch (error) {
-      this.logger.error(`Global search error: ${describeError(error)}`);
+      this.logger.error(`Global search error: ${describeError(error, { includeMessage: false })}`);
       // Fall back to ILIKE search on any unexpected error
       return this.fallbackSearch(organizationId, query, limit, configs);
     }

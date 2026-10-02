@@ -38,7 +38,9 @@ export class DepreciationService {
           `Org ${org.id}: ${result.processed} assets, ${result.journalsCreated} journals created`,
         );
       } catch (error) {
-        this.logger.error(`Failed to run depreciation for org ${org.id}: ${describeError(error)}`);
+        this.logger.error(
+          `Failed to run depreciation for org ${org.id}: ${describeError(error, { includeMessage: false })}`,
+        );
       }
     }
   }
@@ -160,7 +162,7 @@ export class DepreciationService {
         totalDepreciation += depreciationAmount.toNumber();
       } catch (error) {
         this.logger.error(
-          `Failed to process depreciation for asset ${asset.id}: ${describeError(error)}`,
+          `Failed to process depreciation for asset ${asset.id}: ${describeError(error, { includeMessage: false })}`,
         );
       }
     }

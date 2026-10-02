@@ -365,7 +365,7 @@ export class PayrollService {
     }>
   > {
     const payslip = await this.prisma.payslip.findFirst({
-      where: { id, payrollRun: { organizationId } },
+      where: { id, payrollRun: { organizationId }, employee: { deletedAt: null } },
       include: {
         employee: true,
         payrollRun: true,

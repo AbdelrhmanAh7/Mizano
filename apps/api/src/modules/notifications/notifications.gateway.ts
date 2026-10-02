@@ -125,10 +125,17 @@ export class NotificationsGateway
     }
     if (!payload?.sub) throw new Error('invalid token');
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: { id: true, status: true, organizationId: true },
-    });
+    const user = await this.prisma.user
+      .findUnique({
+        where: { id: payload.sub },
+        select: { id: true, status: true, organizationId: true },
+      })
+      .catch((error: unknown) => {
+        this.logger.error(
+          `Notifications socket authentication failed: ${describeError(error, { includeMessage: false })}`,
+        );
+        throw new Error('Unauthorized');
+      });
     if (!user || user.status !== 'ACTIVE' || !user.organizationId) {
       throw new Error('inactive user');
     }

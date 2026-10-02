@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -119,6 +120,25 @@ describe('NotificationsGateway', () => {
       const socket = makeSocket({ auth: { token: 't', organizationId: 'org-evil-client' } });
       await gateway.authenticate(socket);
       expect(socket.data.user).toEqual({ id: 'user-1', organizationId: 'org-a' });
+    });
+
+    it('logs unexpected database failures safely and rejects the handshake', async () => {
+      const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      try {
+        verifyAsync.mockResolvedValue({ sub: 'user-1' });
+        findUnique.mockRejectedValue(new Error('private user and document data'));
+        const use = jest.fn();
+        gateway.afterInit({ use } as unknown as Server);
+        const socket = makeSocket({ auth: { token: 't' } });
+        const rejected = await new Promise<Error | undefined>((resolve) =>
+          use.mock.calls[0][0](socket, resolve),
+        );
+        expect(rejected?.message).toBe('Unauthorized');
+        expect(log.mock.calls).toEqual([['Notifications socket authentication failed: Error']]);
+        expect(socket.data.user).toBeUndefined();
+      } finally {
+        log.mockRestore();
+      }
     });
 
     it('afterInit registers a middleware that rejects unauthenticated sockets', async () => {

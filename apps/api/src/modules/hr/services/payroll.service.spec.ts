@@ -100,12 +100,25 @@ describe('PayrollService (payslips cross-tenant scoping)', () => {
       await expect(service.getPayslip(orgA, payslipId)).rejects.toThrow(NotFoundException);
 
       expect(findFirstPayslip).toHaveBeenCalledWith({
-        where: { id: payslipId, payrollRun: { organizationId: orgA } },
+        where: {
+          id: payslipId,
+          payrollRun: { organizationId: orgA },
+          employee: { deletedAt: null },
+        },
         include: {
           employee: true,
           payrollRun: true,
         },
       });
+    });
+
+    it('returns 404 for a soft-deleted employee', async () => {
+      findFirstPayslip.mockImplementation(async ({ where }) =>
+        where.employee?.deletedAt === null && where.payrollRun.organizationId === orgA
+          ? null
+          : { employee: { deletedAt: new Date() } },
+      );
+      await expect(service.getPayslip(orgA, payslipId)).rejects.toThrow(NotFoundException);
     });
 
     it('returns payslip when it belongs to caller organization', async () => {
@@ -119,7 +132,11 @@ describe('PayrollService (payslips cross-tenant scoping)', () => {
       const result = await service.getPayslip(orgA, payslipId);
 
       expect(findFirstPayslip).toHaveBeenCalledWith({
-        where: { id: payslipId, payrollRun: { organizationId: orgA } },
+        where: {
+          id: payslipId,
+          payrollRun: { organizationId: orgA },
+          employee: { deletedAt: null },
+        },
         include: {
           employee: true,
           payrollRun: true,

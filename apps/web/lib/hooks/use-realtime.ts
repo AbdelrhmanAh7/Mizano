@@ -80,6 +80,9 @@ export function useRealtime() {
     let disposed = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
+    let reconnectDelay = 1000;
+    let recovering = false;
+
     const socket = io(`${WS_URL}/events`, {
       auth: (cb) => {
         getSession()
@@ -126,6 +129,28 @@ export function useRealtime() {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     });
 
+    const scheduleRecovery = () => {
+      if (disposed) return;
+      reconnectTimer = setTimeout(async () => {
+        reconnectTimer = undefined;
+        let hasToken = false;
+        try {
+          hasToken = !!(await getSession())?.accessToken;
+        } catch {
+          // Retry temporary session failures with backoff.
+        }
+        if (disposed) return;
+        if (hasToken) {
+          recovering = false;
+          reconnectDelay = 1000;
+          socket.connect();
+        } else {
+          reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+          scheduleRecovery();
+        }
+      }, reconnectDelay);
+    };
+
     socket.on('disconnect', (reason) => {
       if (reason === 'io client disconnect') {
         // Client-initiated cleanup (e.g., unmount) — expected, no log
@@ -135,19 +160,9 @@ export function useRealtime() {
         // Socket.IO will auto-reconnect — no action needed
         return;
       }
-      if (reason === 'io server disconnect' && !disposed && reconnectTimer === undefined) {
-        reconnectTimer = setTimeout(() => {
-          getSession()
-            .then((freshSession) => {
-              if (!disposed && freshSession?.accessToken) socket.connect();
-            })
-            .catch(() => {
-              // A failed session refresh leaves the socket disconnected.
-            })
-            .finally(() => {
-              reconnectTimer = undefined;
-            });
-        }, 1000);
+      if (reason === 'io server disconnect' && !disposed && !recovering) {
+        recovering = true;
+        scheduleRecovery();
       }
     });
 

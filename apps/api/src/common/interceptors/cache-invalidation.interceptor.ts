@@ -78,7 +78,9 @@ export class CacheInvalidationInterceptor implements NestInterceptor {
           this.eventEmitter.emit('cache.invalidated', event);
         } catch (error) {
           // Never fail the request due to cache invalidation errors
-          this.logger.warn(`Cache invalidation error: ${describeError(error)}`);
+          this.logger.warn(
+            `Cache invalidation error: ${describeError(error, { includeMessage: false })}`,
+          );
         }
         return response;
       }),
