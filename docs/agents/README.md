@@ -4,12 +4,12 @@ Read [AGENTS.md](../../AGENTS.md) and [the ten-day plan](../roadmap.md). This is
 
 ## Roles and ownership
 
-| Provider | Default lane | Owned scope | Independent reviewer |
-| --- | --- | --- | --- |
-| Claude | Coordinator, queue/Telegram/runtime | Integration decisions, job lifecycle, deployment tooling | Codex |
-| Codex | Accounting/security and final verification | Identity, tenant checks, Decimal/posting/bulk invariants | Claude |
-| GLM | CPU extraction implementation | Parser/OCR adapter, field rules, fixtures and benchmark | Codex |
-| Antigravity | Accountant UX and charts | Inbox, preview/corrections, RTL/mobile, report presentation | Claude or Codex |
+| Provider    | Default lane                               | Owned scope                                                 | Independent reviewer |
+| ----------- | ------------------------------------------ | ----------------------------------------------------------- | -------------------- |
+| Claude      | Coordinator, queue/Telegram/runtime        | Integration decisions, job lifecycle, deployment tooling    | Codex                |
+| Codex       | Accounting/security and final verification | Identity, tenant checks, Decimal/posting/bulk invariants    | Claude               |
+| GLM         | CPU extraction implementation              | Parser/OCR adapter, field rules, fixtures and benchmark     | Codex                |
+| Antigravity | Accountant UX and charts                   | Inbox, preview/corrections, RTL/mobile, report presentation | Claude or Codex      |
 
 Either Claude or Codex can receive the entry prompt and coordinate. If Codex coordinates, it delegates its implementation work to a separate worker and Claude independently reviews those changes. The coordinator may implement bounded integration work, but cannot approve its own changes as independent review. Roles are defaults; use demonstrated availability and task fit. The P0 backlog alone is estimated at 21 agent-hours, so it cannot all sit with one Codex worker during the first two days. Split non-overlapping implementation across available providers (for example frontend session isolation, backend tenancy and the shared tax calculator), while the coordinator serializes shared-schema and posting integration. Treat early milestone dates as at-risk forecasts until Day 1 capacity and reproduction results are known; retain the Day 10 release target and report any miss honestly. Do not invent model IDs or pretend current ChatGPT subagents are the four external products.
 
@@ -44,12 +44,15 @@ For provider quota/failure: checkpoint diff and next step; permit one bounded re
 
 ## Minimal prompts and evidence
 
+Every worker brief must include or link [review lessons](review-lessons.md); reviewers check changes against it.
+
 Give each worker the issue URL, baseline SHA, acceptance criteria, owned paths, dependencies, 60–90 minute task budget and reviewer. Ask for a patch/PR plus evidence. Do not send all docs/full repository to every worker. The coordinator keeps a compact dependency map, consumes summaries and reads consequential diffs directly.
 
 Daily checkpoint template:
 
 ```markdown
 # Run YYYY-MM-DD (Africa/Cairo)
+
 Start/end and elapsed minutes:
 Baseline / integrated / deployed SHA:
 Provider versions and smoke proof:
