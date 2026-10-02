@@ -162,3 +162,19 @@ The workflow still pulls an Ollama vision model on the host; the CPU-only demo m
 Historical VPS sizing and provider notes: [archive/deployment-requirements-2026-03.md](archive/deployment-requirements-2026-03.md).
 
 **Raspberry Pi 5.** The tiny live deployment (compose, Cloudflare Tunnel, digest deploys, encrypted backups, monitoring) is documented in [deploy/pi/README.md](../deploy/pi/README.md).
+
+## Extraction benchmark
+
+`apps/api/src/modules/ai/extraction/benchmark/run-benchmark.ts` runs the intake processor's CPU-only rules path (`buildExtractionContext` → `RulesStrategy` → `needsReview`) over a labelled corpus. No LLM, GPU or network is used.
+
+```bash
+cd apps/api
+pnpm exec ts-node --transpile-only -r tsconfig-paths/register   src/modules/ai/extraction/benchmark/run-benchmark.ts   --corpus src/modules/ai/extraction/benchmark/corpus/synthetic   [--labels <file>] [--out <dir>] [--language eng+ara]
+```
+
+- **Corpus:** `.pdf`, `.png`, `.jpg` files go through pdf-parse or Tesseract exactly as uploads do. Images need the pinned Tesseract assets (`INTAKE_TESSDATA_DIR`). `.txt` files stand in for a PDF's native text layer.
+- **Labels:** `labels.json` (default `<corpus>/labels.json`) holds `{ "synthetic": bool, "documents": { "<file>": { invoiceNumber, date, dueDate, vendorTaxId, currency, subtotal, tax, total } } }`. Money is a decimal string, dates are ISO and an absent field is `null`.
+- **Report:** per-field precision (correct / predicted), recall (correct / labelled) and exact match (absence counts), the all-fields-exact share and the NEEDS_REVIEW share. Review routing uses the processor's own rule, assuming an invoice with no duplicate, because classification and duplicate checks need the database. The report also gives hrtime latency p50/p95/max per document and peak RSS. It prints Markdown, and `--out` also writes `benchmark.md` and `benchmark.json`. Only file names and metrics are printed, never document text or values.
+- **Scoring tests:** `npx jest src/modules/ai/extraction/benchmark`.
+
+The committed corpus is **synthetic** (hand-written fixtures, marked `synthetic: true`), and its report says so. Its numbers test the harness. They are not an accuracy measurement. Keep real invoices in an uncommitted directory on the target host (for example `~/mizano-benchmark/`) and never publish accuracy figures without a reviewed real held-out corpus.
