@@ -1,0 +1,11 @@
+Cairo Office Supplies Co.
+Tax Invoice
+Invoice No: INV-2024-0042
+Invoice Date: 15/03/2024
+Due Date: 14/04/2024
+Tax Registration No: 123-456-789
+Description        Qty   Price   Total
+Paper A4           10    50.00   500.00
+Sub Total: EGP 1,000.00
+VAT 14%: EGP 140.00
+Total: EGP 1,140.00
