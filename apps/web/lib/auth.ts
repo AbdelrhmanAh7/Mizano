@@ -166,9 +166,19 @@ export const authOptions: NextAuthOptions = {
     // Revoke API refresh tokens best-effort, then clear this session's local state.
     async signOut({ token }) {
       try {
-        if (token?.accessToken) {
+        let accessToken = token?.accessToken;
+        // signOut receives the raw JWT without running the jwt callback first.
+        if (
+          token &&
+          (!token.accessTokenExpires || Date.now() >= token.accessTokenExpires - REFRESH_BUFFER_MS)
+        ) {
+          const refreshed = await tokenRefresher.refresh(token.refreshToken);
+          if (!refreshed) return;
+          accessToken = refreshed.accessToken;
+        }
+        if (accessToken) {
           await axios.post(`${API_BASE_URL}/auth/logout`, undefined, {
-            headers: { Authorization: `Bearer ${token.accessToken}` },
+            headers: { Authorization: `Bearer ${accessToken}` },
             timeout: 3_000,
           });
         }

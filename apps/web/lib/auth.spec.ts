@@ -167,6 +167,76 @@ describe('refreshAccessToken (per-session isolation)', () => {
 });
 
 describe('logout clears session state', () => {
+  it('refreshes an expired access token before logging out with the new token', async () => {
+    const { authOptions } = await import('./auth');
+    tokenRefresher.reset();
+    const postSpy = jest
+      .spyOn(axios, 'post')
+      .mockResolvedValueOnce({
+        data: { tokens: { accessToken: 'new-access-A', refreshToken: 'rt-A2' } },
+      })
+      .mockResolvedValueOnce({ data: {} });
+    try {
+      await authOptions.events?.signOut?.({
+        token: jwtFor('A', 'rt-A'),
+        session: undefined as never,
+      });
+      const api =
+        process.env.API_INTERNAL_URL ||
+        process.env.NEXT_PUBLIC_API_URL ||
+        'http://localhost:6001/api';
+      expect(postSpy).toHaveBeenCalledTimes(2);
+      expect(postSpy).toHaveBeenNthCalledWith(
+        1,
+        `${api}/auth/refresh`,
+        { refreshToken: 'rt-A' },
+        {
+          headers: { Authorization: 'Bearer rt-A', 'Content-Type': 'application/json' },
+        },
+      );
+      expect(postSpy).toHaveBeenNthCalledWith(2, `${api}/auth/logout`, undefined, {
+        headers: { Authorization: 'Bearer new-access-A' },
+        timeout: 3_000,
+      });
+      expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0 });
+    } finally {
+      postSpy.mockRestore();
+      tokenRefresher.reset();
+    }
+  });
+
+  it('skips logout and clears local state when refreshing an expired token fails', async () => {
+    const { authOptions } = await import('./auth');
+    tokenRefresher.reset();
+    const postSpy = jest.spyOn(axios, 'post').mockRejectedValue(
+      Object.assign(new Error('secret-refresh-token'), {
+        isAxiosError: true,
+        config: { headers: { Authorization: 'Bearer secret-refresh-token' } },
+        response: { status: 401 },
+      }),
+    );
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const forgetSpy = jest.spyOn(tokenRefresher, 'forget');
+    try {
+      await authOptions.events?.signOut?.({
+        token: jwtFor('A', 'secret-refresh-token'),
+        session: undefined as never,
+      });
+      expect(postSpy).toHaveBeenCalledTimes(1);
+      expect(postSpy.mock.calls[0][0]).toMatch(/\/auth\/refresh$/);
+      expect(forgetSpy).toHaveBeenCalledWith('secret-refresh-token');
+      expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0 });
+      expect(errorSpy).toHaveBeenCalledWith('Failed to refresh access token: HTTP 401');
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('secret-refresh-token');
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('Bearer');
+    } finally {
+      postSpy.mockRestore();
+      errorSpy.mockRestore();
+      forgetSpy.mockRestore();
+      tokenRefresher.reset();
+    }
+  });
+
   it('forget removes only that session cooldown, letting it retry', async () => {
     const refresh = jest.fn<Promise<RefreshedTokens | null>, [string]>();
     refresh.mockResolvedValueOnce(null);
@@ -189,7 +259,7 @@ describe('logout clears session state', () => {
     const spy = jest.spyOn(tokenRefresher, 'forget');
     try {
       await authOptions.events?.signOut?.({
-        token: jwtFor('A', 'rt-A'),
+        token: { ...jwtFor('A', 'rt-A'), accessTokenExpires: Date.now() + 120_000 },
         session: undefined as never,
       });
       expect(postSpy).toHaveBeenCalledWith(
@@ -220,7 +290,11 @@ describe('logout clears session state', () => {
       expect(tokenRefresher.size().cooldowns).toBe(1);
       errorSpy.mockClear();
       await authOptions.events?.signOut?.({
-        token: { ...jwtFor('A', 'secret-refresh-token'), accessToken: 'secret-access-token' },
+        token: {
+          ...jwtFor('A', 'secret-refresh-token'),
+          accessToken: 'secret-access-token',
+          accessTokenExpires: Date.now() + 120_000,
+        },
         session: undefined as never,
       });
       expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0 });
