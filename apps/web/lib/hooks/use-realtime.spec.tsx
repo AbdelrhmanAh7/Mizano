@@ -12,7 +12,13 @@ const mockOn = jest.fn();
 const mockEmit = jest.fn();
 const mockDisconnect = jest.fn();
 const mockConnect = jest.fn();
-const mockSocket = { connect: mockConnect, on: mockOn, emit: mockEmit, disconnect: mockDisconnect };
+const mockSocket = {
+  active: true,
+  connect: mockConnect,
+  on: mockOn,
+  emit: mockEmit,
+  disconnect: mockDisconnect,
+};
 
 jest.mock('socket.io-client', () => ({
   io: jest.fn(() => mockSocket),
@@ -48,6 +54,7 @@ function getHandler(eventName: string): ((...args: unknown[]) => void) | undefin
 }
 
 beforeEach(() => {
+  mockSocket.active = true;
   mockConnect.mockReset();
   mockGetSession.mockReset();
   mockGetSession.mockResolvedValue(null);
@@ -106,6 +113,7 @@ describe('useRealtime', () => {
     expect(registeredEvents).toContain('entity-event');
     expect(registeredEvents).toContain('notification');
     expect(registeredEvents).toContain('disconnect');
+    expect(registeredEvents).toContain('connect_error');
   });
 
   it('joins the org room on connect', () => {
@@ -214,6 +222,68 @@ describe('useRealtime', () => {
       });
       expect(mockConnect).toHaveBeenCalledTimes(1);
       expect(cb).toHaveBeenLastCalledWith({ token: 'fresh-token' });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('recovers a rejected handshake once a token is available without duplicate timers', async () => {
+    jest.useFakeTimers();
+    try {
+      mockUseSession.mockReturnValue({ data: { user: { id: 'user-1' } } });
+      mockSocket.active = false;
+      const { Wrapper } = createWrapper();
+      const { unmount } = renderHook(() => useRealtime(), { wrapper: Wrapper });
+      const auth = (io as jest.Mock).mock.calls[0][1].auth;
+      const cb = jest.fn();
+      mockConnect.mockImplementation(() => auth(cb));
+
+      getHandler('connect_error')!();
+      getHandler('connect_error')!();
+      getHandler('disconnect')!('io server disconnect');
+      expect(jest.getTimerCount()).toBe(1);
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+      expect(mockConnect).not.toHaveBeenCalled();
+      expect(mockGetSession).toHaveBeenCalledTimes(1);
+      mockGetSession.mockResolvedValue({ accessToken: 'recovered-token' });
+      await act(async () => {
+        jest.advanceTimersByTime(1999);
+      });
+      expect(mockConnect).not.toHaveBeenCalled();
+      await act(async () => {
+        jest.advanceTimersByTime(1);
+      });
+      expect(mockConnect).toHaveBeenCalledTimes(1);
+      expect(cb).toHaveBeenLastCalledWith({ token: 'recovered-token' });
+      expect(jest.getTimerCount()).toBe(0);
+
+      getHandler('connect_error')!();
+      unmount();
+      expect(jest.getTimerCount()).toBe(0);
+      await act(async () => {
+        jest.advanceTimersByTime(30000);
+      });
+      expect(mockConnect).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('leaves active handshake errors to automatic reconnection', async () => {
+    jest.useFakeTimers();
+    try {
+      mockUseSession.mockReturnValue({ data: { user: { id: 'user-1' } } });
+      const { Wrapper } = createWrapper();
+      renderHook(() => useRealtime(), { wrapper: Wrapper });
+      getHandler('connect_error')!();
+      expect(jest.getTimerCount()).toBe(0);
+      await act(async () => {
+        jest.advanceTimersByTime(30000);
+      });
+      expect(mockGetSession).not.toHaveBeenCalled();
+      expect(mockConnect).not.toHaveBeenCalled();
     } finally {
       jest.useRealTimers();
     }

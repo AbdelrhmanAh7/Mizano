@@ -55,8 +55,8 @@ const FINANCIAL_ENTITIES = new Set([
 /**
  * Socket.IO disconnect reasons that are auto-recoverable.
  * Socket.IO will reconnect automatically for these — no warning needed.
- * Only `io server disconnect` requires manual reconnection (server forcefully
- * kicked the client and auto-reconnect is disabled for that reason).
+ * Server disconnects and rejected handshakes require manual recovery when
+ * Socket.IO has disabled automatic reconnection.
  */
 const AUTO_RECOVERABLE_REASONS = new Set(['transport close', 'transport error', 'ping timeout']);
 
@@ -151,6 +151,16 @@ export function useRealtime() {
       }, reconnectDelay);
     };
 
+    const recoverConnection = () => {
+      if (disposed || recovering) return;
+      recovering = true;
+      scheduleRecovery();
+    };
+
+    socket.on('connect_error', () => {
+      if (socket.active === false) recoverConnection();
+    });
+
     socket.on('disconnect', (reason) => {
       if (reason === 'io client disconnect') {
         // Client-initiated cleanup (e.g., unmount) — expected, no log
@@ -160,10 +170,7 @@ export function useRealtime() {
         // Socket.IO will auto-reconnect — no action needed
         return;
       }
-      if (reason === 'io server disconnect' && !disposed && !recovering) {
-        recovering = true;
-        scheduleRecovery();
-      }
+      if (reason === 'io server disconnect') recoverConnection();
     });
 
     return () => {
