@@ -95,6 +95,15 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## Review process
 
-- CodeRabbit reviews every PR (configured in `.coderabbit.yaml`, which points it at this file). If a review doesn't start automatically, comment `@coderabbitai review`.
+- Run `/code-review` on every PR (inline comments). CodeRabbit (configured in `.coderabbit.yaml`, which points it at this file) does full reviews once a seat is assigned; if one doesn't start automatically then, comment `@coderabbitai review`.
 - Fix every valid finding at its root, reply on the thread with the commit, and resolve it. When a finding is wrong, reply once with the reason and resolve it.
 - Add any new root cause to this file in the same PR.
+
+## Ops and deploy
+
+- **Health checks must probe a route that exists.** Grep the app's routes first (Next has no `/api/health` unless a route file exists; `/robots.txt` returns 200 without auth). A probe of a missing route makes the container permanently unhealthy.
+- **Next standalone in Docker needs `HOSTNAME=0.0.0.0`.** Docker sets `HOSTNAME` to the container id and Next binds to it, so probes on `127.0.0.1` and peers fail. Probe `127.0.0.1`, not `localhost` (IPv6 in alpine).
+- **Persist deploy state where later commands read it.** Pinned digests live in `.env.pi` (atomic rewrite of those keys only), or a later `compose up` silently reverts to the old images.
+- **Rollback must be repeatable.** Track an active pointer in `deployments.log` (`OK`/`ROLLBACK` lines), not "the previous OK line", or the second rollback is a no-op.
+- **Check DB readiness over TCP** (`pg_isready -h 127.0.0.1`). The temporary init server listens on the unix socket only and passes a socket probe.
+- **Dedupe alerts on stable keys** (check name), never on live values like percentages; alert once on start and once on recovery.

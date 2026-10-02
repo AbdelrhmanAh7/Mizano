@@ -1,0 +1,162 @@
+# Mizano on Raspberry Pi 5 (8GB, arm64). Unverified until run on a Pi.
+# Usage: docker compose -f docker-compose.pi.yml --env-file .env.pi up -d
+# No ports are published: cloudflared reaches web/api over the internal network.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+name: mizano
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    mem_limit: 1536m
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mizano}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-mizano_db}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=384MB
+      - -c
+      - effective_cache_size=1GB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=40
+    volumes:
+      - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    logging: *logging
+    networks: [internal]
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    mem_limit: 256m
+    command:
+      [
+        'redis-server',
+        '--appendonly',
+        'yes',
+        '--maxmemory',
+        '192mb',
+        '--maxmemory-policy',
+        'noeviction',
+      ]
+    volumes:
+      - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: *logging
+    networks: [internal]
+
+  # One-shot: applies pending Prisma migrations, then exits 0.
+  migrate:
+    image: ${MIZANO_API_IMAGE:?set MIZANO_API_IMAGE}
+    restart: 'no'
+    mem_limit: 768m
+    working_dir: /app/apps/api
+    command: ['npx', 'prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *logging
+    networks: [internal]
+
+  api:
+    image: ${MIZANO_API_IMAGE:?set MIZANO_API_IMAGE}
+    restart: unless-stopped
+    mem_limit: 1024m
+    environment:
+      NODE_ENV: production
+      API_PORT: '6001'
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN}
+      FRONTEND_URL: ${CORS_ORIGIN:?set CORS_ORIGIN}
+      OLLAMA_ENABLED: ${OLLAMA_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      INTAKE_STORAGE_DIR: /data/originals
+    volumes:
+      - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/originals:/data/originals
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:6001/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging: *logging
+    networks: [internal]
+
+  # Reserved for the CPU extraction worker (2048m budget); enable when it exists.
+  # worker:
+  #   mem_limit: 2048m
+
+  web:
+    image: ${MIZANO_WEB_IMAGE:?set MIZANO_WEB_IMAGE}
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: '5001'
+      NEXTAUTH_URL: ${NEXTAUTH_URL:?set NEXTAUTH_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET}
+      API_INTERNAL_URL: http://api:6001/api
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:5001/robots.txt']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging: *logging
+    networks: [internal]
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    mem_limit: 128m
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      web:
+        condition: service_healthy
+    logging: *logging
+    networks: [internal]
+
+networks:
+  internal:
+    driver: bridge
