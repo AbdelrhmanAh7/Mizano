@@ -10,15 +10,32 @@ import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
 export class BankAccountsService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Creates a bank account. A non-zero opening balance is rejected: opening balances are posted
+   * journals, recorded in one place (Accounting > Opening Balances) so the ledger, trial balance
+   * and cash KPIs all agree. Stored balances are never a source of truth.
+   */
   async create(organizationId: string, dto: CreateBankAccountDto) {
+    const opening = new Decimal(dto.openingBalance || '0');
+    if (!opening.isZero()) {
+      throw new BadRequestException(
+        'Record opening bank balances through Opening Balances (Accounting → Opening Balances)',
+      );
+    }
+    const linked = await this.prisma.account.findFirst({
+      where: { id: dto.linkedAccountId, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!linked) throw new BadRequestException('Linked ledger account not found');
+
     return this.prisma.bankAccount.create({
       data: {
         name: dto.name,
         accountNumber: dto.accountNumber,
         currency: dto.currency || 'USD',
         type: dto.type,
-        systemBalance: new Decimal(dto.openingBalance || '0'),
-        bankBalance: new Decimal(dto.openingBalance || '0'),
+        systemBalance: new Decimal(0),
+        bankBalance: new Decimal(0),
         linkedAccountId: dto.linkedAccountId,
         organizationId,
       },

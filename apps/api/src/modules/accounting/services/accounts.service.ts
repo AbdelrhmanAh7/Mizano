@@ -10,6 +10,12 @@ import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
+import {
+  money,
+  naturalBalance,
+  parseReportDate,
+  sumPostedLinesByAccount,
+} from '../../reports/utils/report-utils';
 import { CreateAccountDto } from '../dto/create-account.dto';
 import { UpdateAccountDto } from '../dto/update-account.dto';
 
@@ -282,6 +288,10 @@ export class AccountsService {
     return { message: 'Account deleted successfully' };
   }
 
+  /**
+   * Account balance from posted, non-deleted journal lines only. Opening balances are posted
+   * journals, so `Account.openingBalance` is never added. Money leaves as fixed 4-dp strings.
+   */
   async getBalance(organizationId: string, accountId: string, asOfDate?: string) {
     const account = await this.prisma.account.findFirst({
       where: { id: accountId, organizationId, deletedAt: null },
@@ -291,48 +301,66 @@ export class AccountsService {
       throw new NotFoundException('Account not found');
     }
 
-    const dateFilter: Prisma.JournalWhereInput = {};
-    if (asOfDate) {
-      dateFilter.date = { lte: new Date(asOfDate) };
-    }
-
-    const aggregation = await this.prisma.journalLine.aggregate({
-      where: {
-        accountId,
-        journal: {
-          organizationId,
-          isPosted: true,
-          deletedAt: null,
-          ...dateFilter,
-        },
-      },
-      _sum: {
-        debit: true,
-        credit: true,
-      },
-    });
-
-    const totalDebits = new Decimal(aggregation._sum.debit?.toString() || '0');
-    const totalCredits = new Decimal(aggregation._sum.credit?.toString() || '0');
-    const openingBalance = new Decimal(account.openingBalance?.toString() || '0');
-
-    // Debit-normal: ASSET, EXPENSE; Credit-normal: LIABILITY, EQUITY, INCOME, REVENUE
-    const debitNormalTypes: string[] = [AccountType.ASSET, AccountType.EXPENSE];
-    const balance = debitNormalTypes.includes(account.type)
-      ? totalDebits.minus(totalCredits).plus(openingBalance)
-      : totalCredits.minus(totalDebits).plus(openingBalance);
+    const asOf = parseReportDate(asOfDate, 'end', 'asOfDate');
+    const totals = await sumPostedLinesByAccount(
+      this.prisma,
+      organizationId,
+      asOf ? { lte: asOf } : undefined,
+      [accountId],
+    );
+    const t = totals.get(accountId);
+    const totalDebits = t?.debit ?? new Decimal(0);
+    const totalCredits = t?.credit ?? new Decimal(0);
 
     return {
       accountId,
       accountCode: account.code,
       accountName: account.name,
       accountType: account.type,
-      balance,
-      totalDebits,
-      totalCredits,
-      openingBalance,
+      balance: money(naturalBalance(account.type, totalDebits, totalCredits)),
+      totalDebits: money(totalDebits),
+      totalCredits: money(totalCredits),
       asOfDate: asOfDate || null,
     };
+  }
+
+  /** Posted-ledger natural balances for every account of the tenant (one grouped query). */
+  async getBalances(
+    organizationId: string,
+    asOfDate?: string,
+  ): Promise<
+    Array<{
+      accountId: string;
+      accountCode: string;
+      accountName: string;
+      accountType: AccountType;
+      balance: string;
+      totalDebits: string;
+      totalCredits: string;
+    }>
+  > {
+    const asOf = parseReportDate(asOfDate, 'end', 'asOfDate');
+    const [accounts, totals] = await Promise.all([
+      this.prisma.account.findMany({
+        where: { organizationId, deletedAt: null },
+        orderBy: { code: 'asc' },
+        select: { id: true, code: true, name: true, type: true },
+      }),
+      sumPostedLinesByAccount(this.prisma, organizationId, asOf ? { lte: asOf } : undefined),
+    ]);
+    return accounts.map((a) => {
+      const debit = totals.get(a.id)?.debit ?? new Decimal(0);
+      const credit = totals.get(a.id)?.credit ?? new Decimal(0);
+      return {
+        accountId: a.id,
+        accountCode: a.code,
+        accountName: a.name,
+        accountType: a.type,
+        balance: money(naturalBalance(a.type, debit, credit)),
+        totalDebits: money(debit),
+        totalCredits: money(credit),
+      };
+    });
   }
 
   async seedDefaultAccounts(organizationId: string) {

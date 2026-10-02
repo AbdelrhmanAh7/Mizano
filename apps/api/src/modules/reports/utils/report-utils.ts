@@ -135,7 +135,14 @@ export interface MonthBucket {
 }
 
 /** The last `months` calendar months (UTC) ending with the month containing `now`. */
-export function lastMonths(months: number, now: Date = new Date()): MonthBucket[] {
+export const MAX_MONTHS = 36;
+export const MAX_DAYS = 366;
+
+export function lastMonths(requested: number, now: Date = new Date()): MonthBucket[] {
+  // Guard: 0, negative and NaN never reach the loop; huge values are bounded.
+  const months = Number.isFinite(requested)
+    ? Math.min(MAX_MONTHS, Math.max(1, Math.trunc(requested)))
+    : 6;
   const buckets: MonthBucket[] = [];
   for (let i = months - 1; i >= 0; i--) {
     const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
@@ -232,6 +239,44 @@ export async function sumPostedLinesByAccount(
     });
   }
   return totals;
+}
+
+export interface PostedLineRow {
+  accountId: string;
+  journalId: string;
+  date: Date;
+  debit: Decimal;
+  credit: Decimal;
+}
+
+/**
+ * Posted journal lines of the given accounts with their journal date (one query), for reports that
+ * bucket by day/month. Prefer {@link sumPostedLinesByAccount} when no time bucketing is needed.
+ */
+export async function postedLineRows(
+  prisma: ReportPrisma,
+  organizationId: string,
+  accountIds: string[],
+  date?: Prisma.DateTimeFilter,
+): Promise<PostedLineRow[]> {
+  if (accountIds.length === 0) return [];
+  const lines = await prisma.journalLine.findMany({
+    where: { accountId: { in: accountIds }, journal: postedJournalWhere(organizationId, date) },
+    select: {
+      accountId: true,
+      journalId: true,
+      debit: true,
+      credit: true,
+      journal: { select: { date: true } },
+    },
+  });
+  return lines.map((l) => ({
+    accountId: l.accountId,
+    journalId: l.journalId,
+    date: l.journal.date,
+    debit: toDecimal(l.debit),
+    credit: toDecimal(l.credit),
+  }));
 }
 
 /**

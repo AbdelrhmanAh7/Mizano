@@ -1,6 +1,7 @@
 {
   "title": "Reports",
   "description": "Financial reports and analytics",
+  "agingUnappliedCredits": "Net of {amount} in unapplied credits",
   "categories": {
     "financial": "Financial Reports",
     "sales": "Sales Reports",

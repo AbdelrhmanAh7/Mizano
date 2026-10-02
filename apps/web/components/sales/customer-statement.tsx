@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCustomerStatement, Customer, formatCurrency } from '@/lib/hooks/use-customers';
+import { moneyToNumber } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
 interface CustomerStatementProps {
@@ -21,93 +23,30 @@ interface CustomerStatementProps {
   customer?: Customer;
 }
 
-interface StatementLine {
-  id: string;
-  date: string;
-  type: 'INVOICE' | 'PAYMENT' | 'CREDIT_NOTE';
-  reference: string;
-  description?: string;
-  debit: number;
-  credit: number;
-  link?: string;
+/** Detail pages of the documents a statement row comes from. */
+const SOURCE_ROUTES: Record<'invoice' | 'payment' | 'creditNote', (id: string) => string> = {
+  invoice: (id) => `/sales/invoices/${id}`,
+  payment: (id) => `/sales/payments/${id}`,
+  creditNote: (id) => `/sales/credit-notes/${id}`,
+};
+
+/** Shows a fixed-scale decimal string as currency, or a dash for zero (display only). */
+function showAmount(value: string, currency: string): string {
+  const n = moneyToNumber(value);
+  return n === 0 ? '-' : formatCurrency(n, currency);
+}
+
+function balanceClass(value: string): string {
+  const n = moneyToNumber(value);
+  return n > 0 ? 'text-red-600' : n < 0 ? 'text-green-600' : '';
 }
 
 export function CustomerStatement({ customerId, customer }: CustomerStatementProps) {
-  const { data: statementData, isLoading } = useCustomerStatement(customerId);
+  const t = useTranslations('sales.customers.statement');
+  const tc = useTranslations('common');
+  const { data: statement, isLoading, isError, refetch } = useCustomerStatement(customerId);
 
   const currency = customer?.currency || 'USD';
-
-  // Create unified statement from invoices, payments, credit notes
-  const statement = useMemo(() => {
-    if (!statementData) return [];
-
-    const lines: StatementLine[] = [];
-
-    // Add invoices as debits (increase balance owed)
-    (statementData.invoices || []).forEach((inv) => {
-      lines.push({
-        id: inv.id,
-        date: inv.date,
-        type: 'INVOICE',
-        reference: inv.invoiceNumber,
-        description: `Invoice ${inv.invoiceNumber}`,
-        debit: parseFloat(inv.grandTotal || '0'),
-        credit: 0,
-        link: `/sales/invoices/${inv.id}`,
-      });
-    });
-
-    // Add payments as credits (decrease balance owed)
-    (statementData.payments || []).forEach((pmt) => {
-      lines.push({
-        id: pmt.id,
-        date: pmt.date,
-        type: 'PAYMENT',
-        reference: pmt.paymentNumber,
-        description: `Payment ${pmt.paymentNumber} (${pmt.paymentMode?.replace('_', ' ')})`,
-        debit: 0,
-        credit: parseFloat(pmt.amount || '0'),
-        link: `/sales/payments/${pmt.id}`,
-      });
-    });
-
-    // Add credit notes as credits (decrease balance owed)
-    (statementData.creditNotes || []).forEach((cn) => {
-      lines.push({
-        id: cn.id,
-        date: cn.date,
-        type: 'CREDIT_NOTE',
-        reference: cn.creditNoteNumber,
-        description: `Credit Note ${cn.creditNoteNumber}`,
-        debit: 0,
-        credit: parseFloat(cn.amount || '0'),
-        link: `/sales/credit-notes/${cn.id}`,
-      });
-    });
-
-    // Sort by date ascending
-    lines.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    return lines;
-  }, [statementData]);
-
-  // Calculate totals
-  const totals = useMemo(() => {
-    const totalDebits = statement.reduce((sum, line) => sum + line.debit, 0);
-    const totalCredits = statement.reduce((sum, line) => sum + line.credit, 0);
-    const balance = totalDebits - totalCredits;
-
-    return { totalDebits, totalCredits, balance };
-  }, [statement]);
-
-  // Calculate running balance for each line
-  const statementWithBalance = useMemo(() => {
-    let runningBalance = 0;
-    return statement.map((line) => {
-      runningBalance += line.debit - line.credit;
-      return { ...line, runningBalance };
-    });
-  }, [statement]);
 
   if (isLoading) {
     return (
@@ -118,38 +57,51 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
     );
   }
 
+  if (isError || !statement) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center space-y-4" role="alert">
+          <p className="text-muted-foreground">{tc('table.error')}</p>
+          <Button variant="outline" onClick={() => void refetch()}>
+            {tc('dashboard.tryAgain')}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Every figure below was computed by the API in exact Decimal; the UI only formats it.
+  const hasTransactions = statement.transactions.length > 0;
+
   return (
     <div className="space-y-6">
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
-            <div className="text-sm text-muted-foreground">Total Invoiced</div>
+            <div className="text-sm text-muted-foreground">{t('totalInvoiced')}</div>
             <div className="text-2xl font-bold font-mono text-blue-600">
-              {formatCurrency(totals.totalDebits, currency)}
+              {formatCurrency(moneyToNumber(statement.totalInvoiced), currency)}
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-6">
-            <div className="text-sm text-muted-foreground">Total Paid</div>
+            <div className="text-sm text-muted-foreground">{t('totalPaid')}</div>
             <div className="text-2xl font-bold font-mono text-green-600">
-              {formatCurrency(totals.totalCredits, currency)}
+              {formatCurrency(moneyToNumber(statement.totalCredits), currency)}
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-6">
-            <div className="text-sm text-muted-foreground">Outstanding Balance</div>
+            <div className="text-sm text-muted-foreground">{t('outstanding')}</div>
             <div
-              className={cn(
-                'text-2xl font-bold font-mono',
-                totals.balance > 0 ? 'text-red-600' : totals.balance < 0 ? 'text-green-600' : '',
-              )}
+              className={cn('text-2xl font-bold font-mono', balanceClass(statement.closingBalance))}
             >
-              {formatCurrency(totals.balance, currency)}
+              {formatCurrency(moneyToNumber(statement.closingBalance), currency)}
             </div>
           </CardContent>
         </Card>
@@ -158,89 +110,92 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
       {/* Statement Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Transaction History</CardTitle>
+          <CardTitle>{t('history')}</CardTitle>
         </CardHeader>
         <CardContent>
-          {statementWithBalance.length === 0 ? (
+          {!hasTransactions ? (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">No transactions found</p>
+              <p className="text-muted-foreground">{t('noTransactions')}</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Debit</TableHead>
-                  <TableHead className="text-right">Credit</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
+                  <TableHead>{t('columns.date')}</TableHead>
+                  <TableHead>{t('columns.type')}</TableHead>
+                  <TableHead>{t('columns.reference')}</TableHead>
+                  <TableHead className="text-right">{t('columns.debit')}</TableHead>
+                  <TableHead className="text-right">{t('columns.credit')}</TableHead>
+                  <TableHead className="text-right">{t('columns.balance')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* Transaction Rows */}
-                {statementWithBalance.map((line) => (
-                  <TableRow key={line.id}>
+                {moneyToNumber(statement.openingBalance) !== 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="font-medium">
+                      {t('openingBalance')}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatCurrency(moneyToNumber(statement.openingBalance), currency)}
+                    </TableCell>
+                  </TableRow>
+                )}
+                {statement.transactions.map((line, index) => (
+                  <TableRow key={`${line.type}-${line.reference}-${index}`}>
                     <TableCell>{format(new Date(line.date), 'MMM d, yyyy')}</TableCell>
                     <TableCell>
                       <span
                         className={cn(
                           'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-                          line.type === 'INVOICE' && 'bg-blue-100 text-blue-800',
-                          line.type === 'PAYMENT' && 'bg-green-100 text-green-800',
-                          line.type === 'CREDIT_NOTE' && 'bg-yellow-100 text-yellow-800',
+                          line.type === 'Invoice' && 'bg-blue-100 text-blue-800',
+                          line.type === 'Payment' && 'bg-green-100 text-green-800',
+                          (line.type === 'Payment Void' || line.type === 'Invoice Void') &&
+                            'bg-red-100 text-red-800',
+                          (line.type === 'Credit Note' || line.type === 'Credit Note Refund') &&
+                            'bg-yellow-100 text-yellow-800',
                         )}
                       >
-                        {line.type.replace('_', ' ')}
+                        {t(`types.${line.type}`)}
                       </span>
                     </TableCell>
                     <TableCell className="font-mono text-sm">
-                      {line.link ? (
-                        <Link href={line.link} className="text-blue-600 hover:underline">
-                          {line.reference}
-                        </Link>
-                      ) : (
-                        line.reference
-                      )}
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate">
-                      {line.description || '-'}
+                      <Link
+                        href={SOURCE_ROUTES[line.sourceType](line.sourceId)}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {line.reference}
+                      </Link>
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {line.debit > 0 ? formatCurrency(line.debit, currency) : '-'}
+                      {showAmount(line.debit, currency)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {line.credit > 0 ? formatCurrency(line.credit, currency) : '-'}
+                      {showAmount(line.credit, currency)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(line.runningBalance, currency)}
+                      {formatCurrency(moneyToNumber(line.balance), currency)}
                     </TableCell>
                   </TableRow>
                 ))}
 
                 {/* Closing Balance Row */}
                 <TableRow className="border-t-2 bg-muted/50">
-                  <TableCell colSpan={4} className="font-semibold">
-                    Balance Due
+                  <TableCell colSpan={3} className="font-semibold">
+                    {t('balanceDue')}
                   </TableCell>
                   <TableCell className="text-right font-mono font-semibold">
-                    {formatCurrency(totals.totalDebits, currency)}
+                    {formatCurrency(moneyToNumber(statement.totalDebits), currency)}
                   </TableCell>
                   <TableCell className="text-right font-mono font-semibold">
-                    {formatCurrency(totals.totalCredits, currency)}
+                    {formatCurrency(moneyToNumber(statement.totalCredits), currency)}
                   </TableCell>
                   <TableCell
                     className={cn(
                       'text-right font-mono font-bold',
-                      totals.balance > 0
-                        ? 'text-red-600'
-                        : totals.balance < 0
-                          ? 'text-green-600'
-                          : '',
+                      balanceClass(statement.closingBalance),
                     )}
                   >
-                    {formatCurrency(totals.balance, currency)}
+                    {formatCurrency(moneyToNumber(statement.closingBalance), currency)}
                   </TableCell>
                 </TableRow>
               </TableBody>

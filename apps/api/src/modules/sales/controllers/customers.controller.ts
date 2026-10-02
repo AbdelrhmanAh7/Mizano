@@ -81,8 +81,13 @@ export class CustomersController {
   @Get(':id/statement')
   @Permissions('sales.view')
   @ApiOperation({ summary: 'Get customer statement' })
-  getStatement(@CurrentOrg() orgId: string, @Param('id') id: string) {
-    return this.customersService.getStatement(orgId, id);
+  getStatement(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.customersService.getStatement(orgId, id, startDate, endDate);
   }
 
   @Patch(':id')

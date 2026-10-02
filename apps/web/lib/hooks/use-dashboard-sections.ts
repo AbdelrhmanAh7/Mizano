@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { moneyToNumber } from '@/lib/money';
 
 // ============ Types ============
 
@@ -223,6 +224,19 @@ export interface AnomalyTimelineItem {
   description: string;
 }
 
+/**
+ * Money arrives from the API as fixed-scale decimal strings. Convert the listed fields once, at
+ * the hook boundary, for display and chart plotting only.
+ */
+function withMoney<T extends object>(rows: unknown, fields: readonly string[]): T[] {
+  if (!Array.isArray(rows)) return [];
+  return rows.map((row) => {
+    const out: Record<string, unknown> = { ...(row as Record<string, unknown>) };
+    for (const field of fields) out[field] = moneyToNumber(out[field]);
+    return out as T;
+  });
+}
+
 // ============ Hooks ============
 
 const REFETCH_INTERVAL = 60000;
@@ -233,7 +247,7 @@ export function useGrossMarginTrend(enabled = true) {
     queryKey: ['dashboard', 'gross-margin'],
     queryFn: async (): Promise<GrossMarginPoint[]> => {
       const res = await api.get('/reports/dashboard/gross-margin-trend?months=6');
-      return res.data?.data ?? res.data ?? [];
+      return withMoney<GrossMarginPoint>(res.data?.data ?? res.data, ['revenue', 'cogs']);
     },
     enabled,
     refetchInterval: REFETCH_INTERVAL,
@@ -246,7 +260,10 @@ export function useRevenueYoY(enabled = true) {
     queryKey: ['dashboard', 'revenue-yoy'],
     queryFn: async (): Promise<RevenueYoYPoint[]> => {
       const res = await api.get('/reports/dashboard/revenue-yoy');
-      return res.data?.data ?? res.data ?? [];
+      return withMoney<RevenueYoYPoint>(res.data?.data ?? res.data, [
+        'currentYear',
+        'previousYear',
+      ]);
     },
     enabled,
     refetchInterval: REFETCH_INTERVAL,
@@ -259,7 +276,7 @@ export function useAccountBalances(enabled = true) {
     queryKey: ['dashboard', 'account-balances'],
     queryFn: async (): Promise<AccountBalance[]> => {
       const res = await api.get('/reports/dashboard/account-balances');
-      return res.data?.data ?? res.data ?? [];
+      return withMoney<AccountBalance>(res.data?.data ?? res.data, ['balance']);
     },
     enabled,
     refetchInterval: REFETCH_INTERVAL,
@@ -286,7 +303,7 @@ export function useInvoiceStatus(enabled = true) {
     queryKey: ['dashboard', 'invoice-status'],
     queryFn: async (): Promise<InvoiceStatusItem[]> => {
       const res = await api.get('/reports/dashboard/invoice-status');
-      return res.data?.data ?? res.data ?? [];
+      return withMoney<InvoiceStatusItem>(res.data?.data ?? res.data, ['amount']);
     },
     enabled,
     refetchInterval: REFETCH_INTERVAL,
@@ -312,7 +329,7 @@ export function useInvoiceVolume(enabled = true) {
     queryKey: ['dashboard', 'invoice-volume'],
     queryFn: async (): Promise<InvoiceVolumePoint[]> => {
       const res = await api.get('/reports/dashboard/invoice-volume?months=6');
-      return res.data?.data ?? res.data ?? [];
+      return withMoney<InvoiceVolumePoint>(res.data?.data ?? res.data, ['amount']);
     },
     enabled,
     refetchInterval: REFETCH_INTERVAL,
@@ -325,7 +342,7 @@ export function usePaymentCollection(enabled = true) {
     queryKey: ['dashboard', 'payment-collection'],
     queryFn: async (): Promise<PaymentCollectionPoint[]> => {
       const res = await api.get('/reports/dashboard/payment-collection?months=6');
-      return res.data?.data ?? res.data ?? [];
+      return withMoney<PaymentCollectionPoint>(res.data?.data ?? res.data, ['amount']);
     },
     enabled,
     refetchInterval: REFETCH_INTERVAL,
@@ -365,7 +382,7 @@ export function useBillStatus(enabled = true) {
     queryKey: ['dashboard', 'bill-status'],
     queryFn: async (): Promise<BillStatusItem[]> => {
       const res = await api.get('/reports/dashboard/bill-status');
-      return res.data?.data ?? res.data ?? [];
+      return withMoney<BillStatusItem>(res.data?.data ?? res.data, ['amount']);
     },
     enabled,
     refetchInterval: REFETCH_INTERVAL,
@@ -378,7 +395,7 @@ export function useTopVendors(enabled = true) {
     queryKey: ['dashboard', 'top-vendors'],
     queryFn: async (): Promise<TopVendor[]> => {
       const res = await api.get('/reports/dashboard/top-vendors?limit=5');
-      return res.data?.data ?? res.data ?? [];
+      return withMoney<TopVendor>(res.data?.data ?? res.data, ['totalAmount']);
     },
     enabled,
     refetchInterval: REFETCH_INTERVAL,
@@ -391,7 +408,11 @@ export function usePurchaseTrend(enabled = true) {
     queryKey: ['dashboard', 'purchase-trend'],
     queryFn: async (): Promise<PurchaseTrendPoint[]> => {
       const res = await api.get('/reports/dashboard/purchase-trend?months=6');
-      return res.data?.data ?? res.data ?? [];
+      return withMoney<PurchaseTrendPoint>(res.data?.data ?? res.data, [
+        'bills',
+        'expenses',
+        'total',
+      ]);
     },
     enabled,
     refetchInterval: REFETCH_INTERVAL,
@@ -404,7 +425,10 @@ export function useExpenseTrend(enabled = true) {
     queryKey: ['dashboard', 'expense-trend'],
     queryFn: async (): Promise<ExpenseTrendPoint[]> => {
       const res = await api.get('/reports/dashboard/expense-trend?months=6');
-      return res.data?.data ?? res.data ?? [];
+      return withMoney<ExpenseTrendPoint>(res.data?.data ?? res.data, ['amount']).map((point) => ({
+        ...point,
+        categories: withMoney<{ name: string; amount: number }>(point.categories, ['amount']),
+      }));
     },
     enabled,
     refetchInterval: REFETCH_INTERVAL,
