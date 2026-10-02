@@ -163,9 +163,20 @@ export const authOptions: NextAuthOptions = {
     },
   },
   events: {
-    // Logout clears only this session's single-flight and cooldown state.
-    signOut({ token }) {
-      tokenRefresher.forget(token?.refreshToken);
+    // Revoke API refresh tokens best-effort, then clear this session's local state.
+    async signOut({ token }) {
+      try {
+        if (token?.accessToken) {
+          await axios.post(`${API_BASE_URL}/auth/logout`, undefined, {
+            headers: { Authorization: `Bearer ${token.accessToken}` },
+            timeout: 3_000,
+          });
+        }
+      } catch (error) {
+        console.error(`Logout error: ${describeAuthError(error)}`);
+      } finally {
+        tokenRefresher.forget(token?.refreshToken);
+      }
     },
   },
   pages: {

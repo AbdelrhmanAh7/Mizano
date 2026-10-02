@@ -183,15 +183,57 @@ describe('logout clears session state', () => {
     expect(await r.refresh('rt-B')).toBeNull();
   });
 
-  it('authOptions signOut event forgets the session', async () => {
+  it('authOptions signOut revokes API tokens with the session access token', async () => {
     const { authOptions } = await import('./auth');
+    const postSpy = jest.spyOn(axios, 'post').mockResolvedValue({ data: {} });
     const spy = jest.spyOn(tokenRefresher, 'forget');
-    authOptions.events?.signOut?.({
-      token: { ...jwtFor('A', 'rt-A') },
-      session: undefined as never,
-    });
-    expect(spy).toHaveBeenCalledWith('rt-A');
-    spy.mockRestore();
+    try {
+      await authOptions.events?.signOut?.({
+        token: jwtFor('A', 'rt-A'),
+        session: undefined as never,
+      });
+      expect(postSpy).toHaveBeenCalledWith(
+        `${process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6001/api'}/auth/logout`,
+        undefined,
+        { headers: { Authorization: 'Bearer old-access-A' }, timeout: 3_000 },
+      );
+      expect(spy).toHaveBeenCalledWith('rt-A');
+    } finally {
+      postSpy.mockRestore();
+      spy.mockRestore();
+    }
+  });
+
+  it('a failed API logout still clears state and logs only a redacted error', async () => {
+    const { authOptions } = await import('./auth');
+    tokenRefresher.reset();
+    const postSpy = jest.spyOn(axios, 'post').mockRejectedValue(
+      Object.assign(new Error('secret-refresh-token secret-access-token'), {
+        isAxiosError: true,
+        config: { headers: { Authorization: 'Bearer secret-access-token' } },
+        response: { status: 503 },
+      }),
+    );
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      await tokenRefresher.refresh('secret-refresh-token');
+      expect(tokenRefresher.size().cooldowns).toBe(1);
+      errorSpy.mockClear();
+      await authOptions.events?.signOut?.({
+        token: { ...jwtFor('A', 'secret-refresh-token'), accessToken: 'secret-access-token' },
+        session: undefined as never,
+      });
+      expect(tokenRefresher.size()).toEqual({ inFlight: 0, cooldowns: 0 });
+      expect(errorSpy).toHaveBeenCalledWith('Logout error: HTTP 503');
+      const logged = JSON.stringify(errorSpy.mock.calls);
+      expect(logged).not.toContain('secret-refresh-token');
+      expect(logged).not.toContain('secret-access-token');
+      expect(logged).not.toContain('Bearer');
+    } finally {
+      postSpy.mockRestore();
+      errorSpy.mockRestore();
+      tokenRefresher.reset();
+    }
   });
 });
 
