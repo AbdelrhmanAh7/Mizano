@@ -171,7 +171,13 @@ export class OcrLlmStrategy implements ExtractionStrategy {
     if (!this.tesseractWorker) {
       // Map language codes: 'ara+en' → 'ara+eng'
       const tessLang = language.replace(/\ben\b/g, 'eng').replace(/\bar\b/g, 'ara');
-      this.tesseractWorker = await Tesseract.createWorker(tessLang);
+      // Bundled traineddata (eng/ara) live in INTAKE_TESSDATA_DIR; reading them
+      // from there keeps OCR offline regardless of the process cwd.
+      const tessdataDir = process.env.INTAKE_TESSDATA_DIR;
+      const workerOptions = tessdataDir
+        ? { langPath: tessdataDir, cachePath: tessdataDir, gzip: false }
+        : undefined;
+      this.tesseractWorker = await Tesseract.createWorker(tessLang, undefined, workerOptions);
     }
 
     const worker = this.tesseractWorker as {

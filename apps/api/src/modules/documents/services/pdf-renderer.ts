@@ -30,7 +30,9 @@ export async function renderHtmlToPdf(
   try {
     browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      // /dev/shm is 64 MB in Docker by default; without this flag Chromium
+      // crashes on larger pages instead of falling back to /tmp.
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
       timeout: timeoutMs,
     });
     const page = await browser.newPage();

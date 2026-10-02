@@ -85,6 +85,8 @@ services:
     image: ${MIZANO_API_IMAGE:?set MIZANO_API_IMAGE}
     restart: unless-stopped
     mem_limit: 1024m
+    # Headless Chromium (PDF rendering) needs more than Docker's 64 MB /dev/shm.
+    shm_size: 256m
     environment:
       NODE_ENV: production
       API_PORT: '6001'

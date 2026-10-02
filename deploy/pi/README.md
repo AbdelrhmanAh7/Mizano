@@ -10,7 +10,8 @@ Memory budget (8GB): postgres 1.5G, redis 256M, api 1G, web 512M, cloudflared 12
 2. Install Docker Engine and the compose plugin from Docker's apt repository. Add your user to the `docker` group.
 3. Install `age` (`sudo apt install age`) and `curl`.
 4. Mount the SSD at `/mnt/ssd` (ext4, `UUID=... /mnt/ssd ext4 defaults,noatime 0 2` in `/etc/fstab`), then:
-   `sudo mkdir -p /mnt/ssd/mizano/{postgres,redis,originals,backups,monitor}`.
+   `sudo mkdir -p /mnt/ssd/mizano/{postgres,redis,originals,backups,monitor}` and
+   `sudo chown -R 1001:1001 /mnt/ssd/mizano/originals` (the api container writes intake originals as uid 1001; `deploy.sh` refuses to deploy while that directory is not writable by it). Backups are written by the host backup timer, not by the containers.
 5. Use an official Pi power supply and active cooling; the health check alerts on undervoltage and throttling.
 
 ## 2. Get the deploy files (no source build on the Pi)

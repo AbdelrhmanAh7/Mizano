@@ -98,7 +98,10 @@ FROM node:20-alpine AS runtime
 # that headless Chromium never loads: it ships its own ANGLE/SwiftShader GL
 # (libEGL/libGLESv2 under /usr/lib/chromium). The CI gate renders a PDF and a
 # screenshot offline on every target arch to prove the trimmed image works.
-RUN apk add --no-cache openssl chromium \
+# font-noto-naskh-arabic (1.9 MB) gives Arabic/RTL PDFs real glyphs through
+# fontconfig fallback; Latin text and digits use font-opensans, which the
+# chromium package already depends on.
+RUN apk add --no-cache openssl chromium font-noto-naskh-arabic \
   && rm -rf /usr/lib/libLLVM* /usr/lib/libgallium* /usr/lib/dri /usr/lib/gbm \
        /usr/lib/libvulkan* /usr/share/vulkan /usr/lib/libxatracker*
 
@@ -106,7 +109,8 @@ ENV NODE_ENV=production \
     PORT=6001 \
     npm_config_offline=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
-    PUPPETEER_SKIP_DOWNLOAD=true
+    PUPPETEER_SKIP_DOWNLOAD=true \
+    INTAKE_TESSDATA_DIR=/app/tessdata
 
 # Non-root user. Files are copied with --chown (a recursive chown would
 # duplicate the whole node_modules layer).
@@ -116,7 +120,8 @@ RUN addgroup --system --gid 1001 nodejs \
 
 WORKDIR /app
 
-COPY --chown=nestjs:nodejs --from=ocr-assets /tessdata/ ./apps/api/
+# Bundled eng/ara traineddata; the api reads them from INTAKE_TESSDATA_DIR.
+COPY --chown=nestjs:nodejs --from=ocr-assets /tessdata/ ./tessdata/
 COPY --chown=nestjs:nodejs --from=deps /out/node_modules ./node_modules
 COPY --from=deps /opt/prisma /opt/prisma
 COPY --chown=nestjs:nodejs --from=deps /app/packages/shared-types/package.json ./packages/shared-types/package.json

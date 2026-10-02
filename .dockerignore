@@ -25,9 +25,10 @@ dist
 .claude/
 .clinerules
 
-# Environment
-.env
-.env.*
+# Environment (any depth); example files stay available to the build
+**/.env
+**/.env.*
+!**/.env.example
 
 # Logs
 *.log

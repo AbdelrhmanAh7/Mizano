@@ -260,22 +260,28 @@ jobs:
           docker run --rm --network none --platform "linux/$TARGET_ARCH" --entrypoint node "mizano-api:$TARGET_ARCH" -e "require('bcrypt'); require('sharp'); require('@prisma/client')"
           docker run --rm --network none --platform "linux/$TARGET_ARCH" --entrypoint node "mizano-web:$TARGET_ARCH" -e "require('sharp')"
           docker run --rm --network none --platform "linux/$TARGET_ARCH" -e DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/validation "mizano-api:$TARGET_ARCH" npx --no-install prisma validate
-          docker run --rm --network none --platform "linux/$TARGET_ARCH" --entrypoint node "mizano-api:$TARGET_ARCH" -e "require('tesseract.js').createWorker('eng+ara').then(worker => worker.terminate()).catch(() => process.exit(1))"
-          # Headless Chromium must render a PDF and a PNG offline as the non-root user.
+          # Bundled tesseract languages must load from INTAKE_TESSDATA_DIR, not from the cwd.
+          docker run --rm --network none --platform "linux/$TARGET_ARCH" -w / -e NODE_PATH=/app/node_modules --entrypoint node "mizano-api:$TARGET_ARCH" -e "const dir = process.env.INTAKE_TESSDATA_DIR; if (!dir) throw new Error('INTAKE_TESSDATA_DIR is unset'); require('tesseract.js').createWorker('eng+ara', undefined, { langPath: dir, cachePath: dir, gzip: false }).then(worker => worker.terminate()).catch(error => { console.error('tesseract failed:', error.message); process.exit(1); })"
+          # An Arabic-capable font must be installed for RTL PDFs.
+          docker run --rm --network none --platform "linux/$TARGET_ARCH" --entrypoint fc-list "mizano-api:$TARGET_ARCH" :lang=ar | grep -q .
+          # Headless Chromium must render a PDF and a PNG offline as the non-root user,
+          # with Arabic text falling back to the bundled Noto Naskh Arabic from the
+          # same font stack the invoice templates use.
           # Under QEMU emulation Chromium does not start within minutes, so the
           # arm64 render is verified on the real Pi (#44), not here.
           if [ "$TARGET_ARCH" = amd64 ]; then
             docker run --rm -i --network none --platform "linux/$TARGET_ARCH" -e NODE_PATH=/app/node_modules --entrypoint node "mizano-api:$TARGET_ARCH" - <<'EOF'
           const puppeteer = require('puppeteer');
           (async () => {
-            const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'], timeout: 120000 });
+            const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], timeout: 120000 });
             const page = await browser.newPage();
-            await page.setContent('<html><body dir="rtl"><h1>فاتورة Invoice 123</h1><p>total 1,234.50</p></body></html>');
-            const pdf = await page.pdf({ format: 'A4' });
+            await page.setContent('<html><body dir="rtl" style="font-family: \'Helvetica Neue\', Helvetica, Arial, sans-serif"><h1>فاتورة ضريبية 123</h1><p>Invoice total 1,234.50</p></body></html>');
+            const pdf = Buffer.from(await page.pdf({ format: 'A4' }));
             const png = await page.screenshot({ type: 'png' });
             await browser.close();
             if (pdf.length < 1000 || png.length < 1000) throw new Error('empty render output');
-            console.log(`chromium render ok: pdf=${pdf.length} bytes png=${png.length} bytes`);
+            if (!pdf.toString('latin1').includes('NotoNaskhArabic')) throw new Error('Arabic text was not rendered with Noto Naskh Arabic');
+            console.log(`chromium render ok: pdf=${pdf.length} bytes png=${png.length} bytes, Noto Naskh Arabic embedded`);
           })().catch((error) => { console.error('chromium render failed:', error.message); process.exit(1); });
           EOF
           else
