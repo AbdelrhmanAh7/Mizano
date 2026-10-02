@@ -1,6 +1,6 @@
 # Antigravity entrypoint for Mizano
 
-Read [AGENTS.md](AGENTS.md), [agent operations](docs/agents/README.md), [roadmap](docs/roadmap.md) and your assigned GitHub issue before editing.
+Read [AGENTS.md](AGENTS.md), [agent operations](docs/agents/README.md), [review lessons](docs/agents/review-lessons.md), [roadmap](docs/roadmap.md) and your assigned GitHub issue before editing.
 
 Role: Accountant inbox, source preview, minimal-click approval, Arabic/RTL/mobile and reconciled charts.
 
