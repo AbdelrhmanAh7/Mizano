@@ -9,14 +9,17 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsDecimalString } from '../../../common/dto/decimal-string';
 
 export class BillLineDto {
   @IsString() @IsOptional() itemId?: string;
   @IsString() @IsOptional() accountId?: string;
   @IsString() @IsOptional() description?: string;
-  @IsString() quantity: string;
-  @IsString() rate: string;
-  @IsString() @IsOptional() taxRate?: string;
+  /** Decimal strings bounded to Decimal(19, 4); the scan confirm path uses the same rule. */
+  @IsString() @IsDecimalString() quantity: string;
+  @IsString() @IsDecimalString() rate: string;
+  /** Percentage (14 => 14%), at most 2 decimals. */
+  @IsString() @IsOptional() @IsDecimalString(2) taxRate?: string;
 }
 
 export class CreateBillDto {

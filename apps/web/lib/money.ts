@@ -101,3 +101,47 @@ export function moneyToNumber(value: unknown): number {
   const n = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(n) ? n : 0;
 }
+
+export type TotalsField = 'subtotal' | 'tax' | 'total';
+
+export interface TotalsDiscrepancy {
+  field: TotalsField;
+  /** Value read from the document, as a plain decimal string. */
+  extracted: string;
+  /** Value computed from the reviewed lines with `computeTotals`. */
+  computed: string;
+}
+
+export interface ExtractedTotalsInput {
+  subtotal?: string | number | null;
+  tax?: string | number | null;
+  total?: string | number | null;
+}
+
+/** Largest accepted gap between an extracted and a computed total (0.01), in scale-4 units. */
+const DISCREPANCY_TOLERANCE = BigInt(100);
+
+/**
+ * Compares document-level totals read by extraction with the totals computed from the reviewed
+ * lines. The computed values always win; any field that differs by more than 0.01 is returned so
+ * the review UI can warn. A missing extracted value is not a discrepancy.
+ */
+export function findTotalsDiscrepancies(
+  computed: Pick<MoneyTotals, 'subtotal' | 'taxAmount' | 'grandTotal'>,
+  extracted: ExtractedTotalsInput,
+): TotalsDiscrepancy[] {
+  const pairs: Array<[TotalsField, string | number | null | undefined, string]> = [
+    ['subtotal', extracted.subtotal, computed.subtotal],
+    ['tax', extracted.tax, computed.taxAmount],
+    ['total', extracted.total, computed.grandTotal],
+  ];
+  const out: TotalsDiscrepancy[] = [];
+  for (const [field, raw, computedText] of pairs) {
+    if (raw === null || raw === undefined || !DECIMAL_RE.test(String(raw))) continue;
+    const diff = toScaled(raw) - toScaled(computedText);
+    if ((diff < ZERO ? -diff : diff) > DISCREPANCY_TOLERANCE) {
+      out.push({ field, extracted: String(raw).trim(), computed: computedText });
+    }
+  }
+  return out;
+}
