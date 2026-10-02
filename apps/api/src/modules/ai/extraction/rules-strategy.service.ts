@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
+import { accessSync, constants } from 'fs';
 import { resolve } from 'path';
 import { describeError } from '../../../common/utils/redact';
 import { DocumentExtractionResult } from '../services/ollama.service';
@@ -12,8 +13,10 @@ import {
 import { extractInvoiceFields, RuleField, RulesExtraction } from './rules/invoice-rules-extractor';
 
 const MIN_TEXT_LENGTH = 10;
+const WORKER_INIT_TIMEOUT_MS = 30_000;
 
 interface TesseractWorker {
+  terminate(): Promise<unknown>;
   recognize(buffer: Buffer): Promise<{ data: { text: string; confidence: number } }>;
 }
 
@@ -145,18 +148,45 @@ export class RulesStrategy implements ExtractionStrategy {
       const tessdataDir = process.env.INTAKE_TESSDATA_DIR;
       // Resolve as a filesystem path, never a URL: missing local assets must fail offline.
       const localPath = tessdataDir ? resolve(tessdataDir) : undefined;
-      pending = Tesseract.createWorker(
-        lang,
-        undefined,
-        localPath
-          ? {
-              langPath: localPath,
-              cachePath: localPath,
-              cacheMethod: 'readOnly',
-              gzip: false,
+      if (localPath) {
+        for (const assetLanguage of lang.split('+')) {
+          if (!/^[a-z][a-z0-9_]*$/.test(assetLanguage)) {
+            throw new Error('Invalid OCR language');
+          }
+          accessSync(resolve(localPath, `${assetLanguage}.traineddata`), constants.R_OK);
+        }
+      }
+      pending = new Promise<TesseractWorker>((done, reject) => {
+        let failed = false;
+        const fail = () => {
+          failed = true;
+          clearTimeout(timer);
+          reject(new Error('OCR worker initialization failed'));
+        };
+        const timer = setTimeout(fail, WORKER_INIT_TIMEOUT_MS);
+        Promise.resolve()
+          .then(() =>
+            Tesseract.createWorker(lang, undefined, {
+              ...(localPath
+                ? {
+                    langPath: localPath,
+                    cachePath: localPath,
+                    cacheMethod: 'readOnly',
+                    gzip: false,
+                  }
+                : {}),
+              errorHandler: fail,
+            }),
+          )
+          .then((worker: TesseractWorker) => {
+            clearTimeout(timer);
+            if (failed) {
+              void worker.terminate().catch(() => undefined);
+            } else {
+              done(worker);
             }
-          : undefined,
-      ) as Promise<TesseractWorker>;
+          }, fail);
+      });
       this.workers.set(lang, pending);
       void pending.catch(() => this.workers.delete(lang));
     }

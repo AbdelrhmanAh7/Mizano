@@ -1,4 +1,7 @@
 import { resolve } from 'path';
+import { accessSync } from 'fs';
+
+jest.mock('fs', () => ({ accessSync: jest.fn(), constants: { R_OK: 4 } }));
 import { RulesStrategy } from './rules-strategy.service';
 import { ExtractionContext } from './extraction-strategy.interface';
 
@@ -16,6 +19,7 @@ const context: ExtractionContext = {
   isPdf: false,
 };
 const worker = () => ({
+  terminate: jest.fn().mockResolvedValue(undefined),
   recognize: jest.fn().mockResolvedValue({ data: { text: 'Total: 100.00', confidence: 90 } }),
 });
 
@@ -24,8 +28,10 @@ describe('RulesStrategy worker cache', () => {
   beforeEach(() => {
     delete process.env.INTAKE_TESSDATA_DIR;
     createWorker.mockReset();
+    jest.mocked(accessSync).mockReset();
   });
   afterEach(() => {
+    jest.useRealTimers();
     if (originalDir === undefined) delete process.env.INTAKE_TESSDATA_DIR;
     else process.env.INTAKE_TESSDATA_DIR = originalDir;
   });
@@ -67,16 +73,59 @@ describe('RulesStrategy worker cache', () => {
     expect(await strategy.extract(context)).not.toBeNull();
     expect(createWorker).toHaveBeenCalledTimes(2);
   });
-  it('uses local read-only assets and fails without a download fallback', async () => {
+  it('rejects missing local assets before creating a worker', async () => {
     process.env.INTAKE_TESSDATA_DIR = './missing-tessdata';
-    createWorker.mockRejectedValue(new Error('missing local asset'));
+    jest.mocked(accessSync).mockImplementation(() => {
+      throw new Error('missing');
+    });
     expect(await new RulesStrategy().extract(context)).toBeNull();
-    expect(createWorker).toHaveBeenCalledWith('eng', undefined, {
-      langPath: resolve('./missing-tessdata'),
-      cachePath: resolve('./missing-tessdata'),
+    expect(createWorker).not.toHaveBeenCalled();
+  });
+  it('checks every requested language and uses read-only local assets', async () => {
+    process.env.INTAKE_TESSDATA_DIR = './tessdata';
+    createWorker.mockResolvedValue(worker());
+    expect(await new RulesStrategy().extract({ ...context, language: 'eng+ara' })).not.toBeNull();
+    expect(accessSync).toHaveBeenCalledWith(resolve('./tessdata/eng.traineddata'), 4);
+    expect(accessSync).toHaveBeenCalledWith(resolve('./tessdata/ara.traineddata'), 4);
+    expect(createWorker).toHaveBeenCalledWith('eng+ara', undefined, {
+      langPath: resolve('./tessdata'),
+      cachePath: resolve('./tessdata'),
       cacheMethod: 'readOnly',
       gzip: false,
+      errorHandler: expect.any(Function),
     });
-    expect(createWorker).toHaveBeenCalledTimes(1);
+  });
+  it('handles callback failures even when creation never settles and retries', async () => {
+    createWorker
+      .mockImplementationOnce((_lang, _oem, options) => {
+        options.errorHandler(new Error('language load failed'));
+        return new Promise(() => undefined);
+      })
+      .mockResolvedValueOnce(worker());
+    const strategy = new RulesStrategy();
+    expect(await strategy.extract(context)).toBeNull();
+    expect(await strategy.extract(context)).not.toBeNull();
+  });
+  it('bounds pending initialization and terminates a worker arriving after timeout', async () => {
+    jest.useFakeTimers();
+    const late = worker();
+    let finish!: (value: typeof late) => void;
+    createWorker
+      .mockImplementationOnce(
+        () =>
+          new Promise((done) => {
+            finish = done;
+          }),
+      )
+      .mockResolvedValueOnce(worker());
+    const strategy = new RulesStrategy();
+    const first = strategy.extract(context);
+    await jest.advanceTimersByTimeAsync(30_000);
+    expect(await first).toBeNull();
+    expect(await strategy.extract(context)).not.toBeNull();
+    finish(late);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(late.terminate).toHaveBeenCalledTimes(1);
+    expect(late.recognize).not.toHaveBeenCalled();
   });
 });

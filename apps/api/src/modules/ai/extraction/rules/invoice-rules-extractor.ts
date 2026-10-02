@@ -73,7 +73,13 @@ type AmountKey = 'subtotal' | 'tax' | 'total';
 const TABLE_HEADER_RE = /\b(?:qty|quantity|price)\b|الكميه|السعر/;
 
 function classifyAmountLine(folded: string): AmountKey | null {
-  if (TABLE_HEADER_RE.test(folded)) return null;
+  if (
+    TABLE_HEADER_RE.test(folded) &&
+    (/\b(?:description|item)\b|\u0627\u0644\u0648\u0635\u0641/.test(folded) ||
+      (/\bprice\b|\u0627\u0644\u0633\u0639\u0631/.test(folded) &&
+        /\b(?:qty|quantity)\b|\u0627\u0644\u0643\u0645\u064a\u0647/.test(folded)))
+  )
+    return null;
   if (TOTAL_VAT_RE.test(folded)) return 'tax';
   if (TOTAL_INCL_RE.test(folded)) return 'total';
   if (SUBTOTAL_RE.test(folded)) return 'subtotal';

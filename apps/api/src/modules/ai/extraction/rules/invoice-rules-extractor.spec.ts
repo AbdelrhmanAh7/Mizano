@@ -137,6 +137,12 @@ describe('extractInvoiceFields: Arabic fixtures', () => {
 });
 
 describe('extractInvoiceFields: table totals', () => {
+  it('extracts a Total Price summary', () => {
+    const r = extractInvoiceFields('Total Price: 100.00');
+    expect(r.total?.value.toString()).toBe('100');
+    expect(r.total?.evidence.text).toBe('Total Price: 100.00');
+  });
+
   it.each([
     'Description Qty Price Total',
     'Description Quantity Total 50',
