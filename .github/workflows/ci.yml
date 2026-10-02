@@ -205,6 +205,9 @@ jobs:
     timeout-minutes: 60
     strategy:
       max-parallel: 1
+      # Each arch reports its own result and image sizes; an amd64 failure must
+      # not cancel the arm64 (Pi) build before it is measured.
+      fail-fast: false
       matrix:
         arch: [amd64, arm64]
     steps:
@@ -258,6 +261,20 @@ jobs:
           docker run --rm --network none --platform "linux/$TARGET_ARCH" --entrypoint node "mizano-web:$TARGET_ARCH" -e "require('sharp')"
           docker run --rm --network none --platform "linux/$TARGET_ARCH" -e DATABASE_URL=postgresql://validation:validation@127.0.0.1:5432/validation "mizano-api:$TARGET_ARCH" npx --no-install prisma validate
           docker run --rm --network none --platform "linux/$TARGET_ARCH" --entrypoint node "mizano-api:$TARGET_ARCH" -e "require('tesseract.js').createWorker('eng+ara').then(worker => worker.terminate()).catch(() => process.exit(1))"
+          # Headless Chromium must render a PDF and a PNG offline as the non-root user.
+          docker run --rm -i --network none --platform "linux/$TARGET_ARCH" -e NODE_PATH=/app/node_modules --entrypoint node "mizano-api:$TARGET_ARCH" - <<'EOF'
+          const puppeteer = require('puppeteer');
+          (async () => {
+            const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'], timeout: 120000 });
+            const page = await browser.newPage();
+            await page.setContent('<html><body dir="rtl"><h1>فاتورة Invoice 123</h1><p>total 1,234.50</p></body></html>');
+            const pdf = await page.pdf({ format: 'A4' });
+            const png = await page.screenshot({ type: 'png' });
+            await browser.close();
+            if (pdf.length < 1000 || png.length < 1000) throw new Error('empty render output');
+            console.log(`chromium render ok: pdf=${pdf.length} bytes png=${png.length} bytes`);
+          })().catch((error) => { console.error('chromium render failed:', error.message); process.exit(1); });
+          EOF
           docker image ls
           api_size=$(docker image inspect --format '{{.Size}}' "mizano-api:$TARGET_ARCH")
           web_size=$(docker image inspect --format '{{.Size}}' "mizano-web:$TARGET_ARCH")

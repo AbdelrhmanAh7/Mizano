@@ -94,7 +94,13 @@ RUN npm install --prefix /opt/prisma --no-audit --no-fund prisma@${PRISMA_VERSIO
 FROM node:20-alpine AS runtime
 
 # Chromium preserves PDF rendering without Puppeteer runtime downloads.
-RUN apk add --no-cache openssl chromium
+# Its apk dependency chain pulls in the mesa/LLVM GPU driver stack (~215 MB)
+# that headless Chromium never loads: it ships its own ANGLE/SwiftShader GL
+# (libEGL/libGLESv2 under /usr/lib/chromium). The CI gate renders a PDF and a
+# screenshot offline on every target arch to prove the trimmed image works.
+RUN apk add --no-cache openssl chromium \
+  && rm -rf /usr/lib/libLLVM* /usr/lib/libgallium* /usr/lib/dri /usr/lib/gbm \
+       /usr/lib/libvulkan* /usr/share/vulkan /usr/lib/libxatracker*
 
 ENV NODE_ENV=production \
     PORT=6001 \
