@@ -70,7 +70,10 @@ const TOTAL_RE =
 
 type AmountKey = 'subtotal' | 'tax' | 'total';
 
+const TABLE_HEADER_RE = /\b(?:qty|quantity|price)\b|الكميه|السعر/;
+
 function classifyAmountLine(folded: string): AmountKey | null {
+  if (TABLE_HEADER_RE.test(folded)) return null;
   if (TOTAL_VAT_RE.test(folded)) return 'tax';
   if (TOTAL_INCL_RE.test(folded)) return 'total';
   if (SUBTOTAL_RE.test(folded)) return 'subtotal';

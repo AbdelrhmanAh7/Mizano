@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { describeError } from '../../../common/utils/redact';
 import {
   ExtractionContext,
   ExtractionStrategy,
@@ -75,7 +76,7 @@ export class ExtractionStrategyResolver {
       this.logger.warn('LLM extraction returned nothing; using rules baseline');
     } catch (error) {
       this.logger.warn(
-        `LLM extraction failed (${error instanceof Error ? error.name : 'unknown'}); using rules baseline`,
+        `LLM extraction failed (${describeError(error, { includeMessage: false })}); using rules baseline`,
       );
     }
     return this.rulesStrategy.extract(context);

@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ExtractionStrategyResolver } from './extraction-strategy-resolver.service';
 import { ExtractionContext, StrategyExtractionResult } from './extraction-strategy.interface';
@@ -55,6 +56,24 @@ describe('ExtractionStrategyResolver rules baseline', () => {
     expect((await empty.resolver.resolve(context))?.strategyUsed).toBe('rules');
     const broken = build(undefined, () => Promise.reject(new Error('ECONNREFUSED')));
     expect((await broken.resolver.resolve(context))?.strategyUsed).toBe('rules');
+  });
+
+  it('logs safe failure metadata before falling back without exposing the message', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    try {
+      const error = Object.assign(new Error('private invoice text'), { code: 'ECONNREFUSED' });
+      const { resolver, rules } = build(undefined, () => Promise.reject(error));
+      rules.extract.mockImplementation(async () => {
+        expect(warn).toHaveBeenCalledWith(
+          'LLM extraction failed (Error(ECONNREFUSED)); using rules baseline',
+        );
+        return result('rules');
+      });
+      expect((await resolver.resolve(context))?.strategyUsed).toBe('rules');
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('private invoice text');
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('honours an explicit per-job rules request', async () => {

@@ -136,6 +136,31 @@ describe('extractInvoiceFields: Arabic fixtures', () => {
   });
 });
 
+describe('extractInvoiceFields: table totals', () => {
+  it.each([
+    'Description Qty Price Total',
+    'Description Quantity Total 50',
+    '\u0627\u0644\u0648\u0635\u0641 \u0627\u0644\u0643\u0645\u064a\u0629 \u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a',
+    '\u0627\u0644\u0648\u0635\u0641 \u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a 50',
+  ])('rejects table header %s without a summary total', (header) => {
+    expect(extractInvoiceFields(`${header}\n50.00\nPayable: 100.00`).total).toBeNull();
+  });
+
+  it('prefers the last summary amount and ignores a later table header', () => {
+    const r = extractInvoiceFields(
+      'Total: 50\nDescription Qty Price Total\nItem 1 50 50\nGrand Total: 100\nDescription Quantity Total 50',
+    );
+    expect(r.total?.value.toString()).toBe('100');
+    expect(r.total?.evidence.lineIndex).toBe(3);
+  });
+
+  it('keeps a summary label without an amount unknown', () => {
+    expect(
+      extractInvoiceFields('Total\nDescription Qty Price Total\nItem 1 50 50').total,
+    ).toBeNull();
+  });
+});
+
 describe('extractInvoiceFields: uncertainty', () => {
   it('lowers confidence and warns when subtotal + VAT does not equal total', () => {
     const ok = extractInvoiceFields(fixture('en-sa-invoice.txt'));

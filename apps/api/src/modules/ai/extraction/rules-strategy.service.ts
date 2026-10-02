@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
+import { resolve } from 'path';
 import { describeError } from '../../../common/utils/redact';
 import { DocumentExtractionResult } from '../services/ollama.service';
 import { preprocessForOcr } from '../utils/image-preprocessor.util';
@@ -81,7 +82,7 @@ export function toExtractionResult(
 export class RulesStrategy implements ExtractionStrategy {
   readonly name = 'rules' as const;
   private readonly logger = new Logger(RulesStrategy.name);
-  private tesseractWorker: TesseractWorker | null = null;
+  private readonly workers = new Map<string, Promise<TesseractWorker>>();
 
   canHandle(_context: ExtractionContext): boolean {
     return true;
@@ -132,13 +133,34 @@ export class RulesStrategy implements ExtractionStrategy {
     imageBuffer: Buffer,
     language: string,
   ): Promise<{ text: string; confidence: number }> {
-    if (!this.tesseractWorker) {
+    const lang = language
+      .trim()
+      .toLowerCase()
+      .replace(/\ben\b/g, 'eng')
+      .replace(/\bar\b/g, 'ara');
+    let pending = this.workers.get(lang);
+    if (!pending) {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const Tesseract = require('tesseract.js');
-      const lang = language.replace(/\ben\b/g, 'eng').replace(/\bar\b/g, 'ara');
-      this.tesseractWorker = (await Tesseract.createWorker(lang)) as TesseractWorker;
+      const tessdataDir = process.env.INTAKE_TESSDATA_DIR;
+      // Resolve as a filesystem path, never a URL: missing local assets must fail offline.
+      const localPath = tessdataDir ? resolve(tessdataDir) : undefined;
+      pending = Tesseract.createWorker(
+        lang,
+        undefined,
+        localPath
+          ? {
+              langPath: localPath,
+              cachePath: localPath,
+              cacheMethod: 'readOnly',
+              gzip: false,
+            }
+          : undefined,
+      ) as Promise<TesseractWorker>;
+      this.workers.set(lang, pending);
+      void pending.catch(() => this.workers.delete(lang));
     }
-    const result = await this.tesseractWorker.recognize(imageBuffer);
+    const result = await (await pending).recognize(imageBuffer);
     return { text: result.data.text || '', confidence: result.data.confidence || 0 };
   }
 }
