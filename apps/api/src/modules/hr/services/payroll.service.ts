@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma, PayrollStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 
 @Injectable()
 export class PayrollService {
@@ -254,6 +255,7 @@ export class PayrollService {
         }
       }
 
+      await lockOrganizationLedger(tx, organizationId);
       const journal = await tx.journal.create({
         data: {
           journalNumber,

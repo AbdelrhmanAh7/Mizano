@@ -35,10 +35,14 @@ describe('payables reports net unapplied vendor credits', () => {
 
     expect(prisma.vendorCredit.findMany.mock.calls[0][0].where).toMatchObject({
       organizationId: ORG,
-      deletedAt: null,
       appliedToBillId: null,
-      refundedAt: null,
     });
+    // A credit refunded or voided after the cutoff still debited AP on the cutoff date.
+    const and = prisma.vendorCredit.findMany.mock.calls[0][0].where.AND;
+    expect(and[0].OR[0]).toEqual({ refundedAt: null });
+    expect(and[0].OR[1].refundedAt.gt).toBeInstanceOf(Date);
+    expect(and[1].OR[0]).toEqual({ deletedAt: null });
+    expect(and[1].OR[1].deletedAt.gt).toBeInstanceOf(Date);
     expect(report.summary.total).toBe(256);
     expect(report.summary.unappliedCredits).toBe('200.0000');
     expect(report.summary.netTotal).toBe('56.0000');

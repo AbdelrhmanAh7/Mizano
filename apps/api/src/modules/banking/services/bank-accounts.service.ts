@@ -5,6 +5,11 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { BankAccountQueryDto } from '../dto/bank-account-query.dto';
 import { CreateBankAccountDto } from '../dto/create-bank-account.dto';
 import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
+import {
+  bankBookBalances,
+  endOfUtcDay,
+  sumPostedLinesByAccount,
+} from '../../reports/utils/report-utils';
 
 @Injectable()
 export class BankAccountsService {
@@ -81,7 +86,20 @@ export class BankAccountsService {
       this.prisma.bankAccount.count({ where }),
     ]);
 
-    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    // The stored systemBalance is not maintained; the book balance is the linked ledger balance
+    // as of today (future-dated entries do not count yet).
+    const totals = await sumPostedLinesByAccount(
+      this.prisma,
+      organizationId,
+      { lte: endOfUtcDay(new Date()) },
+      data.map((a) => a.linkedAccountId),
+    );
+    const withBook = data.map((a) => {
+      const t = totals.get(a.linkedAccountId);
+      return { ...a, systemBalance: t ? t.debit.sub(t.credit) : new Decimal(0) };
+    });
+
+    return { data: withBook, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async findOne(organizationId: string, id: string) {
@@ -90,7 +108,14 @@ export class BankAccountsService {
       include: { linkedAccount: true },
     });
     if (!account) throw new NotFoundException('Bank account not found');
-    return account;
+    const totals = await sumPostedLinesByAccount(
+      this.prisma,
+      organizationId,
+      { lte: endOfUtcDay(new Date()) },
+      [account.linkedAccountId],
+    );
+    const t = totals.get(account.linkedAccountId);
+    return { ...account, systemBalance: t ? t.debit.sub(t.credit) : new Decimal(0) };
   }
 
   async update(organizationId: string, id: string, dto: UpdateBankAccountDto) {
@@ -117,10 +142,7 @@ export class BankAccountsService {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [accounts, pendingCount, monthlyCount] = await Promise.all([
-      this.prisma.bankAccount.findMany({
-        where: { organizationId, isActive: true, deletedAt: null },
-        select: { systemBalance: true },
-      }),
+      bankBookBalances(this.prisma, organizationId),
       this.prisma.bankTransaction.count({
         where: { organizationId, status: 'PENDING' },
       }),
@@ -130,7 +152,7 @@ export class BankAccountsService {
     ]);
 
     const totalSystemBalance = accounts.reduce(
-      (sum, a) => sum + parseFloat(a.systemBalance.toString()),
+      (sum, a) => sum + parseFloat(a.balance.toString()),
       0,
     );
 

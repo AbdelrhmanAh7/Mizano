@@ -241,6 +241,41 @@ export async function sumPostedLinesByAccount(
   return totals;
 }
 
+export interface BankBookBalance {
+  id: string;
+  name: string;
+  linkedAccountId: string;
+  /** Book balance: posted debits less credits on the linked ledger account. */
+  balance: Decimal;
+}
+
+/**
+ * Book balance of every active bank account from its linked ledger account. `BankAccount.systemBalance`
+ * is not maintained (opening balances are journals), so every consumer reads the ledger instead.
+ * Without `until` the balance is the current one: lines dated up to the end of today (UTC), so
+ * future-dated entries do not count yet.
+ */
+export async function bankBookBalances(
+  prisma: Pick<ReportPrisma, 'bankAccount' | 'journalLine'>,
+  organizationId: string,
+  until: Date = endOfUtcDay(new Date()),
+): Promise<BankBookBalance[]> {
+  const banks = await prisma.bankAccount.findMany({
+    where: { organizationId, isActive: true, deletedAt: null },
+    select: { id: true, name: true, linkedAccountId: true },
+  });
+  const totals = await sumPostedLinesByAccount(
+    prisma as ReportPrisma,
+    organizationId,
+    { lte: until },
+    [...new Set(banks.map((b) => b.linkedAccountId))],
+  );
+  return banks.map((b) => {
+    const t = totals.get(b.linkedAccountId);
+    return { ...b, balance: t ? t.debit.sub(t.credit) : new Decimal(0) };
+  });
+}
+
 export interface PostedLineRow {
   accountId: string;
   journalId: string;

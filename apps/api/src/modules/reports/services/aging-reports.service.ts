@@ -53,42 +53,180 @@ export class AgingReportsService {
   constructor(private prisma: ReadReplicaService) {}
 
   /**
-   * Receivables aging. Only issued invoices count (DRAFT and VOID never do). Unapplied
-   * APPLY_TO_INVOICE credit notes credited the AR control account without reducing any invoice,
-   * so they are shown per customer and netted in `summary.netTotal`, which reconciles to the AR
-   * control account (mirrors the payables aging with vendor credits).
+   * Voided payments with the accounting date of the void: the reversal journal's date (which
+   * `JournalsService.reverse` takes from the original entry, so a future-dated payment voided early
+   * is reversed on its own date), falling back to `deletedAt` for legacy voids without a journal.
+   */
+  private async paymentVoids(
+    model: 'paymentReceived' | 'paymentMade',
+    organizationId: string,
+    partyId: string,
+    sourceType: 'PAYMENT_RECEIVED_VOID' | 'PAYMENT_MADE_VOID',
+  ): Promise<Array<{ id: string; paymentNumber: string; amount: Decimal; voidDate: Date }>> {
+    const where =
+      model === 'paymentReceived'
+        ? { customerId: partyId, organizationId, deletedAt: { not: null } }
+        : { vendorId: partyId, organizationId, deletedAt: { not: null } };
+    const rows: Array<{
+      id: string;
+      paymentNumber: string;
+      amount: Decimal;
+      deletedAt: Date | null;
+    }> =
+      model === 'paymentReceived'
+        ? await this.prisma.paymentReceived.findMany({ where })
+        : await this.prisma.paymentMade.findMany({ where });
+    if (rows.length === 0) return [];
+    const journals = await this.prisma.journal.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+        isPosted: true,
+        sourceType,
+        sourceId: { in: rows.map((r) => r.id) },
+      },
+      select: { sourceId: true, date: true },
+    });
+    const dates = new Map<string, Date>();
+    for (const j of journals) if (j.sourceId) dates.set(j.sourceId, j.date);
+    return rows.map((r) => ({
+      id: r.id,
+      paymentNumber: r.paymentNumber,
+      amount: r.amount,
+      voidDate: dates.get(r.id) ?? (r.deletedAt as Date),
+    }));
+  }
+
+  /**
+   * Receivables aging as of a cutoff. Only posted invoices count (DRAFT never does); an invoice
+   * voided after the cutoff was still open on it. Each balance is rebuilt as of the cutoff from
+   * the payments and applied credit notes dated on or before it that were still live then (a
+   * void dated later is ignored), so the snapshot does not depend on today's `balanceDue`.
+   * Unapplied APPLY_TO_INVOICE credit notes credited the AR control account without reducing any
+   * invoice, so they are shown per customer and netted in `summary.netTotal`, which reconciles to
+   * the AR control account (mirrors the payables aging with vendor credits).
+   *
+   * Limitation: applying a credit note has no applied-at column, so a note is treated as applied
+   * on its own date; a note applied through `/apply` after the cutoff is still netted on that
+   * date. The same holds for vendor credits in the payables aging.
    */
   async getReceivablesAging(organizationId: string, asOfDate?: string) {
     const { asOf } = resolveAsOf(asOfDate);
 
-    const [invoices, credits] = await Promise.all([
-      this.prisma.invoice.findMany({
-        where: {
-          organizationId,
-          deletedAt: null,
-          balanceDue: { gt: 0 },
-          status: { in: POSTED_INVOICE_STATUSES },
-          date: { lte: asOf },
-        },
-        include: {
-          customer: { select: { id: true, name: true } },
-        },
-      }),
+    // An invoice voided after the cutoff was still open on it (its reversal journal is dated
+    // later), so it stays in the historical snapshot and the report matches the AR control account.
+    const laterVoids = await this.prisma.journal.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+        isPosted: true,
+        sourceType: 'INVOICE_VOID',
+        date: { gt: asOf },
+      },
+      select: { sourceId: true },
+    });
+    const laterVoidedIds = laterVoids.flatMap((j) => (j.sourceId ? [j.sourceId] : []));
+
+    // No `balanceDue` filter: an invoice settled after the cutoff was still open on it.
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+        OR: [
+          { status: { in: POSTED_INVOICE_STATUSES } },
+          { status: InvoiceStatus.VOID, id: { in: laterVoidedIds } },
+        ],
+        date: { lte: asOf },
+      },
+      include: {
+        customer: { select: { id: true, name: true } },
+      },
+    });
+    const invoiceIds = invoices.map((i) => i.id);
+
+    const [allocations, creditNotes] = await Promise.all([
+      invoiceIds.length === 0
+        ? []
+        : this.prisma.paymentAllocation.findMany({
+            where: {
+              invoiceId: { in: invoiceIds },
+              payment: { organizationId, date: { lte: asOf } },
+            },
+            select: {
+              invoiceId: true,
+              amount: true,
+              payment: { select: { id: true, deletedAt: true } },
+            },
+          }),
       this.prisma.creditNote.findMany({
         where: {
           organizationId,
-          deletedAt: null,
           type: CreditNoteType.APPLY_TO_INVOICE,
-          appliedToInvoiceId: null,
           date: { lte: asOf },
+          OR: [{ appliedToInvoiceId: null }, { appliedToInvoiceId: { in: invoiceIds } }],
         },
         select: {
+          id: true,
+          appliedToInvoiceId: true,
           customerId: true,
           amount: true,
+          deletedAt: true,
           customer: { select: { id: true, name: true } },
         },
       }),
     ]);
+
+    // Voids are dated on their reversal journal (deletedAt only for legacy voids without one).
+    const voidedPaymentIds = allocations.flatMap((al) =>
+      al.payment.deletedAt ? [al.payment.id] : [],
+    );
+    const voidedCreditIds = creditNotes.flatMap((c) => (c.deletedAt ? [c.id] : []));
+    const voidJournals =
+      voidedPaymentIds.length + voidedCreditIds.length === 0
+        ? []
+        : await this.prisma.journal.findMany({
+            where: {
+              organizationId,
+              deletedAt: null,
+              isPosted: true,
+              OR: [
+                { sourceType: 'PAYMENT_RECEIVED_VOID', sourceId: { in: voidedPaymentIds } },
+                { sourceType: 'CREDIT_NOTE_VOID', sourceId: { in: voidedCreditIds } },
+              ],
+            },
+            select: { sourceType: true, sourceId: true, date: true },
+          });
+    const voidDates = new Map<string, Date>();
+    for (const j of voidJournals) {
+      if (j.sourceId) voidDates.set(`${j.sourceType}:${j.sourceId}`, j.date);
+    }
+    const liveAsOf = (kind: string, row: { id: string; deletedAt: Date | null }): boolean =>
+      row.deletedAt === null || (voidDates.get(`${kind}:${row.id}`) ?? row.deletedAt) > asOf;
+
+    const settledByInvoice = new Map<string, Decimal>();
+    const settle = (invoiceId: string, amount: Decimal): void => {
+      settledByInvoice.set(
+        invoiceId,
+        (settledByInvoice.get(invoiceId) ?? new Decimal(0)).add(amount),
+      );
+    };
+    for (const al of allocations) {
+      if (liveAsOf('PAYMENT_RECEIVED_VOID', al.payment)) settle(al.invoiceId, al.amount);
+    }
+    const credits: Array<{ customerId: string; amount: Decimal; customer: { name: string } }> = [];
+    for (const note of creditNotes) {
+      if (!liveAsOf('CREDIT_NOTE_VOID', note)) continue;
+      if (note.appliedToInvoiceId) settle(note.appliedToInvoiceId, note.amount);
+      else credits.push(note);
+    }
+    const balanceAsOf = (invoice: { id: string; grandTotal: Decimal }): Decimal =>
+      Decimal.max(
+        invoice.grandTotal.sub(settledByInvoice.get(invoice.id) ?? new Decimal(0)),
+        new Decimal(0),
+      );
+    const openInvoices = invoices
+      .map((invoice) => ({ invoice, balance: balanceAsOf(invoice) }))
+      .filter((row) => row.balance.greaterThan(0));
 
     const creditsByCustomer = new Map<string, { customerName: string; amount: Decimal }>();
     for (const credit of credits) {
@@ -116,7 +254,7 @@ export class AgingReportsService {
       over90: new Decimal(0),
     };
 
-    for (const invoice of invoices) {
+    for (const { invoice, balance } of openInvoices) {
       const days = daysPastDue(invoice.dueDate, asOf);
       const key = agingBucket(days);
       buckets[key].push({
@@ -129,9 +267,9 @@ export class AgingReportsService {
         issueDate: invoice.issueDate,
         dueDate: invoice.dueDate,
         daysOverdue: Math.max(0, days),
-        balanceDue: money(invoice.balanceDue),
+        balanceDue: money(balance),
       });
-      bucketTotals[key] = bucketTotals[key].add(invoice.balanceDue);
+      bucketTotals[key] = bucketTotals[key].add(balance);
     }
 
     const invoicesTotal = sumDecimals(Object.values(bucketTotals));
@@ -157,8 +295,8 @@ export class AgingReportsService {
           amount: money(r.amount),
         })),
       },
-      customerCount: new Set(invoices.map((i) => i.customerId)).size,
-      invoiceCount: invoices.length,
+      customerCount: new Set(openInvoices.map((r) => r.invoice.customerId)).size,
+      invoiceCount: openInvoices.length,
     };
   }
 
@@ -185,9 +323,14 @@ export class AgingReportsService {
     const credits = await this.prisma.vendorCredit.findMany({
       where: {
         organizationId,
-        deletedAt: null,
+        // Limitation: there is no applied-at column, so a credit applied to a bill after the
+        // cutoff is still treated as applied (it is netted through the bill's current balance).
         appliedToBillId: null,
-        refundedAt: null,
+        // Refunded/voided after the cutoff: the credit still debited AP on the cutoff date.
+        AND: [
+          { OR: [{ refundedAt: null }, { refundedAt: { gt: date } }] },
+          { OR: [{ deletedAt: null }, { deletedAt: { gt: date } }] },
+        ],
         date: { lte: date },
       },
       select: { vendorId: true, amount: true, vendor: { select: { id: true, name: true } } },
@@ -316,6 +459,12 @@ export class AgingReportsService {
     for (const j of voidJournals) {
       if (j.sourceId) voidDate.set(j.sourceId, j.date);
     }
+    const paymentVoids = await this.paymentVoids(
+      'paymentReceived',
+      organizationId,
+      customerId,
+      'PAYMENT_RECEIVED_VOID',
+    );
     const postedVoided = voided.filter((i) => voidDate.has(i.id));
 
     const invoiceBase = {
@@ -329,42 +478,29 @@ export class AgingReportsService {
     } satisfies Prisma.InvoiceWhereInput;
     const creditBase = { customerId, organizationId, deletedAt: null };
 
-    const [
-      openingInvoices,
-      openingPayments,
-      openingVoids,
-      openingCredits,
-      invoices,
-      payments,
-      voids,
-      creditNotes,
-    ] = await Promise.all([
-      this.prisma.invoice.findMany({ where: { ...invoiceBase, date: { lt: start } } }),
-      this.prisma.paymentReceived.findMany({
-        where: { customerId, organizationId, date: { lt: start } },
-      }),
-      this.prisma.paymentReceived.findMany({
-        where: { customerId, organizationId, deletedAt: { lt: start } },
-      }),
-      this.prisma.creditNote.findMany({ where: { ...creditBase, date: { lt: start } } }),
-      this.prisma.invoice.findMany({
-        where: { ...invoiceBase, date: { gte: start, lte: end } },
-        orderBy: { date: 'asc' },
-      }),
-      this.prisma.paymentReceived.findMany({
-        where: { customerId, organizationId, date: { gte: start, lte: end } },
-        orderBy: { date: 'asc' },
-      }),
-      this.prisma.paymentReceived.findMany({
-        where: { customerId, organizationId, deletedAt: { gte: start, lte: end } },
-        orderBy: { deletedAt: 'asc' },
-      }),
-      this.prisma.creditNote.findMany({
-        where: { ...creditBase, date: { gte: start, lte: end } },
-        orderBy: { date: 'asc' },
-      }),
-    ]);
+    const [openingInvoices, openingPayments, openingCredits, invoices, payments, creditNotes] =
+      await Promise.all([
+        this.prisma.invoice.findMany({ where: { ...invoiceBase, date: { lt: start } } }),
+        this.prisma.paymentReceived.findMany({
+          where: { customerId, organizationId, date: { lt: start } },
+        }),
+        this.prisma.creditNote.findMany({ where: { ...creditBase, date: { lt: start } } }),
+        this.prisma.invoice.findMany({
+          where: { ...invoiceBase, date: { gte: start, lte: end } },
+          orderBy: { date: 'asc' },
+        }),
+        this.prisma.paymentReceived.findMany({
+          where: { customerId, organizationId, date: { gte: start, lte: end } },
+          orderBy: { date: 'asc' },
+        }),
+        this.prisma.creditNote.findMany({
+          where: { ...creditBase, date: { gte: start, lte: end } },
+          orderBy: { date: 'asc' },
+        }),
+      ]);
 
+    const openingVoids = paymentVoids.filter((p) => p.voidDate < start);
+    const voids = paymentVoids.filter((p) => p.voidDate >= start && p.voidDate <= end);
     const invoiceVoids = postedVoided.map((i) => ({
       invoice: i,
       date: voidDate.get(i.id) as Date,
@@ -418,7 +554,7 @@ export class AgingReportsService {
         credit: toDecimal(p.amount),
       })),
       ...voids.map((p) => ({
-        date: p.deletedAt as Date,
+        date: p.voidDate,
         type: 'Payment Void',
         reference: p.paymentNumber,
         sourceType: 'payment' as const,
@@ -481,9 +617,15 @@ export class AgingReportsService {
     });
     if (!vendor) return null;
 
-    const start = new Date(startDate);
-    // A date-only end must include that whole day (voids/payments later on the end date).
-    const end = endOfUtcDay(new Date(endDate));
+    const start = parseReportDate(startDate, 'start', 'startDate') ?? new Date(0);
+    // A date-only end must include that whole day; explicit timestamps stay exact.
+    const end = parseReportDate(endDate, 'end', 'endDate') ?? endOfUtcDay(new Date());
+    const paymentVoids = await this.paymentVoids(
+      'paymentMade',
+      organizationId,
+      vendorId,
+      'PAYMENT_MADE_VOID',
+    );
 
     // Opening balance
     const openingBills = await this.prisma.bill.findMany({
@@ -500,9 +642,7 @@ export class AgingReportsService {
     const openingPayments = await this.prisma.paymentMade.findMany({
       where: { vendorId, organizationId, date: { lt: start } },
     });
-    const openingVoids = await this.prisma.paymentMade.findMany({
-      where: { vendorId, organizationId, deletedAt: { lt: start } },
-    });
+    const openingVoids = paymentVoids.filter((p) => p.voidDate < start);
 
     const sum = (values: Decimal[]): Decimal =>
       values.reduce((acc, v) => acc.add(v), new Decimal(0));
@@ -526,10 +666,7 @@ export class AgingReportsService {
       where: { vendorId, organizationId, date: { gte: start, lte: end } },
       orderBy: { date: 'asc' },
     });
-    const voids = await this.prisma.paymentMade.findMany({
-      where: { vendorId, organizationId, deletedAt: { gte: start, lte: end } },
-      orderBy: { deletedAt: 'asc' },
-    });
+    const voids = paymentVoids.filter((p) => p.voidDate >= start && p.voidDate <= end);
 
     const zero = new Decimal(0);
     const transactions = [
@@ -548,7 +685,7 @@ export class AgingReportsService {
         credit: p.amount,
       })),
       ...voids.map((p) => ({
-        date: p.deletedAt as Date,
+        date: p.voidDate,
         type: 'Payment Void' as const,
         reference: p.paymentNumber,
         debit: p.amount,

@@ -34,6 +34,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **"Current" figures exclude future-dated entries.** Cash today means lines dated ≤ end of today.
 - **Side records carry the document date.** Inventory movements are dated on the adjustment date, not on `createdAt` = now.
 - **Historical reports keep later-voided documents in their original period** and show the reversal on the void date. Filtering on today's status rewrites history. _(customer statement)_
+- **An as-of report rebuilds balances from dated events.** Today's stored `balanceDue` is not a historical balance: subtract only payments and credits dated on or before the cutoff, and count a void only if its reversal journal is dated on or before the cutoff. _(receivables aging)_
 
 ## 5. Single-currency ledger and data
 

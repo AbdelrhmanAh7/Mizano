@@ -4,6 +4,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { AssetStatus, Prisma } from '@prisma/client';
 import { describeError } from '../../../common/utils/redact';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 
 @Injectable()
 export class DepreciationService {
@@ -99,6 +100,7 @@ export class DepreciationService {
 
       try {
         await this.prisma.$transaction(async (tx) => {
+          await lockOrganizationLedger(tx, organizationId);
           // Create depreciation journal entry
           const journalNumber = await this.generateJournalNumber(tx, organizationId);
 
@@ -219,6 +221,7 @@ export class DepreciationService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      await lockOrganizationLedger(tx, organizationId);
       const journalNumber = await this.generateJournalNumber(tx, organizationId);
 
       const journal = await tx.journal.create({

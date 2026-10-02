@@ -5,6 +5,25 @@ import { PaymentPredictionService } from './payment-prediction.service';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
 import { Decimal } from '@prisma/client/runtime/library';
+import { bankBookBalances } from '../../reports/utils/report-utils';
+
+// Book balances come from the linked ledger; these specs feed them from the mocked bank rows.
+jest.mock('../../reports/utils/report-utils', () => ({
+  ...jest.requireActual('../../reports/utils/report-utils'),
+  bankBookBalances: jest.fn(),
+}));
+const feedBookBalances = (prismaMock: { bankAccount: { findMany: jest.Mock } }): void => {
+  (bankBookBalances as jest.Mock).mockImplementation(async () =>
+    (
+      (await prismaMock.bankAccount.findMany()) as Array<{ name?: string; systemBalance: unknown }>
+    ).map((a, i) => ({
+      id: `bank-${i}`,
+      name: a.name ?? 'Account',
+      linkedAccountId: `acc-${i}`,
+      balance: a.systemBalance,
+    })),
+  );
+};
 
 describe('CashFlowPredictionService', () => {
   let service: CashFlowPredictionService;
@@ -15,6 +34,7 @@ describe('CashFlowPredictionService', () => {
 
   beforeEach(async () => {
     prisma = createMockPrisma();
+    feedBookBalances(prisma);
     paymentPredictionService = {
       predictPaymentDate: jest.fn().mockResolvedValue(null),
     };

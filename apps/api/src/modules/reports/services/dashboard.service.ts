@@ -109,7 +109,7 @@ export class DashboardService {
       this.getLedgerProfitAndLoss(organizationId, accounts, periodStart, periodEnd),
       this.getLedgerProfitAndLoss(organizationId, accounts, prevPeriodStart, prevPeriodEnd),
       this.getLedgerProfitAndLoss(organizationId, accounts, startOfYear, endOfUtcDay(today)),
-      this.getCashAndBank(organizationId),
+      this.getCashAndBank(organizationId, periodEnd),
       this.getOverdueInvoicesCount(organizationId),
       this.getOverdueBillsCount(organizationId),
       this.getRecentInvoices(organizationId, 5),
@@ -193,7 +193,10 @@ export class DashboardService {
    * Cash and bank from the posted ledger: the total over every cash/bank ledger account plus each
    * active bank account's ledger balance (its stored balance only when nothing is linked).
    */
-  private async getCashAndBank(organizationId: string): Promise<{
+  private async getCashAndBank(
+    organizationId: string,
+    cutoff: Date,
+  ): Promise<{
     total: Decimal;
     accounts: Array<{
       id: string;
@@ -219,13 +222,10 @@ export class DashboardService {
       }),
     ]);
     const linkedIds = bankAccounts.map((b) => b.linkedAccountId);
-    // Current balance: nothing dated after the end of today (UTC) counts yet.
-    const totals = await sumPostedLinesByAccount(
-      this.prisma,
-      organizationId,
-      { lte: endOfUtcDay(new Date()) },
-      [...new Set([...cashIds, ...linkedIds])],
-    );
+    // Balance as of the requested report cutoff (the same one the other KPIs use).
+    const totals = await sumPostedLinesByAccount(this.prisma, organizationId, { lte: cutoff }, [
+      ...new Set([...cashIds, ...linkedIds]),
+    ]);
     const balance = (accountId: string): Decimal => {
       const t = totals.get(accountId);
       return t ? t.debit.sub(t.credit) : ZERO;

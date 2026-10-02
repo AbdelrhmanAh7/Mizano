@@ -14,24 +14,45 @@ describe('receivables aging', () => {
     date: new Date('2026-01-03'),
     issueDate: new Date('2026-01-01'),
     dueDate: new Date(due),
+    // Balances are rebuilt as of the cutoff from grandTotal; balanceDue is today's value only.
+    grandTotal: new Decimal(balance),
     balanceDue: new Decimal(balance),
     customer: { id: customerId, name: `Customer ${customerId}` },
   });
   const credit = (customerId: string, amount: string) => ({
+    id: `cn-${customerId}-${amount}`,
+    appliedToInvoiceId: null,
+    deletedAt: null,
     customerId,
     amount: new Decimal(amount),
     customer: { id: customerId, name: `Customer ${customerId}` },
   });
 
-  function build(invoices: unknown[], credits: unknown[]) {
+  function build(
+    invoices: unknown[],
+    credits: unknown[],
+    laterVoids: unknown[] = [],
+    allocations: unknown[] = [],
+    voidJournals: unknown[] = [],
+  ) {
     const prisma = {
+      // First call: INVOICE_VOID journals after the cutoff; second: void journals of the
+      // deleted payments/credit notes found in the allocations.
+      journal: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce(laterVoids)
+          .mockResolvedValueOnce(voidJournals)
+          .mockResolvedValue([]),
+      },
       invoice: { findMany: jest.fn().mockResolvedValue(invoices) },
+      paymentAllocation: { findMany: jest.fn().mockResolvedValue(allocations) },
       creditNote: { findMany: jest.fn().mockResolvedValue(credits) },
     };
     return { prisma, service: new AgingReportsService(prisma as unknown as ReadReplicaService) };
   }
 
-  it('queries only issued, non-deleted invoices and unapplied APPLY credit notes of the org', async () => {
+  it('queries posted, non-deleted invoices and APPLY credit notes of the org as of the cutoff', async () => {
     const { prisma, service } = build([], []);
 
     await service.getReceivablesAging(ORG, '2026-03-31');
@@ -40,16 +61,122 @@ describe('receivables aging', () => {
     expect(invoiceWhere).toMatchObject({
       organizationId: ORG,
       deletedAt: null,
-      balanceDue: { gt: 0 },
-      status: ISSUED,
+      OR: [{ status: ISSUED }, { status: 'VOID', id: { in: [] } }],
     });
+    // An invoice settled after the cutoff was still open on it: no balanceDue filter.
+    expect(invoiceWhere.balanceDue).toBeUndefined();
     expect(invoiceWhere.date.lte.toISOString()).toBe('2026-03-31T23:59:59.999Z');
-    expect(prisma.creditNote.findMany.mock.calls[0][0].where).toMatchObject({
+    // Without invoices there is nothing to allocate against.
+    expect(prisma.paymentAllocation.findMany).not.toHaveBeenCalled();
+    const creditWhere = prisma.creditNote.findMany.mock.calls[0][0].where;
+    expect(creditWhere).toMatchObject({
       organizationId: ORG,
-      deletedAt: null,
       type: CreditNoteType.APPLY_TO_INVOICE,
-      appliedToInvoiceId: null,
+      OR: [{ appliedToInvoiceId: null }, { appliedToInvoiceId: { in: [] } }],
     });
+    expect(creditWhere.date.lte.toISOString()).toBe('2026-03-31T23:59:59.999Z');
+  });
+
+  it('rebuilds each balance as of the cutoff from live payments and applied credits', async () => {
+    const voidedLater = new Date('2026-02-10T10:00:00Z');
+    const voidedBefore = new Date('2026-01-15T10:00:00Z');
+    const { prisma, service } = build(
+      // Fully paid today (balanceDue 0) but 1000 open on the cutoff less what was settled by then.
+      [{ ...invoice('i1', 'c1', '1000', '2026-01-20'), balanceDue: new Decimal(0) }],
+      [
+        // Applied to i1 and still live: reduces the balance.
+        { ...credit('c1', '50'), id: 'cn-applied', appliedToInvoiceId: 'i1' },
+        // Applied but voided before the cutoff: ignored.
+        {
+          ...credit('c1', '70'),
+          id: 'cn-voided',
+          appliedToInvoiceId: 'i1',
+          deletedAt: voidedBefore,
+        },
+        // Unapplied and voided after the cutoff: still netted as an unapplied credit.
+        { ...credit('c1', '20'), id: 'cn-open', deletedAt: voidedLater },
+      ],
+      [],
+      [
+        { invoiceId: 'i1', amount: new Decimal('300'), payment: { id: 'p1', deletedAt: null } },
+        // Voided after the cutoff: it still reduced the balance on the cutoff date.
+        {
+          invoiceId: 'i1',
+          amount: new Decimal('200'),
+          payment: { id: 'p2', deletedAt: voidedLater },
+        },
+        // Voided before the cutoff (reversal journal dated earlier): not counted.
+        {
+          invoiceId: 'i1',
+          amount: new Decimal('100'),
+          payment: { id: 'p3', deletedAt: voidedBefore },
+        },
+        // Legacy void without a reversal journal: deletedAt decides (after the cutoff = live).
+        {
+          invoiceId: 'i1',
+          amount: new Decimal('25'),
+          payment: { id: 'p4', deletedAt: voidedLater },
+        },
+      ],
+      [
+        { sourceType: 'PAYMENT_RECEIVED_VOID', sourceId: 'p2', date: voidedLater },
+        { sourceType: 'PAYMENT_RECEIVED_VOID', sourceId: 'p3', date: voidedBefore },
+        { sourceType: 'CREDIT_NOTE_VOID', sourceId: 'cn-voided', date: voidedBefore },
+        { sourceType: 'CREDIT_NOTE_VOID', sourceId: 'cn-open', date: voidedLater },
+      ],
+    );
+
+    const report = await service.getReceivablesAging(ORG, '2026-01-31');
+
+    const allocationWhere = prisma.paymentAllocation.findMany.mock.calls[0][0].where;
+    expect(allocationWhere.invoiceId).toEqual({ in: ['i1'] });
+    expect(allocationWhere.payment.organizationId).toBe(ORG);
+    expect(allocationWhere.payment.date.lte.toISOString()).toBe('2026-01-31T23:59:59.999Z');
+    const voidWhere = prisma.journal.findMany.mock.calls[1][0].where;
+    expect(voidWhere.OR).toEqual([
+      { sourceType: 'PAYMENT_RECEIVED_VOID', sourceId: { in: ['p2', 'p3', 'p4'] } },
+      { sourceType: 'CREDIT_NOTE_VOID', sourceId: { in: ['cn-voided', 'cn-open'] } },
+    ]);
+    // 1000 - 300 (p1) - 200 (p2) - 25 (p4) - 50 (applied credit) = 425
+    expect(report.summary.total).toBe('425.0000');
+    expect(report.buckets.days1_30[0]).toMatchObject({ invoiceId: 'i1', balanceDue: '425.0000' });
+    expect(report.summary.unappliedCredits).toBe('20.0000');
+    expect(report.summary.netTotal).toBe('405.0000');
+    expect(report.invoiceCount).toBe(1);
+  });
+
+  it('drops an invoice that was already settled on the cutoff', async () => {
+    const { service } = build(
+      [invoice('i1', 'c1', '100', '2026-03-31')],
+      [],
+      [],
+      [{ invoiceId: 'i1', amount: new Decimal('100'), payment: { id: 'p1', deletedAt: null } }],
+    );
+
+    const report = await service.getReceivablesAging(ORG, '2026-03-31');
+
+    expect(report.summary.total).toBe('0.0000');
+    expect(report.invoiceCount).toBe(0);
+    expect(report.customerCount).toBe(0);
+  });
+
+  it('keeps an invoice voided after the cutoff in the historical snapshot (reversal journal dated later)', async () => {
+    const { prisma, service } = build(
+      [invoice('i9', 'c1', '500', '2026-01-31')],
+      [],
+      [{ sourceId: 'i9' }, { sourceId: null }],
+    );
+
+    const report = await service.getReceivablesAging(ORG, '2026-01-31');
+
+    const journalWhere = prisma.journal.findMany.mock.calls[0][0].where;
+    expect(journalWhere).toMatchObject({ organizationId: ORG, sourceType: 'INVOICE_VOID' });
+    expect(journalWhere.date.gt.toISOString()).toBe('2026-01-31T23:59:59.999Z');
+    expect(prisma.invoice.findMany.mock.calls[0][0].where.OR).toEqual([
+      { status: ISSUED },
+      { status: 'VOID', id: { in: ['i9'] } },
+    ]);
+    expect(report.summary.total).toBe('500.0000');
   });
 
   it('buckets by days past due and keeps every sum an exact 4-dp string', async () => {

@@ -1,4 +1,5 @@
 import { Decimal } from '@prisma/client/runtime/library';
+import { bankBookBalances } from '../../reports/utils/report-utils';
 
 interface InvoiceWithCustomer {
   invoiceNumber: string;
@@ -394,17 +395,12 @@ export const queryTemplates: QueryTemplate[] = [
     chartType: 'metric',
     execute: async (prisma, orgId) => {
       // Get bank accounts
-      const bankAccounts = await prisma.bankAccount.findMany({
-        where: {
-          organizationId: orgId,
-          isActive: true,
-        },
-        select: {
-          id: true,
-          name: true,
-          systemBalance: true,
-        },
-      });
+      const books = await bankBookBalances(prisma, orgId);
+      const bankAccounts: BankAccountBalance[] = books.map((b) => ({
+        id: b.id,
+        name: b.name,
+        systemBalance: b.balance,
+      }));
 
       const totalBalance = bankAccounts.reduce(
         (sum: number, acc: BankAccountBalance) => sum + Number(acc.systemBalance || 0),

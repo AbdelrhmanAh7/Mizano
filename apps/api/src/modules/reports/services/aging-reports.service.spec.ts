@@ -2,7 +2,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { ReadReplicaService } from '../../../prisma/read-replica.service';
 import { AgingReportsService } from './aging-reports.service';
 
-type Where = { date?: { lt?: Date; gte?: Date }; deletedAt?: { lt?: Date; gte?: Date } };
+type Where = { date?: { lt?: Date; gte?: Date }; deletedAt?: unknown };
 
 describe('AgingReportsService.getVendorStatement (voided payments)', () => {
   // One bill (228, Jan 2), one payment (100, Jan 10) voided on Feb 5.
@@ -24,7 +24,10 @@ describe('AgingReportsService.getVendorStatement (voided payments)', () => {
     (!r?.gte || d >= r.gte) &&
     (!(r as { lte?: Date })?.lte || d <= (r as { lte: Date }).lte);
 
+  // Reversal journal of the void; absent for legacy voids (falls back to deletedAt).
+  let voidJournals: Array<{ sourceId: string; date: Date }> = [];
   const prisma = {
+    journal: { findMany: jest.fn(async () => voidJournals) },
     vendor: { findFirst: jest.fn().mockResolvedValue({ id: 'v1', name: 'V', email: null }) },
     bill: {
       findMany: jest.fn(async ({ where }: { where: Where }) =>
@@ -33,7 +36,7 @@ describe('AgingReportsService.getVendorStatement (voided payments)', () => {
     },
     paymentMade: {
       findMany: jest.fn(async ({ where }: { where: Where }) => {
-        if (where.deletedAt) return within(payment.deletedAt, where.deletedAt) ? [payment] : [];
+        if (where.deletedAt) return payment.deletedAt ? [{ ...payment, id: 'p1' }] : [];
         return within(payment.date, where.date) ? [payment] : [];
       }),
     },
@@ -52,6 +55,37 @@ describe('AgingReportsService.getVendorStatement (voided payments)', () => {
     payment.deletedAt = new Date('2026-02-05');
     expect(feb?.transactions).toEqual([
       expect.objectContaining({ type: 'Payment Void', debit: '100.0000', balance: '228.0000' }),
+    ]);
+  });
+
+  it('preserves an explicit end timestamp instead of expanding it to the whole day', async () => {
+    payment.deletedAt = new Date('2026-02-28T10:00:00Z');
+    const early = await service.getVendorStatement(
+      'org',
+      'v1',
+      '2026-02-01',
+      '2026-02-28T09:00:00Z',
+    );
+    const late = await service.getVendorStatement(
+      'org',
+      'v1',
+      '2026-02-01',
+      '2026-02-28T11:00:00Z',
+    );
+    payment.deletedAt = new Date('2026-02-05');
+    expect(early?.transactions).toEqual([]);
+    expect(late?.transactions.map((t) => t.type)).toEqual(['Payment Void']);
+  });
+
+  it('dates the void row on the reversal journal, not on deletedAt', async () => {
+    voidJournals = [{ sourceId: 'p1', date: new Date('2026-03-10') }];
+    const feb = await service.getVendorStatement('org', 'v1', '2026-02-01', '2026-02-28');
+    const mar = await service.getVendorStatement('org', 'v1', '2026-03-01', '2026-03-31');
+    voidJournals = [];
+    expect(feb?.transactions).toEqual([]);
+    expect(feb?.openingBalance).toBe('128.0000');
+    expect(mar?.transactions).toEqual([
+      expect.objectContaining({ type: 'Payment Void', balance: '228.0000' }),
     ]);
   });
 

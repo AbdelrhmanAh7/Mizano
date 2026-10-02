@@ -5,6 +5,7 @@ import { CursorPaginationDto } from '../../../common/dto/cursor-pagination.dto';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AssetQueryDto, CreateAssetDto, DisposeAssetDto, UpdateAssetDto } from '../dto/assets.dto';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 
 @Injectable()
 export class AssetsService {
@@ -588,6 +589,8 @@ export class AssetsService {
       });
     }
 
+    // Serialize with other journal producers and base-currency changes.
+    await lockOrganizationLedger(tx, organizationId);
     // Generate journal number
     const journalNumber = await this.generateJournalNumber(tx, organizationId);
 

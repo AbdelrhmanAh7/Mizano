@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Item, Prisma, WorkOrderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 
 export interface CreateWorkOrderData {
   bomId: string;
@@ -374,6 +375,7 @@ export class WorkOrdersService {
         }
       }
 
+      await lockOrganizationLedger(tx, organizationId);
       const journal = await tx.journal.create({
         data: {
           journalNumber,

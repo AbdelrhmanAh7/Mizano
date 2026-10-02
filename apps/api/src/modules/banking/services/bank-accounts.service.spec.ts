@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { BankAccountType } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { BankAccountsService } from './bank-accounts.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { createMockPrisma, MockPrismaClient } from '../../../test/mocks/prisma.mock';
@@ -52,5 +53,26 @@ describe('BankAccountsService.create opening balance', () => {
       organizationId: ORG,
       deletedAt: null,
     });
+  });
+});
+
+describe('BankAccountsService book balances', () => {
+  it('derives balances from the linked ledger account, not the stored systemBalance', async () => {
+    const prisma = createMockPrisma();
+    prisma.bankAccount.findMany.mockResolvedValue([
+      { id: 'ba-1', name: 'Main', linkedAccountId: 'acc-bank', systemBalance: new Decimal(0) },
+    ] as never);
+    prisma.bankAccount.count.mockResolvedValue(1 as never);
+    prisma.bankTransaction.count.mockResolvedValue(0 as never);
+    prisma.journalLine.groupBy.mockResolvedValue([
+      { accountId: 'acc-bank', _sum: { debit: new Decimal('5000.5'), credit: new Decimal('0.5') } },
+    ] as never);
+    const service = new BankAccountsService(prisma as unknown as PrismaService);
+
+    const list = await service.findAll(ORG);
+    const stats = await service.getDashboardStats(ORG);
+
+    expect(list.data[0].systemBalance.toString()).toBe('5000');
+    expect(stats.totalSystemBalance).toBe(5000);
   });
 });

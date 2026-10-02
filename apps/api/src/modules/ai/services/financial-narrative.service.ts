@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { bankBookBalances } from '../../reports/utils/report-utils';
 import { queryTemplates, getQueryTemplate } from '../templates/query-templates';
 import { Decimal } from '@prisma/client/runtime/library';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
@@ -535,12 +536,9 @@ export class FinancialNarrativeService {
    */
   async generateCashFlowNarrative(organizationId: string): Promise<GeneratedNarrative> {
     // Get bank balances
-    const bankAccounts = await this.prisma.bankAccount.findMany({
-      where: { organizationId, isActive: true },
-      select: { name: true, systemBalance: true },
-    });
+    const bankAccounts = await bankBookBalances(this.prisma, organizationId);
 
-    const totalCash = bankAccounts.reduce((sum, acc) => sum + Number(acc.systemBalance || 0), 0);
+    const totalCash = bankAccounts.reduce((sum, acc) => sum + Number(acc.balance.toString()), 0);
 
     // Get AR and AP
     const [ar, ap] = await Promise.all([
@@ -590,7 +588,7 @@ export class FinancialNarrativeService {
         content: `Total cash across ${bankAccounts.length} account${bankAccounts.length !== 1 ? 's' : ''}: ${this.formatCurrency(totalCash)}.`,
         metrics: bankAccounts.map((acc) => ({
           label: acc.name,
-          value: this.formatCurrency(Number(acc.systemBalance) || 0),
+          value: this.formatCurrency(Number(acc.balance.toString()) || 0),
         })),
       },
       {
@@ -790,12 +788,10 @@ export class FinancialNarrativeService {
     });
 
     // Cash balance
-    const bankAccounts = await this.prisma.bankAccount.aggregate({
-      where: { organizationId, isActive: true },
-      _sum: { systemBalance: true },
-    });
-
-    const cashBalance = Number(bankAccounts._sum?.systemBalance) || 0;
+    const cashBalance = (await bankBookBalances(this.prisma, organizationId)).reduce(
+      (sum, b) => sum + Number(b.balance.toString()),
+      0,
+    );
 
     // Estimate cash days remaining
     const dailyBurn = expenses / 30;

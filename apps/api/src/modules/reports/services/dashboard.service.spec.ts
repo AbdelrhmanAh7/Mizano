@@ -150,6 +150,19 @@ describe('DashboardService', () => {
       expect(overview.netPosition).toBe('7000.2000');
     });
 
+    it('computes cash as of the requested end date, not a separate server cutoff', async () => {
+      arrangeOverview({});
+      ledger([{ accountId: 'cash', debit: '10', credit: '0' }]);
+
+      await service.getDashboardOverview(ORG_ID, '2026-01-01', '2026-01-31');
+
+      const cashQuery = prisma.journalLine.groupBy.mock.calls.find(([args]) =>
+        (args.where as { accountId?: { in: string[] } }).accountId?.in?.includes('cash'),
+      );
+      const date = (cashQuery?.[0].where as { journal: { date: { lte: Date } } }).journal.date;
+      expect(date.lte.toISOString()).toBe('2026-01-31T23:59:59.999Z');
+    });
+
     it('reports cash from the ledger accounts, not stored bank balances', async () => {
       arrangeOverview({});
       ledger([{ accountId: 'cash', debit: '5000.50', credit: '114' }]);

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { bankBookBalances } from '../../reports/utils/report-utils';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
@@ -43,11 +44,9 @@ export class AiForecastingService {
 
   async forecastCashFlow(organizationId: string, weeks: number = 4) {
     // Get current bank balance
-    const bankAccounts = await this.prisma.bankAccount.aggregate({
-      where: { organizationId, isActive: true },
-      _sum: { systemBalance: true },
-    });
-    let currentBalance = parseFloat(bankAccounts._sum.systemBalance?.toString() || '0');
+    const books = await bankBookBalances(this.prisma, organizationId);
+    const bookTotal = books.reduce((sum, b) => sum + Number(b.balance.toString()), 0);
+    let currentBalance = bookTotal;
 
     const weeklyRecurring = await this.estimateWeeklyRecurring(organizationId);
     const rawForecast = [];
@@ -113,7 +112,7 @@ export class AiForecastingService {
 
     return {
       data,
-      currentBalance: parseFloat(bankAccounts._sum.systemBalance?.toString() || '0'),
+      currentBalance: bookTotal,
       warnings: this.generateCashFlowWarnings(rawForecast),
       generatedAt: new Date(),
     };
