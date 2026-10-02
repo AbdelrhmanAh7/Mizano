@@ -135,7 +135,14 @@ export interface MonthBucket {
 }
 
 /** The last `months` calendar months (UTC) ending with the month containing `now`. */
-export function lastMonths(months: number, now: Date = new Date()): MonthBucket[] {
+export const MAX_MONTHS = 36;
+export const MAX_DAYS = 366;
+
+export function lastMonths(requested: number, now: Date = new Date()): MonthBucket[] {
+  // Guard: 0, negative and NaN never reach the loop; huge values are bounded.
+  const months = Number.isFinite(requested)
+    ? Math.min(MAX_MONTHS, Math.max(1, Math.trunc(requested)))
+    : 6;
   const buckets: MonthBucket[] = [];
   for (let i = months - 1; i >= 0; i--) {
     const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));

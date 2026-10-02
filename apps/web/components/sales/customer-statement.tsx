@@ -1,6 +1,7 @@
 'use client';
 
 import { format } from 'date-fns';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +22,13 @@ interface CustomerStatementProps {
   customerId: string;
   customer?: Customer;
 }
+
+/** Detail pages of the documents a statement row comes from. */
+const SOURCE_ROUTES: Record<'invoice' | 'payment' | 'creditNote', (id: string) => string> = {
+  invoice: (id) => `/sales/invoices/${id}`,
+  payment: (id) => `/sales/payments/${id}`,
+  creditNote: (id) => `/sales/credit-notes/${id}`,
+};
 
 /** Shows a fixed-scale decimal string as currency, or a dash for zero (display only). */
 function showAmount(value: string, currency: string): string {
@@ -73,7 +81,7 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground">{t('totalInvoiced')}</div>
             <div className="text-2xl font-bold font-mono text-blue-600">
-              {formatCurrency(moneyToNumber(statement.totalDebits), currency)}
+              {formatCurrency(moneyToNumber(statement.totalInvoiced), currency)}
             </div>
           </CardContent>
         </Card>
@@ -141,7 +149,8 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
                           'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
                           line.type === 'Invoice' && 'bg-blue-100 text-blue-800',
                           line.type === 'Payment' && 'bg-green-100 text-green-800',
-                          line.type === 'Payment Void' && 'bg-red-100 text-red-800',
+                          (line.type === 'Payment Void' || line.type === 'Invoice Void') &&
+                            'bg-red-100 text-red-800',
                           (line.type === 'Credit Note' || line.type === 'Credit Note Refund') &&
                             'bg-yellow-100 text-yellow-800',
                         )}
@@ -149,7 +158,14 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
                         {t(`types.${line.type}`)}
                       </span>
                     </TableCell>
-                    <TableCell className="font-mono text-sm">{line.reference}</TableCell>
+                    <TableCell className="font-mono text-sm">
+                      <Link
+                        href={SOURCE_ROUTES[line.sourceType](line.sourceId)}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {line.reference}
+                      </Link>
+                    </TableCell>
                     <TableCell className="text-right font-mono">
                       {showAmount(line.debit, currency)}
                     </TableCell>

@@ -1,7 +1,8 @@
 'use client';
 
 import { useToast } from '@/components/ui/use-toast';
-import { api, customersApi } from '@/lib/api';
+import { format } from 'date-fns';
+import { customersApi } from '@/lib/api';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -45,7 +46,7 @@ export interface Customer {
 }
 
 /**
- * Customer statement from the reconciling reports API (`/reports/customer-statement/:id`): issued
+ * Customer statement (`GET /customers/:id/statement`, sales.view), served by the reconciling reports service: issued
  * invoices, payments (a voided payment is a separate debit on its void date) and credit notes.
  * Every money value is a fixed 4-dp decimal string computed exactly by the API.
  */
@@ -55,13 +56,23 @@ export interface CustomerStatement {
   openingBalance: string;
   transactions: Array<{
     date: string;
-    type: 'Invoice' | 'Payment' | 'Payment Void' | 'Credit Note' | 'Credit Note Refund';
+    type:
+      | 'Invoice'
+      | 'Invoice Void'
+      | 'Payment'
+      | 'Payment Void'
+      | 'Credit Note'
+      | 'Credit Note Refund';
     reference: string;
+    sourceType: 'invoice' | 'payment' | 'creditNote';
+    sourceId: string;
     debit: string;
     credit: string;
     balance: string;
   }>;
   closingBalance: string;
+  /** Invoice debits only. */
+  totalInvoiced: string;
   totalDebits: string;
   totalCredits: string;
 }
@@ -140,10 +151,9 @@ export function useCustomerStatement(id: string | undefined) {
     queryFn: async () => {
       if (!id) throw new Error('Customer ID is required');
       // Full history: an early start date keeps the opening balance at zero.
-      const endDate = new Date().toISOString().slice(0, 10);
-      const response = await api.get(`/reports/customer-statement/${id}`, {
-        params: { startDate: '2000-01-01', endDate },
-      });
+      // The cutoff is the user's local calendar day (toISOString would be the UTC day).
+      const endDate = format(new Date(), 'yyyy-MM-dd');
+      const response = await customersApi.getStatement(id, { startDate: '2000-01-01', endDate });
       const body = response.data?.data ?? response.data;
       return (body && Array.isArray(body.transactions) ? body : null) as CustomerStatement | null;
     },

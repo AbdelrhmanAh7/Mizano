@@ -94,24 +94,28 @@ describe('customer statement', () => {
   const D = (v: string): Decimal => new Decimal(v);
 
   const invoice: Row = {
+    id: 'inv-1',
     invoiceNumber: 'INV-1',
     date: new Date('2026-01-02'),
     total: null,
     grandTotal: D('0.1'),
   };
   const invoice2: Row = {
+    id: 'inv-2',
     invoiceNumber: 'INV-2',
     date: new Date('2026-01-03'),
     total: null,
     grandTotal: D('0.2'),
   };
   const payment: Row = {
+    id: 'pay-1',
     paymentNumber: 'PMT-1',
     date: new Date('2026-01-10'),
     amount: D('0.05'),
     deletedAt: new Date('2026-02-05'),
   };
   const applyNote: Row = {
+    id: 'cn-1',
     creditNoteNumber: 'CN-1',
     date: new Date('2026-01-15'),
     total: null,
@@ -119,6 +123,7 @@ describe('customer statement', () => {
     type: CreditNoteType.APPLY_TO_INVOICE,
   };
   const refundNote: Row = {
+    id: 'cn-2',
     creditNoteNumber: 'CN-2',
     date: new Date('2026-01-16'),
     total: null,
@@ -131,13 +136,27 @@ describe('customer statement', () => {
     !!d && (!r?.lt || d < r.lt) && (!r?.gte || d >= r.gte) && (!r?.lte || d <= r.lte);
 
   const invoiceWheres: unknown[] = [];
+  // Voided invoices of the customer and the INVOICE_VOID reversal journals that exist for them.
+  let voidedInvoices: Row[] = [];
+  let voidJournals: Array<{ sourceId: string; date: Date }> = [];
   const prisma = {
     customer: { findFirst: jest.fn().mockResolvedValue({ id: 'c1', name: 'C', email: null }) },
     invoice: {
-      findMany: jest.fn(async ({ where }: { where: { date: DateFilter } }) => {
+      findMany: jest.fn(async ({ where }: { where: { date?: DateFilter; status?: unknown } }) => {
+        if (where.status === 'VOID') return voidedInvoices;
         invoiceWheres.push(where);
-        return [invoice, invoice2].filter((i) => within(i.date as Date, where.date));
+        const or = (where as unknown as { OR: Array<{ id?: { in: string[] } }> }).OR;
+        const ids = or?.[1]?.id?.in ?? [];
+        const rows = [
+          invoice,
+          invoice2,
+          ...voidedInvoices.filter((v) => ids.includes(v.id as string)),
+        ];
+        return rows.filter((i) => within(i.date as Date, where.date));
       }),
+    },
+    journal: {
+      findMany: jest.fn(async () => voidJournals),
     },
     paymentReceived: {
       findMany: jest.fn(
@@ -174,8 +193,9 @@ describe('customer statement', () => {
       customerId: 'c1',
       organizationId: ORG,
       deletedAt: null,
-      status: ISSUED,
     });
+    // Issued invoices, plus voided ones only when they were posted (never DRAFT).
+    expect((invoiceWheres[0] as { OR: unknown[] }).OR[0]).toEqual({ status: ISSUED });
   });
 
   it('shows credit notes (a refund note nets to zero) and the payment', async () => {
@@ -209,6 +229,82 @@ describe('customer statement', () => {
     const feb = await service.getCustomerStatement(ORG, 'c1', '2026-02-01', '2026-02-28');
     payment.deletedAt = new Date('2026-02-05');
     expect(feb?.transactions.map((t) => t.type)).toEqual(['Payment Void']);
+  });
+
+  describe('invoices voided after the period', () => {
+    const voided: Row = {
+      id: 'inv-v',
+      invoiceNumber: 'INV-V',
+      date: new Date('2026-01-05'),
+      total: null,
+      grandTotal: D('1.0'),
+    };
+    const draftVoided: Row = {
+      id: 'inv-d',
+      invoiceNumber: 'INV-D',
+      date: new Date('2026-01-06'),
+      total: null,
+      grandTotal: D('9'),
+    };
+
+    beforeEach(() => {
+      voidedInvoices = [voided, draftVoided];
+      // Only the posted invoice has a reversal journal (Feb 10); the voided draft never posted.
+      voidJournals = [{ sourceId: 'inv-v', date: new Date('2026-02-10') }];
+    });
+    afterEach(() => {
+      voidedInvoices = [];
+      voidJournals = [];
+    });
+
+    it('keeps the invoice in January, unchanged by a February void, and excludes the draft', async () => {
+      const jan = await service.getCustomerStatement(ORG, 'c1', '2026-01-01', '2026-01-31');
+
+      expect(jan?.transactions.map((t) => t.reference)).toContain('INV-V');
+      expect(jan?.transactions.some((t) => t.reference === 'INV-D')).toBe(false);
+      expect(jan?.transactions.some((t) => t.type === 'Invoice Void')).toBe(false);
+      // 0.1 + 0.2 + 1.0 - 0.05 - 0.01 - 0.02 + 0.02
+      expect(jan?.closingBalance).toBe('1.2400');
+      expect(jan?.totalInvoiced).toBe('1.3000');
+    });
+
+    it('shows the reversal on the void date and carries both into later openings', async () => {
+      const feb = await service.getCustomerStatement(ORG, 'c1', '2026-02-01', '2026-02-28');
+
+      expect(feb?.openingBalance).toBe('1.2400');
+      expect(feb?.transactions).toEqual([
+        expect.objectContaining({ type: 'Payment Void', sourceType: 'payment', sourceId: 'pay-1' }),
+        expect.objectContaining({
+          type: 'Invoice Void',
+          reference: 'INV-V',
+          sourceType: 'invoice',
+          sourceId: 'inv-v',
+          credit: '1.0000',
+          balance: '0.2900',
+        }),
+      ]);
+      expect(feb?.totalInvoiced).toBe('0.0000');
+
+      const mar = await service.getCustomerStatement(ORG, 'c1', '2026-03-01', '2026-03-31');
+      // The invoice and its reversal both precede March.
+      expect(mar?.openingBalance).toBe('0.2900');
+    });
+  });
+
+  it('links each row to its source document and reports invoice-only totalInvoiced', async () => {
+    const jan = await service.getCustomerStatement(ORG, 'c1', '2026-01-01', '2026-01-31');
+
+    expect(jan?.transactions.map((t) => [t.type, t.sourceType, t.sourceId])).toEqual([
+      ['Invoice', 'invoice', 'inv-1'],
+      ['Invoice', 'invoice', 'inv-2'],
+      ['Payment', 'payment', 'pay-1'],
+      ['Credit Note', 'creditNote', 'cn-1'],
+      ['Credit Note', 'creditNote', 'cn-2'],
+      ['Credit Note Refund', 'creditNote', 'cn-2'],
+    ]);
+    expect(jan?.totalInvoiced).toBe('0.3000');
+    // totalDebits also contains the refund debit
+    expect(jan?.totalDebits).toBe('0.3200');
   });
 
   it('returns null for a customer of another organization', async () => {

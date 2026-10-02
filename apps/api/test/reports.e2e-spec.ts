@@ -127,6 +127,27 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       });
       expect(opening.status).toBe(201);
 
+      // A bank account with an opening balance posts its own journal against account 3900.
+      const linked = await createAccount(a, '1050', 'Savings Bank', 'ASSET');
+      const bankAccount = await a.post('/bank-accounts').send({
+        name: 'Savings',
+        type: 'BANK',
+        linkedAccountId: linked,
+        openingBalance: '250.25',
+        openingDate: isoDay(-100),
+      });
+      expect(bankAccount.status).toBe(201);
+      const linkedBalance = await a.get(`/accounts/${linked}/balance`);
+      expect(linkedBalance.body.balance).toBe('250.2500');
+      const sourced = await prisma.journal.count({
+        where: {
+          organizationId: tenantA.organizationId,
+          sourceType: 'OPENING_BALANCE',
+          sourceId: `bank-account:${bankAccount.body.id}`,
+        },
+      });
+      expect(sourced).toBe(1);
+
       const c1 = await a.post('/customers').send({ name: 'Nile Trading', currency: 'EGP' });
       const c2 = await a.post('/customers').send({ name: 'Delta Retail', currency: 'EGP' });
       const c3 = await a.post('/customers').send({ name: 'Tiny Amounts', currency: 'EGP' });
@@ -437,13 +458,31 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       expect(s3.totalDebits).toBe('0.3000');
       expect(s3.transactions).toHaveLength(2);
 
+      // The sales-authorized route serves the same reconciling statement.
+      const viaCustomers = await a.get(`/customers/${customer3}/statement`);
+      expect(viaCustomers.status).toBe(200);
+      expect(viaCustomers.body.closingBalance).toBe('0.3000');
+      expect(viaCustomers.body.totalInvoiced).toBe('0.3000');
+      expect(viaCustomers.body.transactions[0]).toMatchObject({ sourceType: 'invoice' });
+      expect((await b.get(`/customers/${customer3}/statement`)).status).toBe(404);
+
       const s1 = await stmt(customer1);
       expect(s1.closingBalance).toBe('983.0000');
       expect(s1.transactions.map((t: { type: string }) => t.type)).toEqual(
         expect.arrayContaining(['Invoice', 'Payment', 'Credit Note']),
       );
-      // Drafts, voids and deleted invoices are absent.
-      expect(s1.transactions.filter((t: { type: string }) => t.type === 'Invoice')).toHaveLength(1);
+      // The posted-then-voided invoice stays on its date with a separate reversal; the draft and
+      // the deleted draft never appear.
+      const rows = s1.transactions as Array<{ type: string; debit: string; credit: string }>;
+      expect(rows.filter((t) => t.type === 'Invoice').map((t) => t.debit)).toEqual(
+        expect.arrayContaining(['1140.0000', '333.0000']),
+      );
+      expect(rows.filter((t) => t.type === 'Invoice')).toHaveLength(2);
+      expect(rows.filter((t) => t.type === 'Invoice Void').map((t) => t.credit)).toEqual([
+        '333.0000',
+      ]);
+      expect(rows.some((t) => ['777.0000', '555.0000'].includes(t.debit))).toBe(false);
+      expect(s1.totalInvoiced).toBe('1473.0000');
 
       const s2 = await stmt(customer2);
       const types = s2.transactions.map((t: { type: string }) => t.type);

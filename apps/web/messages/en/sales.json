@@ -83,7 +83,8 @@
         "Payment": "Payment",
         "Payment Void": "Payment voided",
         "Credit Note": "Credit note",
-        "Credit Note Refund": "Credit note refund"
+        "Credit Note Refund": "Credit note refund",
+        "Invoice Void": "Invoice voided"
       }
     }
   },

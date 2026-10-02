@@ -11,6 +11,7 @@ import { InvoicesService } from './services/invoices.service';
 import { CreditNotesService } from './services/credit-notes.service';
 import { PaymentsReceivedService } from './services/payments-received.service';
 import { DeliveryChallansService } from './services/delivery-challans.service';
+import { AgingReportsService } from '../reports/services/aging-reports.service';
 import { AccountingModule } from '../accounting/accounting.module';
 
 @Module({
@@ -24,6 +25,7 @@ import { AccountingModule } from '../accounting/accounting.module';
     DeliveryChallansController,
   ],
   providers: [
+    AgingReportsService,
     CustomersService,
     QuotesService,
     InvoicesService,

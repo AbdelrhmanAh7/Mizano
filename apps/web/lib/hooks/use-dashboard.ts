@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { format } from 'date-fns';
 import { api } from '@/lib/api';
 import { moneyToNumber } from '@/lib/money';
 
@@ -308,8 +309,9 @@ export function transformDashboardOverview(
  * KPI stats — fastest endpoint, renders first
  */
 export function useDashboardStats(dateRange?: { from: Date; to: Date }) {
-  const startDate = dateRange?.from?.toISOString().split('T')[0];
-  const endDate = dateRange?.to?.toISOString().split('T')[0];
+  // Date-only values are the user's local calendar days, not the UTC day.
+  const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined;
+  const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined;
 
   return useQuery({
     queryKey: ['dashboard', 'stats', startDate, endDate],
@@ -381,12 +383,8 @@ export function useDashboardExpenses() {
     queryKey: ['dashboard', 'expenses'],
     queryFn: async (): Promise<ExpenseCategory[]> => {
       const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-        .toISOString()
-        .split('T')[0];
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-        .toISOString()
-        .split('T')[0];
+      const startOfMonth = format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd');
+      const endOfMonth = format(new Date(now.getFullYear(), now.getMonth() + 1, 0), 'yyyy-MM-dd');
       const res = await api.get(
         `/reports/dashboard/expenses-by-category?startDate=${startOfMonth}&endDate=${endOfMonth}`,
       );

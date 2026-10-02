@@ -320,6 +320,28 @@ describe('DashboardService', () => {
     });
   });
 
+  describe('months and days bounds', () => {
+    beforeEach(() => {
+      prisma.account.findMany.mockResolvedValue(ACCOUNTS as never);
+      prisma.journalLine.findMany.mockResolvedValue([] as never);
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultBankAccountId: null,
+        defaultCashAccountId: null,
+      } as never);
+      prisma.bankAccount.findMany.mockResolvedValue([] as never);
+    });
+
+    it.each([0, -3])('treats months=%p as one month instead of throwing', async (m) => {
+      expect(await service.getRevenueChart(ORG_ID, m)).toHaveLength(1);
+    });
+
+    it('caps months at 36 and days at 366', async () => {
+      expect(await service.getRevenueChart(ORG_ID, 1000)).toHaveLength(36);
+      expect(await service.getCashFlowChart(ORG_ID, 100000)).toHaveLength(366);
+      expect(await service.getCashFlowChart(ORG_ID, -1)).toHaveLength(1);
+    });
+  });
+
   describe('getAccountBalances', () => {
     it('sums natural balances per type from posted lines and ignores Account.openingBalance', async () => {
       prisma.account.findMany.mockResolvedValue([

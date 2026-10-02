@@ -1,4 +1,4 @@
-import { CreditNoteType, Prisma } from '@prisma/client';
+import { CreditNoteType, InvoiceStatus, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { Injectable } from '@nestjs/common';
 import { ReadReplicaService } from '../../../prisma/read-replica.service';
@@ -39,6 +39,9 @@ export interface StatementTransaction {
   date: Date;
   type: string;
   reference: string;
+  /** The document the row links to (invoice, payment or credit note). */
+  sourceType: 'invoice' | 'payment' | 'creditNote';
+  sourceId: string;
   debit: Decimal;
   credit: Decimal;
 }
@@ -265,11 +268,12 @@ export class AgingReportsService {
 
   /**
    * Customer statement in exact Decimal. Issued invoices are debits; payments and applied credit
-   * notes are credits. A voided payment keeps its original credit on its own date and shows a
-   * separate debit on the date it was voided, so later corrections never rewrite an earlier
-   * period. A REFUND credit note is paid out in cash, so it is a credit plus an equal refund debit
-   * (no net effect on what the customer owes, as in the ledger). DRAFT and VOID invoices and
-   * deleted credit notes never appear.
+   * notes are credits. Corrections never rewrite an earlier period: a voided payment or invoice
+   * keeps its original entry on its own date and shows a separate reversal on the date it was
+   * voided (the reversal journal's date for invoices, `deletedAt` for payments), so a January
+   * statement is unchanged by a February void. A REFUND credit note is paid out in cash, so it is
+   * a credit plus an equal refund debit. DRAFT invoices (including drafts that were voided and
+   * never posted) and deleted credit notes never appear.
    */
   async getCustomerStatement(
     organizationId: string,
@@ -286,11 +290,38 @@ export class AgingReportsService {
     // A date-only end must include that whole day (voids/payments later on the end date).
     const end = parseReportDate(endDate, 'end', 'endDate') ?? endOfUtcDay(new Date());
 
+    // A voided invoice was posted (and reversed) only if its INVOICE_VOID journal exists; a
+    // voided draft never reached the ledger.
+    const voided = await this.prisma.invoice.findMany({
+      where: { customerId, organizationId, deletedAt: null, status: InvoiceStatus.VOID },
+    });
+    const voidJournals =
+      voided.length > 0
+        ? await this.prisma.journal.findMany({
+            where: {
+              organizationId,
+              deletedAt: null,
+              isPosted: true,
+              sourceType: 'INVOICE_VOID',
+              sourceId: { in: voided.map((i) => i.id) },
+            },
+            select: { sourceId: true, date: true },
+          })
+        : [];
+    const voidDate = new Map<string, Date>();
+    for (const j of voidJournals) {
+      if (j.sourceId) voidDate.set(j.sourceId, j.date);
+    }
+    const postedVoided = voided.filter((i) => voidDate.has(i.id));
+
     const invoiceBase = {
       customerId,
       organizationId,
       deletedAt: null,
-      status: { in: POSTED_INVOICE_STATUSES },
+      OR: [
+        { status: { in: POSTED_INVOICE_STATUSES } },
+        { status: InvoiceStatus.VOID, id: { in: postedVoided.map((i) => i.id) } },
+      ],
     } satisfies Prisma.InvoiceWhereInput;
     const creditBase = { customerId, organizationId, deletedAt: null };
 
@@ -330,9 +361,19 @@ export class AgingReportsService {
       }),
     ]);
 
+    const invoiceVoids = postedVoided.map((i) => ({
+      invoice: i,
+      date: voidDate.get(i.id) as Date,
+    }));
+    const voidsBefore = invoiceVoids.filter((v) => v.date < start);
+    const voidsInPeriod = invoiceVoids.filter((v) => v.date >= start && v.date <= end);
+    const invoiceTotal = (i: { total: Decimal | null; grandTotal: Decimal }): Decimal =>
+      toDecimal(i.total ?? i.grandTotal);
+
     // Payments count on their own date even if voided later; a void is a separate debit.
     // A refund credit note nets to zero (credit + refund debit); only APPLY notes move the balance.
-    const openingBalance = sumDecimals(openingInvoices.map((i) => i.total ?? i.grandTotal))
+    const openingBalance = sumDecimals(openingInvoices.map(invoiceTotal))
+      .sub(sumDecimals(voidsBefore.map((v) => invoiceTotal(v.invoice))))
       .sub(sumDecimals(openingPayments.map((p) => p.amount)))
       .add(sumDecimals(openingVoids.map((p) => p.amount)))
       .sub(
@@ -349,13 +390,26 @@ export class AgingReportsService {
         date: i.date,
         type: 'Invoice',
         reference: i.invoiceNumber,
-        debit: toDecimal(i.total ?? i.grandTotal),
+        sourceType: 'invoice' as const,
+        sourceId: i.id,
+        debit: invoiceTotal(i),
         credit: zero,
+      })),
+      ...voidsInPeriod.map((v) => ({
+        date: v.date,
+        type: 'Invoice Void',
+        reference: v.invoice.invoiceNumber,
+        sourceType: 'invoice' as const,
+        sourceId: v.invoice.id,
+        debit: zero,
+        credit: invoiceTotal(v.invoice),
       })),
       ...payments.map((p) => ({
         date: p.date,
         type: 'Payment',
         reference: p.paymentNumber,
+        sourceType: 'payment' as const,
+        sourceId: p.id,
         debit: zero,
         credit: toDecimal(p.amount),
       })),
@@ -363,28 +417,24 @@ export class AgingReportsService {
         date: p.deletedAt as Date,
         type: 'Payment Void',
         reference: p.paymentNumber,
+        sourceType: 'payment' as const,
+        sourceId: p.id,
         debit: toDecimal(p.amount),
         credit: zero,
       })),
       ...creditNotes.flatMap((cn): StatementTransaction[] => {
         const amount = toDecimal(cn.total ?? cn.amount);
+        const base = {
+          date: cn.date,
+          reference: cn.creditNoteNumber,
+          sourceType: 'creditNote' as const,
+          sourceId: cn.id,
+        };
         const rows: StatementTransaction[] = [
-          {
-            date: cn.date,
-            type: 'Credit Note',
-            reference: cn.creditNoteNumber,
-            debit: zero,
-            credit: amount,
-          },
+          { ...base, type: 'Credit Note', debit: zero, credit: amount },
         ];
         if (cn.type === CreditNoteType.REFUND) {
-          rows.push({
-            date: cn.date,
-            type: 'Credit Note Refund',
-            reference: cn.creditNoteNumber,
-            debit: amount,
-            credit: zero,
-          });
+          rows.push({ ...base, type: 'Credit Note Refund', debit: amount, credit: zero });
         }
         return rows;
       }),
@@ -407,6 +457,10 @@ export class AgingReportsService {
       openingBalance: money(openingBalance),
       transactions: entries,
       closingBalance: money(runningBalance),
+      /** Invoiced in the period: invoice debits only (no voided-payment or refund debits). */
+      totalInvoiced: money(
+        sumDecimals(transactions.filter((t) => t.type === 'Invoice').map((t) => t.debit)),
+      ),
       totalDebits: money(sumDecimals(transactions.map((t) => t.debit))),
       totalCredits: money(sumDecimals(transactions.map((t) => t.credit))),
     };

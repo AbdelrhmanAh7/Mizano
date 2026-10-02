@@ -18,6 +18,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { CacheService } from '../../../cache/cache.service';
 import { ReadReplicaService } from '../../../prisma/read-replica.service';
 import {
+  MAX_DAYS,
   POSTED_BILL_STATUSES,
   POSTED_EXPENSE_STATUSES,
   POSTED_INVOICE_STATUSES,
@@ -301,7 +302,10 @@ export class DashboardService {
    * Daily cash movement of the cash/bank ledger accounts. Each journal contributes its net effect
    * on cash once (a transfer between two bank accounts is neither in nor out).
    */
-  async getCashFlowChart(organizationId: string, days: number = 30) {
+  async getCashFlowChart(organizationId: string, requestedDays: number = 30) {
+    const days = Number.isFinite(requestedDays)
+      ? Math.min(MAX_DAYS, Math.max(1, Math.trunc(requestedDays)))
+      : 30;
     const today = new Date();
     const start = startOfUtcDay(new Date(today.getTime() - (days - 1) * 86_400_000));
     const cashIds = await resolveCashAccountIds(this.prisma, organizationId);
