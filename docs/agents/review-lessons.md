@@ -1,6 +1,6 @@
 # Review lessons
 
-Every rule below comes from a real Codex or Copilot finding on PRs #33–#46. Each one cost a review round. Read this file before you write code, a worker brief or a review, whether you are Claude, Codex, Copilot or any other agent. Apply the _root cause_, not just the example: most findings came back in a different module with the same cause.
+Every rule below comes from a real review finding on PRs #33–#47. Each one cost a review round. Read this file before you write code, a worker brief or a review, whatever agent you are (Claude, Codex, CodeRabbit or any other). Apply the _root cause_, not just the example: most findings came back in a different module with the same cause.
 
 **When a review raises a new kind of problem, add it here in the same PR that fixes it.**
 
@@ -8,15 +8,15 @@ Every rule below comes from a real Codex or Copilot finding on PRs #33–#46. Ea
 
 - **Lock the ledger before reading what you post with.** Take `lockOrganizationLedger(tx, orgId)` (`common/utils/ledger-lock.ts`) before reading org settings, the base currency or default accounts that the journal depends on. Every path that makes a journal posted must hold it: `create`, `reverse` and `post`. _(bill approve, invoice send, VAT submit, journal post)_
 - **Lock the document row before snapshotting the values you post.** If you post from a plain read, an edit that commits concurrently makes the ledger disagree with the document. Use `SELECT … FOR UPDATE` on the document first. _(invoice send/update)_
-- **Use one lock order everywhere: document → other documents (sorted by id) → ledger.** Opposite orders deadlock. _(VAT submit vs. payment)_
+- **Pick one lock order per workflow and use it on every path that touches the same rows.** The default is document → other documents (sorted by id) → ledger. VAT returns are a deliberate exception: submit and payment both take ledger → return row, because submission must freeze the ledger before recomputing. What deadlocks is two paths taking the same locks in opposite orders. _(VAT submit vs. payment)_
 - **Scope every row lock by organization:** `WHERE id = $1 AND "organizationId" = $2 FOR UPDATE`. A caller-supplied foreign id must lock nothing. _(lockInvoices, lockBills)_
 - **A check and the write it guards share one transaction and one lock.** Duplicate and overlap checks run inside the same tx as the insert, under an advisory lock. _(VAT period overlap)_
 - **Lock every record you read to decide a mutation.** For example, voiding a credit note must lock the note before reading `appliedToInvoiceId`, or a concurrent apply slips through. _(credit-note void vs. apply)_
 
 ## 2. Idempotency and retries
 
-- **Every state change is a guarded transition:** `updateMany({ where: { id, organizationId, status: FROM } })` plus a `count` check that throws `ConflictException`. The journal uses a unique `{ sourceType, sourceId }`.
-- **Never use a random id as an idempotency key.** Manual runs, imports and other client retries need a stable key: a client `idempotencyKey`, `profileId:YYYY-MM-DD`, or a sha256 of file + row. _(manual recurring execute, import retries)_
+- **Every state change is a guarded transition:** `updateMany({ where: { id, organizationId, status: FROM } })` plus a `count` check that throws `ConflictException`. Journal idempotency is the tenant-scoped unique key `(organizationId, sourceType, sourceId)`.
+- **An idempotency key must stay the same across retries of one action.** Generating a fresh random id on the server for each request defeats it. A client UUID created once per user action and reused on every retry is fine (`idempotencyKeyFor`); so are `profileId:YYYY-MM-DD` or a sha256 of file + row. _(manual recurring execute, import retries)_
 - **Store idempotency markers where users cannot edit them.** Notes, reason and reference text get edited; use an append-only store such as AuditLog `IMPORT_ROW`. _(import markers)_
 - **Bulk operations reuse the single-record command through `runBulk`** and report `{ processed, total, failures }`. Never write a bulk `updateMany` that skips the posting logic.
 
@@ -45,7 +45,7 @@ Every rule below comes from a real Codex or Copilot finding on PRs #33–#46. Ea
 
 ## 6. Money arithmetic
 
-- **Use Decimal end to end and send fixed 4-dp strings.** No `parseFloat`, `Number()` or `toNumber()` on money, including inside running balances.
+- **Use Decimal end to end for money arithmetic and comparisons, and send fixed 4-dp strings.** No `parseFloat`, `Number()` or `toNumber()` in sums, balances or checks. Converting an exact API string to a number only at the display boundary (formatting, chart plotting via `moneyToNumber`) is allowed.
 - **Bound inputs to `Decimal(19,4)`:** at most 15 integer and 4 fraction digits, validated with `common/dto/decimal-string.ts`. Bound computed totals before writing.
 - **Allocate VAT cumulatively.** Each partial credit's VAT = `round(totalVAT × cumulative/total) − already allocated`, so the parts sum exactly to the whole.
 - **The web preview rounds per line exactly like the server** (`computeDocumentTotals`), otherwise the shown and stored totals differ.
@@ -54,7 +54,7 @@ Every rule below comes from a real Codex or Copilot finding on PRs #33–#46. Ea
 
 ## 7. Tenancy, roles and validation
 
-- **Put `organizationId` on every query, lock and lookup.** Another tenant's ids return 404 (or 400 when they come from the body), and soft-deleted parents return 404.
+- **Scope every tenant resource by `organizationId`** in queries, locks and lookups. Child rows are scoped through their tenant-scoped parent, and pre-authentication lookups such as login by email are the documented exception. Another tenant's ids return 404 (or 400 when they come from the body), and soft-deleted parents return 404.
 - **Validate the role of every referenced account, not only ownership.** Refund, payment and paid-from accounts must pass the bank/cash rule (`common/utils/bank-cash-accounts.ts`). Expense offsets must be `EXPENSE`. Credit accounts must come from the source document's lines.
 - **Validate direction and type.** A withdrawal can't settle an invoice, and switching a recurring profile to JOURNAL must validate the journal template.
 - **When a form needs data the role can't read, add a narrow lookup endpoint guarded by the form's own permission,** for example `/invoices/tax-rate-options` (`sales.view`) or `/inventory-adjustments/account-options` (`inventory.create`). Never widen permissions.
@@ -63,8 +63,8 @@ Every rule below comes from a real Codex or Copilot finding on PRs #33–#46. Ea
 
 ## 8. Voided and deleted records
 
-- **Voided or soft-deleted documents stay readable** (read-only, with `deletedAt` set) on their detail endpoint so journal source links resolve. Lists still exclude them.
-- **Statements and reports exclude DRAFT/VOID/deleted documents,** but voided history stays where it belongs (see 4).
+- **Posted documents that were voided stay readable** (read-only, with `deletedAt` set) on their detail endpoint so journal source links resolve. Lists exclude them. Deleted drafts, which never posted, return 404.
+- **Current figures (open balances, aging, dashboards) exclude DRAFT, VOID and deleted documents.** Historical statements and period reports keep a posted document that was voided later in its original period, with the reversal on the void date (see 4).
 
 ## 9. Reports must reconcile
 
@@ -75,7 +75,7 @@ Every rule below comes from a real Codex or Copilot finding on PRs #33–#46. Ea
 
 ## 10. Logging, audit and secrets
 
-- **Never log or audit values:** no document text, amounts, tax ids, LLM output, query parameters or raw error objects. Use `describeError`/`redactText`, and store field names and status only.
+- **Never log or audit values:** no document text, amounts, tax ids, LLM output, query parameters or raw error objects. Log metadata instead (ids, counts, lengths, durations, field names, status), and use `describeError` for errors. `redactText` only masks credential-shaped strings, so it does not make document text safe to log.
 - **Clients can't claim trusted provenance.** HTTP log captures are forced to `FRONTEND`.
 - **Compare secrets in constant time, with no default secrets.** Re-apply file permissions on files that already exist.
 
@@ -95,6 +95,6 @@ Every rule below comes from a real Codex or Copilot finding on PRs #33–#46. Ea
 
 ## Review process
 
-- After opening a PR, request **both** reviewers: comment `@codex review` and add Copilot (`gh pr edit <n> --add-reviewer @copilot`).
+- CodeRabbit reviews every PR (configured in `.coderabbit.yaml`, which points it at this file). If a review doesn't start automatically, comment `@coderabbitai review`.
 - Fix every valid finding at its root, reply on the thread with the commit, and resolve it. When a finding is wrong, reply once with the reason and resolve it.
 - Add any new root cause to this file in the same PR.
