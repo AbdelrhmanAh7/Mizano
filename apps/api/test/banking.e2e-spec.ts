@@ -167,7 +167,7 @@ describe('Banking (e2e)', () => {
       expect(tb.body.data).toEqual([]);
     });
 
-    it('rejects posting a transaction to the other tenant bank account (PRODUCT BUG if 201: create() has no ownership check)', async () => {
+    it("rejects a transaction against another tenant's bank account", async () => {
       const res = await b.post('/bank-transactions').send({
         bankAccountId,
         date: today(),
@@ -175,6 +175,31 @@ describe('Banking (e2e)', () => {
         amount: '1.00',
       });
       expect(res.status).toBe(400);
+    });
+
+    it("rejects bulk import against another tenant's bank account and creates nothing", async () => {
+      const res = await b.post('/bank-transactions/import').send({
+        bankAccountId,
+        transactions: [
+          { date: today(), type: 'DEPOSIT', amount: '1.00', description: 'Foreign import deposit' },
+          {
+            date: today(),
+            type: 'WITHDRAWAL',
+            amount: '2.00',
+            description: 'Foreign import withdrawal',
+          },
+        ],
+      });
+      expect(res.status).toBe(400);
+
+      const [ra, rb] = await Promise.all([
+        a.get('/bank-transactions'),
+        b.get('/bank-transactions'),
+      ]);
+      expect(ra.status).toBe(200);
+      expect(rb.status).toBe(200);
+      expect(ids(ra.body)).toEqual([transactionId]);
+      expect(rb.body.data).toEqual([]);
     });
   });
 
