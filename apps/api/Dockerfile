@@ -104,6 +104,8 @@ FROM node:20-alpine AS runtime
 # fontconfig fallback; Latin text and digits use font-opensans, which the
 # chromium package already depends on.
 RUN apk add --no-cache openssl chromium font-noto-naskh-arabic poppler-utils util-linux-misc \
+  && test -x /usr/bin/prlimit && test -x /usr/bin/pdftotext \
+  && test -x /usr/bin/pdfinfo && test -x /usr/bin/pdftoppm \
   && rm -rf /usr/lib/libLLVM* /usr/lib/libgallium* /usr/lib/dri /usr/lib/gbm \
        /usr/lib/libvulkan* /usr/share/vulkan /usr/lib/libxatracker*
 
@@ -140,6 +142,12 @@ COPY --chown=nestjs:nodejs --from=build /app/apps/api/package.json ./apps/api/pa
 RUN mkdir -p /app/node_modules/.bin \
   && ln -s /opt/prisma/node_modules/prisma /app/node_modules/prisma \
   && ln -s ../prisma/build/index.js /app/node_modules/.bin/prisma
+
+# The Pi compose worker, its health probe and the per-document extraction child are started
+# by path; fail the build if the compiled layout ever stops providing them.
+RUN test -f /app/apps/api/dist/intake-worker.js \
+  && test -f /app/apps/api/dist/intake-worker-healthcheck.js \
+  && test -f /app/apps/api/dist/modules/ai/intake/intake-child.js
 
 USER nestjs
 EXPOSE 6001

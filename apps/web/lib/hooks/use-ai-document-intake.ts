@@ -89,7 +89,13 @@ export interface DocumentIntakeResult {
   } | null;
 
   /** Which AI engine was used */
-  extractionMethod?: 'ollama-vision' | 'ollama-text' | 'ocr-llm' | 'hybrid-ocr' | 'hybrid-vlm';
+  extractionMethod?:
+    | 'cpu-ocr'
+    | 'ollama-vision'
+    | 'ollama-text'
+    | 'ocr-llm'
+    | 'hybrid-ocr'
+    | 'hybrid-vlm';
 
   /** Suggested vendor creation when no existing vendor matched */
   suggestCreateVendor?: {
@@ -170,7 +176,12 @@ const documentIntakeApi = {
       stage: IntakeStage;
       progress: number;
       result: DocumentIntakeResult | null;
+      /** Localized by the API from the request language; show it as-is. */
       lastError: string | null;
+      /** Stable runtime code (INTAKE_TIMEOUT, ...) behind `lastError`. */
+      errorCode?: string | null;
+      /** True for FAILED and DEAD_LETTER jobs: the Retry action is available. */
+      retryable?: boolean;
     };
   }> => {
     const response = await api.get(`/ai/document-intake/${encodeURIComponent(jobId)}/result`);

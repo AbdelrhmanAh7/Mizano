@@ -2,7 +2,21 @@
 
 Tiny live deployment: Raspberry Pi 5 (8GB, arm64), Raspberry Pi OS 64-bit, Docker Engine + compose plugin, data on an attached SSD, private HTTPS through a Cloudflare Tunnel. Nothing here has been run on a Pi yet; treat every step as unverified until the first real deployment.
 
-Memory budget (8GB): postgres 1.5G, redis 256M, api 1G, web 512M, cloudflared 128M, 2G reserved for the extraction worker, remainder for the OS and page cache.
+Memory budget (8GB): postgres 1.5G, redis 256M, api 1G, web 512M, cloudflared 128M, 2G hard-capped extraction worker, remainder for the OS and page cache.
+
+The worker runs `dist/intake-worker.js` from the **same API image digest**, with
+one replica, concurrency 1 (configurable to 2 only after measurements), a
+2-core CPU quota, no swap and 128 PID cap. Steady container limits sum to
+5504 MiB; the 768 MiB one-shot migration brings the maximum to 6272 MiB,
+leaving 1920 MiB of an 8 GiB host for the OS/cache during migration.
+`INTAKE_JOB_DEADLINE_MS` defaults to a provisional 120 seconds per document.
+The API never consumes intake jobs; worker originals are mounted read-only.
+Deploy and rollback wait for worker health as well as API/web health, and the monitoring timer (section 6) alerts when the worker is down or unhealthy, because a dead worker leaves every document queued without any error in the API.
+
+See [CPU runtime](../../docs/strategy/pi-cpu-extraction-runtime.md) for per-child
+and external-tool limits, EN/AR retry errors, shutdown and Pi measurement gates.
+The current no-LLM worker preserves OCR evidence with unknown fields requiring
+review; #16 structured parsing and measured Pi acceptance remain outstanding.
 
 ## 1. Prepare the Pi
 
@@ -71,7 +85,7 @@ Only SSH (ideally LAN-only) should answer. No container should list a published 
 deploy/pi/scripts/deploy.sh <commit-sha> sha256:<api-digest> sha256:<web-digest>
 ```
 
-It pulls by digest, runs `prisma migrate deploy` (one-shot `migrate` service; the api only starts when it succeeds), restarts, waits for healthy, and appends `OK`/`FAILED` lines to `$MIZANO_DATA_DIR/deployments.log`. On failed health it rolls back to the previous recorded digests. Migrations are never reverted, so keep them backward compatible with the previous release.
+It pulls by digest, runs `prisma migrate deploy` (one-shot `migrate` service; the api only starts when it succeeds), restarts, waits for API/web/worker healthy, and appends `OK`/`FAILED` lines to `$MIZANO_DATA_DIR/deployments.log`. On failed health it rolls back to the previous recorded digests. Migrations are never reverted, so keep them backward compatible with the previous release.
 
 ## 5. Backups and restore drill
 
@@ -89,10 +103,12 @@ The units assume the repo at `/opt/mizano`; edit `ExecStart` otherwise, and ensu
 
 ## 6. Monitoring
 
-`mizano-healthcheck.timer` runs `healthcheck.sh` every 5 minutes: API and web health endpoints, disk above 80%, low available memory, CPU temperature, throttling (`vcgencmd get_throttled`), and backup status older than 26 hours. Alerts and recovery messages go to Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`). Messages contain only short check names; no secrets or document data. A state file in `$MIZANO_DATA_DIR/monitor` suppresses repeats. Create the bot with BotFather and get the chat id from `getUpdates`.
+`mizano-healthcheck.timer` runs `healthcheck.sh` every 5 minutes: API and web health endpoints, the intake worker container's health (a fresh PostgreSQL and Redis heartbeat), disk above 80%, low available memory, CPU temperature, throttling (`vcgencmd get_throttled`), and backup status older than 26 hours. Alerts and recovery messages go to Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`). Messages contain only short check names; no secrets or document data. A state file in `$MIZANO_DATA_DIR/monitor` suppresses repeats. Create the bot with BotFather and get the chat id from `getUpdates`.
 
 ## 7. Upgrade and rollback
 
 - Upgrade: run `deploy.sh` with the new SHA and digests (section 4).
 - Manual rollback: `deploy/pi/scripts/rollback.sh` restores the previous `OK` digests from `deployments.log`.
 - Back up before any upgrade that includes a migration: `sudo systemctl start mizano-backup.service`.
+
+Offline worker-readiness regression: `bash deploy/pi/scripts/worker-health.test.sh` from the repository root. It checks that a healthy, unhealthy, starting or missing worker is accepted or rejected by the deploy/rollback health wait and raises the right monitoring problem, without Docker or network access.
