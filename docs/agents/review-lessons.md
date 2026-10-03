@@ -90,6 +90,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 12. Caches, tests and scope
 
+- **Keep CommonJS import interop consistent between the app compiler and every test runner.** Callable CommonJS exports such as `csv-parser` need default imports with `esModuleInterop`; namespace imports become non-callable objects. Exercise the real parser through both preview and full-row paths under the legacy and standard Jest configurations.
 - **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included.
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.

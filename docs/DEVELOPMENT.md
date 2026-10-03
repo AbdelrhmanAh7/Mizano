@@ -115,6 +115,14 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 
 `_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly.
 
+The API compiler enables `esModuleInterop`, matching the legacy runner's ts-jest
+setting. Import callable CommonJS modules such as `csv-parser` with a default
+import; a namespace import becomes an object under this setting. For the import
+regression check, run `node apps/api/_run_tests.js --testPathPattern=import --runInBand`
+from the repository root, then run
+`npx jest src/modules/import-export --runInBand` from `apps/api` to verify the
+standard Jest configuration too. Run targeted tests serially on shared low-memory hosts.
+
 Unit-test infrastructure lives in `apps/api/src/test/`: `mocks/prisma.mock.ts` (deep Prisma mock, transactions call back with the mock), `mocks/redis.mock.ts` (in-memory cache), `mocks/{sharp,tesseract}.mock.js` (heavy native/OCR libraries), `helpers/test-utils.ts` (typed factories) and `helpers/decimal.helpers.ts`. Unit tests must not need Redis, PostgreSQL, Ollama or the network.
 
 Rules:

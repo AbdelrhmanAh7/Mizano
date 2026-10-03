@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { CreditNoteType, PaymentMode, Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import { Decimal } from '@prisma/client/runtime/library';
-import * as csv from 'csv-parser';
+import csv from 'csv-parser';
 import { Readable } from 'stream';
 import * as XLSX from 'xlsx';
 import { PrismaService } from '../../../prisma/prisma.service';
