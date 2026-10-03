@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import {
   validateAmount,
   validateCurrency,
@@ -58,6 +59,20 @@ describe('validateCurrency', () => {
 });
 
 describe('validateAmount', () => {
+  it('does not invent binary artifacts or hide precision already lost by numeric arithmetic', () => {
+    expect(validateAmount(0.3)).toEqual({ value: '0.3000', status: 'valid', reasons: [] });
+    const computed = 0.1 + 0.2;
+    // decimal.js already parses numeric fractions via their decimal string. String() cannot
+    // recover the intended 0.3 after the extractor has performed binary arithmetic.
+    expect(new Decimal(computed).toString()).toBe('0.30000000000000004');
+    expect(new Decimal(String(computed)).toString()).toBe('0.30000000000000004');
+    expect(validateAmount(computed)).toEqual({
+      value: '0.3000',
+      status: 'warning',
+      reasons: ['AMOUNT_PRECISION'],
+    });
+  });
+
   it('bounds to Decimal(19,4) and rejects negatives', () => {
     expect(validateAmount(10.5)).toMatchObject({ status: 'valid', value: '10.5000' });
     expect(validateAmount(null).status).toBe('missing');
@@ -91,6 +106,15 @@ describe('validateTaxId', () => {
 });
 
 describe('validateExtraction', () => {
+  it('reconciles decimal fractions without a binary sum causing a totals mismatch', () => {
+    const v = validateExtraction({ ...GOOD, subtotal: 0.1, tax: 0.2, total: 0.3 }, ctx);
+    expect(v.blockingFields).toEqual([]);
+    expect(v.fields.subtotal).toMatchObject({ value: '0.1000', status: 'valid', reasons: [] });
+    expect(v.fields.total).toMatchObject({ value: '0.3000', status: 'valid', reasons: [] });
+    expect(v.fields.tax.reasons).toEqual(['VAT_RATE_UNEXPECTED']);
+    expect(v.requiresReview).toBe(false);
+  });
+
   it('passes a consistent SA invoice', () => {
     const v = validateExtraction(GOOD, ctx);
     expect(v.requiresReview).toBe(false);
@@ -146,6 +170,48 @@ describe('validateExtraction', () => {
     ]);
     const v = validateExtraction({ ...GOOD, currency: 'EGP', vendorTaxId: '123456789' }, ctx);
     expect(v.blockingFields).toContain('currency');
+  });
+
+  it('uses SA rules when the extracted currency is misread as EGP', () => {
+    const v = validateExtraction({ ...GOOD, currency: 'EGP' }, ctx);
+    expect(v.blockingFields).toEqual(['currency']);
+    expect(v.fields.currency.reasons).toEqual(['CURRENCY_NOT_BASE']);
+    expect(v.fields.vendorTaxId).toMatchObject({ status: 'valid', reasons: [] });
+    expect(v.fields.tax).toMatchObject({ status: 'valid', reasons: [] });
+    expect(
+      validateExtraction({ ...GOOD, currency: 'EGP', tax: 14, total: 114 }, ctx).fields.tax,
+    ).toMatchObject({ status: 'warning', reasons: ['VAT_RATE_UNEXPECTED'] });
+  });
+
+  it('uses EG rules when the extracted currency is misread as SAR', () => {
+    const v = validateExtraction(
+      { ...GOOD, vendorTaxId: '123456789', tax: 14, total: 114 },
+      { ...ctx, baseCurrency: ' egp ' },
+    );
+    expect(v.blockingFields).toEqual(['currency']);
+    expect(v.fields.vendorTaxId).toMatchObject({ status: 'valid', reasons: [] });
+    expect(v.fields.tax).toMatchObject({ status: 'valid', reasons: [] });
+    expect(
+      validateExtraction({ ...GOOD, vendorTaxId: '123456789' }, { ...ctx, baseCurrency: 'EGP' })
+        .fields.tax,
+    ).toMatchObject({ status: 'warning', reasons: ['VAT_RATE_UNEXPECTED'] });
+  });
+
+  it('uses base-currency tax rules when extracted currency is missing', () => {
+    const v = validateExtraction({ ...GOOD, currency: null }, ctx);
+    expect(v.blockingFields).toEqual(['currency']);
+    expect(v.fields.vendorTaxId).toMatchObject({ status: 'valid', reasons: [] });
+    expect(v.fields.tax).toMatchObject({ status: 'valid', reasons: [] });
+  });
+
+  it('keeps country unknown when the base currency has no country mapping', () => {
+    const v = validateExtraction(
+      { ...GOOD, currency: 'SAR', vendorTaxId: '123456789', tax: 7, total: 107 },
+      { ...ctx, baseCurrency: 'USD' },
+    );
+    expect(v.blockingFields).toEqual(['currency']);
+    expect(v.fields.vendorTaxId).toMatchObject({ status: 'valid', reasons: [] });
+    expect(v.fields.tax).toMatchObject({ status: 'valid', reasons: [] });
   });
 
   it('requires date, total and currency but not the invoice number', () => {

@@ -201,10 +201,7 @@ export function validateExtraction(
   const now = ctx.now ?? new Date();
   const ev = input.fieldEvidence ?? {};
   const ambiguous = input.extractionWarnings?.includes('DATE_AMBIGUOUS') ?? false;
-  const currencyCountry =
-    CURRENCY_COUNTRY[(clean(input.currency) ?? '').toUpperCase()] ??
-    CURRENCY_COUNTRY[ctx.baseCurrency.trim().toUpperCase()] ??
-    null;
+  const currencyCountry = CURRENCY_COUNTRY[ctx.baseCurrency.trim().toUpperCase()] ?? null;
 
   let subtotal = validateAmount(input.subtotal, ev.subtotal);
   let tax = validateAmount(input.tax, ev.tax);

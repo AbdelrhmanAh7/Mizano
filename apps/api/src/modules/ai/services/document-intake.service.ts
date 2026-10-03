@@ -441,6 +441,9 @@ export class DocumentIntakeService {
       where: { id: organizationId },
       select: { baseCurrency: true },
     });
+    if (!org?.baseCurrency?.trim()) {
+      throw new BadRequestException('Organization base currency is unavailable');
+    }
     const taxId = extraction.vendorTaxId?.trim();
     const digits = taxId ? normalizeDigits(taxId).replace(/[\s\-.]/g, '') : undefined;
     let vendorMatchedByTaxId = false;
@@ -453,7 +456,7 @@ export class DocumentIntakeService {
     }
     return validateExtraction(
       { ...extraction },
-      { baseCurrency: org?.baseCurrency ?? 'SAR', vendorMatchedByTaxId },
+      { baseCurrency: org.baseCurrency, vendorMatchedByTaxId },
     );
   }
 

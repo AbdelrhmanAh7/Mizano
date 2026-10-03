@@ -133,6 +133,49 @@ describe('client-side confirm rules', () => {
         currencyCode: 'SAR',
         lines: [{ quantity: '2', rate: '60.5' }],
       }),
-    ).toEqual([]);
+    ).toEqual(['total']);
+  });
+
+  it.each([
+    ['unchanged net', [{ quantity: '1', rate: '100' }]],
+    ['edited rate', [{ quantity: '1', rate: '101' }]],
+    ['edited quantity', [{ quantity: '2', rate: '100' }]],
+    ['empty lines', []],
+    ['malformed line', [{ quantity: '1', rate: 'bad' }]],
+    ['zero net', [{ quantity: '1', rate: '0' }]],
+  ])('keeps all amount blockers for acknowledgement with %s', (_label, lines) => {
+    const v: ExtractionValidation = {
+      requiresReview: true,
+      blockingFields: ['subtotal', 'tax', 'total'],
+      fields: {
+        subtotal: { value: '100.0000', status: 'invalid', reasons: ['TOTALS_MISMATCH'] },
+        tax: { value: '15.0000', status: 'invalid', reasons: ['TOTALS_MISMATCH'] },
+        total: { value: '130.0000', status: 'invalid', reasons: ['TOTALS_MISMATCH'] },
+      },
+    };
+    const blocked = uncorrectedBlockingFields(v, extracted, { ...form, lines });
+    expect(blocked).toEqual(['subtotal', 'tax', 'total']);
+    expect(partitionBlocking(blocked, v)).toEqual({
+      hard: [],
+      amounts: ['subtotal', 'tax', 'total'],
+      missingDate: false,
+    });
+  });
+
+  it('requires acknowledgement of a missing amount even after editing lines', () => {
+    const v: ExtractionValidation = {
+      requiresReview: true,
+      blockingFields: ['total'],
+      fields: {
+        subtotal: { value: null, status: 'missing', reasons: ['AMOUNT_MISSING'] },
+        total: { value: null, status: 'missing', reasons: ['AMOUNT_MISSING'] },
+      },
+    };
+    expect(
+      uncorrectedBlockingFields(v, extracted, {
+        ...form,
+        lines: [{ quantity: '2', rate: '60.5' }],
+      }),
+    ).toEqual(['total']);
   });
 });

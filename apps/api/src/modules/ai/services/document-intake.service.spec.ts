@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { DocumentIntakeService, ConfirmIntakeInput } from './document-intake.service';
-import { OllamaService } from './ollama.service';
+import { DocumentExtractionResult, OllamaService } from './ollama.service';
 import { DocumentClassificationService } from './document-classification.service';
 import { EntityExtractionService } from './entity-extraction.service';
 import { AiFeedbackService } from './ai-feedback.service';
@@ -13,6 +13,7 @@ const ORG_A = 'org-a';
 const ORG_B = 'org-b';
 
 interface PrismaMock {
+  organization: { findFirst: jest.Mock };
   vendor: { findFirst: jest.Mock; findMany: jest.Mock };
   customer: { findFirst: jest.Mock };
   project: { findFirst: jest.Mock };
@@ -52,7 +53,11 @@ function buildPrisma(): PrismaMock {
       );
 
   return {
-    vendor: { findFirst: jest.fn(findOwned(owned.vendor)), findMany: jest.fn() },
+    organization: { findFirst: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }) },
+    vendor: {
+      findFirst: jest.fn(findOwned(owned.vendor)),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     customer: { findFirst: jest.fn(findOwned(owned.customer)) },
     project: { findFirst: jest.fn(findOwned(owned.project)) },
     item: { findMany: jest.fn(findManyOwned(owned.item)) },
@@ -92,17 +97,21 @@ function baseBill(overrides: Partial<ConfirmIntakeInput> = {}): ConfirmIntakeInp
 describe('DocumentIntakeService', () => {
   let prisma: PrismaMock;
   let feedback: { processFeedback: jest.Mock };
+  let resolver: { resolve: jest.Mock };
   let service: DocumentIntakeService;
 
   beforeEach(() => {
     prisma = buildPrisma();
     feedback = { processFeedback: jest.fn().mockResolvedValue(undefined) };
+    resolver = { resolve: jest.fn().mockResolvedValue(null) };
     service = new DocumentIntakeService(
       prisma as unknown as PrismaService,
       {} as OllamaService,
-      { resolve: jest.fn().mockResolvedValue(null) } as unknown as ExtractionStrategyResolver,
+      resolver as unknown as ExtractionStrategyResolver,
       {} as DocumentClassificationService,
-      {} as EntityExtractionService,
+      {
+        extractAndMatch: jest.fn().mockResolvedValue({ matches: [] }),
+      } as unknown as EntityExtractionService,
       feedback as unknown as AiFeedbackService,
       {} as ConfigService,
     );
@@ -112,6 +121,95 @@ describe('DocumentIntakeService', () => {
   });
 
   afterEach(() => jest.restoreAllMocks());
+
+  describe('processDocument — organization validation settings', () => {
+    const extraction: DocumentExtractionResult = {
+      vendorName: null,
+      vendorAddress: null,
+      vendorPhone: null,
+      vendorEmail: null,
+      vendorTaxId: '123456789',
+      invoiceNumber: 'INV-1',
+      date: '2026-09-01',
+      dueDate: null,
+      total: 114,
+      subtotal: 100,
+      tax: 14,
+      discount: null,
+      currency: 'EGP',
+      paymentTerms: null,
+      notes: null,
+      lineItems: [],
+      rawText: 'PRIVATE-DOCUMENT-TEXT',
+      ocrConfidence: 0.9,
+      fieldConfidence: {},
+      documentCategory: 'INVOICE',
+      accountingEntry: null,
+      processingTimeMs: 1,
+    };
+
+    beforeEach(() => {
+      resolver.resolve.mockResolvedValue({ extraction, strategyUsed: 'rules', totalTimeMs: 1 });
+    });
+
+    it.each([
+      ['missing organization', null],
+      ['missing currency', {}],
+      ['null currency', { baseCurrency: null }],
+      ['empty currency', { baseCurrency: '' }],
+      ['blank currency', { baseCurrency: '   ' }],
+    ])('rejects %s without assuming currency or tax rules', async (_label, organization) => {
+      prisma.organization.findFirst.mockResolvedValue(organization);
+
+      await expect(
+        service.processDocument(ORG_A, Buffer.from('image'), 'image/png'),
+      ).rejects.toThrow('Organization base currency is unavailable');
+
+      expect(prisma.organization.findFirst).toHaveBeenCalledWith({
+        where: { id: ORG_A },
+        select: { baseCurrency: true },
+      });
+      expect(prisma.vendor.findFirst).not.toHaveBeenCalled();
+      expect(prisma.bill.create).not.toHaveBeenCalled();
+      expect(prisma.invoice.create).not.toHaveBeenCalled();
+      expect(JSON.stringify(jest.mocked(Logger.prototype.log).mock.calls)).not.toContain(
+        extraction.rawText,
+      );
+    });
+
+    it.each([
+      ['EGP', 14, '123456789'],
+      ['SAR', 15, '300000000000003'],
+    ])(
+      'preserves %s validation and tenant-scoped tax-ID matching',
+      async (currency, tax, taxId) => {
+        prisma.organization.findFirst.mockResolvedValue({ baseCurrency: currency });
+        prisma.vendor.findFirst.mockResolvedValue({ id: 'vendor-a' });
+        resolver.resolve.mockResolvedValue({
+          extraction: { ...extraction, currency, tax, total: 100 + tax, vendorTaxId: taxId },
+          strategyUsed: 'rules',
+          totalTimeMs: 1,
+        });
+
+        const result = await service.processDocument(ORG_A, Buffer.from('image'), 'image/png');
+
+        expect(result.validation).toMatchObject({
+          blockingFields: [],
+          requiresReview: false,
+          fields: {
+            currency: { status: 'valid', reasons: [] },
+            tax: { status: 'valid', reasons: [] },
+            vendorTaxId: { status: 'valid', reasons: [] },
+            vendor: { status: 'valid', reasons: ['VENDOR_MATCHED_BY_TAX_ID'] },
+          },
+        });
+        expect(prisma.vendor.findFirst).toHaveBeenCalledWith({
+          where: { organizationId: ORG_A, deletedAt: null, taxId: { in: [taxId] } },
+          select: { id: true },
+        });
+      },
+    );
+  });
 
   describe('confirmAndCreate — tax arithmetic', () => {
     it('2 x 100 at 14% => net 200, tax 28, gross 228 (bill)', async () => {
