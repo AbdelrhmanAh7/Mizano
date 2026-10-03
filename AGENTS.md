@@ -4,7 +4,7 @@ Applies repository-wide. Read this first, then the provider entrypoint, [current
 
 ## Goal
 
-Deliver the accountant-led CPU invoice demo by **14 September 2026, 23:59 Africa/Cairo**: Telegram/web → original → extraction → validated draft → one batch approval → ledger → payment → reports. Ten daily development sessions, 2–3 wall-clock hours each. Four providers: Codex, Claude, GLM and Antigravity. Provider names describe intended tools, not proof that this environment has them connected.
+Run a tiny live deployment on a **Raspberry Pi 5 (8GB, arm64)** with the full accountant flow: core ledger (AP/AR, reports, Arabic/English) + invoice intake (web upload, CPU-only extraction, validated drafts, batch approval) + Telegram ingestion. Tracking epic: GitHub issue #45. Milestones: P1 Pi platform, P2 Ledger correctness, P3 Intake & Telegram, P4 Pi go-live. Project board: `Mizano — Pi Live`.
 
 ## Non-negotiable domain rules
 

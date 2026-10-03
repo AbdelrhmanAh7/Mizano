@@ -1,0 +1,8 @@
+Dubai Tech FZE
+Tax Invoice
+Invoice No. AE-1009
+Date: 12 March 2024
+TRN: 100234567800003
+Subtotal AED 1,200.00
+VAT 5% AED 60.00
+Grand Total AED 1,260.00

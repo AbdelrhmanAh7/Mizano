@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { api } from '@/lib/api';
+import { decimalToDisplayNumber, subtractDecimals, sumDecimals } from '@/lib/decimal';
 import { moneyToNumber } from '@/lib/money';
 
 // Types
@@ -196,7 +197,7 @@ export function transformDashboardOverview(
     overview.overview?.cashBalance !== undefined
       ? moneyToNumber(overview.overview.cashBalance)
       : Array.isArray(overview.bankBalances)
-        ? overview.bankBalances.reduce((sum, b) => sum + moneyToNumber(b.systemBalance), 0)
+        ? decimalToDisplayNumber(sumDecimals(overview.bankBalances.map((b) => b.systemBalance)))
         : 0;
 
   // Build alerts from overview
@@ -395,7 +396,7 @@ export function useDashboardExpenses() {
         ? data
         : [];
       // Percentages are a display ratio of API-computed amounts, not money arithmetic.
-      const total = expenseArray.reduce((sum: number, e) => sum + moneyToNumber(e.amount), 0);
+      const total = decimalToDisplayNumber(sumDecimals(expenseArray.map((e) => e.amount)));
       return expenseArray.slice(0, 5).map((e) => ({
         name: e.category || 'Other',
         amount: moneyToNumber(e.amount),
@@ -553,28 +554,29 @@ export function useDashboard() {
 
 /**
  * Aggregate daily cash flow data into monthly buckets.
+ * Sums and the net are exact decimal strings; they become numbers only for plotting.
  */
-function aggregateCashFlowByMonth(
+export function aggregateCashFlowByMonth(
   daily: Array<{ date: string; cashIn?: string | number; cashOut?: string | number }>,
 ): CashFlowPoint[] {
-  const byMonth: Record<string, { inflow: number; outflow: number }> = {};
+  const byMonth: Record<string, { inflow: string; outflow: string }> = {};
   const monthFormatter = new Intl.DateTimeFormat('default', { month: 'short' });
 
   for (const day of daily) {
     const date = new Date(day.date);
     const key = monthFormatter.format(date);
-    if (!byMonth[key]) {
-      byMonth[key] = { inflow: 0, outflow: 0 };
-    }
-    byMonth[key].inflow += moneyToNumber(day.cashIn);
-    byMonth[key].outflow += moneyToNumber(day.cashOut);
+    const bucket = byMonth[key] ?? { inflow: '0', outflow: '0' };
+    byMonth[key] = {
+      inflow: sumDecimals([bucket.inflow, day.cashIn]),
+      outflow: sumDecimals([bucket.outflow, day.cashOut]),
+    };
   }
 
   return Object.entries(byMonth).map(([month, data]) => ({
     month,
-    inflow: data.inflow,
-    outflow: data.outflow,
-    net: data.inflow - data.outflow,
+    inflow: decimalToDisplayNumber(data.inflow),
+    outflow: decimalToDisplayNumber(data.outflow),
+    net: decimalToDisplayNumber(subtractDecimals(data.inflow, data.outflow)),
   }));
 }
 

@@ -56,11 +56,13 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 7. Tenancy, roles and validation
 
 - **Scope every tenant resource by `organizationId`** in queries, locks and lookups. Child rows are scoped through their tenant-scoped parent, and pre-authentication lookups such as login by email are the documented exception. Another tenant's ids return 404 (or 400 when they come from the body), and soft-deleted parents return 404.
+- **Ownership checks for `@Sse` routes live in a guard, not the handler.** Once the stream starts the status is already 200, so a `NotFoundException` thrown in the handler arrives as an in-band error event and the tenant probe sees 200. `IntakeJobOwnerGuard` returns the real 404. _(intake progress SSE)_
 - **Validate the role of every referenced account, not only ownership.** Refund, payment and paid-from accounts must pass the bank/cash rule (`common/utils/bank-cash-accounts.ts`). Expense offsets must be `EXPENSE`. Credit accounts must come from the source document's lines.
 - **Validate direction and type.** A withdrawal can't settle an invoice, and switching a recurring profile to JOURNAL must validate the journal template.
 - **When a form needs data the role can't read, add a narrow lookup endpoint guarded by the form's own permission,** for example `/invoices/tax-rate-options` (`sales.view`) or `/inventory-adjustments/account-options` (`inventory.create`). Never widen permissions.
 - **Gate UI actions with exactly the API route's permission.**
 - **Money-bearing imports require the same per-entity create permission as the single-record routes.**
+- **Adding auth to a server endpoint or socket changes its contract: update every client in the same PR** (send the token, handle expiry and reconnect). A server-only change silently breaks the client. _(events gateway vs `use-realtime`)_
 
 ## 8. Voided and deleted records
 
@@ -76,7 +78,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 10. Logging, audit and secrets
 
-- **Never log or audit values:** no document text, amounts, tax ids, LLM output, query parameters or raw error objects. Log metadata instead (ids, counts, lengths, durations, field names, status), and use `describeError` for errors. `redactText` only masks credential-shaped strings, so it does not make document text safe to log.
+- **Never log or audit values:** no document text, amounts, tax ids, LLM output, query parameters or raw error objects. Log metadata instead (ids, counts, lengths, durations, field names, status), and use `describeError(error, { includeMessage: false })` wherever an error message could contain document or user data. `redactText` only masks credential-shaped strings, so it does not make document text safe to log.
 - **Clients can't claim trusted provenance.** HTTP log captures are forced to `FRONTEND`.
 - **Compare secrets in constant time, with no default secrets.** Re-apply file permissions on files that already exist.
 

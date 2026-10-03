@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Prisma } from '@prisma/client';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -68,14 +69,31 @@ export class PayrollController {
   @Get('payslips/employee/:employeeId')
   @Permissions('payroll.view')
   @ApiOperation({ summary: 'Get employee payslips' })
-  getEmployeePayslips(@CurrentOrg() orgId: string, @Param('employeeId') employeeId: string) {
+  getEmployeePayslips(
+    @CurrentOrg() orgId: string,
+    @Param('employeeId') employeeId: string,
+  ): Promise<
+    Prisma.PayslipGetPayload<{
+      include: { payrollRun: { select: { month: true; year: true; status: true } } };
+    }>[]
+  > {
     return this.payrollService.getEmployeePayslips(orgId, employeeId);
   }
 
   @Get('payslips/:id')
   @Permissions('payroll.view')
   @ApiOperation({ summary: 'Get payslip details' })
-  getPayslip(@CurrentOrg() orgId: string, @Param('id') id: string) {
+  getPayslip(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+  ): Promise<
+    Prisma.PayslipGetPayload<{
+      include: {
+        employee: true;
+        payrollRun: true;
+      };
+    }>
+  > {
     return this.payrollService.getPayslip(orgId, id);
   }
 

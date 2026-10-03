@@ -35,6 +35,8 @@ export interface TokenRefresher {
    * Resolves null if the refresh failed or the session is cooling down.
    */
   refresh(refreshToken: string | undefined | null): Promise<RefreshedTokens | null>;
+  /** Drop all state for the session owning `refreshToken` (call on logout). */
+  forget(refreshToken: string | undefined | null): void;
   /** Number of in-flight refreshes and cooldown entries (for tests/diagnostics). */
   size(): { inFlight: number; cooldowns: number };
   /** Clear all state. */
@@ -120,6 +122,12 @@ export function createTokenRefresher(options: TokenRefresherOptions): TokenRefre
       });
       inFlight.set(key, promise);
       return promise;
+    },
+    forget(refreshToken) {
+      if (!refreshToken) return;
+      const key = sessionRefreshKey(refreshToken);
+      inFlight.delete(key);
+      cooldownUntil.delete(key);
     },
     size() {
       return { inFlight: inFlight.size, cooldowns: cooldownUntil.size };

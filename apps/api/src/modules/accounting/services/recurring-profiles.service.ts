@@ -20,6 +20,7 @@ import { CreateBillDto } from '../../purchases/dto/create-bill.dto';
 import { CreateExpenseDto } from '../../purchases/dto/create-expense.dto';
 import { BillsService } from '../../purchases/services/bills.service';
 import { ExpensesService } from '../../purchases/services/expenses.service';
+import { describeError } from '../../../common/utils/redact';
 
 /** Shared shape for a single line in journal/invoice/bill templates */
 interface JournalTemplateLine {
@@ -421,9 +422,7 @@ export class RecurringProfilesService {
         await this.executeRecurringProfile(profile);
       } catch (error) {
         this.logger.error(
-          `Failed to process recurring profile ${profile.id}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
+          `Failed to process recurring profile ${profile.id}: ${describeError(error, { includeMessage: false })}`,
         );
       }
     }

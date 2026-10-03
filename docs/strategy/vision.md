@@ -1,6 +1,6 @@
 # Mizano: vision, mission and product decisions
 
-Decision date: 5 September 2026. Audience: the product owner, accountants and engineering agents.
+Original vision decision date: 5 September 2026. Audience: the product owner, accountants and engineering agents.
 
 ## Vision
 
@@ -21,9 +21,9 @@ Turn business documents into traceable, validated accounting records with minima
 
 Start with an Egypt-based service/trading SMB and EGP purchase bills. Sales invoice/payment/report smoke coverage protects existing core integration. Regional currencies and Arabic/English presentation remain architectural requirements; tax adapters are separate later releases.
 
-## Ten-day outcome
+## Raspberry Pi live outcome
 
-By **14 September 2026, 23:59 Africa/Cairo**, demonstrate Telegram/web → stored original → CPU extraction → validated draft → one accountant batch approval → ledger → partial payment → reconciled reports. Day 1 is 5 September. Development runs in one 2–3 hour daily window with four bounded provider lanes. The deployed intake service operates continuously; development windows do not restrict invoice intake uptime.
+The current goal is a tiny live deployment on a **Raspberry Pi 5 (8GB, arm64)**, tracked by epic **#45**, with core ledger (AP/AR, reports, Arabic/English), invoice intake and Telegram ingestion: Telegram/web → stored original → CPU extraction → validated draft → one accountant batch approval → ledger → partial payment → reconciled reports. The ten-day demo target is superseded by the Pi plan (#45).
 
 This is a committed scope and target, not an assertion that the work is already implemented. The release is blocked if accounting or tenant-isolation gates fail. Cut optional polish, vendor layouts or extra charts first; never silently cut the connected journey or change a failed gate to green.
 
@@ -39,6 +39,6 @@ This is a committed scope and target, not an assertion that the work is already 
 
 ## Scope discipline
 
-Keep the existing Next.js/NestJS/PostgreSQL/Redis stack. Add one isolated CPU extraction worker if required by dependencies. Reuse current reports and UI components. No framework rewrite, generic agent platform, new HR/CRM/manufacturing work, speculative forecasting or supplier portal during the ten days.
+Keep the existing Next.js/NestJS/PostgreSQL/Redis stack. Add one isolated CPU extraction worker if required by dependencies. Reuse current reports and UI components. No framework rewrite, generic agent platform, new HR/CRM/manufacturing work, speculative forecasting or supplier portal during the Pi sprint.
 
 After demo acceptance: controlled Egypt pilot, accountant feedback and retention/access review; then ETA eInvoice PreProd, distinct eReceipt if needed, Saudi sandbox and UAE ASP partnership. Roadmap dates after the demo depend on measured capacity and authority onboarding.

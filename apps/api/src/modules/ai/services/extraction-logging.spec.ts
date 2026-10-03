@@ -3,7 +3,6 @@ import { of } from 'rxjs';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { DocumentIntakeService } from './document-intake.service';
 import { OllamaService } from './ollama.service';
@@ -157,7 +156,6 @@ describe('extraction and intake logging never contains document content', () => 
       } as unknown as EntityExtractionService,
       { processFeedback: jest.fn() } as unknown as AiFeedbackService,
       {} as ConfigService,
-      new EventEmitter2(),
     );
   });
 
@@ -334,7 +332,6 @@ describe('extraction and intake logging never contains document content', () => 
       } as unknown as EntityExtractionService,
       { processFeedback: jest.fn() } as unknown as AiFeedbackService,
       {} as ConfigService,
-      new EventEmitter2(),
     );
 
     await failing.processDocument('org-1', Buffer.from('x'), 'image/png').catch(() => undefined);

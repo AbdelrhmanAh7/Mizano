@@ -12,6 +12,7 @@ import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { runBulk } from '../../../common/utils/run-bulk';
+import { assertTotalsFit } from '../../sales/utils/sales-helpers';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
 import { BillCursorQueryDto } from '../dto/bill-cursor-query.dto';
@@ -495,6 +496,7 @@ export class BillsService {
     const totals = computeDocumentTotals(
       lines.map((l) => ({ quantity: l.quantity, rate: l.rate, taxRatePercent: l.taxRate })),
     );
+    assertTotalsFit(totals);
     const lineData = lines.map((line, i) => ({
       ...(line.itemId && { itemId: line.itemId }),
       ...(line.accountId && { accountId: line.accountId }),

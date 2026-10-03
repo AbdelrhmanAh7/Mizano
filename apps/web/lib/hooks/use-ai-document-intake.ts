@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSession } from 'next-auth/react';
 import api from '@/lib/api';
+import { useTranslations } from 'next-intl';
 
 // ============ Types ============
 
@@ -14,6 +15,18 @@ export type IntakeStage =
   | 'matching'
   | 'complete'
   | 'error';
+
+/** Durable server-side job status (PostgreSQL), distinct from the progress stage. */
+export type IntakeJobStatus =
+  | 'QUEUED'
+  | 'PROCESSING'
+  | 'EXTRACTED'
+  | 'NEEDS_REVIEW'
+  | 'FAILED'
+  | 'DEAD_LETTER'
+  | 'APPROVED';
+
+export const RETRYABLE_INTAKE_STATUSES: IntakeJobStatus[] = ['FAILED', 'DEAD_LETTER'];
 
 export interface VendorCandidate {
   id: string;
@@ -76,7 +89,13 @@ export interface DocumentIntakeResult {
   } | null;
 
   /** Which AI engine was used */
-  extractionMethod?: 'ollama-vision' | 'ollama-text' | 'ocr-llm' | 'hybrid-ocr' | 'hybrid-vlm';
+  extractionMethod?:
+    | 'ollama-vision'
+    | 'ollama-text'
+    | 'ocr-llm'
+    | 'hybrid-ocr'
+    | 'hybrid-vlm'
+    | 'rules';
 
   /** Suggested vendor creation when no existing vendor matched */
   suggestCreateVendor?: {
@@ -117,6 +136,8 @@ export interface ConfirmIntakeData {
   notes?: string;
   projectId?: string;
   corrections?: Record<string, unknown>;
+  /** Intake job this draft came from; the server approves it once and links the draft. */
+  jobId?: string;
 }
 
 export interface ConfirmIntakeResponse {
@@ -127,6 +148,7 @@ export interface ConfirmIntakeResponse {
 
 export interface IntakeProgressEvent {
   stage: IntakeStage;
+  status?: IntakeJobStatus;
   progress: number;
   message?: string;
   result?: DocumentIntakeResult;
@@ -147,14 +169,21 @@ const documentIntakeApi = {
     jobId: string,
   ): Promise<{
     data: {
-      jobId: string;
-      status: IntakeStage;
+      id: string;
+      draftDocumentType?: string | null;
+      draftDocumentId?: string | null;
+      status: IntakeJobStatus;
+      stage: IntakeStage;
       progress: number;
       result: DocumentIntakeResult | null;
-      error: string | null;
+      lastError: string | null;
     };
   }> => {
     const response = await api.get(`/ai/document-intake/${encodeURIComponent(jobId)}/result`);
+    return response.data;
+  },
+  retry: async (jobId: string) => {
+    const response = await api.post(`/ai/document-intake/${encodeURIComponent(jobId)}/retry`);
     return response.data;
   },
   confirmIntake: async (data: ConfirmIntakeData) => {
@@ -250,8 +279,16 @@ export function useDocumentIntakeStream(): {
   error: string | null;
   isProcessing: boolean;
   isReconnecting: boolean;
+  jobId: string | null;
+  jobStatus: IntakeJobStatus | null;
+  isDuplicate: boolean;
+  /** Set when an identical file was already approved: the draft it produced. */
+  existingDraft: { type: string; id: string } | null;
+  canRetry: boolean;
+  retry: () => Promise<void>;
   reset: () => void;
 } {
+  const t = useTranslations('ai.intake');
   const [stage, setStage] = useState<IntakeStage | null>(null);
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
@@ -259,6 +296,10 @@ export function useDocumentIntakeStream(): {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobStatus, setJobStatus] = useState<IntakeJobStatus | null>(null);
+  const [isDuplicate, setIsDuplicate] = useState(false);
+  const [existingDraft, setExistingDraft] = useState<{ type: string; id: string } | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -284,29 +325,37 @@ export function useDocumentIntakeStream(): {
     setError(null);
     setIsProcessing(false);
     setIsReconnecting(false);
+    setJobId(null);
+    setJobStatus(null);
+    setIsDuplicate(false);
+    setExistingDraft(null);
   }, [stopAll]);
 
   /** Apply an event; returns true when the job reached a terminal state. */
-  const handleProgressEvent = useCallback((event: IntakeProgressEvent): boolean => {
-    setStage(event.stage);
-    setProgress(event.progress);
-    if (event.message) setMessage(event.message);
+  const handleProgressEvent = useCallback(
+    (event: IntakeProgressEvent): boolean => {
+      setStage(event.stage);
+      setProgress(event.progress);
+      if (event.status) setJobStatus(event.status);
+      if (event.message) setMessage(event.message);
 
-    if (event.stage === 'complete') {
-      if (event.result) setResult(event.result);
-      else setError('Processing finished without a result');
-      setIsProcessing(false);
-      setIsReconnecting(false);
-      return true;
-    }
-    if (event.stage === 'error') {
-      setError(event.error || 'Processing failed');
-      setIsProcessing(false);
-      setIsReconnecting(false);
-      return true;
-    }
-    return false;
-  }, []);
+      if (event.stage === 'complete') {
+        if (event.result) setResult(event.result);
+        else setError(t('streamNoResult'));
+        setIsProcessing(false);
+        setIsReconnecting(false);
+        return true;
+      }
+      if (event.stage === 'error') {
+        setError(event.error || t('streamFailed'));
+        setIsProcessing(false);
+        setIsReconnecting(false);
+        return true;
+      }
+      return false;
+    },
+    [t],
+  );
 
   const fail = useCallback((msg: string) => {
     setError(msg);
@@ -328,21 +377,22 @@ export function useDocumentIntakeStream(): {
           failures = 0;
           setIsReconnecting(false);
           const terminal = handleProgressEvent({
-            stage: job.status,
+            stage: job.stage,
+            status: job.status,
             progress: job.progress,
             result: job.result ?? undefined,
-            error: job.error ?? undefined,
+            error: job.lastError ?? undefined,
           });
           if (terminal) return;
         } catch (err) {
           const status = (err as { response?: { status?: number } }).response?.status;
           if (status === 404) {
-            fail('This scan is no longer available. Please upload the document again.');
+            fail(t('streamUnavailable'));
             return;
           }
           failures += 1;
           if (failures >= MAX_CONSECUTIVE_POLL_FAILURES) {
-            fail('Lost connection while processing the document. Please try again.');
+            fail(t('streamLostConnection'));
             return;
           }
           setIsReconnecting(true);
@@ -354,7 +404,7 @@ export function useDocumentIntakeStream(): {
 
       void poll();
     },
-    [handleProgressEvent, fail],
+    [handleProgressEvent, fail, t],
   );
 
   const streamProgress = useCallback(
@@ -389,46 +439,104 @@ export function useDocumentIntakeStream(): {
     [handleProgressEvent],
   );
 
+  /** Authenticated progress stream, polling as the reconnect path. */
+  const followJob = useCallback(
+    async (id: string) => {
+      const controller = new AbortController();
+      abortRef.current = controller;
+      try {
+        const terminal = await streamProgress(id, controller.signal);
+        if (!terminal && !controller.signal.aborted) {
+          startPolling(id, controller.signal);
+        }
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        if (err instanceof IntakeStreamHttpError && err.status === 404) {
+          fail(t('streamUnavailable'));
+          return;
+        }
+        // Network drop, 401 (token refresh is handled by the API client), proxy
+        // buffering, etc. — continue via polling.
+        startPolling(id, controller.signal);
+      }
+    },
+    [streamProgress, startPolling, fail, t],
+  );
+
   const processDocument = useCallback(
     async (formData: FormData) => {
       reset();
       setIsProcessing(true);
       setStage('received');
       setProgress(5);
-      setMessage('Uploading document...');
+      setMessage(t('streamUploading'));
 
-      let jobId: string;
+      let newJobId: string;
       try {
-        // Step 1: POST file → get jobId
+        // Step 1: POST file → job (an identical earlier upload returns the existing job)
         const response = await documentIntakeApi.processDocument(formData);
-        jobId = response.data.jobId;
+        newJobId = response.data.jobId;
+        setJobId(newJobId);
+        setJobStatus(response.data.status ?? null);
+        setIsDuplicate(response.data.duplicate === true);
+        if (response.data.status === 'APPROVED') {
+          // Already approved: show the draft it produced, never a second review form.
+          const job = (await documentIntakeApi.getResult(newJobId)).data;
+          if (job.draftDocumentId && job.draftDocumentType) {
+            setExistingDraft({ type: job.draftDocumentType, id: job.draftDocumentId });
+          }
+          setStage('complete');
+          setProgress(100);
+          setIsProcessing(false);
+          return;
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        fail(msg || 'Failed to process document');
+        fail(msg || t('streamProcessFailed'));
         return;
       }
 
-      // Step 2: authenticated progress stream, polling as the reconnect path
-      const controller = new AbortController();
-      abortRef.current = controller;
-      try {
-        const terminal = await streamProgress(jobId, controller.signal);
-        if (!terminal && !controller.signal.aborted) {
-          startPolling(jobId, controller.signal);
-        }
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        if (err instanceof IntakeStreamHttpError && err.status === 404) {
-          fail('This scan is no longer available. Please upload the document again.');
-          return;
-        }
-        // Network drop, 401 (token refresh is handled by the API client), proxy
-        // buffering, etc. — continue via polling.
-        startPolling(jobId, controller.signal);
-      }
+      await followJob(newJobId);
     },
-    [reset, fail, streamProgress, startPolling],
+    [reset, fail, followJob, t],
   );
+
+  const retry = useCallback(async () => {
+    if (!jobId) return;
+    stopAll();
+    setError(null);
+    setStage('received');
+    setProgress(0);
+    setIsProcessing(true);
+    try {
+      await documentIntakeApi.retry(jobId);
+      setJobStatus('QUEUED');
+    } catch (err) {
+      const status = (err as { response?: { status?: number } }).response?.status;
+      if (status === 409) {
+        try {
+          const job = (await documentIntakeApi.getResult(jobId)).data;
+          setJobStatus(job.status);
+          if (job.status === 'QUEUED' || job.status === 'PROCESSING') {
+            setStage(job.stage);
+            setProgress(job.progress);
+            await followJob(jobId);
+            return;
+          }
+          // The server refused the transition; do not offer the same retry again.
+          if (RETRYABLE_INTAKE_STATUSES.includes(job.status)) setJobStatus(null);
+          fail(t('retryUnavailable'));
+        } catch {
+          setJobStatus(null);
+          fail(t('retryFailed'));
+        }
+      } else {
+        fail(t('retryFailed'));
+      }
+      return;
+    }
+    await followJob(jobId);
+  }, [jobId, stopAll, fail, followJob, t]);
 
   return {
     processDocument,
@@ -439,6 +547,12 @@ export function useDocumentIntakeStream(): {
     error,
     isProcessing,
     isReconnecting,
+    jobId,
+    jobStatus,
+    isDuplicate,
+    existingDraft,
+    canRetry: jobId !== null && jobStatus !== null && RETRYABLE_INTAKE_STATUSES.includes(jobStatus),
+    retry,
     reset,
   };
 }

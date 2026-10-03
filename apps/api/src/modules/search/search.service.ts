@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { JaroWinklerDistance } from 'natural';
 import { PrismaService } from '../../prisma/prisma.service';
+import { describeError } from '../../common/utils/redact';
 import type { GlobalSearchQueryDto, SearchEntityType } from './dto';
 
 // ============================================
@@ -120,7 +121,9 @@ export class SearchService {
             if (errMsg.includes('function similarity') || errMsg.includes('pg_trgm')) {
               hasTrgm = false;
             }
-            this.logger.warn(`Fuzzy search failed for ${config.type}: ${errMsg}`);
+            this.logger.warn(
+              `Fuzzy search failed for ${config.type}: ${describeError(err, { includeMessage: false })}`,
+            );
             return { config, rows: [] };
           }
         }),
@@ -184,7 +187,7 @@ export class SearchService {
         totalResults: allResults.length,
       };
     } catch (error) {
-      this.logger.error('Global search error', error instanceof Error ? error.stack : error);
+      this.logger.error(`Global search error: ${describeError(error, { includeMessage: false })}`);
       // Fall back to ILIKE search on any unexpected error
       return this.fallbackSearch(organizationId, query, limit, configs);
     }
