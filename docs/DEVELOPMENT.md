@@ -7,7 +7,7 @@ Setup, environments, database, testing, CI, git workflow and deployment for Miza
 - Node 20 (CI and Docker images use Node 20; `engines` allows >=18)
 - pnpm 8.14 via `corepack enable` (pinned in `packageManager`)
 - Docker with Compose for PostgreSQL 16 and Redis 7
-- Python 3 only for the planning scripts in `scripts/`
+- Python 3 for the planning scripts in `scripts/` and the docs-check tests; Bash (Git Bash on Windows) for the worktree helpers and docs-check tests
 
 ## Quick start
 
@@ -34,18 +34,19 @@ Health: `GET /api/health`, `/api/health/ready`, `/api/health/live`.
 
 ## Commands
 
-| Area      | Command                                                                                              | Notes                                   |
-| --------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| Dev       | `pnpm dev`, `pnpm dev:api`, `pnpm dev:web`                                                           | `dev:local` forces `APP_ENV=local`      |
-| Build     | `pnpm build`, `pnpm build:{dev,sit,prod}`                                                            | sets `APP_ENV` for the build            |
-| Quality   | `pnpm lint`, `pnpm lint:fix`, `pnpm type-check`, `pnpm format:check`                                 | `pnpm format` rewrites files            |
-| Tests     | `pnpm test`, `pnpm test:api`, `pnpm test:web`, `pnpm test:cov`, `pnpm test:e2e`                      | E2E needs a seeded database             |
-| CI gate   | `pnpm ci:full`                                                                                       | lint + type-check + unit tests (no E2E) |
-| Database  | `pnpm db:{generate,push,migrate,seed,reset,studio,check}`                                            | `db:reset` drops data                   |
-| Docker    | `pnpm docker:{up,down,logs,dev,sit,prod,prod:down}`, `pnpm status`                                   |                                         |
-| Utilities | `pnpm env:check`, `pnpm generate:types`, `pnpm generate:validators`, `pnpm clean`, `pnpm clean:full` |                                         |
+| Area      | Command                                                                                              | Notes                                           |
+| --------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Dev       | `pnpm dev`, `pnpm dev:api`, `pnpm dev:web`                                                           | `dev:local` forces `APP_ENV=local`              |
+| Build     | `pnpm build`, `pnpm build:{dev,sit,prod}`                                                            | sets `APP_ENV` for the build                    |
+| Quality   | `pnpm lint`, `pnpm lint:fix`, `pnpm type-check`, `pnpm format:check`                                 | `pnpm format` rewrites files                    |
+| Tests     | `pnpm test`, `pnpm test:api`, `pnpm test:web`, `pnpm test:cov`, `pnpm test:e2e`                      | E2E needs a seeded database                     |
+| CI gate   | `pnpm ci:full`                                                                                       | lint + type-check + unit tests (no E2E)         |
+| Database  | `pnpm db:{generate,push,migrate,seed,reset,studio,check}`                                            | `db:reset` drops data                           |
+| Docker    | `pnpm docker:{up,down,logs,dev,sit,prod,prod:down}`, `pnpm status`                                   |                                                 |
+| Utilities | `pnpm env:check`, `pnpm generate:types`, `pnpm generate:validators`, `pnpm clean`, `pnpm clean:full` |                                                 |
+| Worktrees | `pnpm wt:new <lane> [base]`, `pnpm wt:clean`                                                         | Bash; see [worktree helpers](#worktree-helpers) |
 
-Agent slash-command recipes live in [`.agents/workflows/`](../.agents/workflows/). The legacy `/ci` recipe still incorrectly claims `ci:full` includes format/E2E; the current package script above is authoritative. This sandbox makes `.agents/` read-only, so the lead must refresh that recipe in a writable checkout.
+Agent slash-command recipes live in [`.agents/workflows/`](../.agents/workflows/). The `/ci` recipe matches the `ci:full` script above: lint, type-check and unit tests; format check and E2E run separately.
 
 ## Environments
 
@@ -113,6 +114,8 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 | API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database               |
 | Browser E2E    | not wired yet                                              | tracked by the seeded API/browser journey issue         |
 | Planning tools | `scripts/test_*.py`                                        | `python -m unittest discover -s scripts -p 'test_*.py'` |
+| Docs guard     | `.github/tests/test_docs_check.py`                         | `python .github/tests/test_docs_check.py`               |
+| Worktree tools | `scripts/test-wt.sh`                                       | `bash scripts/test-wt.sh`                               |
 
 Native Windows pnpm works with the package Jest configuration. Use `cd apps/api && npx jest`
 (or `pnpm test:api`) and bound workers on a small host (`--maxWorkers=2`). `_run_tests.js`,
@@ -182,7 +185,8 @@ bash scripts/test-wt.sh      # bounded offline tests with real Git and stubbed p
 
 `wt:new <lane> [base]` creates `.worktrees/<lane>` with a branch named `<lane>`.
 Lane names start with a letter or digit and contain only letters, digits, hyphens
-and underscores. Existing branches or paths are rejected. The default base is
+and underscores, so a slashed sprint name such as `demo/<issue>-<topic>` needs a
+`git branch -m` rename afterwards. Existing branches or paths are rejected. The default base is
 `master`; the helpers use existing `origin/<base>` refs and never fetch. The
 coordinator must refresh remote refs before use. Creation then runs
 `pnpm install --offline --frozen-lockfile`, `pnpm db:generate` and
@@ -224,4 +228,4 @@ The VM workflow still enables Ollama/VLM and pulls a vision model on the host. I
 
 Historical VPS sizing and provider notes: [archive/deployment-requirements-2026-03.md](archive/deployment-requirements-2026-03.md).
 
-**Raspberry Pi 5.** The tiny live deployment (compose, Cloudflare Tunnel, digest deploys, encrypted backups, monitoring) is documented in [deploy/pi/README.md](../deploy/pi/README.md).
+**Raspberry Pi 5.** The tiny live deployment (compose, Cloudflare Tunnel, digest deploys, encrypted backups, monitoring) is documented in [deploy/pi/README.md](../deploy/pi/README.md); the first demo and every release candidate are accepted with the [Pi runbook](../deploy/pi/RUNBOOK.md) (evidence-bound GO/NO-GO).

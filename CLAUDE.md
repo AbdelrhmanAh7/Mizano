@@ -219,22 +219,22 @@ if (!totalDebits.equals(totalCredits)) throw new BadRequestException('Journal en
 
 All workflows are in `.agents/workflows/`. Use these commands for full project control:
 
-| Command          | Description                                                     |
-| ---------------- | --------------------------------------------------------------- |
-| `/dev`           | Start dev servers (Docker + Web :5001 + API :6001)              |
-| `/build`         | Build for any environment (local/dev/sit/prod)                  |
-| `/test`          | Run tests (unit/e2e/coverage/watch)                             |
-| `/lint`          | Lint + type-check + format (with auto-fix option)               |
-| `/ci`            | Package gate: lint/type-check/unit; legacy recipe needs refresh |
-| `/db`            | Database ops (generate/push/migrate/seed/reset)                 |
-| `/docker`        | Docker infra (up/down/logs/status/prod)                         |
-| `/deploy`        | Deploy (pre-checks → build → docker prod)                       |
-| `/git`           | Git ops (conventional commits, branch management)               |
-| `/env`           | Environment management (check/switch/validate)                  |
-| `/new-module`    | Scaffold NestJS backend module                                  |
-| `/new-page`      | Scaffold Next.js frontend page + hooks + API client             |
-| `/add-component` | Add shadcn/ui components                                        |
-| `/debug-api`     | Debug API (Docker/ports/DB/logs/endpoints)                      |
+| Command          | Description                                               |
+| ---------------- | --------------------------------------------------------- |
+| `/dev`           | Start dev servers (Docker + Web :5001 + API :6001)        |
+| `/build`         | Build for any environment (local/dev/sit/prod)            |
+| `/test`          | Run tests (unit/e2e/coverage/watch)                       |
+| `/lint`          | Lint + type-check + format (with auto-fix option)         |
+| `/ci`            | Package gate: lint, type-check, unit tests (E2E separate) |
+| `/db`            | Database ops (generate/push/migrate/seed/reset)           |
+| `/docker`        | Docker infra (up/down/logs/status/prod)                   |
+| `/deploy`        | Deploy (pre-checks → build → docker prod)                 |
+| `/git`           | Git ops (conventional commits, branch management)         |
+| `/env`           | Environment management (check/switch/validate)            |
+| `/new-module`    | Scaffold NestJS backend module                            |
+| `/new-page`      | Scaffold Next.js frontend page + hooks + API client       |
+| `/add-component` | Add shadcn/ui components                                  |
+| `/debug-api`     | Debug API (Docker/ports/DB/logs/endpoints)                |
 
 ## CPU-only invoice intake and historical AI infrastructure
 
@@ -276,3 +276,5 @@ tessdata settings. See [Architecture](docs/ARCHITECTURE.md#pi-invoice-pipeline) 
 | [`docs/roadmap.md`](docs/roadmap.md)                                   | Raspberry Pi live plan (milestones P1–P4)                           |
 | [`docs/strategy/demo-acceptance.md`](docs/strategy/demo-acceptance.md) | Demo go/no-go contract                                              |
 | [`docs/strategy/`](docs/strategy/)                                     | Vision, repository review, extraction and regional research         |
+| [`deploy/pi/README.md`](deploy/pi/README.md)                           | Raspberry Pi setup, deploy, backup, monitoring and rollback         |
+| [`deploy/pi/RUNBOOK.md`](deploy/pi/RUNBOOK.md)                         | Pi live acceptance checklist with GO/NO-GO criteria                 |

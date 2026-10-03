@@ -95,9 +95,9 @@ apps/web     Next.js 14 accountant UI (en/ar, RTL)
 apps/api     NestJS 10 API, Prisma schema, migrations and seed
 packages/    shared-types and validators (Zod)
 services/    historical ollama-proxy (Colab tunnel); outside the Pi live path
-deploy/pi/   Pi compose, digest deployment, backups, rollback and monitoring
+deploy/pi/   Pi compose, digest deployment, backups, rollback, monitoring and the acceptance runbook
 docs/        ARCHITECTURE, DEVELOPMENT, DESIGN-SYSTEM, roadmap, strategy, planning, agents, archive
-scripts/     GitHub planning sync and its offline tests
+scripts/     GitHub planning sync, worktree helpers (pnpm wt:new / wt:clean) and their offline tests
 nginx/       production reverse proxy configuration
 ```
 

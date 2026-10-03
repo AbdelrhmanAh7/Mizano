@@ -56,7 +56,8 @@ A lease record contains issue key/number, provider, run ID, paths, baseline SHA,
 For local worktrees, use `pnpm wt:new <lane> [base]` (default cached
 `origin/master`) and `pnpm wt:clean`; see the [helper guide](../DEVELOPMENT.md#worktree-helpers).
 The lane is both the branch name and `.worktrees/<lane>` directory name; use a
-simple lane name without slashes. Refresh remote refs through the coordinator
+simple lane name without slashes, then `git branch -m` to the sprint's
+`demo/<issue>-<topic>` name if required. Refresh remote refs through the coordinator
 before use. Setup installs offline, generates Prisma and builds only shared
 packages sequentially. Schedule setup as one expensive task on the shared host.
 Record the actual base SHA in the lease; a helper invocation does not acquire a
