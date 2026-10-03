@@ -19,6 +19,10 @@ Core ledger (AP/AR, reports, Arabic/English) + invoice intake (web upload, CPU-o
 
 Each issue carries its own dependencies and acceptance criteria; do not overwrite humans' issue text or reopen completed work. The sprint coordinator records emergent blockers, owns the shared schema and serializes integration. On a slipped milestone, publish the blocked state with the exact remaining issues; do not claim the target met or weaken tests. [Agent operations](agents/README.md).
 
+Issue #44 execution checklist: [Pi live acceptance runbook](../deploy/pi/RUNBOOK.md).
+It covers platform preparation, both intake routes, the English/Arabic accountant journey,
+restore/rollback drills and evidence-bound GO/NO-GO; its existence does not mark P4 complete.
+
 ## Repository implementation snapshot (not milestone completion)
 
 At baseline `56b9a59c6d9a40211be9ee7d6234f9fc97039964`, Pi deployment scripts and compose,
