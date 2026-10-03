@@ -47,6 +47,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Use Decimal end to end for money arithmetic and comparisons, and send fixed 4-dp strings.** No `parseFloat`, `Number()` or `toNumber()` in sums, balances or checks. Converting an exact API string to a number only at the display boundary (formatting, chart plotting via `moneyToNumber`) is allowed.
 - **Bound inputs to `Decimal(19,4)`:** at most 15 integer and 4 fraction digits, validated with `common/dto/decimal-string.ts`. Bound computed totals before writing.
+- **Send each field at the scale its DTO validates; 4 dp is a bound, not a universal pad.** Quantity and rate go as fixed 4-dp strings, but a tax percentage is `IsDecimalString(2)`, so padding it to `'14.0000'` is a 400 on every scanned line. A page spec with a mocked confirm mutation cannot see that: pin the accepted and rejected shapes in the API DTO spec as well. _(scan confirm payload)_
 - **Allocate VAT cumulatively.** Each partial credit's VAT = `round(totalVAT × cumulative/total) − already allocated`, so the parts sum exactly to the whole.
 - **The web preview rounds per line exactly like the server** (`computeDocumentTotals`), otherwise the shown and stored totals differ.
 - **When storage changes (net vs. gross), update every view:** list, detail, PDF and report. _(tax-inclusive expenses)_
@@ -85,12 +86,15 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Every new string needs en and ar,** including dialog titles, confirm and cancel buttons, placeholders, selector labels and report row names. Shared components accept localized label props.
 - **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed.
+- **Bind async intake updates to the active job for the entire operation:** invalidate pending uploads, retries, lookups, streams and redirects on navigation/reset, and remove the previous draft before rendering a new job.
+- **Never render server error text; map stable error codes to localized messages.** Job errors can quote documents, while format failures carry an `INTAKE_<CODE>:` prefix. The intake hook shows a localized repair only for a known code (`INTAKE_REPAIR_KEYS`, en and ar) and a generic localized failure otherwise, on the upload rejection, the progress stream and polling alike. Dropping server text without mapping the codes loses the repair the user needs. _(failed jobs after folding job links into the format work)_
 - **Show the currency of the document**, falling back to the org base currency, never the counterparty's default. The API must actually return the fields the UI relies on (for example `baseCurrency`).
 - **Payment-wide effects get payment-wide warnings.** Voiding a payment affects every allocated bill.
 
 ## 12. Caches, tests and scope
 
 - **Resolve merge conflicts at the contract level, then test the combined flow.** Taking a whole side can restore obsolete upload limits/model controls or discard Decimal transport and tax-percentage review. Preserve source-format repairs alongside money handling and EN/AR key unions; exercise upload → review → confirmation together. _(formats lane integrating bill-tax PR #56)_
+- **A merged message object must not repeat a key.** `JSON.parse` keeps the last duplicate silently, so one lane's wording (limits, supported formats) disappears. Check for duplicate keys as well as the en/ar union. _(`formatsHint` in the formats and job-link fold)_
 
 - **Extraction limits must fail explicitly, never silently truncate.** Route each PDF page, preserve DOCX table label/value rows and later-page evidence, and treat unreadable sources as repairable errors rather than completed empty drafts. Test real format fixtures separately from mocked OCR/tool routing.
 - **Native text does not prove page completeness.** OCR pages with raster content too, preserve both sources for review, and reject legacy Word before queueing with a save-as-DOCX/PDF repair; plain-text conversion silently loses evidence.

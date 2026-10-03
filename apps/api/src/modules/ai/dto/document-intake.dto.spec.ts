@@ -28,6 +28,21 @@ describe('ConfirmIntakeDto', () => {
     ).toEqual([]);
   });
 
+  // The scan page (apps/web .../bills/scan/page.tsx) sends fixed 4-dp quantity/rate, but a tax
+  // PERCENTAGE only up to 2 dp: padding it to '14.0000' is a 400 for every scanned line.
+  it('accepts what the scan page sends and rejects a 4-dp tax percentage', async () => {
+    expect(
+      await invalidLineProps({
+        quantity: '1.0000',
+        rate: '999999999999999.9999',
+        taxRatePercent: '14.5',
+      }),
+    ).toEqual([]);
+    expect(
+      await invalidLineProps({ quantity: '1.0000', rate: '10.0000', taxRatePercent: '14.0000' }),
+    ).toEqual(['taxRatePercent']);
+  });
+
   it('rejects JS numbers for money (no float transport)', async () => {
     const props = await invalidLineProps({ quantity: 2, rate: 100, taxRatePercent: 14 });
     expect(props).toEqual(expect.arrayContaining(['quantity', 'rate', 'taxRatePercent']));

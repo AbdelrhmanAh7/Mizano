@@ -16,9 +16,14 @@ jest.mock('next-intl', () => ({
       .split('.')
       .reduce<unknown>((value, part) => (value as Record<string, unknown>)[part], messages);
   },
+  useLocale: () => mockLocale,
 }));
 
-jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+// No `jobId` in the URL: this spec exercises the upload route of the page.
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
 jest.mock('heic2any', () => ({ __esModule: true, default: jest.fn() }));
 jest.mock('./hooks/use-ai-document-intake', () => ({
   useDocumentIntakeStream: jest.fn(),
@@ -57,7 +62,7 @@ describe('scan upload preserves originals and repairs invalid previews', () => {
     });
   }
   function drop(file: File): void {
-    fireEvent.drop(screen.getByText((mockLocale === 'en' ? en : ar).intake.scan.dropHint), {
+    fireEvent.drop(screen.getByText((mockLocale === 'en' ? en : ar).intake.dropHint), {
       dataTransfer: { files: [file] },
     });
   }
@@ -120,8 +125,8 @@ describe('scan upload preserves originals and repairs invalid previews', () => {
     expect(reviewedForm().scanDefaults?.lines).toEqual([
       { description: 'CPU', quantity: '2.0000', rate: '100.0000', taxRate: '14' },
     ]);
-    expect(screen.getByText(en.intake.scan.extractedTax)).toBeInTheDocument();
-    expect(screen.getByText(en.intake.scan.extractedTotal)).toBeInTheDocument();
+    expect(screen.getByText(en.intake.extractedTax)).toBeInTheDocument();
+    expect(screen.getByText(en.intake.extractedTotal)).toBeInTheDocument();
     expect(reviewedForm().extractedTotals).toEqual({
       subtotal: '200.0000',
       tax: '28.0000',
@@ -158,16 +163,39 @@ describe('scan upload preserves originals and repairs invalid previews', () => {
     }
   });
 
+  it('sends decimals within the API bounds: 4-dp quantity and rate, at most 2-dp tax percentage', async () => {
+    await review('28.0000');
+    jest.useFakeTimers();
+    try {
+      await act(async () => {
+        reviewedForm().onSubmit({
+          ...reviewedForm().scanDefaults,
+          lines: [{ description: 'CPU', quantity: '2', rate: '100.5', taxRate: '14.5' }],
+        });
+      });
+      const payload = mockConfirm.mock.calls[0][0] as { lines: Array<Record<string, string>> };
+      expect(payload.lines[0]).toMatchObject({
+        quantity: '2.0000',
+        rate: '100.5000',
+        taxRatePercent: '14.5',
+      });
+      // ConfirmIntakeLineDto: quantity/rate IsDecimalString() (4 dp), taxRatePercent IsDecimalString(2).
+      expect(payload.lines[0].rate).toMatch(/^\d{1,15}(\.\d{1,4})?$/);
+      expect(payload.lines[0].taxRatePercent).toMatch(/^\d{1,15}(\.\d{1,2})?$/);
+    } finally {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    }
+  });
+
   it('blocks confirmation of unresolved tax until the accountant reviews it', async () => {
     await review('0.0000');
     expect(reviewedForm().scanDefaults?.lines?.[0].taxRate).toBe('');
     await act(async () => {
       reviewedForm().onSubmit({ ...reviewedForm().scanDefaults });
     });
-    expect(screen.getByText(en.intake.scan.taxNotReviewed)).toBeInTheDocument();
-    expect(
-      screen.getByRole('checkbox', { name: en.intake.scan.taxReviewedCheckbox }),
-    ).not.toBeChecked();
+    expect(screen.getByText(en.intake.taxReviewRequired)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: en.intake.taxReviewed })).not.toBeChecked();
     expect(mockConfirm).not.toHaveBeenCalled();
   });
 

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { Suspense, useState, useCallback, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useLocale, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -34,7 +34,7 @@ import { format } from 'date-fns';
 import { moneyToNumber } from '@/lib/money';
 import { isLegacyWordUpload, isOversizedIntakeUpload } from '@/lib/document-intake-upload';
 
-type Step = 'upload' | 'processing' | 'review' | 'confirmed' | 'existing';
+type Step = 'upload' | 'processing' | 'review' | 'confirmed' | 'existing' | 'empty';
 
 interface UnresolvedTaxLine {
   lineNumber: number;
@@ -42,32 +42,68 @@ interface UnresolvedTaxLine {
   extractedTaxAmount: string | null;
 }
 
-type ConfirmLineField = 'quantity' | 'rate' | 'taxPercent';
+class InvalidScanDecimal extends Error {}
 
-/** Thrown when a reviewed line value is not a non-negative decimal; localized by the page. */
-class ConfirmLineValueError extends Error {
-  constructor(
-    readonly line: number,
-    readonly field: ConfirmLineField,
-  ) {
-    super(`line ${line}: invalid ${field}`);
-  }
+const CONFIRM_DECIMAL = /^(\d+)(?:\.(\d+))?$/;
+
+/**
+ * Preserve a form string exactly. Bounds mirror the API's `IsDecimalString(maxFraction)`: at most
+ * 15 integer digits and `maxFraction` fraction digits, never rounded.
+ */
+function boundedDecimal(
+  value: unknown,
+  maxFraction: number,
+  errorMessage: string,
+): { whole: string; fraction: string } {
+  const match = typeof value === 'string' ? CONFIRM_DECIMAL.exec(value.trim()) : null;
+  if (!match) throw new InvalidScanDecimal(errorMessage);
+  const whole = match[1].replace(/^0+(?=\d)/, '');
+  const fraction = match[2] ?? '';
+  if (whole.length > 15 || fraction.length > maxFraction)
+    throw new InvalidScanDecimal(errorMessage);
+  return { whole, fraction };
 }
 
-/** BillForm submits decimal strings; validate them before sending them to the API. */
-function toConfirmDecimal(value: unknown, field: ConfirmLineField, lineNumber: number): string {
-  const text =
-    typeof value === 'number' || typeof value === 'string' ? toDecimalString(value) : null;
-  if (text === null) throw new ConfirmLineValueError(lineNumber, field);
-  return text;
+/** Quantity and rate travel as fixed 4-dp strings (Decimal(19,4)). */
+function toConfirmDecimal(value: unknown, errorMessage: string): string {
+  const { whole, fraction } = boundedDecimal(value, 4, errorMessage);
+  return `${whole}.${fraction.padEnd(4, '0')}`;
+}
+
+/** The API accepts a tax percentage with at most 2 decimals, so it is never padded to 4. */
+function toConfirmPercent(value: unknown, errorMessage: string): string {
+  const { whole, fraction } = boundedDecimal(value, 2, errorMessage);
+  return fraction ? `${whole}.${fraction}` : whole;
+}
+
+function ScanLoading() {
+  const t = useTranslations('ai.intake');
+  return <p role="status">{t('jobLoading')}</p>;
 }
 
 export default function ScanBillPage() {
+  return (
+    <Suspense fallback={<ScanLoading />}>
+      <ScanBillRoute />
+    </Suspense>
+  );
+}
+
+function ScanBillRoute() {
+  const searchParams = useSearchParams();
+  const linkedJobId = searchParams.get('jobId')?.trim() || null;
+  const locale = useLocale();
+  // Remount before rendering a different job: no previous form or pending mutation survives.
+  return <ScanBillContent key={`${locale}:${linkedJobId ?? ''}`} linkedJobId={linkedJobId} />;
+}
+
+function ScanBillContent({ linkedJobId }: { linkedJobId: string | null }) {
   const router = useRouter();
+  const locale = useLocale();
   const t = useTranslations('ai.intake');
   const ts = useTranslations('ai.intake.scan');
 
-  const [step, setStep] = useState<Step>('upload');
+  const [step, setStep] = useState<Step>(linkedJobId ? 'processing' : 'upload');
   const [dragOver, setDragOver] = useState(false);
   const [converting, setConverting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -77,21 +113,47 @@ export default function ScanBillPage() {
   const [scanDefaults, setScanDefaults] = useState<BillFormDefaultValues | null>(null);
   const [unresolvedTaxLines, setUnresolvedTaxLines] = useState<UnresolvedTaxLine[]>([]);
   const [taxReviewed, setTaxReviewed] = useState(false);
+  const activeRef = useRef(true);
+  const redirectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    activeRef.current = true;
+    return () => {
+      activeRef.current = false;
+      if (redirectRef.current) clearTimeout(redirectRef.current);
+    };
+  }, []);
+  useEffect(
+    () => () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    },
+    [previewUrl],
+  );
 
   // SSE-based document intake
   const intake = useDocumentIntakeStream();
   const confirmIntake = useDocumentIntakeConfirm();
   const createVendor = useCreateVendor();
 
+  const { loadJob, reset } = intake;
   useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
+    setLocalResult(null);
+    setScanDefaults(null);
+    setLocalError(null);
+    setUnresolvedTaxLines([]);
+    setTaxReviewed(false);
+    if (linkedJobId) {
+      setStep('processing');
+      void loadJob(linkedJobId);
+    } else {
+      reset();
+      setStep('upload');
+    }
+    return reset;
+  }, [linkedJobId, loadJob, reset]);
 
   // Transition to review when SSE completes
   useEffect(() => {
-    if (intake.result && step === 'processing') {
+    if (intake.result && step === 'processing' && (!linkedJobId || intake.jobId === linkedJobId)) {
       const result = intake.result;
       setLocalResult(result);
 
@@ -139,20 +201,31 @@ export default function ScanBillPage() {
 
       setStep('review');
     }
-  }, [intake.result, step]);
+  }, [intake.result, intake.jobId, linkedJobId, step]);
 
   // An identical file was already approved: show its draft instead of a review form.
   useEffect(() => {
-    if (intake.existingDraft && step === 'processing') setStep('existing');
-  }, [intake.existingDraft, step]);
+    if (
+      intake.existingDraft &&
+      step === 'processing' &&
+      (!linkedJobId || intake.jobId === linkedJobId)
+    )
+      setStep('existing');
+  }, [intake.existingDraft, intake.jobId, linkedJobId, step]);
 
   // Handle errors
   useEffect(() => {
-    if (intake.error && step === 'processing') {
+    if (intake.error && step === 'processing' && (!linkedJobId || intake.jobId === linkedJobId)) {
       setLocalError(intake.error);
       setStep('upload');
     }
-  }, [intake.error, step]);
+  }, [intake.error, intake.jobId, linkedJobId, step]);
+
+  useEffect(() => {
+    if (intake.isEmpty && step === 'processing' && (!linkedJobId || intake.jobId === linkedJobId)) {
+      setStep('empty');
+    }
+  }, [intake.isEmpty, intake.jobId, linkedJobId, step]);
 
   const handleFileSelect = useCallback(
     async (file: File) => {
@@ -182,6 +255,7 @@ export default function ScanBillPage() {
         try {
           const heic2any = (await import('heic2any')).default;
           const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+          if (!activeRef.current) return;
           const blob = Array.isArray(converted) ? converted[0] : converted;
           const jpegFile = new File([blob], file.name.replace(/\.hei[cf]$/i, '.jpg'), {
             type: 'image/jpeg',
@@ -190,6 +264,7 @@ export default function ScanBillPage() {
           setSelectedFile(file);
           setPreviewUrl(URL.createObjectURL(jpegFile));
         } catch {
+          if (!activeRef.current) return;
           setLocalError(t('previewFailed'));
           setSelectedFile(null);
           setPreviewUrl(null);
@@ -215,7 +290,7 @@ export default function ScanBillPage() {
       e.preventDefault();
       setDragOver(false);
       const file = e.dataTransfer.files[0];
-      if (file) handleFileSelect(file);
+      if (file) void handleFileSelect(file);
     },
     [handleFileSelect],
   );
@@ -236,7 +311,7 @@ export default function ScanBillPage() {
   const handleConfirm = async (formData: Record<string, unknown>) => {
     setLocalError(null);
     if (unresolvedTaxLines.length > 0 && !taxReviewed) {
-      setLocalError(ts('taxNotReviewed'));
+      setLocalError(t('taxReviewRequired'));
       return;
     }
     try {
@@ -253,10 +328,10 @@ export default function ScanBillPage() {
         itemId: l.itemId || undefined,
         accountId: l.accountId || undefined,
         description: l.description,
-        quantity: toConfirmDecimal(l.quantity, 'quantity', i + 1),
-        rate: toConfirmDecimal(l.rate, 'rate', i + 1),
+        quantity: toConfirmDecimal(l.quantity, t('invalidLineDecimal', { line: i + 1 })),
+        rate: toConfirmDecimal(l.rate, t('invalidLineDecimal', { line: i + 1 })),
         // The form field is a PERCENTAGE; reviewed lines send it explicitly.
-        taxRatePercent: toConfirmDecimal(l.taxRate, 'taxPercent', i + 1),
+        taxRatePercent: toConfirmPercent(l.taxRate, t('invalidLinePercent', { line: i + 1 })),
       }));
 
       const response = await confirmIntake.mutateAsync({
@@ -280,20 +355,28 @@ export default function ScanBillPage() {
           : undefined,
       });
 
+      if (!activeRef.current) return;
       setStep('confirmed');
-      setTimeout(() => {
-        router.push(`/purchases/bills/${response.data.id}`);
+      redirectRef.current = setTimeout(() => {
+        router.push(`/${locale}/purchases/bills/${encodeURIComponent(response.data.id)}`);
       }, 2000);
     } catch (err) {
+      if (!activeRef.current) return;
+      // Only expose the known, localized currency rejection; other server text may contain document data.
+      const currencyMismatch = ts('currencyMismatch');
+      const message = getScanReviewErrorMessage(err, t('confirmFailed'), currencyMismatch);
       setLocalError(
-        err instanceof ConfirmLineValueError
-          ? ts('lineValueInvalid', { line: err.line, field: ts(`fields.${err.field}`) })
-          : getScanReviewErrorMessage(err, ts('createFailed'), ts('currencyMismatch')),
+        err instanceof InvalidScanDecimal
+          ? err.message
+          : message === currencyMismatch
+            ? currencyMismatch
+            : t('confirmFailed'),
       );
     }
   };
 
   const handleReupload = () => {
+    if (linkedJobId) router.replace(`/${locale}/purchases/bills/scan`);
     setStep('upload');
     setLocalResult(null);
     setScanDefaults(null);
@@ -304,23 +387,23 @@ export default function ScanBillPage() {
   };
 
   const getConfidenceBadge = (confidence: number) => {
-    if (confidence >= 0.8) return <Badge variant="default">{ts('confidence.high')}</Badge>;
-    if (confidence >= 0.5) return <Badge variant="secondary">{ts('confidence.medium')}</Badge>;
-    return <Badge variant="destructive">{ts('confidence.low')}</Badge>;
+    if (confidence >= 0.8) return <Badge variant="default">{t('confidenceHigh')}</Badge>;
+    if (confidence >= 0.5) return <Badge variant="secondary">{t('confidenceMedium')}</Badge>;
+    return <Badge variant="destructive">{t('confidenceLow')}</Badge>;
   };
 
   // Stage-specific messages for the processing UI
   const stageMessage =
     intake.message ||
     (intake.stage === 'received'
-      ? t('uploadingDocument')
+      ? t('stages.received')
       : intake.stage === 'extracting'
-        ? t('readingDocument')
+        ? t('stages.extracting')
         : intake.stage === 'classifying'
-          ? t('classifyingDocument')
+          ? t('stages.classifying')
           : intake.stage === 'matching'
-            ? t('matchingParties')
-            : t('processingDocument'));
+            ? t('stages.matching')
+            : t('stages.processing'));
 
   const result = localResult;
   const error = localError;
@@ -329,14 +412,14 @@ export default function ScanBillPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild aria-label={ts('back')}>
-          <Link href="/purchases/bills">
+        <Button variant="ghost" size="icon" asChild aria-label={t('goBack')}>
+          <Link href={`/${locale}/purchases/bills`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{ts('title')}</h1>
-          <p className="text-muted-foreground">{ts('subtitle')}</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+          <p className="text-muted-foreground">{t('subtitle')}</p>
         </div>
       </div>
 
@@ -344,31 +427,31 @@ export default function ScanBillPage() {
       <div className="flex items-center gap-2">
         <StepBadge
           step={1}
-          label={ts('steps.upload')}
+          label={t('steps.upload')}
           active={step === 'upload'}
           done={step !== 'upload'}
         />
         <Separator className="w-8" />
         <StepBadge
           step={2}
-          label={ts('steps.processing')}
+          label={t('steps.processing')}
           active={step === 'processing'}
           done={step === 'review' || step === 'confirmed'}
         />
         <Separator className="w-8" />
         <StepBadge
           step={3}
-          label={ts('steps.review')}
+          label={t('steps.review')}
           active={step === 'review'}
           done={step === 'confirmed'}
         />
         <Separator className="w-8" />
-        <StepBadge step={4} label={ts('steps.done')} active={step === 'confirmed'} done={false} />
+        <StepBadge step={4} label={t('steps.done')} active={step === 'confirmed'} done={false} />
       </div>
 
       {/* Error */}
       {error && (
-        <Card className="border-destructive">
+        <Card className="border-destructive" role="alert">
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-4 w-4" />
@@ -378,42 +461,62 @@ export default function ScanBillPage() {
                   {t(`status.${intake.jobStatus}`)}
                 </Badge>
               )}
-              {intake.canRetry && (
+              {(intake.canRetry || linkedJobId) && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
                     setLocalError(null);
                     setStep('processing');
-                    void intake.retry();
+                    if (intake.canRetry) void intake.retry();
+                    else if (linkedJobId) void intake.loadJob(linkedJobId);
                   }}
                 >
                   {t('retry')}
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="ml-auto h-6 w-6"
-                aria-label={ts('dismissError')}
-                onClick={() => setLocalError(null)}
-              >
-                <X className="h-3 w-3" />
-              </Button>
+              {!linkedJobId && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="ms-auto h-6 w-6"
+                  aria-label={t('dismissError')}
+                  onClick={() => setLocalError(null)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
       )}
 
+      {step === 'empty' && (
+        <Card role="status">
+          <CardContent className="space-y-4 pt-6">
+            <p>{t('jobEmpty')}</p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setStep('processing');
+                if (intake.jobId) void loadJob(intake.jobId);
+              }}
+            >
+              {t('retry')}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Step 1: Upload */}
-      {step === 'upload' && (
+      {step === 'upload' && !linkedJobId && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5" />
-              {ts('uploadTitle')}
+              {t('uploadTitle')}
             </CardTitle>
-            <CardDescription>{ts('uploadDescription')}</CardDescription>
+            <CardDescription>{t('uploadDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div
@@ -436,7 +539,7 @@ export default function ScanBillPage() {
                 input.accept = '*/*';
                 input.onchange = (e) => {
                   const file = (e.target as HTMLInputElement).files?.[0];
-                  if (file) handleFileSelect(file);
+                  if (file) void handleFileSelect(file);
                 };
                 input.click();
               }}
@@ -445,17 +548,18 @@ export default function ScanBillPage() {
                 <div className="space-y-3">
                   <Loader2 className="h-12 w-12 mx-auto animate-spin text-primary" />
                   <div>
-                    <p className="font-medium">{ts('convertingTitle')}</p>
-                    <p className="text-sm text-muted-foreground">{ts('convertingHint')}</p>
+                    <p className="font-medium">{t('converting')}</p>
+                    <p className="text-sm text-muted-foreground">{t('conversionHint')}</p>
                   </div>
                 </div>
               ) : selectedFile ? (
                 <div className="space-y-3">
                   {previewUrl ? (
+                    // Blob previews require a native image; Next image optimization cannot fetch them.
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={previewUrl}
-                      alt={ts('previewAlt')}
+                      alt={t('preview')}
                       className="max-h-48 mx-auto rounded-lg shadow-sm"
                     />
                   ) : (
@@ -476,15 +580,15 @@ export default function ScanBillPage() {
                       setPreviewUrl(null);
                     }}
                   >
-                    <X className="mr-1 h-3 w-3" />
-                    {ts('remove')}
+                    <X className="me-1 h-3 w-3" />
+                    {t('remove')}
                   </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
                   <Upload className="h-12 w-12 mx-auto text-muted-foreground" />
                   <div>
-                    <p className="font-medium">{ts('dropHint')}</p>
+                    <p className="font-medium">{t('dropHint')}</p>
                     <p className="text-sm text-muted-foreground">{t('formatsHint')}</p>
                   </div>
                 </div>
@@ -493,7 +597,7 @@ export default function ScanBillPage() {
 
             <div className="flex justify-end">
               <Button onClick={handleProcess} disabled={!selectedFile || converting} size="lg">
-                <Sparkles className="mr-2 h-4 w-4" />
+                <Sparkles className="me-2 h-4 w-4" />
                 {t('prepareFields')}
               </Button>
             </div>
@@ -522,7 +626,7 @@ export default function ScanBillPage() {
                 )}
                 {intake.isReconnecting && (
                   <p className="text-xs text-yellow-600" role="status">
-                    {ts('reconnecting')}
+                    {t('reconnecting')}
                   </p>
                 )}
               </div>
@@ -563,7 +667,7 @@ export default function ScanBillPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-primary" />
-                  {ts('resultsTitle')}
+                  {t('resultsTitle')}
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   {result.extractionMethod && (
@@ -571,13 +675,13 @@ export default function ScanBillPage() {
                   )}
                   {getConfidenceBadge(result.ocrConfidence)}
                   <span className="text-xs text-muted-foreground">
-                    {ts('classification', {
-                      value: Math.round(result.classificationConfidence * 100),
+                    {t('classification', {
+                      percent: Math.round(result.classificationConfidence * 100),
                     })}
                   </span>
                 </div>
               </div>
-              <CardDescription>{ts('reviewHint')}</CardDescription>
+              <CardDescription>{t('reviewHint')}</CardDescription>
             </CardHeader>
           </Card>
 
@@ -588,10 +692,10 @@ export default function ScanBillPage() {
                 <div className="flex items-center gap-2 text-yellow-600">
                   <AlertTriangle className="h-5 w-5" />
                   <div>
-                    <p className="font-medium">{ts('duplicateTitle')}</p>
+                    <p className="font-medium">{t('possibleDuplicate')}</p>
                     <p className="text-sm">
-                      {ts('duplicateBody', {
-                        value: Math.round((result.duplicateWarning.similarity || 0) * 100),
+                      {t('duplicateMatch', {
+                        percent: Math.round((result.duplicateWarning.similarity || 0) * 100),
                       })}
                     </p>
                   </div>
@@ -600,48 +704,47 @@ export default function ScanBillPage() {
             </Card>
           )}
 
-          {/* AI Vendor Intelligence */}
+          {/* Vendor matching */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">{ts('vendorTitle')}</CardTitle>
+              <CardTitle className="text-sm">{t('vendorTitle')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               {result.matchedVendor ? (
                 <p>
-                  <span className="text-muted-foreground">{ts('vendorMatched')}</span>{' '}
+                  <span className="text-muted-foreground">{t('matchedVendor')}</span>{' '}
                   <span className="font-medium">{result.matchedVendor.name}</span>{' '}
                   <span className="text-muted-foreground">
-                    {ts('vendorConfidence', {
-                      value: Math.round(result.matchedVendor.similarity * 100),
+                    {t('vendorConfidence', {
+                      percent: Math.round(result.matchedVendor.similarity * 100),
                     })}
                   </span>
                 </p>
               ) : (
-                <p className="text-muted-foreground">{ts('noVendorMatched')}</p>
+                <p className="text-muted-foreground">{t('noVendor')}</p>
               )}
 
               {result.vendorCandidates.length > 1 && (
                 <p className="text-muted-foreground">
-                  {ts('otherCandidates', {
-                    names: result.vendorCandidates
-                      .filter((c) => c.id !== result.matchedVendor?.id)
-                      .slice(0, 3)
-                      .map((c) => c.name)
-                      .join(', '),
-                  })}
+                  {t('otherCandidates')}{' '}
+                  {result.vendorCandidates
+                    .filter((c) => c.id !== result.matchedVendor?.id)
+                    .slice(0, 3)
+                    .map((c) => c.name)
+                    .join(', ')}
                 </p>
               )}
 
               {result.extractedFields.vendorTaxId && (
                 <p>
-                  <span className="text-muted-foreground">{ts('vendorTaxId')}</span>{' '}
+                  <span className="text-muted-foreground">{t('vendorTaxId')}</span>{' '}
                   {result.extractedFields.vendorTaxId}
                 </p>
               )}
 
               {result.extractedFields.paymentTerms && (
                 <p>
-                  <span className="text-muted-foreground">{ts('paymentTerms')}</span>{' '}
+                  <span className="text-muted-foreground">{t('paymentTerms')}</span>{' '}
                   {result.extractedFields.paymentTerms}
                 </p>
               )}
@@ -654,43 +757,51 @@ export default function ScanBillPage() {
                   disabled={createVendor.isPending}
                   onClick={async () => {
                     const suggestion = result.suggestCreateVendor!;
-                    const created = await createVendor.mutateAsync({
-                      name: suggestion.name,
-                      email: suggestion.email ?? undefined,
-                      phone: suggestion.phone ?? undefined,
-                      taxId: suggestion.taxId ?? undefined,
-                    });
-                    if (created?.data?.id) {
-                      setScanDefaults((prev) =>
-                        prev ? { ...prev, vendorId: created.data.id } : prev,
-                      );
+                    try {
+                      const created = await createVendor.mutateAsync({
+                        name: suggestion.name,
+                        email: suggestion.email ?? undefined,
+                        phone: suggestion.phone ?? undefined,
+                        taxId: suggestion.taxId ?? undefined,
+                      });
+                      if (created?.data?.id) {
+                        if (!activeRef.current) return;
+                        setScanDefaults((prev) =>
+                          prev ? { ...prev, vendorId: created.data.id } : prev,
+                        );
+                      }
+                    } catch {
+                      if (activeRef.current) setLocalError(t('vendorCreateFailed'));
                     }
                   }}
                 >
                   {createVendor.isPending ? (
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    <Loader2 className="me-2 h-3 w-3 animate-spin" />
                   ) : (
-                    <UserPlus className="mr-2 h-3 w-3" />
+                    <UserPlus className="me-2 h-3 w-3" />
                   )}
-                  {ts('createVendor', { name: result.suggestCreateVendor.name })}
+                  {t('createVendor', { name: result.suggestCreateVendor.name })}
                 </Button>
               )}
             </CardContent>
           </Card>
 
-          {/* Extracted Financial Summary */}
+          {/* Extracted financial summary */}
           {(result.extractedFields.subtotal != null ||
             result.extractedFields.tax != null ||
             result.extractedFields.total != null) && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">{ts('summaryTitle')}</CardTitle>
+                <CardTitle className="text-sm">
+                  {t('financialSummary')} ({result.extractedFields.currency || t('currencyUnknown')}
+                  )
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-1 text-sm">
                   {result.extractedFields.subtotal != null && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">{ts('extractedSubtotal')}</span>
+                      <span className="text-muted-foreground">{t('extractedSubtotal')}</span>
                       <span className="font-mono">
                         {moneyToNumber(result.extractedFields.subtotal).toFixed(2)}
                       </span>
@@ -698,7 +809,7 @@ export default function ScanBillPage() {
                   )}
                   {result.extractedFields.tax != null && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">{ts('extractedTax')}</span>
+                      <span className="text-muted-foreground">{t('extractedTax')}</span>
                       <span className="font-mono">
                         {moneyToNumber(result.extractedFields.tax).toFixed(2)}
                       </span>
@@ -707,7 +818,7 @@ export default function ScanBillPage() {
                   {result.extractedFields.discount != null &&
                     moneyToNumber(result.extractedFields.discount) > 0 && (
                       <div className="flex justify-between text-yellow-600">
-                        <span>{ts('extractedDiscount')}</span>
+                        <span>{t('extractedDiscount')}</span>
                         <span className="font-mono">
                           -{moneyToNumber(result.extractedFields.discount).toFixed(2)}
                         </span>
@@ -715,7 +826,7 @@ export default function ScanBillPage() {
                     )}
                   {result.extractedFields.total != null && (
                     <div className="flex justify-between font-medium border-t pt-1 mt-1">
-                      <span>{ts('extractedTotal')}</span>
+                      <span>{t('extractedTotal')}</span>
                       <span className="font-mono">
                         {moneyToNumber(result.extractedFields.total).toFixed(2)}
                       </span>
@@ -730,20 +841,20 @@ export default function ScanBillPage() {
           {result.accountingEntry && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">{ts('accountingTitle')}</CardTitle>
+                <CardTitle className="text-sm">{t('accountingSuggestion')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
-                    <span className="text-muted-foreground">{ts('debit')}</span>{' '}
+                    <span className="text-muted-foreground">{t('debit')}</span>{' '}
                     {result.accountingEntry.debitAccount || '-'}
                   </div>
                   <div>
-                    <span className="text-muted-foreground">{ts('credit')}</span>{' '}
+                    <span className="text-muted-foreground">{t('credit')}</span>{' '}
                     {result.accountingEntry.creditAccount || '-'}
                   </div>
                   <div>
-                    <span className="text-muted-foreground">{ts('tax')}</span>{' '}
+                    <span className="text-muted-foreground">{t('tax')}</span>{' '}
                     {result.accountingEntry.taxAccount || '-'}
                   </div>
                 </div>
@@ -757,22 +868,22 @@ export default function ScanBillPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-sm text-yellow-700">
                   <AlertTriangle className="h-4 w-4" />
-                  {ts('taxReviewTitle')}
+                  {t('taxReviewTitle')}
                 </CardTitle>
-                <CardDescription>{ts('taxReviewBody')}</CardDescription>
+                <CardDescription>{t('taxReviewHint')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <ul className="space-y-1">
                   {unresolvedTaxLines.map((line) => (
                     <li key={line.lineNumber} className="flex justify-between gap-4">
                       <span>
-                        {ts('line', { line: line.lineNumber })}
+                        {t('lineNumber', { line: line.lineNumber })}
                         {line.description ? `: ${line.description}` : ''}
                       </span>
                       <span className="font-mono text-muted-foreground">
                         {line.extractedTaxAmount !== null
-                          ? ts('extractedTaxAmount', { amount: line.extractedTaxAmount })
-                          : ts('noTaxAmount')}
+                          ? t('extractedTaxAmount', { amount: line.extractedTaxAmount })
+                          : t('noTaxAmount')}
                       </span>
                     </li>
                   ))}
@@ -784,7 +895,7 @@ export default function ScanBillPage() {
                     onChange={(e) => setTaxReviewed(e.target.checked)}
                     className="h-4 w-4"
                   />
-                  {ts('taxReviewedCheckbox')}
+                  {t('taxReviewed')}
                 </label>
               </CardContent>
             </Card>
@@ -818,8 +929,8 @@ export default function ScanBillPage() {
                 <Link
                   href={
                     intake.existingDraft.type === 'invoice'
-                      ? `/sales/invoices/${intake.existingDraft.id}`
-                      : `/purchases/bills/${intake.existingDraft.id}`
+                      ? `/${locale}/sales/invoices/${encodeURIComponent(intake.existingDraft.id)}`
+                      : `/${locale}/purchases/bills/${encodeURIComponent(intake.existingDraft.id)}`
                   }
                 >
                   {t('openDraft')}
@@ -836,8 +947,8 @@ export default function ScanBillPage() {
             <div className="text-center space-y-4">
               <CheckCircle2 className="h-16 w-16 mx-auto text-green-500" />
               <div>
-                <p className="text-lg font-medium">{ts('createdTitle')}</p>
-                <p className="text-sm text-muted-foreground">{ts('redirecting')}</p>
+                <p className="text-lg font-medium">{t('confirmed')}</p>
+                <p className="text-sm text-muted-foreground">{t('redirecting')}</p>
               </div>
             </div>
           </CardContent>
