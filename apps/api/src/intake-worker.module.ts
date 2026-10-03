@@ -4,8 +4,13 @@ import { PrismaService } from './prisma/prisma.service';
 import { IntakeQueueService } from './modules/ai/intake/intake-queue.service';
 import { IntakeProcessorService } from './modules/ai/intake/intake-processor.service';
 import { IntakeExecutorService } from './modules/ai/intake/intake-executor.service';
+import { IntakeMatchingService } from './modules/ai/intake/intake-matching.service';
 
-/** Deliberately excludes AppModule, HTTP controllers, schedulers and all AI/LLM modules. */
+/**
+ * Deliberately excludes AppModule, HTTP controllers, schedulers and all AI/LLM modules. The
+ * extraction child applies the deterministic rules; `IntakeMatchingService` adds the tenant-scoped
+ * vendor and duplicate checks from the database, with no model.
+ */
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -19,6 +24,12 @@ import { IntakeExecutorService } from './modules/ai/intake/intake-executor.servi
       ],
     }),
   ],
-  providers: [PrismaService, IntakeQueueService, IntakeExecutorService, IntakeProcessorService],
+  providers: [
+    PrismaService,
+    IntakeQueueService,
+    IntakeExecutorService,
+    IntakeMatchingService,
+    IntakeProcessorService,
+  ],
 })
 export class IntakeWorkerModule {}

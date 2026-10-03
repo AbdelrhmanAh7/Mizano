@@ -2,12 +2,16 @@ import 'reflect-metadata';
 
 /**
  * The dedicated worker is the no-LLM CPU path (#42). These modules are the LLM providers, the
- * legacy extraction pipeline that calls them, and the AI feature modules. If the worker's
- * import graph ever reaches one, this test fails at the import.
+ * legacy extraction pipeline that calls them, the model-backed classifier and entity matcher, and
+ * the AI feature modules. If the worker's (or its extraction child's) import graph ever reaches
+ * one, this test fails at the import.
  */
 const FORBIDDEN = [
   './modules/ai/services/ollama.service',
+  './modules/ai/services/ollama-inference-gateway.service',
   './modules/ai/services/document-intake.service',
+  './modules/ai/services/document-classification.service',
+  './modules/ai/services/entity-extraction.service',
   './modules/ai/services/paddle-ocr.service',
   './modules/ai/extraction/extraction-strategy-resolver.service',
   './modules/ai/extraction/ocr-llm-strategy.service',
@@ -33,6 +37,7 @@ describe('dedicated intake worker module', () => {
       const { IntakeWorkerModule } = await import('./intake-worker.module');
       expect(names(Reflect.getMetadata('providers', IntakeWorkerModule)).sort()).toEqual([
         'IntakeExecutorService',
+        'IntakeMatchingService',
         'IntakeProcessorService',
         'IntakeQueueService',
         'PrismaService',
@@ -49,6 +54,19 @@ describe('dedicated intake worker module', () => {
     }
     await jest.isolateModulesAsync(async () => {
       await expect(import('./intake-worker.module')).resolves.toBeDefined();
+    });
+  });
+
+  it('never loads an LLM provider or the AI modules in the extraction child either', async () => {
+    for (const path of FORBIDDEN) {
+      jest.doMock(path, () => {
+        throw new Error(`the extraction child loaded ${path}`);
+      });
+    }
+    await jest.isolateModulesAsync(async () => {
+      // The child runs the structured rules, so this graph reaches the rules code, never a model.
+      await expect(import('./modules/ai/intake/intake-child')).resolves.toBeDefined();
+      await expect(import('./modules/ai/intake/cpu-structured')).resolves.toBeDefined();
     });
   });
 

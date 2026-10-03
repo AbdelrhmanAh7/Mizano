@@ -5,6 +5,9 @@ import { promisify } from 'util';
 import { createOfflineTesseractWorker } from '../extraction/offline-tesseract';
 import type { DocumentIntakeResult } from '../services/document-intake.service';
 import { writeSecureFile } from '../utils/secure-temp.util';
+import { NATIVE_TEXT_CONFIDENCE, structuredCpuResult } from './cpu-structured';
+
+export { cpuReviewResult } from './cpu-structured';
 
 const execute = promisify(execFile);
 const MAX_PAGES = 20;
@@ -14,44 +17,6 @@ function toolCpuLimit(): string {
   if (!Number.isInteger(seconds) || seconds < 1 || seconds > 60)
     throw new Error('Invalid CPU limit');
   return `--cpu=${seconds}`;
-}
-
-/** #16 owns field parsing. Until integrated, preserve evidence and leave values unknown. */
-export function cpuReviewResult(rawText: string, confidence: number): DocumentIntakeResult {
-  return {
-    documentType: 'OTHER',
-    classificationConfidence: 0,
-    ocrConfidence: confidence,
-    extractedFields: {
-      date: null,
-      dueDate: null,
-      total: null,
-      subtotal: null,
-      tax: null,
-      discount: null,
-      documentNumber: null,
-      vendorName: null,
-      vendorAddress: null,
-      vendorPhone: null,
-      vendorEmail: null,
-      vendorTaxId: null,
-      currency: null,
-      paymentTerms: null,
-      notes: null,
-      customerName: null,
-      lineItems: [],
-    },
-    fieldConfidence: {},
-    matchedVendor: null,
-    vendorCandidates: [],
-    matchedCustomer: null,
-    customerCandidates: [],
-    duplicateWarning: null,
-    rawText,
-    accountingEntry: null,
-    suggestCreateVendor: null,
-    extractionMethod: 'cpu-ocr',
-  };
 }
 
 /** No shell, bounded external tools, inherited child process group and CPU limit. */
@@ -77,7 +42,7 @@ export async function extractCpuDocument(
     // pdftotext processes the complete document; no silent first-N-page truncation.
     await runPdfTool('/usr/bin/pdftotext', ['-enc', 'UTF-8', original, info]);
     const text = await readFile(info, 'utf8');
-    if (text.trim().length > 50) return cpuReviewResult(text, 0);
+    if (text.trim().length > 50) return structuredCpuResult(text, NATIVE_TEXT_CONFIDENCE);
     const output = await execute(
       '/usr/bin/prlimit',
       ['--as=536870912', toolCpuLimit(), '--', '/usr/bin/pdfinfo', original],
@@ -114,7 +79,7 @@ export async function extractCpuDocument(
       texts.push(result.data.text);
       confidence = Math.min(confidence, result.data.confidence / 100);
     }
-    return cpuReviewResult(texts.join('\n'), confidence);
+    return structuredCpuResult(texts.join('\n'), confidence);
   } finally {
     await engine.terminate();
   }

@@ -15,8 +15,10 @@ Deploy and rollback wait for worker health as well as API/web health, and the mo
 
 See [CPU runtime](../../docs/strategy/pi-cpu-extraction-runtime.md) for per-child
 and external-tool limits, EN/AR retry errors, shutdown and Pi measurement gates.
-The current no-LLM worker preserves OCR evidence with unknown fields requiring
-review; #16 structured parsing and measured Pi acceptance remain outstanding.
+The no-LLM worker reads PDFs and images with local OCR, applies the
+deterministic Arabic/English invoice rules and matches vendors and duplicates in
+the database; unknown or inconsistent values go to review. Extraction accuracy
+and measured Pi acceptance remain outstanding.
 
 ## 1. Prepare the Pi
 

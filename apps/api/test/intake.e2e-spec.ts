@@ -2,8 +2,11 @@
  * Durable document intake (issues #15, #9 and #42): real HTTP API, real login, real PostgreSQL and
  * Redis/BullMQ. The HTTP API only produces jobs; a separate minimal worker context (the same
  * `IntakeWorkerModule` that `dist/intake-worker.js` boots) consumes them. Only the extraction
- * is stubbed (no model, OCR engine or Linux process cap is required): the executor returns a
- * fixed extraction, throws when `stub.mode === 'fail'`, or fails like a deadline when
+ * child is substituted (no OCR engine, Poppler or Linux process cap is required): the executor
+ * reads the stored original, takes the text the fixture PDF carries as the OCR output and runs
+ * the child's real deterministic rules (`structuredCpuResult`). Everything after the child is the
+ * production worker: vendor and duplicate matching from the database, review routing, retries
+ * and persistence. The executor throws when `stub.mode === 'fail'` and fails like a deadline when
  * `stub.mode === 'timeout'`. The real supervisor is covered by intake-executor.process.spec.ts.
  */
 import { INestApplication, INestApplicationContext } from '@nestjs/common';
@@ -14,62 +17,58 @@ import { registerTenant, TestTenant } from './helpers/tenant.helper';
 import { eventually } from './helpers/journey.helper';
 import { ApiHelper } from './helpers/api-client.helper';
 import { IntakeWorkerModule } from '../src/intake-worker.module';
-import { ExtractionStrategyResolver } from '../src/modules/ai/extraction/extraction-strategy-resolver.service';
+import { structuredCpuResult } from '../src/modules/ai/intake/cpu-structured';
 import { IntakeExecutorService } from '../src/modules/ai/intake/intake-executor.service';
 import { IntakeRuntimeError } from '../src/modules/ai/intake/intake-runtime';
 import { IntakeStorage, sha256Hex } from '../src/modules/ai/intake/intake-storage';
-import { DocumentIntakeService } from '../src/modules/ai/services/document-intake.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 process.env.INTAKE_RETRY_BASE_MS = '50';
 process.env.INTAKE_LEASE_MS = '1000';
 
 const stub = { mode: 'ok' as 'ok' | 'fail' | 'timeout', calls: 0 };
+/** Text-layer confidence the real child assigns to a PDF's embedded text. */
+const TEXT_CONFIDENCE = 0.95;
 
-const stubResolver = {
-  resolve: async () => {
-    stub.calls += 1;
-    if (stub.mode === 'timeout') throw new IntakeRuntimeError('INTAKE_TIMEOUT');
-    if (stub.mode === 'fail') throw new Error('stub extraction failure with INVOICE-TEXT-SECRET');
-    return {
-      strategyUsed: 'ocr',
-      totalTimeMs: 1,
-      extraction: {
-        vendorName: 'E2E Vendor',
-        vendorAddress: null,
-        vendorPhone: null,
-        vendorEmail: null,
-        vendorTaxId: null,
-        invoiceNumber: 'E2E-1',
-        date: '2026-09-01',
-        dueDate: null,
-        total: 115,
-        subtotal: 100,
-        tax: 15,
-        discount: null,
-        currency: 'EGP',
-        paymentTerms: null,
-        notes: null,
-        lineItems: [],
-        rawText: 'stubbed text',
-        ocrConfidence: 0.95,
-        fieldConfidence: {},
-        documentCategory: 'INVOICE',
-        accountingEntry: null,
-        processingTimeMs: 1,
-      },
-    };
-  },
-};
-
-function pdfFixture(marker: string): Buffer {
-  const text = `Invoice ${marker} Total 115.00`;
+/** A one-page PDF whose text is `lines`; `\n` escapes separate them inside one text string. */
+function textPdf(lines: string[]): Buffer {
+  if (lines.some((line) => /[()\\]/.test(line))) throw new Error('fixture text needs escaping');
+  const text = lines.join('\\n');
   return Buffer.from(
     `%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n` +
       `3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n` +
       `4 0 obj<</Length ${text.length + 30}>>stream\nBT /F1 12 Tf 20 100 Td (${text}) Tj ET\nendstream endobj\n` +
       `5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n`,
   );
+}
+
+/** What the substituted extraction child "reads" from a fixture produced by `textPdf`. */
+function fixtureText(pdf: Buffer): string {
+  const match = /\((.*)\) Tj/.exec(pdf.toString('latin1'));
+  if (!match) throw new Error('not a textPdf fixture');
+  return match[1].replace(/\\n/g, '\n');
+}
+
+/** The lines of a plain English tax invoice; the rules read every field below from them. */
+function invoiceLines(
+  vendor: string,
+  number: string,
+  amounts = { net: '100.00', vat: '15.00', gross: '115.00' },
+): string[] {
+  return [
+    `Supplier: ${vendor}`,
+    'Tax Invoice',
+    `Invoice No: ${number}`,
+    'Invoice Date: 2026-09-01',
+    `Sub Total: EGP ${amounts.net}`,
+    `VAT 15%: EGP ${amounts.vat}`,
+    `Total: EGP ${amounts.gross}`,
+  ];
+}
+
+/** A complete invoice from `E2E Vendor`; the marker makes the bytes (and the number) unique. */
+function pdfFixture(marker: string): Buffer {
+  return textPdf(invoiceLines('E2E Vendor', `E2E-${marker}`));
 }
 
 let worker: INestApplicationContext | undefined;
@@ -86,10 +85,12 @@ async function startWorker(app: INestApplication): Promise<INestApplicationConte
         gate.maxInFlight = Math.max(gate.maxInFlight, gate.inFlight);
         try {
           if (gate.delayMs) await new Promise((resolve) => setTimeout(resolve, gate.delayMs));
+          stub.calls += 1;
+          if (stub.mode === 'timeout') throw new IntakeRuntimeError('INTAKE_TIMEOUT');
+          if (stub.mode === 'fail')
+            throw new Error('stub extraction failure with INVOICE-TEXT-SECRET');
           const buffer = await app.get(IntakeStorage).get(job.storageKey, job.sha256);
-          return await app
-            .get(DocumentIntakeService)
-            .processDocument(job.organizationId, buffer, job.mimeType);
+          return structuredCpuResult(fixtureText(buffer), TEXT_CONFIDENCE);
         } finally {
           gate.inFlight -= 1;
         }
@@ -100,9 +101,7 @@ async function startWorker(app: INestApplication): Promise<INestApplicationConte
 }
 
 async function boot(): Promise<INestApplication> {
-  const app = await createTestApp((builder) =>
-    builder.overrideProvider(ExtractionStrategyResolver).useValue(stubResolver),
-  );
+  const app = await createTestApp();
   worker = await startWorker(app);
   return app;
 }
@@ -128,14 +127,32 @@ describe('Document intake (e2e)', () => {
     });
   }
 
-  async function waitForStatus(jobId: string, status: IntakeJobStatus) {
+  async function waitForStatus(
+    jobId: string,
+    status: IntakeJobStatus,
+    organizationId = tenantA.organizationId,
+  ) {
     return eventually(async () => {
-      const job = await prisma.intakeJob.findFirst({
-        where: { id: jobId, organizationId: tenantA.organizationId },
-      });
+      const job = await prisma.intakeJob.findFirst({ where: { id: jobId, organizationId } });
       expect(job?.status).toBe(status);
       return job;
     }, 20000);
+  }
+
+  /** Uploads a document, waits for the worker to finish it and returns the API's result view. */
+  async function extract(
+    api: ApiHelper,
+    organizationId: string,
+    file: Buffer,
+    status: IntakeJobStatus,
+  ) {
+    const res = await upload(api, file);
+    expect(res.status).toBe(201);
+    const jobId = res.body.data.jobId as string;
+    await waitForStatus(jobId, status, organizationId);
+    const view = await api.get(`/ai/document-intake/${jobId}/result`);
+    expect(view.status).toBe(200);
+    return view.body.data.result;
   }
 
   beforeAll(async () => {
@@ -468,6 +485,141 @@ describe('Document intake (e2e)', () => {
     });
     const done = await waitForStatus(failed.id, IntakeJobStatus.EXTRACTED);
     expect(done?.attempts).toBe(2);
+  });
+
+  describe('structured extraction in the worker (#42, #16)', () => {
+    it('turns OCR text into structured fields, matches the tenant vendor and needs no review', async () => {
+      const vendorName = `Delta Supplies ${uniqueSuffix()}`;
+      const vendor = await a.post('/vendors').send({ name: vendorName });
+      expect(vendor.status).toBe(201);
+      const number = `STR-2026-${uniqueSuffix()}`;
+
+      const result = await extract(
+        a,
+        tenantA.organizationId,
+        textPdf(invoiceLines(vendorName, number)),
+        IntakeJobStatus.EXTRACTED,
+      );
+
+      expect(result).toMatchObject({
+        documentType: 'BILL',
+        extractionMethod: 'rules',
+        extractedFields: {
+          vendorName,
+          documentNumber: number,
+          date: '2026-09-01',
+          subtotal: 100,
+          tax: 15,
+          total: 115,
+          currency: 'EGP',
+        },
+        matchedVendor: { id: vendor.body.id, similarity: 1 },
+        duplicateWarning: null,
+        suggestCreateVendor: null,
+        extractionWarnings: [],
+      });
+      expect(result.ocrConfidence).toBeGreaterThanOrEqual(0.6);
+      // Evidence points at the document line each value came from.
+      expect(result.fieldEvidence.total.text).toContain('115.00');
+      expect(result.rawText).toContain(number);
+    });
+
+    it('flags the same invoice arriving again once its bill exists, and sends it to review', async () => {
+      const vendorName = `Echo Traders ${uniqueSuffix()}`;
+      const vendor = await a.post('/vendors').send({ name: vendorName });
+      expect(vendor.status).toBe(201);
+      const number = `DUP-2026-${uniqueSuffix()}`;
+      const lines = invoiceLines(vendorName, number);
+
+      const first = await extract(
+        a,
+        tenantA.organizationId,
+        textPdf(lines),
+        IntakeJobStatus.EXTRACTED,
+      );
+      expect(first.duplicateWarning).toBeNull();
+      const bill = await a.post('/ai/document-intake/confirm').send({
+        type: 'BILL',
+        vendorId: vendor.body.id,
+        documentNumber: number,
+        date: '2026-09-01',
+        dueDate: '2026-10-01',
+        lines: [{ description: 'Goods', quantity: '1', rate: '100', taxRatePercent: '15' }],
+      });
+      expect(bill.status).toBe(201);
+
+      // Different bytes (a second page marker), same supplier invoice.
+      const again = await extract(
+        a,
+        tenantA.organizationId,
+        textPdf([...lines, 'Page 2 of 2']),
+        IntakeJobStatus.NEEDS_REVIEW,
+      );
+      expect(again.duplicateWarning).toEqual({
+        isDuplicate: true,
+        existingId: bill.body.data.id,
+        matchType: 'exact_number',
+        similarity: 1,
+      });
+      expect(again.extractedFields.total).toBe(115);
+    });
+
+    it('never matches another tenant vendor, and each tenant matches its own', async () => {
+      const vendorName = `Shared Name Trading ${uniqueSuffix()}`;
+      const theirs = await b.post('/vendors').send({ name: vendorName });
+      expect(theirs.status).toBe(201);
+
+      const mine = await extract(
+        a,
+        tenantA.organizationId,
+        textPdf(invoiceLines(vendorName, `ISO-2026-${uniqueSuffix()}`)),
+        IntakeJobStatus.EXTRACTED,
+      );
+      // Tenant A has no vendor of that name; tenant B's must not leak in as a match or a candidate.
+      expect(mine.matchedVendor).toBeNull();
+      expect(mine.suggestCreateVendor).toMatchObject({ name: vendorName });
+      expect(JSON.stringify(mine)).not.toContain(theirs.body.id);
+
+      const ownResult = await extract(
+        b,
+        tenantB.organizationId,
+        textPdf(invoiceLines(vendorName, `ISO-2026-${uniqueSuffix()}`)),
+        IntakeJobStatus.EXTRACTED,
+      );
+      expect(ownResult.matchedVendor).toMatchObject({ id: theirs.body.id });
+    });
+
+    it('routes totals that do not add up to review and keeps the reason', async () => {
+      const result = await extract(
+        a,
+        tenantA.organizationId,
+        textPdf(
+          invoiceLines('Mismatch Trading', `MIS-2026-${uniqueSuffix()}`, {
+            net: '1,000.00',
+            vat: '150.00',
+            gross: '1,300.00',
+          }),
+        ),
+        IntakeJobStatus.NEEDS_REVIEW,
+      );
+      expect(result.extractionWarnings).toContain('TOTALS_MISMATCH');
+      expect(result.ocrConfidence).toBeLessThan(0.6);
+    });
+
+    it('keeps every field unknown when the text holds no invoice evidence', async () => {
+      const result = await extract(
+        a,
+        tenantA.organizationId,
+        textPdf(['Meeting notes', `Agenda for Monday ${uniqueSuffix()}`]),
+        IntakeJobStatus.NEEDS_REVIEW,
+      );
+      expect(result).toMatchObject({
+        documentType: 'OTHER',
+        extractedFields: { total: null, date: null, documentNumber: null, currency: null },
+        matchedVendor: null,
+        duplicateWarning: null,
+      });
+    });
   });
 
   describe('worker isolation and concurrency (#42)', () => {

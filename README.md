@@ -4,7 +4,7 @@ Mizano helps accountants and finance teams turn business documents into traceabl
 
 **Current goal:** a tiny live deployment on a **Raspberry Pi 5 (8GB, arm64)**, tracked by epic **#45**, with the full accountant flow (AP/AR, reports, Arabic/English): Telegram/web → original document → extraction → validated draft → one batch approval → ledger → payments and reconciled reports.
 
-**Status:** pre-demo hardening. The September review identified accounting, tenant-isolation, extraction and delivery blockers. The dedicated CPU intake worker is implemented with OCR evidence and review-required unknown fields; structured CPU parsing, Telegram invoice intake and the four-provider daily runner remain pending; their presence in the roadmap is not a claim that they already run. Existing modules and green unit tests do not establish end-to-end readiness.
+**Status:** pre-demo hardening. The September review identified accounting, tenant-isolation, extraction and delivery blockers. The dedicated CPU intake worker reads documents with local OCR, applies the rules-based Arabic/English invoice parser and matches vendors and duplicates in the database, sending unknown or inconsistent values to review; its accuracy is not measured yet. Telegram invoice intake, Pi acceptance and the four-provider daily runner remain pending; their presence in the roadmap is not a claim that they already run. Existing modules and green unit tests do not establish end-to-end readiness.
 
 ## Start here
 
@@ -45,7 +45,7 @@ The demo does not require GPU hardware, Colab or paid AI APIs. Free local softwa
 | Identity            | NextAuth + backend JWT/refresh tokens                                                            |
 | Workspace           | pnpm workspaces and Turborepo                                                                    |
 | Existing extraction | Ollama plus OCR strategy code; production docs describe a Colab proxy                            |
-| Target extraction   | Isolated CPU OCR worker with deadlines and Pi caps; structured parsing and Pi acceptance pending |
+| Target extraction   | Isolated CPU OCR worker (deadlines, Pi caps) with rules-based parsing; accuracy not yet measured |
 
 Accounting, purchases, sales, banking, reports, inventory, tax, assets, projects, HR, manufacturing and CRM code exists. Demo acceptance covers the accounting journey above; peripheral modules need their own verification. Keep the existing stack during this sprint.
 

@@ -14,8 +14,10 @@ The existing OCR+LLM strategy is **not** the no-LLM baseline from #16.
 Bundling Tesseract assets does not remove its Ollama dependency or add scanned
 PDF rendering. Queued intake no longer uses it: the
 [dedicated worker](#dedicated-worker-and-resource-budget) has its own OCR/PDF
-path. Integration with #16's structured parser is still required before
-claiming CPU invoice extraction.
+path and applies #16's deterministic rules to the recognized text
+([structured extraction](#structured-extraction-in-the-worker)). That wires the
+parser in; it is not a measured accuracy claim, which the held-out corpus of #24
+has to decide.
 
 ## Reproducible language assets
 
@@ -114,13 +116,60 @@ always loads both pinned languages and never selects a model.
 The CPU path extracts native PDF text, or renders scanned PDF pages
 sequentially (up to 20, 2000-pixel maximum dimension) and recognizes images
 with Tesseract. It deliberately does not call the legacy strategy resolver,
-classifier or Ollama. **#16's structured parser is absent on this branch**:
-text is retained as evidence, money/currency/dates remain null, vendor and
-duplicate matching are not run, and the result is `NEEDS_REVIEW` with
-`extractionMethod=cpu-ocr`. This is an extraction runtime, not a claim of
-complete invoice parsing or measured accuracy. When #16 lands, its pure text
-rules belong in the child; tenant-scoped matching and duplicate detection need
-the database and belong in the worker process, after the child has closed.
+the model-backed classifier or entity matcher, or Ollama. What happens to the
+text is described next. This is an extraction runtime, not a claim of complete
+invoice parsing or measured accuracy.
+
+### Structured extraction in the worker
+
+The work is split at the process boundary, by what each step needs:
+
+- **In the child (pure text, no database, no model).** `structuredCpuResult`
+  runs the same `extractInvoiceFields` rules and the same
+  `toExtractionResult` mapping as the API's `RulesStrategy`, so the two cannot
+  drift apart (a parity test compares them on the shared fixtures). The result
+  carries invoice number, date, due date, vendor name and tax id, subtotal, tax,
+  total and currency, each with the source line as evidence and a confidence,
+  plus machine-coded warnings such as `TOTALS_MISMATCH`. The text confidence is
+  0.95 for an embedded PDF text layer and the weakest page's score for OCR; the
+  rules scale their own confidence by it and cap it below the review threshold
+  when a consistency check fails. The document type comes from bilingual
+  keywords (`BILL`, `RECEIPT` or `OTHER`); its confidence is the strength of
+  that keyword evidence, not an accuracy. Text shorter than ten characters is
+  not parsed: the result keeps the text as evidence with every field null and
+  `extractionMethod=cpu-ocr`. Otherwise `extractionMethod=rules`.
+- **In the worker process, after the child has closed.** `IntakeMatchingService`
+  needs the database, so it is not in the child. Every query is scoped to the
+  job's organization and ignores deleted rows. It lists up to five vendor
+  candidates by fuzzy name similarity (display name or name; at least 0.4 to be
+  listed, 0.6 to be matched; only the first 200 characters are compared, to bound
+  the edit-distance work on the event loop). Two vendors tied for the best strong
+  similarity are **ambiguous**: they stay candidates, nothing is matched and no
+  new vendor is suggested, because a guess would pick the supplier of a bill that
+  a batch approval posts. For a matched vendor it flags a bill with the same
+  number, else a bill from the last 30 days whose total differs by less than
+  0.01, compared as `Decimal`. With no match it suggests creating the vendor.
+  Anything the child claimed for these fields is replaced: only the database
+  decides.
+- **Review routing is unchanged.** `NEEDS_REVIEW` when the confidence is below
+  0.6, the total or date is missing, the type is `OTHER` or a duplicate was
+  found; otherwise `EXTRACTED`. Nothing posts by itself.
+
+Differences from the legacy in-process pipeline, all deliberate: no NLP entity
+matching (it needs the model gateway), so vendors are matched on the extracted
+name only and customers are not matched; the type is keyword based because the
+model classifier is not in the worker; no due date is invented (the legacy path
+used invoice date plus 30 days), so a missing due date stays `null`; PDF text is
+not cut to 4,000 characters (that limit protected the LLM prompt). Line items
+are not extracted (`lineItems` is empty). The vendor name falls back to the first
+plain header line at low confidence, as in the rules strategy.
+
+Known limit, seen in an informal, uncommitted check: Tesseract read a rendered
+Arabic invoice's words and vendor name but misread the Arabic-Indic digits, so
+the rules parsed wrong amounts; their consistency check raised `TOTALS_MISMATCH`,
+capped the confidence and sent the job to review. A misread that still adds up
+would not be caught by the rules. Accuracy on real Arabic documents is unknown
+until #24.
 
 | Limit                        | Implementation                                                                                                                                                                                                                                                                                                                     |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -176,7 +225,12 @@ The aborted job fails with `INTAKE_WORKER_FAILED` and is retried after backoff.
 
 Local development: the worker needs Linux (`pnpm --filter api start:worker`
 after a build, in WSL or a container). The seeded intake E2E runs on any OS
-because it starts the worker module in-process with a stubbed executor.
+because it starts the worker module in-process with a stubbed extraction child:
+the executor reads the stored original and takes the text a fixture PDF carries
+as the OCR output, then runs the child's real rules, and the real
+`IntakeMatchingService`, review routing and persistence follow. The unit suite
+also runs the real pinned Tesseract on a rendered image
+(`cpu-extraction.ocr.spec.ts`), on any OS.
 
 ## Pi acceptance protocol (not yet executed)
 
@@ -205,7 +259,7 @@ backlog larger than the concurrency cap and verify API responsiveness.
 | API p95 while processing batch      | Unknown; threshold not agreed                                                           |
 | Dedicated worker resource isolation | Implemented; real-process tests pass in a Linux container; Pi, arm64 and Alpine pending |
 | Per-document timeout to exceptions  | Implemented; real-process and seeded API E2E pass; Pi pending                           |
-| No-LLM extraction integration (#16) | OCR evidence only; structured parser absent on this branch                              |
+| No-LLM extraction integration (#16) | Rules in the child, vendor/duplicate matching in the worker; accuracy unmeasured (#24)  |
 
 Issue #42 remains partial until those gates have evidence. An amd64 build or
 mocked OCR unit test cannot satisfy Pi acceptance. Do not build arm64 locally.
@@ -295,8 +349,9 @@ API tasks ran fresh; cached web tests contain 40 suites/386 tests, while the
 direct run above verified all 46 suites/431 tests in this worktree. CI retains
 the package script's two Jest workers; the separate full and affected suites
 and E2E used `--runInBand`. The worker and terminating deadlines this
-section listed as next are now implemented (see the evidence below); #16
-integration, arm64/size CI and the held-out Pi/API measurements remain.
+section listed as next are now implemented, and #16's rules are integrated into
+the worker (see the evidence below); arm64/size CI and the held-out Pi/API
+measurements remain.
 
 ## Dedicated worker evidence (3 October 2026)
 
@@ -342,3 +397,37 @@ container has no Poppler and no package mirror; the image build, the arm64 and
 offline CI jobs and the image-size limit; a fresh (uncached) full web suite;
 Pi latency and RAM per document type (#24); authenticated API p95 under a backlog; browser journeys. Issue #42
 stays partial until the Pi gates above have evidence.
+
+## Structured extraction integration evidence (3 October 2026)
+
+Scope: [issue #42](https://github.com/AbdelrhmanAh7/Mizano/issues/42) and #16 on
+`demo/38-arm64-images` ([PR #60](https://github.com/AbdelrhmanAh7/Mizano/pull/60),
+which already contains #72 and #89), after merging master (#55, #56 and #59).
+Written by Claude Sonnet 5.5; this is not an independent review of the exact
+head. Everything ran on the Windows development host: **nothing ran on a Pi, on
+arm64, on Alpine/musl or on Node 20**, and no held-out corpus was used.
+
+| Command / gate                                                                                                                                                                    | Result                                                                                                                                                                  |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API `tsc --noEmit` (`tsconfig.json`, `test/tsconfig.e2e.json`); web `tsc --noEmit` run directly, because Turbo's cache replayed stale web results                                 | Passed                                                                                                                                                                  |
+| `eslint --max-warnings 0` on every changed API file and on the web hook merged from master                                                                                        | Passed                                                                                                                                                                  |
+| API `jest --runInBand` on `modules/ai/intake`, `extraction`, `operations`, `utils`, `src/intake-worker*` and the document-intake controller, service and logging specs            | 33 suites / 643 tests passed; 1 Linux-only suite (9 tests) skipped on Windows                                                                                           |
+| Web `jest` on the intake hook and the scan specs merged from master                                                                                                               | 6 suites / 61 tests passed                                                                                                                                              |
+| Seeded `test/intake.e2e-spec.ts` (PostgreSQL 16, Redis 7 in Docker; database `mizano_e2e_pimages`; Redis DB 9; `OLLAMA_ENABLED=false`)                                            | 26 tests passed: the 21 existing ones and five structured-extraction journeys (vendor match, duplicate flag, other-tenant vendor, totals mismatch, no invoice evidence) |
+| Mutation check: the processor without the matching step                                                                                                                           | The three E2E tests that depend on matching fail; the other tests pass                                                                                                  |
+| Real pinned Tesseract (`eng+ara` assets, no network) on a rendered English invoice image, through `extractCpuDocument` (`cpu-extraction.ocr.spec.ts`, plus an uncommitted driver) | Invoice number, dates, subtotal, VAT, total, currency and tax id read correctly from synthetic crisp text; this proves the wiring, not accuracy                         |
+| Informal, uncommitted: the same driver on a rendered Arabic invoice                                                                                                               | Words and vendor name read, but Arabic-Indic digits misread: wrong amounts, `TOTALS_MISMATCH`, confidence capped, job to review (see the known limit above)             |
+
+The E2E worker context substitutes only the extraction child: the executor
+returns the child's real rules applied to the text a fixture PDF carries.
+Everything after the child is production code against PostgreSQL and
+Redis/BullMQ, including the cross-tenant case. The previous stub ran the legacy
+in-process pipeline instead, so it could never have shown that the dedicated
+worker returned no fields.
+
+Not run and still unknown: the real supervisor and Poppler (the Linux-only
+process spec is skipped on Windows; Poppler is not installed here); scanned
+PDFs and the PDF text layer through the real tools; the image build with this
+code, the arm64 and offline jobs and the size limit; Pi latency and RAM (#24);
+accuracy on real invoices, especially Arabic scans and photos. Issue #42 stays
+partial until those gates have evidence.

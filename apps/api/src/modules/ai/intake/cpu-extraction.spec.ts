@@ -1,10 +1,12 @@
 import { execFile } from 'child_process';
+import { readFileSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { join, sep } from 'path';
 import { promisify } from 'util';
 import { createOfflineTesseractWorker } from '../extraction/offline-tesseract';
 import { writeSecureFile } from '../utils/secure-temp.util';
 import { cpuReviewResult, extractCpuDocument, runPdfTool } from './cpu-extraction';
+import { NATIVE_TEXT_CONFIDENCE, structuredCpuResult } from './cpu-structured';
 
 // `execFile` is promisified once at import; the real one has a custom promisifier that
 // resolves `{ stdout, stderr }`, so the mock provides the same shape.
@@ -17,6 +19,9 @@ jest.mock('../utils/secure-temp.util', () => ({ writeSecureFile: jest.fn() }));
 jest.mock('../extraction/offline-tesseract', () => ({ createOfflineTesseractWorker: jest.fn() }));
 
 const execute = (execFile as unknown as Record<symbol, jest.Mock>)[promisify.custom];
+
+const fixture = (name: string): string =>
+  readFileSync(join(__dirname, '../extraction/rules/__fixtures__', name), 'utf8');
 
 /** The prlimit-wrapped tool name and arguments of every external tool call, in order. */
 function toolCalls(): { tool: string; args: string[] }[] {
@@ -56,10 +61,43 @@ describe('CPU extraction without an LLM', () => {
   it('uses only the pinned local OCR engine for images and terminates it', async () => {
     const result = await extractCpuDocument(Buffer.from('image'), 'image/png', '/tmp/job');
     expect(result.rawText).toBe('private text');
-    expect(result.ocrConfidence).toBe(0.8);
+    // Text without any invoice evidence yields no fields, hence no confidence in any of them.
+    expect(result).toMatchObject({
+      extractionMethod: 'rules',
+      ocrConfidence: 0,
+      extractedFields: { total: null, date: null },
+    });
     expect(terminate).toHaveBeenCalledTimes(1);
     expect(writeSecureFile).toHaveBeenCalledWith(join('/tmp/job', 'original'), expect.any(Buffer));
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('runs the deterministic rules on recognized image text and returns structured fields', async () => {
+    recognize.mockResolvedValue({ data: { text: fixture('en-eg-invoice.txt'), confidence: 90 } });
+    const result = await extractCpuDocument(Buffer.from('image'), 'image/png', '/tmp/job');
+    expect(result).toMatchObject({
+      documentType: 'BILL',
+      extractionMethod: 'rules',
+      extractedFields: {
+        documentNumber: 'INV-2024-0042',
+        date: '2024-03-15',
+        subtotal: 1000,
+        tax: 140,
+        total: 1140,
+        currency: 'EGP',
+        vendorName: 'Cairo Office Supplies Co.',
+      },
+    });
+    // The engine's own score scales the rules' confidence; it is not replaced by it.
+    expect(result).toEqual(structuredCpuResult(fixture('en-eg-invoice.txt'), 0.9));
+    expect(result.ocrConfidence).toBeGreaterThanOrEqual(0.6);
+    expect(terminate).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays evidence-only when OCR returns no usable text', async () => {
+    recognize.mockResolvedValue({ data: { text: ' . ', confidence: 12 } });
+    const result = await extractCpuDocument(Buffer.from('image'), 'image/png', '/tmp/job');
+    expect(result).toEqual(cpuReviewResult(' . ', 0.12));
   });
 
   it('terminates the OCR engine after recognition failure', async () => {
@@ -85,6 +123,27 @@ describe('CPU extraction without an LLM', () => {
     expect(result.rawText).toContain('Native invoice');
     expect(createOfflineTesseractWorker).not.toHaveBeenCalled();
     expect(toolCalls().map((c) => c.tool)).toEqual(['/usr/bin/pdftotext']);
+  });
+
+  it('parses a native Arabic PDF text layer into structured fields at text-layer confidence', async () => {
+    jest.mocked(readFile).mockResolvedValue(fixture('ar-eg-invoice.txt'));
+    const result = await extractCpuDocument(Buffer.from('pdf'), 'application/pdf', '/tmp/job');
+    expect(result).toMatchObject({
+      documentType: 'BILL',
+      extractionMethod: 'rules',
+      extractedFields: {
+        documentNumber: 'INV-2024-0150',
+        date: '2024-03-15',
+        total: 1140,
+        currency: 'EGP',
+        vendorName: 'شركة النيل للتوريدات',
+      },
+    });
+    expect(result).toEqual(
+      structuredCpuResult(fixture('ar-eg-invoice.txt'), NATIVE_TEXT_CONFIDENCE),
+    );
+    expect(result.ocrConfidence).toBeGreaterThanOrEqual(0.6);
+    expect(createOfflineTesseractWorker).not.toHaveBeenCalled();
   });
 
   it('keeps external-tool CPU limits within a short inherited job deadline', async () => {
@@ -136,14 +195,26 @@ describe('CPU extraction without an LLM', () => {
 
     it('renders and recognizes every page sequentially through one terminated engine', async () => {
       scanned(3);
+      const pages = [
+        'Cairo Office Supplies Co.\nTax Invoice\nInvoice No: INV-2024-0042',
+        'Invoice Date: 15/03/2024\nSub Total: EGP 1,000.00\nVAT 14%: EGP 140.00',
+        'Total: EGP 1,140.00',
+      ];
       recognize
-        .mockResolvedValueOnce({ data: { text: 'one', confidence: 90 } })
-        .mockResolvedValueOnce({ data: { text: 'two', confidence: 55 } })
-        .mockResolvedValueOnce({ data: { text: 'three', confidence: 70 } });
+        .mockResolvedValueOnce({ data: { text: pages[0], confidence: 90 } })
+        .mockResolvedValueOnce({ data: { text: pages[1], confidence: 55 } })
+        .mockResolvedValueOnce({ data: { text: pages[2], confidence: 70 } });
       const result = await extractCpuDocument(Buffer.from('pdf'), 'application/pdf', '/tmp/job');
-      expect(result.rawText).toBe('one\ntwo\nthree');
-      // The weakest page decides: an accountant must see the doubt, not an average.
-      expect(result.ocrConfidence).toBe(0.55);
+      expect(result.rawText).toBe(pages.join('\n'));
+      // Fields found on any page, with the weakest page deciding the confidence: an accountant
+      // must see the doubt, not an average of 90, 55 and 70.
+      expect(result).toEqual(structuredCpuResult(pages.join('\n'), 0.55));
+      expect(result.extractedFields).toMatchObject({
+        documentNumber: 'INV-2024-0042',
+        date: '2024-03-15',
+        total: 1140,
+        currency: 'EGP',
+      });
       expect(createOfflineTesseractWorker).toHaveBeenCalledTimes(1);
       expect(terminate).toHaveBeenCalledTimes(1);
       const calls = toolCalls();

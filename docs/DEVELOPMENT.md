@@ -243,7 +243,9 @@ fallback, so an uploaded document stays `QUEUED` until a worker runs.
   `pdfinfo`, `pdftoppm`) and the pinned OCR assets in `INTAKE_TESSDATA_DIR`;
   the API image has all three. On Windows it refuses to start, because the
   caps cannot be enforced there. The seeded intake E2E runs on any OS: it starts
-  the worker module in-process with a stubbed extractor.
+  the worker module in-process with a stubbed extraction child (the fixture PDF's
+  text stands in for OCR output; the child's real rules, the vendor and duplicate
+  matching, review routing and persistence run for real).
 - **Settings:** `INTAKE_CONCURRENCY` is 1 unless exactly `2`;
   `INTAKE_JOB_DEADLINE_MS` defaults to 120000 (100-600000).
 - `docker-compose.production.yml` (historical VPS stack) has no worker service
@@ -252,6 +254,10 @@ fallback, so an uploaded document stays `QUEUED` until a worker runs.
 `intake-executor.process.spec.ts` exercises the real supervisor, `prlimit` and
 process groups. It runs automatically on Linux (including CI) and is skipped on
 other systems. See the [runtime contract](strategy/pi-cpu-extraction-runtime.md)
-for limits, error codes and evidence. Until #16's parser is integrated, unknown
-structured fields go to review; OCR text is not proof of accurate invoice
-extraction.
+for limits, error codes and evidence. The child applies #16's deterministic
+Arabic/English invoice rules to the recognized text and the worker process adds
+tenant-scoped vendor and duplicate matching, with no model. Unknown or
+inconsistent values stay null or are flagged and go to review; extraction
+accuracy is not measured yet (#24). `cpu-extraction.ocr.spec.ts` runs the real
+pinned Tesseract on a rendered English invoice image in the unit suite, on any
+OS, as a wiring check rather than an accuracy claim.

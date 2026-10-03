@@ -66,4 +66,8 @@ Validate `X-Telegram-Bot-Api-Secret-Token` and chat allowlist before file access
 
 ### Local rules OCR language assets
 
-Set `INTAKE_TESSDATA_DIR` to a local directory containing uncompressed `eng.traineddata` and `ara.traineddata` (and any other requested languages). The rules strategy passes this directory as both `langPath` and `cachePath`, with read-only caching and gzip disabled. Missing assets fail locally; configured language assets are never downloaded at runtime. Packaging pinned traineddata into the worker remains issue #42. When unset, the existing Tesseract defaults apply.
+Set `INTAKE_TESSDATA_DIR` to a local directory containing uncompressed `eng.traineddata` and `ara.traineddata` (and any other requested languages). The rules strategy passes this directory as both `langPath` and `cachePath`, with read-only caching and gzip disabled. Missing assets fail locally; configured language assets are never downloaded at runtime. When unset, the existing Tesseract defaults apply.
+
+### Queued intake (dedicated worker)
+
+Uploaded and Telegram documents are not read by the API process. The dedicated worker's disposable child extracts native PDF text (Poppler), renders scanned PDF pages and recognizes images with the hash-verified, image-bundled `eng+ara` assets (#72), then applies the same deterministic rules as above, with no model. The worker process afterwards matches vendors and duplicates in the database. The split, the review routing and the deliberate differences from the in-process strategy are in the [CPU runtime contract](pi-cpu-extraction-runtime.md#structured-extraction-in-the-worker). Field accuracy on the held-out corpus (#24) is still unmeasured.

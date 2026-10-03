@@ -8,6 +8,7 @@ import { DocumentIntakeResult } from '../services/document-intake.service';
 import { intakeLeaseMs, queueJobId } from './intake-jobs.service';
 import { IntakeQueuePayload, IntakeQueueService } from './intake-queue.service';
 import { IntakeExecutorService } from './intake-executor.service';
+import { IntakeMatchingService } from './intake-matching.service';
 import { IntakeRuntimeError } from './intake-runtime';
 
 const LOW_CONFIDENCE = 0.6;
@@ -41,6 +42,7 @@ export class IntakeProcessorService implements OnModuleInit {
     private readonly intake: IntakeExecutorService,
     private readonly queue: IntakeQueueService,
     private readonly config: ConfigService,
+    private readonly matching: IntakeMatchingService,
   ) {}
 
   onModuleInit(): void {
@@ -117,7 +119,11 @@ export class IntakeProcessorService implements OnModuleInit {
     );
 
     try {
-      const result = await this.intake.run(job, cancellation.signal);
+      const extracted = await this.intake.run(job, cancellation.signal);
+      if (leaseLost) throw new LeaseLostError();
+      // The child holds no database access: vendor candidates and the duplicate check are
+      // tenant-scoped reads, made here after it has closed.
+      const result = await this.matching.enrich(job.organizationId, extracted);
       if (leaseLost) throw new LeaseLostError();
       const status = needsReview(result) ? IntakeJobStatus.NEEDS_REVIEW : IntakeJobStatus.EXTRACTED;
       const written = await this.prisma.intakeJob.updateMany({

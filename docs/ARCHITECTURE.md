@@ -101,7 +101,7 @@ Current code path:
 | Draft bills and approval | `modules/purchases` (bills, payments made), `modules/bulk-operations`                                                     |
 | Ledger and reports       | `modules/accounting` (accounts, journals), `modules/reports` (GL, trial balance, AP aging, P&L, balance sheet)            |
 
-The dedicated CPU worker bypasses Ollama/VLM for queued intake. It preserves OCR evidence with null unknown fields and routes to review until #16 structured parsing is integrated. Other advisory routes retain their legacy providers. Telegram integration and measured Pi acceptance remain separate gates; see [CPU runtime](strategy/pi-cpu-extraction-runtime.md).
+The dedicated CPU worker bypasses Ollama/VLM for queued intake. Its extraction child turns OCR/PDF text into structured fields with the deterministic rules of #16 (`intake/cpu-structured.ts`), and the worker process then adds tenant-scoped vendor and duplicate matching (`intake/intake-matching.service.ts`); unknown or inconsistent values route to review. Other advisory routes retain their legacy providers. Telegram integration and measured Pi acceptance remain separate gates; see [CPU runtime](strategy/pi-cpu-extraction-runtime.md).
 
 ## API modules
 
