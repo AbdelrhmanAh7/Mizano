@@ -2,6 +2,10 @@
 
 Tiny live deployment: Raspberry Pi 5 (8GB, arm64), Raspberry Pi OS 64-bit, Docker Engine + compose plugin, data on an attached SSD, private HTTPS through a Cloudflare Tunnel. Nothing here has been run on a Pi yet; treat every step as unverified until the first real deployment.
 
+For live acceptance, follow the [Pi runbook](RUNBOOK.md): platform checks, accountant journey,
+backup/restore and rollback drills, evidence capture and an explicit GO/NO-GO decision. The
+[acceptance contract](../../docs/strategy/demo-acceptance.md) remains the release authority.
+
 Memory budget (8GB): postgres 1.5G, redis 256M, api 1G, web 512M, cloudflared 128M, 2G reserved for the extraction worker, remainder for the OS and page cache.
 
 ## 1. Prepare the Pi
@@ -70,6 +74,10 @@ Only SSH (ideally LAN-only) should answer. No container should list a published 
 deploy/pi/scripts/deploy.sh <commit-sha> sha256:<api-digest> sha256:<web-digest>
 ```
 
+Verify the final active SHA/digests in `deployments.log`: a failed candidate can roll back
+successfully, so exit zero alone does not prove that candidate is deployed. Pull/migration
+failures can exit before automatic rollback.
+
 It pulls by digest, runs `prisma migrate deploy` (one-shot `migrate` service; the api only starts when it succeeds), restarts, waits for healthy, and appends `OK`/`FAILED` lines to `$MIZANO_DATA_DIR/deployments.log`. On failed health it rolls back to the previous recorded digests. Migrations are never reverted, so keep them backward compatible with the previous release.
 
 ## 5. Backups and restore drill
@@ -84,7 +92,10 @@ The units assume the repo at `/opt/mizano`; edit `ExecStart` otherwise, and ensu
 
 - Generate a key pair on your own machine: `age-keygen -o mizano-backup.key`. Put only the public key in `BACKUP_AGE_RECIPIENT`. Store the private key offline (password manager); the Pi must not hold it.
 - `backup.sh` runs nightly at 02:30 Africa/Cairo: encrypted `pg_dump` (custom format) and a tar of `originals/` in `$MIZANO_DATA_DIR/backups`, retention `BACKUP_RETENTION_DAYS`, status in `backup.status`. Copy the folder off the Pi as well (a backup on the same SSD is not a disaster backup).
-- Run a drill monthly and before every demo: `AGE_IDENTITY_FILE=/path/mizano-backup.key deploy/pi/scripts/restore-drill.sh`. It restores the latest dump into a scratch Postgres container, then checks that tables exist and journal debits equal credits.
+- Run a drill monthly and before every demo: `AGE_IDENTITY_FILE=/path/mizano-backup.key deploy/pi/scripts/restore-drill.sh`. It restores the latest dump into a scratch Postgres container, then checks that tables exist and each posted, non-deleted journal balances. This is a DB
+  sanity drill only: it does not restore originals or verify original-to-ledger links. Complete
+  the isolated application restore checks in [RUNBOOK.md](RUNBOOK.md#5-encrypted-backup-and-restore-drill)
+  before GO; never restore over the live database.
 
 ## 6. Monitoring
 
@@ -93,5 +104,7 @@ The units assume the repo at `/opt/mizano`; edit `ExecStart` otherwise, and ensu
 ## 7. Upgrade and rollback
 
 - Upgrade: run `deploy.sh` with the new SHA and digests (section 4).
-- Manual rollback: `deploy/pi/scripts/rollback.sh` restores the previous `OK` digests from `deployments.log`.
+- Manual rollback: `deploy/pi/scripts/rollback.sh` uses the active `OK`/`ROLLBACK` pointer in
+  `deployments.log` to select the previous good deployment. Repeated manual calls move further
+  back; inspect the active record before each call. Migrations are not reverted.
 - Back up before any upgrade that includes a migration: `sudo systemctl start mizano-backup.service`.
