@@ -405,7 +405,17 @@ export class WorkOrdersService {
         });
       } else {
         // Credit operations cost to raw materials account as fallback
-        journalLines[1].credit = journalLines[1].credit.add(operationsCost);
+        const rawLine = journalLines.find((l) => l.accountId === rawMaterialsAccount.id);
+        if (rawLine) {
+          rawLine.credit = rawLine.credit.add(operationsCost);
+        } else {
+          journalLines.push({
+            accountId: rawMaterialsAccount.id,
+            debit: new Decimal(0),
+            credit: operationsCost,
+            description: `Manufacturing overhead - WO ${workOrder.workOrderNumber}`,
+          });
+        }
       }
     }
 

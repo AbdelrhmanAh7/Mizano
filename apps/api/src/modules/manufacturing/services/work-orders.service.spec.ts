@@ -25,7 +25,9 @@ const workOrder = {
  * bypasses the transaction (and therefore the ledger lock and the rollback) fails the test. The
  * ledger lock serializes transactions until the callback ends, like the advisory lock does.
  */
-function transactional(options: { accounts?: boolean } = {}) {
+function transactional(
+  options: { accounts?: boolean; overhead?: boolean; materialCost?: Decimal } = {},
+) {
   const calls: string[] = [];
   const state = { open: true, exists: true, status: WorkOrderStatus.IN_PROCESS as WorkOrderStatus };
   let tail: Promise<void> = Promise.resolve();
@@ -45,7 +47,20 @@ function transactional(options: { accounts?: boolean } = {}) {
           return state.exists ? { status: state.status } : null;
         }
         calls.push('load');
-        return state.exists ? { ...workOrder, status: state.status } : null;
+        if (!state.exists) return null;
+        const bom = options.materialCost
+          ? {
+              ...workOrder.bom,
+              items: [
+                {
+                  itemId: 'raw',
+                  quantity: new Decimal(1),
+                  item: { costPrice: options.materialCost },
+                },
+              ],
+            }
+          : workOrder.bom;
+        return { ...workOrder, bom, status: state.status };
       }),
       update: jest.fn(async (args: { data: Record<string, unknown> }) => {
         calls.push('finish');
@@ -77,9 +92,11 @@ function transactional(options: { accounts?: boolean } = {}) {
       }),
     },
     account: {
-      findFirst: jest.fn(async (..._args: unknown[]) => {
+      findFirst: jest.fn(async (args: { where?: { type?: string } }) => {
         calls.push('account');
-        return options.accounts === false ? null : { id: 'account' };
+        if (options.accounts === false) return null;
+        if (options.overhead === false && args.where?.type === 'EXPENSE') return null;
+        return { id: 'account' };
       }),
     },
     journal: {
@@ -186,6 +203,21 @@ describe('WorkOrdersService completion', () => {
     const credit = lines.reduce((sum, l) => sum.add(l.credit), new Decimal(0));
     expect(debit.toFixed(4)).toBe('2.3000');
     expect(credit.equals(debit)).toBe(true);
+  });
+
+  it('credits operations cost to raw materials when there is no material cost or overhead account', async () => {
+    const { service, tables } = transactional({ overhead: false, materialCost: new Decimal(0) });
+
+    await service.completeWorkOrder(ORG, 'wo-1', { quantityProduced: 1 });
+
+    const journal = tables.journal.create.mock.calls[0][0] as {
+      data: { lines: { create: { debit: Decimal; credit: Decimal }[] } };
+    };
+    const lines = journal.data.lines.create;
+    const debit = lines.reduce((sum, l) => sum.add(l.debit), new Decimal(0));
+    const credit = lines.reduce((sum, l) => sum.add(l.credit), new Decimal(0));
+    expect(debit.toFixed(4)).toBe('2.0000');
+    expect(credit.toFixed(4)).toBe('2.0000');
   });
 
   it('completes without a journal when the inventory accounts are missing', async () => {

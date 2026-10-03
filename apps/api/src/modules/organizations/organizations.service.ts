@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AccountType, Prisma } from '@prisma/client';
 import { lockOrganizationLedger } from '../../common/utils/ledger-lock';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -145,6 +145,22 @@ export class OrganizationsService {
 
       if (invalidIds.length > 0) {
         throw new BadRequestException(`Invalid or inactive account IDs: ${invalidIds.join(', ')}`);
+      }
+    }
+
+    // AR must be an asset and AP a liability: the as-of dashboard totals read control accounts by type.
+    const typed: Array<[string | undefined, AccountType, string]> = [
+      [updateAccountSettingsDto.defaultArAccountId, AccountType.ASSET, 'defaultArAccountId'],
+      [updateAccountSettingsDto.defaultApAccountId, AccountType.LIABILITY, 'defaultApAccountId'],
+    ];
+    for (const [accountId, type, field] of typed) {
+      if (!accountId) continue;
+      const account = await this.prisma.account.findFirst({
+        where: { id: accountId, organizationId: id },
+        select: { type: true },
+      });
+      if (account && account.type !== type) {
+        throw new BadRequestException(`${field} must reference an account of type ${type}`);
       }
     }
 
