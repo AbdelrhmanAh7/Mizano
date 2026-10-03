@@ -7,6 +7,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { DocumentIntakeResult, DocumentIntakeService } from '../services/document-intake.service';
 import { intakeLeaseMs, queueJobId } from './intake-jobs.service';
 import { IntakeQueuePayload, IntakeQueueService } from './intake-queue.service';
+import { IntakeFormatError } from './format-error';
 import { IntakeStorage } from './intake-storage';
 
 const LOW_CONFIDENCE = 0.6;
@@ -17,6 +18,7 @@ export function needsReview(result: DocumentIntakeResult): boolean {
   const fields = result.extractedFields;
   return (
     result.ocrConfidence < LOW_CONFIDENCE ||
+    (result.extractionWarnings?.length ?? 0) > 0 ||
     fields.total === null ||
     fields.date === null ||
     result.documentType === 'OTHER' ||
@@ -183,10 +185,13 @@ export class IntakeProcessorService implements OnModuleInit {
 
   private async recordFailure(job: IntakeJob, leaseToken: string, error: unknown): Promise<void> {
     // Extractor errors may quote document text: keep the error type/code only.
-    const lastError = describeError(error, { includeMessage: false }).slice(0, 200);
+    const lastError =
+      error instanceof IntakeFormatError
+        ? error.message
+        : describeError(error, { includeMessage: false }).slice(0, 200);
     // `job` was read after the claim, so job.attempts already counts this run.
     const attempts = job.attempts;
-    const dead = attempts >= job.maxAttempts;
+    const dead = error instanceof IntakeFormatError || attempts >= job.maxAttempts;
     const status = dead ? IntakeJobStatus.DEAD_LETTER : IntakeJobStatus.FAILED;
     const moved = await this.prisma.intakeJob.updateMany({
       where: {
@@ -198,7 +203,7 @@ export class IntakeProcessorService implements OnModuleInit {
       data: { status, lastError, progress: 0, leaseToken: null, leaseExpiresAt: null },
     });
     this.logger.error(
-      `Intake job ${job.id} failed: status=${status} attempts=${attempts}/${job.maxAttempts} error=${lastError}`,
+      `Intake job ${job.id} failed: status=${status} attempts=${attempts}/${job.maxAttempts} error=${error instanceof IntakeFormatError ? error.code : lastError}`,
     );
     if (dead || moved.count === 0) return;
     const delay =

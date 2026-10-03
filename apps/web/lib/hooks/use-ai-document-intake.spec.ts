@@ -8,6 +8,8 @@ jest.mock('next-intl', () => ({
     (
       ({
         retryUnavailable: 'This scan can no longer be retried.',
+        unsupportedLegacyDoc: 'Save the file as DOCX or PDF and upload again.',
+        unsupportedFormat: 'Upload a PDF, DOCX or supported image.',
         retryFailed: 'Could not retry the scan. Please try again.',
       }) as Record<string, string>
     )[key],
@@ -53,7 +55,15 @@ function fakeBody(chunks: string[]): ReadableStream<Uint8Array> {
   } as unknown as ReadableStream<Uint8Array>;
 }
 
-const RESULT = { documentType: 'BILL', extractedFields: { lineItems: [] } };
+const RESULT = {
+  documentType: 'BILL',
+  extractedFields: {
+    total: '123456789012345.1234',
+    subtotal: '200.0000',
+    tax: '28.0000',
+    lineItems: [],
+  },
+};
 
 describe('readSseStream', () => {
   it('parses data lines split across chunks', async () => {
@@ -83,6 +93,24 @@ describe('useDocumentIntakeStream', () => {
     });
   });
 
+  it.each([
+    ['UNSUPPORTED_LEGACY_DOC', 'Save the file as DOCX or PDF and upload again.'],
+    ['UNSUPPORTED', 'Upload a PDF, DOCX or supported image.'],
+  ])('localizes synchronous %s upload rejection without following a job', async (code, repair) => {
+    mockPost.mockRejectedValueOnce({
+      response: { status: 400, data: { message: 'INTAKE_' + code + ': bilingual repair' } },
+    });
+    const { result } = renderHook(() => useDocumentIntakeStream());
+    await act(async () => {
+      await result.current.processDocument(new FormData());
+    });
+    expect(result.current.error).toBe(repair);
+    expect(result.current.jobId).toBeNull();
+    expect(result.current.isProcessing).toBe(false);
+    expect(result.current.canRetry).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockGet).not.toHaveBeenCalled();
+  });
   it('streams progress with the Authorization header (no EventSource)', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
@@ -131,6 +159,31 @@ describe('useDocumentIntakeStream', () => {
 
     await waitFor(() => expect(result.current.result).toEqual(RESULT));
     expect(mockGet).toHaveBeenCalledWith('/ai/document-intake/intake_1/result');
+  });
+
+  it('preserves fixed 4-dp extracted money through the authenticated stream', async () => {
+    const extracted = {
+      ...RESULT,
+      extractedFields: {
+        lineItems: [],
+        total: '123456789012345.1234',
+        subtotal: '200.0000',
+        tax: '28.0000',
+      },
+    };
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: fakeBody([
+        `data: ${JSON.stringify({ stage: 'complete', progress: 100, result: extracted })}\n\n`,
+      ]),
+    });
+    const { result } = renderHook(() => useDocumentIntakeStream());
+    await act(async () => {
+      await result.current.processDocument(new FormData());
+    });
+    expect(result.current.result?.extractedFields.total).toBe('123456789012345.1234');
+    expect(result.current.result?.extractedFields.tax).toBe('28.0000');
   });
 
   it('reports a 404 (job not visible to this organization) as an error', async () => {

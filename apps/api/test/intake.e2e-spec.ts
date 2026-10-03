@@ -3,6 +3,7 @@
  * Redis/BullMQ. Only the extraction strategy is stubbed (no model is required): it returns a
  * fixed extraction, or throws when `stub.mode === 'fail'`.
  */
+import { preflightFormatTools } from './helpers/format-tools-preflight.helper';
 import { INestApplication } from '@nestjs/common';
 import { IntakeJobStatus } from '@prisma/client';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
@@ -55,12 +56,25 @@ const stubResolver = {
 
 function pdfFixture(marker: string): Buffer {
   const text = `Invoice ${marker} Total 115.00`;
-  return Buffer.from(
-    `%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n` +
-      `3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n` +
-      `4 0 obj<</Length ${text.length + 30}>>stream\nBT /F1 12 Tf 20 100 Td (${text}) Tj ET\nendstream endobj\n` +
-      `5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n`,
-  );
+  const stream = `BT /F1 12 Tf 20 100 Td (${text}) Tj ET\n`;
+  const objects = [
+    '<</Type/Catalog/Pages 2 0 R>>',
+    '<</Type/Pages/Kids[3 0 R]/Count 1>>',
+    '<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>',
+    `<</Length ${Buffer.byteLength(stream)}>>\nstream\n${stream}endstream`,
+    '<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>',
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = objects.map((object, index) => {
+    const offset = Buffer.byteLength(pdf);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    return offset;
+  });
+  const xref = Buffer.byteLength(pdf);
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  pdf += offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+  pdf += `trailer\n<</Root 1 0 R/Size ${objects.length + 1}>>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(pdf);
 }
 
 async function boot(): Promise<INestApplication> {
@@ -86,16 +100,21 @@ describe('Document intake (e2e)', () => {
   }
 
   async function waitForStatus(jobId: string, status: IntakeJobStatus) {
-    return eventually(async () => {
+    const row = await eventually(async () => {
       const job = await prisma.intakeJob.findFirst({
         where: { id: jobId, organizationId: tenantA.organizationId },
       });
-      expect(job?.status).toBe(status);
+      // Stop polling when the worker has conclusively failed. The assertion
+      // outside still requires the exact expected state and fails immediately.
+      expect(job?.status === status || job?.status === IntakeJobStatus.DEAD_LETTER).toBe(true);
       return job;
     }, 20000);
+    expect(row?.status).toBe(status);
+    return row;
   }
 
   beforeAll(async () => {
+    await preflightFormatTools();
     stub.mode = 'ok';
     app = await boot();
     prisma = getPrisma(app);
@@ -107,7 +126,7 @@ describe('Document intake (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
   });
 
   let jobId = '';
@@ -132,7 +151,7 @@ describe('Document intake (e2e)', () => {
     const result = await a.get(`/ai/document-intake/${jobId}/result`);
     expect(result.status).toBe(200);
     expect(result.body.data).toMatchObject({ id: jobId, status: 'EXTRACTED', stage: 'complete' });
-    expect(result.body.data.result.extractedFields.total).toBe(115);
+    expect(result.body.data.result.extractedFields.total).toBe('115.0000');
     expect(result.body.data).not.toHaveProperty('storageKey');
   });
 
@@ -199,7 +218,9 @@ describe('Document intake (e2e)', () => {
       lines: [{ description: 'x', quantity: '1', rate: '1', taxRatePercent: '0' }],
     });
     expect(confirm.status).toBe(404);
-    const untouched = await prisma.intakeJob.findUniqueOrThrow({ where: { id: jobId } });
+    const untouched = await prisma.intakeJob.findFirstOrThrow({
+      where: { id: jobId, organizationId: tenantA.organizationId },
+    });
     expect(untouched.status).toBe(IntakeJobStatus.EXTRACTED);
   });
 
@@ -307,7 +328,9 @@ describe('Document intake (e2e)', () => {
     expect(first.status).toBe(201);
     const replay = await a.post('/ai/document-intake/confirm').send(body);
     expect(replay.status).toBe(409);
-    const job = await prisma.intakeJob.findUniqueOrThrow({ where: { id: jobId } });
+    const job = await prisma.intakeJob.findFirstOrThrow({
+      where: { id: jobId, organizationId: tenantA.organizationId },
+    });
     expect(job).toMatchObject({
       status: IntakeJobStatus.APPROVED,
       draftDocumentType: 'bill',
@@ -321,7 +344,10 @@ describe('Document intake (e2e)', () => {
     const first = await upload(a, bytes);
     const firstId = first.body.data.jobId as string;
     await waitForStatus(firstId, IntakeJobStatus.EXTRACTED);
-    await prisma.intakeJob.update({ where: { id: firstId }, data: { deletedAt: new Date() } });
+    await prisma.intakeJob.update({
+      where: { id: firstId, organizationId: tenantA.organizationId },
+      data: { deletedAt: new Date() },
+    });
     const again = await upload(a, bytes);
     expect(again.status).toBe(201);
     expect(again.body.data.duplicate).toBe(false);

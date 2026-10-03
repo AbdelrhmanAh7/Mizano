@@ -90,6 +90,10 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 12. Caches, tests and scope
 
+- **Extraction limits must fail explicitly, never silently truncate.** Route each PDF page, preserve DOCX table label/value rows and later-page evidence, and treat unreadable sources as repairable errors rather than completed empty drafts. Test real format fixtures separately from mocked OCR/tool routing.
+- **Native text does not prove page completeness.** OCR pages with raster content too, preserve both sources for review, and reject legacy Word before queueing with a save-as-DOCX/PDF repair; plain-text conversion silently loses evidence.
+- **A container signature is not a format validation.** Check Word package content types, relationships and XML roots before extracting fields, and support or explicitly reject different OOXML namespaces rather than dropping their text.
+
 - **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included.
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
@@ -102,6 +106,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - Add any new root cause to this file in the same PR.
 
 ## Ops and deploy
+
+- **Check the actual image base (Alpine) before specifying runtime packages; never require a base-image switch from a feature lane.**
 
 - **Health checks must probe a route that exists.** Grep the app's routes first (Next has no `/api/health` unless a route file exists; `/robots.txt` returns 200 without auth). A probe of a missing route makes the container permanently unhealthy.
 - **Next standalone in Docker needs `HOSTNAME=0.0.0.0`.** Docker sets `HOSTNAME` to the container id and Next binds to it, so probes on `127.0.0.1` and peers fail. Probe `127.0.0.1`, not `localhost` (IPv6 in alpine).

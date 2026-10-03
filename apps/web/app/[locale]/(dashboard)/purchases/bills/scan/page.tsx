@@ -14,8 +14,6 @@ import {
   Sparkles,
   X,
   UserPlus,
-  Zap,
-  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -32,6 +30,8 @@ import { resolveScanLineTaxes, toDecimalString } from '@/lib/document-intake-tax
 import { BillForm, type BillFormDefaultValues } from '@/components/purchases/bill-form';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { moneyToNumber } from '@/lib/money';
+import { isLegacyWordUpload, isOversizedIntakeUpload } from '@/lib/document-intake-upload';
 
 type Step = 'upload' | 'processing' | 'review' | 'confirmed' | 'existing';
 
@@ -63,7 +63,6 @@ export default function ScanBillPage() {
   const [localResult, setLocalResult] = useState<DocumentIntakeResult | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [scanDefaults, setScanDefaults] = useState<BillFormDefaultValues | null>(null);
-  const [scanMode, setScanMode] = useState<'fast' | 'slow'>('fast');
   const [unresolvedTaxLines, setUnresolvedTaxLines] = useState<UnresolvedTaxLine[]>([]);
   const [taxReviewed, setTaxReviewed] = useState(false);
 
@@ -71,6 +70,12 @@ export default function ScanBillPage() {
   const intake = useDocumentIntakeStream();
   const confirmIntake = useDocumentIntakeConfirm();
   const createVendor = useCreateVendor();
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   // Transition to review when SSE completes
   useEffect(() => {
@@ -137,49 +142,61 @@ export default function ScanBillPage() {
     }
   }, [intake.error, step]);
 
-  const handleFileSelect = useCallback(async (file: File) => {
-    if (file.size > 15 * 1024 * 1024) {
-      setLocalError('File too large. Maximum size is 15MB.');
-      return;
-    }
-
-    setLocalError(null);
-
-    const isHeic =
-      file.type === 'image/heic' ||
-      file.type === 'image/heif' ||
-      file.name.toLowerCase().endsWith('.heic') ||
-      file.name.toLowerCase().endsWith('.heif');
-
-    if (isHeic) {
-      setConverting(true);
-      try {
-        const heic2any = (await import('heic2any')).default;
-        const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
-        const blob = Array.isArray(converted) ? converted[0] : converted;
-        const jpegFile = new File([blob], file.name.replace(/\.hei[cf]$/i, '.jpg'), {
-          type: 'image/jpeg',
-        });
-        setSelectedFile(jpegFile);
-        setPreviewUrl(URL.createObjectURL(jpegFile));
-      } catch {
-        setLocalError('Failed to convert HEIC image. Please convert it manually to JPEG or PNG.');
+  const handleFileSelect = useCallback(
+    async (file: File) => {
+      if (isOversizedIntakeUpload(file.size)) {
+        setLocalError(t('uploadTooLarge'));
         setSelectedFile(null);
         setPreviewUrl(null);
-      } finally {
-        setConverting(false);
+        return;
       }
-      return;
-    }
 
-    setSelectedFile(file);
+      if (isLegacyWordUpload(file)) {
+        setLocalError(t('unsupportedLegacyDoc'));
+        setSelectedFile(null);
+        setPreviewUrl(null);
+        return;
+      }
+      setLocalError(null);
 
-    if (file.type.startsWith('image/')) {
-      setPreviewUrl(URL.createObjectURL(file));
-    } else {
-      setPreviewUrl(null);
-    }
-  }, []);
+      const isHeic =
+        file.type === 'image/heic' ||
+        file.type === 'image/heif' ||
+        file.name.toLowerCase().endsWith('.heic') ||
+        file.name.toLowerCase().endsWith('.heif');
+
+      if (isHeic) {
+        setConverting(true);
+        try {
+          const heic2any = (await import('heic2any')).default;
+          const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+          const blob = Array.isArray(converted) ? converted[0] : converted;
+          const jpegFile = new File([blob], file.name.replace(/\.hei[cf]$/i, '.jpg'), {
+            type: 'image/jpeg',
+          });
+          // The JPEG is a preview only. Store and upload the original source.
+          setSelectedFile(file);
+          setPreviewUrl(URL.createObjectURL(jpegFile));
+        } catch {
+          setLocalError(t('previewFailed'));
+          setSelectedFile(null);
+          setPreviewUrl(null);
+        } finally {
+          setConverting(false);
+        }
+        return;
+      }
+
+      setSelectedFile(file);
+
+      if (file.type.startsWith('image/')) {
+        setPreviewUrl(URL.createObjectURL(file));
+      } else {
+        setPreviewUrl(null);
+      }
+    },
+    [t],
+  );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -200,7 +217,6 @@ export default function ScanBillPage() {
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('forceType', 'BILL');
-    formData.append('strategy', scanMode);
 
     await intake.processDocument(formData);
   };
@@ -286,14 +302,14 @@ export default function ScanBillPage() {
   const stageMessage =
     intake.message ||
     (intake.stage === 'received'
-      ? 'Uploading document...'
+      ? t('uploadingDocument')
       : intake.stage === 'extracting'
-        ? 'AI is reading your document...'
+        ? t('readingDocument')
         : intake.stage === 'classifying'
-          ? 'Classifying document type...'
+          ? t('classifyingDocument')
           : intake.stage === 'matching'
-            ? 'Matching vendors and customers...'
-            : 'Processing...');
+            ? t('matchingParties')
+            : t('processingDocument'));
 
   const result = localResult;
   const error = localError;
@@ -308,10 +324,8 @@ export default function ScanBillPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Scan Bill</h1>
-          <p className="text-muted-foreground">
-            Upload a document and let AI extract bill data automatically
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('scanBillTitle')}</h1>
+          <p className="text-muted-foreground">{t('uploadDescription')}</p>
         </div>
       </div>
 
@@ -375,12 +389,9 @@ export default function ScanBillPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5" />
-              Upload Document
+              {t('uploadTitle')}
             </CardTitle>
-            <CardDescription>
-              Upload any invoice, bill, or receipt (image or PDF). AI will extract the data
-              automatically.
-            </CardDescription>
+            <CardDescription>{t('uploadDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div
@@ -452,57 +463,18 @@ export default function ScanBillPage() {
                   <Upload className="h-12 w-12 mx-auto text-muted-foreground" />
                   <div>
                     <p className="font-medium">Drop your document here or click to browse</p>
-                    <p className="text-sm text-muted-foreground">
-                      Supports images (JPEG, PNG, WebP, HEIC) and PDF — max 15MB
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t('formatsHint')}</p>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Scan Mode Toggle */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-muted-foreground">Scan Mode:</span>
-                <div className="flex rounded-lg border p-1 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setScanMode('fast')}
-                    className={cn(
-                      'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                      scanMode === 'fast'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                    )}
-                  >
-                    <Zap className="h-3.5 w-3.5" />
-                    Fast
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setScanMode('slow')}
-                    className={cn(
-                      'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                      scanMode === 'slow'
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted',
-                    )}
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    Accurate
-                  </button>
-                </div>
-              </div>
+            <div className="flex justify-end">
               <Button onClick={handleProcess} disabled={!selectedFile || converting} size="lg">
                 <Sparkles className="mr-2 h-4 w-4" />
-                Process with AI
+                {t('prepareFields')}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {scanMode === 'fast'
-                ? 'Fast: PaddleOCR + text model — quick extraction, works best with clear printed documents.'
-                : 'Accurate: qwen3-vl:8b vision model — slower but handles handwriting, poor scans, and complex layouts better.'}
-            </p>
           </CardContent>
         </Card>
       )}
@@ -515,9 +487,7 @@ export default function ScanBillPage() {
               <div className="text-center space-y-2">
                 <Loader2 className="h-12 w-12 mx-auto animate-spin text-primary" />
                 <p className="text-lg font-medium">{stageMessage}</p>
-                <p className="text-sm text-muted-foreground">
-                  AI is processing your document. You&apos;ll see live progress below.
-                </p>
+                <p className="text-sm text-muted-foreground">{t('processingHint')}</p>
                 {intake.isDuplicate && (
                   <p className="text-xs text-muted-foreground" role="status">
                     {t('duplicate')}
@@ -696,29 +666,33 @@ export default function ScanBillPage() {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Extracted Subtotal</span>
                       <span className="font-mono">
-                        {result.extractedFields.subtotal.toFixed(2)}
+                        {moneyToNumber(result.extractedFields.subtotal).toFixed(2)}
                       </span>
                     </div>
                   )}
                   {result.extractedFields.tax != null && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Extracted Tax / VAT</span>
-                      <span className="font-mono">{result.extractedFields.tax.toFixed(2)}</span>
+                      <span className="font-mono">
+                        {moneyToNumber(result.extractedFields.tax).toFixed(2)}
+                      </span>
                     </div>
                   )}
                   {result.extractedFields.discount != null &&
-                    result.extractedFields.discount > 0 && (
+                    moneyToNumber(result.extractedFields.discount) > 0 && (
                       <div className="flex justify-between text-yellow-600">
                         <span>Extracted Discount</span>
                         <span className="font-mono">
-                          -{result.extractedFields.discount.toFixed(2)}
+                          -{moneyToNumber(result.extractedFields.discount).toFixed(2)}
                         </span>
                       </div>
                     )}
                   {result.extractedFields.total != null && (
                     <div className="flex justify-between font-medium border-t pt-1 mt-1">
                       <span>Extracted Total</span>
-                      <span className="font-mono">{result.extractedFields.total.toFixed(2)}</span>
+                      <span className="font-mono">
+                        {moneyToNumber(result.extractedFields.total).toFixed(2)}
+                      </span>
                     </div>
                   )}
                 </div>

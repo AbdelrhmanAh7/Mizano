@@ -118,6 +118,21 @@ describe('DocumentIntakeController', () => {
     });
   });
 
+  it.each([
+    'application/msword',
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ])('rejects legacy OLE declared as %s before creating a job', async (mime) => {
+    const file = {
+      buffer: Buffer.from('d0cf11e0a1b11ae1', 'hex'),
+      mimetype: mime,
+      originalname: 'disguised.pdf',
+    } as Express.Multer.File;
+    await expect(controller.processDocument(ORG_A, 'user-1', file, {})).rejects.toThrow(
+      'INTAKE_UNSUPPORTED_LEGACY_DOC',
+    );
+    expect(jobs.createFromUpload).not.toHaveBeenCalled();
+  });
   it('creates jobs owned by the current organization and user', async () => {
     const file = {
       buffer: Buffer.from('x'),

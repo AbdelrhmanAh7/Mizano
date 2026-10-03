@@ -338,7 +338,7 @@ function extractCurrency(
 }
 
 const VENDOR_LABEL_RE =
-  /^\s*(?:supplier|vendor|seller|sold\s*by|issued\s*by|company)(?:\s*name)?\s*[:-]\s*(.*)$|^\s*(?:اسم\s*)?(?:المورد|البائع|اسم\s*الشركه|اسم\s*المنشاه|المنشاه|الشركه)\s*[:-]\s*(.*)$/i;
+  /^\s*(?:supplier|vendor|seller|sold\s*by|issued\s*by|company)(?:\s*name)?[ ]*[:\t-]\s*(.*)$|^\s*(?:اسم\s*)?(?:المورد|البائع|اسم\s*الشركه|اسم\s*المنشاه|المنشاه|الشركه)[ ]*[:\t-]\s*(.*)$/i;
 const VENDOR_SKIP_RE =
   /invoice|فاتوره|tax|ضريب|receipt|ايصال|date|تاريخ|trn|vat|original|copy|page|www\.|@|\d{5,}/;
 

@@ -42,11 +42,11 @@ export interface CustomerCandidate {
 
 export interface IntakeLineItem {
   description: string;
-  quantity: number;
-  unitPrice: number;
+  quantity: string | number;
+  unitPrice: string | number;
   /** Extracted tax AMOUNT (not a rate); may be missing or 0 when not found. */
-  taxAmount: number | null;
-  total: number;
+  taxAmount: string | number | null;
+  total: string | number;
 }
 
 export interface DocumentIntakeResult {
@@ -55,10 +55,10 @@ export interface DocumentIntakeResult {
   extractedFields: {
     date: string | null;
     dueDate: string | null;
-    total: number | null;
-    subtotal: number | null;
-    tax: number | null;
-    discount: number | null;
+    total: string | number | null;
+    subtotal: string | number | null;
+    tax: string | number | null;
+    discount: string | number | null;
     documentNumber: string | null;
     vendorName: string | null;
     vendorTaxId: string | null;
@@ -488,14 +488,29 @@ export function useDocumentIntakeStream(): {
           return;
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const response = (err as { response?: { data?: { message?: unknown } } } | null)?.response
+          ?.data;
+        const msg =
+          typeof response?.message === 'string'
+            ? response.message
+            : err instanceof Error
+              ? err.message
+              : String(err);
+        if (msg.includes('INTAKE_UNSUPPORTED_LEGACY_DOC')) {
+          fail(t('unsupportedLegacyDoc'));
+          return;
+        }
+        if (msg.includes('INTAKE_UNSUPPORTED:')) {
+          fail(t('unsupportedFormat'));
+          return;
+        }
         fail(msg || 'Failed to process document');
         return;
       }
 
       await followJob(newJobId);
     },
-    [reset, fail, followJob],
+    [reset, fail, followJob, t],
   );
 
   const retry = useCallback(async () => {
