@@ -1,6 +1,6 @@
 import { ConflictException, HttpException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IntakeJobStatus } from '@prisma/client';
+import { IntakeJobStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { INTAKE_DRAFT_ENTITY, IntakeJobsService, stageFor } from './intake-jobs.service';
 import { IntakeQueueService } from './intake-queue.service';
@@ -14,6 +14,14 @@ import {
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
 
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 describe('IntakeJobsService', () => {
   let table: FakeIntakeJobTable;
   let auditLogs: FakeAuditLogTable;
@@ -23,6 +31,15 @@ describe('IntakeJobsService', () => {
   let storage: MemoryIntakeStorage;
   let queue: { enqueue: jest.Mock; cancel: jest.Mock };
   let config: { get: jest.Mock };
+  let fakePrisma: {
+    intakeJob: FakeIntakeJobTable['delegate'];
+    auditLog: FakeAuditLogTable['delegate'];
+    bill: FakeDocumentTable['delegate'];
+    invoice: FakeDocumentTable['delegate'];
+    expense: FakeDocumentTable['delegate'];
+    $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
+  };
   let service: IntakeJobsService;
 
   beforeEach(() => {
@@ -37,14 +54,17 @@ describe('IntakeJobsService', () => {
       cancel: jest.fn().mockResolvedValue(undefined),
     };
     config = { get: jest.fn() };
+    fakePrisma = {
+      intakeJob: table.delegate,
+      auditLog: auditLogs.delegate,
+      bill: bills.delegate,
+      invoice: invoices.delegate,
+      expense: expenses.delegate,
+      $transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>) => cb(fakePrisma)),
+      $queryRaw: jest.fn().mockResolvedValue([]),
+    };
     service = new IntakeJobsService(
-      {
-        intakeJob: table.delegate,
-        auditLog: auditLogs.delegate,
-        bill: bills.delegate,
-        invoice: invoices.delegate,
-        expense: expenses.delegate,
-      } as unknown as PrismaService,
+      fakePrisma as unknown as PrismaService,
       storage,
       queue as unknown as IntakeQueueService,
       config as unknown as ConfigService,
@@ -296,6 +316,209 @@ describe('IntakeJobsService', () => {
     });
   });
 
+  it('linkDraft only links when draftDocumentId is null (does not overwrite existing link)', async () => {
+    const { job } = await upload(ORG_A);
+    table.rows[0].status = IntakeJobStatus.APPROVED;
+    table.rows[0].draftDocumentType = 'bill';
+    table.rows[0].draftDocumentId = 'bill-existing';
+    await service.linkDraft(job.id, ORG_A, { type: 'bill', id: 'bill-new' });
+    expect(table.rows[0].draftDocumentId).toBe('bill-existing');
+    expect(table.rows[0].draftDocumentType).toBe('bill');
+  });
+
+  describe('approval transaction versus recovery', () => {
+    let waitingForLock: ReturnType<typeof deferred>;
+
+    beforeEach(() => {
+      // Deterministic transaction double: row locks wait until commit/rollback, and failed
+      // transactions discard staged job, document and marker writes. Each client is distinct.
+      let tail = Promise.resolve();
+      let lockAttempts = 0;
+      waitingForLock = deferred();
+      fakePrisma.$transaction.mockImplementation(
+        async (callback: (tx: Prisma.TransactionClient) => Promise<unknown>) => {
+          let unlock: (() => void) | undefined;
+          let snapshot:
+            | {
+                jobs: typeof table.rows;
+                markers: typeof auditLogs.rows;
+                documents: typeof bills.rows;
+              }
+            | undefined;
+          const tx = {
+            ...fakePrisma,
+            $queryRaw: jest.fn(async (sql: TemplateStringsArray, id: string, org: string) => {
+              await fakePrisma.$queryRaw(sql, id, org);
+              expect(sql.join('?')).toBe(
+                'SELECT id FROM "intake_jobs" WHERE id = ? AND "organizationId" = ? FOR UPDATE',
+              );
+              if (!table.rows.some((row) => row.id === id && row.organizationId === org)) return [];
+              // Reentrant acquisition by the same transaction is already protected.
+              if (unlock) return [];
+              const previous = tail;
+              tail = new Promise<void>((done) => {
+                unlock = done;
+              });
+              if (++lockAttempts === 2) waitingForLock.resolve();
+              await previous;
+              snapshot = {
+                jobs: table.rows.map((row) => ({ ...row })),
+                markers: auditLogs.rows.slice(),
+                documents: bills.rows.slice(),
+              };
+              return [];
+            }),
+          } as unknown as Prisma.TransactionClient;
+          try {
+            return await callback(tx);
+          } catch (error) {
+            if (snapshot) {
+              table.rows = snapshot.jobs;
+              auditLogs.rows = snapshot.markers;
+              bills.rows = snapshot.documents;
+            }
+            throw error;
+          } finally {
+            unlock?.();
+          }
+        },
+      );
+    });
+
+    const createDraft = async (tx: Prisma.TransactionClient, jobId: string) => {
+      expect(tx).not.toBe(fakePrisma);
+      bills.rows.push({ id: 'bill-atomic', organizationId: ORG_A, deletedAt: null });
+      await tx.auditLog.create({
+        data: {
+          organizationId: ORG_A,
+          userId: 'u1',
+          action: 'CREATE',
+          entityType: INTAKE_DRAFT_ENTITY,
+          entityId: jobId,
+          newValues: { draftType: 'bill', draftId: 'bill-atomic' },
+        },
+      });
+      return { type: 'bill', id: 'bill-atomic', number: 'BILL-1' };
+    };
+
+    it('holds the confirmation lock through draft, marker and link so a queued recovery never reopens it', async () => {
+      const { job } = await upload(ORG_A);
+      table.rows[0].status = IntakeJobStatus.EXTRACTED;
+      const entered = deferred();
+      const finish = deferred();
+      const confirmation = service.confirmWithApproval(job.id, ORG_A, async (tx) => {
+        const result = await createDraft(tx, job.id);
+        entered.resolve();
+        await finish.promise;
+        return result;
+      });
+      await entered.promise;
+      // Model a sweep that already scanned this job before confirmation refreshed it.
+      table.delegate.findMany.mockResolvedValueOnce([{ ...table.rows[0] }]);
+      const markerReads = auditLogs.delegate.findFirst.mock.calls.length;
+      const recovery = service.recoverApprovedJobs({ organizationId: ORG_A });
+      await waitingForLock.promise;
+      expect(auditLogs.delegate.findFirst).toHaveBeenCalledTimes(markerReads);
+      finish.resolve();
+      await expect(confirmation).resolves.toMatchObject({ id: 'bill-atomic' });
+      await expect(recovery).resolves.toEqual({ linked: 0, reopened: 0 });
+      expect(table.rows[0]).toMatchObject({
+        status: IntakeJobStatus.APPROVED,
+        draftDocumentId: 'bill-atomic',
+      });
+      const replay = jest.fn();
+      await expect(service.confirmWithApproval(job.id, ORG_A, replay)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(replay).not.toHaveBeenCalled();
+      expect(bills.rows).toHaveLength(1);
+      expect(auditLogs.rows).toHaveLength(1);
+    });
+
+    it('claims under the lock after recovery wins, and competing confirmations create exactly one draft', async () => {
+      const { job } = await upload(ORG_A);
+      Object.assign(table.rows[0], {
+        status: IntakeJobStatus.APPROVED,
+        updatedAt: new Date(Date.now() - 10 * 60 * 1000),
+      });
+      const entered = deferred();
+      const finish = deferred();
+      const findMarker = auditLogs.delegate.findFirst.getMockImplementation()!;
+      auditLogs.delegate.findFirst.mockImplementationOnce(async (args) => {
+        entered.resolve();
+        await finish.promise;
+        return findMarker(args);
+      });
+      const recovery = service.recoverApprovedJobs({ organizationId: ORG_A });
+      await entered.promise;
+      const first = service.confirmWithApproval(job.id, ORG_A, (tx) => createDraft(tx, job.id));
+      await waitingForLock.promise;
+      const duplicate = jest.fn((tx: Prisma.TransactionClient) => createDraft(tx, job.id));
+      const second = service.confirmWithApproval(job.id, ORG_A, duplicate);
+      const refused = expect(second).rejects.toThrow(ConflictException);
+      expect(bills.rows).toHaveLength(0);
+      finish.resolve();
+      await expect(recovery).resolves.toEqual({ linked: 0, reopened: 1 });
+      await expect(first).resolves.toMatchObject({ id: 'bill-atomic' });
+      await refused;
+      expect(duplicate).not.toHaveBeenCalled();
+      expect(bills.rows).toHaveLength(1);
+      expect(auditLogs.rows).toHaveLength(1);
+      expect(table.rows[0]).toMatchObject({
+        status: IntakeJobStatus.APPROVED,
+        draftDocumentId: 'bill-atomic',
+      });
+    });
+
+    it.each([IntakeJobStatus.EXTRACTED, IntakeJobStatus.NEEDS_REVIEW])(
+      'rolls back the %s claim, draft and marker together when linking fails',
+      async (status) => {
+        const { job } = await upload(ORG_A);
+        table.rows[0].status = status;
+        const update = table.delegate.updateMany.getMockImplementation()!;
+        table.delegate.updateMany.mockImplementation(async (args) =>
+          args.data.draftDocumentId ? { count: 0 } : update(args),
+        );
+        await expect(
+          service.confirmWithApproval(job.id, ORG_A, (tx) => createDraft(tx, job.id)),
+        ).rejects.toThrow(ConflictException);
+        expect(table.rows[0]).toMatchObject({ status, draftDocumentId: null });
+        expect(bills.rows).toHaveLength(0);
+        expect(auditLogs.rows).toHaveLength(0);
+      },
+    );
+
+    it('rolls back the claim when draft creation fails and allows a later retry', async () => {
+      const { job } = await upload(ORG_A);
+      table.rows[0].status = IntakeJobStatus.EXTRACTED;
+      await expect(
+        service.confirmWithApproval(job.id, ORG_A, async () => {
+          throw new Error('draft failed');
+        }),
+      ).rejects.toThrow('draft failed');
+      expect(table.rows[0].status).toBe(IntakeJobStatus.EXTRACTED);
+      await expect(
+        service.confirmWithApproval(job.id, ORG_A, (tx) => createDraft(tx, job.id)),
+      ).resolves.toMatchObject({ id: 'bill-atomic' });
+      expect(bills.rows).toHaveLength(1);
+    });
+
+    it('does not claim or create for a foreign or deleted job', async () => {
+      const { job } = await upload(ORG_A);
+      table.rows[0].status = IntakeJobStatus.EXTRACTED;
+      const create = jest.fn();
+      await expect(service.confirmWithApproval(job.id, ORG_B, create)).rejects.toThrow(
+        NotFoundException,
+      );
+      table.rows[0].deletedAt = new Date();
+      await expect(service.confirmWithApproval(job.id, ORG_A, create)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(create).not.toHaveBeenCalled();
+      expect(table.rows[0].status).toBe(IntakeJobStatus.EXTRACTED);
+    });
+  });
+
   describe('recoverApprovedJobs', () => {
     it('link found: links the draft when marker and draft exist for older APPROVED job', async () => {
       const past = new Date(Date.now() - 10 * 60 * 1000);
@@ -327,6 +550,14 @@ describe('IntakeJobsService', () => {
       expect(updated?.status).toBe(IntakeJobStatus.APPROVED);
       expect(updated?.draftDocumentType).toBe('bill');
       expect(updated?.draftDocumentId).toBe('bill-1');
+      expect(fakePrisma.$transaction).toHaveBeenCalled();
+      expect(fakePrisma.$queryRaw).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.stringContaining('SELECT id FROM "intake_jobs" WHERE id = '),
+        ]),
+        job.id,
+        ORG_A,
+      );
     });
 
     it('no draft -> reopen: marks job back to EXTRACTED with redacted lastError when no draft exists', async () => {

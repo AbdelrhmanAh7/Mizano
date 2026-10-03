@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiFeature, AiFeedbackAction, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { INTAKE_DRAFT_ENTITY } from '../intake/intake-jobs.service';
+import { INTAKE_DRAFT_ENTITY, lockIntakeJob } from '../intake/intake-jobs.service';
 import { OllamaService, DocumentExtractionResult } from './ollama.service';
 import { DocumentClassificationService, DocumentCategory } from './document-classification.service';
 import { EntityExtractionService } from './entity-extraction.service';
@@ -423,21 +423,51 @@ export class DocumentIntakeService {
    * belong to `organizationId` before anything is written; a foreign or unknown
    * id is rejected with 400 and no mutation. Totals come from the shared Decimal
    * calculator: `taxRatePercent` is a percentage, line `amount` is the net.
+   * When a transaction is supplied, its owner calls recordConfirmation after commit.
    */
   async confirmAndCreate(
     organizationId: string,
     dto: ConfirmIntakeInput,
+    tx?: Prisma.TransactionClient,
   ): Promise<{ type: 'bill' | 'invoice'; id: string; number: string }> {
     if (!organizationId) {
       throw new BadRequestException('Organization context is required');
     }
-    if (dto.type === 'BILL') {
-      return this.createDraftBill(organizationId, dto);
+    if (dto.type !== 'BILL' && dto.type !== 'INVOICE') {
+      throw new BadRequestException('type must be BILL or INVOICE');
     }
-    if (dto.type === 'INVOICE') {
-      return this.createDraftInvoice(organizationId, dto);
+    const result =
+      dto.type === 'BILL'
+        ? await this.createDraftBill(organizationId, dto, tx)
+        : await this.createDraftInvoice(organizationId, dto, tx);
+    if (!tx) await this.recordConfirmation(organizationId, dto, result);
+    return result;
+  }
+
+  /** Best-effort feedback and success logging; call only after the draft transaction commits. */
+  async recordConfirmation(
+    organizationId: string,
+    dto: ConfirmIntakeInput,
+    draft: { type: 'bill' | 'invoice'; id: string; number: string },
+  ): Promise<void> {
+    if (draft.type === 'bill') {
+      try {
+        await this.feedbackService.processFeedback(organizationId, {
+          feature: AiFeature.DOCUMENT_CLASSIFICATION,
+          aiSuggestion: { type: 'document_intake', documentType: 'BILL' },
+          userAction: dto.corrections ? AiFeedbackAction.CORRECTED : AiFeedbackAction.ACCEPTED,
+          userAnswer: dto.corrections ? JSON.stringify(dto.corrections) : undefined,
+          inputData: { billNumber: draft.number, vendorId: dto.vendorId },
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Failed to log intake feedback: ${error instanceof Error ? error.name : 'unknown error'}`,
+        );
+      }
     }
-    throw new BadRequestException('type must be BILL or INVOICE');
+    this.logger.log(
+      `Created draft ${draft.type} ${draft.id} (${dto.lines.length} lines) from document intake for org ${organizationId}`,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -617,15 +647,12 @@ export class DocumentIntakeService {
     draft: { type: 'bill' | 'invoice'; id: string },
   ): Promise<void> {
     if (!dto.jobId) return;
-    let actorUserId = dto.userId;
-    if (!actorUserId) {
-      const job = await tx.intakeJob.findFirst({
-        where: { id: dto.jobId, organizationId, deletedAt: null },
-        select: { createdById: true },
-      });
-      if (!job) throw new BadRequestException('Intake job not found');
-      actorUserId = job.createdById;
-    }
+    const job = await tx.intakeJob.findFirst({
+      where: { id: dto.jobId, organizationId, deletedAt: null },
+      select: { createdById: true },
+    });
+    if (!job) throw new BadRequestException('Intake job not found');
+    const actorUserId = dto.userId ?? job.createdById;
     await tx.auditLog.create({
       data: {
         organizationId,
@@ -641,13 +668,17 @@ export class DocumentIntakeService {
   private async createDraftBill(
     organizationId: string,
     dto: ConfirmIntakeInput,
+    tx?: Prisma.TransactionClient,
   ): Promise<{ type: 'bill'; id: string; number: string }> {
     const resolved = await this.resolveConfirmation(organizationId, dto);
     const vendorId = dto.vendorId as string;
 
     const billNumber = dto.documentNumber || (await this.generateBillNumber(organizationId));
 
-    const bill = await this.prisma.$transaction(async (tx) => {
+    const create = async (tx: Prisma.TransactionClient) => {
+      if (dto.jobId) {
+        await lockIntakeJob(tx, organizationId, dto.jobId);
+      }
       const b = await tx.bill.create({
         data: {
           billNumber,
@@ -682,26 +713,8 @@ export class DocumentIntakeService {
       await this.writeDraftMarker(tx, organizationId, dto, { type: 'bill', id: b.id });
 
       return b;
-    });
-
-    // Log feedback for AI improvement
-    try {
-      await this.feedbackService.processFeedback(organizationId, {
-        feature: AiFeature.DOCUMENT_CLASSIFICATION,
-        aiSuggestion: { type: 'document_intake', documentType: 'BILL' },
-        userAction: dto.corrections ? AiFeedbackAction.CORRECTED : AiFeedbackAction.ACCEPTED,
-        userAnswer: dto.corrections ? JSON.stringify(dto.corrections) : undefined,
-        inputData: { billNumber, vendorId },
-      });
-    } catch (error) {
-      this.logger.warn(
-        `Failed to log intake feedback: ${error instanceof Error ? error.name : 'unknown error'}`,
-      );
-    }
-
-    this.logger.log(
-      `Created draft bill ${bill.id} (${resolved.lines.length} lines) from document intake for org ${organizationId}`,
-    );
+    };
+    const bill = tx ? await create(tx) : await this.prisma.$transaction(create);
 
     return { type: 'bill', id: bill.id, number: billNumber };
   }
@@ -709,13 +722,17 @@ export class DocumentIntakeService {
   private async createDraftInvoice(
     organizationId: string,
     dto: ConfirmIntakeInput,
+    tx?: Prisma.TransactionClient,
   ): Promise<{ type: 'invoice'; id: string; number: string }> {
     const resolved = await this.resolveConfirmation(organizationId, dto);
     const customerId = dto.customerId as string;
 
     const invoiceNumber = await this.generateInvoiceNumber(organizationId);
 
-    const invoice = await this.prisma.$transaction(async (tx) => {
+    const create = async (tx: Prisma.TransactionClient) => {
+      if (dto.jobId) {
+        await lockIntakeJob(tx, organizationId, dto.jobId);
+      }
       const inv = await tx.invoice.create({
         data: {
           invoiceNumber,
@@ -750,11 +767,8 @@ export class DocumentIntakeService {
       await this.writeDraftMarker(tx, organizationId, dto, { type: 'invoice', id: inv.id });
 
       return inv;
-    });
-
-    this.logger.log(
-      `Created draft invoice ${invoice.id} (${resolved.lines.length} lines) from document intake for org ${organizationId}`,
-    );
+    };
+    const invoice = tx ? await create(tx) : await this.prisma.$transaction(create);
 
     return { type: 'invoice', id: invoice.id, number: invoiceNumber };
   }

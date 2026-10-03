@@ -82,6 +82,18 @@ export function queueJobId(jobId: string, attempts: number): string {
   return `${jobId}-a${attempts}`;
 }
 
+/**
+ * Row-locks one intake job for the rest of the transaction.
+ * Scoped by organization: another tenant's job id matches nothing and is never locked.
+ */
+export async function lockIntakeJob(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  jobId: string,
+): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM "intake_jobs" WHERE id = ${jobId} AND "organizationId" = ${organizationId} FOR UPDATE`;
+}
+
 const RECOVERY_BATCH = 200;
 const MAX_SWEEP_INTERVAL_MS = 30_000;
 
@@ -331,10 +343,18 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
   }
 
   /** EXTRACTED/NEEDS_REVIEW -> APPROVED; returns the status to restore if the draft fails. */
-  async claimForApproval(jobId: string, organizationId: string): Promise<IntakeJobStatus> {
-    const current = await this.getForOrg(jobId, organizationId);
+  async claimForApproval(
+    jobId: string,
+    organizationId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<IntakeJobStatus> {
+    const db = tx ?? this.prisma;
+    const current = tx
+      ? await tx.intakeJob.findFirst({ where: { id: jobId, organizationId, deletedAt: null } })
+      : await this.getForOrg(jobId, organizationId);
+    if (!current) throw new NotFoundException('Intake job not found');
     const previous = current.status;
-    const claimed = await this.prisma.intakeJob.updateMany({
+    const claimed = await db.intakeJob.updateMany({
       where: {
         id: jobId,
         organizationId,
@@ -364,13 +384,44 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
     });
   }
 
+  /** Claim, draft and link commit together; recovery cannot reopen an in-flight confirmation. */
+  async confirmWithApproval<T extends { type: string; id: string }>(
+    jobId: string,
+    organizationId: string,
+    createDraft: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.$transaction(async (tx) => {
+      await lockIntakeJob(tx, organizationId, jobId);
+      await this.claimForApproval(jobId, organizationId, tx);
+      const draft = await createDraft(tx);
+      const linked = await tx.intakeJob.updateMany({
+        where: {
+          id: jobId,
+          organizationId,
+          deletedAt: null,
+          status: IntakeJobStatus.APPROVED,
+          draftDocumentId: null,
+        },
+        data: { draftDocumentType: draft.type, draftDocumentId: draft.id },
+      });
+      if (linked.count === 0) throw new ConflictException('Intake job could not be linked');
+      return draft;
+    });
+  }
+
   async linkDraft(
     jobId: string,
     organizationId: string,
     draft: { type: string; id: string },
   ): Promise<void> {
     await this.prisma.intakeJob.updateMany({
-      where: { id: jobId, organizationId, status: IntakeJobStatus.APPROVED },
+      where: {
+        id: jobId,
+        organizationId,
+        deletedAt: null,
+        status: IntakeJobStatus.APPROVED,
+        draftDocumentId: null,
+      },
       data: { draftDocumentType: draft.type, draftDocumentId: draft.id },
     });
   }
@@ -446,90 +497,98 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
     jobId: string,
     organizationId: string,
   ): Promise<'linked' | 'reopened' | 'none'> {
-    const marker = await this.prisma.auditLog.findFirst({
-      where: { organizationId, entityType: INTAKE_DRAFT_ENTITY, entityId: jobId },
-      orderBy: { createdAt: 'desc' },
-      select: { newValues: true },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      await lockIntakeJob(tx, organizationId, jobId);
 
-    let draftInfo: { type: string; id: string } | null = null;
-    if (marker && marker.newValues && typeof marker.newValues === 'object') {
-      const v = marker.newValues as Record<string, unknown>;
-      const draftType = typeof v.draftType === 'string' ? v.draftType : null;
-      const draftId = typeof v.draftId === 'string' ? v.draftId : null;
-      if (draftType && draftId) {
-        const exists = await this.verifyDraftExists(organizationId, draftType, draftId);
-        if (exists) {
-          draftInfo = { type: draftType.toLowerCase(), id: draftId };
+      const marker = await tx.auditLog.findFirst({
+        where: { organizationId, entityType: INTAKE_DRAFT_ENTITY, entityId: jobId },
+        orderBy: { createdAt: 'desc' },
+        select: { newValues: true },
+      });
+
+      let draftInfo: { type: string; id: string } | null = null;
+      if (marker && marker.newValues && typeof marker.newValues === 'object') {
+        const v = marker.newValues as Record<string, unknown>;
+        const draftType = typeof v.draftType === 'string' ? v.draftType : null;
+        const draftId = typeof v.draftId === 'string' ? v.draftId : null;
+        if (draftType && draftId) {
+          const exists = await this.verifyDraftExists(organizationId, draftType, draftId, tx);
+          if (exists) {
+            draftInfo = { type: draftType.toLowerCase(), id: draftId };
+          }
         }
       }
-    }
 
-    if (draftInfo) {
-      const updated = await this.prisma.intakeJob.updateMany({
+      if (draftInfo) {
+        const updated = await tx.intakeJob.updateMany({
+          where: {
+            id: jobId,
+            organizationId,
+            deletedAt: null,
+            status: IntakeJobStatus.APPROVED,
+            draftDocumentId: null,
+          },
+          data: {
+            draftDocumentType: draftInfo.type,
+            draftDocumentId: draftInfo.id,
+          },
+        });
+        if (updated.count > 0) {
+          this.logger.log(
+            `Recovered intake job ${jobId}: linked draft ${draftInfo.type}:${draftInfo.id} for org ${organizationId}`,
+          );
+          return 'linked';
+        }
+        return 'none';
+      }
+
+      const reopened = await tx.intakeJob.updateMany({
         where: {
           id: jobId,
           organizationId,
+          deletedAt: null,
           status: IntakeJobStatus.APPROVED,
           draftDocumentId: null,
         },
         data: {
-          draftDocumentType: draftInfo.type,
-          draftDocumentId: draftInfo.id,
+          status: IntakeJobStatus.EXTRACTED,
+          lastError: 'Approval interrupted before draft creation; ready to confirm again',
         },
       });
-      if (updated.count > 0) {
-        this.logger.log(
-          `Recovered intake job ${jobId}: linked draft ${draftInfo.type}:${draftInfo.id} for org ${organizationId}`,
+      if (reopened.count > 0) {
+        this.logger.warn(
+          `Recovered intake job ${jobId}: no draft found for org ${organizationId}; reopened to EXTRACTED`,
         );
-        return 'linked';
+        return 'reopened';
       }
       return 'none';
-    }
-
-    const reopened = await this.prisma.intakeJob.updateMany({
-      where: {
-        id: jobId,
-        organizationId,
-        status: IntakeJobStatus.APPROVED,
-        draftDocumentId: null,
-      },
-      data: {
-        status: IntakeJobStatus.EXTRACTED,
-        lastError: 'Approval interrupted before draft creation; ready to confirm again',
-      },
     });
-    if (reopened.count > 0) {
-      this.logger.warn(
-        `Recovered intake job ${jobId}: no draft found for org ${organizationId}; reopened to EXTRACTED`,
-      );
-      return 'reopened';
-    }
-    return 'none';
   }
 
   private async verifyDraftExists(
     organizationId: string,
     draftType: string,
     draftId: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<boolean> {
+    const db = tx ?? this.prisma;
     const type = draftType.toLowerCase();
     if (type === 'bill') {
-      const bill = await this.prisma.bill.findFirst({
+      const bill = await db.bill.findFirst({
         where: { id: draftId, organizationId, deletedAt: null },
         select: { id: true },
       });
       return !!bill;
     }
     if (type === 'invoice') {
-      const invoice = await this.prisma.invoice.findFirst({
+      const invoice = await db.invoice.findFirst({
         where: { id: draftId, organizationId, deletedAt: null },
         select: { id: true },
       });
       return !!invoice;
     }
     if (type === 'expense') {
-      const expense = await this.prisma.expense.findFirst({
+      const expense = await db.expense.findFirst({
         where: { id: draftId, organizationId, deletedAt: null },
         select: { id: true },
       });

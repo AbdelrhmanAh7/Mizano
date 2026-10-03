@@ -1,7 +1,7 @@
-import { ConflictException, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
-import { IntakeJob, IntakeJobStatus } from '@prisma/client';
+import { IntakeJob, IntakeJobStatus, Prisma } from '@prisma/client';
 import { firstValueFrom, toArray } from 'rxjs';
 import { DocumentIntakeController } from './document-intake.controller';
 import { DocumentIntakeService } from '../services/document-intake.service';
@@ -49,16 +49,15 @@ function makeJob(overrides: Partial<IntakeJob> = {}): IntakeJob {
 }
 
 describe('DocumentIntakeController', () => {
-  let service: { confirmAndCreate: jest.Mock };
+  const transaction = {} as Prisma.TransactionClient;
+  let service: { confirmAndCreate: jest.Mock; recordConfirmation: jest.Mock };
   let jobs: {
     createFromUpload: jest.Mock;
     getForOrg: jest.Mock;
     list: jest.Mock;
     readOriginal: jest.Mock;
     retry: jest.Mock;
-    claimForApproval: jest.Mock;
-    linkDraft: jest.Mock;
-    releaseApproval: jest.Mock;
+    confirmWithApproval: jest.Mock;
     toView: jest.Mock;
   };
   let controller: DocumentIntakeController;
@@ -67,6 +66,7 @@ describe('DocumentIntakeController', () => {
     const job = makeJob();
     service = {
       confirmAndCreate: jest.fn().mockResolvedValue({ type: 'bill', id: 'b1', number: 'BILL-1' }),
+      recordConfirmation: jest.fn().mockResolvedValue(undefined),
     };
     jobs = {
       createFromUpload: jest.fn().mockResolvedValue({ job, duplicate: false }),
@@ -83,9 +83,7 @@ describe('DocumentIntakeController', () => {
         throw new NotFoundException('Intake job not found');
       }),
       retry: jest.fn().mockResolvedValue(job),
-      claimForApproval: jest.fn().mockResolvedValue(IntakeJobStatus.EXTRACTED),
-      linkDraft: jest.fn().mockResolvedValue(undefined),
-      releaseApproval: jest.fn().mockResolvedValue(undefined),
+      confirmWithApproval: jest.fn(async (_id, _org, createDraft) => createDraft(transaction)),
       toView: jest.fn((j: IntakeJob) => ({ id: j.id, status: j.status })),
     };
     controller = new DocumentIntakeController(
@@ -208,35 +206,58 @@ describe('DocumentIntakeController', () => {
       const res = await controller.confirmDocument(ORG_A, dto);
       expect(service.confirmAndCreate).toHaveBeenCalledWith(ORG_A, dto);
       expect(res.data.id).toBe('b1');
-      expect(jobs.claimForApproval).not.toHaveBeenCalled();
+      expect(jobs.confirmWithApproval).not.toHaveBeenCalled();
     });
 
     it('claims the job once, creates the draft and links it', async () => {
       await controller.confirmDocument(ORG_A, { ...dto, jobId: 'job-1' });
-      expect(jobs.claimForApproval).toHaveBeenCalledWith('job-1', ORG_A);
-      expect(service.confirmAndCreate).toHaveBeenCalledWith(ORG_A, { ...dto, jobId: 'job-1' });
-      expect(jobs.linkDraft).toHaveBeenCalledWith('job-1', ORG_A, { type: 'bill', id: 'b1' });
+      expect(jobs.confirmWithApproval).toHaveBeenCalledWith('job-1', ORG_A, expect.any(Function));
+      expect(service.confirmAndCreate).toHaveBeenCalledWith(
+        ORG_A,
+        { ...dto, jobId: 'job-1' },
+        transaction,
+      );
+      expect(service.recordConfirmation).toHaveBeenCalledWith(ORG_A, dto, {
+        type: 'bill',
+        id: 'b1',
+        number: 'BILL-1',
+      });
+    });
+
+    it('passes the authenticated actor through the approval transaction', async () => {
+      await controller.confirmDocument(ORG_A, { ...dto, jobId: 'job-1' }, 'actor-1');
+      expect(service.confirmAndCreate).toHaveBeenCalledWith(
+        ORG_A,
+        { ...dto, jobId: 'job-1', userId: 'actor-1' },
+        transaction,
+      );
     });
 
     it('creates no draft when the job cannot be claimed (replay)', async () => {
-      jobs.claimForApproval.mockRejectedValue(new ConflictException());
+      jobs.confirmWithApproval.mockRejectedValue(new ConflictException());
       await expect(controller.confirmDocument(ORG_A, { ...dto, jobId: 'job-1' })).rejects.toThrow(
         ConflictException,
       );
       expect(service.confirmAndCreate).not.toHaveBeenCalled();
+      expect(service.recordConfirmation).not.toHaveBeenCalled();
     });
 
-    it('releases the claim when draft creation fails', async () => {
+    it('propagates draft failure to the approval transaction for rollback', async () => {
       service.confirmAndCreate.mockRejectedValue(new Error('invalid'));
       await expect(controller.confirmDocument(ORG_A, { ...dto, jobId: 'job-1' })).rejects.toThrow(
         'invalid',
       );
-      expect(jobs.releaseApproval).toHaveBeenCalledWith('job-1', ORG_A, IntakeJobStatus.EXTRACTED);
+      expect(jobs.confirmWithApproval).toHaveBeenCalledTimes(1);
+      expect(service.recordConfirmation).not.toHaveBeenCalled();
     });
   });
 
-  it('keeps the job APPROVED (never reopens it) when linking a committed draft fails', async () => {
-    jobs.linkDraft.mockRejectedValue(new Error('db down'));
+  it('propagates link failure instead of reporting success for an uncommitted draft', async () => {
+    jobs.confirmWithApproval.mockImplementationOnce(async (_id, _org, createDraft) => {
+      await createDraft(transaction);
+      expect(service.recordConfirmation).not.toHaveBeenCalled();
+      throw new Error('db down');
+    });
     const dto = {
       type: 'BILL',
       vendorId: 'v1',
@@ -245,10 +266,8 @@ describe('DocumentIntakeController', () => {
       lines: [{ description: 'CPU', quantity: '2', rate: '100', taxRatePercent: '14' }],
       jobId: 'job-1',
     } as ConfirmIntakeDto;
-    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-    const res = await controller.confirmDocument(ORG_A, dto);
-    expect(res.data.id).toBe('b1');
-    expect(jobs.releaseApproval).not.toHaveBeenCalled();
+    await expect(controller.confirmDocument(ORG_A, dto)).rejects.toThrow('db down');
+    expect(service.recordConfirmation).not.toHaveBeenCalled();
   });
 
   it('retry delegates to the org-scoped service', async () => {
