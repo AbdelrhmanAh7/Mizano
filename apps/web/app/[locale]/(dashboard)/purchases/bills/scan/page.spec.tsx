@@ -69,7 +69,11 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => mockQuery,
 }));
 jest.mock('next-intl', () => ({
-  useTranslations: () => mockTranslate,
+  useTranslations: (namespace: string) =>
+    namespace === 'ai.intake.scan'
+      ? (key: string, values?: Record<string, string | number>) =>
+          mockTranslate(`scan.${key}`, values)
+      : mockTranslate,
   useLocale: () => mockLocale,
 }));
 jest.mock('@/lib/hooks/use-ai-document-intake', () => ({
@@ -82,15 +86,23 @@ jest.mock('@/lib/hooks/use-vendors', () => ({
 jest.mock('@/components/purchases/bill-form', () => ({
   BillForm: ({
     scanDefaults,
+    extractedTotals,
     onCancel,
     onSubmit,
   }: {
     scanDefaults: BillFormDefaultValues;
+    extractedTotals: {
+      subtotal: number | null;
+      tax: number | null;
+      total: number | null;
+      discount: number | null;
+    };
     onCancel: () => void;
     onSubmit: (data: Record<string, unknown>) => Promise<void>;
   }) => (
     <div>
       <div data-testid="draft">{JSON.stringify(scanDefaults)}</div>
+      <div data-testid="extracted-totals">{JSON.stringify(extractedTotals)}</div>
       <button onClick={onCancel}>Cancel review</button>
       <button onClick={() => void onSubmit(mockFormData)}>Submit review</button>
     </div>
@@ -281,6 +293,50 @@ describe('scan job deep link', () => {
   it('localizes confirmation errors without showing server data', async () => {
     mockIntake.result = extracted;
     mockConfirm.mockRejectedValue(new Error('private document data'));
+    render(<ScanBillPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Submit review' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(mockTranslate('confirmFailed'));
+    expect(screen.queryByText('private document data')).not.toBeInTheDocument();
+  });
+  it('passes extracted totals and header discount to the Decimal discrepancy preview', async () => {
+    mockIntake.result = {
+      ...extracted,
+      extractedFields: { ...extracted.extractedFields, tax: 7, total: 107, discount: 10 },
+    };
+    render(<ScanBillPage />);
+    const totals = await screen.findByTestId('extracted-totals');
+    expect(JSON.parse(totals.textContent || '{}')).toEqual({
+      subtotal: 100,
+      tax: 7,
+      total: 107,
+      discount: 10,
+    });
+  });
+  it.each(['en', 'ar'] as const)(
+    'localizes currency mismatch after loading a job in %s',
+    async (locale) => {
+      mockLocale = locale;
+      mockIntake.result = extracted;
+      mockConfirm.mockRejectedValue({
+        response: {
+          data: {
+            message:
+              'Document currency USD differs from the base currency EGP; foreign-currency documents are not supported yet',
+          },
+        },
+      });
+      render(<ScanBillPage />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Submit review' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        mockTranslate('scan.currencyMismatch'),
+      );
+      expect(mockConfirm).toHaveBeenCalledWith(expect.objectContaining({ jobId: 'telegram_1' }));
+      expect(screen.queryByText(/Document currency USD/)).not.toBeInTheDocument();
+    },
+  );
+  it('keeps unknown API response text out of the localized confirmation error', async () => {
+    mockIntake.result = extracted;
+    mockConfirm.mockRejectedValue({ response: { data: { message: 'private document data' } } });
     render(<ScanBillPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Submit review' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(mockTranslate('confirmFailed'));

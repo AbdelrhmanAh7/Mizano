@@ -15,6 +15,12 @@ jest.mock('next-intl', () => ({
         jobFailed: 'Scan failed',
         connectionLost: 'Connection lost',
         'stages.received': 'Uploading document',
+        streamNoResult: 'Processing finished without a result',
+        streamFailed: 'Processing failed',
+        streamUnavailable: 'This scan is no longer available. Please upload the document again.',
+        streamLostConnection: 'Lost connection while processing the document. Please try again.',
+        streamUploading: 'Uploading document...',
+        streamProcessFailed: 'Failed to process document',
       }) as Record<string, string>
     )[key],
 }));

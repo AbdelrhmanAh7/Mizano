@@ -31,6 +31,7 @@ import { useCreateVendor } from '@/lib/hooks/use-vendors';
 import { resolveScanLineTaxes, toDecimalString } from '@/lib/document-intake-tax';
 import { BillForm, type BillFormDefaultValues } from '@/components/purchases/bill-form';
 import { cn } from '@/lib/utils';
+import { getScanReviewErrorMessage } from '@/lib/scan-review-error';
 import { format } from 'date-fns';
 
 type Step = 'upload' | 'processing' | 'review' | 'confirmed' | 'existing' | 'empty';
@@ -75,6 +76,7 @@ function ScanBillContent({ linkedJobId }: { linkedJobId: string | null }) {
   const router = useRouter();
   const locale = useLocale();
   const t = useTranslations('ai.intake');
+  const ts = useTranslations('ai.intake.scan');
 
   const [step, setStep] = useState<Step>(linkedJobId ? 'processing' : 'upload');
   const [dragOver, setDragOver] = useState(false);
@@ -328,7 +330,16 @@ function ScanBillContent({ linkedJobId }: { linkedJobId: string | null }) {
       }, 2000);
     } catch (err) {
       if (!activeRef.current) return;
-      setLocalError(err instanceof InvalidScanDecimal ? err.message : t('confirmFailed'));
+      // Only expose the known, localized currency rejection; other server text may contain document data.
+      const currencyMismatch = ts('currencyMismatch');
+      const message = getScanReviewErrorMessage(err, t('confirmFailed'), currencyMismatch);
+      setLocalError(
+        err instanceof InvalidScanDecimal
+          ? err.message
+          : message === currencyMismatch
+            ? currencyMismatch
+            : t('confirmFailed'),
+      );
     }
   };
 
@@ -893,6 +904,12 @@ function ScanBillContent({ linkedJobId }: { linkedJobId: string | null }) {
           <BillForm
             key={scanDefaults.vendorId}
             scanDefaults={scanDefaults}
+            extractedTotals={{
+              subtotal: result.extractedFields.subtotal,
+              tax: result.extractedFields.tax,
+              total: result.extractedFields.total,
+              discount: result.extractedFields.discount,
+            }}
             onSubmit={handleConfirm}
             onCancel={handleReupload}
             isSubmitting={confirmIntake.isPending}
