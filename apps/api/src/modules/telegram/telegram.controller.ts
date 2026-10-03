@@ -38,7 +38,11 @@ export class TelegramController {
   @Delete('links/:id')
   @HttpCode(204)
   @Permissions('settings.edit')
-  async unlink(@CurrentOrg() orgId: string, @Param('id') id: string): Promise<void> {
-    await this.links.unlink(id, orgId);
+  async unlink(
+    @CurrentOrg() orgId: string,
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.links.unlink(id, orgId, userId);
   }
 }

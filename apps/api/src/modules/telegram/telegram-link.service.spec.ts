@@ -59,6 +59,10 @@ function setup() {
         async ({ where }: { where: { chatId: string } }) =>
           links.find((l) => l.chatId === where.chatId) ?? null,
       ),
+      findFirst: jest.fn(
+        async ({ where }: { where: { id: string; organizationId: string } }) =>
+          links.find((l) => l.id === where.id && l.organizationId === where.organizationId) ?? null,
+      ),
       create: jest.fn(async ({ data }: { data: Omit<LinkRow, 'id'> }) => {
         const row = { id: `l${links.length + 1}`, ...data };
         links.push(row);
@@ -126,12 +130,34 @@ describe('TelegramLinkService', () => {
     expect(res.status).toBe('already-linked');
   });
 
-  it('unlink is scoped to the organization', async () => {
-    const { svc, links } = setup();
+  it('unlink is scoped to the organization and writes no audit entry when nothing is removed', async () => {
+    const { svc, links, delegates } = setup();
     await svc.redeem((await svc.createCode('org-1', 'u1')).code, '42');
-    await expect(svc.unlink(links[0].id, 'org-2')).rejects.toThrow(NotFoundException);
-    await svc.unlink(links[0].id, 'org-1');
+    delegates.auditLog.create.mockClear();
+    await expect(svc.unlink(links[0].id, 'org-2', 'u9')).rejects.toThrow(NotFoundException);
+    expect(delegates.auditLog.create).not.toHaveBeenCalled();
+    expect(links).toHaveLength(1);
+    await svc.unlink(links[0].id, 'org-1', 'u9');
     expect(links).toHaveLength(0);
+  });
+
+  it('audits an unlink with the acting user in the same transaction as the delete', async () => {
+    const { svc, links, delegates } = setup();
+    await svc.redeem((await svc.createCode('org-1', 'u1')).code, '42');
+    const linkId = links[0].id;
+    delegates.auditLog.create.mockClear();
+    await svc.unlink(linkId, 'org-1', 'admin-2');
+    expect(delegates.auditLog.create).toHaveBeenCalledTimes(1);
+    expect(delegates.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        organizationId: 'org-1',
+        userId: 'admin-2',
+        action: 'DELETE',
+        entityType: 'TelegramLink',
+        entityId: linkId,
+        oldValues: { chatId: '42', linkedById: 'u1' },
+      },
+    });
   });
 
   it('rejects codes whose creator is no longer active and authorized in the tenant', async () => {

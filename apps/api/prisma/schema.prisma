@@ -604,8 +604,8 @@ model Organization {
   onboardingCompleted Boolean                 @default(false)
   onboarding          OrganizationOnboarding?
 
-  telegramLinks     TelegramLink[]
-  telegramLinkCodes TelegramLinkCode[]
+  telegramLinks      TelegramLink[]
+  telegramLinkCodes  TelegramLinkCode[]
   telegramDeliveries TelegramDelivery[]
 
   @@map("organizations")
@@ -3093,24 +3093,34 @@ model TelegramLinkCode {
   @@map("telegram_link_codes")
 }
 
-/// Durable long-poll cursor: the next update_id to request.
+/// Durable long-poll cursor: the next update_id to request. BigInt: ids are never bounded by int4.
 model TelegramPollState {
   id         String   @id
-  nextOffset Int      @default(0)
+  nextOffset BigInt   @default(0)
   updatedAt  DateTime @updatedAt
 
   @@map("telegram_poll_state")
 }
 
 /// Immutable source identity before download; never rebound when a chat changes tenant.
+/// The file reference is stored so a delivery deferred by a rate limit or a full queue can be
+/// resumed after the cursor moved on (Telegram cannot redeliver an acknowledged update).
 model TelegramDelivery {
   botKey         String
-  updateId       Int
+  updateId       BigInt
   organizationId String
   linkId         String
   messageId      Int
+  chatId         String
+  fileId         String
+  fileName       String
+  mimeType       String
+  fileSize       Int?
+  senderId       BigInt?
   attempts       Int       @default(0)
   intakeJobId    String?
+  /// Set while the delivery waits for its chat's rate window or the organization queue.
+  deferredUntil  DateTime?
   completedAt    DateTime?
   createdAt      DateTime  @default(now())
 
@@ -3118,5 +3128,6 @@ model TelegramDelivery {
 
   @@id([botKey, updateId])
   @@index([organizationId, createdAt])
+  @@index([botKey, completedAt, deferredUntil])
   @@map("telegram_deliveries")
 }

@@ -43,60 +43,85 @@ function doc(over: Partial<TelegramMessage> = {}): TelegramMessage {
   };
 }
 
+type DeliveryCreate = Omit<
+  TelegramDelivery,
+  'attempts' | 'completedAt' | 'intakeJobId' | 'deferredUntil' | 'createdAt'
+>;
+
+interface DeliveryUpdate {
+  attempts?: { increment?: number; decrement?: number };
+  completedAt?: Date;
+  deferredUntil?: Date | null;
+  intakeJobId?: string | null;
+}
+
 function setup(linked: TelegramLink | null = link) {
   let stored = 0;
-  const deliveries = new Map<number, TelegramDelivery>();
+  const deliveries = new Map<string, TelegramDelivery>();
   const prisma = {
     telegramPollState: {
       findUnique: jest.fn(async () =>
-        stored ? { nextOffset: stored, updatedAt: new Date() } : null,
+        stored ? { nextOffset: BigInt(stored), updatedAt: new Date() } : null,
       ),
-      upsert: jest.fn(async ({ create }: { create: { nextOffset: number } }) => {
-        if (!stored) stored = create.nextOffset;
+      upsert: jest.fn(async ({ create }: { create: { nextOffset: bigint } }) => {
+        if (!stored) stored = Number(create.nextOffset);
       }),
-      updateMany: jest.fn(async ({ data }: { data: { nextOffset: number } }) => {
-        stored = Math.max(stored, data.nextOffset);
+      updateMany: jest.fn(async ({ data }: { data: { nextOffset: bigint } }) => {
+        stored = Math.max(stored, Number(data.nextOffset));
         return { count: 1 };
       }),
     },
     telegramDelivery: {
-      upsert: jest.fn(
-        async ({
-          create,
-        }: {
-          create: Omit<TelegramDelivery, 'attempts' | 'completedAt' | 'intakeJobId' | 'createdAt'>;
-        }) => {
-          const row = deliveries.get(create.updateId) ?? {
-            ...create,
-            attempts: 0,
-            completedAt: null,
-            intakeJobId: null,
-            createdAt: new Date(),
-          };
-          deliveries.set(create.updateId, row);
-          return { ...row };
-        },
-      ),
+      upsert: jest.fn(async ({ create }: { create: DeliveryCreate }) => {
+        const row: TelegramDelivery = deliveries.get(String(create.updateId)) ?? {
+          ...create,
+          attempts: 0,
+          completedAt: null,
+          intakeJobId: null,
+          deferredUntil: null,
+          createdAt: new Date(),
+        };
+        deliveries.set(String(create.updateId), row);
+        return { ...row };
+      }),
       updateMany: jest.fn(
         async ({
           where,
           data,
         }: {
-          where: { updateId: number; organizationId: string };
-          data: {
-            attempts?: { increment: number };
-            completedAt?: Date;
-            intakeJobId?: string | null;
-          };
+          where: { updateId: bigint; organizationId: string };
+          data: DeliveryUpdate;
         }) => {
-          const row = deliveries.get(where.updateId);
+          const row = deliveries.get(String(where.updateId));
           if (!row || row.organizationId !== where.organizationId || row.completedAt)
             return { count: 0 };
-          if (data.attempts) row.attempts += data.attempts.increment;
+          if (data.attempts)
+            row.attempts += (data.attempts.increment ?? 0) - (data.attempts.decrement ?? 0);
           if (data.completedAt) row.completedAt = data.completedAt;
+          if (data.deferredUntil !== undefined) row.deferredUntil = data.deferredUntil;
           if (data.intakeJobId !== undefined) row.intakeJobId = data.intakeJobId;
           return { count: 1 };
         },
+      ),
+      findMany: jest.fn(
+        async ({
+          where,
+          take,
+        }: {
+          where: { botKey: string; deferredUntil: { lte: Date } };
+          take: number;
+        }) =>
+          [...deliveries.values()]
+            .filter(
+              (row) =>
+                row.botKey === where.botKey &&
+                !row.completedAt &&
+                row.deferredUntil !== null &&
+                row.deferredUntil <= where.deferredUntil.lte,
+            )
+            .sort((a, b) => Number(a.updateId - b.updateId))
+            .slice(0, take)
+            .map((row) => ({ ...row })),
       ),
     },
   } as unknown as PrismaService;
@@ -113,7 +138,7 @@ function setup(linked: TelegramLink | null = link) {
     shutdown: jest.fn(),
   };
   const links = {
-    findByChat: jest.fn(async () => linked),
+    findByChat: jest.fn(async (_chatId: string): Promise<TelegramLink | null> => linked),
     redeem: jest.fn(async (): Promise<RedeemResult> => ({ status: 'invalid' })),
   };
   const jobs = {
@@ -348,27 +373,179 @@ describe('TelegramIntakeService', () => {
     );
   });
 
-  it('tells the sender when the organization queue is full', async () => {
-    const { svc, jobs, sent } = setup();
+  it('tells the sender once when the organization queue is full and keeps the delivery pending', async () => {
+    const { svc, jobs, sent, deliveries } = setup();
     jobs.createFromUpload.mockRejectedValueOnce(
       new HttpException('busy', HttpStatus.TOO_MANY_REQUESTS),
     );
-    await expect(svc.handleUpdate(upd(doc()))).rejects.toMatchObject({ retryAfterSeconds: 60 });
+    await expect(svc.handleUpdate(upd(doc()))).resolves.toBeUndefined();
+    expect(sent).toHaveLength(1);
     expect(sent[0].text).toContain('Too many documents');
+    expect(deliveries.get('1')).toMatchObject({
+      attempts: 0,
+      completedAt: null,
+      deferredUntil: expect.any(Date),
+    });
   });
 
-  it('defers excess documents, then accepts the entire 20-document batch after the window', async () => {
+  it('keeps a delivery pending when the queue stays full for far more than five retries', async () => {
     jest.useFakeTimers();
-    const { svc, jobs, sent } = setup();
-    for (let i = 0; i < 10; i += 1) await svc.handleUpdate(upd(doc(), i + 1));
-    for (let i = 10; i < 15; i += 1) {
-      await expect(svc.handleUpdate(upd(doc(), i + 1))).rejects.toMatchObject({ status: 429 });
+    const { svc, jobs, sent, deliveries } = setup();
+    jobs.createFromUpload.mockRejectedValue(
+      new HttpException('busy', HttpStatus.TOO_MANY_REQUESTS),
+    );
+    await svc.handleUpdate(upd(doc()));
+    for (let round = 0; round < 8; round += 1) {
+      jest.advanceTimersByTime(31_000);
+      await expect(svc.drainDeferred()).resolves.toBe(1);
+    }
+    expect(jobs.createFromUpload).toHaveBeenCalledTimes(9);
+    expect(deliveries.get('1')).toMatchObject({
+      attempts: 0,
+      completedAt: null,
+      intakeJobId: null,
+    });
+    expect(sent.filter((m) => m.text.includes('Too many documents'))).toHaveLength(1);
+    expect(sent.some((m) => m.text.includes('send it again'))).toBe(false);
+
+    jobs.createFromUpload.mockResolvedValue({ job: job(), duplicate: false });
+    jest.advanceTimersByTime(31_000);
+    await svc.drainDeferred();
+    expect(deliveries.get('1')).toMatchObject({
+      attempts: 1,
+      completedAt: expect.any(Date),
+      deferredUntil: null,
+      intakeJobId: 'job-1',
+    });
+    expect(sent.at(-1)?.text).toContain('Received');
+  });
+
+  it('does not let a full organization queue hold back another tenant in the same poll', async () => {
+    const { svc, client, jobs, deliveries } = setup();
+    jobs.createFromUpload.mockRejectedValueOnce(
+      new HttpException('busy', HttpStatus.TOO_MANY_REQUESTS),
+    );
+    client.getUpdates.mockResolvedValueOnce([upd(doc(), 1), upd(doc({ message_id: 8 }), 2)]);
+    await svc.pollOnce(0);
+    expect(jobs.createFromUpload).toHaveBeenCalledTimes(2);
+    expect(await svc.loadOffset()).toBe(3);
+    expect(deliveries.get('1')?.completedAt).toBeNull();
+    expect(deliveries.get('2')?.completedAt).toEqual(expect.any(Date));
+  });
+
+  it('defers excess documents durably, then accepts the entire batch after the window', async () => {
+    jest.useFakeTimers();
+    const { svc, restart, jobs, sent, deliveries } = setup();
+    for (let i = 0; i < 15; i += 1) {
+      await expect(
+        svc.handleUpdate(upd(doc({ from: { id: 5_000_000_000 } }), i + 1)),
+      ).resolves.toBeUndefined();
     }
     expect(jobs.createFromUpload).toHaveBeenCalledTimes(10);
-    expect(sent.filter((s) => s.text.includes('Too many messages'))).toHaveLength(1);
+    expect(sent.filter((m) => m.text.includes('Too many messages'))).toHaveLength(1);
+    expect(deliveries.get('11')).toMatchObject({
+      chatId: '42',
+      fileId: 'f1',
+      fileName: 'inv.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 100,
+      senderId: 5_000_000_000n,
+      completedAt: null,
+      deferredUntil: expect.any(Date),
+    });
+
+    // Still inside the chat's rate window: the delivery waits again instead of failing.
+    jest.advanceTimersByTime(31_000);
+    await svc.drainDeferred();
+    expect(jobs.createFromUpload).toHaveBeenCalledTimes(10);
+    expect(deliveries.get('11')).toMatchObject({ attempts: 0, completedAt: null });
+
+    // A restarted process resumes from the database alone, in arrival order.
     jest.advanceTimersByTime(60_000);
-    for (let i = 10; i < 20; i += 1) await svc.handleUpdate(upd(doc(), i + 1));
-    expect(jobs.createFromUpload).toHaveBeenCalledTimes(20);
+    const restarted = restart();
+    await expect(restarted.drainDeferred()).resolves.toBe(5);
+    expect(jobs.createFromUpload).toHaveBeenCalledTimes(15);
+    expect(deliveries.get('15')).toMatchObject({ attempts: 1, intakeJobId: 'job-1' });
+    expect(sent.at(-1)?.text).toContain('Telegram sender: 5000000000');
+  });
+
+  it('does not block another chat or the cursor behind a rate-limited chat', async () => {
+    const { svc, client, links, jobs, deliveries } = setup();
+    links.findByChat.mockImplementation(async (chatId: string) => ({ ...link, chatId }));
+    const flood = Array.from({ length: 12 }, (_, i) => upd(doc(), i + 1));
+    const other = upd(doc({ chat: { id: 77, type: 'private' } }), 13);
+    client.getUpdates.mockResolvedValueOnce([...flood, other]);
+    await expect(svc.pollOnce(0)).resolves.toBe(13);
+    expect(jobs.createFromUpload).toHaveBeenCalledTimes(11);
+    expect(await svc.loadOffset()).toBe(14);
+    expect(deliveries.get('11')?.deferredUntil).toEqual(expect.any(Date));
+    expect(deliveries.get('12')?.deferredUntil).toEqual(expect.any(Date));
+    expect(deliveries.get('13')?.completedAt).toEqual(expect.any(Date));
+  });
+
+  it('does not defer or store edited posts or unlinked chats while rate limited', async () => {
+    const { svc, links, deliveries } = setup();
+    for (let i = 0; i < 10; i += 1) await svc.handleUpdate(upd(doc(), i + 1));
+    await svc.handleUpdate({ update_id: 11, edited_message: doc() });
+    links.findByChat.mockResolvedValue(null);
+    await svc.handleUpdate(upd(doc(), 12));
+    expect(deliveries.has('11')).toBe(false);
+    expect(deliveries.has('12')).toBe(false);
+  });
+
+  it('completes a deferred delivery without ingesting when the chat was unlinked or relinked', async () => {
+    jest.useFakeTimers();
+    const { svc, links, jobs, deliveries, sent } = setup();
+    jobs.createFromUpload.mockRejectedValue(
+      new HttpException('busy', HttpStatus.TOO_MANY_REQUESTS),
+    );
+    await svc.handleUpdate(upd(doc(), 1));
+    await svc.handleUpdate(upd(doc(), 2));
+    jobs.createFromUpload.mockClear();
+    jest.advanceTimersByTime(31_000);
+    links.findByChat.mockResolvedValueOnce(null);
+    links.findByChat.mockResolvedValueOnce({ ...link, id: 'new-link', organizationId: 'org-2' });
+    await svc.drainDeferred();
+    expect(jobs.createFromUpload).not.toHaveBeenCalled();
+    for (const id of ['1', '2']) {
+      expect(deliveries.get(id)).toMatchObject({
+        organizationId: 'org-1',
+        attempts: 0,
+        completedAt: expect.any(Date),
+        intakeJobId: null,
+      });
+    }
+    expect(sent.filter((m) => m.text.includes('not linked'))).toHaveLength(1);
+  });
+
+  it('stores an oversize Telegram file size within the integer column and still rejects it', async () => {
+    const { svc, client, deliveries, sent } = setup();
+    await svc.handleUpdate(
+      upd(doc({ document: { file_id: 'f', mime_type: 'application/pdf', file_size: 3e9 } })),
+    );
+    expect(client.downloadFile).not.toHaveBeenCalled();
+    expect(deliveries.get('1')?.fileSize).toBe(15 * 1024 * 1024 + 1);
+    expect(sent[0].text).toContain('too large');
+  });
+
+  it('does not count an attempt that shutdown interrupted', async () => {
+    const { svc, client, deliveries } = setup();
+    client.downloadFile.mockImplementationOnce(async () => {
+      void svc.onModuleDestroy();
+      return Buffer.from('%PDF-1.4 body');
+    });
+    await expect(svc.handleUpdate(upd(doc()))).rejects.toBeInstanceOf(TelegramApiError);
+    expect(deliveries.get('1')).toMatchObject({ attempts: 0, completedAt: null });
+  });
+
+  it('stores 32-bit-overflowing update IDs in the cursor', async () => {
+    const { svc, client, prisma } = setup();
+    client.getUpdates.mockResolvedValueOnce([upd(doc(), 2_147_483_647)]);
+    await svc.pollOnce(0);
+    expect(prisma.telegramPollState.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: { id: 'test-bot', nextOffset: 2_147_483_648n } }),
+    );
+    expect(await svc.loadOffset()).toBe(2_147_483_648);
   });
 
   it('persists the offset after each update and resumes from it', async () => {
@@ -418,7 +595,7 @@ describe('TelegramIntakeService', () => {
     const { svc, client, jobs, prisma } = setup();
     jest.spyOn(prisma.telegramPollState, 'findUnique').mockResolvedValueOnce({
       id: 'test-bot',
-      nextOffset: 9999,
+      nextOffset: 9999n,
       updatedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
     });
     client.getUpdates.mockResolvedValueOnce([upd(doc(), 10)]);
@@ -428,16 +605,16 @@ describe('TelegramIntakeService', () => {
     expect(prisma.telegramPollState.updateMany).toHaveBeenCalledWith({
       where: {
         id: 'test-bot',
-        OR: [{ nextOffset: { lt: 11 } }, { updatedAt: { lte: expect.any(Date) } }],
+        OR: [{ nextOffset: { lt: 11n } }, { updatedAt: { lte: expect.any(Date) } }],
       },
-      data: { nextOffset: 11 },
+      data: { nextOffset: 11n },
     });
   });
 
   it('replays a completed update after restart without another download, even if the chat is relinked', async () => {
     const { svc, restart, client, links, jobs, deliveries } = setup();
     await svc.handleUpdate(upd(doc()));
-    expect(deliveries.get(1)).toMatchObject({ intakeJobId: 'job-1', organizationId: 'org-1' });
+    expect(deliveries.get('1')).toMatchObject({ intakeJobId: 'job-1', organizationId: 'org-1' });
     links.findByChat.mockResolvedValue({ ...link, id: 'new-link', organizationId: 'org-2' });
     await restart().handleUpdate(upd(doc()));
     expect(client.downloadFile).toHaveBeenCalledTimes(1);
@@ -460,7 +637,7 @@ describe('TelegramIntakeService', () => {
     for (let i = 0; i < 5; i += 1) await expect(svc.handleUpdate(upd(doc()))).rejects.toThrow();
     await svc.handleUpdate(upd(doc()));
     expect(jobs.createFromUpload).toHaveBeenCalledTimes(5);
-    expect(deliveries.get(1)).toMatchObject({
+    expect(deliveries.get('1')).toMatchObject({
       attempts: 5,
       completedAt: expect.any(Date),
       intakeJobId: null,
@@ -568,8 +745,8 @@ describe('TelegramIntakeService', () => {
         }),
     );
     svc.onApplicationBootstrap();
-    await Promise.resolve();
-    await Promise.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(client.getUpdates).toHaveBeenCalledTimes(1);
     let stopped = false;
     const stopping = svc.onModuleDestroy().then(() => {
       stopped = true;

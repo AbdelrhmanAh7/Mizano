@@ -125,8 +125,22 @@ export class TelegramLinkService {
     });
   }
 
-  async unlink(id: string, organizationId: string): Promise<void> {
-    const res = await this.prisma.telegramLink.deleteMany({ where: { id, organizationId } });
-    if (res.count === 0) throw new NotFoundException('Telegram link not found');
+  /** Removing a binding stops tenant ingestion, so the deletion is audited with the actor. */
+  async unlink(id: string, organizationId: string, userId: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const link = await tx.telegramLink.findFirst({ where: { id, organizationId } });
+      const res = await tx.telegramLink.deleteMany({ where: { id, organizationId } });
+      if (!link || res.count === 0) throw new NotFoundException('Telegram link not found');
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          userId,
+          action: 'DELETE',
+          entityType: 'TelegramLink',
+          entityId: id,
+          oldValues: { chatId: link.chatId, linkedById: link.linkedById },
+        },
+      });
+    });
   }
 }

@@ -16,6 +16,9 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 2. Idempotency and retries
 
 - **A transport cursor is an acknowledgement, not a delivery record.** Persist source identity and its original tenant before external I/O; advance the cursor only after durable success or a recorded terminal outcome. Sort batches before acknowledging, namespace cursors by bot, and handle provider ID resets after inactivity. Never rebind an old delivery after chat unlink/relink. Rate limits defer authorized batches; they must not discard the remaining documents. _(Telegram intake, PR #58)_
+- **Defer per item, durably; never stall a shared cursor.** Throwing from a shared poll loop because one chat or tenant is limited holds back every other tenant and can outlast the provider's retention. Store the delivery with everything needed to resume it (the provider cannot resend an acknowledged update), mark it deferred, advance the cursor, and resume from the database after re-checking the binding. A deferral (rate limit, full queue, shutdown) is not a failed attempt: refund the counter, or a long wait silently turns an authorized document into a terminal failure. _(Telegram intake, PR #58)_
+- **Size provider-controlled numbers for 64 bits.** Telegram update/user/chat/file sizes are not bounded by `INTEGER`; use `BIGINT` for cursors and identifiers, and clamp values that only matter against a limit before storing them. _(Telegram intake, PR #58)_
+- **Do not share one credential between an opt-in poller and a monitor.** A token reused for alerts becomes an intake token the moment the API reads the same variable. Give each integration its own variable and keep opt-in switches empty in env templates. _(Pi monitoring vs Telegram intake)_
 - **Shutdown owns its asynchronous work.** Abort requests, cancel backoff and await the active loop; detached promises can outlive database and queue dependencies. _(Telegram polling)_
 
 - **Every state change is a guarded transition:** `updateMany({ where: { id, organizationId, status: FROM } })` plus a `count` check that throws `ConflictException`. Journal idempotency is the tenant-scoped unique key `(organizationId, sourceType, sourceId)`.
@@ -57,7 +60,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 7. Tenancy, roles and validation
 
-- **Persistent integration bindings must recheck the authorizing principal.** Disabled/deleted users or revoked permissions must stop future ingestion and pending link-code redemption. Verify private-channel administrator control before binding a caller-supplied channel ID. _(Telegram binding)_
+- **Persistent integration bindings must recheck the authorizing principal.** Disabled/deleted users or revoked permissions must stop future ingestion and pending link-code redemption, and removing a binding is audited with the acting user like creating it. Verify private-channel administrator control before binding a caller-supplied channel ID. _(Telegram binding)_
 
 - **Scope every tenant resource by `organizationId`** in queries, locks and lookups. Child rows are scoped through their tenant-scoped parent, and pre-authentication lookups such as login by email are the documented exception. Another tenant's ids return 404 (or 400 when they come from the body), and soft-deleted parents return 404.
 - **Ownership checks for `@Sse` routes live in a guard, not the handler.** Once the stream starts the status is already 200, so a `NotFoundException` thrown in the handler arrives as an in-band error event and the tenant probe sees 200. `IntakeJobOwnerGuard` returns the real 404. _(intake progress SSE)_

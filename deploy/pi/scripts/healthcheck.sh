@@ -52,11 +52,11 @@ else
 fi
 
 notify() {
-  if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_ALERT_CHAT_ID:-}" ]; then return 0; fi
+  if [ -z "${TELEGRAM_ALERT_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_ALERT_CHAT_ID:-}" ]; then return 0; fi
   curl -fsS --max-time 15 -o /dev/null \
     --data-urlencode "chat_id=$TELEGRAM_ALERT_CHAT_ID" \
     --data-urlencode "text=$1" \
-    "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" >/dev/null 2>&1 || true
+    "https://api.telegram.org/bot${TELEGRAM_ALERT_BOT_TOKEN}/sendMessage" >/dev/null 2>&1 || true
 }
 
 # Dedupe on stable keys (check name), never on live numbers: one alert when a check

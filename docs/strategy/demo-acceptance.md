@@ -18,7 +18,7 @@ Target: a tiny live deployment on a Raspberry Pi 5 (8GB, arm64), tracked by epic
 
 ## Pass criteria and evidence
 
-Telegram rehearsal must follow [the binding/runbook](../telegram-intake.md): use an authorized private channel, replay the **same update ID**, reorder a batch, interrupt between job creation and cursor persistence, and exercise a 20-document batch across rate-limit windows. Verify revoked administrator/unlinked chat rejection and edited-post instructions. The mocked Telegram E2E covers ingestion only; complete the real CPU extraction, draft, approval and report journey separately before acceptance.
+Telegram rehearsal must follow [the binding/runbook](../telegram-intake.md): use an authorized private channel, replay the **same update ID**, reorder a batch, interrupt between job creation and cursor persistence, and exercise a 20-document batch across rate-limit windows, including a second tenant's document sent while the first chat is rate limited (it must be ingested immediately, and the deferred files must complete in the next window without a resend). Verify revoked administrator/unlinked chat rejection and edited-post instructions. The mocked Telegram E2E covers ingestion only; complete the real CPU extraction, draft, approval and report journey separately before acceptance.
 
 | Gate                    | Required evidence                                                                                                                                                               |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

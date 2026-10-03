@@ -6,7 +6,7 @@ import {
   OnApplicationBootstrap,
   OnModuleDestroy,
 } from '@nestjs/common';
-import { IntakeJobStatus, IntakeSource, TelegramLink } from '@prisma/client';
+import { IntakeJobStatus, IntakeSource, TelegramDelivery, TelegramLink } from '@prisma/client';
 import { describeError } from '../../common/utils/redact';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IntakeJobsService } from '../ai/intake/intake-jobs.service';
@@ -27,6 +27,10 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const MAX_BACKOFF_MS = 60_000;
 const MAX_DELIVERY_ATTEMPTS = 5;
 const CURSOR_IDLE_MS = 7 * 24 * 60 * 60 * 1000;
+/** How long a deferred delivery waits before it is tried again. */
+const DEFER_MS = 30_000;
+/** Deferred deliveries resumed per poll round, so one backlog cannot starve the poll loop. */
+const SWEEP_BATCH = 10;
 
 const STATUS_AR: Record<IntakeJobStatus, string> = {
   QUEUED: 'في الانتظار',
@@ -82,9 +86,14 @@ const MSG = {
     `This file was already received. Status: ${status}.\nتم استلام هذا الملف سابقا. الحالة: ${STATUS_AR[status]}.`,
 };
 
-class TelegramRateLimitError extends TelegramApiError {
+/**
+ * The organization's intake queue is full. A deferral is not a failure: the delivery stays
+ * pending in the database, keeps its attempt budget and never blocks other tenants.
+ */
+class IntakeDeferred extends Error {
   constructor() {
-    super('intake', 429, RATE_LIMIT_WINDOW_MS / 1000);
+    super('Telegram intake deferred');
+    this.name = 'IntakeDeferred';
   }
 }
 
@@ -174,11 +183,14 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
     });
     // Telegram randomizes update IDs after a week without updates. Poll unconfirmed updates
     // again instead of acknowledging a newly generated ID below an obsolete high watermark.
-    return state && state.updatedAt.getTime() > Date.now() - CURSOR_IDLE_MS ? state.nextOffset : 0;
+    return state && state.updatedAt.getTime() > Date.now() - CURSOR_IDLE_MS
+      ? Number(state.nextOffset)
+      : 0;
   }
 
   /** Advance atomically; only an idle cursor can start a new Telegram update-ID sequence. */
-  private async saveOffset(nextOffset: number): Promise<void> {
+  private async saveOffset(offset: number): Promise<void> {
+    const nextOffset = BigInt(offset);
     await this.prisma.telegramPollState.upsert({
       where: { id: this.client.pollKey() },
       create: { id: this.client.pollKey(), nextOffset },
@@ -197,11 +209,15 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
   }
 
   /**
-   * One getUpdates round. Updates are handled in order and the offset is persisted after each
-   * one. Failures leave the cursor in place; durable delivery identity and tenant file hashes
-   * make crash replay safe. Only one process may poll a bot (Telegram rejects competing polls).
+   * One poll round: resume deferred deliveries, then getUpdates. Updates are handled in order
+   * and the offset is persisted after each one. A rate-limited or queue-blocked document is
+   * recorded as a deferred delivery first, so the cursor moves on and one chat or tenant never
+   * holds back the others. Other failures leave the cursor in place; durable delivery identity
+   * and tenant file hashes make crash replay safe. Only one process may poll a bot (Telegram
+   * rejects competing polls).
    */
   async pollOnce(timeoutSeconds: number): Promise<number> {
+    await this.drainDeferred();
     const offset = await this.loadOffset();
     const updates = await this.client.getUpdates(offset, timeoutSeconds);
     let next = offset;
@@ -250,25 +266,33 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
     }
   }
 
-  /** Only terminal outcomes are acknowledged. Transient errors propagate to poll backoff. */
+  /**
+   * Only a recorded outcome is acknowledged: completed, terminally failed or durably deferred.
+   * Transient errors propagate to poll backoff and leave the cursor in place.
+   */
   async handleUpdate(update: TelegramUpdate): Promise<void> {
     const message =
       update.message ?? update.channel_post ?? update.edited_message ?? update.edited_channel_post;
     if (!message) return;
     const chatId = String(message.chat.id);
+    const edited = !update.message && !update.channel_post;
 
     const gate = this.allowed(chatId);
     if (!gate.ok) {
       if (gate.warn) await this.reply(chatId, MSG.rateLimited);
       // A 20-document batch is deferred instead of silently acknowledging its last ten files.
-      if ((message.document || message.photo?.length) && (await this.links.findByChat(chatId))) {
-        throw new TelegramRateLimitError();
+      // The delivery is stored first, so the cursor can move on without holding up other chats.
+      const file = edited ? null : this.fileOf(message);
+      const link = file ? await this.links.findByChat(chatId) : null;
+      if (file && link) {
+        const delivery = await this.recordDelivery(update, message, link, chatId, file);
+        if (delivery) await this.deferDelivery(delivery);
       }
       return;
     }
 
     try {
-      if (update.edited_message || update.edited_channel_post) {
+      if (edited) {
         await this.reply(
           chatId,
           (await this.links.findByChat(chatId)) ? MSG.edited : MSG.notLinked,
@@ -296,51 +320,178 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
         await this.reply(chatId, MSG.hint);
         return;
       }
-      const delivery = await this.prisma.telegramDelivery.upsert({
-        where: { botKey_updateId: { botKey: this.client.pollKey(), updateId: update.update_id } },
-        create: {
-          botKey: this.client.pollKey(),
-          updateId: update.update_id,
-          organizationId: link.organizationId,
-          linkId: link.id,
-          messageId: message.message_id,
-        },
-        update: {},
-      });
-      // The receiver resolves an untrusted source identity once. Never move an old delivery
-      // to a new binding, even after a crash between durable enqueue and cursor persistence.
-      if (
-        delivery.completedAt ||
-        delivery.linkId !== link.id ||
-        delivery.organizationId !== link.organizationId
-      )
-        return;
-      const where = {
-        botKey: delivery.botKey,
-        updateId: delivery.updateId,
-        organizationId: link.organizationId,
-        completedAt: null,
-      };
-      if (delivery.attempts >= MAX_DELIVERY_ATTEMPTS) {
-        await this.prisma.telegramDelivery.updateMany({ where, data: { completedAt: new Date() } });
-        await this.reply(chatId, MSG.failed);
-        return;
-      }
-      await this.prisma.telegramDelivery.updateMany({
-        where,
-        data: { attempts: { increment: 1 } },
-      });
-      const intakeJobId = await this.ingest(link, chatId, file, message.from?.id);
-      await this.prisma.telegramDelivery.updateMany({
-        where,
-        data: { completedAt: new Date(), intakeJobId },
-      });
+      const delivery = await this.recordDelivery(update, message, link, chatId, file);
+      if (delivery) await this.processDelivery(delivery, link);
     } catch (error) {
       this.logger.error(
         `Telegram update failed: ${describeError(error, { includeMessage: false })}`,
       );
       if (!this.stopping) await this.reply(chatId, MSG.retrying);
       throw error;
+    }
+  }
+
+  /**
+   * The receiver resolves an untrusted source identity once. Never move an old delivery to a
+   * new binding, even after a crash between durable enqueue and cursor persistence. Returns
+   * null for a finished or rebound delivery.
+   */
+  private async recordDelivery(
+    update: TelegramUpdate,
+    message: TelegramMessage,
+    link: TelegramLink,
+    chatId: string,
+    file: FileCandidate,
+  ): Promise<TelegramDelivery | null> {
+    const botKey = this.client.pollKey();
+    const updateId = BigInt(update.update_id);
+    const delivery = await this.prisma.telegramDelivery.upsert({
+      where: { botKey_updateId: { botKey, updateId } },
+      create: {
+        botKey,
+        updateId,
+        organizationId: link.organizationId,
+        linkId: link.id,
+        messageId: message.message_id,
+        chatId,
+        fileId: file.fileId,
+        fileName: file.fileName,
+        mimeType: file.mimeType,
+        // Telegram sizes can exceed int4; only "larger than the limit" matters.
+        fileSize: file.size === undefined ? null : Math.min(file.size, MAX_FILE_BYTES + 1),
+        senderId: message.from?.id === undefined ? null : BigInt(message.from.id),
+      },
+      update: {},
+    });
+    if (
+      delivery.completedAt ||
+      delivery.linkId !== link.id ||
+      delivery.organizationId !== link.organizationId
+    )
+      return null;
+    return delivery;
+  }
+
+  private deliveryWhere(delivery: TelegramDelivery): {
+    botKey: string;
+    updateId: bigint;
+    organizationId: string;
+    completedAt: null;
+  } {
+    return {
+      botKey: delivery.botKey,
+      updateId: delivery.updateId,
+      organizationId: delivery.organizationId,
+      completedAt: null,
+    };
+  }
+
+  private async deferDelivery(delivery: TelegramDelivery): Promise<void> {
+    await this.prisma.telegramDelivery.updateMany({
+      where: this.deliveryWhere(delivery),
+      data: { deferredUntil: new Date(Date.now() + DEFER_MS) },
+    });
+  }
+
+  /**
+   * Run one delivery. Attempts are counted before the work for crash safety, and refunded when
+   * the delivery is only deferred (full queue) or interrupted by shutdown: neither is a fault.
+   */
+  private async processDelivery(delivery: TelegramDelivery, link: TelegramLink): Promise<void> {
+    const where = this.deliveryWhere(delivery);
+    if (delivery.attempts >= MAX_DELIVERY_ATTEMPTS) {
+      await this.prisma.telegramDelivery.updateMany({
+        where,
+        data: { completedAt: new Date(), deferredUntil: null },
+      });
+      await this.reply(delivery.chatId, MSG.failed);
+      return;
+    }
+    await this.prisma.telegramDelivery.updateMany({ where, data: { attempts: { increment: 1 } } });
+    let intakeJobId: string | null;
+    try {
+      intakeJobId = await this.ingest(
+        link,
+        delivery.chatId,
+        {
+          fileId: delivery.fileId,
+          fileName: delivery.fileName,
+          mimeType: delivery.mimeType,
+          size: delivery.fileSize ?? undefined,
+        },
+        delivery.senderId === null ? undefined : Number(delivery.senderId),
+        // The sender is told once; later retries of the same deferral stay silent.
+        delivery.deferredUntil !== null,
+      );
+    } catch (error) {
+      const deferred = error instanceof IntakeDeferred;
+      if (deferred || this.stopping) {
+        await this.prisma.telegramDelivery.updateMany({
+          where,
+          data: {
+            attempts: { decrement: 1 },
+            ...(deferred ? { deferredUntil: new Date(Date.now() + DEFER_MS) } : {}),
+          },
+        });
+      }
+      if (deferred) return;
+      throw error;
+    }
+    await this.prisma.telegramDelivery.updateMany({
+      where,
+      data: { completedAt: new Date(), deferredUntil: null, intakeJobId },
+    });
+  }
+
+  /**
+   * Resume deliveries whose cursor was already acknowledged (rate-limited chat or full queue).
+   * Telegram cannot resend them, so the stored file reference is the only source. This is a
+   * system-level lookup like the poll cursor; every row is pinned to its recorded tenant and is
+   * re-verified against the chat's current binding before any download or write.
+   */
+  async drainDeferred(): Promise<number> {
+    if (this.stopping) return 0;
+    const due = await this.prisma.telegramDelivery.findMany({
+      where: {
+        botKey: this.client.pollKey(),
+        completedAt: null,
+        deferredUntil: { lte: new Date() },
+      },
+      orderBy: { updateId: 'asc' },
+      take: SWEEP_BATCH,
+    });
+    for (const delivery of due) {
+      if (this.stopping) break;
+      await this.resumeDelivery(delivery);
+    }
+    return due.length;
+  }
+
+  private async resumeDelivery(delivery: TelegramDelivery): Promise<void> {
+    const where = this.deliveryWhere(delivery);
+    const link = await this.links.findByChat(delivery.chatId);
+    if (!link || link.id !== delivery.linkId || link.organizationId !== delivery.organizationId) {
+      // Unlinked or relinked while waiting: never rebind the old delivery to a new tenant.
+      await this.prisma.telegramDelivery.updateMany({
+        where,
+        data: { completedAt: new Date(), deferredUntil: null },
+      });
+      if (!link) await this.reply(delivery.chatId, MSG.notLinked);
+      return;
+    }
+    if (!this.allowed(delivery.chatId).ok) {
+      await this.deferDelivery(delivery);
+      return;
+    }
+    try {
+      await this.processDelivery(delivery, link);
+    } catch (error) {
+      if (this.stopping) return;
+      // Other deliveries and tenants continue; the attempt cap ends a delivery that keeps failing.
+      this.logger.error(
+        `Telegram deferred delivery failed: ${describeError(error, { includeMessage: false })}`,
+      );
+      await this.deferDelivery(delivery);
     }
   }
 
@@ -431,6 +582,7 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
     chatId: string,
     file: FileCandidate,
     senderId?: number,
+    quiet = false,
   ): Promise<string | null> {
     if (!ALLOWED_MIMES.has(file.mimeType)) {
       await this.reply(chatId, MSG.unsupported);
@@ -480,8 +632,8 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
       return job.id;
     } catch (error) {
       if (error instanceof HttpException && error.getStatus() === HttpStatus.TOO_MANY_REQUESTS) {
-        await this.reply(chatId, MSG.busy);
-        throw new TelegramRateLimitError();
+        if (!quiet) await this.reply(chatId, MSG.busy);
+        throw new IntakeDeferred();
       }
       throw error;
     }

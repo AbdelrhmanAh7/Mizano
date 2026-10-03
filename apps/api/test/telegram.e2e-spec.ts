@@ -16,12 +16,16 @@ import * as request from 'supertest';
 
 const sent: { chatId: string; text: string }[] = [];
 let files: Record<string, Buffer> = {};
+let pending: TelegramUpdate[] = [];
+// Deliveries are keyed by (bot, update id) and never deleted: a per-run bot key keeps reruns
+// against the same database from replaying an earlier run's receipts.
+const BOT_KEY = `telegram-e2e-${uniqueSuffix()}`;
 
 const fakeClient: TelegramClient = {
   isEnabled: () => false,
-  pollKey: () => 'telegram-e2e',
+  pollKey: () => BOT_KEY,
   canManageChannel: async () => true,
-  getUpdates: async () => [],
+  getUpdates: async () => pending.splice(0),
   downloadFile: async (fileId: string) => files[fileId],
   sendMessage: async (chatId: string, text: string) => {
     sent.push({ chatId, text });
@@ -160,6 +164,18 @@ describe('Telegram intake (e2e)', () => {
     const [row] = (await a.api.get('/telegram/links')).body.data as { id: string }[];
     expect((await b.api.delete(`/telegram/links/${row.id}`)).status).toBe(404);
     expect((await a.api.delete(`/telegram/links/${row.id}`)).status).toBe(204);
+    const audit = await prisma.auditLog.findMany({
+      where: { organizationId: a.organizationId, entityType: 'TelegramLink', entityId: row.id },
+    });
+    expect(audit.map((entry) => [entry.action, entry.userId]).sort()).toEqual([
+      ['CREATE', a.userId],
+      ['DELETE', a.userId],
+    ]);
+    expect(
+      await prisma.auditLog.count({
+        where: { organizationId: b.organizationId, entityType: 'TelegramLink', entityId: row.id },
+      }),
+    ).toBe(0);
     files = { y: Buffer.from(`%PDF after unlink ${uniqueSuffix()}`) };
     await sendDoc(chatA, 'y');
     expect(sent.at(-1)?.text).toContain('not linked');
@@ -200,14 +216,14 @@ describe('Telegram intake (e2e)', () => {
       where: {
         organizationId: a.organizationId,
         botKey: fakeClient.pollKey(),
-        updateId: update.update_id,
+        updateId: BigInt(update.update_id),
       },
     });
     expect(receipt?.intakeJobId).toEqual(expect.any(String));
     const links = app.get(TelegramLinkService);
     const bound = await links.findByChat(chat);
     expect(bound).not.toBeNull();
-    await links.unlink(bound!.id, a.organizationId);
+    await links.unlink(bound!.id, a.organizationId, a.userId);
     await link(b, chat);
     const beforeB = await prisma.intakeJob.count({ where: { organizationId: b.organizationId } });
     const restarted = new TelegramIntakeService(
@@ -295,12 +311,89 @@ describe('Telegram intake (e2e)', () => {
       where: {
         organizationId: a.organizationId,
         botKey: fakeClient.pollKey(),
-        updateId: update.update_id,
+        updateId: BigInt(update.update_id),
       },
     });
     expect(receipt).toMatchObject({
       completedAt: expect.any(Date),
       intakeJobId: expect.any(String),
     });
+  });
+
+  it('defers a rate-limited chat durably, never holds back another tenant, and resumes after a restart', async () => {
+    const chat = `${chatA}16`;
+    await link(a, chat);
+    const beforeA = await prisma.intakeJob.count({ where: { organizationId: a.organizationId } });
+    const beforeB = await prisma.intakeJob.count({ where: { organizationId: b.organizationId } });
+    files = {};
+    const flood: TelegramUpdate[] = [];
+    for (let i = 0; i < 12; i += 1) {
+      files[`flood-${i}`] = Buffer.from(`%PDF flood ${i} ${uniqueSuffix()}`);
+      flood.push(
+        msg(chat, {
+          document: {
+            file_id: `flood-${i}`,
+            file_name: `flood-${i}.pdf`,
+            mime_type: 'application/pdf',
+          },
+        }),
+      );
+    }
+    files.other = Buffer.from(`%PDF other ${uniqueSuffix()}`);
+    const other = msg(chatB, {
+      document: { file_id: 'other', file_name: 'other.pdf', mime_type: 'application/pdf' },
+    });
+    pending = [...flood, other];
+
+    // One poll batch: the linking message used one of the chat's ten hits this minute, so nine
+    // flood documents are ingested and three are recorded as deferred. Tenant B's later document
+    // is ingested in the same batch and the cursor moves past everything.
+    await expect(intake.pollOnce(0)).resolves.toBe(13);
+    expect(await intake.loadOffset()).toBe(other.update_id + 1);
+    expect(await prisma.intakeJob.count({ where: { organizationId: b.organizationId } })).toBe(
+      beforeB + 1,
+    );
+    expect(await prisma.intakeJob.count({ where: { organizationId: a.organizationId } })).toBe(
+      beforeA + 9,
+    );
+    const waiting = await prisma.telegramDelivery.findMany({
+      where: {
+        botKey: BOT_KEY,
+        organizationId: a.organizationId,
+        completedAt: null,
+        deferredUntil: { not: null },
+      },
+      orderBy: { updateId: 'asc' },
+    });
+    expect(waiting.map((row) => row.fileId)).toEqual(['flood-9', 'flood-10', 'flood-11']);
+    expect(waiting.every((row) => row.chatId === chat && row.attempts === 0)).toBe(true);
+
+    // A fresh process (empty rate windows) resumes them from the database alone.
+    await prisma.telegramDelivery.updateMany({
+      where: { botKey: BOT_KEY, completedAt: null },
+      data: { deferredUntil: new Date(Date.now() - 1000) },
+    });
+    const restarted = new TelegramIntakeService(
+      prisma,
+      fakeClient,
+      app.get(TelegramLinkService),
+      app.get(IntakeJobsService),
+    );
+    await expect(restarted.drainDeferred()).resolves.toBe(3);
+    expect(await prisma.intakeJob.count({ where: { organizationId: a.organizationId } })).toBe(
+      beforeA + 12,
+    );
+    const resumed = await prisma.telegramDelivery.findMany({
+      where: {
+        botKey: BOT_KEY,
+        organizationId: a.organizationId,
+        fileId: { startsWith: 'flood-' },
+      },
+    });
+    expect(resumed).toHaveLength(12);
+    expect(
+      resumed.every((row) => row.completedAt !== null && typeof row.intakeJobId === 'string'),
+    ).toBe(true);
+    await expect(restarted.drainDeferred()).resolves.toBe(0);
   });
 });

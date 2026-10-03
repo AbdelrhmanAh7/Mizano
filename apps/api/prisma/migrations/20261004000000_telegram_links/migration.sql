@@ -25,7 +25,7 @@ CREATE TABLE "telegram_link_codes" (
 -- CreateTable
 CREATE TABLE "telegram_poll_state" (
     "id" TEXT NOT NULL,
-    "nextOffset" INTEGER NOT NULL DEFAULT 0,
+    "nextOffset" BIGINT NOT NULL DEFAULT 0,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "telegram_poll_state_pkey" PRIMARY KEY ("id")
