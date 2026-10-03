@@ -3,24 +3,31 @@
 import { useState } from 'react';
 import { format, startOfYear, endOfMonth } from 'date-fns';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
+import { ReportLoadError } from '@/components/reports/report-load-error';
 import { useProfitLossReport, formatCurrency, ReportAccount } from '@/lib/hooks/use-reports';
 
 export default function ProfitLossReportPage() {
   const t = useTranslations('reports');
+  const formatter = useFormatter();
   const today = new Date();
   const [dateRange, setDateRange] = useState({
     startDate: startOfYear(today),
     endDate: endOfMonth(today),
   });
 
-  const { data: report, isLoading } = useProfitLossReport({
+  const {
+    data: report,
+    isLoading,
+    isError,
+    refetch,
+  } = useProfitLossReport({
     startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
     endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
   });
@@ -76,8 +83,17 @@ export default function ProfitLossReportPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('profitLoss.title')}</h1>
           <p className="text-muted-foreground">
-            {format(dateRange.startDate, 'MMMM d, yyyy')} -{' '}
-            {format(dateRange.endDate, 'MMMM d, yyyy')}
+            {formatter.dateTime(dateRange.startDate, {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            })}{' '}
+            -{' '}
+            {formatter.dateTime(dateRange.endDate, {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            })}
           </p>
         </div>
       </div>
@@ -85,10 +101,12 @@ export default function ProfitLossReportPage() {
       {/* Filters */}
       <ReportFilters dateRange={dateRange} onDateRangeChange={setDateRange} showDateRange />
 
-      {!hasData ? (
+      {isError ? (
+        <ReportLoadError onRetry={() => void refetch()} />
+      ) : !hasData ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No profit & loss data available. Create some transactions first.
+            {t('profitLoss.empty')}
           </CardContent>
         </Card>
       ) : (

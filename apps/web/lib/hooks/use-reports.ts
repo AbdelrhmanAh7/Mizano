@@ -775,18 +775,6 @@ export function formatCurrency(
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode }).format(num);
 }
 
-export function getAgingBucketLabel(bucket: string): string {
-  const labels: Record<string, string> = {
-    current: 'Current',
-    '1-15': '1-15 Days',
-    '16-30': '16-30 Days',
-    '31-60': '31-60 Days',
-    '61-90': '61-90 Days',
-    '90+': 'Over 90 Days',
-  };
-  return labels[bucket] || bucket;
-}
-
 export function getAgingBucketColor(bucket: string): string {
   const colors: Record<string, string> = {
     current: 'bg-green-100 text-green-800',

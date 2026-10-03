@@ -3,20 +3,27 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
+import { ReportLoadError } from '@/components/reports/report-load-error';
 import { useBalanceSheetReport, formatCurrency, ReportAccount } from '@/lib/hooks/use-reports';
 
 export default function BalanceSheetReportPage() {
   const t = useTranslations('reports');
+  const formatter = useFormatter();
   const [asOfDate, setAsOfDate] = useState(new Date());
 
-  const { data: report, isLoading } = useBalanceSheetReport(format(asOfDate, 'yyyy-MM-dd'));
+  const {
+    data: report,
+    isLoading,
+    isError,
+    refetch,
+  } = useBalanceSheetReport(format(asOfDate, 'yyyy-MM-dd'));
 
   const currencyCode = report?.currencyCode;
 
@@ -71,7 +78,15 @@ export default function BalanceSheetReportPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('balanceSheet.title')}</h1>
-          <p className="text-muted-foreground">As of {format(asOfDate, 'MMMM d, yyyy')}</p>
+          <p className="text-muted-foreground">
+            {t('asOf', {
+              date: formatter.dateTime(asOfDate, {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+              }),
+            })}
+          </p>
         </div>
       </div>
 
@@ -83,10 +98,12 @@ export default function BalanceSheetReportPage() {
         showAsOfDate
       />
 
-      {!hasData ? (
+      {isError ? (
+        <ReportLoadError onRetry={() => void refetch()} />
+      ) : !hasData ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No balance sheet data available. Create some transactions first.
+            {t('balanceSheet.empty')}
           </CardContent>
         </Card>
       ) : (
@@ -184,7 +201,7 @@ export default function BalanceSheetReportPage() {
                 </span>
               </div>
               <p className={cn('text-sm mt-2', isBalanced ? 'text-success' : 'text-destructive')}>
-                {isBalanced ? 'Balance sheet is balanced' : 'Balance sheet is not balanced'}
+                {isBalanced ? t('balanceSheet.balanced') : t('balanceSheet.notBalanced')}
               </p>
             </CardContent>
           </Card>

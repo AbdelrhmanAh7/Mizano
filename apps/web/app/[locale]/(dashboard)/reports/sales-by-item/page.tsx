@@ -2,6 +2,7 @@
 
 import { DataTable } from '@/components/data-table/data-table';
 import { ReportFilters } from '@/components/reports/report-filters';
+import { ReportLoadError } from '@/components/reports/report-load-error';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -31,7 +32,7 @@ function SalesByItemContent() {
     [dateRange],
   );
 
-  const { data, isLoading } = useSalesByItemReport(params);
+  const { data, isLoading, isError, refetch } = useSalesByItemReport(params);
   // Report amounts are labelled with the currency the API returns, never a default.
   const currencyCode = data?.currencyCode;
 
@@ -39,7 +40,7 @@ function SalesByItemContent() {
     () => [
       {
         accessorKey: 'itemName',
-        header: 'Item',
+        header: t('item'),
         cell: ({ row }) => (
           <div>
             <div className="font-medium">{row.original.itemName}</div>
@@ -51,19 +52,19 @@ function SalesByItemContent() {
       },
       {
         accessorKey: 'quantitySold',
-        header: 'Qty Sold',
+        header: t('quantitySold'),
         cell: ({ row }) => row.original.quantitySold.toLocaleString(),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'averagePrice',
-        header: 'Avg. Price',
+        header: t('averagePrice'),
         cell: ({ row }) => formatCurrency(row.original.averagePrice, currencyCode),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'totalAmount',
-        header: 'Total Amount',
+        header: t('totalAmount'),
         cell: ({ row }) => (
           <span className="font-medium">
             {formatCurrency(row.original.totalAmount, currencyCode)}
@@ -72,7 +73,7 @@ function SalesByItemContent() {
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
     ],
-    [currencyCode],
+    [currencyCode, t],
   );
 
   return (
@@ -85,11 +86,11 @@ function SalesByItemContent() {
       <ReportFilters dateRange={dateRange} onDateRangeChange={setDateRange} showDateRange />
 
       {/* Summary Cards */}
-      {data && (
+      {data && !isError && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('salesByItem.totalRevenue')}</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -100,7 +101,9 @@ function SalesByItemContent() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Qty Sold</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('salesByItem.totalQuantitySold')}
+              </CardTitle>
               <Hash className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -109,7 +112,7 @@ function SalesByItemContent() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Unique Items</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('salesByItem.uniqueItems')}</CardTitle>
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -119,18 +122,22 @@ function SalesByItemContent() {
         </div>
       )}
 
-      <Card>
-        <CardContent className="pt-6">
-          <DataTable
-            columns={columns}
-            data={data?.entries || []}
-            isLoading={isLoading}
-            emptyMessage="No item sales data found for the selected period."
-            enableExport
-            exportFilename="sales-by-item"
-          />
-        </CardContent>
-      </Card>
+      {isError ? (
+        <ReportLoadError onRetry={() => void refetch()} />
+      ) : (
+        <Card>
+          <CardContent className="pt-6">
+            <DataTable
+              columns={columns}
+              data={data?.entries || []}
+              isLoading={isLoading}
+              emptyMessage={t('salesByItem.empty')}
+              enableExport
+              exportFilename="sales-by-item"
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -8,6 +8,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 jest.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
+  useFormatter: () => ({
+    dateTime: (date: Date, options: Intl.DateTimeFormatOptions) =>
+      new Intl.DateTimeFormat('en', options).format(date),
+  }),
 }));
 
 jest.mock('@/components/reports/report-filters', () => ({

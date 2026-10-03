@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import api from '@/lib/api';
 
@@ -290,6 +290,11 @@ export function useOrganization() {
  * posted in it, so they must be displayed in it too, never in the counterparty's default.
  */
 export function useBaseCurrency(): string | undefined {
+  return useBaseCurrencyQuery().data?.baseCurrency;
+}
+
+/** Exposes loading, failure and retry for views that require the ledger currency. */
+export function useBaseCurrencyQuery(): UseQueryResult<{ baseCurrency: string }, Error> {
   // Its own lookup instead of GET /organization, which needs settings.view: an AP-only role must
   // still see the real currency. Fetched through the authenticated client (token refresh and
   // expiry handled there) and refreshed whenever an ['organization', ...] query is invalidated,
@@ -301,7 +306,7 @@ export function useBaseCurrency(): string | undefined {
     queryFn: organizationApi.getBaseCurrency,
     enabled: !!organizationId,
     staleTime: 5 * 60 * 1000,
-  }).data?.baseCurrency;
+  });
 }
 
 /** Display currency of a document: its own currency, else the organization base currency. */

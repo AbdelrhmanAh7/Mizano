@@ -38,17 +38,12 @@ import {
   normalizeDecimal,
   subtractDecimals,
 } from '@/lib/decimal';
-import {
-  useBill,
-  useApproveBill,
-  formatCurrency,
-  getStatusVariant,
-  getStatusText,
-} from '@/lib/hooks/use-bills';
+import { useBill, useApproveBill, getStatusVariant, getStatusText } from '@/lib/hooks/use-bills';
 import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import { cn } from '@/lib/utils';
-import { documentCurrency, useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useBaseCurrencyQuery } from '@/lib/hooks/use-organization';
+import { BillAmount } from '@/components/purchases/bill-amount';
 
 const PAYABLE_STATUSES = ['OPEN', 'OVERDUE', 'PARTIALLY_PAID'];
 
@@ -68,7 +63,7 @@ interface BillDetailPageProps {
 export default function BillDetailPage({ params }: BillDetailPageProps) {
   const { id } = params;
   const t = useTranslations('purchases');
-  const baseCurrency = useBaseCurrency();
+  const currencyQuery = useBaseCurrencyQuery();
   const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();
   const { toast } = useToast();
@@ -162,8 +157,11 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
   });
   const isOverdue =
     bill.status === 'OVERDUE' || (bill.status === 'OPEN' && new Date(bill.dueDate) < new Date());
-  // A bill without its own currency is posted in the base currency, so it is shown in it.
-  const currency = documentCurrency(bill.currencyCode, baseCurrency);
+  // The bill's own currency wins; otherwise the organization base currency (skeleton while it
+  // loads, error with Retry if it fails), never a guessed default.
+  const renderAmount = (amount: string): JSX.Element => (
+    <BillAmount amount={amount} currencyCode={bill.currencyCode} currencyQuery={currencyQuery} />
+  );
 
   return (
     <div className="space-y-6">
@@ -218,9 +216,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">
-              {formatCurrency(grandTotal, currency)}
-            </div>
+            <div className="text-2xl font-bold font-mono">{renderAmount(grandTotal)}</div>
           </CardContent>
         </Card>
 
@@ -237,7 +233,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
                 hasBalance ? 'text-destructive' : 'text-success',
               )}
             >
-              {formatCurrency(balanceDue, currency)}
+              {renderAmount(balanceDue)}
             </div>
           </CardContent>
         </Card>
@@ -304,12 +300,10 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
                           </div>
                         </TableCell>
                         <TableCell className="text-right font-mono">{qty}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatCurrency(rate, currency)}
-                        </TableCell>
+                        <TableCell className="text-right font-mono">{renderAmount(rate)}</TableCell>
                         <TableCell className="text-right">{taxRate}%</TableCell>
                         <TableCell className="text-right font-mono font-medium">
-                          {formatCurrency(amount, currency)}
+                          {renderAmount(amount)}
                         </TableCell>
                       </TableRow>
                     );
@@ -322,23 +316,23 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
                 <div className="w-64 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>{tCommon('subtotal')}</span>
-                    <span className="font-mono">{formatCurrency(bill.subtotal, currency)}</span>
+                    <span className="font-mono">{renderAmount(bill.subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>{tCommon('tax')}</span>
-                    <span className="font-mono">{formatCurrency(bill.taxAmount, currency)}</span>
+                    <span className="font-mono">{renderAmount(bill.taxAmount)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-lg font-bold">
                     <span>{tCommon('total')}</span>
-                    <span className="font-mono">{formatCurrency(grandTotal, currency)}</span>
+                    <span className="font-mono">{renderAmount(grandTotal)}</span>
                   </div>
                   {compareDecimals(balanceDue, grandTotal) !== 0 && (
                     <>
                       <div className="flex justify-between text-sm text-muted-foreground">
                         <span>{t('bills.status.paid')}</span>
                         <span className="font-mono">
-                          {formatCurrency(subtractDecimals(grandTotal, balanceDue), currency)}
+                          {renderAmount(subtractDecimals(grandTotal, balanceDue))}
                         </span>
                       </div>
                       <div
@@ -348,7 +342,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
                         )}
                       >
                         <span>{t('bills.table.balance')}</span>
-                        <span className="font-mono">{formatCurrency(balanceDue, currency)}</span>
+                        <span className="font-mono">{renderAmount(balanceDue)}</span>
                       </div>
                     </>
                   )}
@@ -395,7 +389,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
                       </TableCell>
                       <TableCell>{format(new Date(row.date), 'MMM d, yyyy')}</TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(row.amount, currency)}
+                        {renderAmount(row.amount)}
                       </TableCell>
                       {canVoid && (
                         <TableCell className="text-right">

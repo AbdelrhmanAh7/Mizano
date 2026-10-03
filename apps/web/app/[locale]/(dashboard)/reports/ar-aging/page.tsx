@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { ArrowLeft, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,20 +19,20 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
+import { ReportLoadError } from '@/components/reports/report-load-error';
 import {
   useARAgingReport,
   formatCurrency,
-  getAgingBucketLabel,
   getAgingBucketColor,
   AgingBucket,
 } from '@/lib/hooks/use-reports';
 
 export default function ARAgingReportPage() {
   const t = useTranslations('reports');
+  const formatter = useFormatter();
   const [asOfDate, setAsOfDate] = useState(new Date());
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null);
 
-  const tc = useTranslations('common');
   const {
     data: report,
     isLoading,
@@ -49,18 +49,6 @@ export default function ARAgingReportPage() {
         <Skeleton className="h-12 w-full max-w-md" />
         <Skeleton className="h-96" />
       </div>
-    );
-  }
-  if (isError) {
-    return (
-      <Card>
-        <CardContent className="pt-6 text-center space-y-4" role="alert">
-          <p className="text-muted-foreground">{tc('table.error')}</p>
-          <Button variant="outline" onClick={() => void refetch()}>
-            {tc('dashboard.tryAgain')}
-          </Button>
-        </CardContent>
-      </Card>
     );
   }
 
@@ -80,7 +68,15 @@ export default function ARAgingReportPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('arAging.title')}</h1>
-          <p className="text-muted-foreground">As of {format(asOfDate, 'MMMM d, yyyy')}</p>
+          <p className="text-muted-foreground">
+            {t('asOf', {
+              date: formatter.dateTime(asOfDate, {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+              }),
+            })}
+          </p>
         </div>
       </div>
 
@@ -92,10 +88,12 @@ export default function ARAgingReportPage() {
         showAsOfDate
       />
 
-      {!hasData ? (
+      {isError ? (
+        <ReportLoadError onRetry={() => void refetch()} />
+      ) : !hasData ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No accounts receivable aging data available.
+            {t('arAging.empty')}
           </CardContent>
         </Card>
       ) : (
@@ -126,7 +124,7 @@ export default function ARAgingReportPage() {
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Outstanding Invoices</p>
+                <p className="text-sm text-muted-foreground">{t('arAging.outstandingInvoices')}</p>
                 <p className="text-2xl font-bold">{totalCount}</p>
               </CardContent>
             </Card>
@@ -135,7 +133,7 @@ export default function ARAgingReportPage() {
           {/* Aging Buckets */}
           <Card>
             <CardHeader>
-              <CardTitle>Aging Summary</CardTitle>
+              <CardTitle>{t('agingSummary')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -153,11 +151,13 @@ export default function ARAgingReportPage() {
                       getAgingBucketColor(bucket.range),
                     )}
                   >
-                    <p className="text-sm font-medium">{getAgingBucketLabel(bucket.range)}</p>
+                    <p className="text-sm font-medium">{t(`agingBuckets.${bucket.range}`)}</p>
                     <p className="text-xl font-bold font-mono mt-1">
                       {formatCurrency(bucket.amount, currencyCode)}
                     </p>
-                    <p className="text-xs mt-1">{bucket.count} invoices</p>
+                    <p className="text-xs mt-1">
+                      {t('arAging.invoiceCount', { count: bucket.count })}
+                    </p>
                   </button>
                 ))}
               </div>
@@ -168,20 +168,22 @@ export default function ARAgingReportPage() {
           {expandedBucket && (
             <Card>
               <CardHeader>
-                <CardTitle>{getAgingBucketLabel(expandedBucket)} Invoices</CardTitle>
+                <CardTitle>
+                  {t('arAging.bucketTitle', { bucket: t(`agingBuckets.${expandedBucket}`) })}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {buckets.find((b: AgingBucket) => b.range === expandedBucket)?.items?.length ? (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Invoice #</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Invoice Date</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead className="text-right">Balance Due</TableHead>
-                        <TableHead className="text-center">Days Overdue</TableHead>
+                        <TableHead>{t('arAging.invoiceNumber')}</TableHead>
+                        <TableHead>{t('customer')}</TableHead>
+                        <TableHead>{t('arAging.invoiceDate')}</TableHead>
+                        <TableHead>{t('dueDate')}</TableHead>
+                        <TableHead className="text-right">{t('amount')}</TableHead>
+                        <TableHead className="text-right">{t('balanceDue')}</TableHead>
+                        <TableHead className="text-center">{t('daysOverdue')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -208,8 +210,20 @@ export default function ARAgingReportPage() {
                                 </Link>
                               </TableCell>
                               <TableCell>{item.counterpartyName}</TableCell>
-                              <TableCell>{format(new Date(item.date), 'MMM d, yyyy')}</TableCell>
-                              <TableCell>{format(new Date(item.dueDate), 'MMM d, yyyy')}</TableCell>
+                              <TableCell>
+                                {formatter.dateTime(new Date(item.date), {
+                                  month: 'long',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
+                              </TableCell>
+                              <TableCell>
+                                {formatter.dateTime(new Date(item.dueDate), {
+                                  month: 'long',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
+                              </TableCell>
                               <TableCell className="text-right font-mono">
                                 {formatCurrency(item.amount, currencyCode)}
                               </TableCell>
@@ -237,7 +251,7 @@ export default function ARAgingReportPage() {
                   </Table>
                 ) : (
                   <p className="text-center py-8 text-muted-foreground">
-                    No invoices in this aging bucket
+                    {t('arAging.emptyBucket')}
                   </p>
                 )}
               </CardContent>
