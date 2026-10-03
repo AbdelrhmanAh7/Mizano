@@ -196,10 +196,12 @@ browser-accessible API URL **at build time**; changing the runtime environment
 does not rebuild the client bundle. For an `exec format error` on arm64, install
 emulation once: `docker run --privileged --rm tonistiigi/binfmt --install arm64`.
 
-Image sizes: verification pending in this worktree; targets are API <1 GB and
-web <500 MB. Use `docker image inspect --format '{{.Size}}' IMAGE` for exact
-local byte sizes; registry transfer sizes and Docker's displayed disk usage can
-differ. Recorded measurements and limitations are in the issue-38 checkpoint.
+Image size limits, enforced by the verification script below: API under
+1,200,000,000 bytes (Chromium alone is about 575 MB, so 1 GB is unreachable) and
+web under 500,000,000 bytes. Use `docker image inspect --format '{{.Size}}' IMAGE`
+for exact local byte sizes; registry transfer sizes and Docker's displayed disk
+usage can differ. Recorded measurements and limitations are in the issue-38
+checkpoint.
 
 API migrations use the image's bundled Prisma CLI and target schema engine:
 `npx prisma migrate deploy` from `/app/apps/api`. No npm installation is needed;
@@ -210,18 +212,31 @@ probe `http://127.0.0.1:6001/api/health` and
 `http://127.0.0.1:5001/robots.txt`; Next binds to `0.0.0.0`.
 
 Image startup, Prisma and installed native dependencies need no runtime
-package downloads. OCR/PDF acceptance remains separate: Chromium and pinned English/Arabic
-traineddata are bundled, and Tesseract reads those language files from its default working-directory
-cache. Verify cold OCR with networking disabled before release. Bundled
-`onnxruntime-node` Linux binaries require glibc rather than Alpine musl. These
+package downloads. OCR/PDF acceptance remains separate: Chromium, Poppler and
+the pinned English/Arabic traineddata are bundled (`INTAKE_TESSDATA_DIR=/app/tessdata`,
+see the [runtime contract](strategy/pi-cpu-extraction-runtime.md)). These
 images alone do not establish the complete offline intake-worker acceptance
 from issue #38.
 
-CI's `docker-multiarch` job serially builds and loads API and web for
-`linux/amd64,linux/arm64` with separate cache scopes and an explicit web API
-build argument. It checks architecture, native dependencies, offline Prisma
-validation and the size limits. It does not push images; publishing SHA tags/digests and Pi
-cold-start/health evidence remain release work.
+Image verification is one script, `deploy/ci/verify-docker-image.sh`, run once
+per architecture against images loaded into the local Docker daemon
+(`TARGET_ARCH`, `API_IMAGE` and `WEB_IMAGE`; see its header for the command).
+Every container runs with `--network none`. It checks the architecture; the
+native modules; the worker's tools at the absolute paths its code uses
+(`/usr/bin/pdftoppm`, `pdftotext`, `pdfinfo`, `prlimit`); that the extraction
+child's compiled import graph loads; offline Prisma validation; offline
+initialization of the bundled `eng+ara` OCR assets; the production extraction
+code reading a rendered invoice image (a wiring check on synthetic text, not an
+accuracy claim); an Arabic-capable font; headless Chromium rendering a PDF and a
+PNG with Arabic text; and the size limits. Chromium and the extraction check run
+on both architectures, because each architecture builds and runs on a native
+runner. CI has one Docker job, the `docker-build` matrix of PR #82 (`ubuntu-latest`
+for amd64, `ubuntu-24.04-arm` for arm64), which builds each image with
+`load: true` and runs the script. It never pushes images; publishing SHA
+tags/digests and Pi cold-start/health evidence remain release work. QEMU
+emulation is not used in CI: it left `pnpm install` without progress for 60
+minutes. Until #82 is on master and the job calls the script, CI has no Docker
+job and the script is run by hand.
 
 Historical VPS sizing and provider notes: [archive/deployment-requirements-2026-03.md](archive/deployment-requirements-2026-03.md).
 

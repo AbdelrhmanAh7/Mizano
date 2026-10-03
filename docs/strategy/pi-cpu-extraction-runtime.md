@@ -42,11 +42,13 @@ the local-file route rather than relying on its TypeScript declaration.
 Unset configuration selects tracked local files relative to the adapter;
 missing/corrupt files, URL configuration and unsupported languages fail closed.
 Build-time registry access is allowed; runtime language downloads are not.
-The CI Docker job already initializes `eng+ara` under
-`--network none` on both architectures. Keep that check and the image-size
-assertion. Asset updates require an explicit version/hash change and rerunning
-the offline initialization check; never regenerate hashes automatically during
-the Docker build.
+The image verification script (`deploy/ci/verify-docker-image.sh`, run by
+the CI Docker job on each native architecture) initializes `eng+ara` under
+`--network none` and then reads a rendered invoice through the production
+extraction code. Keep those checks and the image-size assertion. Asset
+updates require an explicit version/hash change and rerunning the offline
+initialization check; never regenerate hashes automatically during the Docker
+build.
 
 The offline unit contract in
 `apps/api/src/modules/ai/extraction/ocr-assets.spec.ts` checks both local asset
