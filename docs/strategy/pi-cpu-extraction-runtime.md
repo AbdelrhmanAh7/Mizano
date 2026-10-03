@@ -139,7 +139,9 @@ The work is split at the process boundary, by what each step needs:
   keywords (`BILL`, `RECEIPT` or `OTHER`); its confidence is the strength of
   that keyword evidence, not an accuracy. Text shorter than ten characters is
   not parsed: the result keeps the text as evidence with every field null and
-  `extractionMethod=cpu-ocr`. Otherwise `extractionMethod=rules`.
+  `extractionMethod=cpu-ocr`. If the rules themselves throw, the result is the
+  same evidence-only one with the warning code `RULES_FAILED`, not a failed job
+  that is retried into the dead letter. Otherwise `extractionMethod=rules`.
 - **In the worker process, after the child has closed.** `IntakeMatchingService`
   needs the database, so it is not in the child. Every query is scoped to the
   job's organization and ignores deleted rows. It lists up to five vendor

@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import * as rules from '../extraction/rules/invoice-rules-extractor';
 import { RulesStrategy } from '../extraction/rules-strategy.service';
 import {
   classifyDocumentText,
@@ -110,6 +111,24 @@ describe('structuredCpuResult: rules extraction over worker text', () => {
       extractionMethod: 'cpu-ocr',
       ocrConfidence: 0.9,
       extractedFields: { total: null, date: null, vendorName: null },
+    });
+  });
+
+  describe('when the rules themselves fail', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it('keeps the text as evidence and names the failure by code, never by message', () => {
+      jest.spyOn(rules, 'extractInvoiceFields').mockImplementation(() => {
+        throw new Error('stack with SECRET invoice text 9999.99');
+      });
+      const text = fixture('en-eg-invoice.txt');
+      const result = structuredCpuResult(text, NATIVE_TEXT_CONFIDENCE);
+      expect(result).toEqual({
+        ...cpuReviewResult(text, NATIVE_TEXT_CONFIDENCE),
+        extractionWarnings: ['RULES_FAILED'],
+      });
+      expect(result.extractedFields.total).toBeNull();
+      expect(JSON.stringify(result.extractionWarnings)).not.toContain('SECRET');
     });
   });
 

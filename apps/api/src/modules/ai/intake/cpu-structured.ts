@@ -109,6 +109,16 @@ export function structuredCpuResult(rawText: string, textConfidence: number): Do
   if (rawText.trim().length < MIN_RULES_TEXT_LENGTH) {
     return cpuReviewResult(rawText, textConfidence);
   }
+  try {
+    return parsedResult(rawText, textConfidence);
+  } catch {
+    // A defect in the rules must not lose the recognized text, nor retry the same document into the
+    // dead letter: keep the evidence for the accountant and say, by code only, why nothing was parsed.
+    return { ...cpuReviewResult(rawText, textConfidence), extractionWarnings: ['RULES_FAILED'] };
+  }
+}
+
+function parsedResult(rawText: string, textConfidence: number): DocumentIntakeResult {
   const extraction = toExtractionResult(extractInvoiceFields(rawText, textConfidence), rawText, 0);
   const classification = classifyDocumentText(rawText);
   return {
