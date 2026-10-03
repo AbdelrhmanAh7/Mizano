@@ -56,6 +56,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **The web preview rounds per line exactly like the server** (`computeDocumentTotals`), otherwise the shown and stored totals differ.
 - **When storage changes (net vs. gross), update every view:** list, detail, PDF and report. _(tax-inclusive expenses)_
 - **Keep accepted amounts.** Converting a quote copies its stored lines and totals rather than recomputing them.
+- **Benchmark exact money before rounding or numeric adapters.** Carry original Decimal strings into scoring, reject unsupported ground-truth precision and count unsupported predictions as mismatches. Check bounds before expanding exponents with `toFixed`, so unsupported values cannot allocate enormous strings.
 
 ## 7. Tenancy, roles and validation
 
@@ -105,6 +106,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
 - **Paginated searches apply their predicate in the database for both page and count.** Never materialize all matching ids or cap that intermediate list; preserve tenant/deletion filters, literal wildcard escaping and stable ordering.
 - **Parallel branches that touch one pipeline are verified together, not one by one.** A clean textual merge can still change behaviour: field validation moved the inbox E2E's foreign-currency fixture from `EXTRACTED` to `NEEDS_REVIEW`, and bulk approval had to adopt the transactional confirm (claim, draft, `INTAKE_DRAFT` marker and job link in one transaction) that the reconcile branch gave the single route. After merging, rerun every branch's seeded E2E on the merged tree, route each bulk path through the merged single-record command, and change the fixture to the intended scenario, never the assertion. _(intake bundle)_
+- **Validate benchmark labels at the JSON boundary.** Require a document map and every scored field as a string or explicit null before opening corpus files.
+- **OCR must fail closed without local language assets.** Check all requested traineddata files before image benchmarking and worker creation; require readable, nonempty regular files and never allow a CDN fallback. Use static error codes to distinguish configuration failures without logging paths.
 
 ## Review process
 

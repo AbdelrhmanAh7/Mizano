@@ -205,6 +205,45 @@ export interface IntakeProgressEvent {
 /** Truncate PDF raw text to this length before sending to Ollama (speeds up inference). */
 const PDF_TEXT_TRUNCATION_LIMIT = 4000;
 
+/**
+ * Builds the strategy input exactly as the intake processor does: PDF text layer first
+ * (truncated), images untouched. Shared with the offline extraction benchmark.
+ */
+export async function buildExtractionContext(
+  fileBuffer: Buffer,
+  mimeType: string,
+  language: string,
+  filename?: string,
+  logger?: Logger,
+): Promise<{ context: ExtractionContext; rawText: string }> {
+  const isPdf = mimeType === 'application/pdf';
+  const context: ExtractionContext = { fileBuffer, mimeType, filename, language, isPdf };
+  let rawText = '';
+  if (isPdf) {
+    try {
+      const pdfResult = await extractTextFromPdf(fileBuffer);
+      logger?.log(
+        `PDF extraction: pages=${pdfResult.pageCount}, native=${pdfResult.isNativeText}, textLen=${pdfResult.text.length}`,
+      );
+      context.pdfText = pdfResult.text;
+      context.pdfIsNativeText = pdfResult.isNativeText;
+      context.pdfPageCount = pdfResult.pageCount;
+      if (pdfResult.text.length > 20) {
+        rawText = pdfResult.text;
+        if (rawText.length > PDF_TEXT_TRUNCATION_LIMIT) {
+          rawText = rawText.slice(0, PDF_TEXT_TRUNCATION_LIMIT);
+          context.pdfText = rawText;
+        }
+      }
+    } catch (error) {
+      logger?.warn(
+        `PDF text extraction failed: ${error instanceof Error ? error.name : 'unknown error'}`,
+      );
+    }
+  }
+  return { context, rawText };
+}
+
 function uniqueIds(values: Array<string | undefined>): string[] {
   return [...new Set(values.filter((v): v is string => typeof v === 'string' && v.length > 0))];
 }
@@ -250,45 +289,21 @@ export class DocumentIntakeService {
       `Processing document intake: org=${organizationId}, mime=${mimeType}, size=${fileBuffer.length}, strategy=${strategy || 'default'}`,
     );
 
-    let rawText = '';
     let extraction: DocumentExtractionResult | null = null;
     let extractionMethod: DocumentIntakeResult['extractionMethod'] = 'ocr-llm';
-    const isPdf = mimeType === 'application/pdf';
 
     // Step 1: Build extraction context
     onProgress?.('extracting', 20, 'AI is reading your document...');
 
-    const context: ExtractionContext = {
+    const prepared = await buildExtractionContext(
       fileBuffer,
       mimeType,
+      _language,
       filename,
-      language: _language,
-      isPdf,
-    };
-
-    // For PDFs, extract text first (used by all strategies)
-    if (isPdf) {
-      try {
-        const pdfResult = await extractTextFromPdf(fileBuffer);
-        this.logger.log(
-          `PDF extraction: pages=${pdfResult.pageCount}, native=${pdfResult.isNativeText}, textLen=${pdfResult.text.length}`,
-        );
-        context.pdfText = pdfResult.text;
-        context.pdfIsNativeText = pdfResult.isNativeText;
-        context.pdfPageCount = pdfResult.pageCount;
-        if (pdfResult.text.length > 20) {
-          rawText = pdfResult.text;
-          if (rawText.length > PDF_TEXT_TRUNCATION_LIMIT) {
-            rawText = rawText.slice(0, PDF_TEXT_TRUNCATION_LIMIT);
-            context.pdfText = rawText;
-          }
-        }
-      } catch (error) {
-        this.logger.warn(
-          `PDF text extraction failed: ${error instanceof Error ? error.name : 'unknown error'}`,
-        );
-      }
-    }
+      this.logger,
+    );
+    const context = prepared.context;
+    let rawText = prepared.rawText;
 
     // Step 2: Resolve and execute extraction strategy
     const strategyResult = await this.strategyResolver.resolve(context, strategy);
