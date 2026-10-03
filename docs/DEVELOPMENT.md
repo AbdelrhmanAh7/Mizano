@@ -133,8 +133,8 @@ Rules:
 - **Push to `master` or `develop`**: full CI runs (install → lint/type-check → test → build → Docker multi-arch validation).
 - **Pull requests**: CI runs on `opened`, `synchronize`, `reopened`, `ready_for_review` and `labeled`.
 - **Draft PRs**: CI is **skipped** unless the PR has the `ci` label. Adding `ci` to an existing draft starts CI without a new commit.
-- **Labels**: only `ci` and `docker` matter. Adding any other label starts a run whose gate skips every job, and that run never cancels one already in progress.
-- **Concurrency**: one run per PR (keyed by PR number) or per pushed branch (keyed by ref). A newer PR run cancels the older one as a whole, including the Docker job. Pushes to `master`/`develop` are queued, not cancelled, so every commit on those branches keeps a complete CI result (the deploy workflow starts from the CI result of `master`).
+- **Labels**: only `ci` and `docker` change what runs, but every label change re-runs CI on the same commit. A run whose jobs were all skipped would report under the same check names as the real run and hide a failing one, so a label never produces a skipped run (except on a draft without `ci`, which has no real run to hide). The `ci` and `docker` labels must exist in the repository before they can be applied.
+- **Concurrency**: one run per PR (keyed by PR number) or per pushed branch (keyed by ref). A newer PR run (a push or a label change) cancels the older one as a whole, including the Docker job. Pushes to `master`/`develop` are queued, not cancelled, so every commit on those branches keeps a complete CI result (the deploy workflow starts from the CI result of `master`).
 
 ### Job flow
 

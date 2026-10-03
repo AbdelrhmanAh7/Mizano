@@ -13,19 +13,20 @@ on:
   pull_request:
     branches: [master, develop]
     # "labeled" lets an operator start CI on a draft ("ci" label) or request the Docker
-    # validation ("docker" label) without a new commit. The gate job ignores other labels.
+    # validation ("docker" label) without a new commit. Any label change re-runs the real
+    # jobs: a run whose jobs the gate skipped would report under the same check names and
+    # hide a failing run of the same commit.
     types: [opened, synchronize, reopened, ready_for_review, labeled]
 
 permissions:
   contents: read
 
 # One run per PR (or per pushed branch). A newer PR run replaces the older one as a whole,
-# including the expensive Docker job. An unrelated label never cancels a running CI, and
-# branch pushes are queued instead of cancelled so every master commit keeps a complete
-# result (deploy.yml starts from the CI result of master).
+# including the expensive Docker job. Branch pushes are queued instead of cancelled so every
+# master commit keeps a complete result (deploy.yml starts from the CI result of master).
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'ci' || github.event.label.name == 'docker') }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   NODE_VERSION: '20'
@@ -49,20 +50,13 @@ jobs:
         # script body, so a label name cannot inject shell code.
         env:
           EVENT_NAME: ${{ github.event_name }}
-          EVENT_ACTION: ${{ github.event.action }}
           IS_DRAFT: ${{ github.event.pull_request.draft }}
           HAS_CI_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'ci') }}
-          ADDED_LABEL: ${{ github.event.label.name }}
         run: |
           should_run=true
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            if [ "$EVENT_ACTION" = "labeled" ] && [ "$ADDED_LABEL" != "ci" ] && [ "$ADDED_LABEL" != "docker" ]; then
-              echo "The added label does not control CI - skipping"
-              should_run=false
-            elif [ "$IS_DRAFT" = "true" ] && [ "$HAS_CI_LABEL" != "true" ]; then
-              echo "Draft PR without the 'ci' label - skipping CI"
-              should_run=false
-            fi
+          if [ "$EVENT_NAME" = "pull_request" ] && [ "$IS_DRAFT" = "true" ] && [ "$HAS_CI_LABEL" != "true" ]; then
+            echo "Draft PR without the 'ci' label - skipping CI"
+            should_run=false
           fi
           echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
 
@@ -328,7 +322,9 @@ jobs:
   # URL must not be tagged for deployment.
   # ==========================================
   docker-build:
-    name: Docker Multi-Arch Build (${{ matrix.arch }})
+    # Static name: GitHub appends the matrix values itself, and a skipped job would
+    # otherwise show the unresolved ${{ matrix.arch }} template as its check name.
+    name: Docker Multi-Arch Build
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     needs: [gate, filter, lint, test, build]
