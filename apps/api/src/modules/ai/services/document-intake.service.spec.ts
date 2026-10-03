@@ -15,7 +15,7 @@ const ORG_A = 'org-a';
 const ORG_B = 'org-b';
 
 interface PrismaMock {
-  organization: { findFirst: jest.Mock };
+  organization: { findFirst: jest.Mock; findUnique: jest.Mock };
   vendor: { findFirst: jest.Mock; findMany: jest.Mock };
   customer: { findFirst: jest.Mock };
   project: { findFirst: jest.Mock };
@@ -24,7 +24,6 @@ interface PrismaMock {
   taxRate: { findMany: jest.Mock };
   bill: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock };
   invoice: { findFirst: jest.Mock; create: jest.Mock };
-  organization: { findUnique: jest.Mock };
 }
 
 /**
@@ -56,7 +55,10 @@ function buildPrisma(): PrismaMock {
       );
 
   return {
-    organization: { findFirst: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }) },
+    organization: {
+      findFirst: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }),
+      findUnique: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }),
+    },
     vendor: {
       findFirst: jest.fn(findOwned(owned.vendor)),
       findMany: jest.fn().mockResolvedValue([]),
@@ -83,7 +85,6 @@ function buildPrisma(): PrismaMock {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({ id: 'invoice-1' }),
     },
-    organization: { findUnique: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }) },
   };
 }
 
