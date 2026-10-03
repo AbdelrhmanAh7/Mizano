@@ -1,3 +1,4 @@
+import { signedMovementQuantity } from '../../inventory/utils/movement-sign';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Item, Prisma, WorkOrderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -192,15 +193,17 @@ export class WorkOrdersService {
       const baseQty = parseFloat(bomItem.quantity.toString());
       const requiredQty = baseQty * multiplier;
 
-      // Get current stock
+      // Get current stock: sum IN movements, subtract OUT movements
+      // Handles both old rows (negative qty, no movementType) and new rows (positive qty, movementType)
       const movements = await this.prisma.inventoryMovement.findMany({
         where: {
           itemId: bomItem.itemId,
           organizationId,
         },
+        select: { quantity: true, movementType: true },
       });
       const currentStock = movements.reduce(
-        (sum: number, m) => sum + parseFloat(m.quantity.toString()),
+        (sum: number, m) => sum + signedMovementQuantity(m.quantity, m.movementType),
         0,
       );
 
@@ -433,13 +436,14 @@ export class WorkOrdersService {
       const baseQty = parseFloat(bomItem.quantity.toString());
       const consumeQty = Math.round(baseQty * multiplier);
 
-      // Create negative inventory movement
+      // Create OUT inventory movement (positive quantity, movementType carries direction)
       await this.prisma.inventoryMovement.create({
         data: {
           itemId: bomItem.itemId,
           warehouseId,
           type: 'production',
-          quantity: -consumeQty,
+          quantity: consumeQty,
+          movementType: 'OUT',
           referenceType: 'workOrder',
           referenceId: workOrder.id,
           organizationId,
@@ -469,6 +473,7 @@ export class WorkOrdersService {
         warehouseId,
         type: 'production',
         quantity: quantityProduced,
+        movementType: 'IN',
         referenceType: 'workOrder',
         referenceId: workOrder.id,
         organizationId,
