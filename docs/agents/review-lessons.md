@@ -15,6 +15,9 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 2. Idempotency and retries
 
+- **A transport cursor is an acknowledgement, not a delivery record.** Persist source identity and its original tenant before external I/O; advance the cursor only after durable success or a recorded terminal outcome. Sort batches before acknowledging, namespace cursors by bot, and handle provider ID resets after inactivity. Never rebind an old delivery after chat unlink/relink. Rate limits defer authorized batches; they must not discard the remaining documents. _(Telegram intake, PR #58)_
+- **Shutdown owns its asynchronous work.** Abort requests, cancel backoff and await the active loop; detached promises can outlive database and queue dependencies. _(Telegram polling)_
+
 - **Every state change is a guarded transition:** `updateMany({ where: { id, organizationId, status: FROM } })` plus a `count` check that throws `ConflictException`. Journal idempotency is the tenant-scoped unique key `(organizationId, sourceType, sourceId)`.
 - **An idempotency key must stay the same across retries of one action.** Generating a fresh random id on the server for each request defeats it. A client UUID created once per user action and reused on every retry is fine (`idempotencyKeyFor`); so are `profileId:YYYY-MM-DD` or a sha256 of file + row. _(manual recurring execute, import retries)_
 - **Store idempotency markers where users cannot edit them.** Notes, reason and reference text get edited; use an append-only store such as AuditLog `IMPORT_ROW`. _(import markers)_
@@ -54,6 +57,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 7. Tenancy, roles and validation
 
+- **Persistent integration bindings must recheck the authorizing principal.** Disabled/deleted users or revoked permissions must stop future ingestion and pending link-code redemption. Verify private-channel administrator control before binding a caller-supplied channel ID. _(Telegram binding)_
+
 - **Scope every tenant resource by `organizationId`** in queries, locks and lookups. Child rows are scoped through their tenant-scoped parent, and pre-authentication lookups such as login by email are the documented exception. Another tenant's ids return 404 (or 400 when they come from the body), and soft-deleted parents return 404.
 - **Ownership checks for `@Sse` routes live in a guard, not the handler.** Once the stream starts the status is already 200, so a `NotFoundException` thrown in the handler arrives as an in-band error event and the tenant probe sees 200. `IntakeJobOwnerGuard` returns the real 404. _(intake progress SSE)_
 - **Validate the role of every referenced account, not only ownership.** Refund, payment and paid-from accounts must pass the bank/cash rule (`common/utils/bank-cash-accounts.ts`). Expense offsets must be `EXPENSE`. Credit accounts must come from the source document's lines.
@@ -61,6 +66,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **When a form needs data the role can't read, add a narrow lookup endpoint guarded by the form's own permission,** for example `/invoices/tax-rate-options` (`sales.view`) or `/inventory-adjustments/account-options` (`inventory.create`). Never widen permissions.
 - **Gate UI actions with exactly the API route's permission.**
 - **Money-bearing imports require the same per-entity create permission as the single-record routes.**
+- **Adding auth to a server endpoint or socket changes its contract: update every client in the same PR** (send the token, handle expiry and reconnect). A server-only change silently breaks the client. _(events gateway vs `use-realtime`)_
 
 ## 8. Voided and deleted records
 
@@ -76,7 +82,9 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 10. Logging, audit and secrets
 
-- **Never log or audit values:** no document text, amounts, tax ids, LLM output, query parameters or raw error objects. Log metadata instead (ids, counts, lengths, durations, field names, status), and use `describeError` for errors. `redactText` only masks credential-shaped strings, so it does not make document text safe to log.
+- **Bound downloads while streaming, not after buffering.** Check metadata/header size, count each chunk and cancel excess input. Sanitize response parsing/body errors as well as connection errors; those can embed token-bearing URLs too. _(Telegram client)_
+
+- **Never log or audit values:** no document text, amounts, tax ids, LLM output, query parameters or raw error objects. Log metadata instead (ids, counts, lengths, durations, field names, status), and use `describeError(error, { includeMessage: false })` wherever an error message could contain document or user data. `redactText` only masks credential-shaped strings, so it does not make document text safe to log.
 - **Clients can't claim trusted provenance.** HTTP log captures are forced to `FRONTEND`.
 - **Compare secrets in constant time, with no default secrets.** Re-apply file permissions on files that already exist.
 

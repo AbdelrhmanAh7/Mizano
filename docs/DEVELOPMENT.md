@@ -49,6 +49,8 @@ Agent slash-command recipes for these live in [`.agents/workflows/`](../.agents/
 
 ## Environments
 
+Telegram development requires a dedicated bot and exactly one poller for that bot. `TELEGRAM_BOT_TOKEN` enables polling; all E2E tests explicitly disable it to avoid consuming real updates. See [Telegram setup and targeted validation](telegram-intake.md) for private-channel binding, the isolated `mizano_e2e_telegram` database and recovery behavior. Never share a live deployment's polling token with a development API.
+
 Four environment templates are tracked at the repository root. They hold placeholders (`__CHANGE_ME__`) or local-only defaults; real secrets are supplied outside source control.
 
 | File         | `APP_ENV` | `NODE_ENV`  | Purpose                    |

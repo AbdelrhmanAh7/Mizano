@@ -1,6 +1,6 @@
 /**
- * Telegram intake (issue #20): real API, real login and PostgreSQL; only the Telegram Bot API
- * client is replaced. A linked chat's document becomes an intake job in that organization only.
+ * Telegram intake (issue #20): real API, login and PostgreSQL. The Telegram client and
+ * extraction resolver are replaced; this verifies durable ingestion and tenant isolation.
  */
 import { INestApplication } from '@nestjs/common';
 import { IntakeSource } from '@prisma/client';
@@ -10,12 +10,17 @@ import { ExtractionStrategyResolver } from '../src/modules/ai/extraction/extract
 import { TelegramClient, TelegramUpdate } from '../src/modules/telegram/telegram.client';
 import { TelegramIntakeService } from '../src/modules/telegram/telegram-intake.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { TelegramLinkService } from '../src/modules/telegram/telegram-link.service';
+import { IntakeJobsService } from '../src/modules/ai/intake/intake-jobs.service';
+import * as request from 'supertest';
 
 const sent: { chatId: string; text: string }[] = [];
 let files: Record<string, Buffer> = {};
 
 const fakeClient: TelegramClient = {
   isEnabled: () => false,
+  pollKey: () => 'telegram-e2e',
+  canManageChannel: async () => true,
   getUpdates: async () => [],
   downloadFile: async (fileId: string) => files[fileId],
   sendMessage: async (chatId: string, text: string) => {
@@ -76,7 +81,7 @@ describe('Telegram intake (e2e)', () => {
 
   afterAll(async () => {
     held.forEach((release) => release(new Error('test teardown')));
-    await app.close();
+    await app?.close();
   });
 
   it('refuses an unlinked chat and stores nothing', async () => {
@@ -161,5 +166,141 @@ describe('Telegram intake (e2e)', () => {
     expect(await prisma.intakeJob.count({ where: { organizationId: a.organizationId } })).toBe(
       before,
     );
+  });
+
+  it('requires authentication and rejects a foreign organization before issuing a code', async () => {
+    expect((await request(app.getHttpServer()).post('/telegram/link-code')).status).toBe(401);
+    expect((await request(app.getHttpServer()).get('/telegram/links')).status).toBe(401);
+    expect(
+      (await a.api.post('/telegram/link-code').send({ organizationId: b.organizationId })).status,
+    ).toBe(403);
+  });
+
+  it('atomically consumes a code under concurrent redemption', async () => {
+    const res = await a.api.post('/telegram/link-code');
+    expect(res.status).toBe(201);
+    const links = app.get(TelegramLinkService);
+    const results = await Promise.all([
+      links.redeem(res.body.data.code as string, `${chatA}10`),
+      links.redeem(res.body.data.code as string, `${chatA}11`),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual(['invalid', 'linked']);
+  });
+
+  it('replays the exact update after restart/relink without copying it to another tenant', async () => {
+    const chat = `${chatA}12`;
+    await link(a, chat);
+    const content = Buffer.from(`%PDF replay ${uniqueSuffix()}`);
+    files = { replay: content };
+    const update = msg(chat, {
+      document: { file_id: 'replay', mime_type: 'application/pdf', file_name: 'replay.pdf' },
+    });
+    await intake.handleUpdate(update);
+    const receipt = await prisma.telegramDelivery.findFirst({
+      where: {
+        organizationId: a.organizationId,
+        botKey: fakeClient.pollKey(),
+        updateId: update.update_id,
+      },
+    });
+    expect(receipt?.intakeJobId).toEqual(expect.any(String));
+    const links = app.get(TelegramLinkService);
+    const bound = await links.findByChat(chat);
+    expect(bound).not.toBeNull();
+    await links.unlink(bound!.id, a.organizationId);
+    await link(b, chat);
+    const beforeB = await prisma.intakeJob.count({ where: { organizationId: b.organizationId } });
+    const restarted = new TelegramIntakeService(
+      prisma,
+      fakeClient,
+      links,
+      app.get(IntakeJobsService),
+    );
+    await restarted.handleUpdate(update);
+    expect(await prisma.intakeJob.count({ where: { organizationId: b.organizationId } })).toBe(
+      beforeB,
+    );
+    expect((await a.api.get(`/ai/document-intake/${receipt!.intakeJobId}/result`)).status).toBe(
+      200,
+    );
+    expect((await b.api.get(`/ai/document-intake/${receipt!.intakeJobId}/result`)).status).toBe(
+      404,
+    );
+  });
+
+  it('links an authorized private channel and accepts a channel_post exactly once', async () => {
+    const channel = `-${chatA}13`;
+    const res = await a.api.post('/telegram/link-code');
+    expect(res.status).toBe(201);
+    await intake.handleUpdate(
+      msg('42', { from: { id: 42 }, text: `${res.body.data.command} ${channel}` }),
+    );
+    expect(sent.at(-1)?.text).toContain('Linked');
+    const before = await prisma.intakeJob.count({ where: { organizationId: a.organizationId } });
+    files = { channel: Buffer.from(`%PDF channel ${uniqueSuffix()}`) };
+    const update: TelegramUpdate = {
+      update_id: updateId++,
+      channel_post: {
+        message_id: updateId,
+        chat: { id: channel, type: 'channel' },
+        document: { file_id: 'channel', mime_type: 'application/pdf' },
+      },
+    };
+    await intake.handleUpdate(update);
+    await intake.handleUpdate(update);
+    expect(await prisma.intakeJob.count({ where: { organizationId: a.organizationId } })).toBe(
+      before + 1,
+    );
+  });
+
+  it('rolls back code consumption when a different tenant already owns the chat', async () => {
+    const links = app.get(TelegramLinkService);
+    const res = await a.api.post('/telegram/link-code');
+    expect(res.status).toBe(201);
+    const code = res.body.data.code as string;
+    expect((await links.redeem(code, chatB)).status).toBe('linked-elsewhere');
+    expect((await links.redeem(code, `${chatA}14`)).status).toBe('linked');
+  });
+
+  it('reuses the durable original after a crash before delivery completion', async () => {
+    const chat = `${chatA}15`;
+    await link(a, chat);
+    files = { crash: Buffer.from(`%PDF crash ${uniqueSuffix()}`) };
+    const update = msg(chat, { document: { file_id: 'crash', mime_type: 'application/pdf' } });
+    const before = await prisma.intakeJob.count({ where: { organizationId: a.organizationId } });
+    const realUpdate = prisma.telegramDelivery.updateMany.bind(prisma.telegramDelivery);
+    const fault = jest.spyOn(prisma.telegramDelivery, 'updateMany').mockImplementation((args) => {
+      if (args.data.completedAt) throw new Error('injected receipt write failure');
+      return realUpdate(args);
+    });
+    try {
+      await expect(intake.handleUpdate(update)).rejects.toThrow('injected receipt write failure');
+    } finally {
+      fault.mockRestore();
+    }
+    expect(await prisma.intakeJob.count({ where: { organizationId: a.organizationId } })).toBe(
+      before + 1,
+    );
+    const restarted = new TelegramIntakeService(
+      prisma,
+      fakeClient,
+      app.get(TelegramLinkService),
+      app.get(IntakeJobsService),
+    );
+    await restarted.handleUpdate(update);
+    expect(await prisma.intakeJob.count({ where: { organizationId: a.organizationId } })).toBe(
+      before + 1,
+    );
+    const receipt = await prisma.telegramDelivery.findFirst({
+      where: {
+        organizationId: a.organizationId,
+        botKey: fakeClient.pollKey(),
+        updateId: update.update_id,
+      },
+    });
+    expect(receipt).toMatchObject({
+      completedAt: expect.any(Date),
+      intakeJobId: expect.any(String),
+    });
   });
 });

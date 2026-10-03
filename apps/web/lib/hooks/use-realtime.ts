@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { io, Socket } from 'socket.io-client';
-import { useSession } from 'next-auth/react';
+import { getSession, useSession } from 'next-auth/react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6001/api';
 // Strip the /api path to get the base WS URL
@@ -55,8 +55,8 @@ const FINANCIAL_ENTITIES = new Set([
 /**
  * Socket.IO disconnect reasons that are auto-recoverable.
  * Socket.IO will reconnect automatically for these — no warning needed.
- * Only `io server disconnect` requires manual attention (server forcefully
- * kicked the client and auto-reconnect is disabled for that reason).
+ * Server disconnects and rejected handshakes require manual recovery when
+ * Socket.IO has disabled automatic reconnection.
  */
 const AUTO_RECOVERABLE_REASONS = new Set(['transport close', 'transport error', 'ping timeout']);
 
@@ -77,7 +77,22 @@ export function useRealtime() {
   useEffect(() => {
     if (!userId) return;
 
+    let disposed = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+
+    let reconnectDelay = 1000;
+    let recovering = false;
+
     const socket = io(`${WS_URL}/events`, {
+      auth: (cb) => {
+        getSession()
+          .then((freshSession) => {
+            if (!disposed) cb({ token: freshSession?.accessToken });
+          })
+          .catch(() => {
+            if (!disposed) cb({});
+          });
+      },
       transports: ['polling', 'websocket'],
       upgrade: true,
       autoConnect: true,
@@ -90,6 +105,10 @@ export function useRealtime() {
     socketRef.current = socket;
 
     socket.on('connect', () => {
+      reconnectDelay = 1000;
+      recovering = false;
+      if (reconnectTimer !== undefined) clearTimeout(reconnectTimer);
+      reconnectTimer = undefined;
       if (orgId) {
         socket.emit('join-org', orgId);
       }
@@ -114,6 +133,37 @@ export function useRealtime() {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     });
 
+    const scheduleRecovery = () => {
+      if (disposed) return;
+      reconnectTimer = setTimeout(async () => {
+        reconnectTimer = undefined;
+        let hasToken = false;
+        try {
+          hasToken = !!(await getSession())?.accessToken;
+        } catch {
+          // Retry temporary session failures with backoff.
+        }
+        if (disposed) return;
+        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+        if (hasToken) {
+          recovering = false;
+          socket.connect();
+        } else {
+          scheduleRecovery();
+        }
+      }, reconnectDelay);
+    };
+
+    const recoverConnection = () => {
+      if (disposed || recovering) return;
+      recovering = true;
+      scheduleRecovery();
+    };
+
+    socket.on('connect_error', () => {
+      if (socket.active === false) recoverConnection();
+    });
+
     socket.on('disconnect', (reason) => {
       if (reason === 'io client disconnect') {
         // Client-initiated cleanup (e.g., unmount) — expected, no log
@@ -123,10 +173,12 @@ export function useRealtime() {
         // Socket.IO will auto-reconnect — no action needed
         return;
       }
-      // Truly unexpected (e.g., io server disconnect) — handled silently
+      if (reason === 'io server disconnect') recoverConnection();
     });
 
     return () => {
+      disposed = true;
+      if (reconnectTimer !== undefined) clearTimeout(reconnectTimer);
       socket.disconnect();
       socketRef.current = null;
     };

@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHash } from 'crypto';
 
 export interface TelegramFileRef {
   file_id: string;
   file_size?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface TelegramDocument extends TelegramFileRef {
@@ -25,6 +28,8 @@ export interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
   channel_post?: TelegramMessage;
+  edited_message?: TelegramMessage;
+  edited_channel_post?: TelegramMessage;
 }
 
 /** Carries only the API method and HTTP status: never a URL (it contains the bot token). */
@@ -32,6 +37,7 @@ export class TelegramApiError extends Error {
   constructor(
     readonly method: string,
     readonly status?: number,
+    readonly retryAfterSeconds?: number,
   ) {
     super(`Telegram ${method} failed${status ? ` (status ${status})` : ''}`);
     this.name = 'TelegramApiError';
@@ -48,6 +54,8 @@ export class TelegramFileTooLargeError extends Error {
 /** Seam for the Telegram Bot API so the intake logic can be tested without network access. */
 export abstract class TelegramClient {
   abstract isEnabled(): boolean;
+  abstract pollKey(): string;
+  abstract canManageChannel(chatId: string, userId: number): Promise<boolean>;
   abstract getUpdates(offset: number, timeoutSeconds: number): Promise<TelegramUpdate[]>;
   abstract downloadFile(fileId: string, maxBytes: number): Promise<Buffer>;
   abstract sendMessage(chatId: string, text: string): Promise<void>;
@@ -72,6 +80,23 @@ export class TelegramHttpClient extends TelegramClient {
     return this.token.length > 0;
   }
 
+  pollKey(): string {
+    // The public bot ID survives token rotation; a different bot has its own cursor/receipts.
+    return createHash('sha256').update(this.token.split(':')[0]).digest('hex');
+  }
+
+  async canManageChannel(chatId: string, userId: number): Promise<boolean> {
+    const chat = await this.call<{ type: string; username?: string }>('getChat', {
+      chat_id: chatId,
+    });
+    if (chat.type !== 'channel' || chat.username) return false;
+    const member = await this.call<{ status: string }>('getChatMember', {
+      chat_id: chatId,
+      user_id: userId,
+    });
+    return member.status === 'creator' || member.status === 'administrator';
+  }
+
   shutdown(): void {
     this.controller.abort();
   }
@@ -86,13 +111,13 @@ export class TelegramHttpClient extends TelegramClient {
     try {
       res = await fetch(url, {
         ...init,
+        redirect: 'error',
         signal: AbortSignal.any([this.controller.signal, AbortSignal.timeout(timeoutMs)]),
       });
     } catch {
       // The underlying error can embed the request URL (and so the token): drop it.
       throw new TelegramApiError(method);
     }
-    if (!res.ok) throw new TelegramApiError(method, res.status);
     return res;
   }
 
@@ -111,15 +136,37 @@ export class TelegramHttpClient extends TelegramClient {
       },
       timeoutMs,
     );
-    const json = (await res.json()) as { ok: boolean; result: T };
-    if (!json.ok) throw new TelegramApiError(method);
-    return json.result;
+    try {
+      const json = (await res.json()) as {
+        ok: boolean;
+        result: T;
+        error_code?: number;
+        parameters?: { retry_after?: number };
+      };
+      if (!res.ok || !json.ok) {
+        const retry = json.parameters?.retry_after;
+        throw new TelegramApiError(
+          method,
+          res.ok ? json.error_code : res.status,
+          typeof retry === 'number' && Number.isSafeInteger(retry) && retry > 0 ? retry : undefined,
+        );
+      }
+      return json.result;
+    } catch (error) {
+      if (error instanceof TelegramApiError) throw error;
+      // JSON parsing and response-body I/O errors can contain URLs or document data too.
+      throw new TelegramApiError(method, res.status);
+    }
   }
 
   async getUpdates(offset: number, timeoutSeconds: number): Promise<TelegramUpdate[]> {
     return this.call<TelegramUpdate[]>(
       'getUpdates',
-      { offset, timeout: timeoutSeconds, allowed_updates: ['message', 'channel_post'] },
+      {
+        offset,
+        timeout: timeoutSeconds,
+        allowed_updates: ['message', 'channel_post', 'edited_message', 'edited_channel_post'],
+      },
       timeoutSeconds * 1000 + REQUEST_TIMEOUT_MS,
     );
   }
@@ -138,9 +185,34 @@ export class TelegramHttpClient extends TelegramClient {
       { method: 'GET' },
       REQUEST_TIMEOUT_MS * 2,
     );
-    const buffer = Buffer.from(await res.arrayBuffer());
-    if (buffer.length > maxBytes) throw new TelegramFileTooLargeError();
-    return buffer;
+    if (!res.ok || !res.body) {
+      await res.body?.cancel().catch(() => undefined);
+      throw new TelegramApiError('downloadFile', res.status);
+    }
+    const reader = res.body.getReader();
+    let complete = false;
+    try {
+      if (Number(res.headers.get('content-length')) > maxBytes) {
+        throw new TelegramFileTooLargeError();
+      }
+      const chunks: Buffer[] = [];
+      let size = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > maxBytes) throw new TelegramFileTooLargeError();
+        chunks.push(Buffer.from(value));
+      }
+      complete = true;
+      return Buffer.concat(chunks, size);
+    } catch (error) {
+      if (error instanceof TelegramFileTooLargeError) throw error;
+      throw new TelegramApiError('downloadFile');
+    } finally {
+      if (!complete) await reader.cancel().catch(() => undefined);
+      reader.releaseLock();
+    }
   }
 
   async sendMessage(chatId: string, text: string): Promise<void> {

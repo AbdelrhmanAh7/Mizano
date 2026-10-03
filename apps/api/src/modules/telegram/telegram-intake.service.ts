@@ -6,12 +6,13 @@ import {
   OnApplicationBootstrap,
   OnModuleDestroy,
 } from '@nestjs/common';
-import { IntakeSource, TelegramLink } from '@prisma/client';
+import { IntakeJobStatus, IntakeSource, TelegramLink } from '@prisma/client';
 import { describeError } from '../../common/utils/redact';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IntakeJobsService } from '../ai/intake/intake-jobs.service';
 import {
   TelegramClient,
+  TelegramApiError,
   TelegramDocument,
   TelegramFileTooLargeError,
   TelegramMessage,
@@ -19,12 +20,23 @@ import {
 } from './telegram.client';
 import { TelegramLinkService } from './telegram-link.service';
 
-const POLL_STATE_ID = 'default';
 const LONG_POLL_SECONDS = 25;
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const MAX_BACKOFF_MS = 60_000;
+const MAX_DELIVERY_ATTEMPTS = 5;
+const CURSOR_IDLE_MS = 7 * 24 * 60 * 60 * 1000;
+
+const STATUS_AR: Record<IntakeJobStatus, string> = {
+  QUEUED: 'في الانتظار',
+  PROCESSING: 'قيد المعالجة',
+  EXTRACTED: 'تم الاستخراج',
+  NEEDS_REVIEW: 'تحتاج إلى مراجعة',
+  FAILED: 'تعذرت المعالجة',
+  DEAD_LETTER: 'توقفت المحاولات',
+  APPROVED: 'تم الاعتماد',
+};
 
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const ALLOWED_MIMES = new Set(['application/pdf', 'image/jpeg', 'image/png', DOCX]);
@@ -49,7 +61,13 @@ const MSG = {
     'This chat is already linked to another organization.\nهذه المحادثة مرتبطة بمؤسسة أخرى.',
   privateLink:
     'Linking must be done in a private chat with the bot.\nيجب إجراء الربط في محادثة خاصة مع البوت.',
-  usage: 'Usage: /link CODE\nالاستخدام: /link الرمز',
+  usage: 'Usage: /link CODE [CHANNEL_ID]\nالاستخدام: /link الرمز [معرف_القناة]',
+  channelDenied:
+    'Use a private channel you administer, with the bot as an administrator.\nاستخدم قناة خاصة تديرها وأضف البوت كمسؤول.',
+  edited:
+    'Edits are not imported. Send the corrected file as a new message.\nلا يتم استيراد التعديلات. أرسل الملف المصحح في رسالة جديدة.',
+  retrying:
+    'Intake is temporarily unavailable; this delivery will be retried.\nالاستلام غير متاح مؤقتا؛ ستتم إعادة المحاولة.',
   hint: 'Send an invoice as a PDF, JPG, PNG or DOCX file.\nأرسل الفاتورة كملف PDF أو JPG أو PNG أو DOCX.',
   tooLarge: 'The file is too large (max 15 MB).\nالملف كبير جدا (الحد الأقصى 15 ميغابايت).',
   unsupported:
@@ -58,10 +76,17 @@ const MSG = {
   failed:
     'The file could not be processed. Please send it again.\nتعذرت معالجة الملف. يرجى إرساله مرة أخرى.',
   rateLimited: 'Too many messages. Please slow down.\nرسائل كثيرة جدا. يرجى التمهل.',
-  received: (status: string) => `Received. Status: ${status}.\nتم الاستلام. الحالة: ${status}.`,
-  duplicate: (status: string) =>
-    `This file was already received. Status: ${status}.\nتم استلام هذا الملف سابقا. الحالة: ${status}.`,
+  received: (status: IntakeJobStatus) =>
+    `Received. Status: ${status}.\nتم الاستلام. الحالة: ${STATUS_AR[status]}.`,
+  duplicate: (status: IntakeJobStatus) =>
+    `This file was already received. Status: ${status}.\nتم استلام هذا الملف سابقا. الحالة: ${STATUS_AR[status]}.`,
 };
+
+class TelegramRateLimitError extends TelegramApiError {
+  constructor() {
+    super('intake', 429, RATE_LIMIT_WINDOW_MS / 1000);
+  }
+}
 
 interface RateWindow {
   hits: number[];
@@ -79,6 +104,9 @@ interface FileCandidate {
 export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(TelegramIntakeService.name);
   private running = false;
+  private stopping = false;
+  private loop?: Promise<void>;
+  private wakeBackoff?: () => void;
   private readonly windows = new Map<string, RateWindow>();
 
   constructor(
@@ -93,13 +121,17 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
       this.logger.warn('TELEGRAM_BOT_TOKEN is not set: Telegram intake is disabled');
       return;
     }
+    if (this.running) return;
     this.running = true;
-    void this.pollLoop();
+    this.loop = this.pollLoop();
   }
 
-  onModuleDestroy(): void {
+  async onModuleDestroy(): Promise<void> {
+    this.stopping = true;
     this.running = false;
     this.client.shutdown();
+    this.wakeBackoff?.();
+    await this.loop;
   }
 
   private async pollLoop(): Promise<void> {
@@ -114,36 +146,67 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
         this.logger.error(
           `Telegram poll failed: ${describeError(error, { includeMessage: false })}`,
         );
-        const delay = Math.min(MAX_BACKOFF_MS, 1000 * 2 ** Math.min(failures, 6));
-        await new Promise<void>((resolve) => setTimeout(resolve, delay).unref());
+        const delay = Math.max(
+          Math.min(MAX_BACKOFF_MS, 1000 * 2 ** Math.min(failures, 6)),
+          error instanceof TelegramApiError ? (error.retryAfterSeconds ?? 0) * 1000 : 0,
+        );
+        await this.backoff(delay);
       }
     }
   }
 
-  async loadOffset(): Promise<number> {
-    const state = await this.prisma.telegramPollState.findUnique({ where: { id: POLL_STATE_ID } });
-    return state?.nextOffset ?? 0;
+  private backoff(delay: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const done = (): void => {
+        clearTimeout(timer);
+        this.wakeBackoff = undefined;
+        resolve();
+      };
+      const timer = setTimeout(done, Math.min(delay, 2_147_483_647));
+      this.wakeBackoff = done;
+      if (this.stopping) done();
+    });
   }
 
-  /** Persist the cursor only forwards. */
+  async loadOffset(): Promise<number> {
+    const state = await this.prisma.telegramPollState.findUnique({
+      where: { id: this.client.pollKey() },
+    });
+    // Telegram randomizes update IDs after a week without updates. Poll unconfirmed updates
+    // again instead of acknowledging a newly generated ID below an obsolete high watermark.
+    return state && state.updatedAt.getTime() > Date.now() - CURSOR_IDLE_MS ? state.nextOffset : 0;
+  }
+
+  /** Advance atomically; only an idle cursor can start a new Telegram update-ID sequence. */
   private async saveOffset(nextOffset: number): Promise<void> {
     await this.prisma.telegramPollState.upsert({
-      where: { id: POLL_STATE_ID },
-      create: { id: POLL_STATE_ID, nextOffset },
-      update: { nextOffset },
+      where: { id: this.client.pollKey() },
+      create: { id: this.client.pollKey(), nextOffset },
+      update: {},
+    });
+    await this.prisma.telegramPollState.updateMany({
+      where: {
+        id: this.client.pollKey(),
+        OR: [
+          { nextOffset: { lt: nextOffset } },
+          { updatedAt: { lte: new Date(Date.now() - CURSOR_IDLE_MS) } },
+        ],
+      },
+      data: { nextOffset },
     });
   }
 
   /**
    * One getUpdates round. Updates are handled in order and the offset is persisted after each
-   * one, so a restart never reprocesses a handled update. Reprocessing after a crash between
-   * handling and saving is harmless: file dedup (sha256) and one-time codes are idempotent.
+   * one. Failures leave the cursor in place; durable delivery identity and tenant file hashes
+   * make crash replay safe. Only one process may poll a bot (Telegram rejects competing polls).
    */
   async pollOnce(timeoutSeconds: number): Promise<number> {
     const offset = await this.loadOffset();
     const updates = await this.client.getUpdates(offset, timeoutSeconds);
     let next = offset;
-    for (const update of updates) {
+    for (const update of [...updates].sort((a, b) => a.update_id - b.update_id)) {
+      if (this.stopping) break;
       if (update.update_id < next) continue;
       await this.handleUpdate(update);
       next = update.update_id + 1;
@@ -165,7 +228,11 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
     win.hits.push(now);
     if (win.hits.length === 1) win.warned = false;
     this.windows.set(chatId, win);
-    if (this.windows.size > 5000) this.pruneWindows(now);
+    if (this.windows.size > 5000) {
+      this.pruneWindows(now);
+      const oldest = this.windows.keys().next().value;
+      if (this.windows.size > 5000 && oldest !== undefined) this.windows.delete(oldest);
+    }
     return { ok: true, warn: false };
   }
 
@@ -183,26 +250,38 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
     }
   }
 
-  /** Never throws for per-message problems; never logs text, captions, files or tokens. */
+  /** Only terminal outcomes are acknowledged. Transient errors propagate to poll backoff. */
   async handleUpdate(update: TelegramUpdate): Promise<void> {
-    const message = update.message ?? update.channel_post;
+    const message =
+      update.message ?? update.channel_post ?? update.edited_message ?? update.edited_channel_post;
     if (!message) return;
     const chatId = String(message.chat.id);
 
     const gate = this.allowed(chatId);
     if (!gate.ok) {
       if (gate.warn) await this.reply(chatId, MSG.rateLimited);
+      // A 20-document batch is deferred instead of silently acknowledging its last ten files.
+      if ((message.document || message.photo?.length) && (await this.links.findByChat(chatId))) {
+        throw new TelegramRateLimitError();
+      }
       return;
     }
 
     try {
+      if (update.edited_message || update.edited_channel_post) {
+        await this.reply(
+          chatId,
+          (await this.links.findByChat(chatId)) ? MSG.edited : MSG.notLinked,
+        );
+        return;
+      }
       const command = this.parseCommand(message.text);
       if (command?.name === 'link') {
         if (message.chat.type !== 'private') {
           await this.reply(chatId, MSG.privateLink);
           return;
         }
-        await this.handleLink(chatId, command.arg);
+        await this.handleLink(chatId, command.arg, message.from?.id);
         return;
       }
 
@@ -217,12 +296,51 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
         await this.reply(chatId, MSG.hint);
         return;
       }
-      await this.ingest(link, chatId, file, message.from?.id);
+      const delivery = await this.prisma.telegramDelivery.upsert({
+        where: { botKey_updateId: { botKey: this.client.pollKey(), updateId: update.update_id } },
+        create: {
+          botKey: this.client.pollKey(),
+          updateId: update.update_id,
+          organizationId: link.organizationId,
+          linkId: link.id,
+          messageId: message.message_id,
+        },
+        update: {},
+      });
+      // The receiver resolves an untrusted source identity once. Never move an old delivery
+      // to a new binding, even after a crash between durable enqueue and cursor persistence.
+      if (
+        delivery.completedAt ||
+        delivery.linkId !== link.id ||
+        delivery.organizationId !== link.organizationId
+      )
+        return;
+      const where = {
+        botKey: delivery.botKey,
+        updateId: delivery.updateId,
+        organizationId: link.organizationId,
+        completedAt: null,
+      };
+      if (delivery.attempts >= MAX_DELIVERY_ATTEMPTS) {
+        await this.prisma.telegramDelivery.updateMany({ where, data: { completedAt: new Date() } });
+        await this.reply(chatId, MSG.failed);
+        return;
+      }
+      await this.prisma.telegramDelivery.updateMany({
+        where,
+        data: { attempts: { increment: 1 } },
+      });
+      const intakeJobId = await this.ingest(link, chatId, file, message.from?.id);
+      await this.prisma.telegramDelivery.updateMany({
+        where,
+        data: { completedAt: new Date(), intakeJobId },
+      });
     } catch (error) {
       this.logger.error(
         `Telegram update failed: ${describeError(error, { includeMessage: false })}`,
       );
-      await this.reply(chatId, MSG.failed);
+      if (!this.stopping) await this.reply(chatId, MSG.retrying);
+      throw error;
     }
   }
 
@@ -233,12 +351,30 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
     return { name, arg: rest.join(' ') };
   }
 
-  private async handleLink(chatId: string, code: string): Promise<void> {
-    if (!code) {
+  private async handleLink(chatId: string, args: string, senderId?: number): Promise<void> {
+    const [code, channelId, ...extra] = args.split(/\s+/);
+    if (!code || extra.length || (channelId && !/^-\d+$/.test(channelId))) {
       await this.reply(chatId, MSG.usage);
       return;
     }
-    const result = await this.links.redeem(code, chatId);
+    if (channelId) {
+      if (senderId === undefined || String(senderId) !== chatId) {
+        await this.reply(chatId, MSG.channelDenied);
+        return;
+      }
+      try {
+        if (!(await this.client.canManageChannel(channelId, senderId))) {
+          await this.reply(chatId, MSG.channelDenied);
+          return;
+        }
+      } catch (error) {
+        if (!(error instanceof TelegramApiError) || ![400, 403].includes(error.status ?? 0))
+          throw error;
+        await this.reply(chatId, MSG.channelDenied);
+        return;
+      }
+    }
+    const result = await this.links.redeem(code, channelId ?? chatId);
     switch (result.status) {
       case 'linked':
         this.logger.log(`Telegram chat linked to organization ${result.link.organizationId}`);
@@ -267,7 +403,11 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
       };
     }
     if (message.photo?.length) {
-      const best = [...message.photo].sort((a, b) => (b.file_size ?? 0) - (a.file_size ?? 0))[0];
+      const best = [...message.photo].sort(
+        (a, b) =>
+          (b.width ?? 0) * (b.height ?? 0) - (a.width ?? 0) * (a.height ?? 0) ||
+          (b.file_size ?? 0) - (a.file_size ?? 0),
+      )[0];
       return {
         fileId: best.file_id,
         fileName: `telegram-${message.message_id}.jpg`,
@@ -291,14 +431,14 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
     chatId: string,
     file: FileCandidate,
     senderId?: number,
-  ): Promise<void> {
+  ): Promise<string | null> {
     if (!ALLOWED_MIMES.has(file.mimeType)) {
       await this.reply(chatId, MSG.unsupported);
-      return;
+      return null;
     }
     if (file.size !== undefined && file.size > MAX_FILE_BYTES) {
       await this.reply(chatId, MSG.tooLarge);
-      return;
+      return null;
     }
 
     let buffer: Buffer;
@@ -307,9 +447,17 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
     } catch (error) {
       if (error instanceof TelegramFileTooLargeError) {
         await this.reply(chatId, MSG.tooLarge);
-        return;
+        return null;
       }
       throw error;
+    }
+
+    if (this.stopping) throw new TelegramApiError('shutdown');
+    // A revoke/unlink during a slow download must stop the write.
+    const current = await this.links.findByChat(chatId);
+    if (current?.id !== link.id) {
+      await this.reply(chatId, MSG.notLinked);
+      return null;
     }
 
     try {
@@ -329,10 +477,11 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
           ? ''
           : `\nTelegram sender: ${senderId}.\nمرسل تيليجرام: ${senderId}.`;
       await this.reply(chatId, receipt + sender);
+      return job.id;
     } catch (error) {
       if (error instanceof HttpException && error.getStatus() === HttpStatus.TOO_MANY_REQUESTS) {
         await this.reply(chatId, MSG.busy);
-        return;
+        throw new TelegramRateLimitError();
       }
       throw error;
     }

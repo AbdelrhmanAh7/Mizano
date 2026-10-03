@@ -1,0 +1,42 @@
+# Telegram invoice intake
+
+Implementation for [issue #20](https://github.com/AbdelrhmanAh7/Mizano/issues/20) and [PR #58](https://github.com/AbdelrhmanAh7/Mizano/pull/58). Local implementation and automated tests are not evidence of a deployed Telegram-to-ledger journey. See the [review checkpoint](agents/runs/2026-10-03-telegram-review.md) for actual verification limits.
+
+## Configuration and binding
+
+1. Apply the `telegram_links` and `telegram_deliveries` migrations using the normal operator migration workflow. Set `TELEGRAM_BOT_TOKEN` in the API environment. Without a token the poller is disabled. Never put tokens in command-line URLs, screenshots or logs.
+2. Run exactly one API poller per bot. Stop any previous consumer and have the operator remove an existing webhook without dropping pending updates before enabling long polling. Do not run manual `getUpdates` against a running intake bot. This integration exposes no webhook endpoint or shared webhook secret.
+3. An authenticated organization administrator (or a role with `settings.edit`) calls `POST /api/telegram/link-code`. The response contains `code`, `expiresAt` and `command` under `data`. Only the SHA-256 code digest is stored; the code expires after 15 minutes and can be consumed once.
+4. For a direct chat, send `/link CODE` privately to the bot. For a **private channel**, make the bot a channel administrator, obtain the immutable numeric channel ID, then send `/link CODE CHANNEL_ID` privately to the bot from a Telegram account that administers the channel. The bot checks the channel is private and the sending account is its administrator/creator before consuming the code. Public channels and linking commands posted inside groups/channels are refused.
+5. `GET /api/telegram/links` requires `settings.view`; `DELETE /api/telegram/links/:id` requires `settings.edit`. Both are tenant scoped. Another organization's link ID returns 404. Unlinking, disabling the linking user or removing their `settings.edit` permission stops ingestion. Unlink first, then create a new code/binding under another authorized administrator if required.
+
+A chat belongs to one organization. A code is an expiring bearer capability: share it only with the intended Telegram operator. The bot rechecks the linking user's active tenant membership and permissions at redemption, receipt and after downloading. Code and chat lookups before tenant resolution are deliberate authentication lookups; delivery mutations and downstream intake reads/writes use the resolved organization.
+
+## Files, status and recovery
+
+- PDF, JPG/JPEG, PNG and DOCX documents and Telegram photos are accepted, up to **15 MiB**. Prefer the original document; the highest-resolution photo is selected when only photos are available. Legacy DOC is not supported by this Telegram adapter yet.
+- Download limits check metadata, HTTP content length and each streamed chunk. Rejected streams are cancelled. Response parsing and network errors expose only safe method/status metadata. File names, document content, sender IDs, codes and bot tokens are never logged.
+- Intake calls the same `IntakeJobsService.createFromUpload` command as web uploads, preserving the original and using tenant-scoped SHA-256 deduplication. This path does not post or pay anything. Extraction quality, corrupt-file handling and accountant approval remain the intake worker/inbox contracts.
+- Every file update first records immutable `(botKey, updateId)`, the original tenant/link and message ID in `telegram_deliveries`. A completed replay does not download again. A pending replay cannot be rebound to a different organization after unlink/relink. The receipt records the intake job ID after durable creation; a crash before receipt completion safely repeats the tenant file-hash lookup. Receipts survive unlinking and are not edited through the API.
+- Poll batches are sorted by update ID. The cursor advances only after a terminal outcome. Storage/download/queue errors retry with exponential backoff, respecting Telegram's `retry_after`; delivery attempts are capped at five. Exhaustion stores a completed receipt with no job ID and tells the sender to resend. Poll/DB infrastructure failures keep the cursor pending. Operators must investigate outages promptly: Telegram retains pending updates for a limited time, and failed downloads are not durable originals.
+- Ten messages per chat per minute are allowed. Excess linked documents remain pending until the next window, so a 20-document batch is processed across two windows. Abusive/unlinked messages can be dropped after one bilingual rate-limit reply. In-memory rate-limit state is bounded and resets on restart.
+- Cursor and delivery keys use a hash of the bot's public numeric ID, surviving token rotation but isolating different bots. After seven idle days, polling starts from unconfirmed updates again because Telegram can randomize IDs. The old unnamespaced `default` cursor is not guessed to belong to a configured bot; retire it only through the operator workflow after deployment verification.
+- Edited messages/posts receive an English/Arabic instruction to send the corrected original as a new message; they never mutate a prior original. All status receipts have English and Arabic status labels. Notifications are best effort; successful durable intake is not undone if a receipt cannot be sent. Check the authorized inbox for the authoritative result.
+- Shutdown aborts HTTP requests, wakes backoff and waits for the active polling loop. No new download result is persisted after shutdown is observed.
+
+Bot API behavior: [getUpdates](https://core.telegram.org/bots/api#getupdates), [update identifiers](https://core.telegram.org/bots/api#update), [retry_after](https://core.telegram.org/bots/api#responseparameters).
+
+## Validation
+
+From `apps/api`, run only targeted tests on shared low-memory machines:
+
+```text
+npx jest src/modules/telegram/telegram-intake.service.spec.ts src/modules/telegram/telegram-link.service.spec.ts src/modules/telegram/telegram.client.spec.ts --runInBand
+npx tsc --noEmit -p tsconfig.json
+npx tsc --noEmit -p test/tsconfig.e2e.json
+npx eslint --max-warnings 0 src/modules/telegram/*.ts test/telegram.e2e-spec.ts
+```
+
+For E2E, create an isolated `mizano_e2e_telegram` database at `127.0.0.1:5435`, set `DATABASE_URL` and `REDIS_URL=redis://127.0.0.1:6380`, apply `npx prisma migrate deploy` from `apps/api`, then run `npx jest --config test/jest-e2e.json test/telegram.e2e-spec.ts --runInBand`. Never reset shared databases. The test setup disables real bot polling and the fixture substitutes Telegram/extraction; it proves ingestion and tenant identity, not live OCR or Telegram delivery. Real deployment still needs the [acceptance journey](strategy/demo-acceptance.md).
+
+On Windows use `npx.cmd` if PowerShell script execution blocks `npx.ps1`. To avoid npm's unrelated pnpm configuration warnings, invoke the installed executables directly: `node ../../node_modules/jest/bin/jest.js`, `node ../../node_modules/typescript/bin/tsc`, and `node ../../node_modules/eslint/bin/eslint.js` with the same arguments.

@@ -1,0 +1,10 @@
+Gulf Trading Est.
+Tax Invoice
+Invoice #: SA-77/2024
+Date: 2024-06-09
+VAT Number: 300123456700003
+Item     Qty   Amount
+Cable    4     2,000.00
+Total (excl. VAT): SAR 2,000.00
+VAT 15%: SAR 300.00
+Total incl. VAT: SAR 2,300.00

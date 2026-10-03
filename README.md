@@ -2,9 +2,9 @@
 
 Mizano helps accountants and finance teams turn business documents into traceable accounting records with less manual entry. Egypt is the first pilot market, followed by distinct Saudi Arabia and UAE integrations. Arabic/English and RTL are core requirements.
 
-**Current goal:** a connected CPU-only invoice demo by **14 September 2026, 23:59 Africa/Cairo**: Telegram/web → original document → extraction → validated draft → one batch approval → ledger → payments and reconciled reports.
+**Current goal:** a tiny live deployment on a **Raspberry Pi 5 (8GB, arm64)**, tracked by epic **#45**, with the full accountant flow (AP/AR, reports, Arabic/English): Telegram/web → original document → extraction → validated draft → one batch approval → ledger → payments and reconciled reports.
 
-**Status:** pre-demo hardening. The September review identified accounting, tenant-isolation, extraction and delivery blockers. The CPU pipeline, Telegram invoice intake and four-provider daily runner are planned work; their presence in the roadmap is not a claim that they already run. Existing modules and green unit tests do not establish end-to-end readiness.
+**Status:** pre-demo hardening. The September review identified accounting, tenant-isolation, extraction and delivery blockers. Telegram long-polling intake is implemented on this branch; [configuration, private-channel linking and recovery](docs/telegram-intake.md) require operator setup and live acceptance evidence. The CPU pipeline and four-provider daily runner remain subject to their own delivery gates. Existing modules and green unit tests do not establish end-to-end readiness.
 
 ## Start here
 

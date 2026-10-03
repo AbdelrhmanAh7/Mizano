@@ -20,6 +20,15 @@ function setup() {
   const codes: CodeRow[] = [];
   const links: LinkRow[] = [];
   const delegates = {
+    user: {
+      findFirst: jest.fn(
+        async () =>
+          ({ role: { name: 'Admin', permissions: [] } }) as {
+            role: { name: string; permissions: { module: string; actions: string[] }[] };
+          } | null,
+      ),
+    },
+    auditLog: { create: jest.fn(async () => ({})) },
     telegramLinkCode: {
       deleteMany: jest.fn(async () => ({ count: 0 })),
       create: jest.fn(async ({ data }: { data: Omit<CodeRow, 'usedAt'> }) => {
@@ -70,7 +79,7 @@ function setup() {
     ...delegates,
     $transaction: async <T>(fn: (tx: typeof delegates) => Promise<T>): Promise<T> => fn(delegates),
   } as unknown as PrismaService;
-  return { svc: new TelegramLinkService(prisma), codes, links };
+  return { svc: new TelegramLinkService(prisma), codes, links, delegates };
 }
 
 describe('TelegramLinkService', () => {
@@ -123,5 +132,50 @@ describe('TelegramLinkService', () => {
     await expect(svc.unlink(links[0].id, 'org-2')).rejects.toThrow(NotFoundException);
     await svc.unlink(links[0].id, 'org-1');
     expect(links).toHaveLength(0);
+  });
+
+  it('rejects codes whose creator is no longer active and authorized in the tenant', async () => {
+    const { svc, delegates, codes } = setup();
+    const { code } = await svc.createCode('org-1', 'user-1');
+    delegates.user.findFirst.mockResolvedValueOnce(null);
+    expect(await svc.redeem(code, '42')).toEqual({ status: 'invalid' });
+    expect(codes[0].usedAt).toBeNull();
+    expect(delegates.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'user-1',
+          organizationId: 'org-1',
+          status: 'ACTIVE',
+          role: { organizationId: 'org-1' },
+        },
+      }),
+    );
+  });
+
+  it('stops an existing binding when its administrator loses settings.edit', async () => {
+    const { svc, delegates } = setup();
+    await svc.redeem((await svc.createCode('org-1', 'user-1')).code, '42');
+    expect(await svc.findByChat('42')).not.toBeNull();
+    delegates.user.findFirst.mockResolvedValue({ role: { name: 'Viewer', permissions: [] } });
+    expect(await svc.findByChat('42')).toBeNull();
+  });
+
+  it('permits a non-admin with settings.edit and audits only link metadata', async () => {
+    const { svc, delegates } = setup();
+    const { code } = await svc.createCode('org-1', 'user-1');
+    delegates.user.findFirst.mockResolvedValue({
+      role: { name: 'Manager', permissions: [{ module: 'settings', actions: ['edit'] }] },
+    });
+    expect((await svc.redeem(code, '42')).status).toBe('linked');
+    expect(delegates.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        organizationId: 'org-1',
+        userId: 'user-1',
+        action: 'CREATE',
+        entityType: 'TelegramLink',
+        entityId: 'l1',
+      },
+    });
+    expect(JSON.stringify(delegates.auditLog.create.mock.calls)).not.toContain(code);
   });
 });

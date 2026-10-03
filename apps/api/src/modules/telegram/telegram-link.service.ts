@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, TelegramLink } from '@prisma/client';
-import { createHash, randomInt } from 'crypto';
+import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -44,16 +44,28 @@ export class TelegramLinkService {
 
   /** Consume a one-time code (guarded transition) and link the chat to its organization. */
   async redeem(rawCode: string, chatId: string): Promise<RedeemResult> {
+    if (!/^[A-Z2-9]{8}$/i.test(rawCode.trim())) return { status: 'invalid' };
     const codeHash = hashLinkCode(rawCode);
     try {
       return await this.prisma.$transaction(async (tx): Promise<RedeemResult> => {
+        // Pre-authentication lookup by a hashed capability; all subsequent operations are scoped.
+        const code = await tx.telegramLinkCode.findUnique({ where: { codeHash } });
+        if (
+          !code ||
+          !timingSafeEqual(Buffer.from(code.codeHash, 'hex'), Buffer.from(codeHash, 'hex')) ||
+          !(await this.isAuthorized(code.organizationId, code.createdById, tx))
+        )
+          return { status: 'invalid' };
         const claimed = await tx.telegramLinkCode.updateMany({
-          where: { codeHash, usedAt: null, expiresAt: { gt: new Date() } },
+          where: {
+            organizationId: code.organizationId,
+            codeHash,
+            usedAt: null,
+            expiresAt: { gt: new Date() },
+          },
           data: { usedAt: new Date() },
         });
         if (claimed.count === 0) return { status: 'invalid' };
-        const code = await tx.telegramLinkCode.findUnique({ where: { codeHash } });
-        if (!code) return { status: 'invalid' };
         const existing = await tx.telegramLink.findUnique({ where: { chatId } });
         if (existing) {
           if (existing.organizationId !== code.organizationId) throw new LinkedElsewhere();
@@ -61,6 +73,15 @@ export class TelegramLinkService {
         }
         const link = await tx.telegramLink.create({
           data: { organizationId: code.organizationId, chatId, linkedById: code.createdById },
+        });
+        await tx.auditLog.create({
+          data: {
+            organizationId: code.organizationId,
+            userId: code.createdById,
+            action: 'CREATE',
+            entityType: 'TelegramLink',
+            entityId: link.id,
+          },
         });
         return { status: 'linked', link };
       });
@@ -73,8 +94,28 @@ export class TelegramLinkService {
     }
   }
 
-  findByChat(chatId: string): Promise<TelegramLink | null> {
-    return this.prisma.telegramLink.findUnique({ where: { chatId } });
+  async findByChat(chatId: string): Promise<TelegramLink | null> {
+    // Trusted Bot API chat identity resolves the tenant, like a login lookup.
+    const link = await this.prisma.telegramLink.findUnique({ where: { chatId } });
+    return link && (await this.isAuthorized(link.organizationId, link.linkedById)) ? link : null;
+  }
+
+  private async isAuthorized(
+    organizationId: string,
+    userId: string,
+    db: Prisma.TransactionClient = this.prisma,
+  ): Promise<boolean> {
+    const user = await db.user.findFirst({
+      where: { id: userId, organizationId, status: 'ACTIVE', role: { organizationId } },
+      include: { role: { include: { permissions: true } } },
+    });
+    return (
+      !!user &&
+      (user.role.name === 'Admin' ||
+        user.role.permissions.some(
+          (permission) => permission.module === 'settings' && permission.actions.includes('edit'),
+        ))
+    );
   }
 
   list(organizationId: string): Promise<TelegramLink[]> {

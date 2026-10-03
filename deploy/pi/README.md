@@ -88,7 +88,9 @@ The units assume the repo at `/opt/mizano`; edit `ExecStart` otherwise, and ensu
 
 ## 6. Monitoring
 
-`mizano-healthcheck.timer` runs `healthcheck.sh` every 5 minutes: API and web health endpoints, disk above 80%, low available memory, CPU temperature, throttling (`vcgencmd get_throttled`), and backup status older than 26 hours. Alerts and recovery messages go to Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`). Messages contain only short check names; no secrets or document data. A state file in `$MIZANO_DATA_DIR/monitor` suppresses repeats. Create the bot with BotFather and get the chat id from `getUpdates`.
+The API also consumes invoice updates when `TELEGRAM_BOT_TOKEN` is configured. Follow [Telegram intake setup](../../docs/telegram-intake.md) before enabling it: apply both Telegram migrations, bind the private channel and run only one polling API per bot. A monitoring bot already present in `.env.pi` must be deliberately assessed before using it for intake. Stop other pollers and remove any old webhook through the operator workflow without dropping pending updates; do not run manual `getUpdates` against the active intake bot. Verify replay, restart and unlink behavior on synthetic documents before accepting the deployment.
+
+`mizano-healthcheck.timer` runs `healthcheck.sh` every 5 minutes: API and web health endpoints, disk above 80%, low available memory, CPU temperature, throttling (`vcgencmd get_throttled`), and backup status older than 26 hours. Alerts and recovery messages go to Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`). Messages contain only short check names; no secrets or document data. A state file in `$MIZANO_DATA_DIR/monitor` suppresses repeats. Create the bot with BotFather and obtain the alert chat ID during setup, before starting the intake poller.
 
 ## 7. Upgrade and rollback
 

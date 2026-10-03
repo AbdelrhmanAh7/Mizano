@@ -606,6 +606,7 @@ model Organization {
 
   telegramLinks     TelegramLink[]
   telegramLinkCodes TelegramLinkCode[]
+  telegramDeliveries TelegramDelivery[]
 
   @@map("organizations")
 }
@@ -3099,4 +3100,23 @@ model TelegramPollState {
   updatedAt  DateTime @updatedAt
 
   @@map("telegram_poll_state")
+}
+
+/// Immutable source identity before download; never rebound when a chat changes tenant.
+model TelegramDelivery {
+  botKey         String
+  updateId       Int
+  organizationId String
+  linkId         String
+  messageId      Int
+  attempts       Int       @default(0)
+  intakeJobId    String?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([botKey, updateId])
+  @@index([organizationId, createdAt])
+  @@map("telegram_deliveries")
 }
