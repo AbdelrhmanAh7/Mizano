@@ -14,12 +14,21 @@ import ar from '../../messages/ar/ai.json';
 let messages: Record<string, unknown> = en.intake.validation;
 
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string, params?: Record<string, string>) => {
-    const found = key
-      .split('.')
-      .reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], messages);
-    if (typeof found !== 'string') return `MISSING:${key}`;
-    return found.replace(/\{(\w+)\}/g, (_, p: string) => params?.[p] ?? '');
+  useTranslations: () => {
+    const t = (key: string, params?: Record<string, string>) => {
+      const found = key
+        .split('.')
+        .reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], messages);
+      if (typeof found !== 'string') return `MISSING:${key}`;
+      return found.replace(/\{(\w+)\}/g, (_, p: string) => params?.[p] ?? '');
+    };
+    t.has = (key: string) => {
+      const found = key
+        .split('.')
+        .reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], messages);
+      return typeof found === 'string';
+    };
+    return t;
   },
 }));
 
