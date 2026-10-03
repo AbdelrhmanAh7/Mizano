@@ -42,6 +42,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Freeze the base currency once journals exist,** and serialize that check with posting through the ledger lock.
 - **Never write a data migration that guesses.** If no stored evidence separates "explicitly chosen" from "default", do not backfill; fix the read rule instead. _(baseCurrency and account-currency backfills, both removed)_
 - **Handle legacy rows.** Journals created before source linking have `sourceType = null`, for example opening balance `OB-001`. Reversal and replacement must find them, or explicitly refuse.
+- **When replacing document totals with journal aggregates, preserve evidenced legacy postings and linked reversals; test null source metadata as well as current source types.**
 
 ## 6. Money arithmetic
 
