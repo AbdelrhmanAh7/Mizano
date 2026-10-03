@@ -126,39 +126,33 @@ Rules:
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pushes and PRs to `master`/`develop` with the following optimizations:
+`.github/workflows/ci.yml` runs on pushes and PRs to `master`/`develop` with the following optimizations. The workflow token is read-only (`contents: read`); only the path-filter job adds `pull-requests: read`.
 
 ### Trigger rules
-- **Push to `master` or `develop`**: full CI runs (install → lint/type-check → test → build → docker multi-arch build)
-- **Pull requests**: CI runs on `opened`, `synchronize`, `reopened`, and `ready_for_review` events
-- **Draft PRs**: CI is **skipped** unless the PR has the `"ci"` label
-- **Concurrency**: each job group (`ci-lint`, `ci-test`, `ci-build`) cancels in-progress runs for the same ref, so superseded pushes don't queue
+
+- **Push to `master` or `develop`**: full CI runs (install → lint/type-check → test → build → Docker multi-arch validation).
+- **Pull requests**: CI runs on `opened`, `synchronize`, `reopened`, `ready_for_review` and `labeled`.
+- **Draft PRs**: CI is **skipped** unless the PR has the `ci` label. Adding `ci` to an existing draft starts CI without a new commit.
+- **Labels**: only `ci` and `docker` matter. Adding any other label starts a run whose gate skips every job, and that run never cancels one already in progress.
+- **Concurrency**: one run per PR (keyed by PR number) or per pushed branch (keyed by ref). A newer PR run cancels the older one as a whole, including the Docker job. Pushes to `master`/`develop` are queued, not cancelled, so every commit on those branches keeps a complete CI result (the deploy workflow starts from the CI result of `master`).
 
 ### Job flow
-1. **gate** — decides whether CI should run (skips draft PRs without `"ci"` label)
-2. **filter** — uses `dorny/paths-filter` to detect changes to Docker-relevant files:
-   - `apps/api/Dockerfile`
-   - `apps/web/Dockerfile`
-   - `.dockerignore`
-   - `deploy/**`
-   - `.github/workflows/ci.yml`
-   - `.github/workflows/deploy.yml`
-3. **install** — shared dependency install with pnpm cache + turbo cache
-4. **lint** — ESLint + TypeScript type-check (parallel, cancels in-progress)
-5. **test** — unit tests with PostgreSQL 16 + Redis 7 (parallel, cancels in-progress)
-6. **build** — `pnpm build` (parallel, cancels in-progress)
-7. **docker-build** — multi-arch (amd64 + arm64) Docker build **only** when:
-   - push to `master`/`develop`, OR
-   - PR changes any Docker-relevant file (per filter), OR
-   - PR has the `"docker"` label
+
+1. **gate** (`CI Gate`) — sets `should_run`. Event data reaches the script as environment variables, never through `${{ }}` inside the script, so a label name cannot inject shell code.
+2. **filter** (`Path Filter`) — `dorny/paths-filter` detects changes to Docker-relevant files: `apps/api/Dockerfile`, `apps/web/Dockerfile`, `.dockerignore`, `deploy/**`, `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`.
+3. **install** — shared dependency install (pnpm store cache) and `prisma generate`; saves `node_modules`.
+4. **lint**, **test**, **build** — run in parallel after install. Each lists `gate` and `install` in `needs`, because the `needs` context only exposes direct dependencies.
+5. **docker-build** — multi-arch (`linux/amd64` + `linux/arm64`) Docker **validation**. It starts only after lint, test and build passed, and only when the event is a push, or the PR changes a Docker-relevant file (per filter), or the PR has the `docker` label. Adding `docker` to an existing PR starts it without a new commit.
 
 ### Caching
-- **pnpm store**: cached via `setup-node` with `cache: 'pnpm'` + explicit `node_modules` cache keyed by `pnpm-lock.yaml` + commit SHA
-- **turbo build cache**: cached in `.turbo` directories, keyed by `pnpm-lock.yaml` + `turbo.json` + commit SHA, with restore-keys for partial hits
-- **Docker layer cache**: GitHub Actions cache (`type=gha`) for both API and Web images
 
-### Docker multi-arch builds
-The `docker-build` job uses `docker/buildx` with `platforms: linux/amd64,linux/arm64`. It runs ~12 minutes per run (QEMU arm64), so it's gated to run only when necessary. On PRs it builds but does **not push** (`push: false`); on pushes to `master`/`develop` it pushes to GHCR with SHA and `latest` tags.
+- **pnpm store**: `setup-node` with `cache: 'pnpm'`, plus an explicit `node_modules` cache keyed by `pnpm-lock.yaml` and the commit SHA.
+- **turbo**: `.turbo/cache` is restored before the Turbo tasks of the lint, test and build jobs and saved when the job succeeds (`actions/cache`), with one key prefix per job (`turbo-lint-`, `turbo-test-`, `turbo-build-`) because the tasks differ. Keys include `pnpm-lock.yaml`, `turbo.json` and the SHA; `restore-keys` give partial hits.
+- **Docker layers**: GitHub Actions cache (`type=gha`) with a separate scope per image (`scope=api`, `scope=web`); a shared scope would let the second image overwrite the first image's cache.
+
+### Docker multi-arch validation
+
+The `docker-build` job installs QEMU (pinned `tonistiigi/binfmt:qemu-v8.1.5`, arm64 only) before Buildx, because both Dockerfiles run commands during the build. arm64 is emulated, so the job is slow and has a 60-minute timeout; that is why it is gated. It builds both images and **never pushes** (`push: false`). Publishing belongs to `deploy.yml`, which tags the images with the short SHA: the web image bakes `NEXT_PUBLIC_API_URL` in at build time, so an image built in CI with a placeholder URL must not be pushed as `latest`. When registry names are built for a push elsewhere, lower-case the owner (GHCR rejects `ghcr.io/AbdelrhmanAh7/...`).
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 
