@@ -88,6 +88,12 @@ pnpm test:e2e
 
 `pnpm ci:full` currently combines lint/type-check/unit tests; it does **not** run E2E. Browser acceptance also requires a configured test harness and seeded environment; the [acceptance contract](docs/strategy/demo-acceptance.md) decides readiness.
 
+The bill scan page accepts `/en/purchases/bills/scan?jobId=<URL-encoded-id>` (or `/ar/...`) for Telegram/inbox links. It reads the existing tenant-scoped intake result API, follows active jobs through authenticated progress/polling, and uses the same draft form as upload completion. Approved jobs link to their existing draft; unavailable and empty jobs have separate localized Retry states. Cancelling review returns to upload in the current language. Link creation in Telegram/inbox is owned by those integrations.
+
+Scan regression tests are in the scan page spec and `apps/web/lib/hooks/use-ai-document-intake.spec.ts`; API ownership/recovery coverage is in `apps/api/test/intake.e2e-spec.ts`. Run E2E with a dedicated migrated database and Redis. The legacy Windows compatibility runner enables `esModuleInterop`, unlike the standard API Jest config; its callable `csv-parser` namespace import fails in four unchanged import-hardening tests on baseline `1d37f28`. Use the standard Jest configuration to distinguish that runner defect from application regressions; it does not waive the compatibility gate.
+
+Until the shared Turbo input globs include the web `app`, `components`, `lib` and `messages` paths, run `pnpm ci:full --force --concurrency=1` to verify current web files; cached CI output may describe an older patch.
+
 ## Repository layout
 
 ```

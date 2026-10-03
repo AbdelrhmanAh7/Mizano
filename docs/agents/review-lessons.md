@@ -85,6 +85,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Every new string needs en and ar,** including dialog titles, confirm and cancel buttons, placeholders, selector labels and report row names. Shared components accept localized label props.
 - **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed.
+- **Bind async intake updates to the active job for the entire operation:** invalidate pending uploads, retries, lookups, streams and redirects on navigation/reset, and remove the previous draft before rendering a new job.
 - **Show the currency of the document**, falling back to the org base currency, never the counterparty's default. The API must actually return the fields the UI relies on (for example `baseCurrency`).
 - **Payment-wide effects get payment-wide warnings.** Voiding a payment affects every allocated bill.
 

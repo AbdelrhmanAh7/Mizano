@@ -272,11 +272,13 @@ export async function readSseStream(
  */
 export function useDocumentIntakeStream(): {
   processDocument: (formData: FormData) => Promise<void>;
+  loadJob: (id: string) => Promise<void>;
   stage: IntakeStage | null;
   progress: number;
   message: string | null;
   result: DocumentIntakeResult | null;
   error: string | null;
+  isEmpty: boolean;
   isProcessing: boolean;
   isReconnecting: boolean;
   jobId: string | null;
@@ -294,6 +296,7 @@ export function useDocumentIntakeStream(): {
   const [message, setMessage] = useState<string | null>(null);
   const [result, setResult] = useState<DocumentIntakeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isEmpty, setIsEmpty] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -323,6 +326,7 @@ export function useDocumentIntakeStream(): {
     setMessage(null);
     setResult(null);
     setError(null);
+    setIsEmpty(false);
     setIsProcessing(false);
     setIsReconnecting(false);
     setJobId(null);
@@ -332,27 +336,31 @@ export function useDocumentIntakeStream(): {
   }, [stopAll]);
 
   /** Apply an event; returns true when the job reached a terminal state. */
-  const handleProgressEvent = useCallback((event: IntakeProgressEvent): boolean => {
-    setStage(event.stage);
-    setProgress(event.progress);
-    if (event.status) setJobStatus(event.status);
-    if (event.message) setMessage(event.message);
+  const handleProgressEvent = useCallback(
+    (event: IntakeProgressEvent): boolean => {
+      setStage(event.stage);
+      setProgress(event.progress);
+      if (event.status) setJobStatus(event.status);
+      // Server messages are not localized and may contain extraction details.
+      setMessage(null);
 
-    if (event.stage === 'complete') {
-      if (event.result) setResult(event.result);
-      else setError('Processing finished without a result');
-      setIsProcessing(false);
-      setIsReconnecting(false);
-      return true;
-    }
-    if (event.stage === 'error') {
-      setError(event.error || 'Processing failed');
-      setIsProcessing(false);
-      setIsReconnecting(false);
-      return true;
-    }
-    return false;
-  }, []);
+      if (event.stage === 'complete') {
+        if (event.result) setResult(event.result);
+        else setIsEmpty(true);
+        setIsProcessing(false);
+        setIsReconnecting(false);
+        return true;
+      }
+      if (event.stage === 'error') {
+        setError(t('jobFailed'));
+        setIsProcessing(false);
+        setIsReconnecting(false);
+        return true;
+      }
+      return false;
+    },
+    [t],
+  );
 
   const fail = useCallback((msg: string) => {
     setError(msg);
@@ -360,6 +368,35 @@ export function useDocumentIntakeStream(): {
     setIsProcessing(false);
     setIsReconnecting(false);
   }, []);
+
+  const applyJob = useCallback(
+    (job: Awaited<ReturnType<typeof documentIntakeApi.getResult>>['data']): boolean => {
+      if (job.status === 'APPROVED') {
+        setJobStatus(job.status);
+        setStage(job.stage);
+        setProgress(job.progress);
+        setMessage(null);
+        if (
+          job.draftDocumentId &&
+          (job.draftDocumentType === 'bill' || job.draftDocumentType === 'invoice')
+        ) {
+          setExistingDraft({ type: job.draftDocumentType, id: job.draftDocumentId });
+        } else {
+          setIsEmpty(true);
+        }
+        setIsProcessing(false);
+        setIsReconnecting(false);
+        return true;
+      }
+      return handleProgressEvent({
+        stage: job.stage,
+        status: job.status,
+        progress: job.progress,
+        result: job.result ?? undefined,
+      });
+    },
+    [handleProgressEvent],
+  );
 
   const startPolling = useCallback(
     (jobId: string, signal: AbortSignal) => {
@@ -371,25 +408,22 @@ export function useDocumentIntakeStream(): {
         try {
           const response = await documentIntakeApi.getResult(jobId);
           const job = response.data;
+          if (signal.aborted) return;
           failures = 0;
           setIsReconnecting(false);
-          const terminal = handleProgressEvent({
-            stage: job.stage,
-            status: job.status,
-            progress: job.progress,
-            result: job.result ?? undefined,
-            error: job.lastError ?? undefined,
-          });
+          const terminal = applyJob(job);
           if (terminal) return;
         } catch (err) {
+          if (signal.aborted) return;
           const status = (err as { response?: { status?: number } }).response?.status;
-          if (status === 404) {
-            fail('This scan is no longer available. Please upload the document again.');
+          if (status === 404 || status === 403) {
+            setJobStatus(null);
+            fail(t('jobNotFound'));
             return;
           }
           failures += 1;
           if (failures >= MAX_CONSECUTIVE_POLL_FAILURES) {
-            fail('Lost connection while processing the document. Please try again.');
+            fail(t('connectionLost'));
             return;
           }
           setIsReconnecting(true);
@@ -401,12 +435,13 @@ export function useDocumentIntakeStream(): {
 
       void poll();
     },
-    [handleProgressEvent, fail],
+    [applyJob, fail, t],
   );
 
   const streamProgress = useCallback(
     async (jobId: string, signal: AbortSignal): Promise<boolean> => {
       const token = await getAccessToken();
+      if (signal.aborted) return false;
       const baseUrl = api.defaults.baseURL || '';
       const response = await fetch(
         `${baseUrl}/ai/document-intake/${encodeURIComponent(jobId)}/progress`,
@@ -426,7 +461,9 @@ export function useDocumentIntakeStream(): {
       await readSseStream(response.body, (data) => {
         try {
           const parsed = JSON.parse(data) as IntakeProgressEvent;
-          if (handleProgressEvent(parsed)) terminal = true;
+          // SSE does not carry the approved draft link; reconcile it through GET.
+          if (parsed.status === 'APPROVED') return;
+          if (!signal.aborted && handleProgressEvent(parsed)) terminal = true;
         } catch {
           // Ignore malformed events; polling will reconcile state if the stream ends early.
         }
@@ -438,9 +475,7 @@ export function useDocumentIntakeStream(): {
 
   /** Authenticated progress stream, polling as the reconnect path. */
   const followJob = useCallback(
-    async (id: string) => {
-      const controller = new AbortController();
-      abortRef.current = controller;
+    async (id: string, controller: AbortController) => {
       try {
         const terminal = await streamProgress(id, controller.signal);
         if (!terminal && !controller.signal.aborted) {
@@ -448,8 +483,9 @@ export function useDocumentIntakeStream(): {
         }
       } catch (err) {
         if (controller.signal.aborted) return;
-        if (err instanceof IntakeStreamHttpError && err.status === 404) {
-          fail('This scan is no longer available. Please upload the document again.');
+        if (err instanceof IntakeStreamHttpError && (err.status === 404 || err.status === 403)) {
+          setJobStatus(null);
+          fail(t('jobNotFound'));
           return;
         }
         // Network drop, 401 (token refresh is handled by the API client), proxy
@@ -457,21 +493,46 @@ export function useDocumentIntakeStream(): {
         startPolling(id, controller.signal);
       }
     },
-    [streamProgress, startPolling, fail],
+    [streamProgress, startPolling, fail, t],
+  );
+
+  /** Resume an authorized existing job without uploading or mutating it. */
+  const loadJob = useCallback(
+    async (id: string): Promise<void> => {
+      reset();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setJobId(id);
+      setIsProcessing(true);
+      setMessage(t('jobLoading'));
+      try {
+        const job = (await documentIntakeApi.getResult(id)).data;
+        if (controller.signal.aborted) return;
+        if (!applyJob(job)) await followJob(id, controller);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        const status = (err as { response?: { status?: number } }).response?.status;
+        fail(t(status === 404 || status === 403 ? 'jobNotFound' : 'jobLoadFailed'));
+      }
+    },
+    [reset, t, fail, followJob, applyJob],
   );
 
   const processDocument = useCallback(
     async (formData: FormData) => {
       reset();
+      const controller = new AbortController();
+      abortRef.current = controller;
       setIsProcessing(true);
       setStage('received');
       setProgress(5);
-      setMessage('Uploading document...');
+      setMessage(t('stages.received'));
 
       let newJobId: string;
       try {
         // Step 1: POST file → job (an identical earlier upload returns the existing job)
         const response = await documentIntakeApi.processDocument(formData);
+        if (controller.signal.aborted) return;
         newJobId = response.data.jobId;
         setJobId(newJobId);
         setJobStatus(response.data.status ?? null);
@@ -479,51 +540,57 @@ export function useDocumentIntakeStream(): {
         if (response.data.status === 'APPROVED') {
           // Already approved: show the draft it produced, never a second review form.
           const job = (await documentIntakeApi.getResult(newJobId)).data;
-          if (job.draftDocumentId && job.draftDocumentType) {
-            setExistingDraft({ type: job.draftDocumentType, id: job.draftDocumentId });
-          }
-          setStage('complete');
-          setProgress(100);
-          setIsProcessing(false);
+          if (controller.signal.aborted) return;
+          applyJob(job);
           return;
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        fail(msg || 'Failed to process document');
+        if (controller.signal.aborted) return;
+        fail(t('jobFailed'));
         return;
       }
 
-      await followJob(newJobId);
+      await followJob(newJobId, controller);
     },
-    [reset, fail, followJob],
+    [reset, fail, followJob, applyJob, t],
   );
 
   const retry = useCallback(async () => {
     if (!jobId) return;
     stopAll();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setError(null);
+    setIsEmpty(false);
+    setResult(null);
+    setExistingDraft(null);
+    setMessage(null);
     setStage('received');
     setProgress(0);
     setIsProcessing(true);
     try {
       await documentIntakeApi.retry(jobId);
+      if (controller.signal.aborted) return;
       setJobStatus('QUEUED');
     } catch (err) {
+      if (controller.signal.aborted) return;
       const status = (err as { response?: { status?: number } }).response?.status;
       if (status === 409) {
         try {
           const job = (await documentIntakeApi.getResult(jobId)).data;
+          if (controller.signal.aborted) return;
           setJobStatus(job.status);
           if (job.status === 'QUEUED' || job.status === 'PROCESSING') {
             setStage(job.stage);
             setProgress(job.progress);
-            await followJob(jobId);
+            await followJob(jobId, controller);
             return;
           }
           // The server refused the transition; do not offer the same retry again.
           if (RETRYABLE_INTAKE_STATUSES.includes(job.status)) setJobStatus(null);
           fail(t('retryUnavailable'));
         } catch {
+          if (controller.signal.aborted) return;
           setJobStatus(null);
           fail(t('retryFailed'));
         }
@@ -532,16 +599,18 @@ export function useDocumentIntakeStream(): {
       }
       return;
     }
-    await followJob(jobId);
+    await followJob(jobId, controller);
   }, [jobId, stopAll, fail, followJob, t]);
 
   return {
     processDocument,
+    loadJob,
     stage,
     progress,
     message,
     result,
     error,
+    isEmpty,
     isProcessing,
     isReconnecting,
     jobId,
