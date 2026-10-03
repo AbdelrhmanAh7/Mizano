@@ -101,7 +101,7 @@ FROM node:20-alpine AS runtime
 # font-noto-naskh-arabic (1.9 MB) gives Arabic/RTL PDFs real glyphs through
 # fontconfig fallback; Latin text and digits use font-opensans, which the
 # chromium package already depends on.
-RUN apk add --no-cache openssl chromium font-noto-naskh-arabic \
+RUN apk add --no-cache openssl chromium font-noto-naskh-arabic poppler-utils util-linux-misc \
   && rm -rf /usr/lib/libLLVM* /usr/lib/libgallium* /usr/lib/dri /usr/lib/gbm \
        /usr/lib/libvulkan* /usr/share/vulkan /usr/lib/libxatracker*
 
