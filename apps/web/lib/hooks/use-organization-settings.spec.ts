@@ -48,7 +48,7 @@ describe('useAccountSettings', () => {
         defaultApAccountId: 'acc-2',
       },
     });
-    const { result } = renderHook(() => useAccountSettings(), {
+    renderHook(() => useAccountSettings(), {
       wrapper: createWrapper(),
     });
     await flush();

@@ -57,7 +57,7 @@ describe('useAllOrganizationSettings', () => {
 
   it('calls GET /organization/settings (singular, not /organizations/)', async () => {
     mockGet.mockResolvedValueOnce({ data: {} });
-    const { result } = renderHook(() => useAllOrganizationSettings(), {
+    renderHook(() => useAllOrganizationSettings(), {
       wrapper: createWrapper(),
     });
     await act(async () => {
@@ -109,7 +109,7 @@ describe('useOrganization', () => {
 
   it('calls GET /organization (singular)', async () => {
     mockGet.mockResolvedValueOnce({ data: {} });
-    const { result } = renderHook(() => useOrganization(), {
+    renderHook(() => useOrganization(), {
       wrapper: createWrapper(),
     });
     await act(async () => {

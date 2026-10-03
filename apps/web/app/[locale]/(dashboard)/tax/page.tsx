@@ -6,7 +6,6 @@ import { format } from 'date-fns';
 import {
   Percent,
   FileText,
-  DollarSign,
   ArrowRight,
   Plus,
   Calculator,

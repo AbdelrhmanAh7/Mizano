@@ -71,10 +71,9 @@ export default function TaxRatesPage() {
   const { data: taxRatesData, isLoading, refetch } = useTaxRates();
   const deleteTaxRate = useDeleteTaxRate();
 
-  const allRates: TaxRate[] = taxRatesData?.data || [];
-
   // Client-side filtering
   const filteredRates = useMemo(() => {
+    const allRates: TaxRate[] = taxRatesData?.data || [];
     let result = allRates;
 
     // Search
@@ -101,7 +100,7 @@ export default function TaxRatesPage() {
     }
 
     return result;
-  }, [allRates, tableParams.search, tableParams.filters.type, tableParams.filters.status]);
+  }, [taxRatesData, tableParams.search, tableParams.filters.type, tableParams.filters.status]);
 
   const canCreate = hasPermission('tax.create');
   const canEdit = hasPermission('tax.edit');
