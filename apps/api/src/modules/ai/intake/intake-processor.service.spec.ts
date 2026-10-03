@@ -96,6 +96,17 @@ describe('IntakeProcessorService', () => {
     expect(needsReview(result())).toBe(false);
   });
 
+  it('routes a job with a blocking field validation to NEEDS_REVIEW at high confidence', async () => {
+    const validation = { fields: {}, blockingFields: ['total'], requiresReview: true };
+    const flagged = { ...result(), validation } as unknown as DocumentIntakeResult;
+    expect(needsReview(flagged)).toBe(true);
+    intake.processDocument.mockResolvedValue(flagged);
+    const job = await seed();
+    await processor.handle({ jobId: job.id, organizationId: ORG_A });
+    expect(table.rows[0].status).toBe(IntakeJobStatus.NEEDS_REVIEW);
+    expect(JSON.stringify(table.rows[0].result)).toContain('blockingFields');
+  });
+
   it('is idempotent: a second delivery of a finished job does nothing', async () => {
     const job = await seed();
     await processor.handle({ jobId: job.id, organizationId: ORG_A });

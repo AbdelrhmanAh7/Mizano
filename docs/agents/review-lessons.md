@@ -42,6 +42,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Only bank registers (`BankAccount.currency`) carry a meaningful currency.** `Account.currency` is a schema default and must not be used for eligibility.
 - **Freeze the base currency once journals exist,** and serialize that check with posting through the ledger lock.
 - **Never write a data migration that guesses.** If no stored evidence separates "explicitly chosen" from "default", do not backfill; fix the read rule instead. _(baseCurrency and account-currency backfills, both removed)_
+- **Missing organization settings stay unknown.** Reject validation when the organization or its base currency is unavailable; never substitute SAR. Tax-ID and VAT rules come from the organization's base currency, so a misread extracted currency cannot select another country's rules. _(intake field validation)_
 - **Handle legacy rows.** Journals created before source linking have `sourceType = null`, for example opening balance `OB-001`. Reversal and replacement must find them, or explicitly refuse.
 
 ## 6. Money arithmetic
@@ -91,6 +92,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed.
 - **Show the currency of the document**, falling back to the org base currency, never the counterparty's default. The API must actually return the fields the UI relies on (for example `baseCurrency`).
 - **Payment-wide effects get payment-wide warnings.** Voiding a payment affects every allocated bill.
+- **Changing lines does not acknowledge extracted amount blockers.** A different net alone proves nothing about tax or gross reconciliation. Keep amount blockers subject to explicit acknowledgement, including when extracted amounts are missing. _(intake field validation)_
 
 ## 12. Caches, tests and scope
 

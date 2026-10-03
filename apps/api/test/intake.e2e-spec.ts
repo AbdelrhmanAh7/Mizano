@@ -16,12 +16,13 @@ import { PrismaService } from '../src/prisma/prisma.service';
 process.env.INTAKE_RETRY_BASE_MS = '50';
 process.env.INTAKE_LEASE_MS = '1000';
 
-const stub = { mode: 'ok' as 'ok' | 'fail', calls: 0 };
+const stub = { mode: 'ok' as 'ok' | 'fail' | 'invalid', calls: 0 };
 
 const stubResolver = {
   resolve: async () => {
     stub.calls += 1;
     if (stub.mode === 'fail') throw new Error('stub extraction failure with INVOICE-TEXT-SECRET');
+    const invalid = stub.mode === 'invalid';
     return {
       strategyUsed: 'ocr',
       totalTimeMs: 1,
@@ -30,15 +31,15 @@ const stubResolver = {
         vendorAddress: null,
         vendorPhone: null,
         vendorEmail: null,
-        vendorTaxId: null,
+        vendorTaxId: invalid ? '123' : null,
         invoiceNumber: 'E2E-1',
         date: '2026-09-01',
         dueDate: null,
-        total: 115,
+        total: invalid ? 130 : 115,
         subtotal: 100,
         tax: 15,
         discount: null,
-        currency: 'EGP',
+        currency: 'USD',
         paymentTerms: null,
         notes: null,
         lineItems: [],
@@ -384,6 +385,33 @@ describe('Document intake (e2e)', () => {
         },
       }),
     ).rejects.toThrow();
+  });
+
+  it('invalid tax id and totals mismatch route to NEEDS_REVIEW with reason codes', async () => {
+    stub.mode = 'invalid';
+    try {
+      const res = await upload(a, pdfFixture(`INVALID-${uniqueSuffix()}`));
+      expect(res.status).toBe(201);
+      const done = await waitForStatus(res.body.data.jobId, IntakeJobStatus.NEEDS_REVIEW);
+      const validation = (
+        done?.result as {
+          validation: {
+            requiresReview: boolean;
+            blockingFields: string[];
+            fields: Record<string, { status: string; reasons: string[] }>;
+          };
+        }
+      ).validation;
+      expect(validation.requiresReview).toBe(true);
+      expect(validation.fields.vendorTaxId.reasons).toContain('TAX_ID_FORMAT');
+      expect(validation.fields.total.reasons).toContain('TOTALS_MISMATCH');
+      expect(validation.fields.currency.status).toBe('valid');
+      expect(validation.blockingFields).toEqual(
+        expect.arrayContaining(['vendorTaxId', 'total', 'subtotal', 'tax']),
+      );
+    } finally {
+      stub.mode = 'ok';
+    }
   });
 
   it('a FAILED job is re-enqueued by the periodic sweep and finishes', async () => {
