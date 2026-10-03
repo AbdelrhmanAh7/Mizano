@@ -42,6 +42,18 @@ Ready issue → lease → scoped plan → branch/worktree → implement → affe
 
 A lease record contains issue key/number, provider, run ID, paths, baseline SHA, worktree, acquired/expiry time and heartbeat. Renew while active. Recover stale leases only after verifying no live worker still owns the process/worktree. Never steal work based only on a missing UI update.
 
+For local worktrees, use `pnpm wt:new <lane> [base]` (default cached
+`origin/master`) and `pnpm wt:clean`; see the [helper guide](../DEVELOPMENT.md#worktree-helpers).
+The lane is both the branch name and `.worktrees/<lane>` directory name; use a
+simple lane name without slashes. Refresh remote refs through the coordinator
+before use. Setup installs offline, generates Prisma and builds only shared
+packages sequentially. Schedule setup as one expensive task on the shared host.
+Record the actual base SHA in the lease; a helper invocation does not acquire a
+lease or verify GitHub issue status. Stop workers and release leases before
+cleanup. Cleanup preserves dirty, unmerged, detached, locked and outside
+worktrees; do not treat merged ancestry as proof that a worker has stopped.
+Run `bash scripts/test-wt.sh` for offline helper verification.
+
 For provider quota/failure: checkpoint diff and next step; permit one bounded retry if transient; reroute to a different authorized available provider with a fresh scoped prompt. Do not bypass permissions, disable checks or repeatedly relaunch a stuck model. Always distinguish provider rate limits from application defects.
 
 ## Minimal prompts and evidence

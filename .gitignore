@@ -112,3 +112,4 @@ services/vlm-service/models/
 **/*.pt
 **/*.pth
 .claude/worktrees/
+.worktrees/
