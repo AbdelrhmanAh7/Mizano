@@ -12,22 +12,22 @@ Target: a tiny live deployment on a Raspberry Pi 5 (8GB, arm64), tracked by epic
 4. Show supplier matching and duplicate detection. Replay the Telegram update, double-click a web request and restart a worker. Each source must create at most one active draft/posting.
 5. Review sources and fields in one inbox. Correct only flagged values. Approve a selected valid batch in one action. Missing currency, totals mismatch and invalid tenant account references cannot pass.
 6. Demonstrate exact arithmetic: 2 × 100, 14% tax → net 200, tax 28, gross 228 through scan and manual entry. Include discount, decimal and mixed-tax cases; totals reconcile per declared rounding.
-7. Record a partial payment, inspect remaining AP, trial balance and journal. Reverse a posted transaction and show linked corrections without rewriting history. Try a locked-period single/bulk action and concurrent approval; both controls must hold.
+7. Record a partial payment, inspect remaining AP, trial balance and journal. Reverse a posted transaction and show linked corrections without rewriting history. Try a locked-period single/bulk action, two simultaneous approvals of one bill, and two simultaneous payments that together exceed one bill's balance; each bill must have at most one successful transition/posting and remain balanced.
 8. Use charts to drill through to the same posted records. Show drafts separately, correct date/as-of filters and EGP denomination.
 9. Restart the CPU instance/worker and recover a queued job; restore backup into an isolated database and verify original-to-ledger links. Display the deployed SHA/digest.
 
 ## Pass criteria and evidence
 
-| Gate                    | Required evidence                                                                                                                                                               |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Security/identity       | Seeded anonymous/two-tenant/API/SSE tests, cross-reference rejection and concurrent refresh tests; no invoice/auth payload in captured logs                                     |
-| Accounting              | Exact Decimal fixture totals, balanced journals, transactional failure injection, idempotency/concurrency, bulk/single parity, period locks and reversal tests                  |
-| Format completeness     | Every declared format and mixed-page test; no silent text/page truncation; explicit encrypted/corrupt/oversized behavior                                                        |
-| Automation and recovery | Zero clicks from configured Telegram channel to draft; <=1 batch approval action for ready invoices; bounded retries/dead-letter, 20-document batch and restart/replay evidence |
-| OCR quality             | Labelled dev/holdout corpus; >=95% critical-header exact-match target on readable holdout, numerator/denominator and slices; all uncertain monetary fields repairable           |
-| CPU performance         | Actual hardware/model versions; warm/cold p50/p95, RAM and batch throughput. Provisional warm p95 <=30s for supported <=3-page invoices, no out-of-memory/crash                 |
-| Delivery                | Required CI/build and strict seeded API/browser journeys; exact-head independent review; tested immutable deploy, health and restore/rollback evidence                          |
-| UX                      | Arabic/English RTL, 375px and desktop, keyboard/source preview, loading/empty/error/reconnect states                                                                            |
+| Gate                    | Required evidence                                                                                                                                                                                          |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Security/identity       | Seeded anonymous/two-tenant/API/SSE tests, cross-reference rejection and concurrent refresh tests; no invoice/auth payload in captured logs                                                                |
+| Accounting              | Exact Decimal fixture totals, balanced journals, transactional failure injection, seeded API tests for concurrent approval and competing overpayments, bulk/single parity, period locks and reversal tests |
+| Format completeness     | Every declared format and mixed-page test; no silent text/page truncation; explicit encrypted/corrupt/oversized behavior                                                                                   |
+| Automation and recovery | Zero clicks from configured Telegram channel to draft; <=1 batch approval action for ready invoices; bounded retries/dead-letter, 20-document batch and restart/replay evidence                            |
+| OCR quality             | Labelled dev/holdout corpus; >=95% critical-header exact-match target on readable holdout, numerator/denominator and slices; all uncertain monetary fields repairable                                      |
+| CPU performance         | Actual hardware/model versions; warm/cold p50/p95, RAM and batch throughput. Provisional warm p95 <=30s for supported <=3-page invoices, no out-of-memory/crash                                            |
+| Delivery                | Required CI/build and strict seeded API/browser journeys; exact-head independent review; tested immutable deploy, health and restore/rollback evidence                                                     |
+| UX                      | Arabic/English RTL, 375px and desktop, keyboard/source preview, loading/empty/error/reconnect states                                                                                                       |
 
 On a target miss, publish measured result and impact; do not redefine the metric after seeing data. Average OCR accuracy never authorizes a wrong posting. Time/size limits reject or mark review-required rather than dropping data. Local hardware and an accountant-labelled corpus are Day 1 prerequisites; absent evidence keeps the applicable gate open.
 
