@@ -216,6 +216,10 @@ jobs:
 
       - name: Set up QEMU for ARM64
         uses: docker/setup-qemu-action@v3
+        with:
+          # Pinned: binfmt:latest intermittently crashes node (SIGILL) under emulation.
+          image: tonistiigi/binfmt:qemu-v8.1.5
+          platforms: arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
