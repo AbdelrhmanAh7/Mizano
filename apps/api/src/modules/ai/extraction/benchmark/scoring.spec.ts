@@ -56,6 +56,25 @@ describe('benchmark scoring', () => {
     ]).total;
     expect(metrics).toEqual({ precision: 0, recall: 0, exactMatch: 0 });
   });
+  it('rejects malformed money strings in grouping or format at the label boundary', () => {
+    const invalidFormats = ['1,2', '1,00,000', '1,000,00', '1,000.5.5', '1,', ',100', '.'];
+    for (const total of invalidFormats) {
+      expect(() => {
+        validateLabels({ synthetic: false, documents: { 'doc.pdf': label({ total }) } });
+      }).toThrow(`Invalid benchmark money label: total`);
+    }
+  });
+
+  it('accepts well-formed money strings at the label boundary', () => {
+    const validFormats = ['1,000', '1,000.5', '1,000,000', '0.5', '1000', '1000.5'];
+    for (const total of validFormats) {
+      const result = validateLabels({
+        synthetic: false,
+        documents: { 'doc.pdf': label({ total }) },
+      });
+      expect(result.documents['doc.pdf'].total).toBe(total);
+    }
+  });
 
   it('retains extra digits rather than rounding them during normalization', () => {
     expect(normalizeField('total', '1.23454')).toBe('1.23454');

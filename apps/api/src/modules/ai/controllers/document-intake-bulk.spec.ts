@@ -120,6 +120,7 @@ describe('DocumentIntakeController.bulkApprove', () => {
         {
           id: 'no-currency',
           reason: 'The document or organization currency is missing or does not match',
+          code: 'CURRENCY_MISMATCH',
         },
       ],
     });
@@ -178,6 +179,7 @@ describe('DocumentIntakeController.bulkApprove', () => {
       failures: ['ok1', 'ok2'].map((id) => ({
         id,
         reason: 'The document or organization currency is missing or does not match',
+        code: 'CURRENCY_MISMATCH',
       })),
     });
     expect(drafts).toBe(0);

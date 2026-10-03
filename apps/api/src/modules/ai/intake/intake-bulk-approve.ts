@@ -72,8 +72,19 @@ function exactPercent(net: Decimal, tax: Decimal): Decimal | null {
 }
 
 function validDate(value: string | null | undefined): string | null {
-  if (!value || Number.isNaN(new Date(value).getTime())) return null;
-  return value;
+  if (!value) return null;
+  const trimmed = value.trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (
+    d.getUTCFullYear() !== Number(m[1]) ||
+    d.getUTCMonth() + 1 !== Number(m[2]) ||
+    d.getUTCDate() !== Number(m[3])
+  ) {
+    return null;
+  }
+  return trimmed;
 }
 
 function normalizeCurrency(value: string | null | undefined): string | null {

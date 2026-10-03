@@ -209,7 +209,7 @@ describe('Accountant inbox (e2e)', () => {
     expect(res.body).toMatchObject({ processed: 2, total: 4 });
     expect(res.body.failures).toEqual([
       { id: ids.review, reason: expect.any(String) },
-      { id: ids.foreign, reason: expect.stringContaining('currency') },
+      { id: ids.foreign, reason: expect.stringContaining('currency'), code: 'CURRENCY_MISMATCH' },
     ]);
 
     const bills = await prisma.bill.findMany({ where: { organizationId: tenantA.organizationId } });

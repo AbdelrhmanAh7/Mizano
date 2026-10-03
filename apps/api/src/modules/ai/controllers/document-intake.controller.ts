@@ -349,7 +349,12 @@ export class DocumentIntakeController {
       const confirmation = buildBillConfirmation(job.result as DocumentIntakeResult | null, {
         baseCurrency,
       });
-      if (!confirmation.ok) throw new BadRequestException(confirmation.reason);
+      if (!confirmation.ok) {
+        throw new BadRequestException({
+          message: confirmation.reason,
+          code: confirmation.code,
+        });
+      }
       return this.confirmJob(orgId, jobId, confirmation.input, userId);
     });
   }

@@ -86,7 +86,12 @@ const navigationConfig: NavItem[] = [
     children: [
       { nameKey: 'purchases.vendors', href: '/purchases/vendors', icon: Users },
       { nameKey: 'purchases.expenses', href: '/purchases/expenses', icon: Receipt },
-      { nameKey: 'purchases.inbox', href: '/purchases/inbox', icon: Inbox },
+      {
+        nameKey: 'purchases.inbox',
+        href: '/purchases/inbox',
+        icon: Inbox,
+        permission: 'purchases.create',
+      },
       { nameKey: 'purchases.bills', href: '/purchases/bills', icon: FileText },
       { nameKey: 'purchases.payments', href: '/purchases/payments', icon: Banknote },
       { nameKey: 'purchases.credits', href: '/purchases/credits', icon: CreditCard },
@@ -267,6 +272,9 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
   );
 
   const renderNavItem = (item: NavItem, isChild = false) => {
+    if (item.permission && (isLoading || !hasPermission(item.permission))) {
+      return null;
+    }
     const hasChildren = item.children && item.children.length > 0;
     const isActive =
       pathnameWithoutLocale === item.href ||

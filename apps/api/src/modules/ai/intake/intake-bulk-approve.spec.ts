@@ -80,6 +80,17 @@ describe('buildBillConfirmation', () => {
     expect(c).toMatchObject({ ok: false, code: 'TOTAL_MISMATCH' });
   });
 
+  it('rejects malformed or non-existent dates', () => {
+    const invalidDates = ['2024-02-30', '2024-13-01', '2024-00-01', '10-01-2024', '2024-1-1'];
+    for (const date of invalidDates) {
+      const base = billResult();
+      const result = { ...base, extractedFields: { ...base.extractedFields, date } };
+      expect(buildBillConfirmation(result, { baseCurrency: 'EGP' })).toMatchObject({
+        ok: false,
+        code: 'NO_DATE',
+      });
+    }
+  });
   it('blocks a document in another currency and normalizes the base currency code', () => {
     const base = billResult();
     expect(buildBillConfirmation(base, { baseCurrency: 'usd' })).toMatchObject({

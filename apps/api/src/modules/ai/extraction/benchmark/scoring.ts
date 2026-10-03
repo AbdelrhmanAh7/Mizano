@@ -61,10 +61,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-/** Unsupported precision is a mismatch, never something to round into correctness. */
 function validMoney(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.includes(',')) {
+    if (!/^(0|[1-9]\d{0,2}(,\d{3})*)(\.\d+)?$/.test(trimmed)) return false;
+  } else {
+    if (!/^\d*(\.\d+)?$/.test(trimmed) || trimmed === '' || trimmed === '.') return false;
+  }
   try {
-    const decimal = new Decimal(value.trim().replace(/,/g, ''));
+    const decimal = new Decimal(trimmed.replace(/,/g, ''));
     return (
       decimal.isFinite() && decimal.gte(0) && decimal.lt('1000000000000000') && decimal.dp() <= 4
     );

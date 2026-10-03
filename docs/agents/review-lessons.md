@@ -31,6 +31,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **A journal is dated on the document date.**
 - **A reversal or refund never precedes its source.** Default to `max(today, sourceDate)` and reject an earlier explicit date. _(JournalsService.reverse, vendor-credit refund)_
+- **Web defaults use the user's local calendar date** (`format(d, 'yyyy-MM-dd')`), never `toISOString()`, which gives yesterday in UTC+ zones such as Cairo.
+- **A regex shape check for dates must cover the full grammar (anchored at the end) and must be combined with a calendar round-trip check** to catch invalid dates like February 30th.
 - **A date-only end bound means end of day** (`endOfUtcDay`). A void at 10:00 on the end date belongs to that period.
 - **Web defaults use the user's local calendar date** (`format(d, 'yyyy-MM-dd')`), never `toISOString()`, which gives yesterday in UTC+ zones such as Cairo.
 - **"Current" figures exclude future-dated entries.** Cash today means lines dated ≤ end of today.

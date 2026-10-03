@@ -45,6 +45,13 @@ describe('validateDate', () => {
       reasons: ['DATE_AMBIGUOUS'],
     });
   });
+
+  it('rejects dates with trailing characters unless properly formed ISO', () => {
+    expect(validateDate('2026-09-01T12:00:00Z', false, NOW).status).toBe('valid');
+    expect(validateDate('2026-09-011', false, NOW).status).toBe('invalid');
+    expect(validateDate('2026-09-01T99:99', false, NOW).status).toBe('invalid');
+    expect(validateDate('2026-09-01garbage', false, NOW).status).toBe('invalid');
+  });
 });
 
 describe('validateCurrency', () => {

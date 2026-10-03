@@ -60,7 +60,7 @@ export interface IntakeInboxPage {
 export interface IntakeBulkResult {
   processed: number;
   total: number;
-  failures?: { id: string; reason: string }[];
+  failures?: { id: string; reason: string; code?: string }[];
 }
 
 /** Inbox lists poll so newly ingested and processed documents appear without a reload. */

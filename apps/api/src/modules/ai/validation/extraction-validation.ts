@@ -105,8 +105,9 @@ export function validateDate(
 ): FieldValidation {
   const v = clean(value);
   if (!v) return finish(null, ['DATE_MISSING'], 'missing', evidence);
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
-  if (!m) return finish(v, ['DATE_INVALID'], 'invalid', evidence);
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T|$)/.exec(v);
+  if (!m || (v.length > 10 && Number.isNaN(Date.parse(v))))
+    return finish(v, ['DATE_INVALID'], 'invalid', evidence);
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
   const dt = new Date(Date.UTC(y, mo - 1, d));
   if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) {

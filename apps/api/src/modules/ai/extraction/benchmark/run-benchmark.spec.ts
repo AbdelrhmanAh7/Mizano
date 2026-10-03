@@ -157,4 +157,27 @@ describe('benchmark runner', () => {
     expect(output).not.toContain('document text');
     expect(output).toMatch(/^Benchmark failed: (Error|SyntaxError|Non-Error thrown \(string\))\n$/);
   });
+
+  it('rejects --out when it is missing a path or consumes the next flag', async () => {
+    process.argv = ['node', 'benchmark', '--corpus', directory, '--out', '--labels'];
+    await expect(main()).rejects.toThrow('--out requires a directory path');
+  });
+
+  it('rejects scanned PDFs without usable text layers', async () => {
+    labels({ 'scanned.pdf': fields });
+    writeFileSync(join(directory, 'scanned.pdf'), 'binary');
+    jest.mocked(buildExtractionContext).mockResolvedValue({
+      context: {
+        fileBuffer: Buffer.from(''),
+        mimeType: 'application/pdf',
+        language: 'eng',
+        isPdf: true,
+        pdfIsNativeText: false,
+      } as any,
+      rawText: '',
+    });
+    await expect(main()).rejects.toThrow(
+      'Unsupported benchmark input: scanned PDF without usable text layer (scanned.pdf)',
+    );
+  });
 });

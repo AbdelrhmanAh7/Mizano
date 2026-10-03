@@ -392,7 +392,7 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
             LIMIT ${limit} OFFSET ${(page - 1) * limit}`)
         : this.prisma.intakeJob.findMany({
             where,
-            orderBy: { createdAt: 'desc' },
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
             skip: (page - 1) * limit,
             take: limit,
           }),

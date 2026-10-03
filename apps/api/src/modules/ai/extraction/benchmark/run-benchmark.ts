@@ -35,7 +35,11 @@ const MIME_BY_EXT: Record<string, string> = {
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
-  return i >= 0 ? process.argv[i + 1] : undefined;
+  if (i >= 0 && i + 1 < process.argv.length) {
+    const val = process.argv[i + 1];
+    return val.startsWith('--') ? undefined : val;
+  }
+  return undefined;
 }
 
 function money(value: number | null): string | null {
@@ -81,7 +85,11 @@ async function contextFor(
       pdfPageCount: 1,
     };
   }
-  return (await buildExtractionContext(buffer, mimeType, language, file)).context;
+  const ctx = (await buildExtractionContext(buffer, mimeType, language, file)).context;
+  if (ctx.isPdf && !ctx.pdfIsNativeText) {
+    throw new Error(`Unsupported benchmark input: scanned PDF without usable text layer (${file})`);
+  }
+  return ctx;
 }
 
 export async function main(): Promise<void> {
@@ -89,7 +97,11 @@ export async function main(): Promise<void> {
   if (!corpus) throw new Error('--corpus <dir> is required');
   const corpusDir = resolve(corpus);
   const labelsPath = resolve(arg('labels') ?? join(corpusDir, 'labels.json'));
+
+  const outDirIndex = process.argv.indexOf('--out');
   const outDir = arg('out');
+  if (outDirIndex >= 0 && !outDir) throw new Error('--out requires a directory path');
+
   const language = arg('language') ?? 'eng+ara';
 
   // Strategy logs are metadata-only, but keep the report readable.

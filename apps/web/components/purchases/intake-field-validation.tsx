@@ -69,7 +69,9 @@ export function IntakeFieldValidation({
                 <StatusIcon status={field.status} />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{t(`fields.${key}`)}</span>
+                    <span className="font-medium">
+                      {t.has(`fields.${key}`) ? t(`fields.${key}`) : key}
+                    </span>
                     <span className="sr-only">{t(`status.${field.status}`)}</span>
                     <span className="text-muted-foreground" dir="auto">
                       {field.value ?? t('emptyValue')}
@@ -78,7 +80,7 @@ export function IntakeFieldValidation({
                   {field.reasons.length > 0 && (
                     <ul className={cn('mt-1 space-y-0.5', STATUS_STYLE[field.status])}>
                       {field.reasons.map((code) => (
-                        <li key={code}>{t(`reasons.${code}`)}</li>
+                        <li key={code}>{t.has(`reasons.${code}`) ? t(`reasons.${code}`) : code}</li>
                       ))}
                     </ul>
                   )}
@@ -86,7 +88,7 @@ export function IntakeFieldValidation({
                 <Popover>
                   <PopoverTrigger
                     className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted"
-                    aria-label={`${t('evidence')}: ${t(`fields.${key}`)}`}
+                    aria-label={`${t('evidence')}: ${t.has(`fields.${key}`) ? t(`fields.${key}`) : key}`}
                   >
                     <FileSearch className="h-4 w-4" aria-hidden />
                   </PopoverTrigger>
