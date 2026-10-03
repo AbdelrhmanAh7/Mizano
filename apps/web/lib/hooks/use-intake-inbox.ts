@@ -90,12 +90,26 @@ export const intakeInboxApi = {
   },
   /** The original needs the bearer token, so it is fetched and opened as a blob URL. */
   openOriginal: async (jobId: string): Promise<void> => {
-    const response = await api.get(`/ai/document-intake/${encodeURIComponent(jobId)}/original`, {
-      responseType: 'blob',
-    });
-    const url = URL.createObjectURL(response.data as Blob);
-    window.open(url, '_blank', 'noopener');
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    // Reserve the tab while the click still has user activation. `noopener` would hide
+    // the handle even on success, so detach it explicitly before fetching anything.
+    const tab = window.open('about:blank', '_blank');
+    if (!tab) throw new Error('Could not open the original file');
+    let url: string | undefined;
+    try {
+      tab.opener = null;
+      const response = await api.get(`/ai/document-intake/${encodeURIComponent(jobId)}/original`, {
+        responseType: 'blob',
+      });
+      if (tab.closed) return;
+      url = URL.createObjectURL(response.data as Blob);
+      tab.location.href = url;
+      const openedUrl = url;
+      setTimeout(() => URL.revokeObjectURL(openedUrl), 60_000);
+    } catch (error) {
+      tab.close();
+      if (url) URL.revokeObjectURL(url);
+      throw error;
+    }
   },
 };
 

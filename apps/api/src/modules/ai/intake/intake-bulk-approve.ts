@@ -25,7 +25,7 @@ const BLOCKER_TEXT: Record<IntakeBlockerCode, string> = {
   INVALID_LINE: 'A line item has a missing quantity or price',
   TAX_UNRESOLVED: 'The tax rate could not be determined exactly',
   TOTAL_MISMATCH: 'Line totals do not reconcile with the document total',
-  CURRENCY_MISMATCH: 'The document currency differs from the organization base currency',
+  CURRENCY_MISMATCH: 'The document or organization currency is missing or does not match',
 };
 
 export type BillConfirmation =
@@ -33,7 +33,7 @@ export type BillConfirmation =
   | { ok: false; code: IntakeBlockerCode; reason: string };
 
 export interface BillConfirmationOptions {
-  /** Organization base currency; a document in another currency is blocked (single-currency ledger). */
+  /** Both currencies must be known and match (single-currency ledger). */
   baseCurrency?: string | null;
 }
 
@@ -86,7 +86,7 @@ function normalizeCurrency(value: string | null | undefined): string | null {
  * Money is Decimal end to end and bounded like the confirm DTO; a tax rate is only taken when
  * it is exact (never a silent 0); the totals are recomputed with the same shared calculator the
  * server stores (`computeDocumentTotals`) and must reconcile with the extracted total; and the
- * currency must be the organization base currency when one is given.
+ * document and organization currencies must both be known and match.
  */
 export function buildBillConfirmation(
   result: DocumentIntakeResult | null | undefined,
@@ -105,7 +105,7 @@ export function buildBillConfirmation(
 
   const currency = normalizeCurrency(fields.currency);
   const base = normalizeCurrency(options.baseCurrency);
-  if (currency && base && currency !== base) return blocked('CURRENCY_MISMATCH');
+  if (!currency || !base || currency !== base) return blocked('CURRENCY_MISMATCH');
 
   const nets: Decimal[] = [];
   const quantities: string[] = [];
@@ -168,7 +168,7 @@ export function buildBillConfirmation(
       date,
       dueDate: validDate(fields.dueDate) ?? date,
       ...(fields.documentNumber ? { reference: fields.documentNumber } : {}),
-      ...(currency ? { currencyCode: currency } : {}),
+      currencyCode: currency,
       lines: items.map((item, i) => ({
         description: item.description,
         quantity: quantities[i],

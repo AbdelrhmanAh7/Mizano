@@ -38,6 +38,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 5. Single-currency ledger and data
 
 - **Reject a document whose `currencyCode` differs from the org `baseCurrency`.** Never post foreign amounts one-for-one. Carry the currency when copying, for example quote → invoice.
+- **Automatic intake approval requires both currencies to be known.** Missing or blank document/base currency stays a per-job exception; use the same validator for inbox readiness and bulk approval.
 - **Only bank registers (`BankAccount.currency`) carry a meaningful currency.** `Account.currency` is a schema default and must not be used for eligibility.
 - **Freeze the base currency once journals exist,** and serialize that check with posting through the ledger lock.
 - **Never write a data migration that guesses.** If no stored evidence separates "explicitly chosen" from "default", do not backfill; fix the read rule instead. _(baseCurrency and account-currency backfills, both removed)_
@@ -84,6 +85,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 11. Web UI
 
 - **Every new string needs en and ar,** including dialog titles, confirm and cancel buttons, placeholders, selector labels and report row names. Shared components accept localized label props.
+- **Navigation labels include breadcrumbs.** Reuse the same translation key as the sidebar, and refresh memoized labels when the locale changes.
+- **Reserve file-viewer tabs during the click, before awaiting authenticated downloads.** Detach the opener explicitly; report a blocked tab, close it on fetch/navigation failure, and release blob URLs.
 - **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed.
 - **Show the currency of the document**, falling back to the org base currency, never the counterparty's default. The API must actually return the fields the UI relies on (for example `baseCurrency`).
 - **Payment-wide effects get payment-wide warnings.** Voiding a payment affects every allocated bill.
@@ -94,6 +97,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
+- **Paginated searches apply their predicate in the database for both page and count.** Never materialize all matching ids or cap that intermediate list; preserve tenant/deletion filters, literal wildcard escaping and stable ordering.
 
 ## Review process
 

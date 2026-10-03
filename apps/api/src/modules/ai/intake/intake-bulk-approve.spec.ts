@@ -4,7 +4,7 @@ import { buildBillConfirmation } from './intake-bulk-approve';
 
 describe('buildBillConfirmation', () => {
   it('builds an exact decimal confirm payload from a complete extraction', () => {
-    const c = buildBillConfirmation(billResult());
+    const c = buildBillConfirmation(billResult(), { baseCurrency: 'EGP' });
     expect(c).toEqual({
       ok: true,
       input: {
@@ -46,10 +46,13 @@ describe('buildBillConfirmation', () => {
     const f = base.extractedFields;
     const items = [{ description: 'CPU', quantity: 1, unitPrice: 100, taxAmount: 0, total: 100 }];
     expect(
-      buildBillConfirmation({
-        ...base,
-        extractedFields: { ...f, lineItems: items, tax: null, subtotal: null, total: 100 },
-      }),
+      buildBillConfirmation(
+        {
+          ...base,
+          extractedFields: { ...f, lineItems: items, tax: null, subtotal: null, total: 100 },
+        },
+        { baseCurrency: 'EGP' },
+      ),
     ).toMatchObject({ ok: false, code: 'TAX_UNRESOLVED' });
   });
 
@@ -57,17 +60,23 @@ describe('buildBillConfirmation', () => {
     const base = billResult();
     const f = base.extractedFields;
     const items = [{ description: 'CPU', quantity: 2, unitPrice: 50, taxAmount: 0, total: 100 }];
-    const c = buildBillConfirmation({ ...base, extractedFields: { ...f, lineItems: items } });
+    const c = buildBillConfirmation(
+      { ...base, extractedFields: { ...f, lineItems: items } },
+      { baseCurrency: 'EGP' },
+    );
     expect(c).toMatchObject({ ok: true });
     if (c.ok) expect(c.input.lines[0].taxRatePercent).toBe('15');
   });
 
   it('blocks totals that do not reconcile', () => {
     const base = billResult();
-    const c = buildBillConfirmation({
-      ...base,
-      extractedFields: { ...base.extractedFields, total: 120 },
-    });
+    const c = buildBillConfirmation(
+      {
+        ...base,
+        extractedFields: { ...base.extractedFields, total: 120 },
+      },
+      { baseCurrency: 'EGP' },
+    );
     expect(c).toMatchObject({ ok: false, code: 'TOTAL_MISMATCH' });
   });
 
@@ -78,12 +87,41 @@ describe('buildBillConfirmation', () => {
       code: 'CURRENCY_MISMATCH',
     });
     expect(buildBillConfirmation(base, { baseCurrency: ' egp ' })).toMatchObject({ ok: true });
-    // No base currency known (or none extracted): nothing to compare, the draft is still built.
-    expect(buildBillConfirmation(base)).toMatchObject({ ok: true });
-    const noCurrency = { ...base, extractedFields: { ...base.extractedFields, currency: null } };
-    const c = buildBillConfirmation(noCurrency, { baseCurrency: 'USD' });
-    expect(c).toMatchObject({ ok: true });
-    if (c.ok) expect(c.input.currencyCode).toBeUndefined();
+  });
+
+  it.each([null, '', '   '])('blocks missing document currency (%s)', (currency) => {
+    const base = billResult();
+    const result = { ...base, extractedFields: { ...base.extractedFields, currency } };
+    expect(buildBillConfirmation(result, { baseCurrency: 'EGP' })).toMatchObject({
+      ok: false,
+      code: 'CURRENCY_MISMATCH',
+    });
+  });
+
+  it('blocks legacy extraction results with an omitted document currency', () => {
+    const result = billResult();
+    Reflect.deleteProperty(result.extractedFields, 'currency');
+    expect(buildBillConfirmation(result, { baseCurrency: 'EGP' })).toMatchObject({
+      ok: false,
+      code: 'CURRENCY_MISMATCH',
+    });
+  });
+
+  it.each([null, undefined, '', '   '])(
+    'blocks missing organization currency (%s)',
+    (baseCurrency) => {
+      expect(buildBillConfirmation(billResult(), { baseCurrency })).toMatchObject({
+        ok: false,
+        code: 'CURRENCY_MISMATCH',
+      });
+    },
+  );
+
+  it('blocks when organization currency options are omitted', () => {
+    expect(buildBillConfirmation(billResult())).toMatchObject({
+      ok: false,
+      code: 'CURRENCY_MISMATCH',
+    });
   });
 
   it('bounds quantities and rates like the confirm DTO (no exponent, 15.6 digits)', () => {
@@ -93,13 +131,19 @@ describe('buildBillConfirmation', () => {
       { description: 'CPU', quantity: 1e16, unitPrice: 1, taxAmount: 0, total: 1e16 },
     ];
     expect(
-      buildBillConfirmation({ ...base, extractedFields: { ...f, lineItems: tooWide } }),
+      buildBillConfirmation(
+        { ...base, extractedFields: { ...f, lineItems: tooWide } },
+        { baseCurrency: 'EGP' },
+      ),
     ).toMatchObject({ ok: false, code: 'INVALID_LINE' });
     const tooFine = [
       { description: 'CPU', quantity: 0.0000001, unitPrice: 100, taxAmount: 0, total: 0 },
     ];
     expect(
-      buildBillConfirmation({ ...base, extractedFields: { ...f, lineItems: tooFine } }),
+      buildBillConfirmation(
+        { ...base, extractedFields: { ...f, lineItems: tooFine } },
+        { baseCurrency: 'EGP' },
+      ),
     ).toMatchObject({ ok: false, code: 'INVALID_LINE' });
   });
 
@@ -112,17 +156,23 @@ describe('buildBillConfirmation', () => {
       { description: 'B', quantity: 1, unitPrice: 33.33, taxAmount: 4.6662, total: 37.9962 },
       { description: 'C', quantity: 1, unitPrice: 33.33, taxAmount: 4.6662, total: 37.9962 },
     ];
-    const c = buildBillConfirmation({
-      ...base,
-      extractedFields: { ...f, lineItems: items, subtotal: 99.99, tax: 14, total: 113.99 },
-    });
+    const c = buildBillConfirmation(
+      {
+        ...base,
+        extractedFields: { ...f, lineItems: items, subtotal: 99.99, tax: 14, total: 113.99 },
+      },
+      { baseCurrency: 'EGP' },
+    );
     expect(c).toMatchObject({ ok: true });
     if (c.ok) expect(c.input.lines.map((l) => l.taxRatePercent)).toEqual(['14', '14', '14']);
     expect(
-      buildBillConfirmation({
-        ...base,
-        extractedFields: { ...f, lineItems: items, subtotal: 99.99, tax: 14, total: 113.97 },
-      }),
+      buildBillConfirmation(
+        {
+          ...base,
+          extractedFields: { ...f, lineItems: items, subtotal: 99.99, tax: 14, total: 113.97 },
+        },
+        { baseCurrency: 'EGP' },
+      ),
     ).toMatchObject({ ok: false, code: 'TOTAL_MISMATCH' });
   });
 });

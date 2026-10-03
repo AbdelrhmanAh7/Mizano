@@ -31,8 +31,9 @@ jest.mock('@/lib/hooks/use-organization', () => ({ useBaseCurrency: () => 'EGP' 
 const mockUseInbox = jest.fn();
 const mockBulk = jest.fn();
 const mockRetry = jest.fn();
+const mockOpenOriginal = jest.fn();
 jest.mock('@/lib/hooks/use-intake-inbox', () => ({
-  intakeInboxApi: { openOriginal: jest.fn() },
+  intakeInboxApi: { openOriginal: (id: string) => mockOpenOriginal(id) },
   useIntakeInbox: (params: unknown) => mockUseInbox(params),
   useBulkApproveIntake: () => ({ mutateAsync: mockBulk, isPending: false }),
   useRetryIntakeJob: () => ({ mutateAsync: mockRetry, isPending: false }),
@@ -142,6 +143,20 @@ describe('IntakeInbox', () => {
     render(<IntakeInbox />);
     fireEvent.click(screen.getByRole('button', { name: 'retry' }));
     await waitFor(() => expect(mockRetry).toHaveBeenCalledWith('f'));
+  });
+
+  it('shows an error toast when the original-file tab cannot be opened', async () => {
+    mockOpenOriginal.mockRejectedValueOnce(new Error('Could not open the original file'));
+    render(<IntakeInbox />);
+    fireEvent.click(screen.getByRole('button', { name: 'viewOriginalFor:{"name":"a.pdf"}' }));
+    // The real opener must be called during the click, before any asynchronous work.
+    expect(mockOpenOriginal).toHaveBeenCalledWith('a');
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: 'destructive',
+        title: 'toast.originalFailed',
+      }),
+    );
   });
 
   it('keeps loading, empty and error states distinct', () => {

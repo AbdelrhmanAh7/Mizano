@@ -24,6 +24,7 @@ describe('DocumentIntakeController.bulkApprove', () => {
   let drafts: number;
   let controller: DocumentIntakeController;
   let intake: { confirmAndCreate: jest.Mock };
+  let baseCurrency: jest.Mock;
 
   beforeEach(() => {
     drafts = 0;
@@ -44,8 +45,9 @@ describe('DocumentIntakeController.bulkApprove', () => {
         return { type: 'bill' as const, id: `bill-${drafts}`, number: `BILL-${drafts}` };
       }),
     };
+    baseCurrency = jest.fn().mockResolvedValue('EGP');
     const jobs = {
-      baseCurrency: jest.fn(async () => 'EGP'),
+      baseCurrency,
       getForOrg: jest.fn(async (id: string, org: string) => {
         const j = rows.get(id);
         if (!j || j.organizationId !== org) throw new NotFoundException('Intake job not found');
@@ -87,6 +89,53 @@ describe('DocumentIntakeController.bulkApprove', () => {
     expect(again.processed).toBe(0);
     expect(again.failures).toHaveLength(2);
     expect(drafts).toBe(1);
+  });
+
+  it('leaves a missing-currency job as an exception while approving a ready job', async () => {
+    const base = billResult();
+    rows.set(
+      'no-currency',
+      job('no-currency', IntakeJobStatus.EXTRACTED, ORG_A, {
+        ...base,
+        extractedFields: { ...base.extractedFields, currency: null },
+      }),
+    );
+    const res = await controller.bulkApprove(ORG_A, { jobIds: ['no-currency', 'ok1'] });
+    expect(res).toEqual({
+      processed: 1,
+      total: 2,
+      failures: [
+        {
+          id: 'no-currency',
+          reason: 'The document or organization currency is missing or does not match',
+        },
+      ],
+    });
+    expect(baseCurrency).toHaveBeenCalledTimes(1);
+    expect(baseCurrency).toHaveBeenCalledWith(ORG_A);
+    expect(drafts).toBe(1);
+    expect(rows.get('no-currency')?.status).toBe(IntakeJobStatus.EXTRACTED);
+    expect(intake.confirmAndCreate).toHaveBeenCalledWith(
+      ORG_A,
+      expect.objectContaining({ currencyCode: 'EGP' }),
+    );
+  });
+
+  it('reports one failure per job when the organization currency is unknown', async () => {
+    baseCurrency.mockResolvedValue(null);
+    const res = await controller.bulkApprove(ORG_A, { jobIds: ['ok1', 'ok2'] });
+    expect(res).toEqual({
+      processed: 0,
+      total: 2,
+      failures: ['ok1', 'ok2'].map((id) => ({
+        id,
+        reason: 'The document or organization currency is missing or does not match',
+      })),
+    });
+    expect(drafts).toBe(0);
+    expect(intake.confirmAndCreate).not.toHaveBeenCalled();
+    expect(rows.get('ok1')?.status).toBe(IntakeJobStatus.EXTRACTED);
+    expect(rows.get('ok2')?.status).toBe(IntakeJobStatus.EXTRACTED);
   });
 
   it('treats another organization id as a failure without approving it', async () => {

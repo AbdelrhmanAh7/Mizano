@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { ChevronRight, Home } from 'lucide-react';
 
@@ -51,7 +51,6 @@ const segmentLabels: Record<string, string> = {
   rates: 'Tax Rates',
   returns: 'VAT Returns',
   scan: 'Scan Document',
-  inbox: 'Invoice inbox',
   performance: 'Performance',
   'audit-logs': 'Audit Logs',
   'price-lists': 'Price Lists',
@@ -62,6 +61,7 @@ const segmentLabels: Record<string, string> = {
 export function Breadcrumbs() {
   const pathname = usePathname();
   const locale = useLocale();
+  const t = useTranslations('navigation');
 
   const breadcrumbs = useMemo(() => {
     // Remove locale prefix
@@ -82,14 +82,16 @@ export function Breadcrumbs() {
         label = parentLabel ? `${parentLabel} Details` : 'Details';
       } else {
         label =
-          segmentLabels[segment] ||
-          segment.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+          segment === 'inbox'
+            ? t('purchases.inbox')
+            : segmentLabels[segment] ||
+              segment.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
       }
       return { label, href, isLast: index === segments.length - 1 };
     });
 
     return crumbs;
-  }, [pathname, locale]);
+  }, [pathname, locale, t]);
 
   if (breadcrumbs.length === 0) return null;
 

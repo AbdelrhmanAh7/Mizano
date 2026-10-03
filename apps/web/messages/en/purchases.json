@@ -492,7 +492,7 @@
       "INVALID_LINE": "A line has a missing quantity or price",
       "TAX_UNRESOLVED": "Tax rate could not be determined exactly",
       "TOTAL_MISMATCH": "Line totals do not match the document total",
-      "CURRENCY_MISMATCH": "Document currency differs from the base currency"
+      "CURRENCY_MISMATCH": "Document or organization currency is missing or does not match"
     },
     "confirm": {
       "title": "Approve {count} documents?",

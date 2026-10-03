@@ -332,20 +332,6 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 20));
     const search = query.search?.trim();
-    // JSON string filters are case-sensitive in Prisma, so match ids with ILIKE (org-scoped).
-    let searchIds: string[] | null = null;
-    if (search) {
-      const pattern = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
-      const matches = await this.prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
-        SELECT "id" FROM "intake_jobs"
-        WHERE "organizationId" = ${organizationId} AND "deletedAt" IS NULL AND (
-          "originalFileName" ILIKE ${pattern}
-          OR "result"->'extractedFields'->>'vendorName' ILIKE ${pattern}
-          OR "result"->'matchedVendor'->>'name' ILIKE ${pattern}
-          OR "result"->'extractedFields'->>'documentNumber' ILIKE ${pattern}
-        )`);
-      searchIds = matches.map((m) => m.id);
-    }
     const createdAt: Prisma.DateTimeFilter = {};
     if (query.from) createdAt.gte = new Date(query.from);
     if (query.to) createdAt.lte = endOfUtcDay(new Date(query.to));
@@ -358,16 +344,42 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
       ...(statusFilter.length > 0 ? { status: { in: statusFilter } } : {}),
       ...(query.source ? { source: query.source } : {}),
       ...(query.from || query.to ? { createdAt } : {}),
-      ...(searchIds ? { id: { in: searchIds } } : {}),
     };
+    // JSON string filters are case-sensitive in Prisma. Keep ILIKE and every other
+    // filter in one SQL predicate used by both queries, without loading matching ids.
+    const pattern = `%${search?.replace(/[\\%_]/g, '\\$&')}%`;
+    const predicate = Prisma.sql`
+      "organizationId" = ${organizationId} AND "deletedAt" IS NULL
+      ${statusFilter.length > 0 ? Prisma.sql`AND "status" IN (${Prisma.join(statusFilter.map((status) => Prisma.sql`${status}::"IntakeJobStatus"`))})` : Prisma.empty}
+      ${query.source ? Prisma.sql`AND "source" = ${query.source}::"IntakeSource"` : Prisma.empty}
+      ${query.from ? Prisma.sql`AND "createdAt" >= ${createdAt.gte}` : Prisma.empty}
+      ${query.to ? Prisma.sql`AND "createdAt" <= ${createdAt.lte}` : Prisma.empty}
+      AND (
+        "originalFileName" ILIKE ${pattern}
+        OR "result"->'extractedFields'->>'vendorName' ILIKE ${pattern}
+        OR "result"->'matchedVendor'->>'name' ILIKE ${pattern}
+        OR "result"->'extractedFields'->>'documentNumber' ILIKE ${pattern}
+      )`;
     const [rows, total, baseCurrency] = await Promise.all([
-      this.prisma.intakeJob.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.intakeJob.count({ where }),
+      search
+        ? this.prisma.$queryRaw<IntakeJob[]>(Prisma.sql`
+            SELECT * FROM "intake_jobs" WHERE ${predicate}
+            ORDER BY "createdAt" DESC, "id" DESC
+            LIMIT ${limit} OFFSET ${(page - 1) * limit}`)
+        : this.prisma.intakeJob.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            skip: (page - 1) * limit,
+            take: limit,
+          }),
+      search
+        ? this.prisma
+            .$queryRaw<{ total: bigint }[]>(
+              Prisma.sql`
+              SELECT COUNT(*) AS "total" FROM "intake_jobs" WHERE ${predicate}`,
+            )
+            .then(([row]) => Number(row.total))
+        : this.prisma.intakeJob.count({ where }),
       this.baseCurrency(organizationId),
     ]);
     return {

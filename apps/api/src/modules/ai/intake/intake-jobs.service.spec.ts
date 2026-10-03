@@ -1,10 +1,10 @@
 import { ConflictException, HttpException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IntakeJobStatus } from '@prisma/client';
+import { IntakeJobStatus, IntakeSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { IntakeJobsService, stageFor } from './intake-jobs.service';
 import { IntakeQueueService } from './intake-queue.service';
-import { FakeIntakeJobTable, MemoryIntakeStorage } from './intake-test-utils';
+import { billResult, FakeIntakeJobTable, MemoryIntakeStorage } from './intake-test-utils';
 
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
@@ -15,6 +15,8 @@ describe('IntakeJobsService', () => {
   let queue: { enqueue: jest.Mock; cancel: jest.Mock };
   let config: { get: jest.Mock };
   let service: IntakeJobsService;
+  let queryRaw: jest.Mock;
+  let organizationLookup: jest.Mock;
 
   beforeEach(() => {
     table = new FakeIntakeJobTable();
@@ -24,10 +26,13 @@ describe('IntakeJobsService', () => {
       cancel: jest.fn().mockResolvedValue(undefined),
     };
     config = { get: jest.fn() };
+    queryRaw = jest.fn();
+    organizationLookup = jest.fn().mockResolvedValue({ baseCurrency: 'EGP' });
     service = new IntakeJobsService(
       {
         intakeJob: table.delegate,
-        organization: { findUnique: jest.fn(async () => ({ baseCurrency: 'EGP' })) },
+        organization: { findUnique: organizationLookup },
+        $queryRaw: queryRaw,
       } as unknown as PrismaService,
       storage,
       queue as unknown as IntakeQueueService,
@@ -109,6 +114,133 @@ describe('IntakeJobsService', () => {
     expect((await service.list(ORG_A, { status: IntakeJobStatus.NEEDS_REVIEW })).meta.total).toBe(
       1,
     );
+  });
+
+  describe('inbox search', () => {
+    it('pages and counts in SQL with the same tenant, date, status and source filters', async () => {
+      const { job } = await upload(ORG_A);
+      job.status = IntakeJobStatus.EXTRACTED;
+      job.result = billResult() as unknown as Prisma.JsonValue;
+      table.delegate.findMany.mockClear();
+      table.delegate.count.mockClear();
+      queryRaw.mockResolvedValueOnce([job]).mockResolvedValueOnce([{ total: 10001n }]);
+      const search = " O'Reilly%_\\ ";
+      const result = await service.list(ORG_A, {
+        search,
+        status: [IntakeJobStatus.EXTRACTED, IntakeJobStatus.NEEDS_REVIEW],
+        source: IntakeSource.TELEGRAM,
+        from: '2026-09-01',
+        to: '2026-09-30',
+        page: 3,
+        limit: 2,
+      });
+      expect(queryRaw).toHaveBeenCalledTimes(2);
+      expect(table.delegate.findMany).not.toHaveBeenCalled();
+      expect(table.delegate.count).not.toHaveBeenCalled();
+      const pageSql = queryRaw.mock.calls[0][0] as Prisma.Sql;
+      const countSql = queryRaw.mock.calls[1][0] as Prisma.Sql;
+      const pagePredicate = pageSql.sql.split(' WHERE ')[1].split('ORDER BY')[0].trim();
+      expect(countSql.sql.split(' WHERE ')[1].trim()).toBe(pagePredicate);
+      expect(pageSql.sql).toContain('SELECT * FROM "intake_jobs"');
+      expect(pageSql.sql).toContain('ORDER BY "createdAt" DESC, "id" DESC');
+      expect(pageSql.sql).toContain('LIMIT ? OFFSET ?');
+      expect(countSql.sql).toContain('SELECT COUNT(*) AS "total"');
+      expect(countSql.sql).not.toMatch(/LIMIT|OFFSET|SELECT "id"/);
+      for (const sql of [pageSql, countSql]) {
+        expect(sql.sql).toContain('"organizationId" = ? AND "deletedAt" IS NULL');
+        expect(sql.sql).toContain('"status" IN (?::"IntakeJobStatus",?::"IntakeJobStatus")');
+        expect(sql.sql).toContain('"source" = ?::"IntakeSource"');
+        expect(sql.sql).toContain('"createdAt" >= ?');
+        expect(sql.sql).toContain('"createdAt" <= ?');
+        expect(sql.sql).toContain('"originalFileName" ILIKE ?');
+        expect(sql.sql).toContain("\"result\"->'extractedFields'->>'vendorName' ILIKE ?");
+        expect(sql.sql).toContain("\"result\"->'matchedVendor'->>'name' ILIKE ?");
+        expect(sql.sql).toContain("\"result\"->'extractedFields'->>'documentNumber' ILIKE ?");
+        expect(sql.sql).not.toContain("O'Reilly");
+      }
+      const pattern = "%O'Reilly\\%\\_\\\\%";
+      const predicateValues = [
+        ORG_A,
+        IntakeJobStatus.EXTRACTED,
+        IntakeJobStatus.NEEDS_REVIEW,
+        IntakeSource.TELEGRAM,
+        new Date('2026-09-01'),
+        new Date('2026-09-30T23:59:59.999Z'),
+        pattern,
+        pattern,
+        pattern,
+        pattern,
+      ];
+      expect(countSql.values).toEqual(predicateValues);
+      expect(pageSql.values).toEqual([...predicateValues, 2, 4]);
+      expect(result.meta).toEqual({ page: 3, limit: 2, total: 10001, totalPages: 5001 });
+      expect(result.data.map((row) => row.id)).toEqual([job.id]);
+      expect(result.data[0]).not.toHaveProperty('storageKey');
+      expect(result.data[0]).not.toHaveProperty('result');
+      expect(result.data[0].summary).toMatchObject({
+        vendorName: 'Acme',
+        documentNumber: 'INV-9',
+        total: '115.0000',
+        currency: 'EGP',
+        readyToApprove: true,
+        blocker: null,
+      });
+      expect(organizationLookup).toHaveBeenCalledWith({
+        where: { id: ORG_A },
+        select: { baseCurrency: true },
+      });
+    });
+
+    it('retains an uncapped count on an empty later page and ignores empty status filters', async () => {
+      queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([{ total: 101n }]);
+      const result = await service.list(ORG_A, {
+        search: 'invoice',
+        status: [],
+        page: 7,
+        limit: 20,
+      });
+      expect(result).toEqual({ data: [], meta: { page: 7, limit: 20, total: 101, totalPages: 6 } });
+      const pageSql = queryRaw.mock.calls[0][0] as Prisma.Sql;
+      const countSql = queryRaw.mock.calls[1][0] as Prisma.Sql;
+      expect(pageSql.values.slice(-2)).toEqual([20, 120]);
+      expect(countSql.values).toEqual([ORG_A, '%invoice%', '%invoice%', '%invoice%', '%invoice%']);
+      expect(countSql.sql).not.toMatch(/"status"|"source"|"createdAt"|LIMIT|OFFSET/);
+    });
+
+    it('keeps whitespace-only searches on the scoped Prisma path', async () => {
+      await upload(ORG_A);
+      await upload(ORG_B, 'foreign');
+      const result = await service.list(ORG_A, { search: '  ' });
+      expect(result.meta.total).toBe(1);
+      expect(queryRaw).not.toHaveBeenCalled();
+      expect(table.delegate.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: ORG_A, deletedAt: null },
+          take: 20,
+          skip: 0,
+        }),
+      );
+    });
+  });
+
+  it('marks extracted summaries as exceptions when either currency is unknown', async () => {
+    const { job } = await upload(ORG_A);
+    const base = billResult();
+    job.status = IntakeJobStatus.EXTRACTED;
+    job.result = base as unknown as Prisma.JsonValue;
+    expect(service.summarize(job, 'EGP')).toMatchObject({ readyToApprove: true, blocker: null });
+    expect(service.summarize(job, null)).toMatchObject({
+      readyToApprove: false,
+      blocker: 'CURRENCY_MISMATCH',
+    });
+    job.result = {
+      ...base,
+      extractedFields: { ...base.extractedFields, currency: null },
+    } as unknown as Prisma.JsonValue;
+    expect(service.summarize(job, 'EGP')).toMatchObject({
+      readyToApprove: false,
+      blocker: 'CURRENCY_MISMATCH',
+    });
   });
 
   describe('retry', () => {
