@@ -21,11 +21,13 @@ on:
 permissions:
   contents: read
 
-# One run per PR (or per pushed branch). A newer PR run replaces the older one as a whole,
-# including the expensive Docker job. Branch pushes are queued instead of cancelled so every
-# master commit keeps a complete result (deploy.yml starts from the CI result of master).
+# One run per PR. A newer PR run replaces the older one as a whole, including the expensive
+# Docker job. Branch pushes get one group per commit SHA: GitHub keeps only one pending run
+# per group, so a shared group would drop the middle of two quick pushes. Per-SHA groups never
+# cancel or replace each other, so every master commit keeps a complete result (deploy.yml
+# starts from the CI result of master).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -79,6 +81,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Determine changed files
         id: filter
@@ -104,6 +107,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -143,6 +148,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -221,6 +228,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -275,6 +284,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -346,6 +357,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
