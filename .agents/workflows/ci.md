@@ -1,5 +1,5 @@
 ---
-description: Run the full CI pipeline locally (lint + type-check + test + format + e2e)
+description: Run the full CI pipeline locally (lint + type-check + test; format and e2e separate)
 ---
 
 // turbo-all
@@ -8,15 +8,15 @@ description: Run the full CI pipeline locally (lint + type-check + test + format
 
 ## Steps
 
-This runs the same checks as the GitHub CI workflow. ALL must pass with **zero warnings and zero errors**.
+This runs the core package checks before pushing. ALL must pass with **zero warnings and zero errors**.
 
-1. Run the full CI pipeline:
+1. Run the CI pipeline script:
 
 ```bash
 pnpm ci:full
 ```
 
-This runs sequentially: `lint` → `type-check` → `test` → `format` → `test:e2e`
+This runs: `lint` + `type-check` + `test` (unit tests). Format check and E2E tests are run separately.
 
 2. If you want to run steps individually to debug failures:
 

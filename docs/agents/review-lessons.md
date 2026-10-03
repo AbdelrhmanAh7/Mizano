@@ -95,6 +95,20 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
 
+## Documentation drift (documentation audit, 3 October 2026)
+
+The audit found commands, diagrams and status claims left behind by implementation changes:
+`ci:full` was documented as running E2E, the legacy Jest runner as mandatory, and CPU intake
+and durable jobs as unimplemented. Treat this as an observed documentation root cause,
+not an independent PR-review approval.
+
+- **Update every affected Markdown file in the same PR**, including instructions, workflow
+  recipes, runtime/operations guides and milestone status. Verify commands against package
+  scripts and runtime claims against code; keep requirements and live evidence distinct.
+- **A Markdown edit alone does not prove relevant documentation is current.** Reviewers
+  must inspect affected guides and any `Docs: not needed because ...` exemption. CI only
+  enforces presence or the explanation; never describe it as semantic completeness checking.
+
 ## Review process
 
 - Run `/code-review` on every PR (inline comments). CodeRabbit (configured in `.coderabbit.yaml`, which points it at this file) does full reviews once a seat is assigned; if one doesn't start automatically then, comment `@coderabbitai review`.

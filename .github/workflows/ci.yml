@@ -10,12 +10,64 @@ on:
     branches: [master, develop]
   pull_request:
     branches: [master, develop]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
 
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '8'
 
 jobs:
+  docs-check:
+    name: docs-check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Test documentation guard offline
+        shell: bash
+        run: python3 .github/tests/test_docs_check.py
+
+      - name: Require documentation or an explained exemption
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          changed_files="$(mktemp)"
+          trap 'rm -f "$changed_files"' EXIT
+
+          git diff --name-only --no-renames -z "$BASE_SHA" "$HEAD_SHA" -- apps/ packages/ deploy/ .github/ > "$changed_files"
+          if [[ ! -s "$changed_files" ]]; then
+            echo 'No changes in documentation-gated paths.'
+            exit 0
+          fi
+
+          # Deleting a Markdown file alone does not update documentation.
+          git diff --name-only --no-renames --diff-filter=ACMRT -z "$BASE_SHA" "$HEAD_SHA" -- '*.md' > "$changed_files"
+          if [[ -s "$changed_files" ]]; then
+            echo 'Markdown documentation updated; reviewers must check relevance and freshness.'
+            exit 0
+          fi
+
+          exemption_pattern=$'(^|\n)Docs: not needed because'
+          if [[ "${PR_BODY:-}" =~ $exemption_pattern ]]; then
+            echo 'Documentation exemption supplied; reviewers must assess the explanation.'
+            exit 0
+          fi
+
+          echo '::error::Update every affected .md file in this PR, or add a PR-body line starting with "Docs: not needed because" and explain why.'
+          exit 1
+
   # ==========================================
   # Install & Cache Dependencies (shared)
   # ==========================================

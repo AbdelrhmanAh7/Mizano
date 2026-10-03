@@ -1,6 +1,6 @@
 # Mizano on Raspberry Pi 5
 
-Tiny live deployment: Raspberry Pi 5 (8GB, arm64), Raspberry Pi OS 64-bit, Docker Engine + compose plugin, data on an attached SSD, private HTTPS through a Cloudflare Tunnel. Nothing here has been run on a Pi yet; treat every step as unverified until the first real deployment.
+Tiny live deployment: Raspberry Pi 5 (8GB, arm64), Raspberry Pi OS 64-bit, Docker Engine + compose plugin, data on an attached SSD, private HTTPS through a Cloudflare Tunnel. This guide does not establish that any step has run on a Pi; require exact-SHA/digest health, restore and accountant-journey evidence before claiming readiness (epic #45, P1–P4).
 
 Memory budget (8GB): postgres 1.5G, redis 256M, api 1G, web 512M, cloudflared 128M, 2G reserved for the extraction worker, remainder for the OS and page cache.
 
@@ -49,7 +49,25 @@ Alternative: Tailscale. Run `tailscale serve` on the host for `http://127.0.0.1:
 - `CORS_ORIGIN` must be exactly the web origin (HTTPS, no wildcard, no trailing slash). The API refuses to start in production without it.
 - `NEXTAUTH_URL` is HTTPS so NextAuth issues secure cookies. Verify in browser dev tools that session cookies are `Secure` and `HttpOnly`.
 - JWT and NextAuth secrets are unique, random, and at least 32 bytes.
-- `OLLAMA_ENABLED=false`; no paid cloud AI.
+- `OLLAMA_ENABLED=false`; no Ollama/LLM, GPU, Colab or paid cloud AI in the live intake path.
+
+### CPU intake readiness
+
+The current Compose API mounts `originals/` and runs the PostgreSQL/BullMQ intake processor
+inside its 1GB API container. The 2GB extraction-worker budget is a commented reservation,
+not an enabled service. `RulesStrategy` uses native PDF text (`pdf-parse`) and Tesseract image
+OCR. The live target also requires Poppler for scanned PDFs; it is not present in this code path.
+
+Before live acceptance, runtime work must pass `INTAKE_EXTRACTION_STRATEGY=rules` and
+`INTAKE_TESSDATA_DIR` into the API/worker and package pinned `eng`/`ara` assets in the image.
+Current Compose does not pass those settings, and the API Dockerfile does not package assets
+or Poppler. Disabling Ollama alone does not force rules extraction: request scan presets can
+still override the mode. Without a tessdata path Tesseract may download assets at runtime.
+Rules return header fields with empty line items; complete automated draft preparation/batch
+posting and scanned-PDF OCR are not proven. See [Architecture](../../docs/ARCHITECTURE.md#pi-invoice-pipeline).
+
+Telegram settings here support operator alerts; they do not implement inbound invoice ingestion.
+Update this README in the same PR as any deployment command/configuration/readiness change.
 
 ### Verify no open ports
 
@@ -88,10 +106,10 @@ The units assume the repo at `/opt/mizano`; edit `ExecStart` otherwise, and ensu
 
 ## 6. Monitoring
 
-`mizano-healthcheck.timer` runs `healthcheck.sh` every 5 minutes: API and web health endpoints, disk above 80%, low available memory, CPU temperature, throttling (`vcgencmd get_throttled`), and backup status older than 26 hours. Alerts and recovery messages go to Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`). Messages contain only short check names; no secrets or document data. A state file in `$MIZANO_DATA_DIR/monitor` suppresses repeats. Create the bot with BotFather and get the chat id from `getUpdates`.
+`mizano-healthcheck.timer` runs `healthcheck.sh` every 5 minutes: API `/api/health` and web `/robots.txt` probes, disk above 80%, low available memory, CPU temperature, throttling (`vcgencmd get_throttled`), and backup status older than 26 hours. Alerts and recovery messages go to Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`). Messages contain operational check names and measurements; no secrets or document data. A state file in `$MIZANO_DATA_DIR/monitor` suppresses repeats. Create the bot with BotFather and get the chat id from `getUpdates`.
 
 ## 7. Upgrade and rollback
 
 - Upgrade: run `deploy.sh` with the new SHA and digests (section 4).
-- Manual rollback: `deploy/pi/scripts/rollback.sh` restores the previous `OK` digests from `deployments.log`.
+- Manual rollback: `deploy/pi/scripts/rollback.sh` uses the active `OK`/`ROLLBACK` pointer in `deployments.log` to select the previous good digests; repeated manual rollback can move further back. A failed deployment restores the last active good release.
 - Back up before any upgrade that includes a migration: `sudo systemctl start mizano-backup.service`.
