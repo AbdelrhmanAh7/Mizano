@@ -263,7 +263,9 @@ jobs:
           # Bundled tesseract languages must load from INTAKE_TESSDATA_DIR, not from the cwd.
           docker run --rm --network none --platform "linux/$TARGET_ARCH" -w / -e NODE_PATH=/app/node_modules --entrypoint node "mizano-api:$TARGET_ARCH" -e "const dir = process.env.INTAKE_TESSDATA_DIR; if (!dir) throw new Error('INTAKE_TESSDATA_DIR is unset'); require('tesseract.js').createWorker('eng+ara', undefined, { langPath: dir, cachePath: dir, gzip: false }).then(worker => worker.terminate()).catch(error => { console.error('tesseract failed:', error.message); process.exit(1); })"
           # An Arabic-capable font must be installed for RTL PDFs.
-          docker run --rm --network none --platform "linux/$TARGET_ARCH" --entrypoint fc-list "mizano-api:$TARGET_ARCH" :lang=ar | grep -q .
+          # Capture first: `grep -q` exits early and, under pipefail, makes docker fail with a broken pipe.
+          arabic_fonts=$(docker run --rm --network none --platform "linux/$TARGET_ARCH" --entrypoint fc-list "mizano-api:$TARGET_ARCH" :lang=ar)
+          test -n "$arabic_fonts"
           # Headless Chromium must render a PDF and a PNG offline as the non-root user,
           # with Arabic text falling back to the bundled Noto Naskh Arabic from the
           # same font stack the invoice templates use.
