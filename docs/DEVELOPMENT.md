@@ -126,7 +126,39 @@ Rules:
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pushes and PRs to `master`/`develop`: install (pnpm 8, Node 20, `prisma generate`) → lint and type-check → unit tests (with PostgreSQL 16 and Redis 7 services, `db:push`) → build. E2E is not part of CI yet.
+`.github/workflows/ci.yml` runs on pushes and PRs to `master`/`develop` with the following optimizations:
+
+### Trigger rules
+- **Push to `master` or `develop`**: full CI runs (install → lint/type-check → test → build → docker multi-arch build)
+- **Pull requests**: CI runs on `opened`, `synchronize`, `reopened`, and `ready_for_review` events
+- **Draft PRs**: CI is **skipped** unless the PR has the `"ci"` label
+- **Concurrency**: each job group (`ci-lint`, `ci-test`, `ci-build`) cancels in-progress runs for the same ref, so superseded pushes don't queue
+
+### Job flow
+1. **gate** — decides whether CI should run (skips draft PRs without `"ci"` label)
+2. **filter** — uses `dorny/paths-filter` to detect changes to Docker-relevant files:
+   - `apps/api/Dockerfile`
+   - `apps/web/Dockerfile`
+   - `.dockerignore`
+   - `deploy/**`
+   - `.github/workflows/ci.yml`
+   - `.github/workflows/deploy.yml`
+3. **install** — shared dependency install with pnpm cache + turbo cache
+4. **lint** — ESLint + TypeScript type-check (parallel, cancels in-progress)
+5. **test** — unit tests with PostgreSQL 16 + Redis 7 (parallel, cancels in-progress)
+6. **build** — `pnpm build` (parallel, cancels in-progress)
+7. **docker-build** — multi-arch (amd64 + arm64) Docker build **only** when:
+   - push to `master`/`develop`, OR
+   - PR changes any Docker-relevant file (per filter), OR
+   - PR has the `"docker"` label
+
+### Caching
+- **pnpm store**: cached via `setup-node` with `cache: 'pnpm'` + explicit `node_modules` cache keyed by `pnpm-lock.yaml` + commit SHA
+- **turbo build cache**: cached in `.turbo` directories, keyed by `pnpm-lock.yaml` + `turbo.json` + commit SHA, with restore-keys for partial hits
+- **Docker layer cache**: GitHub Actions cache (`type=gha`) for both API and Web images
+
+### Docker multi-arch builds
+The `docker-build` job uses `docker/buildx` with `platforms: linux/amd64,linux/arm64`. It runs ~12 minutes per run (QEMU arm64), so it's gated to run only when necessary. On PRs it builds but does **not push** (`push: false`); on pushes to `master`/`develop` it pushes to GHCR with SHA and `latest` tags.
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 

@@ -2,6 +2,7 @@
 # =============================================
 # Runs on all PRs and pushes to master/develop branches.
 # Optimized: shared pnpm cache, parallel jobs, no redundant installs.
+# Docker multi-arch builds only run on master push, relevant PR changes, or "docker" label.
 
 name: CI
 
@@ -10,18 +11,84 @@ on:
     branches: [master, develop]
   pull_request:
     branches: [master, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '8'
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
 
+# Skip CI for draft PRs unless they have the "ci" label
+# Run CI on: opened, synchronize, reopened, ready_for_review (when draft -> ready)
 jobs:
+  # ==========================================
+  # Gate: check if CI should run for this PR
+  # ==========================================
+  gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false || contains(github.event.pull_request.labels.*.name, 'ci')
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+      is_pr: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - name: Check if CI should run
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            if [ "${{ github.event.pull_request.draft }}" = "true" ]; then
+              # Check for "ci" label
+              if echo "${{ toJson(github.event.pull_request.labels) }}" | grep -q '"ci"'; then
+                echo "should_run=true" >> $GITHUB_OUTPUT
+              else
+                echo "Draft PR without 'ci' label - skipping CI"
+                echo "should_run=false" >> $GITHUB_OUTPUT
+              fi
+            else
+              echo "should_run=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          fi
+
+  # ==========================================
+  # Path filter: detect docker-relevant changes
+  # ==========================================
+  filter:
+    name: Path Filter
+    runs-on: ubuntu-latest
+    needs: gate
+    if: needs.gate.outputs.should_run == 'true'
+    outputs:
+      docker-changed: ${{ steps.filter.outputs.docker-changed }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine changed files
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            docker-changed:
+              - 'apps/api/Dockerfile'
+              - 'apps/web/Dockerfile'
+              - '.dockerignore'
+              - 'deploy/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/deploy.yml'
+
   # ==========================================
   # Install & Cache Dependencies (shared)
   # ==========================================
   install:
     name: Install Dependencies
     runs-on: ubuntu-latest
+    needs: [gate, filter]
+    if: needs.gate.outputs.should_run == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -36,6 +103,17 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
+
+      - name: Cache turbo build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .turbo
+            apps/*/.turbo
+            packages/*/.turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -60,6 +138,10 @@ jobs:
     name: Lint & Type Check
     runs-on: ubuntu-latest
     needs: install
+    if: needs.gate.outputs.should_run == 'true'
+    concurrency:
+      group: ci-lint-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -84,6 +166,17 @@ jobs:
             apps/api/src/generated
           key: modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
 
+      - name: Restore turbo build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .turbo
+            apps/*/.turbo
+            packages/*/.turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
+
       - name: Run ESLint
         run: pnpm lint
 
@@ -97,6 +190,10 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     needs: install
+    if: needs.gate.outputs.should_run == 'true'
+    concurrency:
+      group: ci-test-${{ github.ref }}
+      cancel-in-progress: true
     services:
       postgres:
         image: postgres:16-alpine
@@ -146,6 +243,17 @@ jobs:
             apps/api/src/generated
           key: modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
 
+      - name: Restore turbo build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .turbo
+            apps/*/.turbo
+            packages/*/.turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
+
       - name: Push database schema
         run: pnpm db:push
         env:
@@ -167,6 +275,10 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: install
+    if: needs.gate.outputs.should_run == 'true'
+    concurrency:
+      group: ci-build-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -191,7 +303,81 @@ jobs:
             apps/api/src/generated
           key: modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
 
+      - name: Restore turbo build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .turbo
+            apps/*/.turbo
+            packages/*/.turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
+
       - name: Build all packages
         run: pnpm build
         env:
           NEXT_PUBLIC_API_URL: https://api.example.com
+
+  # ==========================================
+  # Docker Multi-Arch Build (conditional)
+  # Runs only on:
+  #   - push to master
+  #   - PRs with docker-relevant file changes
+  #   - PRs with "docker" label
+  # ==========================================
+  docker-build:
+    name: Docker Multi-Arch Build
+    runs-on: ubuntu-latest
+    needs: [gate, filter]
+    if: |
+      needs.gate.outputs.should_run == 'true' &&
+      (github.event_name == 'push' ||
+       needs.filter.outputs.docker-changed == 'true' ||
+       contains(github.event.pull_request.labels.*.name, 'docker'))
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image (multi-arch)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/api/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/mizano-api:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/mizano-api:latest
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NODE_ENV=production
+
+      - name: Build and push Web image (multi-arch)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/web/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/mizano-web:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/mizano-web:latest
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.example.com
