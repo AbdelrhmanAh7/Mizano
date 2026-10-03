@@ -8,6 +8,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Lock the ledger before reading what you post with.** Take `lockOrganizationLedger(tx, orgId)` (`common/utils/ledger-lock.ts`) before reading org settings, the base currency or default accounts that the journal depends on. Every path that makes a journal posted must hold it: `create`, `reverse` and `post`. _(bill approve, invoice send, VAT submit, journal post)_
 - **Lock the document row before snapshotting the values you post.** If you post from a plain read, an edit that commits concurrently makes the ledger disagree with the document. Use `SELECT … FOR UPDATE` on the document first. _(invoice send/update)_
+- **Create every application journal through `JournalsService.create` under the ledger lock.** Direct inserts skip fiscal-period checks, source idempotency and journal numbering. _(COGM, depreciation, asset disposal)_
 - **Pick one lock order per workflow and use it on every path that touches the same rows.** The default is document → other documents (sorted by id) → ledger. VAT returns are a deliberate exception: submit and payment both take ledger → return row, because submission must freeze the ledger before recomputing. What deadlocks is two paths taking the same locks in opposite orders. _(VAT submit vs. payment)_
 - **Scope every row lock by organization:** `WHERE id = $1 AND "organizationId" = $2 FOR UPDATE`. A caller-supplied foreign id must lock nothing. _(lockInvoices, lockBills)_
 - **A check and the write it guards share one transaction and one lock.** Duplicate and overlap checks run inside the same tx as the insert, under an advisory lock. _(VAT period overlap)_
@@ -34,6 +35,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **"Current" figures exclude future-dated entries.** Cash today means lines dated ≤ end of today.
 - **Side records carry the document date.** Inventory movements are dated on the adjustment date, not on `createdAt` = now.
 - **Historical reports keep later-voided documents in their original period** and show the reversal on the void date. Filtering on today's status rewrites history. _(customer statement)_
+- **As-of AP aging replays dated bill allocations, credits and reversal journals.** Current `balanceDue` and today's void status cannot reconstruct a historical balance. Vendor-credit application has no effective-date event, so do not claim exact historical applied/unapplied allocation without adding one. _(payables aging)_
 
 ## 5. Single-currency ledger and data
 
@@ -92,6 +94,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 12. Caches, tests and scope
 
 - **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included.
+- **Cache invalidation metadata must be activated by `CacheInvalidationInterceptor`.** A decorator without an interceptor silently leaves report/dashboard caches stale. _(assets, payroll, work orders)_
+- **Bulk work-order completion calls the single completion command through `runBulk`** and defaults omitted production quantity to the planned quantity; a status-only bulk update skips inventory and COGM posting.
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.

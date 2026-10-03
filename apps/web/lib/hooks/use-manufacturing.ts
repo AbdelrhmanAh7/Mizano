@@ -149,7 +149,7 @@ const workOrderApi = {
   },
   complete: async (id: string, producedQuantity: number) => {
     const response = await api.post(`/manufacturing/work-orders/${id}/complete`, {
-      producedQuantity,
+      quantityProduced: producedQuantity,
     });
     return response.data;
   },

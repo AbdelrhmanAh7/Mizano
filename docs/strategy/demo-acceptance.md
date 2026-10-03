@@ -33,14 +33,16 @@ On a target miss, publish measured result and impact; do not redefine the metric
 
 ## Useful charts for the first demo
 
-| Chart/view                    | Definition and source                                                                                                                  | Accountant action                                              |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| AP aging                      | Remaining supplier balances by not-due, 1–30, 31–60, 61–90, >90 days at explicit as-of date; exclude void/deleted records consistently | Select a bucket → outstanding bill list and original documents |
-| Posted income versus expenses | Period buckets from posted ledger account classifications; drafts excluded; explicit sign rules and currency                           | Drill to general-ledger lines and sources; reconcile sums      |
-| Cash movements                | Actual posted cash/bank inflows and outflows by period; not an AI forecast or claim of live bank balance                               | Inspect payments, transfers and supporting records             |
-| Intake operations             | Counts by queued/running/ready/review-required/failed; duplicate rate, correction time and processing p95 from durable job events      | Open exceptions/retry, identify poor source documents          |
+| Chart/view                    | Definition and source                                                                                                                                                  | Accountant action                                              |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| AP aging                      | Remaining supplier balances by not-due, 1–30, 31–60, 61–90, >90 days at explicit as-of date; replay bill allocations, credits and reversal journals through the cutoff | Select a bucket → outstanding bill list and original documents |
+| Posted income versus expenses | Period buckets from posted ledger account classifications; drafts excluded; explicit sign rules and currency                                                           | Drill to general-ledger lines and sources; reconcile sums      |
+| Cash movements                | Actual posted cash/bank inflows and outflows by period; not an AI forecast or claim of live bank balance                                                               | Inspect payments, transfers and supporting records             |
+| Intake operations             | Counts by queued/running/ready/review-required/failed; duplicate rate, correction time and processing p95 from durable job events                                      | Open exceptions/retry, identify poor source documents          |
 
 Use 2–3 accountant charts plus the intake status strip first; additional category/vendor breakdown is stretch. Prefer simple bars/lines and accessible data tables, clear zero/empty states, date/tenant filters and source drill-through. Never sum EGP/SAR/AED without a documented dated FX conversion. Figures on screen must reconcile with an API/export query, not a mocked presentation fixture.
+
+Historical payables aging uses allocation, credit and reversal dates rather than current bill balances or current void status. Vendor-credit application has no effective-date event yet, so historical applied-versus-unapplied classification is limited to the recorded current application relation and must not be presented as an exact reconstruction.
 
 ## Final release record
 

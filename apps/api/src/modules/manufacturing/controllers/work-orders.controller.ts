@@ -7,10 +7,13 @@ import {
   Patch,
   Post,
   Query,
+  UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { InvalidatesLedger } from '../../../common/decorators/invalidate-cache.decorator';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import {
@@ -23,6 +26,7 @@ import {
 @ApiBearerAuth()
 @Controller('manufacturing/work-orders')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseInterceptors(CacheInvalidationInterceptor)
 export class WorkOrdersController {
   constructor(private readonly workOrdersService: WorkOrdersService) {}
 
@@ -106,11 +110,12 @@ export class WorkOrdersController {
 
   @Post(':id/complete')
   @Permissions('manufacturing.edit')
+  @InvalidatesLedger('work-orders:*', 'items:*', 'inventory:*')
   @ApiOperation({ summary: 'Complete work order and record COGM' })
   complete(
     @CurrentOrg() orgId: string,
     @Param('id') id: string,
-    @Body() dto: { quantityProduced: number; notes?: string },
+    @Body() dto: { quantityProduced?: number; notes?: string },
   ) {
     return this.workOrdersService.completeWorkOrder(orgId, id, dto);
   }
@@ -146,6 +151,7 @@ export class WorkOrdersController {
 
   @Post('bulk-complete')
   @Permissions('manufacturing.edit')
+  @InvalidatesLedger('work-orders:*', 'items:*', 'inventory:*')
   @ApiOperation({ summary: 'Bulk complete work orders' })
   bulkComplete(@CurrentOrg() orgId: string, @Body() dto: { ids: string[] }) {
     return this.workOrdersService.bulkComplete(orgId, dto.ids);

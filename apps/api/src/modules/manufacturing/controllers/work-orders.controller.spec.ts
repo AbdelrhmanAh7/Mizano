@@ -3,7 +3,9 @@
  * Regression: ensures the controller is mounted under /manufacturing/work-orders.
  */
 
-import { PATH_METADATA } from '@nestjs/common/constants';
+import { INTERCEPTORS_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import { INVALIDATE_CACHE_KEY } from '../../../common/decorators/invalidate-cache.decorator';
+import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache-invalidation.interceptor';
 import { WorkOrdersController } from './work-orders.controller';
 
 describe('WorkOrdersController', () => {
@@ -48,5 +50,24 @@ describe('WorkOrdersController', () => {
   it('should have POST /:id/cancel route', () => {
     const metadata = Reflect.getMetadata(PATH_METADATA, WorkOrdersController.prototype.cancel);
     expect(metadata).toBe(':id/cancel');
+  });
+
+  it.each(['complete', 'bulkComplete'] as const)(
+    'invalidates ledger caches after %s',
+    (handler) => {
+      const patterns = Reflect.getMetadata(
+        INVALIDATE_CACHE_KEY,
+        WorkOrdersController.prototype[handler],
+      );
+      expect(patterns).toEqual(
+        expect.arrayContaining(['work-orders:*', 'reports:*', 'dashboard:*']),
+      );
+    },
+  );
+
+  it('registers the cache invalidation interceptor', () => {
+    expect(Reflect.getMetadata(INTERCEPTORS_METADATA, WorkOrdersController)).toContain(
+      CacheInvalidationInterceptor,
+    );
   });
 });
