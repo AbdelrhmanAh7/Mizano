@@ -14,6 +14,7 @@ import { MonthlyBurnRateChart } from '@/components/dashboard/charts/monthly-burn
 import { RevenueYoYChart } from '@/components/dashboard/charts/revenue-yoy-chart';
 import { AccountTypeBreakdownChart } from '@/components/dashboard/charts/account-type-breakdown-chart';
 import { VATSummaryChart } from '@/components/dashboard/charts/vat-summary-chart';
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 
 function ChartSkeleton() {
   return (
@@ -33,6 +34,7 @@ interface FinancialSectionProps {
 }
 
 export function FinancialSection({ enabled }: FinancialSectionProps) {
+  const currency = useBaseCurrency() || 'USD';
   const { data: marginData } = useGrossMarginTrend(enabled);
   const { data: revenueData } = useDashboardRevenue(); // reuse existing, always loaded
   const { data: yoyData } = useRevenueYoY(enabled);
@@ -43,14 +45,22 @@ export function FinancialSection({ enabled }: FinancialSectionProps) {
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {marginData ? <GrossProfitMarginChart data={marginData} /> : <ChartSkeleton />}
-        {revenueData ? <MonthlyBurnRateChart data={revenueData} /> : <ChartSkeleton />}
+        {revenueData ? (
+          <MonthlyBurnRateChart data={revenueData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {yoyData ? <RevenueYoYChart data={yoyData} /> : <ChartSkeleton />}
-        {accountData ? <AccountTypeBreakdownChart data={accountData} /> : <ChartSkeleton />}
+        {yoyData ? <RevenueYoYChart data={yoyData} currency={currency} /> : <ChartSkeleton />}
+        {accountData ? (
+          <AccountTypeBreakdownChart data={accountData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {vatData ? <VATSummaryChart data={vatData} /> : <ChartSkeleton />}
+        {vatData ? <VATSummaryChart data={vatData} currency={currency} /> : <ChartSkeleton />}
       </div>
     </div>
   );

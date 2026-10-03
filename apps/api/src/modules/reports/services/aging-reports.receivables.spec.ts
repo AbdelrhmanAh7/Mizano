@@ -25,6 +25,7 @@ describe('receivables aging', () => {
 
   function build(invoices: unknown[], credits: unknown[]) {
     const prisma = {
+      organization: { findUnique: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }) },
       invoice: { findMany: jest.fn().mockResolvedValue(invoices) },
       creditNote: { findMany: jest.fn().mockResolvedValue(credits) },
     };

@@ -40,7 +40,7 @@ On a target miss, publish measured result and impact; do not redefine the metric
 | Cash movements                | Actual posted cash/bank inflows and outflows by period; not an AI forecast or claim of live bank balance                               | Inspect payments, transfers and supporting records             |
 | Intake operations             | Counts by queued/running/ready/review-required/failed; duplicate rate, correction time and processing p95 from durable job events      | Open exceptions/retry, identify poor source documents          |
 
-Use 2–3 accountant charts plus the intake status strip first; additional category/vendor breakdown is stretch. Prefer simple bars/lines and accessible data tables, clear zero/empty states, date/tenant filters and source drill-through. Never sum EGP/SAR/AED without a documented dated FX conversion. Figures on screen must reconcile with an API/export query, not a mocked presentation fixture.
+Use 2–3 accountant charts plus the intake status strip first; additional category/vendor breakdown is stretch. Prefer simple bars/lines and accessible data tables, clear zero/empty states, date/tenant filters and source drill-through. Ledger-backed reports and charts use and display the organization's frozen base currency. Document summaries either select one currency and report it, or are restricted to that base currency (including legacy records with no currency code); they must never aggregate EGP/SAR/AED together. No dated FX conversion is currently supported, so foreign-currency documents are excluded from base-currency summaries rather than converted. Figures on screen must reconcile with an API/export query, not a mocked presentation fixture.
 
 ## Final release record
 

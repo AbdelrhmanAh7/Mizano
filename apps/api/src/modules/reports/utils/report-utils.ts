@@ -355,6 +355,13 @@ export function documentCurrency(code: string | null | undefined, baseCurrency: 
   return (trimmed || baseCurrency).toUpperCase();
 }
 
+/** Includes legacy documents with no currency code, which are denominated in the base currency. */
+export function baseCurrencyWhere(baseCurrency: string): {
+  OR: [{ currencyCode: string }, { currencyCode: null }];
+} {
+  return { OR: [{ currencyCode: baseCurrency }, { currencyCode: null }] };
+}
+
 export async function getBaseCurrency(
   prisma: ReportPrisma,
   organizationId: string,

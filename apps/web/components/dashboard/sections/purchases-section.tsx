@@ -14,6 +14,7 @@ import { TopVendorsChart } from '@/components/dashboard/charts/top-vendors-chart
 import { PurchasesTrendChart } from '@/components/dashboard/charts/purchases-trend-chart';
 import { ExpenseTrendChart } from '@/components/dashboard/charts/expense-trend-chart';
 import { VendorPaymentTimeChart } from '@/components/dashboard/charts/vendor-payment-time-chart';
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 
 function ChartSkeleton() {
   return (
@@ -37,6 +38,7 @@ interface PurchasesSectionProps {
 // which returns differently structured data. Can be added later with a dedicated hook.
 
 export function PurchasesSection({ enabled }: PurchasesSectionProps) {
+  const currency = useBaseCurrency() || 'USD';
   const { data: billStatusData } = useBillStatus(enabled);
   const { data: vendorsData } = useTopVendors(enabled);
   const { data: purchaseTrendData } = usePurchaseTrend(enabled);
@@ -46,12 +48,28 @@ export function PurchasesSection({ enabled }: PurchasesSectionProps) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {billStatusData ? <BillStatusChart data={billStatusData} /> : <ChartSkeleton />}
-        {vendorsData ? <TopVendorsChart data={vendorsData} /> : <ChartSkeleton />}
+        {billStatusData ? (
+          <BillStatusChart data={billStatusData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
+        {vendorsData ? (
+          <TopVendorsChart data={vendorsData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {purchaseTrendData ? <PurchasesTrendChart data={purchaseTrendData} /> : <ChartSkeleton />}
-        {expenseTrendData ? <ExpenseTrendChart data={expenseTrendData} /> : <ChartSkeleton />}
+        {purchaseTrendData ? (
+          <PurchasesTrendChart data={purchaseTrendData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
+        {expenseTrendData ? (
+          <ExpenseTrendChart data={expenseTrendData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {paymentTimeData ? <VendorPaymentTimeChart data={paymentTimeData} /> : <ChartSkeleton />}

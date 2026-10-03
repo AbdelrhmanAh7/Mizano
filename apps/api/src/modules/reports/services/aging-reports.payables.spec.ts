@@ -22,6 +22,7 @@ describe('payables reports net unapplied vendor credits', () => {
 
   it('AP aging: summary.netTotal = open bill balances - unapplied credits, per vendor and in total', async () => {
     const prisma = {
+      organization: { findUnique: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }) },
       bill: {
         findMany: jest.fn().mockResolvedValue([bill('b1', 'v1', '114'), bill('b2', 'v1', '142')]),
       },
@@ -38,13 +39,40 @@ describe('payables reports net unapplied vendor credits', () => {
       deletedAt: null,
       appliedToBillId: null,
       refundedAt: null,
+      bill: { is: { OR: [{ currencyCode: 'EGP' }, { currencyCode: null }] } },
     });
+    expect(prisma.bill.findMany.mock.calls[0][0].where.OR).toEqual([
+      { currencyCode: 'EGP' },
+      { currencyCode: null },
+    ]);
     expect(report.summary.total).toBe(256);
     expect(report.summary.unappliedCredits).toBe('200.0000');
     expect(report.summary.netTotal).toBe('56.0000');
+    expect(report.currencyCode).toBe('EGP');
     expect(report.unappliedCredits.vendors).toEqual([
       { vendorId: 'v1', vendorName: 'Vendor v1', amount: '200.0000' },
     ]);
+  });
+
+  it('AR aging only nets documents and credits in the organization base currency', async () => {
+    const prisma = {
+      organization: { findUnique: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }) },
+      invoice: { findMany: jest.fn().mockResolvedValue([]) },
+      creditNote: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const service = new AgingReportsService(prisma as unknown as ReadReplicaService);
+
+    const report = await service.getReceivablesAging(ORG, '2026-01-31');
+
+    expect(prisma.invoice.findMany.mock.calls[0][0].where.OR).toEqual([
+      { currencyCode: 'EGP' },
+      { currencyCode: null },
+    ]);
+    expect(prisma.creditNote.findMany.mock.calls[0][0].where.invoice.is.OR).toEqual([
+      { currencyCode: 'EGP' },
+      { currencyCode: null },
+    ]);
+    expect(report.currencyCode).toBe('EGP');
   });
 
   it('purchases by vendor: credits reduce netPayable and a credit-only vendor still appears', async () => {
