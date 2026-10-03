@@ -1,3 +1,4 @@
+import { signedMovementQuantity } from '../../inventory/utils/movement-sign';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -562,8 +563,12 @@ export class AiInsightsService {
     for (const item of items) {
       const movements = await this.prisma.inventoryMovement.findMany({
         where: { itemId: item.id, organizationId },
+        select: { quantity: true, movementType: true },
       });
-      const currentStock = movements.reduce((sum, m) => sum + parseFloat(m.quantity.toString()), 0);
+      const currentStock = movements.reduce(
+        (sum: number, m) => sum + signedMovementQuantity(m.quantity, m.movementType),
+        0,
+      );
 
       if (currentStock <= (item.reorderPoint ? parseFloat(item.reorderPoint.toString()) : 10)) {
         lowStockItems.push({
