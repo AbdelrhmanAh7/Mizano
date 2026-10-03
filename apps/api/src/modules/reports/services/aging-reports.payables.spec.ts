@@ -9,10 +9,31 @@ describe('payables reports net unapplied vendor credits', () => {
     id,
     billNumber: id,
     vendorId,
+    date: new Date('2026-01-02'),
     billDate: null,
     dueDate: new Date('2030-01-01'),
     balanceDue: new Decimal(balance),
     vendor: { id: vendorId, name: `Vendor ${vendorId}` },
+  });
+
+  it('AP aging uses the required accounting date even when optional supplier dates are absent or different', async () => {
+    const first = bill('b1', 'v1', '114');
+    const second = { ...bill('b2', 'v1', '142'), billDate: new Date('2025-12-01') };
+    const prisma = {
+      bill: { findMany: jest.fn().mockResolvedValue([first, second]) },
+      vendorCredit: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const service = new AgingReportsService(prisma as unknown as ReadReplicaService);
+    const report = await service.getPayablesAging(ORG, '2026-01-31');
+    expect(report.buckets.current).toEqual([
+      expect.objectContaining({ billId: 'b1', billDate: first.date }),
+      expect.objectContaining({ billId: 'b2', billDate: second.date }),
+    ]);
+    expect(prisma.bill.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organizationId: ORG, date: expect.any(Object) }),
+      }),
+    );
   });
   const credit = (vendorId: string, amount: string) => ({
     vendorId,

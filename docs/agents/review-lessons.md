@@ -33,6 +33,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Web defaults use the user's local calendar date** (`format(d, 'yyyy-MM-dd')`), never `toISOString()`, which gives yesterday in UTC+ zones such as Cairo.
 - **"Current" figures exclude future-dated entries.** Cash today means lines dated ≤ end of today.
 - **Side records carry the document date.** Inventory movements are dated on the adjustment date, not on `createdAt` = now.
+- **Report detail rows use the required accounting date, not nullable legacy date metadata.** A manual bill has `date` but may have no `billDate`; returning the latter makes the aging drilldown crash when formatting its date. _(issue 23 browser journey)_
 - **Historical reports keep later-voided documents in their original period** and show the reversal on the void date. Filtering on today's status rewrites history. _(customer statement)_
 
 ## 5. Single-currency ledger and data
@@ -88,10 +89,16 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Show the currency of the document**, falling back to the org base currency, never the counterparty's default. The API must actually return the fields the UI relies on (for example `baseCurrency`).
 - **Payment-wide effects get payment-wide warnings.** Voiding a payment affects every allocated bill.
 
+- **Preserve the locale in financial form navigation.** Use the existing locale-aware `Link` and `useRouter` from `i18n/routing` for save/cancel/back paths. Locale-free redirects can change the language and, on loopback Next.js, normalize the host and lose the session cookie. Assert the actual authenticated detail/list destination in EN/AR browser tests. _(issue 23 invoice/payment journey)_
+
+- **Do not filter payment allocations twice.** The payment form emits API allocations after removing UI-only selection flags; the page must preserve them. Filtering again by `selected` silently empties the request. Test the form-to-command payload as well as navigation. _(issue 23 payment received)_
+
 ## 12. Caches, tests and scope
 
 - **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included.
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
+- **Isolate every E2E data client, including read replicas, and reconcile reports per account; rejection tests must compare the ledger before and after, not just document status or balanced gross totals.** _(issue 23 browser gate review)_
+- **Browser gates own direct server processes and bound teardown; do not depend on shell-wrapper tree termination that a Windows sandbox can deny. Test cleanup on success and startup failure.** _(issue 23 browser runner)_
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
 
