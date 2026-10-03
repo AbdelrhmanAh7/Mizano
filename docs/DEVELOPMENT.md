@@ -111,7 +111,7 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 | Web unit       | `apps/web/**/*.spec.ts(x)` (Jest + Testing Library, jsdom) | `cd apps/web && npx jest [--testPathPattern=…]`         |
 | API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database               |
 | Browser E2E    | not wired yet                                              | tracked by the seeded API/browser journey issue         |
-| Planning tools | `scripts/test_*.py`                                        | `python -m unittest discover -s scripts -p 'test_*.py'` |
+| Script tests   | `scripts/test_*.py` (planning sync, rollout scope, turbo)  | `python -m unittest discover -s scripts -p 'test_*.py'` |
 
 `_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly.
 
@@ -141,18 +141,30 @@ Rules:
 1. **gate** (`CI Gate`) — sets `should_run`. Event data reaches the script as environment variables, never through `${{ }}` inside the script, so a label name cannot inject shell code.
 2. **filter** (`Path Filter`) — `dorny/paths-filter` detects changes to Docker-relevant files: `apps/api/Dockerfile`, `apps/web/Dockerfile`, `.dockerignore`, `deploy/**`, `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`.
 3. **install** — shared dependency install (pnpm store cache) and `prisma generate`; saves `node_modules`.
-4. **lint**, **test**, **build** — run in parallel after install. Each lists `gate` and `install` in `needs`, because the `needs` context only exposes direct dependencies.
-5. **docker-build** — multi-arch (`linux/amd64` + `linux/arm64`) Docker **validation**. It starts only after lint, test and build passed, and only when the event is a push, or the PR changes a Docker-relevant file (per filter), or the PR has the `docker` label. Adding `docker` to an existing PR starts it without a new commit.
+4. **lint**, **test**, **build** — run in parallel after install. Each lists `gate` and `install` in `needs`, because the `needs` context only exposes direct dependencies. The lint job also runs the `scripts/test_turbo_config.py` guard (see Turbo task inputs below).
+5. **docker-build** — multi-arch Docker **validation**, one matrix leg per architecture (`amd64` on `ubuntu-latest`, `arm64` on the native `ubuntu-24.04-arm` runner). It starts only after lint, test and build passed, and only when the event is a push, or the PR changes a Docker-relevant file (per filter), or the PR has the `docker` label. Adding `docker` to an existing PR starts it without a new commit.
 
 ### Caching
 
 - **pnpm store**: `setup-node` with `cache: 'pnpm'`, plus an explicit `node_modules` cache keyed by `pnpm-lock.yaml` and the commit SHA.
 - **turbo**: `.turbo/cache` is restored before the Turbo tasks of the lint, test and build jobs and saved when the job succeeds (`actions/cache`), with one key prefix per job (`turbo-lint-`, `turbo-test-`, `turbo-build-`) because the tasks differ. Keys include `pnpm-lock.yaml`, `turbo.json` and the SHA; `restore-keys` give partial hits.
-- **Docker layers**: GitHub Actions cache (`type=gha`) with a separate scope per image (`scope=api`, `scope=web`); a shared scope would let the second image overwrite the first image's cache.
+- **Docker layers**: GitHub Actions cache (`type=gha`) with a separate scope per image and architecture (`api-amd64`, `api-arm64`, `web-amd64`, `web-arm64`); a shared scope would let the next build overwrite the cache of the previous one.
+
+### Turbo task inputs
+
+`turbo.json` declares no `inputs` for `build`, `lint`, `type-check` and `test`, so Turborepo hashes every file of a package that git tracks (or that is untracked and not ignored) and runs the task again when any of them changes. The old `src/**` globs matched nothing in `apps/web` (its code lives in `app/`, `components/`, `lib/`, `messages/` and `public/`), so web tasks hashed only `package.json`, `tsconfig.json` and the lint/jest config and replayed a cached result for any web change. Locally the replay crossed branches, because Turborepo shares `.turbo/cache` between git worktrees: the first result recorded on any branch replayed on every other branch, and `pnpm ci:full` never really checked web code. CI would have done the same as soon as the Turbo cache is restored there. The same globs also skipped `apps/api/test/` (lint and type-check), `apps/api/prisma/` (lint, type-check and test) and the Nest/SWC configs.
+
+`.prettierrc` and `.prettierignore` are `globalDependencies` because the API lint runs Prettier through ESLint. `scripts/test_turbo_config.py` (standard library only, run by the CI lint job) fails when a task declares `inputs` without `$TURBO_DEFAULT$`. If you add `inputs` to a task again, start from `$TURBO_DEFAULT$` and subtract, then check the result:
+
+```bash
+# change a web file, then:
+pnpm turbo run type-check --filter=@mizano/web --dry=json
+# the changed file must appear under tasks[].inputs and cache.status must be "MISS"
+```
 
 ### Docker multi-arch validation
 
-The `docker-build` job installs QEMU (pinned `tonistiigi/binfmt:qemu-v8.1.5`, arm64 only) before Buildx, because both Dockerfiles run commands during the build. arm64 is emulated, so the job is slow and has a 60-minute timeout; that is why it is gated. It builds both images and **never pushes** (`push: false`). Publishing belongs to `deploy.yml`, which tags the images with the short SHA: the web image bakes `NEXT_PUBLIC_API_URL` in at build time, so an image built in CI with a placeholder URL must not be pushed as `latest`. When registry names are built for a push elsewhere, lower-case the owner (GHCR rejects `ghcr.io/AbdelrhmanAh7/...`).
+The `docker-build` job builds each architecture on a native runner and **never pushes** (`push: false`). The first version emulated arm64 with QEMU on `ubuntu-latest`; `pnpm install --frozen-lockfile` made no progress for the whole 60-minute timeout (the same step took 44 seconds for amd64), so the arm64 leg now runs on `ubuntu-24.04-arm`, which is free for public repositories (this repository is public). Each leg has a 30-minute timeout. Publishing belongs to `deploy.yml`, which tags the images with the short SHA: the web image bakes `NEXT_PUBLIC_API_URL` in at build time, so an image built in CI with a placeholder URL must not be pushed as `latest`. When registry names are built for a push elsewhere, lower-case the owner (GHCR rejects `ghcr.io/AbdelrhmanAh7/...`).
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 
