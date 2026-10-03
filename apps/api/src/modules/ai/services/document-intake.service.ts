@@ -17,6 +17,7 @@ import { levenshteinSimilarity, normalizeText } from '../utils/text-similarity.u
 import { ExtractionValidation, validateExtraction } from '../validation/extraction-validation';
 import { normalizeDigits } from '../extraction/rules/rules-normalize';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
+import { assertTotalsFit } from '../../sales/utils/sales-helpers';
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -171,6 +172,7 @@ interface ResolvedIntakeLine {
 }
 
 interface ResolvedIntakeDocument {
+  currencyCode: string;
   lines: ResolvedIntakeLine[];
   subtotal: Decimal;
   taxAmount: Decimal;
@@ -585,6 +587,19 @@ export class DocumentIntakeService {
       for (const tr of taxRates) taxRatePercentById.set(tr.id, new Decimal(tr.rate.toString()));
     }
 
+    // The ledger is single-currency: reject a foreign currency instead of posting it 1:1.
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { baseCurrency: true },
+    });
+    if (!org) throw new BadRequestException('Organization not found');
+    const currencyCode = dto.currencyCode?.trim().toUpperCase() || org.baseCurrency.toUpperCase();
+    if (currencyCode !== org.baseCurrency.toUpperCase()) {
+      throw new BadRequestException(
+        `Document currency ${currencyCode} differs from the base currency ${org.baseCurrency}; foreign-currency documents are not supported yet`,
+      );
+    }
+
     // Per-line tax/discount resolution. Unresolved tax is an error, never a silent 0.
     const prepared = dto.lines.map((line, index) => {
       const lineNo = index + 1;
@@ -638,7 +653,11 @@ export class DocumentIntakeService {
       })),
     );
 
+    // Same Decimal(19, 4) bound as manual invoices/bills: nothing is written that cannot be stored.
+    assertTotalsFit(totals);
+
     return {
+      currencyCode,
       lines: prepared.map((l, i) => ({
         ...l,
         netAmount: totals.lines[i].netAmount,
@@ -670,7 +689,7 @@ export class DocumentIntakeService {
         grandTotal: resolved.grandTotal,
         balanceDue: resolved.grandTotal,
         reference: dto.reference,
-        currencyCode: dto.currencyCode,
+        currencyCode: resolved.currencyCode,
         notes: dto.notes || 'Created from document scan',
         projectId: dto.projectId || null,
         organizationId,
@@ -733,6 +752,7 @@ export class DocumentIntakeService {
         shippingAmount: new Decimal(0),
         grandTotal: resolved.grandTotal,
         balanceDue: resolved.grandTotal,
+        currencyCode: resolved.currencyCode,
         notes: dto.notes || 'Created from document scan',
         organizationId,
         lines: {
