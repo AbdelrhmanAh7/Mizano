@@ -66,6 +66,23 @@ const LEGACY_BILL_APPROVAL: Prisma.JournalWhereInput = {
   },
 };
 
+// Before source linking, invoice send still wrote this fixed reference and Sales Revenue line.
+// A source-less journal is a legacy invoice send only with that evidence; a manual journal whose
+// line merely ends with "- Sales Revenue" must not inflate the sales base.
+const LEGACY_INVOICE_SEND: Prisma.JournalWhereInput = {
+  sourceType: null,
+  reversalOfId: null,
+  isPosted: true,
+  deletedAt: null,
+  reference: { startsWith: 'Invoice ' },
+  lines: {
+    some: {
+      credit: { gt: ZERO },
+      description: { startsWith: 'Invoice ', endsWith: '- Sales Revenue' },
+    },
+  },
+};
+
 type Db = Prisma.TransactionClient;
 
 export interface VatAccounts {
@@ -819,8 +836,9 @@ export class VatReturnsService {
       // Sales are the dated Sales Revenue lines of invoice issue and void journals, so an invoice
       // voided in a later period keeps its base in the original period (like its VAT credit)
       // and the reversal lowers the base of the period the void is dated in. Source-less
-      // journals are legacy invoice sends written before journals were source-linked (such
-      // invoices cannot be voided through the system), identified by the same line marker.
+      // journals count only as legacy invoice sends (written before journals were source-linked,
+      // evidenced by their Invoice reference and revenue line) and the linked reversals of
+      // those, which lower the base on their own date like the VAT credit they carry.
       db.journalLine.aggregate({
         where: {
           description: { endsWith: '- Sales Revenue' },
@@ -835,7 +853,11 @@ export class VatReturnsService {
                   in: [JournalSourceType.INVOICE_SEND, JournalSourceType.INVOICE_VOID],
                 },
               },
-              { sourceType: null },
+              LEGACY_INVOICE_SEND,
+              {
+                sourceType: null,
+                reversalOf: { is: { ...LEGACY_INVOICE_SEND, organizationId } },
+              },
             ],
           },
         },

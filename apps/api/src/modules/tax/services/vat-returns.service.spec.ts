@@ -69,6 +69,21 @@ describe('derivePeriodLabel', () => {
   });
 });
 
+/** The evidence that identifies a source-less journal as a pre-linking invoice send. */
+const legacyInvoiceSend = {
+  sourceType: null,
+  reversalOfId: null,
+  isPosted: true,
+  deletedAt: null,
+  reference: { startsWith: 'Invoice ' },
+  lines: {
+    some: {
+      credit: { gt: dec('0') },
+      description: { startsWith: 'Invoice ', endsWith: '- Sales Revenue' },
+    },
+  },
+};
+
 describe('VatReturnsService', () => {
   let service: VatReturnsService;
   let prisma: VatPrismaMock;
@@ -205,7 +220,8 @@ describe('VatReturnsService', () => {
       )[0].where;
       expect(salesQuery.journal.OR).toEqual([
         { sourceType: { in: ['INVOICE_SEND', 'INVOICE_VOID'] } },
-        { sourceType: null },
+        legacyInvoiceSend,
+        { sourceType: null, reversalOf: { is: { ...legacyInvoiceSend, organizationId: ORG } } },
       ]);
       // No issue/void events in the window: the invoice table is not consulted at all.
       expect(prisma.invoice.aggregate).not.toHaveBeenCalled();
@@ -241,6 +257,37 @@ describe('VatReturnsService', () => {
           { organizationId: ORG, id: { in: ['inv-9'] } },
         ]),
       );
+    });
+
+    it('counts a source-less journal as sales only with legacy invoice evidence', async () => {
+      prisma.vATReturn.findFirst.mockResolvedValue(vatReturn({ status: 'DRAFT' }));
+      prisma.vATReturn.updateMany.mockResolvedValue({ count: 1 });
+      prisma.vATReturn.findUniqueOrThrow.mockResolvedValue({ id: 'vr-1' });
+      givenLedger({ outputCredit: '0', inputDebit: '0' });
+
+      await service.calculate(ORG, 'vr-1');
+
+      const salesWhere = prisma.journalLine.aggregate.mock.calls.find(
+        (c) => c[0].where.description?.endsWith === '- Sales Revenue',
+      )[0].where;
+      // A manual journal whose line merely ends with "- Sales Revenue" has no invoice reference
+      // or invoice-prefixed revenue credit, so no bare source-less branch may accept it.
+      expect(salesWhere.journal.OR).not.toContainEqual({ sourceType: null });
+      const sourceless = salesWhere.journal.OR.filter(
+        (branch: { sourceType?: unknown }) => branch.sourceType === null,
+      );
+      expect(sourceless).toHaveLength(2);
+      for (const branch of sourceless) {
+        const original = branch.reversalOf ? branch.reversalOf.is : branch;
+        expect(original.reference).toEqual({ startsWith: 'Invoice ' });
+        expect(original.lines.some.credit).toEqual({ gt: dec('0') });
+        expect(original.lines.some.description).toEqual({
+          startsWith: 'Invoice ',
+          endsWith: '- Sales Revenue',
+        });
+      }
+      // Linked reversals are matched only against this tenant's legacy invoice journals.
+      expect(sourceless[1].reversalOf.is.organizationId).toBe(ORG);
     });
 
     it('includes VAT on an account that was a default VAT account before', async () => {

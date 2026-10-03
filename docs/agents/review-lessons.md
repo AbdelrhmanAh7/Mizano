@@ -43,6 +43,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Never write a data migration that guesses.** If no stored evidence separates "explicitly chosen" from "default", do not backfill; fix the read rule instead. _(baseCurrency and account-currency backfills, both removed)_
 - **Handle legacy rows.** Journals created before source linking have `sourceType = null`, for example opening balance `OB-001`. Reversal and replacement must find them, or explicitly refuse.
 - **When replacing document totals with journal aggregates, preserve evidenced legacy postings and linked reversals; test null source metadata as well as current source types.**
+- **A `sourceType: null` branch needs the legacy document's fixed reference and line shape, never a label suffix alone.** Manual journals can reuse any description, so match the reference plus the revenue/payable line, and match reversals only through `reversalOf` of such a journal. Seed a look-alike manual journal in E2E. _(VAT sales base)_
 
 ## 6. Money arithmetic
 
