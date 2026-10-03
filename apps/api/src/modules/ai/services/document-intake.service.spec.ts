@@ -1,5 +1,6 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { IntakeJobStatus, Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { DocumentIntakeService, ConfirmIntakeInput } from './document-intake.service';
@@ -24,6 +25,10 @@ interface PrismaMock {
   taxRate: { findMany: jest.Mock };
   bill: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock };
   invoice: { findFirst: jest.Mock; create: jest.Mock };
+  auditLog: { create: jest.Mock; findFirst: jest.Mock };
+  intakeJob: { findFirst: jest.Mock };
+  $transaction: jest.Mock;
+  $queryRaw: jest.Mock;
 }
 
 /**
@@ -54,7 +59,7 @@ function buildPrisma(): PrismaMock {
         where.id.in.filter((id) => table[id] === where.organizationId).map((id) => ({ id })),
       );
 
-  return {
+  const mock: PrismaMock = {
     organization: {
       findFirst: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }),
       findUnique: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }),
@@ -85,7 +90,17 @@ function buildPrisma(): PrismaMock {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({ id: 'invoice-1' }),
     },
+    auditLog: {
+      create: jest.fn().mockResolvedValue({ id: 'audit-1' }),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    intakeJob: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    $transaction: jest.fn(async (cb: (tx: PrismaMock) => Promise<unknown>) => cb(mock)),
+    $queryRaw: jest.fn().mockResolvedValue([]),
   };
+  return mock;
 }
 
 function baseBill(overrides: Partial<ConfirmIntakeInput> = {}): ConfirmIntakeInput {
@@ -602,6 +617,213 @@ describe('DocumentIntakeService', () => {
       );
       const logged = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
       expect(logged).not.toContain('SECRET');
+    });
+
+    it('writes an INTAKE_DRAFT audit marker when jobId is provided', async () => {
+      prisma.intakeJob.findFirst.mockResolvedValue({ createdById: 'creator-1' });
+      await service.confirmAndCreate(
+        ORG_A,
+        baseBill({
+          jobId: 'job-1',
+          userId: 'user-1',
+        }),
+      );
+      expect(prisma.intakeJob.findFirst).toHaveBeenCalledWith({
+        where: { id: 'job-1', organizationId: ORG_A, deletedAt: null },
+        select: { createdById: true },
+      });
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          organizationId: ORG_A,
+          userId: 'user-1',
+          action: 'CREATE',
+          entityType: 'INTAKE_DRAFT',
+          entityId: 'job-1',
+          newValues: { draftType: 'bill', draftId: 'bill-1' },
+        },
+      });
+      // Job row lock acquired before draft creation
+      expect(prisma.$queryRaw).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.stringContaining('SELECT id FROM "intake_jobs" WHERE id = '),
+        ]),
+        'job-1',
+        ORG_A,
+      );
+      // Draft and marker are written through the same transaction client.
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('attributes the marker to the job creator when no user is given', async () => {
+      prisma.intakeJob.findFirst.mockResolvedValue({ createdById: 'creator-1' });
+      await service.confirmAndCreate(ORG_A, baseBill({ jobId: 'job-2' }));
+      expect(prisma.intakeJob.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'job-2', organizationId: ORG_A, deletedAt: null } }),
+      );
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ userId: 'creator-1' }) }),
+      );
+    });
+
+    it('fails the transaction instead of creating a draft when jobId is foreign, even if userId is given', async () => {
+      prisma.intakeJob.findFirst.mockResolvedValue(null);
+      await expect(
+        service.confirmAndCreate(ORG_A, baseBill({ jobId: 'job-foreign', userId: 'user-foreign' })),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.intakeJob.findFirst).toHaveBeenCalledWith({
+        where: { id: 'job-foreign', organizationId: ORG_A, deletedAt: null },
+        select: { createdById: true },
+      });
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it('acquires the job row lock before creating a draft invoice with jobId', async () => {
+      prisma.intakeJob.findFirst.mockResolvedValue({ createdById: 'creator-inv' });
+      await service.confirmAndCreate(ORG_A, {
+        type: 'INVOICE',
+        customerId: 'customer-a',
+        date: '2026-09-01',
+        dueDate: '2026-10-01',
+        lines: [{ description: 'Consulting', quantity: '1', rate: '200', taxRatePercent: '14' }],
+        jobId: 'job-inv-1',
+      });
+      expect(prisma.$queryRaw).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.stringContaining('SELECT id FROM "intake_jobs" WHERE id = '),
+        ]),
+        'job-inv-1',
+        ORG_A,
+      );
+      expect(prisma.invoice.create).toHaveBeenCalledTimes(1);
+      expect(prisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            organizationId: ORG_A,
+            entityType: 'INTAKE_DRAFT',
+            entityId: 'job-inv-1',
+            newValues: { draftType: 'invoice', draftId: 'invoice-1' },
+          }),
+        }),
+      );
+    });
+
+    it.each(['BILL', 'INVOICE'] as const)(
+      'uses the caller transaction for the %s draft, lock and marker without a nested transaction',
+      async (type) => {
+        const tx = buildPrisma();
+        // Direct service callers need tenant ownership, without an APPROVED lookup filter.
+        tx.intakeJob.findFirst.mockResolvedValue({
+          createdById: 'creator-1',
+          status: IntakeJobStatus.EXTRACTED,
+        });
+        const result = await service.confirmAndCreate(
+          ORG_A,
+          baseBill({ type, customerId: 'customer-a', jobId: 'job-tx', userId: 'actor-1' }),
+          tx as unknown as Prisma.TransactionClient,
+        );
+        const create = type === 'BILL' ? tx.bill.create : tx.invoice.create;
+        expect(result.id).toBe(type === 'BILL' ? 'bill-1' : 'invoice-1');
+        expect(create).toHaveBeenCalledTimes(1);
+        const data = create.mock.calls[0][0].data;
+        expect(data.currencyCode).toBe('EGP');
+        expect(data.subtotal.toFixed(4)).toBe('200.0000');
+        expect(data.taxAmount.toFixed(4)).toBe('28.0000');
+        expect(data.grandTotal.toFixed(4)).toBe('228.0000');
+        expect(data.balanceDue.toFixed(4)).toBe('228.0000');
+        expect(data.lines.create[0].taxRate.toFixed(4)).toBe('14.0000');
+        expect(data.lines.create[0].amount.toFixed(4)).toBe('200.0000');
+        expect(tx.auditLog.create).toHaveBeenCalledTimes(1);
+        expect(tx.intakeJob.findFirst).toHaveBeenCalledWith({
+          where: { id: 'job-tx', organizationId: ORG_A, deletedAt: null },
+          select: { createdById: true },
+        });
+        expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+          create.mock.invocationCallOrder[0],
+        );
+        expect(create.mock.invocationCallOrder[0]).toBeLessThan(
+          tx.auditLog.create.mock.invocationCallOrder[0],
+        );
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(tx.$transaction).not.toHaveBeenCalled();
+        expect(prisma.bill.create).not.toHaveBeenCalled();
+        expect(prisma.invoice.create).not.toHaveBeenCalled();
+        expect(prisma.auditLog.create).not.toHaveBeenCalled();
+        expect(feedback.processFeedback).not.toHaveBeenCalled();
+        expect(Logger.prototype.log).not.toHaveBeenCalled();
+        await service.recordConfirmation(ORG_A, baseBill({ type }), result);
+        expect(Logger.prototype.log).toHaveBeenCalledTimes(1);
+        expect(feedback.processFeedback).toHaveBeenCalledTimes(type === 'BILL' ? 1 : 0);
+      },
+    );
+
+    describe.each(['BILL', 'INVOICE'] as const)('%s marker ownership', (type) => {
+      it.each(['foreign', 'missing', 'deleted'] as const)(
+        'rejects a %s job with an explicit actor and commits neither draft nor marker',
+        async (kind) => {
+          const tx = buildPrisma();
+          const jobs =
+            kind === 'missing'
+              ? []
+              : [
+                  {
+                    id: 'unavailable-job',
+                    organizationId: kind === 'foreign' ? ORG_B : ORG_A,
+                    deletedAt: kind === 'deleted' ? new Date() : null,
+                    createdById: 'creator-1',
+                  },
+                ];
+          tx.intakeJob.findFirst.mockImplementation(({ where }) =>
+            Promise.resolve(
+              jobs.find(
+                (job) =>
+                  job.id === where.id &&
+                  job.organizationId === where.organizationId &&
+                  job.deletedAt === where.deletedAt,
+              ) ?? null,
+            ),
+          );
+          const committed: unknown[] = [];
+          prisma.$transaction.mockImplementation(async (callback) => {
+            const result = await callback(tx);
+            committed.push(result);
+            return result;
+          });
+          await expect(
+            service.confirmAndCreate(
+              ORG_A,
+              baseBill({
+                type,
+                customerId: 'customer-a',
+                jobId: 'unavailable-job',
+                userId: 'actor-1',
+              }),
+            ),
+          ).rejects.toThrow(BadRequestException);
+          expect(tx.intakeJob.findFirst).toHaveBeenCalledWith({
+            where: { id: 'unavailable-job', organizationId: ORG_A, deletedAt: null },
+            select: { createdById: true },
+          });
+          expect(tx.auditLog.create).not.toHaveBeenCalled();
+          expect(committed).toEqual([]);
+          expect(prisma.auditLog.create).not.toHaveBeenCalled();
+          expect(feedback.processFeedback).not.toHaveBeenCalled();
+          expect(Logger.prototype.log).not.toHaveBeenCalled();
+        },
+      );
+    });
+
+    it('fails closed without creating a draft or marker when the row lock fails', async () => {
+      prisma.$queryRaw.mockRejectedValue(new Error('lock failed'));
+      await expect(
+        service.confirmAndCreate(ORG_A, baseBill({ jobId: 'job-1', userId: 'actor-1' })),
+      ).rejects.toThrow('lock failed');
+      expect(prisma.bill.create).not.toHaveBeenCalled();
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it('writes no marker for a confirm without an intake job', async () => {
+      await service.confirmAndCreate(ORG_A, baseBill());
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
   });
 });

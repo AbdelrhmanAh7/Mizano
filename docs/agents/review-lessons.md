@@ -12,6 +12,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Scope every row lock by organization:** `WHERE id = $1 AND "organizationId" = $2 FOR UPDATE`. A caller-supplied foreign id must lock nothing. _(lockInvoices, lockBills)_
 - **A check and the write it guards share one transaction and one lock.** Duplicate and overlap checks run inside the same tx as the insert, under an advisory lock. _(VAT period overlap)_
 - **Lock every record you read to decide a mutation.** For example, voiding a credit note must lock the note before reading `appliedToInvoiceId`, or a concurrent apply slips through. _(credit-note void vs. apply)_
+- **Serialize background recovery sweeps with mutation creation using the same row lock.** Hold the job lock through the approval claim, draft, marker and link transaction, and through recovery's marker read and guarded update. Locking only draft creation leaves a gap: recovery can reopen a separately committed claim before confirmation takes the lock. _(intake recovery vs. draft confirm)_
+- **Report success and write external feedback only after the owning transaction commits.** A service called inside another service's transaction must defer these effects to the transaction owner, so a later link failure cannot leave success logs or feedback for a rolled-back draft. _(intake approval transaction)_
 
 ## 2. Idempotency and retries
 
@@ -65,6 +67,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Gate UI actions with exactly the API route's permission.**
 - **Money-bearing imports require the same per-entity create permission as the single-record routes.**
 - **Adding auth to a server endpoint or socket changes its contract: update every client in the same PR** (send the token, handle expiry and reconnect). A server-only change silently breaks the client. _(events gateway vs `use-realtime`)_
+- **Validate entity ownership before writing idempotency markers, even when audit user metadata is supplied.** An idempotency marker writer must unconditionally verify the referenced entity belongs to `organizationId` and is not deleted (`deletedAt: null`), rather than skipping the lookup when caller-provided `userId` is present. _(writeDraftMarker INTAKE_DRAFT)_
 
 ## 8. Voided and deleted records
 
@@ -101,6 +104,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
 - **Paginated searches apply their predicate in the database for both page and count.** Never materialize all matching ids or cap that intermediate list; preserve tenant/deletion filters, literal wildcard escaping and stable ordering.
+- **Parallel branches that touch one pipeline are verified together, not one by one.** A clean textual merge can still change behaviour: field validation moved the inbox E2E's foreign-currency fixture from `EXTRACTED` to `NEEDS_REVIEW`, and bulk approval had to adopt the transactional confirm (claim, draft, `INTAKE_DRAFT` marker and job link in one transaction) that the reconcile branch gave the single route. After merging, rerun every branch's seeded E2E on the merged tree, route each bulk path through the merged single-record command, and change the fixture to the intended scenario, never the assertion. _(intake bundle)_
 
 ## Review process
 

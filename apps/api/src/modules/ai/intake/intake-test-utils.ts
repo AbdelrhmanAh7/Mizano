@@ -156,3 +156,84 @@ export function billResult(overrides: Partial<DocumentIntakeResult> = {}): Docum
     ...overrides,
   } as DocumentIntakeResult;
 }
+
+export class FakeAuditLogTable {
+  rows: Array<{
+    id: string;
+    organizationId: string;
+    userId: string;
+    action: string;
+    entityType: string;
+    entityId: string;
+    newValues?: unknown;
+    createdAt: Date;
+  }> = [];
+  private seq = 0;
+
+  readonly delegate = {
+    create: jest.fn(
+      async ({
+        data,
+      }: {
+        data: {
+          organizationId: string;
+          userId: string;
+          action: string;
+          entityType: string;
+          entityId: string;
+          newValues?: unknown;
+        };
+      }) => {
+        const row = {
+          id: `audit-${++this.seq}`,
+          createdAt: new Date(),
+          ...data,
+        };
+        this.rows.push(row);
+        return row;
+      },
+    ),
+    findFirst: jest.fn(
+      async ({
+        where,
+      }: {
+        where: { organizationId?: string; entityType?: string; entityId?: string };
+      }) => {
+        return (
+          this.rows
+            .slice()
+            .reverse()
+            .find(
+              (r) =>
+                (!where.organizationId || r.organizationId === where.organizationId) &&
+                (!where.entityType || r.entityType === where.entityType) &&
+                (!where.entityId || r.entityId === where.entityId),
+            ) ?? null
+        );
+      },
+    ),
+  };
+}
+
+export class FakeDocumentTable {
+  rows: Array<{ id: string; organizationId: string; deletedAt: Date | null }> = [];
+
+  readonly delegate = {
+    findFirst: jest.fn(
+      async ({
+        where,
+      }: {
+        where: { id: string; organizationId: string; deletedAt?: Date | null };
+      }) => {
+        return (
+          this.rows.find(
+            (r) =>
+              r.id === where.id &&
+              r.organizationId === where.organizationId &&
+              (where.deletedAt === undefined || r.deletedAt === where.deletedAt),
+          ) ?? null
+        );
+      },
+    ),
+  };
+}

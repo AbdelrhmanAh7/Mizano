@@ -2,6 +2,10 @@
  * Accountant inbox (issue #21): real HTTP API, real login, real PostgreSQL and Redis/BullMQ.
  * Only the extraction strategy is stubbed (like intake.e2e-spec.ts): two complete documents and
  * one with a missing date are ingested, then bulk-approved.
+ *
+ * Field validation (issue #18) runs on every extraction, so a document whose currency differs
+ * from the organization base currency lands in NEEDS_REVIEW. The inbox keeps its own currency
+ * check for EXTRACTED jobs (for example after the base currency changed), covered below.
  */
 import { INestApplication } from '@nestjs/common';
 import { IntakeJobStatus } from '@prisma/client';
@@ -10,6 +14,7 @@ import { registerTenant, TestTenant } from './helpers/tenant.helper';
 import { eventually } from './helpers/journey.helper';
 import { ApiHelper } from './helpers/api-client.helper';
 import { ExtractionStrategyResolver } from '../src/modules/ai/extraction/extraction-strategy-resolver.service';
+import { INTAKE_DRAFT_ENTITY } from '../src/modules/ai/intake/intake-jobs.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const stub = {
@@ -113,19 +118,21 @@ describe('Accountant inbox (e2e)', () => {
     a = tenantA.api;
     b = tenantB.api;
     anon = ApiHelper.anonymous(app);
-    // Registration defaults the base currency to USD; the stubbed documents are in EGP.
+    stub.vendorName = `Inbox Vendor ${uniqueSuffix()}`;
+    const vendor = await a.post('/vendors').send({ name: stub.vendorName });
+    expect(vendor.status).toBe(201);
+    // Registration defaults the base currency to USD. The complete USD document is extracted
+    // while the base is still USD (under an EGP base field validation sends it to review);
+    // the base then becomes EGP, so it is an EXTRACTED job in a foreign currency: it stays in
+    // the inbox as an exception and is never bulk-approvable (base-only ledger).
+    ids.foreign = await ingest(a, tenantA, 'IN-4', '2026-09-03', IntakeJobStatus.EXTRACTED, 'USD');
     await prisma.organization.update({
       where: { id: tenantA.organizationId },
       data: { baseCurrency: 'EGP' },
     });
-    stub.vendorName = `Inbox Vendor ${uniqueSuffix()}`;
-    const vendor = await a.post('/vendors').send({ name: stub.vendorName });
-    expect(vendor.status).toBe(201);
     ids.ready1 = await ingest(a, tenantA, 'IN-1', '2026-09-01', IntakeJobStatus.EXTRACTED);
     ids.ready2 = await ingest(a, tenantA, 'IN-2', '2026-09-02', IntakeJobStatus.EXTRACTED);
     ids.review = await ingest(a, tenantA, 'IN-3', null, IntakeJobStatus.NEEDS_REVIEW);
-    // Complete but in a foreign currency: extracted, yet never bulk-approvable (base-only ledger).
-    ids.foreign = await ingest(a, tenantA, 'IN-4', '2026-09-03', IntakeJobStatus.EXTRACTED, 'USD');
   });
 
   afterAll(async () => {
@@ -216,6 +223,21 @@ describe('Accountant inbox (e2e)', () => {
     expect(byId.get(ids.review)?.status).toBe(IntakeJobStatus.NEEDS_REVIEW);
     expect(byId.get(ids.foreign)?.status).toBe(IntakeJobStatus.EXTRACTED);
 
+    // Bulk approval reuses the transactional single-confirm command: every approved job has
+    // exactly one org-scoped INTAKE_DRAFT marker for the draft it is linked to, and the
+    // rejected jobs have none.
+    const markers = await prisma.auditLog.findMany({
+      where: { organizationId: tenantA.organizationId, entityType: INTAKE_DRAFT_ENTITY },
+    });
+    expect(markers.map((m) => m.entityId).sort()).toEqual([ids.ready1, ids.ready2].sort());
+    for (const marker of markers) {
+      expect(marker.newValues).toEqual({
+        draftType: 'bill',
+        draftId: byId.get(marker.entityId)?.draftDocumentId,
+      });
+      expect(marker.userId).toBe(tenantA.userId);
+    }
+
     const again = await a.post('/ai/document-intake/jobs/bulk-approve').send({
       jobIds: [ids.ready1, ids.ready2],
     });
@@ -224,5 +246,22 @@ describe('Accountant inbox (e2e)', () => {
 
     const approved = await a.get('/ai/document-intake/jobs?status=APPROVED');
     expect(approved.body.meta.total).toBe(2);
+  });
+
+  it('sends a document in another currency to review instead of the ready tab', async () => {
+    const jobId = await ingest(
+      a,
+      tenantA,
+      'IN-5',
+      '2026-09-04',
+      IntakeJobStatus.NEEDS_REVIEW,
+      'USD',
+    );
+    const review = await a.get('/ai/document-intake/jobs?status=NEEDS_REVIEW');
+    const row = review.body.data.find((j: { id: string }) => j.id === jobId);
+    expect(row.summary).toMatchObject({ currency: 'USD', readyToApprove: false });
+    const res = await a.post('/ai/document-intake/jobs/bulk-approve').send({ jobIds: [jobId] });
+    expect(res.body).toMatchObject({ processed: 0, total: 1 });
+    expect(res.body.failures).toEqual([{ id: jobId, reason: expect.any(String) }]);
   });
 });

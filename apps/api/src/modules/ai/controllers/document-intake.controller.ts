@@ -1,6 +1,5 @@
 import {
   Controller,
-  Logger,
   Post,
   Get,
   Body,
@@ -73,8 +72,6 @@ const SSE_MAX_DURATION_MS = 10 * 60 * 1000;
 @Controller('ai/document-intake')
 @UseGuards(JwtAuthGuard, OrganizationGuard, PermissionsGuard)
 export class DocumentIntakeController {
-  private readonly logger = new Logger(DocumentIntakeController.name);
-
   constructor(
     private intakeService: DocumentIntakeService,
     private jobs: IntakeJobsService,
@@ -315,12 +312,13 @@ export class DocumentIntakeController {
   async confirmDocument(
     @CurrentOrg() orgId: string,
     @Body() dto: ConfirmIntakeDto,
+    @CurrentUser('id') userId?: string,
   ): Promise<{ data: { type: 'bill' | 'invoice'; id: string; number: string } }> {
     const { jobId, ...input } = dto;
     if (!jobId) {
       return { data: await this.intakeService.confirmAndCreate(orgId, input) };
     }
-    return { data: await this.confirmJob(orgId, jobId, input) };
+    return { data: await this.confirmJob(orgId, jobId, input, userId) };
   }
 
   /**
@@ -335,6 +333,7 @@ export class DocumentIntakeController {
   async bulkApprove(
     @CurrentOrg() orgId: string,
     @Body() dto: BulkApproveIntakeDto,
+    @CurrentUser('id') userId?: string,
   ): Promise<BulkResultDto> {
     // Single-currency ledger: a document in another currency stays in the inbox as an exception.
     const baseCurrency = await this.jobs.baseCurrency(orgId);
@@ -351,28 +350,29 @@ export class DocumentIntakeController {
         baseCurrency,
       });
       if (!confirmation.ok) throw new BadRequestException(confirmation.reason);
-      return this.confirmJob(orgId, jobId, confirmation.input);
+      return this.confirmJob(orgId, jobId, confirmation.input, userId);
     });
   }
 
-  /** Replay-safe: only one confirm can move the job to APPROVED. */
+  /**
+   * Replay-safe: only one confirm can move the job to APPROVED. The claim, the draft, its
+   * INTAKE_DRAFT marker and the job link commit in one transaction, so recovery can never
+   * reopen an in-flight confirmation and a failed draft leaves the job untouched.
+   */
   private async confirmJob(
     orgId: string,
     jobId: string,
     input: ConfirmIntakeInput,
+    userId?: string,
   ): Promise<{ type: 'bill' | 'invoice'; id: string; number: string }> {
-    const restore = await this.jobs.claimForApproval(jobId, orgId);
-    try {
-      const result = await this.intakeService.confirmAndCreate(orgId, input);
-      // The draft is committed: from here on the job is never reopened. If linking fails the
-      // job stays APPROVED, so a second confirm is refused (409) instead of creating a duplicate.
-      await this.jobs.linkDraft(jobId, orgId, { type: result.type, id: result.id }).catch(() => {
-        this.logger.error(`Could not link draft ${result.id} to intake job ${jobId}`);
-      });
-      return result;
-    } catch (error) {
-      await this.jobs.releaseApproval(jobId, orgId, restore);
-      throw error;
-    }
+    const result = await this.jobs.confirmWithApproval(jobId, orgId, (tx) =>
+      this.intakeService.confirmAndCreate(
+        orgId,
+        { ...input, jobId, ...(userId ? { userId } : {}) },
+        tx,
+      ),
+    );
+    await this.intakeService.recordConfirmation(orgId, input, result);
+    return result;
   }
 }

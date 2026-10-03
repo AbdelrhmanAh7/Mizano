@@ -1,6 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { IntakeJob, IntakeJobStatus } from '@prisma/client';
+import { IntakeJob, IntakeJobStatus, Prisma } from '@prisma/client';
 import { DocumentIntakeController } from './document-intake.controller';
 import { DocumentIntakeService } from '../services/document-intake.service';
 import { IntakeJobsService } from '../intake/intake-jobs.service';
@@ -20,10 +20,11 @@ function job(
 }
 
 describe('DocumentIntakeController.bulkApprove', () => {
+  const transaction = {} as Prisma.TransactionClient;
   let rows: Map<string, IntakeJob>;
   let drafts: number;
   let controller: DocumentIntakeController;
-  let intake: { confirmAndCreate: jest.Mock };
+  let intake: { confirmAndCreate: jest.Mock; recordConfirmation: jest.Mock };
   let baseCurrency: jest.Mock;
 
   beforeEach(() => {
@@ -44,6 +45,7 @@ describe('DocumentIntakeController.bulkApprove', () => {
         drafts += 1;
         return { type: 'bill' as const, id: `bill-${drafts}`, number: `BILL-${drafts}` };
       }),
+      recordConfirmation: jest.fn().mockResolvedValue(undefined),
     };
     baseCurrency = jest.fn().mockResolvedValue('EGP');
     const jobs = {
@@ -53,18 +55,28 @@ describe('DocumentIntakeController.bulkApprove', () => {
         if (!j || j.organizationId !== org) throw new NotFoundException('Intake job not found');
         return j;
       }),
-      claimForApproval: jest.fn(async (id: string, org: string) => {
-        const j = rows.get(id);
-        if (!j || j.organizationId !== org) throw new NotFoundException('Intake job not found');
-        if (j.status !== IntakeJobStatus.EXTRACTED && j.status !== IntakeJobStatus.NEEDS_REVIEW) {
-          throw new ConflictException('cannot approve');
-        }
-        const previous = j.status;
-        rows.set(id, { ...j, status: IntakeJobStatus.APPROVED });
-        return previous;
-      }),
-      linkDraft: jest.fn().mockResolvedValue(undefined),
-      releaseApproval: jest.fn(),
+      // Models IntakeJobsService.confirmWithApproval: the guarded claim and the draft commit
+      // together, and a failed draft rolls the claim back.
+      confirmWithApproval: jest.fn(
+        async (
+          id: string,
+          org: string,
+          createDraft: (tx: Prisma.TransactionClient) => Promise<unknown>,
+        ) => {
+          const j = rows.get(id);
+          if (!j || j.organizationId !== org) throw new NotFoundException('Intake job not found');
+          if (j.status !== IntakeJobStatus.EXTRACTED && j.status !== IntakeJobStatus.NEEDS_REVIEW) {
+            throw new ConflictException('cannot approve');
+          }
+          rows.set(id, { ...j, status: IntakeJobStatus.APPROVED });
+          try {
+            return await createDraft(transaction);
+          } catch (error) {
+            rows.set(id, j);
+            throw error;
+          }
+        },
+      ),
     };
     controller = new DocumentIntakeController(
       intake as unknown as DocumentIntakeService,
@@ -117,8 +129,44 @@ describe('DocumentIntakeController.bulkApprove', () => {
     expect(rows.get('no-currency')?.status).toBe(IntakeJobStatus.EXTRACTED);
     expect(intake.confirmAndCreate).toHaveBeenCalledWith(
       ORG_A,
-      expect.objectContaining({ currencyCode: 'EGP' }),
+      expect.objectContaining({ currencyCode: 'EGP', jobId: 'ok1' }),
+      transaction,
     );
+  });
+
+  it('runs every record through the single-confirm transaction with the approving user', async () => {
+    const res = await controller.bulkApprove(ORG_A, { jobIds: ['ok1', 'ok2'] }, 'actor-1');
+    expect(res).toMatchObject({ processed: 2, total: 2 });
+    expect(intake.confirmAndCreate).toHaveBeenCalledTimes(2);
+    expect(intake.confirmAndCreate).toHaveBeenNthCalledWith(
+      1,
+      ORG_A,
+      expect.objectContaining({ jobId: 'ok1', userId: 'actor-1' }),
+      transaction,
+    );
+    expect(intake.confirmAndCreate).toHaveBeenNthCalledWith(
+      2,
+      ORG_A,
+      expect.objectContaining({ jobId: 'ok2', userId: 'actor-1' }),
+      transaction,
+    );
+    // Feedback and success logging happen once per committed draft, after the transaction.
+    expect(intake.recordConfirmation).toHaveBeenCalledTimes(2);
+    expect(intake.recordConfirmation).toHaveBeenCalledWith(
+      ORG_A,
+      expect.objectContaining({ vendorId: 'v1' }),
+      { type: 'bill', id: 'bill-1', number: 'BILL-1' },
+    );
+  });
+
+  it('reports a failed draft for that job only and leaves it ready', async () => {
+    intake.confirmAndCreate.mockRejectedValueOnce(new Error('invalid'));
+    const res = await controller.bulkApprove(ORG_A, { jobIds: ['ok1', 'ok2'] });
+    expect(res).toMatchObject({ processed: 1, total: 2 });
+    expect(res.failures?.map((f) => f.id)).toEqual(['ok1']);
+    expect(rows.get('ok1')?.status).toBe(IntakeJobStatus.EXTRACTED);
+    expect(rows.get('ok2')?.status).toBe(IntakeJobStatus.APPROVED);
+    expect(intake.recordConfirmation).toHaveBeenCalledTimes(1);
   });
 
   it('reports one failure per job when the organization currency is unknown', async () => {
