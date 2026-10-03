@@ -49,6 +49,8 @@
     "docker:prod:down": "docker-compose -f docker-compose.production.yml down",
     "status": "docker-compose ps",
     "// — Utilities ————————————————————": "",
+    "wt:new": "bash scripts/wt-new.sh",
+    "wt:clean": "bash scripts/wt-clean.sh",
     "env:check": "node -e \"const e=process.env.APP_ENV||'local';const f='.env.'+e;require('fs').existsSync(f)?console.log('Using: '+f):console.error('Missing: '+f)\"",
     "generate:types": "pnpm --filter @mizano/shared-types build",
     "generate:validators": "pnpm --filter @mizano/validators build",

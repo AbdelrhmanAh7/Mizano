@@ -162,6 +162,39 @@ Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `
 - Hooks (husky): `pre-commit` runs `_lint_staged.js` (ESLint `--fix` + Prettier on staged files, Windows-safe replacement for lint-staged); `commit-msg` runs commitlint; `pre-push` runs `pnpm ci:full`.
 - Prettier: single quotes, semicolons, trailing commas, width 100 (`.prettierrc`).
 
+### Worktree helpers
+
+Use Bash (Git Bash on Windows), Git and pnpm 8.14. Run from the owning checkout:
+
+```bash
+pnpm wt:new intake           # new branch intake from cached origin/master
+pnpm wt:new ledger develop   # new branch ledger from cached origin/develop
+pnpm wt:clean                # remove eligible worktrees and their local branches
+bash scripts/test-wt.sh      # bounded offline tests with real Git and stubbed pnpm
+```
+
+`wt:new <lane> [base]` creates `.worktrees/<lane>` with a branch named `<lane>`.
+Lane names start with a letter or digit and contain only letters, digits, hyphens
+and underscores. Existing branches or paths are rejected. The default base is
+`master`; the helpers use existing `origin/<base>` refs and never fetch. The
+coordinator must refresh remote refs before use. Creation then runs
+`pnpm install --offline --frozen-lockfile`, `pnpm db:generate` and
+`pnpm -r --filter './packages/*' --workspace-concurrency=1 run build` inside the
+new worktree. Only shared packages are built, sequentially. Populate the local
+pnpm store beforehand; missing offline dependencies fail setup. A failed setup
+keeps the worktree and branch for inspection and manual retry.
+
+`wt:clean` considers registered worktrees physically inside the owning checkout's
+`.worktrees/` directory. It removes only clean, unlocked worktrees with a local
+branch whose tip is an ancestor of cached `origin/master`, then deletes that
+branch and prints both removals. Tracked modifications, staged changes and
+untracked files block removal; ignored install/build outputs do not. Unmerged,
+detached, locked, missing, outside and unregistered paths are preserved. Symlinked
+`.worktrees/` directories are rejected. The owning checkout is never removed.
+Stop workers and release their leases before cleanup; do not run helpers
+concurrently with branch/ref changes. Helpers do not migrate or reset databases.
+The offline tests need no database, network, dependency installation or build.
+
 ## Deployment
 
 **Legacy VM production pipeline** (`.github/workflows/deploy.yml`): after CI succeeds on `master` (or on release/manual dispatch) it
