@@ -468,9 +468,9 @@ export function useDashboardInventory() {
       const res = await api.get('/reports/dashboard/inventory-value-trend?months=6');
       const data = res.data?.data ?? res.data;
       return Array.isArray(data)
-        ? data.map((i: { month: string; value?: number; itemCount?: number }) => ({
+        ? data.map((i: { month: string; value?: string | number; itemCount?: number }) => ({
             month: i.month,
-            value: i.value || 0,
+            value: moneyToNumber(i.value),
             itemCount: i.itemCount || 0,
           }))
         : [];

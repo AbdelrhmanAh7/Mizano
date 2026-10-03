@@ -5,8 +5,16 @@ export function signedMovementQuantity(
   quantity: Decimal | number,
   movementType: string | null | undefined,
 ): number {
-  const value = typeof quantity === 'number' ? quantity : quantity.toNumber();
-  if (movementType === 'IN') return Math.abs(value);
-  if (movementType === 'OUT') return -Math.abs(value);
+  return signedMovementQuantityDecimal(quantity, movementType).toNumber();
+}
+
+/** Use this exact quantity for valuation; numeric stock consumers retain their existing contract. */
+export function signedMovementQuantityDecimal(
+  quantity: Decimal | number,
+  movementType: string | null | undefined,
+): Decimal {
+  const value = typeof quantity === 'number' ? new Decimal(quantity) : quantity;
+  if (movementType === 'IN') return value.abs();
+  if (movementType === 'OUT') return value.abs().negated();
   return value;
 }

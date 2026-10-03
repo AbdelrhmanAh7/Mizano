@@ -1,4 +1,7 @@
-import { signedMovementQuantity } from '../../inventory/utils/movement-sign';
+import {
+  signedMovementQuantity,
+  signedMovementQuantityDecimal,
+} from '../../inventory/utils/movement-sign';
 import { Injectable } from '@nestjs/common';
 import {
   AccountType,
@@ -611,10 +614,12 @@ export class DashboardService {
 
   async getInventoryValueTrend(organizationId: string, months: number = 6) {
     const today = new Date();
+    // Two Decimal(19,4) factors need up to 38 significant digits before aggregation/cancellation.
+    const ValuationDecimal = Decimal.clone({ precision: 50 });
+    const zero = new ValuationDecimal(0);
 
     // Single query: fetch all tracked items with their current inventory levels
-    // Note: inventory levels are current snapshots — historical values are not tracked.
-    // Each month currently shows the same value. To get true trend, use inventory movements.
+    // Inventory levels are current snapshots; movements estimate earlier month-end values.
     const items = await this.prisma.item.findMany({
       where: {
         organizationId,
@@ -630,15 +635,15 @@ export class DashboardService {
       },
     });
 
-    // Compute current total value once
-    let currentValue = 0;
+    // Compute current total value once using Decimal
+    let currentValue = zero;
     for (const item of items) {
       const quantity = item.inventoryLevels.reduce(
-        (sum: number, il: { quantity: Decimal }) => sum + parseFloat((il.quantity ?? 0).toString()),
-        0,
+        (sum: Decimal, il: { quantity: Decimal }) => sum.add(il.quantity ?? 0),
+        zero,
       );
-      const costPrice = parseFloat((item.costPrice ?? 0).toString());
-      currentValue += quantity * costPrice;
+      const costPrice = item.costPrice ?? zero;
+      currentValue = currentValue.add(quantity.mul(costPrice));
     }
 
     // Use inventory movements to estimate historical values
@@ -650,13 +655,13 @@ export class DashboardService {
     });
 
     // Build monthly deltas from movements (working backwards from current value)
-    const monthlyDelta: Record<string, number> = {};
+    const monthlyDelta: Record<string, Decimal> = {};
     for (const mv of movements) {
       const key = `${mv.createdAt.getFullYear()}-${mv.createdAt.getMonth()}`;
-      const qty = signedMovementQuantity(mv.quantity, mv.movementType);
-      const cost = parseFloat((mv.costPerUnit ?? 0).toString());
-      const valueDelta = qty * cost;
-      monthlyDelta[key] = (monthlyDelta[key] || 0) + valueDelta;
+      const qty = new ValuationDecimal(signedMovementQuantityDecimal(mv.quantity, mv.movementType));
+      const cost = mv.costPerUnit ?? zero;
+      const valueDelta = qty.mul(cost);
+      monthlyDelta[key] = (monthlyDelta[key] ?? zero).add(valueDelta);
     }
 
     // Build data from newest to oldest, then reverse
@@ -668,12 +673,12 @@ export class DashboardService {
 
       data.unshift({
         month: d.toLocaleString('default', { month: 'short', year: 'numeric' }),
-        value: runningValue,
+        value: money(runningValue),
         itemCount: items.length,
       });
 
       // Subtract this month's delta to get end-of-previous-month value
-      runningValue -= monthlyDelta[key] || 0;
+      runningValue = runningValue.sub(monthlyDelta[key] ?? zero);
     }
 
     return data;

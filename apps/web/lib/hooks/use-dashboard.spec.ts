@@ -1,4 +1,8 @@
-import { transformDashboardOverview } from './use-dashboard';
+import { createElement, ReactNode } from 'react';
+import { renderHook, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { transformDashboardOverview, useDashboardInventory } from './use-dashboard';
+import { api } from '@/lib/api';
 import { moneyToNumber } from '@/lib/money';
 
 describe('moneyToNumber', () => {
@@ -10,6 +14,39 @@ describe('moneyToNumber', () => {
     expect(moneyToNumber('not a number')).toBe(0);
     expect(moneyToNumber(null)).toBe(0);
   });
+});
+
+describe('useDashboardInventory', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it.each([true, false])(
+    'converts monetary strings to numeric chart points (wrapped=%s)',
+    async (wrapped) => {
+      const points = [
+        { month: 'Nov 2025', value: '-0.0500', itemCount: 2 },
+        { month: 'Dec 2025', value: '0.0000', itemCount: 2 },
+        { month: 'Jan 2026', value: '1234.1251', itemCount: 2 },
+        { month: 'Feb 2026', value: 7, itemCount: 2 },
+      ];
+      const get = jest
+        .spyOn(api, 'get')
+        .mockResolvedValue({ data: wrapped ? { data: points } : points });
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const wrapper = ({ children }: { children: ReactNode }) =>
+        createElement(QueryClientProvider, { client }, children);
+      const { result, unmount } = renderHook(() => useDashboardInventory(), { wrapper });
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(get).toHaveBeenCalledWith('/reports/dashboard/inventory-value-trend?months=6');
+      expect(result.current.data).toEqual([
+        { month: 'Nov 2025', value: -0.05, itemCount: 2 },
+        { month: 'Dec 2025', value: 0, itemCount: 2 },
+        { month: 'Jan 2026', value: 1234.1251, itemCount: 2 },
+        { month: 'Feb 2026', value: 7, itemCount: 2 },
+      ]);
+      unmount();
+      client.clear();
+    },
+  );
 });
 
 describe('transformDashboardOverview', () => {
