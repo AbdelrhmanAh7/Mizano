@@ -60,6 +60,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Validate direction and type.** A withdrawal can't settle an invoice, and switching a recurring profile to JOURNAL must validate the journal template.
 - **When a form needs data the role can't read, add a narrow lookup endpoint guarded by the form's own permission,** for example `/invoices/tax-rate-options` (`sales.view`) or `/inventory-adjustments/account-options` (`inventory.create`). Never widen permissions.
 - **Gate UI actions with exactly the API route's permission.**
+- **Permission migrations must preserve explicit grants and omissions.** A role's mutable name, default flag or a weaker permission is not evidence of authorization for a stronger action. If stored provenance cannot prove the grant, require an authorized role administrator to grant it explicitly; never restore a revoked permission by guessing. _(tax.submit backfill)_
 - **Money-bearing imports require the same per-entity create permission as the single-record routes.**
 - **Adding auth to a server endpoint or socket changes its contract: update every client in the same PR** (send the token, handle expiry and reconnect). A server-only change silently breaks the client. _(events gateway vs `use-realtime`)_
 
