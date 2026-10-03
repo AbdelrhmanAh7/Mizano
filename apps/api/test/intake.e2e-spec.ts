@@ -339,6 +339,50 @@ describe('Document intake (e2e)', () => {
     expect(await prisma.bill.count({ where: { organizationId: tenantA.organizationId } })).toBe(1);
   });
 
+  it('a confirmed scanned draft has the same totals as the equivalent manual bill', async () => {
+    const vendor = await a.post('/vendors').send({ name: `Parity Vendor ${uniqueSuffix()}` });
+    expect(vendor.status).toBe(201);
+    const lines = [
+      { description: 'CPU', quantity: '3', rate: '33.33', taxRate: '14' },
+      { description: 'Cable', quantity: '1.375', rate: '19.999', taxRate: '5' },
+      { description: 'Stand', quantity: '7', rate: '0.35', taxRate: '0' },
+    ];
+    const common = { vendorId: vendor.body.id, date: '2026-09-01', dueDate: '2026-10-01' };
+    const manual = await a.post('/bills').send({ ...common, lines });
+    expect(manual.status).toBe(201);
+    const scanned = await a.post('/ai/document-intake/confirm').send({
+      ...common,
+      type: 'BILL',
+      lines: lines.map(({ taxRate, ...l }) => ({ ...l, taxRatePercent: taxRate })),
+    });
+    expect(scanned.status).toBe(201);
+
+    const [m, s] = await Promise.all([
+      prisma.bill.findUniqueOrThrow({ where: { id: manual.body.id } }),
+      prisma.bill.findUniqueOrThrow({ where: { id: scanned.body.data.id } }),
+    ]);
+    expect(s.subtotal.toString()).toBe('129.94');
+    expect(s.taxAmount.toString()).toBe('15.38');
+    expect(s.grandTotal.toString()).toBe('145.32');
+    expect(s.subtotal.toString()).toBe(m.subtotal.toString());
+    expect(s.taxAmount.toString()).toBe(m.taxAmount.toString());
+    expect(s.grandTotal.toString()).toBe(m.grandTotal.toString());
+    expect(s.status).toBe('DRAFT');
+  });
+
+  it('confirm rejects a currency different from the organization base currency', async () => {
+    const vendor = await a.post('/vendors').send({ name: `Fx Vendor ${uniqueSuffix()}` });
+    const res = await a.post('/ai/document-intake/confirm').send({
+      type: 'BILL',
+      vendorId: vendor.body.id,
+      date: '2026-09-01',
+      dueDate: '2026-10-01',
+      currencyCode: 'ZZZ',
+      lines: [{ description: 'x', quantity: '1', rate: '1', taxRatePercent: '0' }],
+    });
+    expect(res.status).toBe(400);
+  });
+
   it('a soft-deleted job does not block re-uploading the same file (partial unique index)', async () => {
     const bytes = pdfFixture(`DEL-${uniqueSuffix()}`);
     const first = await upload(a, bytes);

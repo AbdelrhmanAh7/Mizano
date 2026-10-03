@@ -124,6 +124,12 @@ Rules:
 - Never delete assertions, skip tests or accept a 404 for a required route to get green. Infrastructure failure is reported as blocked, not passed.
 - Demo go/no-go is decided by the [acceptance contract](strategy/demo-acceptance.md), not by unit-test counts or coverage.
 
+### Scan intake regression checks
+
+When integrating upload-format and bill-tax changes, verify both contracts together: the scan page keeps the original HEIC source, rejects legacy DOC with a DOCX/PDF repair, enforces the shared 20 MiB upload limit, and prepares CPU-only intake without a model-mode selector. Tax amounts remain separate from reviewed percentages; decimal strings survive extraction, review and confirmation. Both English and Arabic message files must retain the union of translation keys.
+
+Run the targeted web specs from `apps/web` with `npx jest --runInBand --runTestsByPath lib/scan-bill-page.spec.tsx lib/hooks/use-ai-document-intake.spec.ts lib/document-intake-upload.spec.ts lib/document-intake-tax.spec.ts lib/money.spec.ts lib/scan-review-error.spec.ts components/purchases/bill-form.scan.spec.tsx`, plus `npx tsc --noEmit` and ESLint with `--max-warnings 0` on edited files. On a constrained shared host, the coordinator runs broader acceptance separately. On Windows, use `npx.cmd` when PowerShell blocks `npx.ps1`; the installed executables can also be invoked through `node ../../node_modules/<package>/bin/<entrypoint>` to avoid npm interpreting pnpm-only configuration.
+
 ## CI
 
 `.github/workflows/ci.yml` runs on pushes and PRs to `master`/`develop`: install (pnpm 8, Node 20, `prisma generate`) → lint and type-check → unit tests (with PostgreSQL 16 and Redis 7 services, `db:push`) → build. E2E is not part of CI yet.

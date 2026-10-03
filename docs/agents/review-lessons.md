@@ -90,6 +90,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 12. Caches, tests and scope
 
+- **Resolve merge conflicts at the contract level, then test the combined flow.** Taking a whole side can restore obsolete upload limits/model controls or discard Decimal transport and tax-percentage review. Preserve source-format repairs alongside money handling and EN/AR key unions; exercise upload → review → confirmation together. _(formats lane integrating bill-tax PR #56)_
+
 - **Extraction limits must fail explicitly, never silently truncate.** Route each PDF page, preserve DOCX table label/value rows and later-page evidence, and treat unreadable sources as repairable errors rather than completed empty drafts. Test real format fixtures separately from mocked OCR/tool routing.
 - **Native text does not prove page completeness.** OCR pages with raster content too, preserve both sources for review, and reject legacy Word before queueing with a save-as-DOCX/PDF repair; plain-text conversion silently loses evidence.
 - **A container signature is not a format validation.** Check Word package content types, relationships and XML roots before extracting fields, and support or explicitly reject different OOXML namespaces rather than dropping their text.

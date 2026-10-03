@@ -11,6 +11,12 @@ jest.mock('next-intl', () => ({
         unsupportedLegacyDoc: 'Save the file as DOCX or PDF and upload again.',
         unsupportedFormat: 'Upload a PDF, DOCX or supported image.',
         retryFailed: 'Could not retry the scan. Please try again.',
+        streamNoResult: 'Processing finished without a result',
+        streamFailed: 'Processing failed',
+        streamUnavailable: 'This scan is no longer available. Please upload the document again.',
+        streamLostConnection: 'Lost connection while processing the document. Please try again.',
+        streamUploading: 'Uploading document...',
+        streamProcessFailed: 'Failed to process document',
       }) as Record<string, string>
     )[key],
 }));
@@ -108,6 +114,17 @@ describe('useDocumentIntakeStream', () => {
     expect(result.current.jobId).toBeNull();
     expect(result.current.isProcessing).toBe(false);
     expect(result.current.canRetry).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+  it('uses the localized fallback for an upload error with no message', async () => {
+    mockPost.mockRejectedValueOnce(new Error(''));
+    const { result } = renderHook(() => useDocumentIntakeStream());
+    await act(async () => {
+      await result.current.processDocument(new FormData());
+    });
+    expect(result.current.error).toBe('Failed to process document');
+    expect(result.current.isProcessing).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(mockGet).not.toHaveBeenCalled();
   });
