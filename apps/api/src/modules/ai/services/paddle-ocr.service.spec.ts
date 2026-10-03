@@ -93,10 +93,9 @@ describe('PaddleOcrService temp files', () => {
 
     expect(result.text).toBe('');
     expect(fs.existsSync(path.dirname(seenPaths[0]))).toBe(false);
-    // stderr is reduced to its last line (the exception summary), not dumped
     const output = JSON.stringify(printed.flatMap((spy) => spy.mock.calls));
     expect(output).toContain('PaddleOCR failed');
-    expect(output).toContain('ValueError: bad page');
+    expect(output).not.toContain('ValueError: bad page');
     expect(output).not.toContain('ZXQ');
   });
 
@@ -134,7 +133,7 @@ describe('PaddleOcrService temp files', () => {
         cb(
           null,
           JSON.stringify({ text: '', confidence: 0, regions: [] }),
-          `Downloading Arabic rec model to /models/x...\nWarning: line "${SENTINEL_TEXT}" skipped\n`,
+          `Downloading Arabic rec model ${SENTINEL_TEXT}\nWarning: line "${SENTINEL_TEXT}" skipped\n`,
         );
       },
     );
@@ -142,9 +141,30 @@ describe('PaddleOcrService temp files', () => {
     await buildService().recognize(Buffer.from('x'));
 
     const output = JSON.stringify(printed.flatMap((spy) => spy.mock.calls));
-    expect(output).toContain('Downloading Arabic rec model');
+    expect(output).toContain('model status received');
+    expect(output).not.toContain('Downloading Arabic rec model');
     expect(output).not.toContain('ZXQ');
   });
+
+  it.each(['stderr', 'error', 'json'] as const)(
+    'never logs document values from a %s failure',
+    async (source) => {
+      mockExecFile.mockImplementation(
+        (_py: string, _args: string[], _o: unknown, cb: ExecCallback) => {
+          cb(
+            source === 'json' ? null : new Error(SENTINEL_TEXT),
+            source === 'json' ? `invalid json ${SENTINEL_TEXT}` : '',
+            source === 'stderr' ? `ValueError: ${SENTINEL_TEXT}` : '',
+          );
+        },
+      );
+      expect((await buildService().recognize(Buffer.from('image'))).text).toBe('');
+      const output = JSON.stringify(printed.flatMap((spy) => spy.mock.calls));
+      expect(output).toContain('PaddleOCR failed');
+      expect(output).not.toContain('ZXQ');
+      expect(output).not.toContain('8,765.43');
+    },
+  );
 
   it('does not log recognised region text or the OCR text', async () => {
     mockExecFile.mockImplementation(

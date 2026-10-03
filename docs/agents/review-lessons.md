@@ -89,6 +89,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 12. Caches, tests and scope
 
+- **Keep test compiler interop settings aligned with production.** A callable CommonJS namespace import can become a non-callable object under a different `esModuleInterop` transform.
 - **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included.
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
@@ -102,6 +103,10 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## Ops and deploy
 
+- **Load verified model snapshots with caches/download fallback disabled, and test the real engine.** Checking a build artifact or trusting an overload's type alone does not prove the runtime uses the pinned bytes.
+- **Serialize lazy initialization under the same concurrency gate as execution,** and terminate failed workers and workers on shutdown; an awaited first-call check alone can create multiple engines.
+- **Give every long-lived connection and timer a shutdown owner.** Disconnect failed clients, unref maintenance timers and clear them on destruction; forced test exit is not cleanup evidence.
+- **Probe the live dependency and inspect the health response body.** An in-memory cache round trip cannot prove Redis is connected, and HTTP 200 can carry an unhealthy status.
 - **Health checks must probe a route that exists.** Grep the app's routes first (Next has no `/api/health` unless a route file exists; `/robots.txt` returns 200 without auth). A probe of a missing route makes the container permanently unhealthy.
 - **Next standalone in Docker needs `HOSTNAME=0.0.0.0`.** Docker sets `HOSTNAME` to the container id and Next binds to it, so probes on `127.0.0.1` and peers fail. Probe `127.0.0.1`, not `localhost` (IPv6 in alpine).
 - **Persist deploy state where later commands read it.** Pinned digests live in `.env.pi` (atomic rewrite of those keys only), or a later `compose up` silently reverts to the old images.

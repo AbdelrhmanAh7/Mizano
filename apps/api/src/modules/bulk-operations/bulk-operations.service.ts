@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { v4 as uuidv4 } from 'uuid';
 import { BulkActionType, BulkEntityType, BulkJobState } from './dto/bulk-operation.dto';
@@ -6,13 +6,19 @@ import { BulkActionType, BulkEntityType, BulkJobState } from './dto/bulk-operati
 const BULK_JOB_TTL = 10 * 60 * 1000; // 10 minutes
 
 @Injectable()
-export class BulkOperationsService {
+export class BulkOperationsService implements OnModuleDestroy {
   private readonly logger = new Logger(BulkOperationsService.name);
   private readonly jobs = new Map<string, BulkJobState>();
+  private readonly cleanupTimer: NodeJS.Timeout;
 
   constructor(private readonly eventEmitter: EventEmitter2) {
     // Cleanup stale jobs every 5 minutes
-    setInterval(() => this.cleanupStaleJobs(), 5 * 60 * 1000);
+    this.cleanupTimer = setInterval(() => this.cleanupStaleJobs(), 5 * 60 * 1000);
+    this.cleanupTimer.unref();
+  }
+
+  onModuleDestroy(): void {
+    clearInterval(this.cleanupTimer);
   }
 
   createJob(

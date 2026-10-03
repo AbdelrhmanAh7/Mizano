@@ -2,6 +2,18 @@ import { ConfigService } from '@nestjs/config';
 import { Cache } from 'cache-manager';
 import { CacheService } from './cache.service';
 
+const redis = {
+  connect: jest.fn(),
+  disconnect: jest.fn(),
+  on: jest.fn(),
+  status: 'ready',
+};
+const constructRedis = jest.fn();
+jest.mock('ioredis', () => ({
+  __esModule: true,
+  default: jest.fn().mockImplementation((...args: unknown[]): unknown => constructRedis(...args)),
+}));
+
 function memoryCache(): Cache & { store: Map<string, unknown> } {
   const store = new Map<string, unknown>();
   return {
@@ -51,5 +63,49 @@ describe('CacheService pattern invalidation (memory store, no Redis)', () => {
 
     expect(await service.clearOrganization('o')).toBe(2);
     expect(cache.store.size).toBe(0);
+  });
+});
+
+describe('CacheService Redis lifecycle', () => {
+  beforeEach(() => {
+    redis.connect.mockReset().mockResolvedValue(undefined);
+    redis.disconnect.mockReset();
+    redis.on.mockReset();
+    constructRedis.mockReset().mockReturnValue(redis);
+  });
+
+  it('disconnects the direct connection on shutdown exactly once', async () => {
+    const service = new CacheService(memoryCache(), {
+      get: () => 'redis://127.0.0.1:6380',
+    } as unknown as ConfigService);
+    await service.onModuleInit();
+    expect(service.isRedisAvailable).toBe(true);
+    expect(redis.on).toHaveBeenCalledWith('error', expect.any(Function));
+    service.onModuleDestroy();
+    service.onModuleDestroy();
+    expect(service.isRedisAvailable).toBe(false);
+    expect(redis.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('disconnects a client whose startup connection failed', async () => {
+    redis.connect.mockRejectedValue(new Error('synthetic connection failure'));
+    const service = new CacheService(memoryCache(), {
+      get: () => 'redis://127.0.0.1:6380',
+    } as unknown as ConfigService);
+    await service.onModuleInit();
+    expect(service.isRedisAvailable).toBe(false);
+    expect(redis.disconnect).toHaveBeenCalledTimes(1);
+    service.onModuleDestroy();
+    expect(redis.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts and stops without a Redis configuration', async () => {
+    const service = new CacheService(memoryCache(), {
+      get: () => undefined,
+    } as unknown as ConfigService);
+    await service.onModuleInit();
+    service.onModuleDestroy();
+    expect(constructRedis).not.toHaveBeenCalled();
+    expect(service.isRedisAvailable).toBe(false);
   });
 });
