@@ -354,13 +354,21 @@ describe('Accountant journey (e2e)', () => {
       expect(decimalEquals(res.body.summary.total, '555.5')).toBe(true);
     });
 
-    it('voids the payment with a linked reversal and restores the bill', async () => {
+    it('voids a payment and reconciles allocations, AP and the ledger', async () => {
       const res = await a.delete(`/payments-made/${payment1Id}`);
       expect(res.status).toBe(200);
 
       const bill = await getBill(bill1Id);
       expect(bill.status).toBe('OPEN');
       expect(bill.balanceDue).toBe('228');
+      const payment = await a.get(`/payments-made/${payment1Id}`);
+      expect(payment.status).toBe(200);
+      expect(payment.body.deletedAt).toBeTruthy();
+      expect(
+        await prisma.billAllocation.count({
+          where: { paymentId: payment1Id, payment: { deletedAt: null } },
+        }),
+      ).toBe(0);
 
       const reversals = await journalsFor(PAYMENT_MADE_VOID, payment1Id);
       expect(reversals).toHaveLength(1);
@@ -392,6 +400,26 @@ describe('Accountant journey (e2e)', () => {
         ]),
       );
 
+      const trialBalance = await a.get('/accounting-reports/trial-balance');
+      expect(trialBalance.status).toBe(200);
+      expect(trialBalance.body.totals.totalDebits).toBe('655.5');
+      expect(trialBalance.body.totals.totalCredits).toBe('655.5');
+      const ap = trialBalance.body.accounts.find((x: { id: string }) => x.id === acc.ap);
+      expect(ap.credit).toBe('655.5');
+      const openBills = await prisma.bill.findMany({
+        where: {
+          organizationId: tenantA.organizationId,
+          deletedAt: null,
+          status: { not: 'DRAFT' },
+        },
+        select: { balanceDue: true },
+      });
+      const openBalance = openBills.reduce(
+        (sum, row) => sum.add(row.balanceDue),
+        new Prisma.Decimal(0),
+      );
+      expect(openBalance.toString()).toBe(ap.credit);
+
       const again = await a.delete(`/payments-made/${payment1Id}`);
       expect(again.status).toBe(404);
       expect(await journalsFor(PAYMENT_MADE_VOID, payment1Id)).toHaveLength(1);
@@ -399,10 +427,16 @@ describe('Accountant journey (e2e)', () => {
 
     it('keeps posted journals immutable and reverses a manual journal exactly once', async () => {
       // System journal from the bill approval.
-      expect((await a.patch(`/journals/${bill1JournalId}`).send({ notes: 'edit' })).status).toBe(
-        400,
-      );
-      expect((await a.delete(`/journals/${bill1JournalId}`)).status).toBe(400);
+      const posted = await a.get(`/journals/${bill1JournalId}`);
+      expect(posted.status).toBe(200);
+      const postedLines = lineSignature(posted.body.lines as JournalLineView[]);
+      const update = await a.patch(`/journals/${bill1JournalId}`).send({ notes: 'edit' });
+      const deletion = await a.delete(`/journals/${bill1JournalId}`);
+      expect(update.status).toBe(400);
+      expect(deletion.status).toBe(400);
+      const unchanged = await a.get(`/journals/${bill1JournalId}`);
+      expect(unchanged.body.isPosted).toBe(true);
+      expect(lineSignature(unchanged.body.lines as JournalLineView[])).toEqual(postedLines);
 
       // Unbalanced manual journal is rejected.
       const unbalanced = await a.post('/journals').send({
