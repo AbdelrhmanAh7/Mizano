@@ -4,7 +4,7 @@ Mizano helps accountants and finance teams turn business documents into traceabl
 
 **Current goal:** a connected CPU-only invoice demo by **14 September 2026, 23:59 Africa/Cairo**: Telegram/web → original document → extraction → validated draft → one batch approval → ledger → payments and reconciled reports.
 
-**Status:** pre-demo hardening. The September review identified accounting, tenant-isolation, extraction and delivery blockers. The CPU pipeline, Telegram invoice intake and four-provider daily runner are planned work; their presence in the roadmap is not a claim that they already run. Existing modules and green unit tests do not establish end-to-end readiness.
+**Status:** pre-demo hardening. The September review identified accounting, tenant-isolation, extraction and delivery blockers. The dedicated CPU intake worker is implemented with OCR evidence and review-required unknown fields; structured CPU parsing, Telegram invoice intake and the four-provider daily runner remain pending; their presence in the roadmap is not a claim that they already run. Existing modules and green unit tests do not establish end-to-end readiness.
 
 ## Start here
 
@@ -36,16 +36,16 @@ The demo does not require GPU hardware, Colab or paid AI APIs. Free local softwa
 
 ## Existing stack and modules
 
-| Layer               | Current repository technology                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------------- |
-| Web                 | Next.js 14, React 18, TypeScript, next-intl                                                       |
-| API                 | NestJS 10, TypeScript                                                                             |
-| Data                | PostgreSQL 16, Prisma, Redis/BullMQ                                                               |
-| UI/state/forms      | Tailwind/shadcn/Radix, TanStack Query, Zustand, React Hook Form/Zod                               |
-| Identity            | NextAuth + backend JWT/refresh tokens                                                             |
-| Workspace           | pnpm workspaces and Turborepo                                                                     |
-| Existing extraction | Ollama plus OCR strategy code; production docs describe a Colab proxy                             |
-| Target extraction   | Isolated CPU parsing/OCR worker with deterministic validation; implementation tracked in the plan |
+| Layer               | Current repository technology                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------ |
+| Web                 | Next.js 14, React 18, TypeScript, next-intl                                                      |
+| API                 | NestJS 10, TypeScript                                                                            |
+| Data                | PostgreSQL 16, Prisma, Redis/BullMQ                                                              |
+| UI/state/forms      | Tailwind/shadcn/Radix, TanStack Query, Zustand, React Hook Form/Zod                              |
+| Identity            | NextAuth + backend JWT/refresh tokens                                                            |
+| Workspace           | pnpm workspaces and Turborepo                                                                    |
+| Existing extraction | Ollama plus OCR strategy code; production docs describe a Colab proxy                            |
+| Target extraction   | Isolated CPU OCR worker with deadlines and Pi caps; structured parsing and Pi acceptance pending |
 
 Accounting, purchases, sales, banking, reports, inventory, tax, assets, projects, HR, manufacturing and CRM code exists. Demo acceptance covers the accounting journey above; peripheral modules need their own verification. Keep the existing stack during this sprint.
 
@@ -67,7 +67,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-The repository pins pnpm 8.14.0 and its existing CI uses Node 20. Runtime-hardening work must reconcile the supported Node/package-manager versions and pinned CPU dependencies; do not interpret old Node 18 badges as a current support guarantee. Current AI routes may remain unavailable without their existing inference service until the CPU extraction tasks are merged.
+The repository pins pnpm 8.14.0 and its existing CI uses Node 20. Runtime-hardening work must reconcile the supported Node/package-manager versions and pinned CPU dependencies; do not interpret old Node 18 badges as a current support guarantee. Queued intake is consumed by the dedicated no-LLM worker, which `pnpm dev` does not start and which needs Linux ([how to run it](docs/DEVELOPMENT.md#dedicated-cpu-intake-worker)); other advisory AI routes may remain unavailable without their existing inference service. See the [runtime contract and evidence](docs/strategy/pi-cpu-extraction-runtime.md).
 
 | Service    | Development port     |
 | ---------- | -------------------- |

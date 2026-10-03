@@ -23,7 +23,7 @@ Browser ──► Next.js (5001)              pages, next-intl, NextAuth session
 
 The browser calls NestJS directly (`NEXT_PUBLIC_API_URL`); there is no Next.js BFF proxy. The only Next.js API route is NextAuth (`app/api/auth/[...nextauth]`). In production, Nginx routes `/api/` and `/socket.io/` to the API and everything else to the web container (see [deployment](DEVELOPMENT.md#deployment)).
 
-`bullmq` is a declared dependency but no queue is registered yet; schedulers use `@nestjs/schedule` and in-process events use `@nestjs/event-emitter`. The durable intake job queue is planned work in the roadmap.
+BullMQ transports tenant-scoped durable intake jobs. The API only produces; `IntakeWorkerModule` consumes in a separate process and supervises disposable CPU extraction children with terminating deadlines. Redis is required. Schedulers still use `@nestjs/schedule`; in-process events use `@nestjs/event-emitter`. See [CPU runtime](strategy/pi-cpu-extraction-runtime.md).
 
 ## Folder structure
 
@@ -101,7 +101,7 @@ Current code path:
 | Draft bills and approval | `modules/purchases` (bills, payments made), `modules/bulk-operations`                                                     |
 | Ledger and reports       | `modules/accounting` (accounts, journals), `modules/reports` (GL, trial balance, AP aging, P&L, balance sheet)            |
 
-The CPU-only extraction worker, Telegram intake and durable queue replace the Ollama/VLM dependency through the planned issues; see [invoice extraction research](strategy/invoice-extraction.md).
+The dedicated CPU worker bypasses Ollama/VLM for queued intake. It preserves OCR evidence with null unknown fields and routes to review until #16 structured parsing is integrated. Other advisory routes retain their legacy providers. Telegram integration and measured Pi acceptance remain separate gates; see [CPU runtime](strategy/pi-cpu-extraction-runtime.md).
 
 ## API modules
 

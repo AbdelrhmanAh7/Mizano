@@ -226,3 +226,32 @@ cold-start/health evidence remain release work.
 Historical VPS sizing and provider notes: [archive/deployment-requirements-2026-03.md](archive/deployment-requirements-2026-03.md).
 
 **Raspberry Pi 5.** The tiny live deployment (compose, Cloudflare Tunnel, digest deploys, encrypted backups, monitoring) is documented in [deploy/pi/README.md](../deploy/pi/README.md).
+
+## Dedicated CPU intake worker
+
+Queued document intake is consumed by a separate process, not by the API. The API
+only creates jobs and enqueues them; Redis is required and there is no inline
+fallback, so an uploaded document stays `QUEUED` until a worker runs.
+
+- **Pi:** the `worker` service in `deploy/pi/docker-compose.pi.yml` runs
+  `node dist/intake-worker.js` from the API image, one replica, with its own
+  memory/CPU caps and health gate ([Pi guide](../deploy/pi/README.md)).
+- **Local:** on Linux, WSL or in a container, build and run
+  `pnpm --filter api start:worker` (or `node dist/intake-worker.js` from
+  `apps/api`) with the API's `DATABASE_URL`, `REDIS_URL` and
+  `INTAKE_STORAGE_DIR`. It needs `/usr/bin/prlimit`, Poppler (`pdftotext`,
+  `pdfinfo`, `pdftoppm`) and the pinned OCR assets in `INTAKE_TESSDATA_DIR`;
+  the API image has all three. On Windows it refuses to start, because the
+  caps cannot be enforced there. The seeded intake E2E runs on any OS: it starts
+  the worker module in-process with a stubbed extractor.
+- **Settings:** `INTAKE_CONCURRENCY` is 1 unless exactly `2`;
+  `INTAKE_JOB_DEADLINE_MS` defaults to 120000 (100-600000).
+- `docker-compose.production.yml` (historical VPS stack) has no worker service
+  and would leave documents queued.
+
+`intake-executor.process.spec.ts` exercises the real supervisor, `prlimit` and
+process groups. It runs automatically on Linux (including CI) and is skipped on
+other systems. See the [runtime contract](strategy/pi-cpu-extraction-runtime.md)
+for limits, error codes and evidence. Until #16's parser is integrated, unknown
+structured fields go to review; OCR text is not proof of accurate invoice
+extraction.

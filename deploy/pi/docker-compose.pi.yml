@@ -117,9 +117,42 @@ services:
     logging: *logging
     networks: [internal]
 
-  # Reserved for the CPU extraction worker (2048m budget); enable when it exists.
-  # worker:
-  #   mem_limit: 2048m
+  worker:
+    image: ${MIZANO_API_IMAGE:?set MIZANO_API_IMAGE}
+    restart: unless-stopped
+    init: true
+    mem_limit: 2048m
+    memswap_limit: 2048m
+    cpus: 2.0
+    pids_limit: 128
+    stop_grace_period: 30s
+    command: ['node', '--max-old-space-size=256', 'dist/intake-worker.js']
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      DATABASE_POOL_SIZE: '3'
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      INTAKE_STORAGE_DIR: /data/originals
+      INTAKE_CONCURRENCY: ${INTAKE_CONCURRENCY:-1}
+      INTAKE_JOB_DEADLINE_MS: ${INTAKE_JOB_DEADLINE_MS:-120000}
+      OLLAMA_ENABLED: 'false'
+    volumes:
+      - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/originals:/data/originals:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD', 'node', '/app/apps/api/dist/intake-worker-healthcheck.js']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging: *logging
+    networks: [internal]
 
   web:
     image: ${MIZANO_WEB_IMAGE:?set MIZANO_WEB_IMAGE}

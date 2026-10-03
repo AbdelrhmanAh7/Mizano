@@ -113,3 +113,17 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Rollback must be repeatable.** Track an active pointer in `deployments.log` (`OK`/`ROLLBACK` lines), not "the previous OK line", or the second rollback is a no-op.
 - **Check DB readiness over TCP** (`pg_isready -h 127.0.0.1`). The temporary init server listens on the unix socket only and passes a socket probe.
 - **Dedupe alerts on stable keys** (check name), never on live values like percentages; alert once on start and once on recovery.
+
+## CPU worker isolation and deadlines (#42)
+
+- **A timeout must terminate work before releasing its slot.** Rejecting a promise leaves OCR threads and render descendants running. Run one document in a supervised process group, kill the group on deadline/lease loss/shutdown, wait for child close, ignore late results, then persist failure under the tenant lease.
+- **V8 heap limits do not bound native/WASM memory.** Combine child RSS enforcement and external-tool prlimit bounds with a worker-container hard memory/CPU cap; measure the whole cgroup on the Pi. Keep aggregate concurrency within that budget.
+- **Never raise an inherited hard resource limit in a child tool.** External-tool CPU caps must be no greater than the parent's cap, including short configured document deadlines.
+- **Moving a processor requires moving its lifecycle tests and deployment gates.** Keep the API producer-only, boot the dedicated worker in queue E2E, and include worker readiness in deploy/rollback health waits. Preserve original tenant/retry assertions.
+- **Run the real supervisor on the real OS before merging; a mocked `spawn` proves nothing about kernel limits.** Mocked tests passed while the CPU-limit classification waited for `SIGXCPU`, a signal the kernel never sends when the soft and hard limit are equal (the child gets `SIGKILL`; a V8 heap overflow is `SIGABRT`). Map the signals you observe, and do not set a kernel backstop equal to the wall deadline: one busy thread reaches both at once and the failure code is a coin toss.
+- **Put tests that need a Linux feature in the unit suite, guarded by platform.** CI runs the unit suite on Linux; an E2E file no job runs is not evidence.
+- **Cleanup in `finally` must never replace the outcome.** A throwing `await rm()` turns a finished extraction into a failure and a timeout into a filesystem error. Catch it, log metadata only, move on.
+- **Attach `on('error')`, not `once`, to a child process.** A second `error` event with no listener is an uncaught exception that takes the worker down.
+- **Fail at boot on runtime preconditions.** Platform, `prlimit` and config ranges stop the process at startup instead of failing every document, and a crash leaves private directories behind, so sweep stale ones when the worker starts.
+- **A prefix check is not a path check.** `org/../other/x` passes `startsWith('org/')`; validate the segments of a storage key inside the isolated child as well.
+- **Every service that gains a queue consumer needs a monitor, not only a deploy wait.** A dead worker leaves documents queued with no error anywhere; the monitoring timer alerts on it.

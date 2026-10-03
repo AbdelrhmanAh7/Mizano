@@ -26,18 +26,35 @@ log() {
   printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
 }
 
-# Wait until api and web report healthy. $1 = timeout in seconds.
+# Docker health status of a compose service's container ($1): healthy, unhealthy or
+# starting; empty when the service has no container.
+service_health() {
+  local cid
+  cid="$(dc ps -q "$1" 2>/dev/null || true)"
+  [ -n "$cid" ] || return 0
+  docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || true
+}
+
+# Append a monitoring problem (the caller's `problems` array, "key|message") unless the
+# service ($1) has a running, healthy container. Used for services that expose no HTTP
+# endpoint, such as the intake worker: a dead worker leaves every document queued silently.
+check_service_health() {
+  local status
+  status="$(service_health "$1")"
+  if [ -z "$status" ]; then
+    problems+=("$1-down|$1 not running")
+  elif [ "$status" != "healthy" ]; then
+    problems+=("$1-unhealthy|$1 unhealthy")
+  fi
+}
+
+# Wait until api, web and worker report healthy. $1 = timeout in seconds.
 wait_healthy() {
-  local deadline=$((SECONDS + ${1:-240})) svc cid status ok
+  local deadline=$((SECONDS + ${1:-240})) svc ok
   while [ "$SECONDS" -lt "$deadline" ]; do
     ok=1
-    for svc in api web; do
-      cid="$(dc ps -q "$svc" 2>/dev/null || true)"
-      status=""
-      if [ -n "$cid" ]; then
-        status="$(docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || true)"
-      fi
-      [ "$status" = "healthy" ] || ok=0
+    for svc in api web worker; do
+      [ "$(service_health "$svc")" = "healthy" ] || ok=0
     done
     if [ "$ok" -eq 1 ]; then
       return 0

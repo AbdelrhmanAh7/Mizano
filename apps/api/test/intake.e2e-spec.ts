@@ -1,26 +1,35 @@
 /**
- * Durable document intake (issues #15 and #9): real HTTP API, real login, real PostgreSQL and
- * Redis/BullMQ. Only the extraction strategy is stubbed (no model is required): it returns a
- * fixed extraction, or throws when `stub.mode === 'fail'`.
+ * Durable document intake (issues #15, #9 and #42): real HTTP API, real login, real PostgreSQL and
+ * Redis/BullMQ. The HTTP API only produces jobs; a separate minimal worker context (the same
+ * `IntakeWorkerModule` that `dist/intake-worker.js` boots) consumes them. Only the extraction
+ * is stubbed (no model, OCR engine or Linux process cap is required): the executor returns a
+ * fixed extraction, throws when `stub.mode === 'fail'`, or fails like a deadline when
+ * `stub.mode === 'timeout'`. The real supervisor is covered by intake-executor.process.spec.ts.
  */
-import { INestApplication } from '@nestjs/common';
-import { IntakeJobStatus } from '@prisma/client';
+import { INestApplication, INestApplicationContext } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { IntakeJob, IntakeJobStatus } from '@prisma/client';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
 import { eventually } from './helpers/journey.helper';
 import { ApiHelper } from './helpers/api-client.helper';
+import { IntakeWorkerModule } from '../src/intake-worker.module';
 import { ExtractionStrategyResolver } from '../src/modules/ai/extraction/extraction-strategy-resolver.service';
+import { IntakeExecutorService } from '../src/modules/ai/intake/intake-executor.service';
+import { IntakeRuntimeError } from '../src/modules/ai/intake/intake-runtime';
 import { IntakeStorage, sha256Hex } from '../src/modules/ai/intake/intake-storage';
+import { DocumentIntakeService } from '../src/modules/ai/services/document-intake.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 process.env.INTAKE_RETRY_BASE_MS = '50';
 process.env.INTAKE_LEASE_MS = '1000';
 
-const stub = { mode: 'ok' as 'ok' | 'fail', calls: 0 };
+const stub = { mode: 'ok' as 'ok' | 'fail' | 'timeout', calls: 0 };
 
 const stubResolver = {
   resolve: async () => {
     stub.calls += 1;
+    if (stub.mode === 'timeout') throw new IntakeRuntimeError('INTAKE_TIMEOUT');
     if (stub.mode === 'fail') throw new Error('stub extraction failure with INVOICE-TEXT-SECRET');
     return {
       strategyUsed: 'ocr',
@@ -63,10 +72,44 @@ function pdfFixture(marker: string): Buffer {
   );
 }
 
+let worker: INestApplicationContext | undefined;
+/** Observes how many documents the (stubbed) executor runs at the same time. */
+const gate = { delayMs: 0, inFlight: 0, maxInFlight: 0 };
+
+/** The dedicated minimal worker context; only its extraction subprocess is substituted. */
+async function startWorker(app: INestApplication): Promise<INestApplicationContext> {
+  const module = await Test.createTestingModule({ imports: [IntakeWorkerModule] })
+    .overrideProvider(IntakeExecutorService)
+    .useValue({
+      run: async (job: IntakeJob) => {
+        gate.inFlight += 1;
+        gate.maxInFlight = Math.max(gate.maxInFlight, gate.inFlight);
+        try {
+          if (gate.delayMs) await new Promise((resolve) => setTimeout(resolve, gate.delayMs));
+          const buffer = await app.get(IntakeStorage).get(job.storageKey, job.sha256);
+          return await app
+            .get(DocumentIntakeService)
+            .processDocument(job.organizationId, buffer, job.mimeType);
+        } finally {
+          gate.inFlight -= 1;
+        }
+      },
+    })
+    .compile();
+  return module.init();
+}
+
 async function boot(): Promise<INestApplication> {
-  return createTestApp((builder) =>
+  const app = await createTestApp((builder) =>
     builder.overrideProvider(ExtractionStrategyResolver).useValue(stubResolver),
   );
+  worker = await startWorker(app);
+  return app;
+}
+
+async function close(app: INestApplication): Promise<void> {
+  await worker?.close();
+  await app.close();
 }
 
 describe('Document intake (e2e)', () => {
@@ -107,7 +150,7 @@ describe('Document intake (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await close(app);
   });
 
   let jobId = '';
@@ -228,7 +271,7 @@ describe('Document intake (e2e)', () => {
   });
 
   it('job state survives an application restart and stays readable', async () => {
-    await app.close();
+    await close(app);
     app = await boot();
     prisma = getPrisma(app);
     const res = await a.withToken(tenantA.accessToken).get(`/ai/document-intake/${jobId}/result`);
@@ -261,7 +304,7 @@ describe('Document intake (e2e)', () => {
       },
     });
 
-    await app.close();
+    await close(app);
     app = await boot(); // bootstrap recovery re-enqueues the orphan
     prisma = getPrisma(app);
     a = new ApiHelper(app, tenantA.accessToken);
@@ -290,6 +333,25 @@ describe('Document intake (e2e)', () => {
     expect(retry.status).toBe(201);
     await waitForStatus(failingId, IntakeJobStatus.EXTRACTED);
     expect((await a.post(`/ai/document-intake/${failingId}/retry`)).status).toBe(409);
+  });
+
+  it('timeout errors are retryable and localized on the authenticated result route', async () => {
+    stub.mode = 'timeout';
+    try {
+      const res = await upload(a, pdfFixture(`TIMEOUT-${uniqueSuffix()}`));
+      const id = res.body.data.jobId as string;
+      await waitForStatus(id, IntakeJobStatus.DEAD_LETTER);
+      const en = await a.get(`/ai/document-intake/${id}/result`).set('x-lang', 'en');
+      const ar = await a.get(`/ai/document-intake/${id}/result`).set('x-lang', 'ar');
+      expect(en.status).toBe(200);
+      expect(ar.status).toBe(200);
+      expect(en.body.data).toMatchObject({ errorCode: 'INTAKE_TIMEOUT', retryable: true });
+      expect(en.body.data.lastError).toContain('timed out');
+      expect(ar.body.data.lastError).toContain('إعادة المحاولة');
+      expect((await b.get(`/ai/document-intake/${id}/result`)).status).toBe(404);
+    } finally {
+      stub.mode = 'ok';
+    }
   });
 
   it('confirm with a jobId approves the job once and links the draft', async () => {
@@ -362,5 +424,75 @@ describe('Document intake (e2e)', () => {
     });
     const done = await waitForStatus(failed.id, IntakeJobStatus.EXTRACTED);
     expect(done?.attempts).toBe(2);
+  });
+
+  describe('worker isolation and concurrency (#42)', () => {
+    async function restartWorker(): Promise<void> {
+      await worker?.close();
+      worker = undefined;
+      gate.maxInFlight = 0;
+      worker = await startWorker(app);
+    }
+    async function uploadMany(count: number): Promise<string[]> {
+      const ids: string[] = [];
+      for (let i = 0; i < count; i += 1) {
+        const res = await upload(a, pdfFixture(`CONC-${i}-${uniqueSuffix()}`));
+        expect(res.status).toBe(201);
+        ids.push(res.body.data.jobId as string);
+      }
+      return ids;
+    }
+
+    afterEach(async () => {
+      gate.delayMs = 0;
+      delete process.env.INTAKE_CONCURRENCY;
+      if (!worker) worker = await startWorker(app);
+    });
+
+    it('the HTTP API never processes a job itself: it stays QUEUED until a worker runs', async () => {
+      await worker?.close();
+      worker = undefined;
+      const callsBefore = stub.calls;
+      const res = await upload(a, pdfFixture(`NOWORKER-${uniqueSuffix()}`));
+      expect(res.status).toBe(201);
+      const id = res.body.data.jobId as string;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const queued = await prisma.intakeJob.findFirst({
+        where: { id, organizationId: tenantA.organizationId },
+      });
+      expect(queued).toMatchObject({ status: IntakeJobStatus.QUEUED, attempts: 0 });
+      expect(stub.calls).toBe(callsBefore);
+
+      // The durable queue entry is picked up as soon as a worker exists.
+      worker = await startWorker(app);
+      const done = await waitForStatus(id, IntakeJobStatus.EXTRACTED);
+      expect(done?.attempts).toBe(1);
+    });
+
+    it('runs one document at a time by default', async () => {
+      gate.delayMs = 300;
+      await restartWorker();
+      const ids = await uploadMany(3);
+      for (const id of ids) await waitForStatus(id, IntakeJobStatus.EXTRACTED);
+      expect(gate.maxInFlight).toBe(1);
+    });
+
+    it('INTAKE_CONCURRENCY=2 runs two at once and never three', async () => {
+      process.env.INTAKE_CONCURRENCY = '2';
+      gate.delayMs = 400;
+      await restartWorker();
+      const ids = await uploadMany(5);
+      for (const id of ids) await waitForStatus(id, IntakeJobStatus.EXTRACTED);
+      expect(gate.maxInFlight).toBe(2);
+    });
+
+    it('an out-of-range INTAKE_CONCURRENCY falls back to one', async () => {
+      process.env.INTAKE_CONCURRENCY = '8';
+      gate.delayMs = 200;
+      await restartWorker();
+      const ids = await uploadMany(3);
+      for (const id of ids) await waitForStatus(id, IntakeJobStatus.EXTRACTED);
+      expect(gate.maxInFlight).toBe(1);
+    });
   });
 });

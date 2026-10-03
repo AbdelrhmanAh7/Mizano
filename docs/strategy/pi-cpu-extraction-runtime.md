@@ -12,7 +12,10 @@ cloud/LLM fallback for the demo.
 
 The existing OCR+LLM strategy is **not** the no-LLM baseline from #16.
 Bundling Tesseract assets does not remove its Ollama dependency or add scanned
-PDF rendering. Integration with #16 is required before claiming CPU extraction.
+PDF rendering. Queued intake no longer uses it: the
+[dedicated worker](#dedicated-worker-and-resource-budget) has its own OCR/PDF
+path. Integration with #16's structured parser is still required before
+claiming CPU invoice extraction.
 
 ## Reproducible language assets
 
@@ -77,29 +80,103 @@ The bulk-job cleanup interval is unreferenced and cleared on shutdown too.
 These probes establish dependency readiness, not authenticated API latency under
 an extraction backlog.
 
-## Worker budget and outstanding integration
+## Dedicated worker and resource budget
 
-The Tesseract adapter serializes initialization and recognition on one worker,
-loads both languages once, terminates failed engines before retry and drains
-accepted calls on shutdown. OCR errors and Python/render errors log metadata
-only, including exception summaries and model status lines. This bounds OCR
-engine concurrency, not whole-job concurrency, process RAM or wall-clock time.
+The API is producer-only. `IntakeProcessorService` is registered only by
+`IntakeWorkerModule`; `node dist/intake-worker.js` boots that minimal Nest
+context without HTTP controllers, application schedulers or AI/LLM providers
+(a unit test fails if its import graph reaches Ollama, the legacy strategy
+resolver or an AI module). Redis is required: there is no inline fallback, so
+an uploaded document stays `QUEUED` until a worker runs. The API keeps durable
+job recovery, ownership checks, uploads, SSE and accountant confirmation.
 
-Target: one extraction job at a time, at most two only after Pi measurements;
-worker memory hard limit 2048 MiB and a CPU quota leaving capacity for the API.
-The current Pi compose file reserves a worker but does not launch one; intake
-currently consumes inside the API process. Setting `INTAKE_CONCURRENCY=1` alone
-does not establish process/memory isolation or API responsiveness. Do not
-enable a second API replica as a substitute: it also starts unrelated services.
-The coordinator must integrate a dedicated worker entrypoint and producer-only
-API, using the same tenant-scoped queue/lease commands, before deployment.
+At boot the worker refuses to start, instead of failing every document, when
+the host is not Linux, `/usr/bin/prlimit` is not executable or
+`INTAKE_JOB_DEADLINE_MS` is invalid. It also removes `mizano-intake-*`
+temporary directories that a crashed predecessor left in the container's
+writable layer (only those older than the deadline plus one minute, so a live
+job is never touched).
 
-Each page/document needs an enforceable wall-clock deadline, including worker
-initialization, preprocessing and PDF rendering. A deadline must terminate the
-OCR/render task before releasing its concurrency slot, then persist an
-exception under the current tenant-scoped lease. A bare `Promise.race` timeout
-leaves expensive work running and is insufficient. Deadline values remain
-unagreed until the owner sets them and the Pi holdout run measures them.
+Each tenant-scoped lease launches one disposable Linux child through
+`/usr/bin/prlimit`, as its own process group. The child receives a storage
+descriptor over IPC, checks that the key lies strictly inside the job's own
+organization folder (no empty, `.` or `..` segment), verifies the original's
+checksum, then uses only local Poppler and the pinned Arabic/English Tesseract
+assets. Database, Redis and provider credentials, `NODE_OPTIONS`, original
+bytes, the original file name and document text never appear in the child's
+argv, environment or logs; its stdout/stderr are discarded. The worker mounts
+the originals read-only. The supervisor removes the child's private temporary
+directory after the process group has closed, on every outcome; a cleanup
+failure is logged as metadata and never replaces the real result or failure.
+The language and strategy hints stored on a job are not used by this path: it
+always loads both pinned languages and never selects a model.
+
+The CPU path extracts native PDF text, or renders scanned PDF pages
+sequentially (up to 20, 2000-pixel maximum dimension) and recognizes images
+with Tesseract. It deliberately does not call the legacy strategy resolver,
+classifier or Ollama. **#16's structured parser is absent on this branch**:
+text is retained as evidence, money/currency/dates remain null, vendor and
+duplicate matching are not run, and the result is `NEEDS_REVIEW` with
+`extractionMethod=cpu-ocr`. This is an extraction runtime, not a claim of
+complete invoice parsing or measured accuracy. When #16 lands, its pure text
+rules belong in the child; tenant-scoped matching and duplicate detection need
+the database and belong in the worker process, after the child has closed.
+
+| Limit                        | Implementation                                                                                                                                                                                                                                                                                                                     |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Whole-job concurrency        | `INTAKE_CONCURRENCY=1`; exactly `2` opts into two; any other value is one                                                                                                                                                                                                                                                          |
+| Whole-document wall deadline | `INTAKE_JOB_DEADLINE_MS=120000`, 100-600000 ms, provisional until Pi measurements. This timer is the deadline                                                                                                                                                                                                                      |
+| Child CPU time               | `prlimit --cpu` is the deadline rounded up **plus 2 s**: a kernel backstop that works even if the supervisor stalls, or if threads burn CPU faster than the wall clock. It is deliberately not equal to the deadline: at equality one busy thread reaches both limits at the same instant and the failure code becomes a coin toss |
+| External tools               | `prlimit` address space 512 MiB and CPU `min(60, deadline in s)`, which is never above the child's own hard limit (a child cannot raise an inherited hard limit); the PDF text and render tools add a 32 MiB file-size and 64-descriptor cap; no shell, bounded output                                                             |
+| Child memory                 | V8 heap 256 MiB; Linux RSS supervisor kills above 768 MiB, sampled every 100 ms                                                                                                                                                                                                                                                    |
+| Worker aggregate             | compose cgroup hard limit 2048 MiB, no swap, 2 CPU cores, 128 PIDs                                                                                                                                                                                                                                                                 |
+
+RSS sampling is not an instantaneous hard per-job RAM ceiling; native/WASM
+allocations and rendered-tool memory also count against the container's hard
+2 GiB limit, and the tools' address-space caps are separate from the child's
+RSS. Two simultaneous jobs can hit that aggregate cap, so keep one until the
+Pi holdout validates two. Run **one worker replica**; per-process BullMQ
+concurrency is not a cluster-wide concurrency cap.
+
+On expiry, lease loss or shutdown the supervisor sends SIGKILL to the entire
+child process group and waits for the child's close event before releasing the
+slot. Late results are ignored. Only then does the processor persist the
+failure code under the current tenant/lease (a stale worker's write matches no
+row) and schedule the existing bounded retry/backoff. Max attempts still
+dead-letter and allow explicit retry. Every timer and listener has an owner
+that clears it when the child closes.
+
+Kernel-enforced limits arrive as signals, not exit codes, so the supervisor
+maps what it observes (checked on Linux):
+
+| Child ends by                                                                                        | Supervisor sees                     | Stable code             |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------- | ----------------------- |
+| Wall deadline                                                                                        | its own timer, then group SIGKILL   | `INTAKE_TIMEOUT`        |
+| RSS above 768 MiB                                                                                    | its own sampler, then group SIGKILL | `INTAKE_RESOURCE_LIMIT` |
+| CPU rlimit (soft equals hard)                                                                        | `SIGKILL`, not `SIGXCPU`            | `INTAKE_RESOURCE_LIMIT` |
+| V8 heap limit                                                                                        | `SIGABRT`                           | `INTAKE_RESOURCE_LIMIT` |
+| Container OOM killer                                                                                 | `SIGKILL`                           | `INTAKE_RESOURCE_LIMIT` |
+| Lease lost, shutdown                                                                                 | its own group SIGKILL               | `INTAKE_WORKER_FAILED`  |
+| Uncaught exception, exit without a result, scope or checksum failure, unsupported format, page limit | exit code                           | `INTAKE_WORKER_FAILED`  |
+
+API views and SSE localize these codes (English/Arabic) from the request's
+existing i18n language; the job view also exposes `errorCode` and `retryable`
+(true for `FAILED` and `DEAD_LETTER`). The web client does not yet send an
+`x-lang` header, so the language follows the browser's `Accept-Language`;
+mapping `errorCode` through the web message catalogs is a follow-up.
+
+Worker readiness requires a fresh DB-and-Redis heartbeat (written every 5 s,
+stale after 20 s). Compose uses the same API image digest for API and worker,
+`init: true` reaps killed descendants, and deploy/rollback health waits and the
+five-minute monitoring timer include the worker, because a dead worker would
+otherwise leave every document queued silently. On SIGTERM the worker stops
+fetching jobs, kills the active child, lets the drain finish while Prisma is
+still connected, then closes its dependencies, all inside the 30 s stop grace.
+The aborted job fails with `INTAKE_WORKER_FAILED` and is retried after backoff.
+
+Local development: the worker needs Linux (`pnpm --filter api start:worker`
+after a build, in WSL or a container). The seeded intake E2E runs on any OS
+because it starts the worker module in-process with a stubbed executor.
 
 ## Pi acceptance protocol (not yet executed)
 
@@ -121,19 +198,22 @@ the denominators. Record probe request count, errors and p95 latency during
 the batch. Agree the API p95 threshold **before** the run. Repeat the run with a
 backlog larger than the concurrency cap and verify API responsiveness.
 
-| Acceptance evidence                 | Current result                   |
-| ----------------------------------- | -------------------------------- |
-| Pi p50/p95 per document type        | Unknown: no Pi/corpus connected  |
-| Peak Pi RAM per document type       | Unknown                          |
-| API p95 while processing batch      | Unknown; threshold not agreed    |
-| Dedicated worker resource isolation | Not implemented on this baseline |
-| Per-document timeout to exceptions  | Not implemented on this baseline |
-| No-LLM extraction integration (#16) | Not present on this baseline     |
+| Acceptance evidence                 | Current result                                                                          |
+| ----------------------------------- | --------------------------------------------------------------------------------------- |
+| Pi p50/p95 per document type        | Unknown: no Pi/corpus connected                                                         |
+| Peak Pi RAM per document type       | Unknown                                                                                 |
+| API p95 while processing batch      | Unknown; threshold not agreed                                                           |
+| Dedicated worker resource isolation | Implemented; real-process tests pass in a Linux container; Pi, arm64 and Alpine pending |
+| Per-document timeout to exceptions  | Implemented; real-process and seeded API E2E pass; Pi pending                           |
+| No-LLM extraction integration (#16) | OCR evidence only; structured parser absent on this branch                              |
 
 Issue #42 remains partial until those gates have evidence. An amd64 build or
 mocked OCR unit test cannot satisfy Pi acceptance. Do not build arm64 locally.
 
-## Runtime review evidence (3 October 2026)
+## Historical asset/readiness review evidence (3 October 2026)
+
+The evidence below belongs to the earlier asset/readiness changes. It is not
+validation of the dedicated-worker changes described above.
 
 Scope: [issue #42](https://github.com/AbdelrhmanAh7/Mizano/issues/42), on top of
 [PR #60](https://github.com/AbdelrhmanAh7/Mizano/pull/60). Provider: Codex API
@@ -214,6 +294,51 @@ existing web lint warnings and emits Turbo cache/output warnings. Its three
 API tasks ran fresh; cached web tests contain 40 suites/386 tests, while the
 direct run above verified all 46 suites/431 tests in this worktree. CI retains
 the package script's two Jest workers; the separate full and affected suites
-and E2E used `--runInBand`. Next: coordinator integration
-of #16's no-LLM worker and terminating deadlines, fresh review, arm64/size CI,
-then the held-out Pi/API batch measurements.
+and E2E used `--runInBand`. The worker and terminating deadlines this
+section listed as next are now implemented (see the evidence below); #16
+integration, arm64/size CI and the held-out Pi/API measurements remain.
+
+## Dedicated worker evidence (3 October 2026)
+
+Scope: [issue #42](https://github.com/AbdelrhmanAh7/Mizano/issues/42), branch
+`demo/42-intake-worker` on top of [PR #60](https://github.com/AbdelrhmanAh7/Mizano/pull/60).
+A Codex implementation was reviewed and corrected by Claude Sonnet 5.5; this is
+not an independent approval of the exact tested head. Everything ran on the
+Windows development host or in a local Linux container; **nothing ran on a Pi,
+on arm64, on Alpine/musl or on Node 20**.
+
+| Command / gate                                                                                                                               | Result                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API `tsc --noEmit` (`tsconfig.json`, `test/tsconfig.e2e.json`); web `tsc --noEmit`                                                           | Passed                                                                                                                                                                        |
+| `eslint --max-warnings 0` on every changed API and web file                                                                                  | Passed                                                                                                                                                                        |
+| API `jest` on the worker, intake, operations and extraction folders plus the document-intake controller/service specs, `--runInBand`         | 15 suites / 222 tests passed; 1 Linux-only suite (9 tests) skipped on Windows                                                                                                 |
+| Web `jest lib/hooks/use-ai-document-intake.spec.ts`                                                                                          | 10 tests passed                                                                                                                                                               |
+| Linux container (Debian, Node 25): the compiled executor, process, child, CPU-extraction, runtime, queue and healthcheck specs under Jest 29 | 7 suites / 107 tests passed, including the real-process spec (9 tests; three runs on the final code, an earlier 8-test version once under `--cpus=1`)                         |
+| Seeded `test/intake.e2e-spec.ts` (PostgreSQL 16, Redis 7 in Docker; database `mizano_e2e_worker`; Redis DB 11; `OLLAMA_ENABLED=false`)       | 19 tests passed, including the localized timeout, producer-only and concurrency cases                                                                                         |
+| `bash deploy/pi/scripts/worker-health.test.sh`; ShellCheck on the changed scripts; `docker compose config` on the Pi file                    | 8 checks passed; no findings; rendered                                                                                                                                        |
+| `nest build` (swc)                                                                                                                           | Passed; `dist` has `intake-worker.js`, `intake-worker-healthcheck.js` and `modules/ai/intake/intake-child.js`                                                                 |
+| `pnpm ci:full` (pre-push hook, pushed head `809678a`)                                                                                        | Exit 0, 12 tasks; API lint, type-check and tests ran fresh (140 suites / 2,242 tests passed, 1 Linux-only suite skipped); web and package tasks replayed from the Turbo cache |
+
+Two defects were found only by running the real supervisor on Linux. Mocked
+spawn tests had passed: the CPU-limit classification waited for `SIGXCPU`,
+which the kernel never sends when the soft and hard limit are equal (the child
+gets `SIGKILL`; a V8 heap overflow is `SIGABRT`), and the deadline test raced
+the CPU limit because both were set to the same number of seconds. Both are
+fixed above and covered by unit and process tests.
+
+An uncommitted driver also ran the real child end to end in the container: the
+pinned Arabic/English assets recognized a synthetic digit image; a wrong
+organization key and a wrong checksum failed before any extraction; a 300 ms
+deadline, an abort, a CPU-bound child with a busy descendant (killed, with no
+process or directory left behind and the supervisor timer unaffected), an
+allocation past the 768 MiB RSS limit, a single-thread CPU loop (wall deadline)
+and two busy threads (CPU backstop) each ended with the expected code; two
+documents ran concurrently. The synthetic image says nothing about invoice
+accuracy.
+
+Not run and still unknown: Poppler (`pdftotext`, `pdfinfo`, `pdftoppm`) and
+the scanned-PDF path are covered only by mocked unit tests, since the test
+container has no Poppler and no package mirror; the image build, the arm64 and
+offline CI jobs and the image-size limit; a fresh (uncached) full web suite;
+Pi latency and RAM per document type (#24); authenticated API p95 under a backlog; browser journeys. Issue #42
+stays partial until the Pi gates above have evidence.

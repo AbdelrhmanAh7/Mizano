@@ -108,7 +108,13 @@ export interface DocumentIntakeResult {
   } | null;
 
   /** Which AI engine extracted the data */
-  extractionMethod: 'ollama-vision' | 'ollama-text' | 'ocr-llm' | 'hybrid-ocr' | 'hybrid-vlm';
+  extractionMethod:
+    | 'cpu-ocr'
+    | 'ollama-vision'
+    | 'ollama-text'
+    | 'ocr-llm'
+    | 'hybrid-ocr'
+    | 'hybrid-vlm';
 }
 
 /**
