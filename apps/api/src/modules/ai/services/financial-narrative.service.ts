@@ -1,6 +1,10 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { bankBookBalances } from '../../reports/utils/report-utils';
+import {
+  bankBookBalances,
+  toDecimal,
+  totalBankBookBalance,
+} from '../../reports/utils/report-utils';
 import { queryTemplates, getQueryTemplate } from '../templates/query-templates';
 import { Decimal } from '@prisma/client/runtime/library';
 import { OllamaInferenceGateway } from './ollama-inference-gateway.service';
@@ -538,7 +542,7 @@ export class FinancialNarrativeService {
     // Get bank balances
     const bankAccounts = await bankBookBalances(this.prisma, organizationId);
 
-    const totalCash = bankAccounts.reduce((sum, acc) => sum + Number(acc.balance.toString()), 0);
+    const totalCash = totalBankBookBalance(bankAccounts);
 
     // Get AR and AP
     const [ar, ap] = await Promise.all([
@@ -560,9 +564,9 @@ export class FinancialNarrativeService {
       }),
     ]);
 
-    const totalAR = Number(ar._sum.grandTotal) || 0;
-    const totalAP = Number(ap._sum.grandTotal) || 0;
-    const netPosition = totalCash + totalAR - totalAP;
+    const totalAR = toDecimal(ar._sum.grandTotal);
+    const totalAP = toDecimal(ap._sum.grandTotal);
+    const netPosition = totalCash.add(totalAR).sub(totalAP);
 
     // Estimate burn rate from last 30 days
     const thirtyDaysAgo = new Date();
@@ -577,9 +581,11 @@ export class FinancialNarrativeService {
       _sum: { amount: true },
     });
 
-    const monthlyBurn = Number(recentExpenses._sum.amount) || 0;
-    const dailyBurn = monthlyBurn / 30;
-    const daysRemaining = dailyBurn > 0 ? Math.floor(totalCash / dailyBurn) : 999;
+    const monthlyBurn = toDecimal(recentExpenses._sum.amount);
+    const dailyBurn = monthlyBurn.div(30);
+    const daysRemaining = dailyBurn.greaterThan(0)
+      ? totalCash.div(dailyBurn).floor().toNumber()
+      : 999;
 
     const sections: NarrativeSection[] = [
       {
@@ -588,7 +594,7 @@ export class FinancialNarrativeService {
         content: `Total cash across ${bankAccounts.length} account${bankAccounts.length !== 1 ? 's' : ''}: ${this.formatCurrency(totalCash)}.`,
         metrics: bankAccounts.map((acc) => ({
           label: acc.name,
-          value: this.formatCurrency(Number(acc.balance.toString()) || 0),
+          value: this.formatCurrency(acc.balance),
         })),
       },
       {
@@ -699,8 +705,8 @@ export class FinancialNarrativeService {
     month: number,
     year: number,
   ): Promise<Omit<MonthlyFinancials, 'prevRevenue' | 'prevExpenses' | 'prevNetIncome'>> {
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59);
+    const startDate = new Date(Date.UTC(year, month - 1, 1));
+    const endDate = new Date(Date.UTC(year, month, 1) - 1);
 
     // Revenue from invoices
     const revenueResult = await this.prisma.invoice.aggregate({
@@ -756,7 +762,7 @@ export class FinancialNarrativeService {
 
     const customerIds = topCustomers.map((c) => c.customerId);
     const customers = await this.prisma.customer.findMany({
-      where: { id: { in: customerIds } },
+      where: { id: { in: customerIds }, organizationId },
       select: { id: true, name: true },
     });
     const customerMap = new Map(customers.map((c) => [c.id, c.name]));
@@ -788,10 +794,9 @@ export class FinancialNarrativeService {
     });
 
     // Cash balance
-    const cashBalance = (await bankBookBalances(this.prisma, organizationId)).reduce(
-      (sum, b) => sum + Number(b.balance.toString()),
-      0,
-    );
+    const cashBalance = totalBankBookBalance(
+      await bankBookBalances(this.prisma, organizationId, endDate),
+    ).toNumber();
 
     // Estimate cash days remaining
     const dailyBurn = expenses / 30;

@@ -1,5 +1,10 @@
 import { Decimal } from '@prisma/client/runtime/library';
-import { bankBookBalances } from '../../reports/utils/report-utils';
+import {
+  bankBookBalances,
+  money,
+  toDecimal,
+  totalBankBookBalance,
+} from '../../reports/utils/report-utils';
 
 interface InvoiceWithCustomer {
   invoiceNumber: string;
@@ -22,12 +27,6 @@ interface ItemWithReorder {
   currentStock: number | null;
   reorderPoint: number | null;
   reorderAnalysis?: { reorderPoint: number; status: string } | null;
-}
-
-interface BankAccountBalance {
-  id: string;
-  name: string;
-  systemBalance: Decimal;
 }
 
 interface CustomerRecord {
@@ -396,16 +395,7 @@ export const queryTemplates: QueryTemplate[] = [
     execute: async (prisma, orgId) => {
       // Get bank accounts
       const books = await bankBookBalances(prisma, orgId);
-      const bankAccounts: BankAccountBalance[] = books.map((b) => ({
-        id: b.id,
-        name: b.name,
-        systemBalance: b.balance,
-      }));
-
-      const totalBalance = bankAccounts.reduce(
-        (sum: number, acc: BankAccountBalance) => sum + Number(acc.systemBalance || 0),
-        0,
-      );
+      const totalBalance = totalBankBookBalance(books);
 
       // Get outstanding receivables
       const arResult = await prisma.invoice.aggregate({
@@ -428,25 +418,25 @@ export const queryTemplates: QueryTemplate[] = [
       });
 
       return {
-        totalCash: totalBalance,
-        accountCount: bankAccounts.length,
-        accounts: bankAccounts.map((a: BankAccountBalance) => ({
+        totalCash: money(totalBalance),
+        accountCount: books.length,
+        accounts: books.map((a) => ({
           name: a.name,
-          balance: Number(a.systemBalance) || 0,
+          balance: money(a.balance),
         })),
-        outstandingAR: Number(arResult._sum.grandTotal) || 0,
-        outstandingAP: Number(apResult._sum.grandTotal) || 0,
+        outstandingAR: money(arResult._sum.grandTotal),
+        outstandingAP: money(apResult._sum.grandTotal),
       };
     },
     render: (data) => {
       const d = data as {
-        totalCash: number;
+        totalCash: string;
         accountCount: number;
-        outstandingAR: number;
-        outstandingAP: number;
+        outstandingAR: string;
+        outstandingAP: string;
       };
-      const netPosition = d.totalCash + d.outstandingAR - d.outstandingAP;
-      return `Current cash: ${formatCurrency(d.totalCash)} across ${d.accountCount} account${d.accountCount > 1 ? 's' : ''}. Receivables: ${formatCurrency(d.outstandingAR)}, Payables: ${formatCurrency(d.outstandingAP)}. Net position: ${formatCurrency(netPosition)}.`;
+      const netPosition = toDecimal(d.totalCash).add(d.outstandingAR).sub(d.outstandingAP);
+      return `Current cash: ${formatCurrency(toDecimal(d.totalCash))} across ${d.accountCount} account${d.accountCount > 1 ? 's' : ''}. Receivables: ${formatCurrency(toDecimal(d.outstandingAR))}, Payables: ${formatCurrency(toDecimal(d.outstandingAP))}. Net position: ${formatCurrency(netPosition)}.`;
     },
   },
 

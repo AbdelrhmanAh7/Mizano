@@ -11,6 +11,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Pick one lock order per workflow and use it on every path that touches the same rows.** The default is document → other documents (sorted by id) → ledger. VAT returns are a deliberate exception: submit and payment both take ledger → return row, because submission must freeze the ledger before recomputing. What deadlocks is two paths taking the same locks in opposite orders. _(VAT submit vs. payment)_
 - **Scope every row lock by organization:** `WHERE id = $1 AND "organizationId" = $2 FOR UPDATE`. A caller-supplied foreign id must lock nothing. _(lockInvoices, lockBills)_
 - **A check and the write it guards share one transaction and one lock.** Duplicate and overlap checks run inside the same tx as the insert, under an advisory lock. _(VAT period overlap)_
+- **Reload mutable posting state after waiting for the ledger lock.** Payroll status, depreciation execution markers and asset book values read before the lock can be stale. Asset disposal and depreciation use ledger → asset consistently; skipped scheduled entries do not count as processed. _(PR #66)_
 - **Lock every record you read to decide a mutation.** For example, voiding a credit note must lock the note before reading `appliedToInvoiceId`, or a concurrent apply slips through. _(credit-note void vs. apply)_
 
 ## 2. Idempotency and retries
@@ -75,6 +76,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Ledger figures come only from posted, non-deleted journal lines.** Never add `Account.openingBalance`; opening balances are journals.
 - **Scope every component of a report to the same period** (bills and credits alike).
 - **Use grouped aggregates, not one query per account.**
+- **Multiple bank registers may link to one ledger account.** Preserve the register detail rows, but sum each linked account once in Decimal for headline cash. _(PR #66)_
 
 ## 10. Logging, audit and secrets
 

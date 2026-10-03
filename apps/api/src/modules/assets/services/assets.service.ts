@@ -229,33 +229,29 @@ export class AssetsService {
    * Dispose an asset (sell or write off)
    */
   async dispose(organizationId: string, assetId: string, dto: DisposeAssetDto): Promise<unknown> {
-    const asset = await this.prisma.asset.findFirst({
-      where: { id: assetId, organizationId, deletedAt: null },
-      include: {
-        assetAccount: true,
-        depreciationAccount: true,
-        accumulatedDeprAccount: true,
-      },
-    });
-
-    if (!asset) {
-      throw new NotFoundException('Asset not found');
-    }
-
-    if (asset.status !== AssetStatus.ACTIVE) {
-      throw new BadRequestException('Asset is already disposed');
-    }
-
-    // Calculate gain/loss on disposal
-    const disposalAmount = new Decimal(dto.disposalAmount);
-    const bookValue = asset.currentBookValue;
-    const gainLoss = disposalAmount.minus(bookValue);
-
-    // Create disposal in transaction
+    // Ledger first, then the asset snapshot and mutations, matching depreciation.
     const disposed = await this.prisma.$transaction(async (tx) => {
+      await lockOrganizationLedger(tx, organizationId);
+      const asset = await tx.asset.findFirst({
+        where: { id: assetId, organizationId, deletedAt: null },
+      });
+
+      if (!asset) {
+        throw new NotFoundException('Asset not found');
+      }
+
+      if (asset.status !== AssetStatus.ACTIVE) {
+        throw new BadRequestException('Asset is already disposed');
+      }
+
+      // Calculate gain/loss on disposal
+      const disposalAmount = new Decimal(dto.disposalAmount);
+      const bookValue = asset.currentBookValue;
+      const gainLoss = disposalAmount.minus(bookValue);
+
       // Update asset status
       const updatedAsset = await tx.asset.update({
-        where: { id: assetId },
+        where: { id: assetId, organizationId },
         data: {
           status: AssetStatus.DISPOSED,
           disposalDate: new Date(dto.disposalDate),
@@ -268,6 +264,7 @@ export class AssetsService {
       await tx.depreciationSchedule.deleteMany({
         where: {
           assetId,
+          organizationId,
           executedAt: null,
         },
       });
@@ -589,8 +586,6 @@ export class AssetsService {
       });
     }
 
-    // Serialize with other journal producers and base-currency changes.
-    await lockOrganizationLedger(tx, organizationId);
     // Generate journal number
     const journalNumber = await this.generateJournalNumber(tx, organizationId);
 

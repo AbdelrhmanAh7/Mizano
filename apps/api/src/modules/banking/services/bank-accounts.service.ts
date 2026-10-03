@@ -8,7 +8,9 @@ import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
 import {
   bankBookBalances,
   endOfUtcDay,
+  money,
   sumPostedLinesByAccount,
+  totalBankBookBalance,
 } from '../../reports/utils/report-utils';
 
 @Injectable()
@@ -151,10 +153,7 @@ export class BankAccountsService {
       }),
     ]);
 
-    const totalSystemBalance = accounts.reduce(
-      (sum, a) => sum + parseFloat(a.balance.toString()),
-      0,
-    );
+    const totalSystemBalance = money(totalBankBookBalance(accounts));
 
     return {
       totalAccounts: accounts.length,

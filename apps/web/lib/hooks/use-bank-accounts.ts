@@ -5,7 +5,7 @@ import { bankAccountsApi } from '@/lib/api';
 
 export interface BankingDashboardStats {
   totalAccounts: number;
-  totalSystemBalance: number;
+  totalSystemBalance: string;
   pendingTransactionCount: number;
   monthlyTransactionCount: number;
 }

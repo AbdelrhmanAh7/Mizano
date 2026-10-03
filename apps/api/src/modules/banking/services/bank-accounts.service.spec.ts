@@ -73,6 +73,6 @@ describe('BankAccountsService book balances', () => {
     const stats = await service.getDashboardStats(ORG);
 
     expect(list.data[0].systemBalance.toString()).toBe('5000');
-    expect(stats.totalSystemBalance).toBe(5000);
+    expect(stats.totalSystemBalance).toBe('5000.0000');
   });
 });

@@ -249,6 +249,13 @@ export interface BankBookBalance {
   balance: Decimal;
 }
 
+/** Count each ledger account once while retaining every bank register in the detail rows. */
+export function totalBankBookBalance(banks: BankBookBalance[]): Decimal {
+  const balances = new Map<string, Decimal>();
+  for (const bank of banks) balances.set(bank.linkedAccountId, bank.balance);
+  return sumDecimals([...balances.values()]);
+}
+
 /**
  * Book balance of every active bank account from its linked ledger account. `BankAccount.systemBalance`
  * is not maintained (opening balances are journals), so every consumer reads the ledger instead.

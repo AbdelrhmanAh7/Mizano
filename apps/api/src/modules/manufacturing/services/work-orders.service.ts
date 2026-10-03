@@ -282,45 +282,46 @@ export class WorkOrdersService {
       return null;
     }
 
-    // Find inventory accounts
-    // Finished goods account (from output item or default ASSET inventory account)
-    const outputItem = await this.prisma.item.findFirst({
-      where: { id: bom.outputItemId, organizationId },
-      select: { inventoryAccountId: true },
-    });
-
-    const finishedGoodsAccount = outputItem?.inventoryAccountId
-      ? await this.prisma.account.findFirst({
-          where: { id: outputItem.inventoryAccountId, organizationId },
-        })
-      : await this.prisma.account.findFirst({
-          where: {
-            organizationId,
-            type: 'ASSET',
-            isActive: true,
-            name: { contains: 'Inventory', mode: 'insensitive' },
-          },
-        });
-
-    // Raw materials account (find a second inventory/asset account or use same)
-    const rawMaterialsAccount = await this.prisma.account.findFirst({
-      where: {
-        organizationId,
-        type: 'ASSET',
-        isActive: true,
-        OR: [
-          { name: { contains: 'Raw Material', mode: 'insensitive' } },
-          { name: { contains: 'Inventory', mode: 'insensitive' } },
-        ],
-      },
-    });
-
-    if (!finishedGoodsAccount || !rawMaterialsAccount) {
-      // Skip journal creation if accounts not configured
-      return null;
-    }
-
     return this.prisma.$transaction(async (tx) => {
+      await lockOrganizationLedger(tx, organizationId);
+      // Find inventory accounts
+      // Finished goods account (from output item or default ASSET inventory account)
+      const outputItem = await tx.item.findFirst({
+        where: { id: bom.outputItemId, organizationId },
+        select: { inventoryAccountId: true },
+      });
+
+      const finishedGoodsAccount = outputItem?.inventoryAccountId
+        ? await tx.account.findFirst({
+            where: { id: outputItem.inventoryAccountId, organizationId },
+          })
+        : await tx.account.findFirst({
+            where: {
+              organizationId,
+              type: 'ASSET',
+              isActive: true,
+              name: { contains: 'Inventory', mode: 'insensitive' },
+            },
+          });
+
+      // Raw materials account (find a second inventory/asset account or use same)
+      const rawMaterialsAccount = await tx.account.findFirst({
+        where: {
+          organizationId,
+          type: 'ASSET',
+          isActive: true,
+          OR: [
+            { name: { contains: 'Raw Material', mode: 'insensitive' } },
+            { name: { contains: 'Inventory', mode: 'insensitive' } },
+          ],
+        },
+      });
+
+      if (!finishedGoodsAccount || !rawMaterialsAccount) {
+        // Skip journal creation if accounts not configured
+        return null;
+      }
+
       const journalNumber = await this.generateJournalNumberTx(tx, organizationId);
 
       const journalLines: Array<{
@@ -375,7 +376,6 @@ export class WorkOrdersService {
         }
       }
 
-      await lockOrganizationLedger(tx, organizationId);
       const journal = await tx.journal.create({
         data: {
           journalNumber,

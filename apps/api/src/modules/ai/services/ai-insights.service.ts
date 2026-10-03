@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { bankBookBalances } from '../../reports/utils/report-utils';
+import { bankBookBalances, totalBankBookBalance } from '../../reports/utils/report-utils';
 import { Decimal } from '@prisma/client/runtime/library';
 import type { AIInsight, AlertCategory, AlertSource, Prisma } from '@prisma/client';
 import { describeError } from '../../../common/utils/redact';
@@ -802,6 +802,6 @@ export class AiInsightsService {
 
   private async getTotalBankBalance(organizationId: string) {
     const books = await bankBookBalances(this.prisma, organizationId);
-    return books.reduce((sum, b) => sum + Number(b.balance.toString()), 0);
+    return totalBankBookBalance(books).toNumber();
   }
 }
