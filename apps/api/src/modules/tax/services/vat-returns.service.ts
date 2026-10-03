@@ -13,6 +13,7 @@ import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
 import { LEGACY_OPENING_JOURNAL_NUMBER } from '../../accounting/services/opening-balances.service';
+import { assertMoneyFits } from '../../sales/utils/sales-helpers';
 import { CreateVatReturnDto } from '../dto/create-vat-return.dto';
 import { RecordVatPaymentDto } from '../dto/record-vat-payment.dto';
 import { VatReturnQueryDto } from '../dto/vat-return-query.dto';
@@ -28,7 +29,7 @@ const TAXABLE_INVOICE_STATUSES: InvoiceStatus[] = [
   InvoiceStatus.OVERDUE,
 ];
 
-/** Approved bills (not drafts, not voided). */
+/** Approved bills for the current dashboard, not historical VAT return bases. */
 const TAXABLE_BILL_STATUSES: BillStatus[] = [
   BillStatus.OPEN,
   BillStatus.PARTIALLY_PAID,
@@ -48,6 +49,22 @@ const VAT_NON_ACTIVITY_SOURCES: string[] = [
 
 /** The legacy onboarding implementation posted its opening journal without a source type. */
 const LEGACY_OPENING = { journalNumber: LEGACY_OPENING_JOURNAL_NUMBER, sourceType: null };
+
+// Before source linking, bill approval still wrote this fixed reference and AP control line.
+// Do not treat arbitrary source-less debits (including opening balances) as purchases.
+const LEGACY_BILL_APPROVAL: Prisma.JournalWhereInput = {
+  sourceType: null,
+  reversalOfId: null,
+  isPosted: true,
+  deletedAt: null,
+  reference: { startsWith: 'Bill ' },
+  lines: {
+    some: {
+      credit: { gt: ZERO },
+      description: { startsWith: 'Bill ', endsWith: '- Accounts Payable' },
+    },
+  },
+};
 
 type Db = Prisma.TransactionClient;
 
@@ -209,6 +226,14 @@ export class VatReturnsService {
 
     const accounts = await this.resolveVatAccounts(this.prisma, organizationId);
     const figures = await this.computeFigures(this.prisma, organizationId, vatReturn, accounts);
+    const totals = {
+      totalSales: figures.totalSales,
+      outputVAT: figures.outputVat,
+      totalPurchases: figures.totalPurchases,
+      inputVAT: figures.inputVat,
+      netPayable: figures.netPayable,
+    };
+    for (const [field, amount] of Object.entries(totals)) assertMoneyFits(amount, field);
 
     // Guarded: a concurrent submit must not be overwritten by a recalculation.
     const { count } = await this.prisma.vATReturn.updateMany({
@@ -219,11 +244,7 @@ export class VatReturnsService {
         status: { in: [VATReturnStatus.DRAFT, VATReturnStatus.CALCULATED] },
       },
       data: {
-        totalSales: figures.totalSales,
-        outputVAT: figures.outputVat,
-        totalPurchases: figures.totalPurchases,
-        inputVAT: figures.inputVat,
-        netPayable: figures.netPayable,
+        ...totals,
         status: VATReturnStatus.CALCULATED,
       },
     });
@@ -231,7 +252,9 @@ export class VatReturnsService {
       throw new ConflictException('VAT return changed while it was being calculated');
     }
 
-    return this.prisma.vATReturn.findUniqueOrThrow({ where: { id } });
+    return this.prisma.vATReturn.findUniqueOrThrow({
+      where: { id, organizationId, deletedAt: null },
+    });
   }
 
   async findAll(organizationId: string, query: VatReturnQueryDto) {
@@ -297,7 +320,9 @@ export class VatReturnsService {
       });
       if (count === 0) throw new ConflictException('VAT return has already been submitted');
 
-      const vatReturn = await tx.vATReturn.findUniqueOrThrow({ where: { id } });
+      const vatReturn = await tx.vATReturn.findUniqueOrThrow({
+        where: { id, organizationId, deletedAt: null },
+      });
 
       // The settlement must clear exactly what the return declares.
       const figures = await this.computeFigures(tx, organizationId, vatReturn, accounts);
@@ -335,7 +360,10 @@ export class VatReturnsService {
         data: { lockDate: periodEnd },
       });
 
-      return tx.vATReturn.findUniqueOrThrow({ where: { id }, include: { payment: true } });
+      return tx.vATReturn.findUniqueOrThrow({
+        where: { id, organizationId, deletedAt: null },
+        include: { payment: true },
+      });
     });
   }
 
@@ -506,7 +534,10 @@ export class VatReturnsService {
           'This VAT return has VAT payable; record its payment to file it',
         );
       }
-      return tx.vATReturn.findUniqueOrThrow({ where: { id }, include: { payment: true } });
+      return tx.vATReturn.findUniqueOrThrow({
+        where: { id, organizationId, deletedAt: null },
+        include: { payment: true },
+      });
     });
   }
 
@@ -734,6 +765,7 @@ export class VatReturnsService {
           journal: {
             organizationId,
             deletedAt: null,
+            isPosted: true,
             OR: [{ sourceType: { in: sources } }, { sourceType: null }],
           },
         },
@@ -825,14 +857,47 @@ export class VatReturnsService {
         },
         _sum: { debit: true, credit: true },
       }),
-      db.bill.aggregate({
+      // The base-side lines of each posting (and its reversal), excluding historical input
+      // VAT accounts. Direction identifies the base without trusting editable line labels.
+      db.journalLine.aggregate({
         where: {
-          organizationId,
-          deletedAt: null,
-          status: { in: TAXABLE_BILL_STATUSES },
-          date: window,
+          accountId: { notIn: accounts.inputIds },
+          journal: {
+            organizationId,
+            isPosted: true,
+            deletedAt: null,
+            date: window,
+          },
+          OR: [
+            {
+              journal: {
+                sourceType: { in: [JournalSourceType.BILL_APPROVAL, JournalSourceType.EXPENSE] },
+              },
+              debit: { gt: ZERO },
+            },
+            {
+              journal: { sourceType: { in: ['BILL_VOID', JournalSourceType.EXPENSE_VOID] } },
+              credit: { gt: ZERO },
+            },
+            {
+              journal: { sourceType: JournalSourceType.VENDOR_CREDIT },
+              credit: { gt: ZERO },
+            },
+            {
+              journal: { sourceType: JournalSourceType.VENDOR_CREDIT_VOID },
+              debit: { gt: ZERO },
+            },
+            { journal: LEGACY_BILL_APPROVAL, debit: { gt: ZERO } },
+            {
+              journal: {
+                sourceType: null,
+                reversalOf: { is: { ...LEGACY_BILL_APPROVAL, organizationId } },
+              },
+              credit: { gt: ZERO },
+            },
+          ],
         },
-        _sum: { subtotal: true },
+        _sum: { debit: true, credit: true },
       }),
     ]);
 
@@ -855,7 +920,7 @@ export class VatReturnsService {
         .sub(creditedNet._sum.debit ?? ZERO)
         .add(creditedNet._sum.credit ?? ZERO),
       outputVat,
-      totalPurchases: purchases._sum.subtotal ?? ZERO,
+      totalPurchases: (purchases._sum.debit ?? ZERO).sub(purchases._sum.credit ?? ZERO),
       inputVat,
       netPayable: outputVat.sub(inputVat),
     };

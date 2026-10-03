@@ -20,12 +20,13 @@ import { RecordVatPaymentDto } from '../dto/record-vat-payment.dto';
 import { VatReturnQueryDto } from '../dto/vat-return-query.dto';
 import { VatSummaryQueryDto } from '../dto/vat-summary-query.dto';
 import { VatReturnsService } from '../services/vat-returns.service';
+import { VatDecimalInterceptor } from '../interceptors/vat-decimal.interceptor';
 
 @ApiTags('VAT Returns')
 @ApiBearerAuth()
 @Controller('vat-returns')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@UseInterceptors(CacheInvalidationInterceptor)
+@UseInterceptors(CacheInvalidationInterceptor, VatDecimalInterceptor)
 export class VatReturnsController {
   constructor(private readonly vatReturnsService: VatReturnsService) {}
 

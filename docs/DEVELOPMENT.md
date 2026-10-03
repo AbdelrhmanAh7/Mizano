@@ -124,6 +124,14 @@ Rules:
 - Never delete assertions, skip tests or accept a 404 for a required route to get green. Infrastructure failure is reported as blocked, not passed.
 - Demo go/no-go is decided by the [acceptance contract](strategy/demo-acceptance.md), not by unit-test counts or coverage.
 
+### VAT return regression
+
+VAT purchase bases come from posted bill, expense and vendor-credit journal lines, net of their dated reversals, rather than the documents' current status. Historical input VAT accounts remain excluded from the purchase base after defaults change. Pre-linking bill approvals are recognized by their fixed bill reference and AP control line; source-less journals without that evidence are not assumed to be purchases. VAT return HTTP responses format Decimal money as four-place strings.
+
+The regression suite is `apps/api/test/vat-purchases.e2e-spec.ts`. Run it with the seeded purchases suite using `jest --config test/jest-e2e.json --runInBand vat-purchases purchases` from `apps/api`, after migrating an isolated lane DB. Bills currently have no void API (DELETE accepts drafts only), so the bill test seeds a balanced linked reversal after real API approval; expense and vendor-credit voids use their real DELETE commands. This test does not certify a bill-void endpoint. Related work: [PR #65](https://github.com/AbdelrhmanAh7/Mizano/pull/65).
+
+The compatibility runner `_run_tests.js` enables `esModuleInterop`, unlike the normal API Jest configuration. On the current local master baseline, `import * as csv from 'csv-parser'` therefore becomes a non-callable namespace and four import hardening tests fail only under that runner. Compare the service and runner configs with master before attributing this failure to a feature branch.
+
 ## CI
 
 `.github/workflows/ci.yml` runs on pushes and PRs to `master`/`develop`: install (pnpm 8, Node 20, `prisma generate`) → lint and type-check → unit tests (with PostgreSQL 16 and Redis 7 services, `db:push`) → build. E2E is not part of CI yet.
