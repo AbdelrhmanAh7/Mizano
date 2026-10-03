@@ -169,9 +169,10 @@ Historical VPS sizing and provider notes: [archive/deployment-requirements-2026-
 
 ```bash
 cd apps/api
-pnpm exec ts-node --transpile-only -r tsconfig-paths/register   src/modules/ai/extraction/benchmark/run-benchmark.ts   --corpus src/modules/ai/extraction/benchmark/corpus/synthetic   [--labels <file>] [--out <dir>] [--language eng+ara]
+pnpm exec ts-node --transpile-only -r tsconfig-paths/register   src/modules/ai/extraction/benchmark/run-benchmark.ts   --corpus src/modules/ai/extraction/benchmark/corpus/synthetic
 ```
 
+- **Optional flags:** `--labels` sets the labels file, `--out` sets the report directory, and `--language` selects OCR languages (default `eng+ara`).
 - **Corpus:** `.pdf`, `.png`, `.jpg` files go through pdf-parse or Tesseract exactly as uploads do. Images need the pinned Tesseract assets (`INTAKE_TESSDATA_DIR`). `.txt` files stand in for a PDF's native text layer.
 - **Labels:** `labels.json` (default `<corpus>/labels.json`) holds `{ "synthetic": bool, "documents": { "<file>": { invoiceNumber, date, dueDate, vendorTaxId, currency, subtotal, tax, total } } }`. Money is a decimal string, dates are ISO and an absent field is `null`.
 - **Report:** per-field precision (correct / predicted), recall (correct / labelled) and exact match (absence counts), the all-fields-exact share and the NEEDS_REVIEW share. Review routing uses the processor's own rule, assuming an invoice with no duplicate, because classification and duplicate checks need the database. The report also gives hrtime latency p50/p95/max per document and peak RSS. It prints Markdown, and `--out` also writes `benchmark.md` and `benchmark.json`. Only file names and metrics are printed, never document text or values.

@@ -26,6 +26,53 @@ export interface LabelsFile {
   documents: Record<string, FieldValues>;
 }
 
+/** Reject malformed ground truth before any document is opened or scored. */
+export function validateLabels(value: unknown): LabelsFile {
+  if (!isRecord(value) || typeof value.synthetic !== 'boolean' || !isRecord(value.documents)) {
+    throw new Error('Invalid benchmark labels structure');
+  }
+  if (value.note !== undefined && typeof value.note !== 'string') {
+    throw new Error('Invalid benchmark labels note');
+  }
+  const documents: Record<string, FieldValues> = {};
+  for (const [file, fields] of Object.entries(value.documents)) {
+    if (!isRecord(fields)) throw new Error('Invalid benchmark document label');
+    const label = {} as FieldValues;
+    for (const field of BENCHMARK_FIELDS) {
+      const entry = fields[field];
+      if (entry !== null && typeof entry !== 'string') {
+        throw new Error(`Invalid benchmark label field: ${field}`);
+      }
+      if (MONEY_FIELDS.has(field) && entry !== null && !validMoney(entry)) {
+        throw new Error(`Invalid benchmark money label: ${field}`);
+      }
+      label[field] = entry;
+    }
+    Object.defineProperty(documents, file, { value: label, enumerable: true });
+  }
+  return {
+    synthetic: value.synthetic,
+    ...(value.note === undefined ? {} : { note: value.note }),
+    documents,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Unsupported precision is a mismatch, never something to round into correctness. */
+function validMoney(value: string): boolean {
+  try {
+    const decimal = new Decimal(value.trim().replace(/,/g, ''));
+    return (
+      decimal.isFinite() && decimal.gte(0) && decimal.lt('1000000000000000') && decimal.dp() <= 4
+    );
+  } catch {
+    return false;
+  }
+}
+
 export interface DocumentScore {
   file: string;
   latencyMs: number;
@@ -60,7 +107,9 @@ export function normalizeField(field: BenchmarkField, value: string | null): str
   if (trimmed === '') return null;
   if (MONEY_FIELDS.has(field)) {
     try {
-      return new Decimal(trimmed.replace(/,/g, '')).toFixed(4);
+      const decimal = new Decimal(trimmed.replace(/,/g, ''));
+      // Bound before expanding exponents: unsupported inputs must not allocate huge strings.
+      return validMoney(trimmed) ? decimal.toFixed(4) : decimal.toString();
     } catch {
       return trimmed;
     }
@@ -76,7 +125,12 @@ export function compareFields(
 ): Record<BenchmarkField, boolean> {
   const out = {} as Record<BenchmarkField, boolean>;
   for (const field of BENCHMARK_FIELDS) {
-    out[field] = normalizeField(field, predicted[field]) === normalizeField(field, label[field]);
+    const p = normalizeField(field, predicted[field]);
+    const l = normalizeField(field, label[field]);
+    out[field] =
+      p === l &&
+      (!MONEY_FIELDS.has(field) ||
+        ((p === null || validMoney(p)) && (l === null || validMoney(l))));
   }
   return out;
 }
@@ -110,10 +164,11 @@ export function computeFieldMetrics(
     for (const { predicted, label } of rows) {
       const p = normalizeField(field, predicted[field]);
       const l = normalizeField(field, label[field]);
-      if (p === l) exact += 1;
+      const matches = compareFields(predicted, label)[field];
+      if (matches) exact += 1;
       if (p !== null) predictedCount += 1;
       if (l !== null) labelledCount += 1;
-      if (p !== null && p === l) correctPredicted += 1;
+      if (p !== null && matches) correctPredicted += 1;
     }
     out[field] = {
       precision: ratio(correctPredicted, predictedCount),

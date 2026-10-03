@@ -7,6 +7,7 @@ import {
   formatMarkdown,
   normalizeField,
   percentile,
+  validateLabels,
 } from './scoring';
 
 const label = (overrides: Partial<FieldValues> = {}): FieldValues => ({
@@ -36,6 +37,70 @@ describe('benchmark scoring', () => {
     expect(normalizeField('total', '1140.0000')).toBe('1140.0000');
     expect(normalizeField('total', '1140.01')).not.toBe(normalizeField('total', '1140.00'));
     expect(normalizeField('tax', '0.1')).toBe(normalizeField('tax', '0.1000'));
+  });
+
+  it.each([
+    '1.23454',
+    '1.23455',
+    'NaN',
+    'Infinity',
+    '-1',
+    '1000000000000000',
+    '1e1000000',
+    '1e-1000000',
+  ])('never counts unsupported money %s as correct', (total) => {
+    expect(compareFields(label({ total }), label({ total: '1.2345' })).total).toBe(false);
+    expect(compareFields(label({ total }), label({ total })).total).toBe(false);
+    const metrics = computeFieldMetrics([
+      { predicted: label({ total }), label: label({ total }) },
+    ]).total;
+    expect(metrics).toEqual({ precision: 0, recall: 0, exactMatch: 0 });
+  });
+
+  it('retains extra digits rather than rounding them during normalization', () => {
+    expect(normalizeField('total', '1.23454')).toBe('1.23454');
+    expect(compareFields(label({ total: '1.234500' }), label({ total: '1.2345' })).total).toBe(
+      true,
+    );
+  });
+
+  it('validates complete labels including explicit nulls', () => {
+    const input = { synthetic: true, note: 'Synthetic fixture', documents: { 'a.txt': label() } };
+    expect(validateLabels(input)).toEqual(input);
+  });
+
+  it('keeps unsupported exponents compact before scoring', () => {
+    expect(normalizeField('total', '1e1000000')).toBe('1e+1000000');
+    expect(normalizeField('total', '1e-1000000')).toBe('1e-1000000');
+  });
+
+  it.each([
+    null,
+    [],
+    {},
+    { synthetic: 'true', documents: {} },
+    { synthetic: true, documents: [] },
+    { synthetic: true, documents: { 'a.txt': null } },
+    { synthetic: true, documents: { 'a.txt': [] } },
+    { synthetic: true, note: 42, documents: {} },
+  ])('rejects malformed label structure %#', (input) => {
+    expect(() => validateLabels(input)).toThrow('Invalid benchmark');
+  });
+
+  it.each(Object.keys(label()))('rejects missing or non-string/non-null %s', (field) => {
+    const missing: Record<string, unknown> = { ...label() };
+    delete missing[field];
+    for (const fields of [missing, { ...label(), [field]: 42 }, { ...label(), [field]: {} }]) {
+      expect(() => validateLabels({ synthetic: true, documents: { 'a.txt': fields } })).toThrow(
+        'Invalid benchmark label field',
+      );
+    }
+  });
+
+  it('rejects unsupported precision in ground truth', () => {
+    expect(() =>
+      validateLabels({ synthetic: true, documents: { 'a.txt': label({ total: '1.23454' }) } }),
+    ).toThrow('Invalid benchmark money label');
   });
 
   it('normalizes tax ids, currencies and blanks', () => {

@@ -52,6 +52,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **When storage changes (net vs. gross), update every view:** list, detail, PDF and report. _(tax-inclusive expenses)_
 - **Keep accepted amounts.** Converting a quote copies its stored lines and totals rather than recomputing them.
 
+- **Benchmark exact money before rounding or numeric adapters.** Carry original Decimal strings into scoring, reject unsupported ground-truth precision and count unsupported predictions as mismatches. Check bounds before expanding exponents with `toFixed`, so unsupported values cannot allocate enormous strings.
+
 ## 7. Tenancy, roles and validation
 
 - **Scope every tenant resource by `organizationId`** in queries, locks and lookups. Child rows are scoped through their tenant-scoped parent, and pre-authentication lookups such as login by email are the documented exception. Another tenant's ids return 404 (or 400 when they come from the body), and soft-deleted parents return 404.
@@ -94,6 +96,9 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
+
+- **Validate benchmark labels at the JSON boundary.** Require a document map and every scored field as a string or explicit null before opening corpus files.
+- **OCR must fail closed without local language assets.** Check all requested traineddata files before image benchmarking and worker creation; require readable, nonempty regular files and never allow a CDN fallback. Use static error codes to distinguish configuration failures without logging paths.
 
 ## Review process
 

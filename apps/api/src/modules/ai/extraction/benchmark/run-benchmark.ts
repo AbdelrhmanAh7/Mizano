@@ -13,14 +13,16 @@ import { needsReview } from '../../intake/intake-processor.service';
 import { buildExtractionContext } from '../../services/document-intake.service';
 import { DocumentExtractionResult } from '../../services/ollama.service';
 import { ExtractionContext } from '../extraction-strategy.interface';
-import { RulesStrategy } from '../rules-strategy.service';
+import { ExactMoney, requireLocalOcrAssets, RulesStrategy } from '../rules-strategy.service';
+import { describeError } from '../../../../common/utils/redact';
+import Decimal from 'decimal.js';
 import {
   buildReport,
   compareFields,
   DocumentScore,
   FieldValues,
   formatMarkdown,
-  LabelsFile,
+  validateLabels,
 } from './scoring';
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -37,19 +39,22 @@ function arg(name: string): string | undefined {
 }
 
 function money(value: number | null): string | null {
-  return value === null ? null : value.toFixed(4);
+  return value === null ? null : new Decimal(value.toString()).toFixed();
 }
 
-export function toFieldValues(e: DocumentExtractionResult | null): FieldValues {
+export function toFieldValues(
+  e: DocumentExtractionResult | null,
+  exactMoney?: ExactMoney,
+): FieldValues {
   return {
     invoiceNumber: e?.invoiceNumber ?? null,
     date: e?.date ?? null,
     dueDate: e?.dueDate ?? null,
     vendorTaxId: e?.vendorTaxId ?? null,
     currency: e?.currency ?? null,
-    subtotal: money(e?.subtotal ?? null),
-    tax: money(e?.tax ?? null),
-    total: money(e?.total ?? null),
+    subtotal: exactMoney ? exactMoney.subtotal : money(e?.subtotal ?? null),
+    tax: exactMoney ? exactMoney.tax : money(e?.tax ?? null),
+    total: exactMoney ? exactMoney.total : money(e?.total ?? null),
   };
 }
 
@@ -79,7 +84,7 @@ async function contextFor(
   return (await buildExtractionContext(buffer, mimeType, language, file)).context;
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   const corpus = arg('corpus');
   if (!corpus) throw new Error('--corpus <dir> is required');
   const corpusDir = resolve(corpus);
@@ -90,7 +95,14 @@ async function main(): Promise<void> {
   // Strategy logs are metadata-only, but keep the report readable.
   Logger.overrideLogger(['error']);
 
-  const labels = JSON.parse(readFileSync(labelsPath, 'utf8')) as LabelsFile;
+  const labels = validateLabels(JSON.parse(readFileSync(labelsPath, 'utf8')));
+  if (
+    Object.keys(labels.documents).some((file) =>
+      MIME_BY_EXT[extname(file).toLowerCase()]?.startsWith('image/'),
+    )
+  ) {
+    requireLocalOcrAssets(language);
+  }
   const strategy = new RulesStrategy();
   const rows: Array<{ predicted: FieldValues; label: FieldValues; score: DocumentScore }> = [];
   let peakRss = process.memoryUsage().rss;
@@ -104,7 +116,7 @@ async function main(): Promise<void> {
     peakRss = Math.max(peakRss, process.memoryUsage().rss);
 
     const extraction = result?.extraction ?? null;
-    const predicted = toFieldValues(extraction);
+    const predicted = toFieldValues(extraction, result?.exactMoney);
     // Classification and duplicate checks need the database; the benchmark assumes an
     // invoice with no duplicate, so only extraction-driven review reasons count.
     const review = needsReview({
@@ -140,13 +152,15 @@ async function main(): Promise<void> {
   }
 }
 
+export function benchmarkError(error: unknown): string {
+  return `Benchmark failed: ${describeError(error, { includeMessage: false })}\n`;
+}
+
 if (require.main === module) {
   main().then(
     () => process.exit(0),
     (error: unknown) => {
-      process.stderr.write(
-        `Benchmark failed: ${error instanceof Error ? error.message : 'unknown error'}\n`,
-      );
+      process.stderr.write(benchmarkError(error));
       process.exit(1);
     },
   );
