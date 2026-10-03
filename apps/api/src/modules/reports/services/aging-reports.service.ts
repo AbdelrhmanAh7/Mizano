@@ -48,14 +48,44 @@ export interface StatementTransaction {
   credit: Decimal;
 }
 
+/** Journal source types that reverse a voided document (see `JournalSourceType`). */
+type VoidSourceType = 'PAYMENT_RECEIVED_VOID' | 'PAYMENT_MADE_VOID' | 'VENDOR_CREDIT_VOID';
+
 @Injectable()
 export class AgingReportsService {
   constructor(private prisma: ReadReplicaService) {}
 
   /**
-   * Voided payments with the accounting date of the void: the reversal journal's date (which
-   * `JournalsService.reverse` takes from the original entry, so a future-dated payment voided early
-   * is reversed on its own date), falling back to `deletedAt` for legacy voids without a journal.
+   * Accounting date of each void, by source id: the date of its posted reversal journal (which
+   * `JournalsService.reverse` takes as `max(today, original date)`, so a future-dated document
+   * voided early is reversed on its own date). A void without a journal (a legacy one) is absent
+   * and the caller falls back to `deletedAt`. Every as-of or period report dates voids through
+   * here, never on `deletedAt` alone, so they agree with the ledger they reconcile to.
+   */
+  private async voidJournalDates(
+    organizationId: string,
+    sourceType: VoidSourceType,
+    sourceIds: string[],
+  ): Promise<Map<string, Date>> {
+    const dates = new Map<string, Date>();
+    if (sourceIds.length === 0) return dates;
+    const journals = await this.prisma.journal.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+        isPosted: true,
+        sourceType,
+        sourceId: { in: sourceIds },
+      },
+      select: { sourceId: true, date: true },
+    });
+    for (const j of journals) if (j.sourceId) dates.set(j.sourceId, j.date);
+    return dates;
+  }
+
+  /**
+   * Voided payments with the accounting date of the void: the reversal journal's date, falling back
+   * to `deletedAt` for legacy voids without a journal.
    */
   private async paymentVoids(
     model: 'paymentReceived' | 'paymentMade',
@@ -77,18 +107,11 @@ export class AgingReportsService {
         ? await this.prisma.paymentReceived.findMany({ where })
         : await this.prisma.paymentMade.findMany({ where });
     if (rows.length === 0) return [];
-    const journals = await this.prisma.journal.findMany({
-      where: {
-        organizationId,
-        deletedAt: null,
-        isPosted: true,
-        sourceType,
-        sourceId: { in: rows.map((r) => r.id) },
-      },
-      select: { sourceId: true, date: true },
-    });
-    const dates = new Map<string, Date>();
-    for (const j of journals) if (j.sourceId) dates.set(j.sourceId, j.date);
+    const dates = await this.voidJournalDates(
+      organizationId,
+      sourceType,
+      rows.map((r) => r.id),
+    );
     return rows.map((r) => ({
       id: r.id,
       paymentNumber: r.paymentNumber,
@@ -318,23 +341,38 @@ export class AgingReportsService {
       },
     });
 
-    // Live, unapplied, unrefunded vendor credits already debited AP but reduced no bill: they are
-    // shown per vendor and netted in `summary.netTotal`, which reconciles to the AP control account.
-    const credits = await this.prisma.vendorCredit.findMany({
+    // Unapplied, unrefunded vendor credits already debited AP but reduced no bill: they are shown
+    // per vendor and netted in `summary.netTotal`, which reconciles to the AP control account.
+    const candidates = await this.prisma.vendorCredit.findMany({
       where: {
         organizationId,
         // Limitation: there is no applied-at column, so a credit applied to a bill after the
         // cutoff is still treated as applied (it is netted through the bill's current balance).
         appliedToBillId: null,
-        // Refunded/voided after the cutoff: the credit still debited AP on the cutoff date.
-        AND: [
-          { OR: [{ refundedAt: null }, { refundedAt: { gt: date } }] },
-          { OR: [{ deletedAt: null }, { deletedAt: { gt: date } }] },
-        ],
+        // Refunded after the cutoff: the credit still debited AP on the cutoff date. The refund
+        // journal carries the same date as `refundedAt`.
+        OR: [{ refundedAt: null }, { refundedAt: { gt: date } }],
+        // No `deletedAt` filter: a credit voided after the cutoff was still live on it.
         date: { lte: date },
       },
-      select: { vendorId: true, amount: true, vendor: { select: { id: true, name: true } } },
+      select: {
+        id: true,
+        vendorId: true,
+        amount: true,
+        deletedAt: true,
+        vendor: { select: { id: true, name: true } },
+      },
     });
+    // A void counts only once its reversal journal is dated on or before the cutoff (deletedAt
+    // only for legacy voids without a journal), the same rule as the receivables aging.
+    const voidDates = await this.voidJournalDates(
+      organizationId,
+      'VENDOR_CREDIT_VOID',
+      candidates.flatMap((c) => (c.deletedAt ? [c.id] : [])),
+    );
+    const credits = candidates.filter(
+      (c) => c.deletedAt === null || (voidDates.get(c.id) ?? c.deletedAt) > date,
+    );
     const creditsByVendor = new Map<string, { vendorName: string; amount: Decimal }>();
     for (const credit of credits) {
       const row = creditsByVendor.get(credit.vendorId) ?? {

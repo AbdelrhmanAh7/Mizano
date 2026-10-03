@@ -1,8 +1,9 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { AssetStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { DepreciationService } from './depreciation.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { JournalsService } from '../../accounting/services/journals.service';
 
 const ORG = 'org-1';
 
@@ -12,7 +13,7 @@ function fixture() {
     id: 'a1',
     name: 'Laptop',
     assetNumber: 'FA-001',
-    status: AssetStatus.ACTIVE,
+    status: AssetStatus.ACTIVE as AssetStatus,
     salvageValue: new Decimal(0),
     purchasePrice: new Decimal(1000),
     depreciationAccountId: 'dep',
@@ -21,6 +22,8 @@ function fixture() {
   const schedule = {
     id: 's1',
     assetId: asset.id,
+    month: 1,
+    year: 2026,
     amount: new Decimal(100),
     accumulatedTotal: new Decimal(100),
     bookValue: new Decimal(900),
@@ -90,9 +93,19 @@ function fixture() {
       },
     ),
   };
+  const journals = {
+    reverse: jest.fn(async (..._args: unknown[]) => {
+      calls.push('reverse');
+      return { id: 'rev1' };
+    }),
+  };
   return {
-    service: new DepreciationService(prisma as unknown as PrismaService),
+    service: new DepreciationService(
+      prisma as unknown as PrismaService,
+      journals as unknown as JournalsService,
+    ),
     prisma,
+    journals,
     calls,
     schedule,
     asset,
@@ -220,21 +233,272 @@ describe('DepreciationService ledger lock', () => {
     await expect(service.runDepreciationForAsset(ORG, 'a1')).rejects.toThrow(ConflictException);
     expect(prisma.asset.update).not.toHaveBeenCalled();
   });
+});
 
-  it('reverse also reads its execution marker inside the same ledger lock', async () => {
-    const { service, prisma, calls, schedule } = fixture();
-    schedule.executedAt = new Date();
-    schedule.journalId = 'j1';
+describe('DepreciationService reversal', () => {
+  interface Entry {
+    id: string;
+    month: number;
+    year: number;
+    accumulatedTotal: Decimal;
+    bookValue: Decimal;
+  }
+
+  /**
+   * Only `$transaction` exists on the outer client, so any query that bypasses the transaction
+   * client (and with it the ledger lock) fails the test.
+   */
+  function setup() {
+    const calls: string[] = [];
+    const asset = {
+      id: 'a1',
+      status: AssetStatus.ACTIVE as AssetStatus,
+      purchasePrice: new Decimal(1000),
+    };
+    const schedule = {
+      id: 's1',
+      assetId: 'a1',
+      month: 2,
+      year: 2026,
+      executedAt: new Date('2026-02-28T00:00:00Z') as Date | null,
+      journalId: 'j2' as string | null,
+      asset,
+    };
+    const state = {
+      schedule: schedule as typeof schedule | null,
+      later: null as { id: string } | null,
+      previous: {
+        id: 's0',
+        month: 1,
+        year: 2026,
+        accumulatedTotal: new Decimal(100),
+        bookValue: new Decimal(900),
+      } as Entry | null,
+      guardCount: 1,
+    };
+    const lock = jest.fn();
+    const tables = {
+      depreciationSchedule: {
+        findFirst: jest.fn(async (args: { where: { id?: string; OR?: unknown } }) => {
+          if (args.where.id === 's1') {
+            calls.push('schedule');
+            return state.schedule && { ...state.schedule };
+          }
+          if (args.where.OR) {
+            calls.push('later');
+            return state.later;
+          }
+          calls.push('previous');
+          return state.previous;
+        }),
+        updateMany: jest.fn(async (..._args: unknown[]) => {
+          calls.push('transition');
+          return { count: state.guardCount };
+        }),
+      },
+      asset: {
+        update: jest.fn(async (..._args: unknown[]) => {
+          calls.push('asset');
+          return asset;
+        }),
+      },
+      journal: { update: jest.fn(), updateMany: jest.fn(), create: jest.fn() },
+    };
+    const tx = {
+      ...tables,
+      $executeRaw: jest.fn(async () => {
+        calls.push('lock');
+        lock();
+        return 1;
+      }),
+    };
+    const prisma = {
+      $transaction: jest.fn(async (fn: (client: typeof tx) => Promise<unknown>) => fn(tx)),
+    };
+    const journals = {
+      reverse: jest.fn(async (..._args: unknown[]) => {
+        calls.push('reverse');
+        return { id: 'rev1' };
+      }),
+    };
+    const service = new DepreciationService(
+      prisma as unknown as PrismaService,
+      journals as unknown as JournalsService,
+    );
+    return { service, tx, tables, journals, calls, asset, schedule, state, lock };
+  }
+
+  it('posts a linked reversal in the locked transaction and never un-posts the original', async () => {
+    const { service, tx, tables, journals, calls } = setup();
+
     await service.reverseDepreciation(ORG, 's1');
-    expect(calls).toEqual(['lock', 'schedule']);
-    expect(prisma.depreciationSchedule.findFirst).toHaveBeenCalledWith({
+
+    expect(calls).toEqual([
+      'lock',
+      'schedule',
+      'later',
+      'transition',
+      'reverse',
+      'previous',
+      'asset',
+    ]);
+    // The shared reversal command: dated max(today, original), period lock enforced, linked by
+    // reversalOfId. The original journal is not touched.
+    expect(journals.reverse).toHaveBeenCalledWith(ORG, 'j2', undefined, { tx });
+    expect(tables.journal.update).not.toHaveBeenCalled();
+    expect(tables.journal.updateMany).not.toHaveBeenCalled();
+    expect(tables.journal.create).not.toHaveBeenCalled();
+    expect(tables.depreciationSchedule.findFirst).toHaveBeenNthCalledWith(1, {
       where: { id: 's1', organizationId: ORG },
-      include: { asset: true, journal: true },
+      include: { asset: true },
     });
-    expect(prisma.depreciationSchedule.findMany).toHaveBeenCalledWith({
+    expect(tables.depreciationSchedule.updateMany).toHaveBeenCalledWith({
+      where: { id: 's1', organizationId: ORG, executedAt: { not: null }, journalId: 'j2' },
+      data: { journalId: null, executedAt: null },
+    });
+  });
+
+  it('only looks for a later executed entry of the same asset and organization', async () => {
+    const { service, tables } = setup();
+
+    await service.reverseDepreciation(ORG, 's1');
+
+    expect(tables.depreciationSchedule.findFirst).toHaveBeenNthCalledWith(2, {
+      where: {
+        assetId: 'a1',
+        organizationId: ORG,
+        executedAt: { not: null },
+        OR: [{ year: { gt: 2026 } }, { year: 2026, month: { gt: 2 } }],
+      },
+      select: { id: true },
+    });
+  });
+
+  it('takes the asset back to the previous executed entry', async () => {
+    const { service, tables } = setup();
+
+    await service.reverseDepreciation(ORG, 's1');
+
+    expect(tables.depreciationSchedule.findFirst).toHaveBeenNthCalledWith(3, {
       where: { assetId: 'a1', organizationId: ORG, executedAt: { not: null } },
       orderBy: [{ year: 'desc' }, { month: 'desc' }],
-      take: 1,
     });
+    expect(tables.asset.update).toHaveBeenCalledWith({
+      where: { id: 'a1', organizationId: ORG },
+      data: {
+        accumulatedDepreciation: new Decimal(100),
+        currentBookValue: new Decimal(900),
+        status: AssetStatus.ACTIVE,
+      },
+    });
+  });
+
+  it('resets the asset to its purchase price when no executed entry is left', async () => {
+    const { service, tables, state, asset } = setup();
+    state.previous = null;
+    asset.status = AssetStatus.FULLY_DEPRECIATED;
+
+    await service.reverseDepreciation(ORG, 's1');
+
+    expect(tables.asset.update).toHaveBeenCalledWith({
+      where: { id: 'a1', organizationId: ORG },
+      data: {
+        accumulatedDepreciation: new Decimal(0),
+        currentBookValue: new Decimal(1000),
+        status: AssetStatus.ACTIVE,
+      },
+    });
+  });
+
+  it('rejects an entry that is not the latest executed one and writes nothing', async () => {
+    const { service, tables, journals, state } = setup();
+    state.later = { id: 's3' };
+
+    await expect(service.reverseDepreciation(ORG, 's1')).rejects.toThrow(BadRequestException);
+    await expect(service.reverseDepreciation(ORG, 's1')).rejects.toThrow(
+      /Only the latest executed depreciation entry can be reversed/,
+    );
+
+    expect(tables.depreciationSchedule.updateMany).not.toHaveBeenCalled();
+    expect(journals.reverse).not.toHaveBeenCalled();
+    expect(tables.asset.update).not.toHaveBeenCalled();
+  });
+
+  it.each([AssetStatus.DISPOSED, AssetStatus.SOLD])(
+    'refuses to reverse the depreciation of a %s asset',
+    async (status) => {
+      const { service, tables, journals, asset } = setup();
+      asset.status = status;
+
+      await expect(service.reverseDepreciation(ORG, 's1')).rejects.toThrow(
+        'Depreciation of a disposed asset cannot be reversed',
+      );
+
+      expect(journals.reverse).not.toHaveBeenCalled();
+      expect(tables.asset.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('is a 404 for an unknown schedule or one of another organization', async () => {
+    const { service, tables, journals, state } = setup();
+    state.schedule = null;
+
+    await expect(service.reverseDepreciation(ORG, 's1')).rejects.toThrow(NotFoundException);
+
+    // The lookup is scoped by organization, so a foreign id finds nothing.
+    expect(tables.depreciationSchedule.findFirst).toHaveBeenCalledWith({
+      where: { id: 's1', organizationId: ORG },
+      include: { asset: true },
+    });
+    expect(journals.reverse).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['was not executed', null, 'j2', 'Depreciation was not executed'],
+    ['has no linked journal', new Date('2026-02-28T00:00:00Z'), null, /no linked ledger entry/],
+  ])('refuses an entry that %s', async (_label, executedAt, journalId, message) => {
+    const { service, schedule, journals, tables } = setup();
+    schedule.executedAt = executedAt;
+    schedule.journalId = journalId;
+
+    await expect(service.reverseDepreciation(ORG, 's1')).rejects.toThrow(message);
+
+    expect(journals.reverse).not.toHaveBeenCalled();
+    expect(tables.asset.update).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the entry after waiting for the lock', async () => {
+    const { service, schedule, journals, tables, lock } = setup();
+    // A concurrent reversal committed while this request waited for the ledger lock.
+    lock.mockImplementation(() => {
+      schedule.executedAt = null;
+      schedule.journalId = null;
+    });
+
+    await expect(service.reverseDepreciation(ORG, 's1')).rejects.toThrow(
+      'Depreciation was not executed',
+    );
+
+    expect(journals.reverse).not.toHaveBeenCalled();
+    expect(tables.depreciationSchedule.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('aborts on a lost execution guard before posting a reversal', async () => {
+    const { service, tables, journals, state } = setup();
+    state.guardCount = 0;
+
+    await expect(service.reverseDepreciation(ORG, 's1')).rejects.toThrow(ConflictException);
+
+    expect(journals.reverse).not.toHaveBeenCalled();
+    expect(tables.asset.update).not.toHaveBeenCalled();
+  });
+
+  it('leaves the asset alone when the reversal itself is refused', async () => {
+    const { service, tables, journals } = setup();
+    journals.reverse.mockRejectedValue(new BadRequestException('This period is locked'));
+
+    await expect(service.reverseDepreciation(ORG, 's1')).rejects.toThrow('This period is locked');
+
+    expect(tables.asset.update).not.toHaveBeenCalled();
   });
 });

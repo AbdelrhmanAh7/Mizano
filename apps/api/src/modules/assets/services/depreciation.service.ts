@@ -1,17 +1,27 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { AssetStatus, Prisma } from '@prisma/client';
 import { describeError } from '../../../common/utils/redact';
 import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
+import { JournalsService } from '../../accounting/services/journals.service';
 import { money, sumDecimals } from '../../reports/utils/report-utils';
 
 @Injectable()
 export class DepreciationService {
   private readonly logger = new Logger(DepreciationService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private journalsService: JournalsService,
+  ) {}
 
   /**
    * Run monthly depreciation for all organizations
@@ -337,62 +347,89 @@ export class DepreciationService {
   }
 
   /**
-   * Reverse a depreciation entry
+   * Reverses the latest executed depreciation entry of an asset. Posted history is immutable: the
+   * original journal stays posted and a linked, dated reversal journal (the shared
+   * `JournalsService.reverse` command: `max(today, original date)`, period lock enforced) takes the
+   * expense back. Lock order: ledger -> asset, like depreciation and disposal.
+   *
+   * Only the latest executed entry can be reversed. The asset's accumulated depreciation and book
+   * value follow its latest executed entry, so reversing an earlier month while later ones stay
+   * executed would reverse the ledger but leave the asset untouched. A disposed asset is refused:
+   * its disposal journal already removed the accumulated depreciation.
    */
   async reverseDepreciation(organizationId: string, scheduleId: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       await lockOrganizationLedger(tx, organizationId);
+      // Everything below is read after the lock, so a concurrent run, reversal or disposal that
+      // held it first is already visible.
       const schedule = await tx.depreciationSchedule.findFirst({
         where: { id: scheduleId, organizationId },
-        include: {
-          asset: true,
-          journal: true,
-        },
+        include: { asset: true },
       });
 
       if (!schedule) {
-        throw new Error('Depreciation schedule not found');
+        throw new NotFoundException('Depreciation schedule not found');
       }
-
       if (!schedule.executedAt) {
-        throw new Error('Depreciation was not executed');
+        throw new BadRequestException('Depreciation was not executed');
+      }
+      if (!schedule.journalId) {
+        throw new BadRequestException(
+          'This depreciation entry has no linked ledger entry and cannot be reversed',
+        );
+      }
+      if (
+        schedule.asset.status === AssetStatus.DISPOSED ||
+        schedule.asset.status === AssetStatus.SOLD
+      ) {
+        throw new BadRequestException('Depreciation of a disposed asset cannot be reversed');
       }
 
-      // Mark schedule as not executed
-      await tx.depreciationSchedule.update({
-        where: { id: scheduleId, organizationId },
-        data: {
-          journalId: null,
-          executedAt: null,
-        },
-      });
-
-      // Void the journal entry by marking it as not posted
-      if (schedule.journalId) {
-        await tx.journal.update({
-          where: { id: schedule.journalId, organizationId },
-          data: { isPosted: false },
-        });
-      }
-
-      // Recalculate asset accumulated depreciation
-      const executedSchedules = await tx.depreciationSchedule.findMany({
+      const later = await tx.depreciationSchedule.findFirst({
         where: {
           assetId: schedule.assetId,
           organizationId,
           executedAt: { not: null },
+          OR: [
+            { year: { gt: schedule.year } },
+            { year: schedule.year, month: { gt: schedule.month } },
+          ],
         },
-        orderBy: [{ year: 'desc' }, { month: 'desc' }],
-        take: 1,
+        select: { id: true },
       });
+      if (later) {
+        throw new BadRequestException(
+          'Only the latest executed depreciation entry can be reversed; reverse the later periods first',
+        );
+      }
 
-      const lastExecuted = executedSchedules[0];
+      // Guarded transition first: a lost guard aborts before anything is posted.
+      const transition = await tx.depreciationSchedule.updateMany({
+        where: {
+          id: scheduleId,
+          organizationId,
+          executedAt: { not: null },
+          journalId: schedule.journalId,
+        },
+        data: { journalId: null, executedAt: null },
+      });
+      if (transition.count !== 1) {
+        throw new ConflictException('Depreciation was changed concurrently');
+      }
+
+      await this.journalsService.reverse(organizationId, schedule.journalId, undefined, { tx });
+
+      // The previous executed entry (if any) is the asset's new latest one.
+      const previous = await tx.depreciationSchedule.findFirst({
+        where: { assetId: schedule.assetId, organizationId, executedAt: { not: null } },
+        orderBy: [{ year: 'desc' }, { month: 'desc' }],
+      });
 
       await tx.asset.update({
         where: { id: schedule.assetId, organizationId },
         data: {
-          accumulatedDepreciation: lastExecuted?.accumulatedTotal || new Decimal(0),
-          currentBookValue: lastExecuted?.bookValue || schedule.asset.purchasePrice,
+          accumulatedDepreciation: previous?.accumulatedTotal ?? new Decimal(0),
+          currentBookValue: previous?.bookValue ?? schedule.asset.purchasePrice,
           status: AssetStatus.ACTIVE,
         },
       });

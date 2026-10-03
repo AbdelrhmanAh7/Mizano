@@ -13,6 +13,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **A check and the write it guards share one transaction and one lock.** Duplicate and overlap checks run inside the same tx as the insert, under an advisory lock. _(VAT period overlap)_
 - **Reload mutable posting state after waiting for the ledger lock.** Payroll status, depreciation execution markers and asset book values read before the lock can be stale. Asset disposal and depreciation use ledger → asset consistently; skipped scheduled entries do not count as processed. _(PR #66)_
 - **Lock every record you read to decide a mutation.** For example, voiding a credit note must lock the note before reading `appliedToInvoiceId`, or a concurrent apply slips through. _(credit-note void vs. apply)_
+- **A posting command is one transaction from claim to commit.** Take the ledger lock, claim the document with a guarded transition (`updateMany({ where: { id, organizationId, status: FROM } })` plus a count check), then write stock movements, the journal and the closing fields with that same `tx`. A status read outside the transaction, or side writes through the outer client, let a retry or a concurrent call post twice, or leave a journal behind a document that is still open. Guard every other path that can overwrite the closed state (cancel) the same way. _(work-order completion, PR #66)_
 
 ## 2. Idempotency and retries
 
@@ -36,6 +37,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Side records carry the document date.** Inventory movements are dated on the adjustment date, not on `createdAt` = now.
 - **Historical reports keep later-voided documents in their original period** and show the reversal on the void date. Filtering on today's status rewrites history. _(customer statement)_
 - **An as-of report rebuilds balances from dated events.** Today's stored `balanceDue` is not a historical balance: subtract only payments and credits dated on or before the cutoff, and count a void only if its reversal journal is dated on or before the cutoff. _(receivables aging)_
+- **Date every void through its reversal journal.** `deletedAt` is only the fallback for legacy voids that have no journal. Payment voids on statements and the vendor credits netted in payables aging go through `voidJournalDates`, receivables aging reads the same journals, and no report decides a void's date on `deletedAt` alone. _(payables aging, PR #66)_
 
 ## 5. Single-currency ledger and data
 
@@ -69,6 +71,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 8. Voided and deleted records
 
 - **Posted documents that were voided stay readable** (read-only, with `deletedAt` set) on their detail endpoint so journal source links resolve. Lists exclude them. Deleted drafts, which never posted, return 404.
+- **Correct posted history with a linked reversal, never by setting `isPosted: false`.** Call `JournalsService.reverse` (dated `max(today, original date)`, period lock enforced, linked by `reversalOfId`). A schedule-driven entry follows its latest executed row (asset book value), so reverse only the latest one and refuse once the asset is disposed. _(depreciation reversal, PR #66)_
 - **Current figures (open balances, aging, dashboards) exclude DRAFT, VOID and deleted documents.** Historical statements and period reports keep a posted document that was voided later in its original period, with the reversal on the void date (see 4).
 
 ## 9. Reports must reconcile

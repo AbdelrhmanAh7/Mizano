@@ -11,7 +11,7 @@ import { Prisma } from '@prisma/client';
 import { ApiHelper } from './helpers/api-client.helper';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TEST_PASSWORD, TestTenant } from './helpers/tenant.helper';
-import { isoDay } from './helpers/journey.helper';
+import { eventually, isoDay } from './helpers/journey.helper';
 import { createAccount } from './helpers/postings.helper';
 import { cashAccountIds, ledgerNetByAccount, natural } from './helpers/reports.helper';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -491,6 +491,49 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       expect(
         D(dash.overview.netPosition).equals(D(dash.overview.totalReceivables).sub(control)),
       ).toBe(true);
+    });
+
+    it('payables aging as of a past date keeps a vendor credit voided later and equals AP as of then', async () => {
+      // Dated three days ago and voided today: the void is dated on its reversal journal (today),
+      // so yesterday the credit still debited AP and is still netted. Today it nets to nothing.
+      const credit = await a.post('/vendor-credits').send({
+        vendorId,
+        billId,
+        date: isoDay(-3),
+        reason: 'Overbilled',
+        amount: '10',
+      });
+      expect(credit.status).toBe(201);
+      expect((await a.delete(`/vendor-credits/${credit.body.id}`)).status).toBe(200);
+      const reversal = await prisma.journal.findFirstOrThrow({
+        where: {
+          organizationId: tenantA.organizationId,
+          sourceType: 'VENDOR_CREDIT_VOID',
+          sourceId: credit.body.id,
+        },
+      });
+      expect(reversal.date.toISOString().slice(0, 10)).toBe(today);
+
+      const asOf = isoDay(-1);
+      const aging = (await a.get('/reports/payables-aging').query({ asOfDate: asOf })).body;
+      const net = await ledgerNetByAccount(
+        prisma,
+        tenantA.organizationId,
+        new Date(`${asOf}T23:59:59.999Z`),
+      );
+      const apAsOf = net.get(acc.ap) as { type: string; net: Prisma.Decimal };
+      const control = natural(apAsOf.type, apAsOf.net);
+      // Bills 912 + 456, less the 100 payment (dated yesterday), the 50 credit and this 10 one.
+      expect(control.equals('1208')).toBe(true);
+      expect(D(aging.summary.netTotal).equals(control)).toBe(true);
+      expect(D(aging.summary.unappliedCredits).equals('60')).toBe(true);
+
+      const current = await eventually(async () => {
+        const body = (await a.get('/reports/payables-aging')).body;
+        expect(D(body.summary.unappliedCredits).equals('50')).toBe(true);
+        return body;
+      });
+      expect(D(current.summary.netTotal).equals('1218')).toBe(true);
     });
 
     it('customer statements are exact, show credit notes and net voided payments', async () => {
