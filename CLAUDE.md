@@ -197,7 +197,7 @@ if (!totalDebits.equals(totalCredits)) throw new BadRequestException('Journal en
 - API tests (native Windows pnpm supported): `cd apps/api && npx jest [--testPathPattern="<pattern>"]`
 - Web tests: `cd apps/web && npx jest [--testPathPattern="<pattern>"]`
 - For application code changes, run affected tests plus full API/web suites and builds, and seeded E2E/browser acceptance separately. Documentation-only changes need content/link/format checks and repository CI; CI scripts need offline behavior tests.
-- `_run_tests.js` is a legacy WSL symlink workaround. Its custom `esModuleInterop: true` configuration has the known `csv-parser` namespace-import failure; do not use it as the standard runner.
+- `_run_tests.js` is a legacy WSL symlink workaround, not the standard runner. The API `tsconfig.json` and that runner both enable `esModuleInterop`, so import callable CommonJS modules such as `csv-parser` with a default import (a namespace import is not callable).
 
 ## Git Hooks
 

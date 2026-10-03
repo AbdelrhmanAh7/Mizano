@@ -67,7 +67,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-The repository pins pnpm 8.14.0; CI and Docker use Node 20. Native Windows pnpm and `cd apps/api && npx jest` are supported; `_run_tests.js` is a legacy workaround with a known csv-parser/esModuleInterop failure. Rules extraction exists without an LLM; optional advisory inference still needs its backend. Pinned CPU dependencies and arm64 image/deployment evidence remain release work.
+The repository pins pnpm 8.14.0; CI and Docker use Node 20. Native Windows pnpm and `cd apps/api && npx jest` are supported; `_run_tests.js` is a legacy WSL workaround, not the standard runner. Rules extraction exists without an LLM; optional advisory inference still needs its backend. Pinned CPU dependencies and arm64 image/deployment evidence remain release work.
 
 | Service    | Development port     |
 | ---------- | -------------------- |

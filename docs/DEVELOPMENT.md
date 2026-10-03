@@ -116,9 +116,16 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 
 Native Windows pnpm works with the package Jest configuration. Use `cd apps/api && npx jest`
 (or `pnpm test:api`) and bound workers on a small host (`--maxWorkers=2`). `_run_tests.js`,
-`_jest.config.js` and `_jest_resolver.js` are a legacy WSL symlink workaround. That custom
-config forces `esModuleInterop: true`, causing the known `csv-parser` namespace-import
-failure (`csv is not a function`); it is not the standard runner.
+`_jest.config.js` and `_jest_resolver.js` are a legacy WSL symlink workaround, not the
+standard runner.
+
+The API compiler (`apps/api/tsconfig.json`) enables `esModuleInterop`, matching the legacy
+runner's ts-jest setting, so both runners compile imports the same way. Import callable
+CommonJS modules such as `csv-parser` with a default import; a namespace import becomes an
+object under this setting (`csv is not a function`). For the import regression check, run
+`node apps/api/_run_tests.js --testPathPattern=import --runInBand` from the repository root,
+then run `npx jest src/modules/import-export --runInBand` from `apps/api` to verify the
+standard Jest configuration too. Run targeted tests serially on shared low-memory hosts.
 
 For seeded API E2E, use a dedicated `mizano_e2e_<lane>` database on `127.0.0.1:5435`
 and Redis on `127.0.0.1:6380`. Create the lane database, set `DATABASE_URL`/`REDIS_URL`
