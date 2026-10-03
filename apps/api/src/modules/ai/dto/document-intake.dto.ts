@@ -3,7 +3,6 @@ import {
   IsOptional,
   IsIn,
   IsArray,
-  Matches,
   ArrayMinSize,
   IsObject,
   IsInt,
@@ -15,7 +14,18 @@ import {
   IsDateString,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import {
+  IsDecimalString,
+  MAX_INTEGER_DIGITS,
+  MAX_FRACTION_DIGITS,
+} from '../../../common/dto/decimal-string';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+/** Bulk approval uses the same precision bounds as the confirm DTO. */
+export const DECIMAL_STRING_PATTERN = new RegExp(
+  `^\\d{1,${MAX_INTEGER_DIGITS}}(\\.\\d{1,${MAX_FRACTION_DIGITS}})?$`,
+);
+export const PERCENT_STRING_PATTERN = new RegExp(`^\\d{1,${MAX_INTEGER_DIGITS}}(\\.\\d{1,2})?$`);
 
 export class ProcessDocumentDto {
   @ApiPropertyOptional({
@@ -47,11 +57,6 @@ export class ProcessDocumentDto {
   strategy?: 'fast' | 'slow' | 'ocr' | 'hybrid' | 'vlm' | 'auto';
 }
 
-/** Non-negative decimal string, e.g. "2", "100.50". No exponents, no signs. */
-export const DECIMAL_STRING_PATTERN = /^\d{1,15}(\.\d{1,6})?$/;
-/** Percentage string with at most 2 decimal places (matches Decimal(5,2) storage). */
-export const PERCENT_STRING_PATTERN = /^\d{1,3}(\.\d{1,2})?$/;
-
 export class ConfirmIntakeLineDto {
   @ApiPropertyOptional({ description: 'Item ID to link', example: 'clx123...' })
   @IsString()
@@ -77,12 +82,12 @@ export class ConfirmIntakeLineDto {
 
   @ApiProperty({ description: 'Quantity as a decimal string', example: '2' })
   @IsString()
-  @Matches(DECIMAL_STRING_PATTERN, { message: 'quantity must be a non-negative decimal string' })
+  @IsDecimalString()
   quantity: string;
 
   @ApiProperty({ description: 'Unit price / rate as a decimal string', example: '100.00' })
   @IsString()
-  @Matches(DECIMAL_STRING_PATTERN, { message: 'rate must be a non-negative decimal string' })
+  @IsDecimalString()
   rate: string;
 
   @ApiPropertyOptional({
@@ -93,9 +98,7 @@ export class ConfirmIntakeLineDto {
   })
   @IsString()
   @IsOptional()
-  @Matches(PERCENT_STRING_PATTERN, {
-    message: 'taxRatePercent must be a percentage with at most 2 decimal places',
-  })
+  @IsDecimalString(2)
   taxRatePercent?: string;
 
   @ApiPropertyOptional({
@@ -104,9 +107,7 @@ export class ConfirmIntakeLineDto {
   })
   @IsString()
   @IsOptional()
-  @Matches(PERCENT_STRING_PATTERN, {
-    message: 'discountPercent must be a percentage with at most 2 decimal places',
-  })
+  @IsDecimalString(2)
   discountPercent?: string;
 }
 

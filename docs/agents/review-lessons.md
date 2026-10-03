@@ -48,6 +48,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Use Decimal end to end for money arithmetic and comparisons, and send fixed 4-dp strings.** No `parseFloat`, `Number()` or `toNumber()` in sums, balances or checks. Converting an exact API string to a number only at the display boundary (formatting, chart plotting via `moneyToNumber`) is allowed.
 - **Bound inputs to `Decimal(19,4)`:** at most 15 integer and 4 fraction digits, validated with `common/dto/decimal-string.ts`. Bound computed totals before writing.
+- **When merging validator replacements, preserve exported contracts used by intake consumers.** Bulk readiness patterns must match the confirm DTO's precision limits; verify both with boundary tests. Removing conflict markers alone can leave missing exports or incompatible validation.
 - **Allocate VAT cumulatively.** Each partial credit's VAT = `round(totalVAT × cumulative/total) − already allocated`, so the parts sum exactly to the whole.
 - **The web preview rounds per line exactly like the server** (`computeDocumentTotals`), otherwise the shown and stored totals differ.
 - **When storage changes (net vs. gross), update every view:** list, detail, PDF and report. _(tax-inclusive expenses)_

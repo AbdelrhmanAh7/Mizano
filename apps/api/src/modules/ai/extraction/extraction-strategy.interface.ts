@@ -1,7 +1,7 @@
 import { DocumentExtractionResult } from '../services/ollama.service';
 
 /** Strategy names for document extraction. */
-export type ExtractionStrategyName = 'vlm' | 'ocr-llm' | 'hybrid';
+export type ExtractionStrategyName = 'vlm' | 'ocr-llm' | 'hybrid' | 'rules';
 
 /** Configurable strategy selection (includes auto mode and scan-speed presets). */
 export type ExtractionStrategyOption = ExtractionStrategyName | 'auto' | 'fast' | 'slow';
