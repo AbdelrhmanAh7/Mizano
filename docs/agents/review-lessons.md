@@ -85,6 +85,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 11. Web UI
 
+- **Prune message keys only against the real message files.** Specs mock next-intl, so a deleted key still passes them and breaks at runtime. Before removing a key, check every `useTranslations('<namespace>')` plus its `t('key')` calls (and dynamic `t()` families), and keep any key that is still referenced. _(intake.scan.currencyMismatch)_
 - **Every new string needs en and ar,** including dialog titles, confirm and cancel buttons, placeholders, selector labels and report row names. Shared components accept localized label props.
 - **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed.
 - **Bind async intake updates to the active job for the entire operation:** invalidate pending uploads, retries, lookups, streams and redirects on navigation/reset, and remove the previous draft before rendering a new job.

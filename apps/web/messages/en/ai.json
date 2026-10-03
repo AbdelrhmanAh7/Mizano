@@ -320,6 +320,9 @@
       "classifying": "Classifying document...",
       "matching": "Matching vendors and customers...",
       "processing": "Processing..."
+    },
+    "scan": {
+      "currencyMismatch": "The document currency differs from your organization's base currency. Foreign-currency documents are not supported yet."
     }
   }
 }
