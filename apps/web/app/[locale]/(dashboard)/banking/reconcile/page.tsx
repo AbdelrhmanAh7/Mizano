@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import Link from 'next/link';
 import { RefreshCw, ArrowRight, Landmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,17 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import {
-  useBankAccounts,
-  getAccountTypeColor,
-  formatCurrency,
-  BankAccount,
-} from '@/lib/hooks/use-bank-accounts';
+import { useBankAccounts, getAccountTypeColor, BankAccount } from '@/lib/hooks/use-bank-accounts';
 import { useTranslations } from 'next-intl';
 
 export default function ReconcilePage() {
   const t = useTranslations('banking');
   const { data, isLoading } = useBankAccounts({ isActive: true });
+  const money = useDocumentMoney();
   const accounts: BankAccount[] = data?.data || [];
 
   if (isLoading) {
@@ -90,13 +87,13 @@ export default function ReconcilePage() {
                       <span className="text-muted-foreground">
                         {t('reconciliation.bookBalance')}
                       </span>
-                      <span className="font-mono">{formatCurrency(currentBalance)}</span>
+                      <span className="font-mono">{money(currentBalance, account.currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">
                         {t('reconciliation.bankBalance')}
                       </span>
-                      <span className="font-mono">{formatCurrency(bankBalance || 0)}</span>
+                      <span className="font-mono">{money(bankBalance || 0, account.currency)}</span>
                     </div>
                     <div className="border-t pt-2 flex justify-between">
                       <span
@@ -113,7 +110,7 @@ export default function ReconcilePage() {
                           needsReconciliation ? 'text-yellow-600' : 'text-green-600',
                         )}
                       >
-                        {formatCurrency(difference)}
+                        {money(difference, account.currency)}
                       </span>
                     </div>
                   </div>

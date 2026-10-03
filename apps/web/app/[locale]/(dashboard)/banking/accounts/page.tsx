@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { Plus, MoreHorizontal, Eye, Pencil, Trash2 } from 'lucide-react';
@@ -38,7 +39,6 @@ import {
   useDeleteBankAccount,
   getAccountTypeLabel,
   getAccountTypeColor,
-  formatCurrency,
   BankAccount,
   BankAccountType,
 } from '@/lib/hooks/use-bank-accounts';
@@ -47,6 +47,7 @@ import { useTranslations } from 'next-intl';
 function BankAccountsPageContent() {
   const t = useTranslations('banking');
   const tableParams = useTableParams({ defaultSortBy: 'name' });
+  const money = useDocumentMoney();
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -134,7 +135,7 @@ function BankAccountsPageContent() {
           <span
             className={cn('font-bold font-mono', balance < 0 ? 'text-red-600' : 'text-green-600')}
           >
-            {formatCurrency(balance)}
+            {money(balance, row.original.currency)}
           </span>
         );
       },
@@ -207,7 +208,7 @@ function BankAccountsPageContent() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Total Balance</p>
-              <p className="text-3xl font-bold font-mono">{formatCurrency(totalBalance)}</p>
+              <p className="text-3xl font-bold font-mono">{money(totalBalance)}</p>
             </div>
             <div className="text-right">
               <p className="text-sm text-muted-foreground">Active Accounts</p>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -21,12 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import {
-  useExpense,
-  useDeleteExpense,
-  usePostExpense,
-  formatCurrency,
-} from '@/lib/hooks/use-expenses';
+import { useExpense, useDeleteExpense, usePostExpense } from '@/lib/hooks/use-expenses';
 import { sumDecimals } from '@/lib/decimal';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 
@@ -41,6 +37,7 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
   const router = useRouter();
   const { hasPermission } = usePermissions();
   const { data: expense, isLoading } = useExpense(id);
+  const money = useDocumentMoney();
   const deleteExpense = useDeleteExpense();
 
   const canDelete = hasPermission('purchases.delete');
@@ -150,10 +147,8 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">{formatCurrency(amount)}</div>
-            {hasTax && (
-              <p className="text-sm text-muted-foreground">+ {formatCurrency(taxAmount)} tax</p>
-            )}
+            <div className="text-2xl font-bold font-mono">{money(amount)}</div>
+            {hasTax && <p className="text-sm text-muted-foreground">+ {money(taxAmount)} tax</p>}
           </CardContent>
         </Card>
 
@@ -164,7 +159,7 @@ export default function ExpenseDetailPage({ params }: ExpenseDetailPageProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono text-red-600">{formatCurrency(total)}</div>
+            <div className="text-2xl font-bold font-mono text-red-600">{money(total)}</div>
             {expense.taxInclusive && hasTax && (
               <p className="text-sm text-muted-foreground">{t('expenses.taxInclusive')}</p>
             )}

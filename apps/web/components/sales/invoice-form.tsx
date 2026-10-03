@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useEffect } from 'react';
 import { useForm, Control, FieldValues, UseFormWatch, UseFormSetValue } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -151,6 +152,7 @@ export function InvoiceForm({
     }
   }, [invoice, form, taxRates]);
 
+  const money = useDocumentMoney();
   const selectedCustomerId = form.watch('customerId');
   const selectedCustomer = customers.find((c: Customer) => c.id === selectedCustomerId);
 
@@ -299,7 +301,6 @@ export function InvoiceForm({
         name="lines"
         taxRates={taxRates}
         taxRatesStatus={taxRatesStatus}
-        currency={selectedCustomer?.currency || 'USD'}
         showTax={true}
         showDiscount={true}
       />
@@ -328,12 +329,7 @@ export function InvoiceForm({
             <div className="border-t pt-4 mt-2 w-64">
               <div className="flex justify-between text-lg font-semibold">
                 <span>Grand Total</span>
-                <span className="font-mono">
-                  {new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: selectedCustomer?.currency || 'USD',
-                  }).format(grandTotal)}
-                </span>
+                <span className="font-mono">{money(grandTotal)}</span>
               </div>
             </div>
           </div>

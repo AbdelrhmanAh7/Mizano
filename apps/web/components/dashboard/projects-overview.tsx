@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useTranslations } from 'next-intl';
 import { FolderKanban } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { ProjectOverview, formatCurrency } from '@/lib/hooks/use-dashboard';
+import { ProjectOverview } from '@/lib/hooks/use-dashboard';
 import { Link } from '@/i18n/routing';
 
 interface ProjectsOverviewProps {
@@ -47,6 +48,7 @@ function getStatusLabel(status: string, t: (key: string) => string): string {
 }
 
 export function ProjectsOverview({ projects }: ProjectsOverviewProps) {
+  const money = useDocumentMoney();
   const t = useTranslations('common.dashboard.projects');
 
   return (
@@ -100,7 +102,7 @@ export function ProjectsOverview({ projects }: ProjectsOverviewProps) {
                       )}
                     />
                     <span className="text-[10px] text-muted-foreground font-mono shrink-0">
-                      {formatCurrency(project.revenue)} / {formatCurrency(project.budget)}
+                      {money(project.revenue)} / {money(project.budget)}
                     </span>
                   </div>
                 )}

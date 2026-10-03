@@ -9,7 +9,7 @@ import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 
 interface BillStatusChartProps {
   data: BillStatusItem[];
-  currency?: string;
+  currency: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -26,7 +26,7 @@ const FALLBACK_COLOR = '#94a3b8';
 
 export const BillStatusChart = memo(function BillStatusChart({
   data,
-  currency = 'USD',
+  currency,
 }: BillStatusChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

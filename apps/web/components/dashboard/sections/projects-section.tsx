@@ -1,5 +1,6 @@
 'use client';
 
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -31,6 +32,7 @@ interface ProjectsSectionProps {
 }
 
 export function ProjectsSection({ enabled }: ProjectsSectionProps) {
+  const currency = useBaseCurrency();
   const { data: budgetData } = useProjectBudgets(enabled);
   const { data: hoursData } = useBillableHours(enabled);
   const { data: taskData } = useTaskStatus(enabled);
@@ -39,12 +41,20 @@ export function ProjectsSection({ enabled }: ProjectsSectionProps) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {budgetData ? <ProjectBudgetsChart data={budgetData} /> : <ChartSkeleton />}
+        {budgetData && currency ? (
+          <ProjectBudgetsChart data={budgetData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
         {hoursData ? <BillableHoursChart data={hoursData} /> : <ChartSkeleton />}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {taskData ? <TaskStatusChart data={taskData} /> : <ChartSkeleton />}
-        {profitData ? <ProjectProfitabilityChart data={profitData} /> : <ChartSkeleton />}
+        {profitData && currency ? (
+          <ProjectProfitabilityChart data={profitData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
       </div>
     </div>
   );

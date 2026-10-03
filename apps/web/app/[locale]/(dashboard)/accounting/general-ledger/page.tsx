@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -45,15 +46,8 @@ const formatAmount = (amount: number | string): string => {
   }).format(num);
 };
 
-const formatCurrency = (amount: number | string, currency = 'USD'): string => {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(num);
-};
-
 export default function GeneralLedgerPage() {
+  const money = useDocumentMoney();
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [dateFrom, setDateFrom] = useState(format(subMonths(new Date(), 3), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -186,9 +180,7 @@ export default function GeneralLedgerPage() {
                   {/* Opening Balance */}
                   <TableRow className="bg-muted/50 font-semibold">
                     <TableCell colSpan={5}>Opening Balance</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(openingBalance)}
-                    </TableCell>
+                    <TableCell className="text-right font-mono">{money(openingBalance)}</TableCell>
                   </TableRow>
 
                   {entries.length === 0 ? (
@@ -217,7 +209,7 @@ export default function GeneralLedgerPage() {
                           {formatAmount(entry.credit)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(entry.runningBalance)}
+                          {money(entry.runningBalance)}
                         </TableCell>
                       </TableRow>
                     ))
@@ -226,9 +218,7 @@ export default function GeneralLedgerPage() {
                   {/* Closing Balance */}
                   <TableRow className="border-t-2 bg-muted/50 font-semibold">
                     <TableCell colSpan={5}>Closing Balance</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(closingBalance)}
-                    </TableCell>
+                    <TableCell className="text-right font-mono">{money(closingBalance)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>

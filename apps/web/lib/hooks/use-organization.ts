@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { formatCompactMoney, formatMoney } from '@/lib/format-money';
 
 // ============ Types ============
 
@@ -292,6 +293,31 @@ export function documentCurrency(
   baseCurrency: string | undefined,
 ): string | undefined {
   return currencyCode || baseCurrency;
+}
+
+/** Shown instead of an amount while the display currency is still unknown (never a guessed one). */
+export const UNKNOWN_CURRENCY_AMOUNT = '—';
+
+/**
+ * Formats an amount in the document currency, falling back to the organization base currency.
+ * While neither is known it renders a placeholder instead of a default currency.
+ */
+export function useDocumentMoney(): (
+  amount: string | number | null | undefined,
+  currencyCode?: string | null,
+) => string {
+  const baseCurrency = useBaseCurrency();
+  return (amount, currencyCode) => {
+    const currency = documentCurrency(currencyCode, baseCurrency);
+    return currency ? formatMoney(amount, currency) : UNKNOWN_CURRENCY_AMOUNT;
+  };
+}
+
+/** Compact variant of useDocumentMoney for the organization base currency. */
+export function useCompactMoney(): (amount: number) => string {
+  const baseCurrency = useBaseCurrency();
+  return (amount) =>
+    baseCurrency ? formatCompactMoney(amount, baseCurrency) : UNKNOWN_CURRENCY_AMOUNT;
 }
 
 export function useAllSettings() {

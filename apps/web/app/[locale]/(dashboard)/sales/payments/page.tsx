@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
 import { ImportWizard } from '@/components/import/import-wizard';
@@ -33,6 +34,7 @@ import { Suspense, useState } from 'react';
 
 function PaymentsReceivedPageContent() {
   const t = useTranslations('sales');
+  const money = useDocumentMoney();
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
 
@@ -78,14 +80,6 @@ function PaymentsReceivedPageContent() {
         ]
       : []),
   ];
-
-  const formatCurrency = (amount: string | number, currency: string = 'USD') => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(num);
-  };
 
   const paymentModeOptions = getPaymentModeOptions();
 
@@ -159,7 +153,7 @@ function PaymentsReceivedPageContent() {
         headerClassName: 'text-right',
         cellClassName: 'text-right font-mono text-green-600 font-semibold',
       },
-      cell: ({ row }) => formatCurrency(row.original.amount),
+      cell: ({ row }) => money(row.original.amount),
     },
     {
       id: 'actions',

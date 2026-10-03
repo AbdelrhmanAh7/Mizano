@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { CustomerAIInsights } from '@/components/ai';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
@@ -26,7 +27,6 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import {
   Customer,
-  formatCurrency,
   getBalanceColor,
   useDeleteCustomer,
   useInfiniteCustomers,
@@ -47,6 +47,7 @@ import { Suspense, useState } from 'react';
 function CustomersPageContent() {
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
+  const money = useDocumentMoney();
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const { onExportAll } = useExportAll('customers', 'customers');
@@ -180,7 +181,7 @@ function CustomersPageContent() {
         const balance = parseFloat(row.original.outstandingBalance || '0');
         return (
           <span className={cn('font-mono font-medium', getBalanceColor(balance))}>
-            {formatCurrency(balance, row.original.currency)}
+            {money(balance, row.original.currency)}
           </span>
         );
       },

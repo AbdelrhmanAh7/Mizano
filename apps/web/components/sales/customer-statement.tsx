@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
@@ -14,7 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCustomerStatement, Customer, formatCurrency } from '@/lib/hooks/use-customers';
+import { useCustomerStatement, Customer } from '@/lib/hooks/use-customers';
 import { moneyToNumber } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
@@ -31,9 +32,9 @@ const SOURCE_ROUTES: Record<'invoice' | 'payment' | 'creditNote', (id: string) =
 };
 
 /** Shows a fixed-scale decimal string as currency, or a dash for zero (display only). */
-function showAmount(value: string, currency: string): string {
+function showAmount(value: string, format: (amount: number) => string): string {
   const n = moneyToNumber(value);
-  return n === 0 ? '-' : formatCurrency(n, currency);
+  return n === 0 ? '-' : format(n);
 }
 
 function balanceClass(value: string): string {
@@ -41,12 +42,12 @@ function balanceClass(value: string): string {
   return n > 0 ? 'text-red-600' : n < 0 ? 'text-green-600' : '';
 }
 
-export function CustomerStatement({ customerId, customer }: CustomerStatementProps) {
+export function CustomerStatement({ customerId }: CustomerStatementProps) {
   const t = useTranslations('sales.customers.statement');
   const tc = useTranslations('common');
   const { data: statement, isLoading, isError, refetch } = useCustomerStatement(customerId);
 
-  const currency = customer?.currency || 'USD';
+  const money = useDocumentMoney();
 
   if (isLoading) {
     return (
@@ -81,7 +82,7 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground">{t('totalInvoiced')}</div>
             <div className="text-2xl font-bold font-mono text-blue-600">
-              {formatCurrency(moneyToNumber(statement.totalInvoiced), currency)}
+              {money(moneyToNumber(statement.totalInvoiced))}
             </div>
           </CardContent>
         </Card>
@@ -90,7 +91,7 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground">{t('totalPaid')}</div>
             <div className="text-2xl font-bold font-mono text-green-600">
-              {formatCurrency(moneyToNumber(statement.totalCredits), currency)}
+              {money(moneyToNumber(statement.totalCredits))}
             </div>
           </CardContent>
         </Card>
@@ -101,7 +102,7 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
             <div
               className={cn('text-2xl font-bold font-mono', balanceClass(statement.closingBalance))}
             >
-              {formatCurrency(moneyToNumber(statement.closingBalance), currency)}
+              {money(moneyToNumber(statement.closingBalance))}
             </div>
           </CardContent>
         </Card>
@@ -136,7 +137,7 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
                       {t('openingBalance')}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(moneyToNumber(statement.openingBalance), currency)}
+                      {money(moneyToNumber(statement.openingBalance))}
                     </TableCell>
                   </TableRow>
                 )}
@@ -167,13 +168,13 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
                       </Link>
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {showAmount(line.debit, currency)}
+                      {showAmount(line.debit, money)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {showAmount(line.credit, currency)}
+                      {showAmount(line.credit, money)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(moneyToNumber(line.balance), currency)}
+                      {money(moneyToNumber(line.balance))}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -184,10 +185,10 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
                     {t('balanceDue')}
                   </TableCell>
                   <TableCell className="text-right font-mono font-semibold">
-                    {formatCurrency(moneyToNumber(statement.totalDebits), currency)}
+                    {money(moneyToNumber(statement.totalDebits))}
                   </TableCell>
                   <TableCell className="text-right font-mono font-semibold">
-                    {formatCurrency(moneyToNumber(statement.totalCredits), currency)}
+                    {money(moneyToNumber(statement.totalCredits))}
                   </TableCell>
                   <TableCell
                     className={cn(
@@ -195,7 +196,7 @@ export function CustomerStatement({ customerId, customer }: CustomerStatementPro
                       balanceClass(statement.closingBalance),
                     )}
                   >
-                    {formatCurrency(moneyToNumber(statement.closingBalance), currency)}
+                    {money(moneyToNumber(statement.closingBalance))}
                   </TableCell>
                 </TableRow>
               </TableBody>

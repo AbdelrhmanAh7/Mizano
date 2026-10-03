@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft, Edit, Mail, Phone, MapPin, CreditCard } from 'lucide-react';
@@ -16,12 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-  useVendor,
-  formatVendorAddress,
-  formatCurrency,
-  getBalanceColor,
-} from '@/lib/hooks/use-vendors';
+import { useVendor, formatVendorAddress, getBalanceColor } from '@/lib/hooks/use-vendors';
 import {
   useBills,
   getStatusVariant as getBillStatusVariant,
@@ -54,6 +50,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
   const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();
   const { data: vendor, isLoading } = useVendor(id);
+  const money = useDocumentMoney();
   const { data: billsData, isLoading: billsLoading } = useBills({ vendorId: id, limit: 100 });
   const { data: expensesData, isLoading: expensesLoading } = useExpenses({
     vendorId: id,
@@ -157,7 +154,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
               </CardHeader>
               <CardContent>
                 <div className={cn('text-2xl font-bold font-mono', getBalanceColor(balance))}>
-                  {formatCurrency(balance, vendor.currency)}
+                  {money(balance)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">{t('vendors.amountOwed')}</p>
               </CardContent>
@@ -362,10 +359,10 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(bill.grandTotal, vendor.currency)}
+                          {money(bill.grandTotal, bill.currencyCode)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(bill.balanceDue, vendor.currency)}
+                          {money(bill.balanceDue, bill.currencyCode)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -404,7 +401,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                         <TableCell>{expense.account?.name ?? '-'}</TableCell>
                         <TableCell>{expense.description ?? '-'}</TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(expense.amount, vendor.currency)}
+                          {money(expense.amount)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -450,7 +447,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                         <TableCell>{format(new Date(payment.date), 'MMM dd, yyyy')}</TableCell>
                         <TableCell>{formatPaymentMode(payment.paymentMode)}</TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(payment.amount, vendor.currency)}
+                          {money(payment.amount)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -504,7 +501,7 @@ export default function VendorDetailPage({ params }: VendorDetailPageProps) {
                           )}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(credit.amount, vendor.currency)}
+                          {money(credit.amount)}
                         </TableCell>
                       </TableRow>
                     ))}

@@ -14,12 +14,12 @@ interface SalesByItemData {
 
 interface SalesByItemChartProps {
   data: SalesByItemData[];
-  currency?: string;
+  currency: string;
 }
 
 export const SalesByItemChart = memo(function SalesByItemChart({
   data,
-  currency = 'USD',
+  currency,
 }: SalesByItemChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

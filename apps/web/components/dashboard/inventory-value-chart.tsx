@@ -22,12 +22,12 @@ interface InventoryValuePoint {
 
 interface InventoryValueChartProps {
   data: InventoryValuePoint[];
-  currency?: string;
+  currency: string;
 }
 
 export const InventoryValueChart = memo(function InventoryValueChart({
   data,
-  currency = 'USD',
+  currency,
 }: InventoryValueChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { sumDecimals } from '@/lib/decimal';
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import {
@@ -18,13 +20,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCustomers, formatCurrency } from '@/lib/hooks/use-customers';
+import { useCustomers } from '@/lib/hooks/use-customers';
 import { useInvoices } from '@/lib/hooks/use-invoices';
 import { useQuotes } from '@/lib/hooks/use-quotes';
 import { differenceInDays } from 'date-fns';
 
 export default function SalesPage() {
   const t = useTranslations('sales');
+  const money = useDocumentMoney();
   const { data: customersData, isLoading: customersLoading } = useCustomers({ limit: 100 });
   const { data: invoicesData, isLoading: invoicesLoading } = useInvoices({ limit: 100 });
   const { data: quotesData, isLoading: quotesLoading } = useQuotes({ limit: 100 });
@@ -36,27 +39,25 @@ export default function SalesPage() {
   const isLoading = customersLoading || invoicesLoading || quotesLoading;
 
   // Calculate metrics
-  const totalOutstanding = customers.reduce(
-    (sum: number, c: { outstandingBalance?: string }) =>
-      sum + parseFloat(c.outstandingBalance || '0'),
-    0,
+  const totalOutstanding = sumDecimals(
+    customers.map((c: { outstandingBalance?: string }) => c.outstandingBalance || '0'),
   );
 
   const overdueInvoices = invoices.filter((i: { status: string }) => i.status === 'OVERDUE');
-  const overdueAmount = overdueInvoices.reduce(
-    (sum: number, i: { balanceDue?: string }) => sum + parseFloat(i.balanceDue || '0'),
-    0,
+  const overdueAmount = sumDecimals(
+    overdueInvoices.map((i: { balanceDue?: string }) => i.balanceDue || '0'),
   );
 
   const pendingQuotes = quotes.filter((q: { status: string }) => q.status === 'SENT');
-  const pendingQuotesTotal = pendingQuotes.reduce(
-    (sum: number, q: { grandTotal?: string }) => sum + parseFloat(q.grandTotal || '0'),
-    0,
+  const pendingQuotesTotal = sumDecimals(
+    pendingQuotes.map((q: { grandTotal?: string }) => q.grandTotal || '0'),
   );
 
-  const paidThisMonth = invoices
-    .filter((i: { status: string }) => i.status === 'PAID')
-    .reduce((sum: number, i: { grandTotal?: string }) => sum + parseFloat(i.grandTotal || '0'), 0);
+  const paidThisMonth = sumDecimals(
+    invoices
+      .filter((i: { status: string }) => i.status === 'PAID')
+      .map((i: { grandTotal?: string }) => i.grandTotal || '0'),
+  );
 
   const modules = [
     {
@@ -150,7 +151,7 @@ export default function SalesPage() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">{formatCurrency(totalOutstanding, 'USD')}</div>
+              <div className="text-2xl font-bold">{money(totalOutstanding)}</div>
             )}
             <p className="text-xs text-muted-foreground">Across {customers.length} customers</p>
           </CardContent>
@@ -165,9 +166,7 @@ export default function SalesPage() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(overdueAmount, 'USD')}
-              </div>
+              <div className="text-2xl font-bold text-red-600">{money(overdueAmount)}</div>
             )}
             <p className="text-xs text-muted-foreground">
               {overdueInvoices.length} overdue invoices
@@ -184,7 +183,7 @@ export default function SalesPage() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">{formatCurrency(pendingQuotesTotal, 'USD')}</div>
+              <div className="text-2xl font-bold">{money(pendingQuotesTotal)}</div>
             )}
             <p className="text-xs text-muted-foreground">
               {pendingQuotes.length} quotes awaiting response
@@ -201,9 +200,7 @@ export default function SalesPage() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(paidThisMonth, 'USD')}
-              </div>
+              <div className="text-2xl font-bold text-green-600">{money(paidThisMonth)}</div>
             )}
             <p className="text-xs text-muted-foreground">From paid invoices</p>
           </CardContent>
@@ -255,6 +252,7 @@ export default function SalesPage() {
                       invoiceNumber: string;
                       status: string;
                       grandTotal?: string;
+                      currencyCode?: string | null;
                       date: string;
                       customer?: { name?: string };
                     }) => (
@@ -276,7 +274,7 @@ export default function SalesPage() {
                             {inv.status}
                           </Badge>
                           <p className="text-sm font-mono mt-1">
-                            {formatCurrency(parseFloat(inv.grandTotal || '0'), 'USD')}
+                            {money(inv.grandTotal || '0', inv.currencyCode)}
                           </p>
                         </div>
                       </div>
@@ -310,6 +308,7 @@ export default function SalesPage() {
                       invoiceNumber: string;
                       dueDate: string;
                       balanceDue?: string;
+                      currencyCode?: string | null;
                       customer?: { name?: string };
                     }) => {
                       const daysOverdue = differenceInDays(new Date(), new Date(inv.dueDate));
@@ -330,7 +329,7 @@ export default function SalesPage() {
                           <div className="text-right">
                             <p className="text-xs text-red-600">{daysOverdue} days overdue</p>
                             <p className="text-sm font-mono font-semibold text-red-600">
-                              {formatCurrency(parseFloat(inv.balanceDue || '0'), 'USD')}
+                              {money(inv.balanceDue || '0', inv.currencyCode)}
                             </p>
                           </div>
                         </div>

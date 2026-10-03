@@ -18,12 +18,12 @@ import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 
 interface ExpenseTrendChartProps {
   data: ExpenseTrendPoint[];
-  currency?: string;
+  currency: string;
 }
 
 export const ExpenseTrendChart = memo(function ExpenseTrendChart({
   data,
-  currency = 'USD',
+  currency,
 }: ExpenseTrendChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

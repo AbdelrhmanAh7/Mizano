@@ -24,14 +24,14 @@ interface TopCustomer {
 
 interface TopCustomersChartProps {
   data: TopCustomer[];
-  currency?: string;
+  currency: string;
 }
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'];
 
 export const TopCustomersChart = memo(function TopCustomersChart({
   data,
-  currency = 'USD',
+  currency,
 }: TopCustomersChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

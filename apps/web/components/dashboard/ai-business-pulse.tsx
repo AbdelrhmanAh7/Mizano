@@ -1,5 +1,6 @@
 'use client';
 
+import { useCompactMoney } from '@/lib/hooks/use-organization';
 import { memo } from 'react';
 import { Brain, TrendingUp, AlertTriangle, Sparkles, CalendarClock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,7 +10,6 @@ import { cn } from '@/lib/utils';
 import { useQuickCashForecast } from '@/lib/hooks/use-ai-cash-flow';
 import { useAlertSummary } from '@/lib/hooks/use-ai-alerts';
 import { useWeeklySnapshot } from '@/lib/hooks/use-ai-narrative';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 
 function PulseSection({
   icon: Icon,
@@ -40,6 +40,7 @@ function ForecastCell({
   label: string;
   data?: { low: number; expected: number; high: number };
 }) {
+  const compact = useCompactMoney();
   return (
     <div className="text-center">
       <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
@@ -47,9 +48,9 @@ function ForecastCell({
       </p>
       {data ? (
         <>
-          <p className="text-base font-bold font-mono">{formatCompactCurrency(data.expected)}</p>
+          <p className="text-base font-bold font-mono">{compact(data.expected)}</p>
           <p className="text-[10px] text-muted-foreground">
-            {formatCompactCurrency(data.low)} – {formatCompactCurrency(data.high)}
+            {compact(data.low)} – {compact(data.high)}
           </p>
         </>
       ) : (
@@ -70,6 +71,7 @@ function SectionSkeleton() {
 }
 
 export const AIBusinessPulse = memo(function AIBusinessPulse() {
+  const compact = useCompactMoney();
   const { data: cashForecast, isLoading: cashLoading } = useQuickCashForecast();
   const { data: alertSummary, isLoading: alertsLoading } = useAlertSummary();
   const { data: weeklySnapshot, isLoading: narrativeLoading } = useWeeklySnapshot();
@@ -118,7 +120,7 @@ export const AIBusinessPulse = memo(function AIBusinessPulse() {
                   {criticalDates.slice(0, 2).map((cd, i) => (
                     <div key={i} className="flex items-center gap-1.5">
                       <span className="text-xs font-mono text-red-600">
-                        {formatCompactCurrency(Math.abs(cd.impact))}
+                        {compact(Math.abs(cd.impact))}
                       </span>
                       <span className="text-xs text-muted-foreground truncate">{cd.reason}</span>
                     </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useCompactMoney } from '@/lib/hooks/use-organization';
 import { memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +17,6 @@ import {
   Legend,
 } from 'recharts';
 import { useRevenueForecast, type RevenueForcast } from '@/lib/hooks/use-ai-insights';
-import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 
 function formatMonth(dateStr: string): string {
   const d = new Date(dateStr);
@@ -24,6 +24,7 @@ function formatMonth(dateStr: string): string {
 }
 
 export const RevenueForecastChart = memo(function RevenueForecastChart() {
+  const compact = useCompactMoney();
   const { data, isLoading } = useRevenueForecast(6);
 
   const forecasts: RevenueForcast[] = Array.isArray(data?.data)
@@ -92,11 +93,11 @@ export const RevenueForecastChart = memo(function RevenueForecastChart() {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                tickFormatter={(v) => formatCompactCurrency(v)}
+                tickFormatter={(v) => compact(v)}
               />
               <Tooltip
                 formatter={(value, name) => [
-                  typeof value === 'number' ? formatCompactCurrency(value) : '—',
+                  typeof value === 'number' ? compact(value) : '—',
                   name === 'actual'
                     ? 'Actual Revenue'
                     : name === 'predicted'

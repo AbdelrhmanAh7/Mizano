@@ -18,12 +18,12 @@ import { RevenueYoYPoint } from '@/lib/hooks/use-dashboard-sections';
 
 interface RevenueYoYChartProps {
   data: RevenueYoYPoint[];
-  currency?: string;
+  currency: string;
 }
 
 export const RevenueYoYChart = memo(function RevenueYoYChart({
   data,
-  currency = 'USD',
+  currency,
 }: RevenueYoYChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -79,6 +80,7 @@ export function CreditNoteForm({
   onCancel,
   isSubmitting,
 }: CreditNoteFormProps) {
+  const money = useDocumentMoney();
   const { data: customersData } = useCustomers({ limit: 100 });
   const customers = customersData?.data || [];
 
@@ -134,13 +136,7 @@ export function CreditNoteForm({
     }
   }, [selectedInvoice, form]);
 
-  const formatCurrency = (amount: string | number) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(num);
-  };
+  const formatCurrency = (amount: string | number) => money(amount);
 
   const handleSubmit = (data: CreditNoteFormData) => {
     onSubmit(data);

@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -33,7 +34,6 @@ import {
   getItemTypeLabel,
   getItemTypeColor,
   getStockStatus,
-  formatCurrency,
 } from '@/lib/hooks/use-items';
 
 interface ItemDetailPageProps {
@@ -45,6 +45,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
   const { id } = params;
   const router = useRouter();
   const { data: item, isLoading } = useItem(id);
+  const money = useDocumentMoney();
   const deleteItem = useDeleteItem();
 
   const handleDelete = async () => {
@@ -150,7 +151,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               <div>
                 <p className="text-sm text-muted-foreground">{t('items.table.sellingPrice')}</p>
                 <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(item.salesPrice || item.sellingPrice)}
+                  {money(item.salesPrice || item.sellingPrice)}
                 </p>
               </div>
             </div>
@@ -165,7 +166,7 @@ export default function ItemDetailPage({ params }: ItemDetailPageProps) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">{t('items.table.costPrice')}</p>
-                <p className="text-2xl font-bold font-mono">{formatCurrency(item.purchasePrice)}</p>
+                <p className="text-2xl font-bold font-mono">{money(item.purchasePrice)}</p>
               </div>
             </div>
           </CardContent>

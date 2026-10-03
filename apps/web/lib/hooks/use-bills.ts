@@ -2,7 +2,7 @@
 
 import { useToast } from '@/components/ui/use-toast';
 import { billsApi } from '@/lib/api';
-import { decimalToDisplayNumber } from '@/lib/decimal';
+import { formatMoney } from '@/lib/format-money';
 import { useInfiniteTableData } from '@/lib/hooks/use-infinite-table-data';
 import { invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -365,12 +365,8 @@ export function getStatusText(status: BillStatus | string): string {
  */
 export function formatCurrency(
   amount: string | number,
-  currency: string = 'USD',
+  currency: string,
   locale = 'en-US',
 ): string {
-  const num = typeof amount === 'string' ? decimalToDisplayNumber(amount) : amount;
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency,
-  }).format(Number.isFinite(num) ? num : 0);
+  return formatMoney(amount, currency, locale);
 }

@@ -1,11 +1,12 @@
 'use client';
 
+import { useBaseCurrency, useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useTranslations } from 'next-intl';
 import { Building2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { BankAccountSummary, formatCurrency } from '@/lib/hooks/use-dashboard';
+import { BankAccountSummary } from '@/lib/hooks/use-dashboard';
 import { Link } from '@/i18n/routing';
 
 interface BankAccountsSummaryProps {
@@ -14,6 +15,8 @@ interface BankAccountsSummaryProps {
 
 export function BankAccountsSummary({ accounts }: BankAccountsSummaryProps) {
   const t = useTranslations('common.dashboard.bankAccounts');
+  const money = useDocumentMoney();
+  const baseCurrency = useBaseCurrency();
 
   return (
     <Card>
@@ -44,11 +47,13 @@ export function BankAccountsSummary({ accounts }: BankAccountsSummaryProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{account.name}</p>
-                    <p className="text-xs text-muted-foreground">{account.currency}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {account.currency ?? baseCurrency ?? ''}
+                    </p>
                   </div>
                   <div className="text-end shrink-0">
                     <p className="font-mono font-medium text-sm">
-                      {formatCurrency(account.systemBalance, account.currency)}
+                      {money(account.systemBalance, account.currency)}
                     </p>
                     {hasDiscrepancy && (
                       <p
@@ -58,7 +63,7 @@ export function BankAccountsSummary({ accounts }: BankAccountsSummaryProps) {
                         )}
                       >
                         {t('bankDiff')}: {diff > 0 ? '+' : ''}
-                        {formatCurrency(diff, account.currency)}
+                        {money(diff, account.currency)}
                       </p>
                     )}
                   </div>

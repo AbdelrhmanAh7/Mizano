@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import Link from 'next/link';
 import {
   DollarSign,
@@ -15,11 +16,11 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranslations } from 'next-intl';
 import { useBankingStats } from '@/lib/hooks/use-bank-accounts';
-import { formatCurrency } from '@/lib/hooks/use-bank-accounts';
 
 export default function BankingPage() {
   const t = useTranslations('banking');
   const { data: stats, isLoading: statsLoading } = useBankingStats();
+  const money = useDocumentMoney();
 
   const modules = [
     {
@@ -91,7 +92,7 @@ export default function BankingPage() {
                   <Skeleton className="h-7 w-24 mt-1" />
                 ) : (
                   <p className="text-2xl font-bold font-mono">
-                    {formatCurrency(stats?.totalSystemBalance ?? 0)}
+                    {money(stats?.totalSystemBalance ?? 0)}
                   </p>
                 )}
               </div>

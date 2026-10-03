@@ -17,12 +17,12 @@ import { PaymentCollectionPoint } from '@/lib/hooks/use-dashboard-sections';
 
 interface PaymentCollectionChartProps {
   data: PaymentCollectionPoint[];
-  currency?: string;
+  currency: string;
 }
 
 export const PaymentCollectionChart = memo(function PaymentCollectionChart({
   data,
-  currency = 'USD',
+  currency,
 }: PaymentCollectionChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

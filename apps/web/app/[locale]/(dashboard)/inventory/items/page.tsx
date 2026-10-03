@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { InventoryAIPanel } from '@/components/ai';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { AutoTourTrigger } from '@/components/tour/auto-tour-trigger';
@@ -29,7 +30,6 @@ import {
 } from '@/components/ui/select';
 import { useExportAll } from '@/lib/hooks/use-export-all';
 import {
-  formatCurrency,
   getItemTypeColor,
   getItemTypeLabel,
   getStockStatus,
@@ -47,6 +47,7 @@ import { useTranslations } from 'next-intl';
 import { Suspense, useState } from 'react';
 
 function ItemsPageContent() {
+  const money = useDocumentMoney();
   const t = useTranslations('inventory');
   const tableParams = useTableParams({ defaultSortBy: 'name', mode: 'virtual' });
   const { onExportAll } = useExportAll('items', 'items');
@@ -128,13 +129,13 @@ function ItemsPageContent() {
       accessorKey: 'salesPrice',
       header: t('items.table.sellingPrice'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) => formatCurrency(row.original.salesPrice || row.original.sellingPrice),
+      cell: ({ row }) => money(row.original.salesPrice || row.original.sellingPrice),
     },
     {
       accessorKey: 'purchasePrice',
       header: t('items.table.costPrice'),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) => formatCurrency(row.original.purchasePrice),
+      cell: ({ row }) => money(row.original.purchasePrice),
     },
     {
       accessorKey: 'currentStock',

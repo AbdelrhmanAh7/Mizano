@@ -9,14 +9,14 @@ import { AccountBalance } from '@/lib/hooks/use-dashboard-sections';
 
 interface AccountTypeBreakdownChartProps {
   data: AccountBalance[];
-  currency?: string;
+  currency: string;
 }
 
 const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export const AccountTypeBreakdownChart = memo(function AccountTypeBreakdownChart({
   data,
-  currency = 'USD',
+  currency,
 }: AccountTypeBreakdownChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

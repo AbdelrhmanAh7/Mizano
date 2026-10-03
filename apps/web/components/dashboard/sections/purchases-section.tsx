@@ -1,5 +1,6 @@
 'use client';
 
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -37,6 +38,7 @@ interface PurchasesSectionProps {
 // which returns differently structured data. Can be added later with a dedicated hook.
 
 export function PurchasesSection({ enabled }: PurchasesSectionProps) {
+  const currency = useBaseCurrency();
   const { data: billStatusData } = useBillStatus(enabled);
   const { data: vendorsData } = useTopVendors(enabled);
   const { data: purchaseTrendData } = usePurchaseTrend(enabled);
@@ -46,12 +48,28 @@ export function PurchasesSection({ enabled }: PurchasesSectionProps) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {billStatusData ? <BillStatusChart data={billStatusData} /> : <ChartSkeleton />}
-        {vendorsData ? <TopVendorsChart data={vendorsData} /> : <ChartSkeleton />}
+        {billStatusData && currency ? (
+          <BillStatusChart data={billStatusData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
+        {vendorsData && currency ? (
+          <TopVendorsChart data={vendorsData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {purchaseTrendData ? <PurchasesTrendChart data={purchaseTrendData} /> : <ChartSkeleton />}
-        {expenseTrendData ? <ExpenseTrendChart data={expenseTrendData} /> : <ChartSkeleton />}
+        {purchaseTrendData && currency ? (
+          <PurchasesTrendChart data={purchaseTrendData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
+        {expenseTrendData && currency ? (
+          <ExpenseTrendChart data={expenseTrendData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {paymentTimeData ? <VendorPaymentTimeChart data={paymentTimeData} /> : <ChartSkeleton />}

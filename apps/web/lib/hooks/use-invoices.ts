@@ -33,6 +33,8 @@ export interface InvoiceLine {
 export interface Invoice {
   id: string;
   invoiceNumber: string;
+  /** Document currency; absent means the organization base currency. */
+  currencyCode?: string | null;
   customerId: string;
   customer?: {
     id: string;

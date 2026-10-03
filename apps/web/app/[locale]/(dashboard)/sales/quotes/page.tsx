@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { DataTable, DataTableSearch, SortableHeader } from '@/components/data-table';
 import { BulkActionConfirmDialog } from '@/components/data-table/bulk-action-confirm';
 import { QuoteStatusBadge } from '@/components/sales/status-badge';
@@ -33,7 +34,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { ImportWizard } from '@/components/import/import-wizard';
 import { quotesApi } from '@/lib/api';
 import { useBulkAction } from '@/lib/hooks/use-bulk-action';
-import { formatCurrency } from '@/lib/hooks/use-customers';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import { usePermissions } from '@/lib/hooks/use-permissions';
 import {
@@ -69,6 +69,7 @@ import { Suspense, useState } from 'react';
 function QuotesPageContent() {
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
+  const money = useDocumentMoney();
   const { toast } = useToast();
   const { hasPermission } = usePermissions();
   const tableParams = useTableParams({ defaultSortBy: 'date', mode: 'virtual' });
@@ -333,11 +334,7 @@ function QuotesPageContent() {
         />
       ),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono' },
-      cell: ({ row }) =>
-        formatCurrency(
-          parseFloat(row.original.grandTotal || '0'),
-          row.original.customer?.currency || 'USD',
-        ),
+      cell: ({ row }) => money(row.original.grandTotal || '0', row.original.currencyCode),
     },
     {
       id: 'actions',

@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -38,12 +39,11 @@ function isDaysKey(key: string): boolean {
   return /days|avgDays/i.test(key);
 }
 
-function formatValue(key: string, value: unknown): string {
+function formatValue(key: string, value: unknown, money: (amount: number) => string): string {
   if (value === null || value === undefined) return '—';
   if (typeof value === 'number') {
     if (isPercentKey(key)) return `${value.toFixed(1)}%`;
-    if (isCurrencyKey(key))
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+    if (isCurrencyKey(key)) return money(value);
     if (isDaysKey(key)) return `${Math.round(value)} days`;
     return Number.isInteger(value) ? value.toString() : value.toFixed(2);
   }
@@ -140,6 +140,7 @@ function SlowPayersTable({ data }: { data: SlowPayer[] }) {
 }
 
 function AnomaliesTable({ data }: { data: ExpenseAnomaly[] }) {
+  const money = useDocumentMoney();
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -160,10 +161,10 @@ function AnomaliesTable({ data }: { data: ExpenseAnomaly[] }) {
             <TableRow key={i}>
               <TableCell className="font-medium">{a.accountName || a.accountId || '—'}</TableCell>
               <TableCell className="text-right font-mono text-muted-foreground">
-                {formatValue('amount', a.previous)}
+                {formatValue('amount', a.previous, money)}
               </TableCell>
               <TableCell className="text-right font-mono font-semibold">
-                {formatValue('amount', a.current)}
+                {formatValue('amount', a.current, money)}
               </TableCell>
               <TableCell className="text-right">
                 <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
@@ -223,6 +224,7 @@ function LowStockTable({ data }: { data: LowStockItem[] }) {
 }
 
 function ProjectsTable({ data }: { data: OverBudgetProject[] }) {
+  const money = useDocumentMoney();
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -244,7 +246,7 @@ function ProjectsTable({ data }: { data: OverBudgetProject[] }) {
               <TableCell className="font-medium">{p.name}</TableCell>
               <TableCell className="text-right font-mono">{p.hoursLogged.toFixed(1)}h</TableCell>
               <TableCell className="text-right font-mono">
-                {formatValue('budget', p.budget)}
+                {formatValue('budget', p.budget, money)}
               </TableCell>
               <TableCell className="text-right">
                 <Badge
@@ -267,6 +269,7 @@ function ProjectsTable({ data }: { data: OverBudgetProject[] }) {
 }
 
 function RevenueChart({ data }: { data: MonthlyRevenue[] }) {
+  const money = useDocumentMoney();
   const max = Math.max(...data.map((m) => m.revenue), 1);
   return (
     <div className="space-y-2">
@@ -278,7 +281,7 @@ function RevenueChart({ data }: { data: MonthlyRevenue[] }) {
         {data.map((m, i) => (
           <div key={i} className="flex-1 flex flex-col items-center gap-1">
             <span className="text-[10px] font-mono text-muted-foreground">
-              {formatValue('revenue', m.revenue)}
+              {formatValue('revenue', m.revenue, money)}
             </span>
             <div
               className="w-full bg-blue-500/80 rounded-t-sm transition-all"
@@ -314,6 +317,7 @@ interface InsightDataViewerProps {
 }
 
 export function InsightDataViewer({ data }: InsightDataViewerProps) {
+  const money = useDocumentMoney();
   const entries = Object.entries(data);
   const scalarEntries = entries.filter(([, v]) => typeof v !== 'object' || v === null);
   const arrayEntries = entries.filter(([, v]) => Array.isArray(v)) as [string, unknown[]][];
@@ -344,7 +348,7 @@ export function InsightDataViewer({ data }: InsightDataViewerProps) {
       {scalarEntries.length > 0 && (
         <div className="rounded-lg border bg-card p-4">
           {scalarEntries.map(([key, value]) => (
-            <StatRow key={key} label={key} value={formatValue(key, value)} />
+            <StatRow key={key} label={key} value={formatValue(key, value, money)} />
           ))}
         </div>
       )}

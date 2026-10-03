@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import {
@@ -20,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useVendors } from '@/lib/hooks/use-vendors';
-import { useBills, formatCurrency, getStatusVariant } from '@/lib/hooks/use-bills';
+import { useBills, getStatusVariant } from '@/lib/hooks/use-bills';
 import { useExpenses } from '@/lib/hooks/use-expenses';
 import { differenceInDays } from 'date-fns';
 
@@ -29,6 +30,7 @@ export default function PurchasesPage() {
   const tCommon = useTranslations('common');
 
   const { data: vendorsData, isLoading: vendorsLoading } = useVendors({ limit: 100 });
+  const money = useDocumentMoney();
   const { data: billsData, isLoading: billsLoading } = useBills({ limit: 100 });
   const { data: expensesData, isLoading: expensesLoading } = useExpenses({ limit: 100 });
 
@@ -129,7 +131,7 @@ export default function PurchasesPage() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">{formatCurrency(totalPayable, 'USD')}</div>
+              <div className="text-2xl font-bold">{money(totalPayable)}</div>
             )}
             <p className="text-xs text-muted-foreground">Across {vendors.length} vendors</p>
           </CardContent>
@@ -144,9 +146,7 @@ export default function PurchasesPage() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(overdueAmount, 'USD')}
-              </div>
+              <div className="text-2xl font-bold text-red-600">{money(overdueAmount)}</div>
             )}
             <p className="text-xs text-muted-foreground">{overdueBills.length} overdue bills</p>
           </CardContent>
@@ -284,9 +284,7 @@ export default function PurchasesPage() {
                           >
                             {bill.status}
                           </Badge>
-                          <p className="text-sm font-mono mt-1">
-                            {formatCurrency(parseFloat(bill.grandTotal || '0'), 'USD')}
-                          </p>
+                          <p className="text-sm font-mono mt-1">{money(bill.grandTotal || '0')}</p>
                         </div>
                       </div>
                     ),
@@ -339,7 +337,7 @@ export default function PurchasesPage() {
                           <div className="text-right">
                             <p className="text-xs text-red-600">{daysOverdue} days overdue</p>
                             <p className="text-sm font-mono font-semibold text-red-600">
-                              {formatCurrency(parseFloat(bill.balanceDue || '0'), 'USD')}
+                              {money(bill.balanceDue || '0')}
                             </p>
                           </div>
                         </div>

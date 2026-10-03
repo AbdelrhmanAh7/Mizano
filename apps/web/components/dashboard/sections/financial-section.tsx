@@ -1,5 +1,6 @@
 'use client';
 
+import { useBaseCurrency } from '@/lib/hooks/use-organization';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -33,6 +34,7 @@ interface FinancialSectionProps {
 }
 
 export function FinancialSection({ enabled }: FinancialSectionProps) {
+  const currency = useBaseCurrency();
   const { data: marginData } = useGrossMarginTrend(enabled);
   const { data: revenueData } = useDashboardRevenue(); // reuse existing, always loaded
   const { data: yoyData } = useRevenueYoY(enabled);
@@ -43,14 +45,30 @@ export function FinancialSection({ enabled }: FinancialSectionProps) {
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {marginData ? <GrossProfitMarginChart data={marginData} /> : <ChartSkeleton />}
-        {revenueData ? <MonthlyBurnRateChart data={revenueData} /> : <ChartSkeleton />}
+        {revenueData && currency ? (
+          <MonthlyBurnRateChart data={revenueData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {yoyData ? <RevenueYoYChart data={yoyData} /> : <ChartSkeleton />}
-        {accountData ? <AccountTypeBreakdownChart data={accountData} /> : <ChartSkeleton />}
+        {yoyData && currency ? (
+          <RevenueYoYChart data={yoyData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
+        {accountData && currency ? (
+          <AccountTypeBreakdownChart data={accountData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {vatData ? <VATSummaryChart data={vatData} /> : <ChartSkeleton />}
+        {vatData && currency ? (
+          <VATSummaryChart data={vatData} currency={currency} />
+        ) : (
+          <ChartSkeleton />
+        )}
       </div>
     </div>
   );

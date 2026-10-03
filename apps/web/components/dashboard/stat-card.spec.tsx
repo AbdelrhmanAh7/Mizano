@@ -64,7 +64,7 @@ const { DollarSign, Users } = jest.requireMock('lucide-react');
 
 describe('StatCard', () => {
   it('renders the title text', () => {
-    render(<StatCard title="Total Revenue" value={50000} icon={DollarSign} />);
+    render(<StatCard title="Total Revenue" value={50000} icon={DollarSign} currency="EGP" />);
     expect(screen.getByText('Total Revenue')).toBeInTheDocument();
   });
 
@@ -74,13 +74,21 @@ describe('StatCard', () => {
     expect(screen.getByText('$1.5M')).toBeInTheDocument();
   });
 
+  it.each(['EGP', 'SAR', 'AED'])('shows no dollar sign for a %s organization', (code) => {
+    const { container } = render(
+      <StatCard title="Revenue" value={1500000} icon={DollarSign} currency={code} />,
+    );
+    expect(container.textContent).not.toContain('$');
+    expect(container.textContent).not.toContain('USD');
+  });
+
   it('renders a plain number when currency is "count"', () => {
     render(<StatCard title="Active Users" value={1234} icon={Users} currency="count" />);
     expect(screen.getByText('1,234')).toBeInTheDocument();
   });
 
   it('renders the icon', () => {
-    render(<StatCard title="Revenue" value={50000} icon={DollarSign} />);
+    render(<StatCard title="Revenue" value={50000} icon={DollarSign} currency="EGP" />);
     expect(screen.getByTestId('stat-icon')).toBeInTheDocument();
   });
 
@@ -90,6 +98,7 @@ describe('StatCard', () => {
         title="Revenue"
         value={50000}
         icon={DollarSign}
+        currency="EGP"
         trend={{ value: 12.5, isPositive: true }}
       />,
     );
@@ -105,6 +114,7 @@ describe('StatCard', () => {
         title="Revenue"
         value={50000}
         icon={DollarSign}
+        currency="EGP"
         trend={{ value: -8.3, isPositive: false }}
       />,
     );
@@ -115,7 +125,7 @@ describe('StatCard', () => {
   });
 
   it('does not render trend section when trend prop is not provided', () => {
-    render(<StatCard title="Revenue" value={50000} icon={DollarSign} />);
+    render(<StatCard title="Revenue" value={50000} icon={DollarSign} currency="EGP" />);
     expect(screen.queryByText(/from last month/)).not.toBeInTheDocument();
   });
 
@@ -125,6 +135,7 @@ describe('StatCard', () => {
         title="Revenue"
         value={50000}
         icon={DollarSign}
+        currency="EGP"
         iconColor="text-purple-600"
         iconBgColor="bg-purple-100"
       />,
@@ -135,7 +146,9 @@ describe('StatCard', () => {
   });
 
   it('defaults to blue icon color and background when not specified', () => {
-    const { container } = render(<StatCard title="Revenue" value={50000} icon={DollarSign} />);
+    const { container } = render(
+      <StatCard title="Revenue" value={50000} icon={DollarSign} currency="EGP" />,
+    );
     // Default blue colors should be in the rendered HTML
     expect(container.innerHTML).toContain('blue');
   });

@@ -106,7 +106,8 @@ export interface BankAccountSummary {
   name: string;
   systemBalance: number;
   bankBalance: number;
-  currency: string;
+  /** Register currency; absent means the organization base currency. */
+  currency?: string;
 }
 
 export interface ProjectOverview {
@@ -230,7 +231,7 @@ export function transformDashboardOverview(
         name: b.name || 'Unknown',
         systemBalance: moneyToNumber(b.systemBalance),
         bankBalance: moneyToNumber(b.bankBalance),
-        currency: b.currency || 'USD',
+        currency: b.currency || undefined,
       }))
     : [];
 
@@ -583,7 +584,7 @@ export function aggregateCashFlowByMonth(
 /**
  * Format currency amount
  */
-export function formatCurrency(amount: number, currency: string = 'USD'): string {
+export function formatCurrency(amount: number, currency: string): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
@@ -595,7 +596,7 @@ export function formatCurrency(amount: number, currency: string = 'USD'): string
 /**
  * Format compact currency (e.g., $1.2M)
  */
-export function formatCompactCurrency(amount: number, currency: string = 'USD'): string {
+export function formatCompactCurrency(amount: number, currency: string): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,

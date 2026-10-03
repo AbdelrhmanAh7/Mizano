@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { CompositeItemForm } from '@/components/inventory/composite-item-form';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,6 @@ import {
 } from '@/components/ui/table';
 import { warehousesApi } from '@/lib/api';
 import {
-  formatCurrency,
   useAssembleCompositeItem,
   useCheckAvailability,
   useCompositeItem,
@@ -38,6 +38,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 
 function CompositeItemDetailContent() {
+  const money = useDocumentMoney();
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -179,9 +180,7 @@ function CompositeItemDetailContent() {
           <dl className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div>
               <dt className="text-sm text-muted-foreground">Selling Price</dt>
-              <dd className="text-lg font-semibold">
-                {formatCurrency(compositeItem.sellingPrice)}
-              </dd>
+              <dd className="text-lg font-semibold">{money(compositeItem.sellingPrice)}</dd>
             </div>
             <div>
               <dt className="text-sm text-muted-foreground">Components</dt>

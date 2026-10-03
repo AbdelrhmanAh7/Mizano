@@ -1,5 +1,6 @@
 'use client';
 
+import { useDocumentMoney } from '@/lib/hooks/use-organization';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -41,7 +42,6 @@ import { useToast } from '@/components/ui/use-toast';
 import {
   useCustomer,
   useDeleteCustomer,
-  formatCurrency,
   formatAddress,
   getBalanceColor,
 } from '@/lib/hooks/use-customers';
@@ -59,6 +59,7 @@ import { cn } from '@/lib/utils';
 export default function CustomerDetailPage() {
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
+  const money = useDocumentMoney();
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -224,7 +225,7 @@ export default function CustomerDetailPage() {
                   {t('customer360.outstandingBalance')}
                 </div>
                 <div className={cn('text-2xl font-bold font-mono', getBalanceColor(balance))}>
-                  {formatCurrency(balance, customer.currency)}
+                  {money(balance)}
                 </div>
               </CardContent>
             </Card>
@@ -437,16 +438,10 @@ export default function CustomerDetailPage() {
                             <InvoiceStatusBadge status={invoice.status as InvoiceStatus} />
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatCurrency(
-                              parseFloat(invoice.grandTotal || '0'),
-                              customer.currency,
-                            )}
+                            {money(invoice.grandTotal || '0')}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatCurrency(
-                              parseFloat(invoice.balanceDue || '0'),
-                              customer.currency,
-                            )}
+                            {money(invoice.balanceDue || '0')}
                           </TableCell>
                         </TableRow>
                       ),
@@ -515,7 +510,7 @@ export default function CustomerDetailPage() {
                           <TableCell>{payment.paymentMode?.replace('_', ' ')}</TableCell>
                           <TableCell>{payment.reference || '-'}</TableCell>
                           <TableCell className="text-right font-mono text-green-600">
-                            {formatCurrency(parseFloat(payment.amount || '0'), customer.currency)}
+                            {money(payment.amount || '0')}
                           </TableCell>
                         </TableRow>
                       ),
@@ -588,7 +583,7 @@ export default function CustomerDetailPage() {
                             <Badge variant="outline">{quote.status}</Badge>
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {formatCurrency(parseFloat(quote.grandTotal || '0'), customer.currency)}
+                            {money(quote.grandTotal || '0')}
                           </TableCell>
                         </TableRow>
                       ),
@@ -654,7 +649,7 @@ export default function CustomerDetailPage() {
                             <Badge variant="outline">{cn.type.replace('_', ' ')}</Badge>
                           </TableCell>
                           <TableCell className="text-right font-mono text-orange-600">
-                            {formatCurrency(parseFloat(cn.amount || '0'), customer.currency)}
+                            {money(cn.amount || '0')}
                           </TableCell>
                         </TableRow>
                       ),

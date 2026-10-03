@@ -18,14 +18,14 @@ import { formatCompactCurrency } from '@/lib/hooks/use-dashboard';
 
 interface TopVendorsChartProps {
   data: TopVendor[];
-  currency?: string;
+  currency: string;
 }
 
 const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export const TopVendorsChart = memo(function TopVendorsChart({
   data,
-  currency = 'USD',
+  currency,
 }: TopVendorsChartProps) {
   const t = useTranslations('common.dashboard.charts');
 

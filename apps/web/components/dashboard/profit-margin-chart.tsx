@@ -25,12 +25,12 @@ interface ProfitPoint {
 
 interface ProfitMarginChartProps {
   data: ProfitPoint[];
-  currency?: string;
+  currency: string;
 }
 
 export const ProfitMarginChart = memo(function ProfitMarginChart({
   data,
-  currency = 'USD',
+  currency,
 }: ProfitMarginChartProps) {
   const t = useTranslations('common.dashboard.charts');
 
