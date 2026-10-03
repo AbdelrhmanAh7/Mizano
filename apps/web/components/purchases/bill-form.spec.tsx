@@ -22,7 +22,7 @@ jest.mock('@/lib/hooks/use-vendors', () => ({
 }));
 
 describe('BillForm', () => {
-  it('bill-form 100.01 inline error', async () => {
+  it.each(['100.01', '14.001', '-1', 'invalid'])('rejects taxRate %s inline', async (taxRate) => {
     const onSubmit = jest.fn();
     const onCancel = jest.fn();
 
@@ -39,18 +39,18 @@ describe('BillForm', () => {
               description: 'Service',
               quantity: '1',
               rate: '100',
-              taxRate: '100.01',
+              taxRate,
             },
           ],
         }}
       />,
     );
 
-    // Submit the form
-    const submitButton = screen.getByRole('button', { name: /create bill/i });
-    fireEvent.click(submitButton);
+    // Exercise the resolver directly: native number constraints can stop a button click
+    // before React Hook Form validates negative or over-precision scan defaults.
+    fireEvent.submit(screen.getByRole('button', { name: /create bill/i }).closest('form')!);
 
-    // Form should reject 100.01 and display inline error
+    // Reject over-limit, over-precision and malformed rates without submitting.
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
@@ -58,7 +58,7 @@ describe('BillForm', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it('accepts taxRate <= 100', async () => {
+  it.each(['100', '14.25', '0', ''])('accepts taxRate "%s"', async (taxRate) => {
     const onSubmit = jest.fn();
     const onCancel = jest.fn();
 
@@ -75,7 +75,7 @@ describe('BillForm', () => {
               description: 'Service',
               quantity: '1',
               rate: '100',
-              taxRate: '100',
+              taxRate,
             },
           ],
         }}
@@ -89,5 +89,10 @@ describe('BillForm', () => {
       expect(onSubmit).toHaveBeenCalled();
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lines: [expect.objectContaining({ quantity: '1', rate: '100', taxRate })],
+      }),
+    );
   });
 });

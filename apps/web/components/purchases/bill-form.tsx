@@ -24,15 +24,23 @@ import { Bill } from '@/lib/hooks/use-bills';
 import { useVendors, Vendor } from '@/lib/hooks/use-vendors';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { addDays, format } from 'date-fns';
+import Decimal from 'decimal.js';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { useTranslations } from 'next-intl';
 import { z } from 'zod';
-import { computeTotals, toDecimalInput } from '@/lib/money';
+import {
+  computeTotals,
+  findTotalsDiscrepancies,
+  toDecimalInput,
+  type ExtractedTotalsInput,
+} from '@/lib/money';
 
-const DECIMAL_INPUT = /^\d+(\.\d+)?$/;
-const OPTIONAL_DECIMAL_INPUT = /^(\d+(\.\d+)?)?$/;
+// Same bounds as the API (`IsDecimalString`): Decimal(19, 4) for money and quantities, a
+// percentage with at most 2 decimals for tax, so the preview never shows what the API rejects.
+const DECIMAL_INPUT = /^\d{1,15}(\.\d{1,4})?$/;
+const OPTIONAL_PERCENT_INPUT = /^(\d{1,3}(\.\d{1,2})?)?$/;
 
 const lineSchema = z.object({
   itemId: z.string().optional(),
@@ -48,8 +56,11 @@ const lineSchema = z.object({
   taxRate: z
     .string()
     .trim()
-    .regex(OPTIONAL_DECIMAL_INPUT, 'taxInvalid')
-    .refine((v) => !v || Number(v) <= 100, 'taxInvalid')
+    .regex(OPTIONAL_PERCENT_INPUT, 'taxInvalid')
+    .refine(
+      (v) => !v || (OPTIONAL_PERCENT_INPUT.test(v) && new Decimal(v).lte('100')),
+      'taxInvalid',
+    )
     .default('0'),
 });
 
@@ -93,6 +104,8 @@ interface BillFormProps {
   defaultVendorId?: string;
   /** Pre-fill form from AI document scan */
   scanDefaults?: BillFormDefaultValues;
+  /** Totals read from the scanned document; compared with the computed totals while reviewing */
+  extractedTotals?: ExtractedTotalsInput & { discount?: string | number | null };
 }
 
 export function BillForm({
@@ -105,9 +118,11 @@ export function BillForm({
   isSubmitting,
   defaultVendorId,
   scanDefaults,
+  extractedTotals,
 }: BillFormProps) {
   const isEditing = !!bill;
   const tValidation = useTranslations('purchases.bills.validation');
+  const tIntake = useTranslations('ai.intake');
   const { data: vendorsData } = useVendors({ limit: 100 });
   const vendors = useMemo(() => vendorsData?.data || [], [vendorsData?.data]);
 
@@ -228,6 +243,13 @@ export function BillForm({
     : [];
   const watchLines = form.watch('lines');
   const totals = computeTotals(watchLines);
+  const discrepancies = extractedTotals ? findTotalsDiscrepancies(totals, extractedTotals) : [];
+  const extractedDiscount =
+    extractedTotals?.discount !== null &&
+    extractedTotals?.discount !== undefined &&
+    Number(extractedTotals.discount) > 0
+      ? String(extractedTotals.discount)
+      : null;
 
   const handleItemSelect = (index: number, itemId: string) => {
     if (itemId === 'none') {
@@ -407,7 +429,7 @@ export function BillForm({
                       <Input
                         {...form.register(`lines.${index}.quantity`)}
                         type="number"
-                        step="0.01"
+                        step="0.0001"
                         className="h-8"
                       />
                     </TableCell>
@@ -415,7 +437,7 @@ export function BillForm({
                       <Input
                         {...form.register(`lines.${index}.rate`)}
                         type="number"
-                        step="0.01"
+                        step="0.0001"
                         className="h-8"
                       />
                     </TableCell>
@@ -489,6 +511,37 @@ export function BillForm({
               </div>
             </div>
           </div>
+
+          {(discrepancies.length > 0 || extractedDiscount !== null) && (
+            <div
+              role="alert"
+              data-testid="totals-discrepancy"
+              className="mt-4 rounded-md border border-yellow-500 p-3 text-sm"
+            >
+              {discrepancies.length > 0 && (
+                <>
+                  <p className="font-medium text-yellow-700">{tIntake('discrepancyTitle')}</p>
+                  <p className="text-muted-foreground">{tIntake('discrepancyBody')}</p>
+                  <ul className="mt-2 space-y-1 font-mono">
+                    {discrepancies.map((d) => (
+                      <li key={d.field}>
+                        {tIntake('discrepancyRow', {
+                          field: tIntake(`discrepancyField.${d.field}`),
+                          extracted: d.extracted,
+                          computed: d.computed,
+                        })}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {extractedDiscount !== null && (
+                <p className="mt-2 text-muted-foreground">
+                  {tIntake('discrepancyDiscount', { amount: extractedDiscount })}
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -7,6 +7,8 @@
  * Values are decimal strings and arithmetic uses scaled BigInt, never floating point.
  */
 
+import Decimal from 'decimal.js';
+
 const SCALE = 4; // internal fixed-point scale for inputs
 const DECIMAL_RE = /^\s*(\d+)(?:\.(\d+))?\s*$/;
 const ZERO = BigInt(0);
@@ -100,4 +102,52 @@ export function toDecimalInput(value: string | number | null | undefined, fallba
 export function moneyToNumber(value: unknown): number {
   const n = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+export type TotalsField = 'subtotal' | 'tax' | 'total';
+
+export interface TotalsDiscrepancy {
+  field: TotalsField;
+  /** Value read from the document, as a plain decimal string. */
+  extracted: string;
+  /** Value computed from the reviewed lines with `computeTotals`. */
+  computed: string;
+}
+
+export interface ExtractedTotalsInput {
+  subtotal?: string | number | null;
+  tax?: string | number | null;
+  total?: string | number | null;
+}
+
+/** Largest accepted gap between an extracted and a computed total. */
+const DISCREPANCY_TOLERANCE = new Decimal('0.01');
+
+/**
+ * Compares document-level totals read by extraction with the totals computed from the reviewed
+ * lines. The computed values always win; any field that differs by more than 0.01 is returned so
+ * the review UI can warn. A missing extracted value is not a discrepancy.
+ */
+export function findTotalsDiscrepancies(
+  computed: Pick<MoneyTotals, 'subtotal' | 'taxAmount' | 'grandTotal'>,
+  extracted: ExtractedTotalsInput,
+): TotalsDiscrepancy[] {
+  const pairs: Array<[TotalsField, string | number | null | undefined, string]> = [
+    ['subtotal', extracted.subtotal, computed.subtotal],
+    ['tax', extracted.tax, computed.taxAmount],
+    ['total', extracted.total, computed.grandTotal],
+  ];
+  const out: TotalsDiscrepancy[] = [];
+  for (const [field, raw, computedText] of pairs) {
+    if (raw === null || raw === undefined || !DECIMAL_RE.test(String(raw))) continue;
+    // Size the arithmetic precision to retain every extracted digit, including large totals.
+    const ExactDecimal = Decimal.clone({
+      precision: Math.max(String(raw).length, computedText.length) + 2,
+    });
+    const diff = new ExactDecimal(String(raw).trim()).minus(new ExactDecimal(computedText)).abs();
+    if (diff.gt(DISCREPANCY_TOLERANCE)) {
+      out.push({ field, extracted: String(raw).trim(), computed: computedText });
+    }
+  }
+  return out;
 }
