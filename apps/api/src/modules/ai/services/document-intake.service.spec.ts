@@ -8,6 +8,8 @@ import { OllamaService } from './ollama.service';
 import { DocumentClassificationService } from './document-classification.service';
 import { EntityExtractionService } from './entity-extraction.service';
 import { AiFeedbackService } from './ai-feedback.service';
+import { computeDocumentTotals } from '../../../common/utils/document-totals';
+import { BillsService } from '../../purchases/services/bills.service';
 import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-resolver.service';
 
 const ORG_A = 'org-a';
@@ -26,6 +28,7 @@ interface PrismaMock {
   intakeJob: { findFirst: jest.Mock };
   $transaction: jest.Mock;
   $queryRaw: jest.Mock;
+  organization: { findUnique: jest.Mock };
 }
 
 /**
@@ -89,6 +92,7 @@ function buildPrisma(): PrismaMock {
     },
     $transaction: jest.fn(async (cb: (tx: PrismaMock) => Promise<unknown>) => cb(mock)),
     $queryRaw: jest.fn().mockResolvedValue([]),
+    organization: { findUnique: jest.fn().mockResolvedValue({ baseCurrency: 'EGP' }) },
   };
   return mock;
 }
@@ -273,6 +277,145 @@ describe('DocumentIntakeService', () => {
           }),
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('confirmAndCreate — parity with manual bills, currency and bounds', () => {
+    const cases: Array<{
+      name: string;
+      lines: Array<{ q: string; r: string; tax: string; disc?: string }>;
+    }> = [
+      { name: '2 x 100 @ 14%', lines: [{ q: '2', r: '100', tax: '14' }] },
+      {
+        name: 'non-100 values, mixed taxes, 3-decimal quantity and rate',
+        lines: [
+          { q: '3', r: '33.33', tax: '14' },
+          { q: '1.375', r: '19.999', tax: '5' },
+          { q: '7', r: '0.35', tax: '0' },
+        ],
+      },
+      {
+        name: '18% VAT on a 100 net line (gross 118)',
+        lines: [{ q: '1', r: '100', tax: '18' }],
+      },
+      {
+        name: 'half-cent rounding per line',
+        lines: [
+          { q: '1', r: '0.05', tax: '10' },
+          { q: '1', r: '0.15', tax: '10' },
+        ],
+      },
+    ];
+
+    it.each(cases)('scanned bill equals manual bill totals: $name', async ({ lines }) => {
+      await service.confirmAndCreate(
+        ORG_A,
+        baseBill({
+          lines: lines.map((l) => ({
+            description: 'x',
+            quantity: l.q,
+            rate: l.r,
+            taxRatePercent: l.tax,
+          })),
+        }),
+      );
+      const scanned = prisma.bill.create.mock.calls[0][0].data;
+
+      // Manual path: BillsService.create builds lines with the same shared calculator.
+      const manualPrisma = {
+        bill: {
+          create: jest.fn().mockResolvedValue({ id: 'm' }),
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+        vendor: { findFirst: jest.fn().mockResolvedValue({ id: 'vendor-a' }) },
+      };
+      const manual = new BillsService(manualPrisma as never, {} as never);
+      await manual.create(ORG_A, {
+        vendorId: 'vendor-a',
+        date: '2026-09-01',
+        dueDate: '2026-10-01',
+        billNumber: 'M-1',
+        lines: lines.map((l) => ({ description: 'x', quantity: l.q, rate: l.r, taxRate: l.tax })),
+      } as never);
+      const manualData = manualPrisma.bill.create.mock.calls[0][0].data;
+
+      expect(scanned.subtotal.toString()).toBe(manualData.subtotal.toString());
+      expect(scanned.taxAmount.toString()).toBe(manualData.taxAmount.toString());
+      expect(scanned.grandTotal.toString()).toBe(manualData.grandTotal.toString());
+      const expected = computeDocumentTotals(
+        lines.map((l) => ({ quantity: l.q, rate: l.r, taxRatePercent: l.tax })),
+      );
+      expect(scanned.grandTotal.toString()).toBe(expected.grandTotal.toString());
+    });
+
+    it('invoice discount and tax match the shared calculator (discount before tax)', async () => {
+      await service.confirmAndCreate(ORG_A, {
+        type: 'INVOICE',
+        customerId: 'customer-a',
+        date: '2026-09-01',
+        dueDate: '2026-10-01',
+        lines: [
+          {
+            description: 'a',
+            quantity: '3',
+            rate: '33.33',
+            taxRatePercent: '14',
+            discountPercent: '12.5',
+          },
+          {
+            description: 'b',
+            quantity: '1.5',
+            rate: '20',
+            taxRatePercent: '5',
+            discountPercent: '0',
+          },
+        ],
+      });
+      const data = prisma.invoice.create.mock.calls[0][0].data;
+      const expected = computeDocumentTotals([
+        { quantity: '3', rate: '33.33', taxRatePercent: '14', discountPercent: '12.5' },
+        { quantity: '1.5', rate: '20', taxRatePercent: '5' },
+      ]);
+      expect(data.subtotal.toString()).toBe(expected.subtotal.toString());
+      expect(data.taxAmount.toString()).toBe(expected.taxAmount.toString());
+      expect(data.grandTotal.toString()).toBe(expected.grandTotal.toString());
+      expect(data.currencyCode).toBe('EGP');
+    });
+
+    it('defaults the currency to the organization base currency', async () => {
+      await service.confirmAndCreate(ORG_A, baseBill());
+      expect(prisma.bill.create.mock.calls[0][0].data.currencyCode).toBe('EGP');
+    });
+
+    it('accepts the base currency in any case', async () => {
+      await service.confirmAndCreate(ORG_A, baseBill({ currencyCode: 'egp' }));
+      expect(prisma.bill.create.mock.calls[0][0].data.currencyCode).toBe('EGP');
+    });
+
+    it('rejects a currency different from the base currency and writes nothing', async () => {
+      await expect(
+        service.confirmAndCreate(ORG_A, baseBill({ currencyCode: 'USD' })),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.bill.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a computed total beyond Decimal(19,4) precision', async () => {
+      await expect(
+        service.confirmAndCreate(
+          ORG_A,
+          baseBill({
+            lines: [
+              {
+                description: 'x',
+                quantity: '999999999999999',
+                rate: '999999999999999',
+                taxRatePercent: '0',
+              },
+            ],
+          }),
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.bill.create).not.toHaveBeenCalled();
     });
   });
 
@@ -482,6 +625,14 @@ describe('DocumentIntakeService', () => {
         const create = type === 'BILL' ? tx.bill.create : tx.invoice.create;
         expect(result.id).toBe(type === 'BILL' ? 'bill-1' : 'invoice-1');
         expect(create).toHaveBeenCalledTimes(1);
+        const data = create.mock.calls[0][0].data;
+        expect(data.currencyCode).toBe('EGP');
+        expect(data.subtotal.toFixed(4)).toBe('200.0000');
+        expect(data.taxAmount.toFixed(4)).toBe('28.0000');
+        expect(data.grandTotal.toFixed(4)).toBe('228.0000');
+        expect(data.balanceDue.toFixed(4)).toBe('228.0000');
+        expect(data.lines.create[0].taxRate.toFixed(4)).toBe('14.0000');
+        expect(data.lines.create[0].amount.toFixed(4)).toBe('200.0000');
         expect(tx.auditLog.create).toHaveBeenCalledTimes(1);
         expect(tx.intakeJob.findFirst).toHaveBeenCalledWith({
           where: { id: 'job-tx', organizationId: ORG_A, deletedAt: null },

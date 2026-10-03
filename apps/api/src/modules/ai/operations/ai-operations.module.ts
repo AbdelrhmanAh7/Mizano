@@ -18,6 +18,7 @@ import { ReconciliationMatcherService } from '../services/reconciliation-matcher
 import { VlmStrategy } from '../extraction/vlm-strategy.service';
 import { OcrLlmStrategy } from '../extraction/ocr-llm-strategy.service';
 import { HybridStrategy } from '../extraction/hybrid-strategy.service';
+import { RulesStrategy } from '../extraction/rules-strategy.service';
 import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-resolver.service';
 
 import { IntakeJobOwnerGuard } from '../intake/intake-job-owner.guard';
@@ -50,6 +51,7 @@ import { OllamaTunnelController } from '../controllers/ollama-tunnel.controller'
     VlmStrategy,
     OcrLlmStrategy,
     HybridStrategy,
+    RulesStrategy,
     ExtractionStrategyResolver,
     DocumentIntakeService,
     IntakeJobsService,
