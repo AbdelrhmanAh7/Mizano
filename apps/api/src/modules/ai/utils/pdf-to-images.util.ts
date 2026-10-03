@@ -40,7 +40,9 @@ export async function convertPdfPagesToImages(
       await renderFirstPage(tmpFile, width, maxPages, images);
     });
   } catch (err) {
-    logger.error(`PDF to images conversion failed: ${describeError(err)}`);
+    logger.error(
+      `PDF to images conversion failed: ${describeError(err, { includeMessage: false })}`,
+    );
   }
 
   return images;
@@ -56,8 +58,7 @@ async function renderFirstPage(
 
   try {
     // Lazy-load puppeteer
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const puppeteer = require('puppeteer');
+    const puppeteer = await import('puppeteer');
 
     browser = await puppeteer.launch({
       headless: true,

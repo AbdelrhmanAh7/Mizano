@@ -39,10 +39,12 @@ RUN pnpm --filter api build \
 
 # Pinned Arabic/English assets are unpacked on the build host, never at runtime.
 FROM --platform=$BUILDPLATFORM node:20-alpine AS ocr-assets
+COPY apps/api/ocr-assets.sha256 /ocr-assets.sha256
 RUN npm install --prefix /assets --ignore-scripts --no-audit --no-fund \
       @tesseract.js-data/eng@1.0.0 @tesseract.js-data/ara@1.0.0 \
   && mkdir /tessdata \
-  && node -e "const fs=require('fs'),zlib=require('zlib'); for (const lang of ['eng','ara']) fs.writeFileSync('/tessdata/'+lang+'.traineddata',zlib.gunzipSync(fs.readFileSync('/assets/node_modules/@tesseract.js-data/'+lang+'/4.0.0_best_int/'+lang+'.traineddata.gz')))"
+  && node -e "const fs=require('fs'),zlib=require('zlib'); for (const lang of ['eng','ara']) fs.writeFileSync('/tessdata/'+lang+'.traineddata',zlib.gunzipSync(fs.readFileSync('/assets/node_modules/@tesseract.js-data/'+lang+'/4.0.0_best_int/'+lang+'.traineddata.gz')))" \
+  && cd /tessdata && sha256sum -c /ocr-assets.sha256
 
 # ---------- Stage 2: production deps (target architecture) ----------
 FROM node:20-alpine AS deps
@@ -122,6 +124,7 @@ WORKDIR /app
 
 # Bundled eng/ara traineddata; the api reads them from INTAKE_TESSDATA_DIR.
 COPY --chown=nestjs:nodejs --from=ocr-assets /tessdata/ ./tessdata/
+COPY --chown=nestjs:nodejs --from=ocr-assets /ocr-assets.sha256 ./apps/api/ocr-assets.sha256
 COPY --chown=nestjs:nodejs --from=deps /out/node_modules ./node_modules
 COPY --from=deps /opt/prisma /opt/prisma
 COPY --chown=nestjs:nodejs --from=deps /app/packages/shared-types/package.json ./packages/shared-types/package.json
@@ -142,7 +145,7 @@ USER nestjs
 EXPOSE 6001
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:6001/api/health || exit 1
+  CMD ["node", "/app/apps/api/dist/health/healthcheck.js"]
 
 # Migrations: npx --no-install prisma migrate deploy (CLI and target engines are bundled).
 WORKDIR /app/apps/api

@@ -16,7 +16,7 @@ import { execFile } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { describeError, redactText } from '../../../common/utils/redact';
+import { describeError } from '../../../common/utils/redact';
 import {
   createSecureTempDir,
   removeSecureTempDir,
@@ -325,7 +325,7 @@ export class PaddleOcrService implements OnModuleInit, OnModuleDestroy {
       this.ocrAvailable = false;
       this.logger.warn(
         `RapidOCR not available. Install: pip install rapidocr-onnxruntime --target ${this.pythonPkgPath}. ` +
-          `Error: ${describeError(err)}`,
+          `Error: ${describeError(err, { includeMessage: false })}`,
       );
     }
 
@@ -425,7 +425,9 @@ export class PaddleOcrService implements OnModuleInit, OnModuleDestroy {
       });
     } catch (err) {
       const processingTimeMs = Date.now() - startTime;
-      this.logger.error(`[OCR] PaddleOCR failed (${processingTimeMs}ms): ${describeError(err)}`);
+      this.logger.error(
+        `[OCR] PaddleOCR failed (${processingTimeMs}ms): ${describeError(err, { includeMessage: false })}`,
+      );
       return { text: '', confidence: 0, regions: [], processingTimeMs };
     }
   }
@@ -469,7 +471,7 @@ export class PaddleOcrService implements OnModuleInit, OnModuleDestroy {
         return imageBuffer;
       });
     } catch (err) {
-      this.logger.error(`pdfPageToImage failed: ${describeError(err)}`);
+      this.logger.error(`pdfPageToImage failed: ${describeError(err, { includeMessage: false })}`);
       return null;
     }
   }
@@ -497,19 +499,16 @@ export class PaddleOcrService implements OnModuleInit, OnModuleDestroy {
         },
         (error, stdout, stderr) => {
           if (stderr) {
-            // Python stderr may quote the document (tracebacks, library warnings): only our own
-            // status lines (model download / model selection) are logged, as debug.
+            // Even model status lines can contain document values. Emit a fixed
+            // event rather than any text produced by the subprocess.
             for (const line of stderr.split('\n').filter(Boolean)) {
               if (SAFE_PYTHON_STDERR.test(line)) {
-                this.logger.debug(`[Python] ${redactText(line, 200)}`);
+                this.logger.debug('[Python] model status received');
               }
             }
           }
           if (error) {
-            // Surface only the last stderr line (the exception summary), redacted and capped.
-            const lines = (stderr || error.message).split('\n').filter((l) => l.trim());
-            const summary = lines[lines.length - 1] ?? 'Python process failed';
-            reject(new Error(redactText(summary, 200)));
+            reject(new Error('OCR subprocess failed'));
             return;
           }
           resolve(stdout);

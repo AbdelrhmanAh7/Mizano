@@ -115,6 +115,15 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 
 `_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly.
 
+The legacy runner currently forces `esModuleInterop: true`, while the API's
+`tsconfig.json` leaves it disabled. The unchanged master CSV import uses
+`import * as csv`, so the legacy transform produces a namespace object and four
+import-hardening cases fail with `csv is not a function`. The standard API Jest
+configuration passes those cases. This is a compiler-configuration mismatch,
+not a runtime-lane regression; retain the assertions and report the legacy
+gate failure until the test runner and production import conventions are
+aligned in their own fix.
+
 Unit-test infrastructure lives in `apps/api/src/test/`: `mocks/prisma.mock.ts` (deep Prisma mock, transactions call back with the mock), `mocks/redis.mock.ts` (in-memory cache), `mocks/{sharp,tesseract}.mock.js` (heavy native/OCR libraries), `helpers/test-utils.ts` (typed factories) and `helpers/decimal.helpers.ts`. Unit tests must not need Redis, PostgreSQL, Ollama or the network.
 
 Rules:

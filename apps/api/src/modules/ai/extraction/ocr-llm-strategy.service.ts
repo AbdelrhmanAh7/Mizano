@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import type { Worker } from 'tesseract.js';
 import {
   ExtractionStrategy,
   ExtractionContext,
@@ -8,6 +9,7 @@ import { OllamaService } from '../services/ollama.service';
 import { PaddleOcrService } from '../services/paddle-ocr.service';
 import { preprocessForOcr } from '../utils/image-preprocessor.util';
 import { describeError } from '../../../common/utils/redact';
+import { createOfflineTesseractWorker } from './offline-tesseract';
 
 /**
  * OCR + LLM Strategy — OCR reads the document, then text model structures it.
@@ -17,10 +19,12 @@ import { describeError } from '../../../common/utils/redact';
  *  2. Tesseract.js (fallback)
  */
 @Injectable()
-export class OcrLlmStrategy implements ExtractionStrategy {
+export class OcrLlmStrategy implements ExtractionStrategy, OnModuleDestroy {
   readonly name = 'ocr-llm' as const;
   private readonly logger = new Logger(OcrLlmStrategy.name);
-  private tesseractWorker: unknown | null = null;
+  private tesseractWorker: Worker | null = null;
+  private tesseractQueue: Promise<void> = Promise.resolve();
+  private closing = false;
 
   constructor(
     private readonly ollamaService: OllamaService,
@@ -106,7 +110,9 @@ export class OcrLlmStrategy implements ExtractionStrategy {
             `[STEP 2] Tesseract.js result: textLen=${ocrText.length}, confidence=${ocrConfidence.toFixed(1)}%`,
           );
         } catch (err) {
-          this.logger.error(`[STEP 2] Tesseract.js OCR failed: ${describeError(err)}`);
+          this.logger.error(
+            `[STEP 2] Tesseract.js OCR failed: ${describeError(err, { includeMessage: false })}`,
+          );
         }
       }
 
@@ -129,8 +135,7 @@ export class OcrLlmStrategy implements ExtractionStrategy {
     }
 
     // Pass OCR text to Ollama text model for structured extraction
-    const modelLabel = context.modelOverride || 'default';
-    this.logger.log(`[STEP 4] Sending OCR text to Ollama (${modelLabel}) for JSON extraction...`);
+    this.logger.log('[STEP 4] Sending OCR text to the configured Ollama model for JSON extraction');
     const extraction = await this.ollamaService.extractFromOcrText(
       ocrText,
       ocrConfidence,
@@ -145,8 +150,8 @@ export class OcrLlmStrategy implements ExtractionStrategy {
     // Counters and timings only: vendor names, amounts, tax ids and line descriptions are
     // invoice content and must not be logged.
     this.logger.log(
-      `[STEP 5] Extraction result: category=${extraction.documentCategory ?? 'none'}, ` +
-        `lineItems=${extraction.lineItems.length}, processingTimeMs=${extraction.processingTimeMs}ms`,
+      `[STEP 5] Extraction result: lineItems=${extraction.lineItems.length}, ` +
+        `processingTimeMs=${extraction.processingTimeMs}ms`,
     );
 
     return {
@@ -161,33 +166,53 @@ export class OcrLlmStrategy implements ExtractionStrategy {
    * Run Tesseract.js OCR as fallback when PaddleOCR is unavailable.
    * Lazy-initializes the worker on first call.
    */
-  private async runTesseract(
+  private runTesseract(
     imageBuffer: Buffer,
     language: string,
   ): Promise<{ text: string; confidence: number }> {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const Tesseract = require('tesseract.js');
-
-    if (!this.tesseractWorker) {
-      // Map language codes: 'ara+en' → 'ara+eng'
-      const tessLang = language.replace(/\ben\b/g, 'eng').replace(/\bar\b/g, 'ara');
-      // Bundled traineddata (eng/ara) live in INTAKE_TESSDATA_DIR; reading them
-      // from there keeps OCR offline regardless of the process cwd.
-      const tessdataDir = process.env.INTAKE_TESSDATA_DIR;
-      const workerOptions = tessdataDir
-        ? { langPath: tessdataDir, cachePath: tessdataDir, gzip: false }
-        : undefined;
-      this.tesseractWorker = await Tesseract.createWorker(tessLang, undefined, workerOptions);
+    if (this.closing) {
+      return Promise.reject(new Error('OCR worker is shutting down'));
     }
+    const normalized = language.replace(/\ben\b/g, 'eng').replace(/\bar\b/g, 'ara');
+    if (!normalized.split('+').every((code) => code === 'eng' || code === 'ara')) {
+      return Promise.reject(new Error('Unsupported offline OCR language'));
+    }
+    // A single FIFO covers initialization AND recognition, including concurrent
+    // first requests. Both pinned languages stay loaded across language changes.
+    const task = this.tesseractQueue.then(async () => {
+      this.tesseractWorker ??= await createOfflineTesseractWorker();
+      try {
+        const result = await this.tesseractWorker.recognize(imageBuffer);
+        return { text: result.data.text || '', confidence: result.data.confidence || 0 };
+      } catch (error) {
+        await this.terminateTesseract();
+        throw error;
+      }
+    });
+    this.tesseractQueue = task.then(
+      () => undefined,
+      () => undefined,
+    );
+    return task;
+  }
 
-    const worker = this.tesseractWorker as {
-      recognize(buffer: Buffer): Promise<{ data: { text: string; confidence: number } }>;
-    };
+  async onModuleDestroy(): Promise<void> {
+    this.closing = true;
+    await this.tesseractQueue;
+    await this.terminateTesseract();
+  }
 
-    const result = await worker.recognize(imageBuffer);
-    return {
-      text: result.data.text || '',
-      confidence: result.data.confidence || 0,
-    };
+  private async terminateTesseract(): Promise<void> {
+    const worker = this.tesseractWorker;
+    this.tesseractWorker = null;
+    if (worker) {
+      try {
+        await worker.terminate();
+      } catch (error) {
+        this.logger.error(
+          `OCR shutdown failed: ${describeError(error, { includeMessage: false })}`,
+        );
+      }
+    }
   }
 }

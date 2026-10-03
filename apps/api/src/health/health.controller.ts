@@ -1,7 +1,7 @@
-import { Controller, Get, Inject, Optional } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SkipThrottle } from '@nestjs/throttler';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
+import Redis from 'ioredis';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface HealthCheckResponse {
@@ -26,7 +26,7 @@ interface HealthCheckResponse {
 export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
+    private readonly config: ConfigService,
   ) {}
 
   @Get()
@@ -55,15 +55,24 @@ export class HealthController {
       response.services.database = { status: 'disconnected' };
     }
 
-    // Check Redis/cache connection
-    if (this.cacheManager) {
+    // A cache round trip may hit the in-memory fallback. Probe Redis itself.
+    const redisUrl = this.config.get<string>('REDIS_URL');
+    if (redisUrl) {
+      let redis: Redis | undefined;
       try {
         const redisStart = Date.now();
-        const testKey = '__health_check__';
-        await this.cacheManager.set(testKey, 'ok', 5000);
-        const result = await this.cacheManager.get(testKey);
-        await this.cacheManager.del(testKey);
-        if (result === 'ok') {
+        redis = new Redis(redisUrl, {
+          lazyConnect: true,
+          connectTimeout: 2500,
+          commandTimeout: 2500,
+          maxRetriesPerRequest: 0,
+          enableOfflineQueue: false,
+          retryStrategy: () => null,
+        });
+        // Connection errors are reflected in status, never logged with URLs.
+        redis.on('error', () => undefined);
+        await redis.connect();
+        if ((await redis.ping()) === 'PONG') {
           response.services.redis = {
             status: 'connected',
             latency: Date.now() - redisStart,
@@ -74,6 +83,9 @@ export class HealthController {
         }
       } catch {
         response.services.redis = { status: 'disconnected' };
+        response.status = 'unhealthy';
+      } finally {
+        redis?.disconnect();
       }
     }
 
