@@ -218,7 +218,7 @@ export class TransfersService {
           data: {
             itemId: line.itemId,
             warehouseId: transfer.fromWarehouseId,
-            quantity: new Decimal(-qty),
+            quantity: new Decimal(qty),
             type: 'transfer',
             movementType: 'OUT',
             referenceType: 'transfer',

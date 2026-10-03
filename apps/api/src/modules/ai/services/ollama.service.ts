@@ -41,6 +41,10 @@ export interface DocumentExtractionResult {
   rawText: string;
   ocrConfidence: number;
   fieldConfidence: Record<string, number>;
+  /** Rule-based extraction only: source line per field. Document content, never log. */
+  fieldEvidence?: Record<string, { text: string; lineIndex: number }>;
+  /** Rule-based extraction only: machine codes for failed consistency checks. */
+  extractionWarnings?: string[];
   documentCategory: string | null;
   accountingEntry: {
     debitAccount: string | null;

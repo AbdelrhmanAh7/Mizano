@@ -95,7 +95,8 @@ export interface DocumentIntakeResult {
     | 'ollama-text'
     | 'ocr-llm'
     | 'hybrid-ocr'
-    | 'hybrid-vlm';
+    | 'hybrid-vlm'
+    | 'rules';
 
   /** Suggested vendor creation when no existing vendor matched */
   suggestCreateVendor?: {
@@ -337,27 +338,30 @@ export function useDocumentIntakeStream(): {
   }, [stopAll]);
 
   /** Apply an event; returns true when the job reached a terminal state. */
-  const handleProgressEvent = useCallback((event: IntakeProgressEvent): boolean => {
-    setStage(event.stage);
-    setProgress(event.progress);
-    if (event.status) setJobStatus(event.status);
-    if (event.message) setMessage(event.message);
+  const handleProgressEvent = useCallback(
+    (event: IntakeProgressEvent): boolean => {
+      setStage(event.stage);
+      setProgress(event.progress);
+      if (event.status) setJobStatus(event.status);
+      if (event.message) setMessage(event.message);
 
-    if (event.stage === 'complete') {
-      if (event.result) setResult(event.result);
-      else setError('Processing finished without a result');
-      setIsProcessing(false);
-      setIsReconnecting(false);
-      return true;
-    }
-    if (event.stage === 'error') {
-      setError(event.error || 'Processing failed');
-      setIsProcessing(false);
-      setIsReconnecting(false);
-      return true;
-    }
-    return false;
-  }, []);
+      if (event.stage === 'complete') {
+        if (event.result) setResult(event.result);
+        else setError(t('streamNoResult'));
+        setIsProcessing(false);
+        setIsReconnecting(false);
+        return true;
+      }
+      if (event.stage === 'error') {
+        setError(event.error || t('streamFailed'));
+        setIsProcessing(false);
+        setIsReconnecting(false);
+        return true;
+      }
+      return false;
+    },
+    [t],
+  );
 
   const fail = useCallback((msg: string) => {
     setError(msg);
@@ -389,12 +393,12 @@ export function useDocumentIntakeStream(): {
         } catch (err) {
           const status = (err as { response?: { status?: number } }).response?.status;
           if (status === 404) {
-            fail('This scan is no longer available. Please upload the document again.');
+            fail(t('streamUnavailable'));
             return;
           }
           failures += 1;
           if (failures >= MAX_CONSECUTIVE_POLL_FAILURES) {
-            fail('Lost connection while processing the document. Please try again.');
+            fail(t('streamLostConnection'));
             return;
           }
           setIsReconnecting(true);
@@ -406,7 +410,7 @@ export function useDocumentIntakeStream(): {
 
       void poll();
     },
-    [handleProgressEvent, fail],
+    [handleProgressEvent, fail, t],
   );
 
   const streamProgress = useCallback(
@@ -454,7 +458,7 @@ export function useDocumentIntakeStream(): {
       } catch (err) {
         if (controller.signal.aborted) return;
         if (err instanceof IntakeStreamHttpError && err.status === 404) {
-          fail('This scan is no longer available. Please upload the document again.');
+          fail(t('streamUnavailable'));
           return;
         }
         // Network drop, 401 (token refresh is handled by the API client), proxy
@@ -462,7 +466,7 @@ export function useDocumentIntakeStream(): {
         startPolling(id, controller.signal);
       }
     },
-    [streamProgress, startPolling, fail],
+    [streamProgress, startPolling, fail, t],
   );
 
   const processDocument = useCallback(
@@ -471,7 +475,7 @@ export function useDocumentIntakeStream(): {
       setIsProcessing(true);
       setStage('received');
       setProgress(5);
-      setMessage('Uploading document...');
+      setMessage(t('streamUploading'));
 
       let newJobId: string;
       try {
@@ -494,13 +498,13 @@ export function useDocumentIntakeStream(): {
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        fail(msg || 'Failed to process document');
+        fail(msg || t('streamProcessFailed'));
         return;
       }
 
       await followJob(newJobId);
     },
-    [reset, fail, followJob],
+    [reset, fail, followJob, t],
   );
 
   const retry = useCallback(async () => {
