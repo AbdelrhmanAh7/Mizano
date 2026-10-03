@@ -109,3 +109,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Rollback must be repeatable.** Track an active pointer in `deployments.log` (`OK`/`ROLLBACK` lines), not "the previous OK line", or the second rollback is a no-op.
 - **Check DB readiness over TCP** (`pg_isready -h 127.0.0.1`). The temporary init server listens on the unix socket only and passes a socket probe.
 - **Dedupe alerts on stable keys** (check name), never on live values like percentages; alert once on start and once on recovery.
+- **An unavailable probe is unknown, not recovered:** retain acknowledged incidents until a successful probe establishes recovery; persist alert state only after Telegram acknowledgement and successful writes.
+- **Mark every unsuccessful backup as failed, including rename and retention errors:** an old OK must never conceal a new failure, and success requires both the database and original documents.
+- **Preserve client routing contracts at ingress:** route NextAuth actions explicitly and keep the existing API and Socket.IO origin convention together.
+- **Bound probes inside the container too:** killing a timed-out Docker CLI does not guarantee its exec process or database query stops; use process deadlines and SQL statement/lock timeouts.

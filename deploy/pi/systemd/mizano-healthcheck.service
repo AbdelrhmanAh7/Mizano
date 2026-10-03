@@ -4,6 +4,9 @@ After=docker.service
 
 [Service]
 Type=oneshot
+# Bound all probes plus one 15-second send per possible incident/recovery key.
+TimeoutStartSec=600
+UMask=0077
 ExecStart=/opt/mizano/deploy/pi/scripts/healthcheck.sh
 # Exit 1 only means problems were found; the script already alerted.
 SuccessExitStatus=1
