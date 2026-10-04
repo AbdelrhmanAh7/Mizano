@@ -407,7 +407,11 @@ export class TelegramIntakeService implements OnApplicationBootstrap, OnModuleDe
       await this.reply(delivery.chatId, MSG.failed);
       return;
     }
-    await this.prisma.telegramDelivery.updateMany({ where, data: { attempts: { increment: 1 } } });
+    const claimed = await this.prisma.telegramDelivery.updateMany({
+      where,
+      data: { attempts: { increment: 1 } },
+    });
+    if (claimed.count === 0) return;
     let intakeJobId: string | null;
     try {
       intakeJobId = await this.ingest(

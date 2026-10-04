@@ -645,6 +645,13 @@ describe('TelegramIntakeService', () => {
     expect(sent.at(-1)?.text).toContain('send it again');
   });
 
+  it('skips ingestion if the attempt increment update claims zero rows', async () => {
+    const { svc, prisma, jobs } = setup();
+    (prisma.telegramDelivery.updateMany as jest.Mock).mockResolvedValueOnce({ count: 0 });
+    await svc.handleUpdate(upd(doc()));
+    expect(jobs.createFromUpload).not.toHaveBeenCalled();
+  });
+
   it('rechecks the binding after download before persisting', async () => {
     const { svc, links, jobs } = setup();
     links.findByChat.mockResolvedValueOnce(link).mockResolvedValueOnce(null);

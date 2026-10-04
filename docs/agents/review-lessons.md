@@ -22,6 +22,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Shutdown owns its asynchronous work.** Abort requests, cancel backoff and await the active loop; detached promises can outlive database and queue dependencies. _(Telegram polling)_
 
 - **Every state change is a guarded transition:** `updateMany({ where: { id, organizationId, status: FROM } })` plus a `count` check that throws `ConflictException`. Journal idempotency is the tenant-scoped unique key `(organizationId, sourceType, sourceId)`.
+- **Check the guarded attempt increment before ingestion.** Capture the result of `updateMany` and return when its count is zero, so an invocation that did not claim the delivery does not execute side effects like downloading the file or sending a reply.
 - **An idempotency key must stay the same across retries of one action.** Generating a fresh random id on the server for each request defeats it. A client UUID created once per user action and reused on every retry is fine (`idempotencyKeyFor`); so are `profileId:YYYY-MM-DD` or a sha256 of file + row. _(manual recurring execute, import retries)_
 - **Store idempotency markers where users cannot edit them.** Notes, reason and reference text get edited; use an append-only store such as AuditLog `IMPORT_ROW`. _(import markers)_
 - **Bulk operations reuse the single-record command through `runBulk`** and report `{ processed, total, failures }`. Never write a bulk `updateMany` that skips the posting logic.
