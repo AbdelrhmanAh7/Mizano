@@ -967,13 +967,38 @@ export class VatReturnsService {
         isPosted: true,
         deletedAt: null,
         date: window,
-        sourceType: { in: [JournalSourceType.INVOICE_SEND, JournalSourceType.INVOICE_VOID] },
+        OR: [
+          { sourceType: { in: [JournalSourceType.INVOICE_SEND, JournalSourceType.INVOICE_VOID] } },
+          LEGACY_INVOICE_SEND,
+          {
+            sourceType: null,
+            reversalOf: { is: { ...LEGACY_INVOICE_SEND, organizationId } },
+          },
+        ],
       },
-      select: { sourceType: true, sourceId: true },
+      select: {
+        sourceType: true,
+        sourceId: true,
+        reference: true,
+        reversalOfId: true,
+        reversalOf: { select: { reference: true } },
+      },
     });
+
     const idsOf = (type: string): string[] =>
       events.flatMap((e) => (e.sourceType === type && e.sourceId ? [e.sourceId] : []));
-    const shippingOf = async (ids: string[]): Promise<Decimal> => {
+
+    const legacyNumbersOf = (isVoid: boolean): string[] =>
+      events.flatMap((e) => {
+        if (e.sourceType !== null) return [];
+        const isCurrentlyVoid = !!e.reversalOfId;
+        if (isCurrentlyVoid !== isVoid) return [];
+        const ref = isVoid ? e.reversalOf?.reference : e.reference;
+        if (!ref || !ref.startsWith('Invoice ')) return [];
+        return [ref.slice(8)];
+      });
+
+    const shippingOfIds = async (ids: string[]): Promise<Decimal> => {
       if (ids.length === 0) return ZERO;
       const { _sum } = await db.invoice.aggregate({
         where: { organizationId, id: { in: ids } },
@@ -981,11 +1006,31 @@ export class VatReturnsService {
       });
       return _sum.shippingAmount ?? ZERO;
     };
-    const [sent, voided] = await Promise.all([
-      shippingOf(idsOf(JournalSourceType.INVOICE_SEND)),
-      shippingOf(idsOf(JournalSourceType.INVOICE_VOID)),
+
+    const shippingOfNumbers = async (numbers: string[]): Promise<Decimal> => {
+      if (numbers.length === 0) return ZERO;
+      const invoices = await db.invoice.findMany({
+        where: { organizationId, invoiceNumber: { in: numbers } },
+        select: { invoiceNumber: true, shippingAmount: true },
+      });
+
+      const foundNumbers = new Set(invoices.map((i) => i.invoiceNumber));
+      const missing = numbers.filter((n) => !foundNumbers.has(n));
+      if (missing.length > 0) {
+        throw new BadRequestException(
+          `Cannot compute VAT: missing legacy invoices ${missing.join(', ')}`,
+        );
+      }
+      return invoices.reduce((sum, inv) => sum.add(inv.shippingAmount ?? ZERO), ZERO);
+    };
+
+    const [sent, voided, legacySent, legacyVoided] = await Promise.all([
+      shippingOfIds(idsOf(JournalSourceType.INVOICE_SEND)),
+      shippingOfIds(idsOf(JournalSourceType.INVOICE_VOID)),
+      shippingOfNumbers(legacyNumbersOf(false)),
+      shippingOfNumbers(legacyNumbersOf(true)),
     ]);
-    return sent.sub(voided);
+    return sent.add(legacySent).sub(voided).sub(legacyVoided);
   }
 
   /** Balanced by construction: output closing - input closing - net = 0 for any signs. */
