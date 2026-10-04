@@ -48,6 +48,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 6. Money arithmetic
 
 - **Use Decimal end to end for money arithmetic and comparisons, and send fixed 4-dp strings.** No `parseFloat`, `Number()` or `toNumber()` in sums, balances or checks. Converting an exact API string to a number only at the display boundary (formatting, chart plotting via `moneyToNumber`) is allowed.
+- **Decimal precision must cover products before subtraction.** Two `Decimal(19,4)` factors can require 38 significant digits; the default 20 can lose 4-dp amounts when large valuations cancel. Use a locally cloned constructor with aggregation headroom, never change global precision, and test large products as well as fractional values. _(inventory value trend, PR #59)_
 - **Bound inputs to `Decimal(19,4)`:** at most 15 integer and 4 fraction digits, validated with `common/dto/decimal-string.ts`. Bound computed totals before writing.
 - **Allocate VAT cumulatively.** Each partial credit's VAT = `round(totalVAT × cumulative/total) − already allocated`, so the parts sum exactly to the whole.
 - **The web preview rounds per line exactly like the server** (`computeDocumentTotals`), otherwise the shown and stored totals differ.
