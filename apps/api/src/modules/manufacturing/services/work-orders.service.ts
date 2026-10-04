@@ -404,8 +404,12 @@ export class WorkOrdersService {
           description: `Manufacturing overhead - WO ${workOrder.workOrderNumber}`,
         });
       } else {
-        // Credit operations cost to raw materials account as fallback
-        const rawLine = journalLines.find((l) => l.accountId === rawMaterialsAccount.id);
+        // Credit operations cost to raw materials account as fallback.
+        // Select only a line that already has a positive credit (the materials credit line),
+        // not the finished-goods debit line, in case both accounts are the same.
+        const rawLine = journalLines.find(
+          (l) => l.accountId === rawMaterialsAccount.id && l.credit.greaterThan(0),
+        );
         if (rawLine) {
           rawLine.credit = rawLine.credit.add(operationsCost);
         } else {

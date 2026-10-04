@@ -387,7 +387,7 @@ describe('OrganizationsService', () => {
 
   describe('updateAccountSettings', () => {
     it('updates default account mappings', async () => {
-      mockPrisma.account.findMany.mockResolvedValue([{ id: 'acc-1' }]);
+      mockPrisma.account.findMany.mockResolvedValue([{ id: 'acc-1', type: 'ASSET' }]);
       mockPrisma.organization.update.mockResolvedValue({ id: ORG_ID, defaultArAccountId: 'acc-1' });
 
       await service.updateAccountSettings(ORG_ID, { defaultArAccountId: 'acc-1' });
@@ -407,8 +407,7 @@ describe('OrganizationsService', () => {
     });
 
     it('rejects an AR default that is not an asset and an AP default that is not a liability', async () => {
-      mockPrisma.account.findMany.mockResolvedValue([{ id: 'acc-1' }]);
-      mockPrisma.account.findFirst.mockResolvedValue({ type: 'EXPENSE' });
+      mockPrisma.account.findMany.mockResolvedValue([{ id: 'acc-1', type: 'EXPENSE' }]);
 
       await expect(
         service.updateAccountSettings(ORG_ID, { defaultArAccountId: 'acc-1' }),
@@ -420,10 +419,10 @@ describe('OrganizationsService', () => {
     });
 
     it('accepts correctly typed AR and AP defaults', async () => {
-      mockPrisma.account.findMany.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
-      mockPrisma.account.findFirst
-        .mockResolvedValueOnce({ type: 'ASSET' })
-        .mockResolvedValueOnce({ type: 'LIABILITY' });
+      mockPrisma.account.findMany.mockResolvedValue([
+        { id: 'a', type: 'ASSET' },
+        { id: 'b', type: 'LIABILITY' },
+      ]);
       mockPrisma.organization.update.mockResolvedValue({ id: ORG_ID });
 
       await service.updateAccountSettings(ORG_ID, {

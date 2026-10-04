@@ -137,7 +137,7 @@ export class OrganizationsService {
           organizationId: id,
           isActive: true,
         },
-        select: { id: true },
+        select: { id: true, type: true },
       });
 
       const foundIds = accounts.map((a) => a.id);
@@ -146,21 +146,16 @@ export class OrganizationsService {
       if (invalidIds.length > 0) {
         throw new BadRequestException(`Invalid or inactive account IDs: ${invalidIds.join(', ')}`);
       }
-    }
 
-    // AR must be an asset and AP a liability: the as-of dashboard totals read control accounts by type.
-    const typed: Array<[string | undefined, AccountType, string]> = [
-      [updateAccountSettingsDto.defaultArAccountId, AccountType.ASSET, 'defaultArAccountId'],
-      [updateAccountSettingsDto.defaultApAccountId, AccountType.LIABILITY, 'defaultApAccountId'],
-    ];
-    for (const [accountId, type, field] of typed) {
-      if (!accountId) continue;
-      const account = await this.prisma.account.findFirst({
-        where: { id: accountId, organizationId: id },
-        select: { type: true },
-      });
-      if (account && account.type !== type) {
-        throw new BadRequestException(`${field} must reference an account of type ${type}`);
+      const typeById = new Map(accounts.map((a) => [a.id, a.type]));
+      const typed: Array<[string | undefined, AccountType, string]> = [
+        [updateAccountSettingsDto.defaultArAccountId, AccountType.ASSET, 'defaultArAccountId'],
+        [updateAccountSettingsDto.defaultApAccountId, AccountType.LIABILITY, 'defaultApAccountId'],
+      ];
+      for (const [accountId, type, field] of typed) {
+        if (accountId && typeById.get(accountId) !== type) {
+          throw new BadRequestException(`${field} must reference an account of type ${type}`);
+        }
       }
     }
 

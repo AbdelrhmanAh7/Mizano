@@ -218,6 +218,12 @@ describe('WorkOrdersService completion', () => {
     const credit = lines.reduce((sum, l) => sum.add(l.credit), new Decimal(0));
     expect(debit.toFixed(4)).toBe('2.0000');
     expect(credit.toFixed(4)).toBe('2.0000');
+    // Each line must have only one positive side (either debit or credit, not both)
+    for (const line of lines) {
+      const hasDebit = line.debit.greaterThan(0);
+      const hasCredit = line.credit.greaterThan(0);
+      expect(hasDebit !== hasCredit).toBe(true);
+    }
   });
 
   it('completes without a journal when the inventory accounts are missing', async () => {
