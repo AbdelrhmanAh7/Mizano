@@ -1,0 +1,148 @@
+# .github/workflows/ai-implementers.yml
+# AI implementers (Claude <-> Codex). Managed from Notion: NileQuant Labs HQ -> Agent Team.
+# Claude runs on the owner's Claude subscription (CLAUDE_CODE_OAUTH_TOKEN).
+# If Claude hits its usage limit, the task is handed to Codex (@codex) and
+# re-tried by Claude every 3 hours; after 2 handoffs it is labelled ai-stuck.
+name: AI implementers (Claude <-> Codex)
+
+on:
+  schedule:
+    - cron: "0 6 * * 0-4"    # 09:00 Riyadh, Sun-Thu: start the next task
+    - cron: "30 */3 * * *"   # every 3h: rescue stalled handoffs
+  workflow_dispatch:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+
+jobs:
+  start:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 6 * * 0-4'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure labels exist
+        run: |
+          gh label create ai-ready      --color 0E8A16 --description "Queued for the AI implementers" --force
+          gh label create ai-claude     --color D97757 --description "Claude is implementing" --force
+          gh label create codex-handoff --color 10A37F --description "Handed to Codex" --force
+          gh label create start-codex   --color 1D76DB --description "Start this task with Codex" --force
+          gh label create handoff-2     --color FBCA04 --description "Second handoff" --force
+          gh label create ai-stuck      --color B60205 --description "AI could not finish - needs the owner" --force
+
+      - id: pick
+        name: Pick the next ai-ready issue
+        run: |
+          n=$(gh issue list --label ai-ready --state open --json number,labels \
+            --jq '[.[] | select([.labels[].name] | (index("ai-claude") or index("codex-handoff") or index("ai-stuck")) | not)] | sort_by(.number) | .[0].number // empty')
+          echo "issue=$n" >> "$GITHUB_OUTPUT"
+          if [ -n "$n" ]; then
+            echo "labels=$(gh issue view "$n" --json labels --jq '[.labels[].name] | join(",")')" >> "$GITHUB_OUTPUT"
+          else
+            echo "No ai-ready issue to start."
+          fi
+
+      - name: Mark Claude working
+        if: steps.pick.outputs.issue != '' && !contains(steps.pick.outputs.labels, 'start-codex')
+        run: gh issue edit ${{ steps.pick.outputs.issue }} --add-label ai-claude
+
+      - id: claude
+        if: steps.pick.outputs.issue != '' && !contains(steps.pick.outputs.labels, 'start-codex')
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Implement GitHub issue #${{ steps.pick.outputs.issue }} in ${{ github.repository }} COMPLETELY, exactly as its brief says.
+            Use branch ai/${{ steps.pick.outputs.issue }}. If it already exists, check it out and CONTINUE from where the
+            previous implementer stopped (read its commits and the issue comments first).
+            Commit and push work-in-progress to that branch after every meaningful step.
+            Run the tests. Open ONE pull request from that branch whose body says "Closes #${{ steps.pick.outputs.issue }}",
+            lists the REQ ids and adds EVIDENCE.md when the brief asks for evidence. Never merge.
+            If the brief is unclear, comment your questions on the issue and stop.
+
+      - name: Hand over to Codex
+        if: steps.pick.outputs.issue != '' && steps.claude.outcome != 'success'
+        run: |
+          n=${{ steps.pick.outputs.issue }}
+          gh issue edit "$n" --remove-label ai-claude --add-label codex-handoff
+          gh issue comment "$n" --body "@codex Please implement this issue COMPLETELY as its brief says. Use branch ai/$n: if it exists, continue the previous work from there. Push work-in-progress often, run the tests, and open ONE PR whose body says 'Closes #$n'. Never merge."
+
+  rescue:
+    if: github.event.schedule == '30 */3 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: stalled
+        name: Find a handoff with no PR after 3 hours
+        run: |
+          for n in $(gh issue list --label codex-handoff --state open --json number --jq '.[].number'); do
+            prs=$(gh pr list --state all --search "Closes #$n in:body" --json number --jq 'length')
+            if [ "$prs" != "0" ]; then
+              gh issue edit "$n" --remove-label codex-handoff
+              continue
+            fi
+            last=$(gh issue view "$n" --json comments --jq '[.comments[] | select(.body | startswith("@codex"))] | last | .createdAt // empty')
+            [ -z "$last" ] && continue
+            if [ $(( $(date +%s) - $(date -d "$last" +%s) )) -gt 10800 ]; then
+              echo "issue=$n" >> "$GITHUB_OUTPUT"
+              echo "labels=$(gh issue view "$n" --json labels --jq '[.labels[].name] | join(",")')" >> "$GITHUB_OUTPUT"
+              break
+            fi
+          done
+
+      - id: claude
+        if: steps.stalled.outputs.issue != ''
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Issue #${{ steps.stalled.outputs.issue }} in ${{ github.repository }} was not finished (usage limit or no result).
+            Check out branch ai/${{ steps.stalled.outputs.issue }} if it exists and CONTINUE it; otherwise start it.
+            Finish the WHOLE task as the brief says, push often, run the tests, and open ONE PR whose body says
+            "Closes #${{ steps.stalled.outputs.issue }}". Never merge.
+
+      - name: Next step after rescue
+        if: steps.stalled.outputs.issue != ''
+        run: |
+          n=${{ steps.stalled.outputs.issue }}
+          if [ "${{ steps.claude.outcome }}" = "success" ]; then
+            gh issue edit "$n" --remove-label codex-handoff
+          elif echo "${{ steps.stalled.outputs.labels }}" | grep -q handoff-2; then
+            gh issue edit "$n" --remove-label codex-handoff --add-label ai-stuck
+            gh issue comment "$n" --body "Claude and Codex both hit limits twice without finishing. Needs the owner."
+          else
+            gh issue edit "$n" --add-label handoff-2
+            gh issue comment "$n" --body "@codex Claude is still out of quota. Please continue branch ai/$n and finish the WHOLE task, then open ONE PR whose body says 'Closes #$n'. Never merge."
+          fi
+
+  mention:
+    if: >-
+      (github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') &&
+      contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
