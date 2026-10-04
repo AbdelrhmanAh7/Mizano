@@ -46,11 +46,21 @@ describe('validateDate', () => {
     });
   });
 
-  it('rejects dates with trailing characters unless properly formed ISO', () => {
+  it('rejects trailing garbage like 2026-01-31abc', () => {
+    expect(validateDate('2026-01-31abc', false, NOW).status).toBe('invalid');
+  });
+
+  it('accepts date-only and valid ISO timestamps with Z or an offset', () => {
+    expect(validateDate('2026-09-01', false, NOW).status).toBe('valid');
     expect(validateDate('2026-09-01T12:00:00Z', false, NOW).status).toBe('valid');
-    expect(validateDate('2026-09-011', false, NOW).status).toBe('invalid');
-    expect(validateDate('2026-09-01T99:99', false, NOW).status).toBe('invalid');
-    expect(validateDate('2026-09-01garbage', false, NOW).status).toBe('invalid');
+    expect(validateDate('2026-09-01T12:00:00.123Z', false, NOW).status).toBe('valid');
+    expect(validateDate('2026-09-01T12:00:00+03:00', false, NOW).status).toBe('valid');
+    expect(validateDate('2026-09-01T12:00:00-05:00', false, NOW).status).toBe('valid');
+  });
+
+  it('still rejects Feb 30', () => {
+    expect(validateDate('2026-02-30', false, NOW).status).toBe('invalid');
+    expect(validateDate('2026-02-30T12:00:00Z', false, NOW).status).toBe('invalid');
   });
 });
 

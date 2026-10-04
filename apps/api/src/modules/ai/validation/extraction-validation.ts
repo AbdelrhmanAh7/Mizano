@@ -97,6 +97,16 @@ export function validateInvoiceNumber(
   return finish(v, [], 'valid', evidence);
 }
 
+const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const TIMESTAMP_RE =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/;
+
+function parseDateParts(value: string): { y: number; mo: number; d: number } | null {
+  const m = DATE_ONLY_RE.exec(value) ?? TIMESTAMP_RE.exec(value);
+  if (!m) return null;
+  return { y: Number(m[1]), mo: Number(m[2]), d: Number(m[3]) };
+}
+
 export function validateDate(
   value: string | null,
   ambiguous: boolean,
@@ -105,10 +115,9 @@ export function validateDate(
 ): FieldValidation {
   const v = clean(value);
   if (!v) return finish(null, ['DATE_MISSING'], 'missing', evidence);
-  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T|$)/.exec(v);
-  if (!m || (v.length > 10 && Number.isNaN(Date.parse(v))))
-    return finish(v, ['DATE_INVALID'], 'invalid', evidence);
-  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const parts = parseDateParts(v);
+  if (!parts) return finish(v, ['DATE_INVALID'], 'invalid', evidence);
+  const { y, mo, d } = parts;
   const dt = new Date(Date.UTC(y, mo - 1, d));
   if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) {
     return finish(v, ['DATE_INVALID'], 'invalid', evidence);

@@ -3,10 +3,41 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { IntakeInbox } from './intake-inbox';
 import type { IntakeInboxRow } from '@/lib/hooks/use-intake-inbox';
 
+import enPurchases from '../../messages/en/purchases.json';
+import arPurchases from '../../messages/ar/purchases.json';
+
+type LocaleData = {
+  inbox: {
+    blocker: Record<string, string>;
+  };
+};
+
+const allLocales: Record<string, LocaleData> = {
+  en: enPurchases as unknown as LocaleData,
+  ar: arPurchases as unknown as LocaleData,
+};
+let currentMockLocale = 'en';
+
 jest.mock('next-intl', () => ({
-  useLocale: () => 'en',
-  useTranslations: () => (key: string, values?: Record<string, unknown>) =>
-    values ? `${key}:${JSON.stringify(values)}` : key,
+  useLocale: () => currentMockLocale,
+  useTranslations: (namespace: string) => {
+    const t = (key: string, values?: Record<string, unknown>) => {
+      // Very simple mock translation lookup
+      if (namespace === 'purchases.inbox' && key.startsWith('blocker.')) {
+        const code = key.split('.')[1];
+        return allLocales[currentMockLocale]?.inbox?.blocker?.[code] || key;
+      }
+      return values ? `${key}:${JSON.stringify(values)}` : key;
+    };
+    t.has = (key: string) => {
+      if (namespace === 'purchases.inbox' && key.startsWith('blocker.')) {
+        const code = key.split('.')[1];
+        return !!allLocales[currentMockLocale]?.inbox?.blocker?.[code];
+      }
+      return true; // Mock true for other things
+    };
+    return t;
+  },
 }));
 
 jest.mock('next/link', () => {
@@ -97,7 +128,7 @@ describe('IntakeInbox', () => {
   it('only lets ready rows be selected and ignores rows with blockers', () => {
     render(<IntakeInbox />);
     expect(screen.getByLabelText(/selectRow.*Vendor c/)).toBeDisabled();
-    expect(screen.getByText('blocker.NO_VENDOR')).toBeInTheDocument();
+    expect(screen.getByText(enPurchases.inbox.blocker.NO_VENDOR)).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('selectAll'));
     expect(screen.getByLabelText(/selectRow.*Vendor a/)).toBeChecked();
     expect(screen.getByLabelText(/selectRow.*Vendor b/)).toBeChecked();
@@ -188,5 +219,63 @@ describe('IntakeInbox', () => {
     rerender(<IntakeInbox />);
     expect(screen.getByText('noAccess')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('renders localized messages for every blocker code from the real message files with no MISSING key', async () => {
+    const enBlockers = enPurchases.inbox.blocker;
+    const arBlockers = arPurchases.inbox.blocker;
+    const codes = Object.keys(enBlockers);
+    expect(codes.length).toBeGreaterThan(0);
+
+    for (const code of codes) {
+      const enText = enBlockers[code as keyof typeof enBlockers];
+      const arText = arBlockers[code as keyof typeof arBlockers];
+      expect(enText).toBeTruthy();
+      expect(arText).toBeTruthy();
+      expect(enText).not.toContain('MISSING');
+      expect(arText).not.toContain('MISSING');
+    }
+
+    const testCode = codes[0];
+    const expectedEnMsg = enBlockers[testCode as keyof typeof enBlockers];
+    mockBulk.mockResolvedValue({
+      processed: 0,
+      total: 1,
+      failures: [{ id: 'a', code: testCode, reason: 'Fallback reason' }],
+    });
+
+    currentMockLocale = 'en';
+    const { unmount } = render(<IntakeInbox />);
+    fireEvent.click(screen.getByLabelText('selectAll'));
+    fireEvent.click(screen.getByRole('button', { name: /approveSelected/ }));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'confirm.confirm' }));
+
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: 'destructive',
+          description: `Vendor a: ${expectedEnMsg}`,
+        }),
+      ),
+    );
+    unmount();
+
+    currentMockLocale = 'ar';
+    const expectedArMsg = arBlockers[testCode as keyof typeof arBlockers];
+    render(<IntakeInbox />);
+    fireEvent.click(screen.getByLabelText('selectAll'));
+    fireEvent.click(screen.getByRole('button', { name: /approveSelected/ }));
+    const dialogAr = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialogAr).getByRole('button', { name: 'confirm.confirm' }));
+
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: 'destructive',
+          description: `Vendor a: ${expectedArMsg}`,
+        }),
+      ),
+    );
   });
 });

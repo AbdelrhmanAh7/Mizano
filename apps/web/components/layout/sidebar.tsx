@@ -260,16 +260,31 @@ function SidebarNav({ collapsed = false, onItemClick }: SidebarNavProps) {
     );
   }, []);
 
-  // Filter navigation based on permissions
-  const filteredNavigation = useMemo(
-    () =>
-      navigationConfig.filter((item) => {
-        if (!item.permission) return true;
-        if (isLoading) return false;
-        return hasPermission(item.permission);
-      }),
-    [hasPermission, isLoading],
-  );
+  // Filter navigation based on permissions. A parent is visible if the user has its
+  // permission OR any of its children's permissions. Children without explicit
+  // permissions inherit the parent's permission.
+  const filteredNavigation = useMemo(() => {
+    if (isLoading) return [];
+    return navigationConfig.reduce<NavItem[]>((acc, item) => {
+      const hasParentPerm = item.permission ? hasPermission(item.permission) : true;
+
+      if (item.children) {
+        const visibleChildren = item.children.filter((child) =>
+          child.permission ? hasPermission(child.permission) : hasParentPerm,
+        );
+
+        if (visibleChildren.length > 0) {
+          acc.push({ ...item, permission: undefined, children: visibleChildren });
+        } else if (hasParentPerm) {
+          acc.push({ ...item, children: [] });
+        }
+      } else {
+        if (hasParentPerm) acc.push(item);
+      }
+
+      return acc;
+    }, []);
+  }, [hasPermission, isLoading]);
 
   const renderNavItem = (item: NavItem, isChild = false) => {
     if (item.permission && (isLoading || !hasPermission(item.permission))) {

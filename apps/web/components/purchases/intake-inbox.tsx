@@ -152,8 +152,7 @@ export function IntakeInbox(): JSX.Element {
         return;
       }
       const lines = failures.slice(0, MAX_TOAST_FAILURES).map((f) => {
-        const reasonText =
-          f.code && t.has(`blockers.${f.code}`) ? t(`blockers.${f.code}`) : f.reason;
+        const reasonText = f.code && t.has(`blocker.${f.code}`) ? t(`blocker.${f.code}`) : f.reason;
         return `${names.get(f.id) ?? f.id}: ${reasonText}`;
       });
       if (failures.length > MAX_TOAST_FAILURES) {
