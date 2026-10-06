@@ -182,7 +182,7 @@ services:
       INTAKE_STORAGE_DIR: /data/originals
       INTAKE_EXTRACTION_STRATEGY: ${INTAKE_EXTRACTION_STRATEGY:-rules}
       INTAKE_CONCURRENCY: ${INTAKE_CONCURRENCY:-1}
-      INTAKE_TESSDATA_DIR: ${INTAKE_TESSDATA_DIR:-}
+      INTAKE_TESSDATA_DIR: /app/apps/api
     volumes:
       # The worker only reads originals; the api writes them.
       - type: bind

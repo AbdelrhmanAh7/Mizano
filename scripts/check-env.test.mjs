@@ -155,7 +155,7 @@ test('demo guardrails: CPU-only extraction, SSD path, age key', () => {
   assert.ok(errors.some((e) => e.startsWith('MIZANO_DATA_DIR:')));
   assert.ok(errors.some((e) => e.startsWith('BACKUP_AGE_RECIPIENT:')));
   assert.ok(warnings.some((w) => w.startsWith('TELEGRAM_BOT_TOKEN/')));
-  assert.ok(warnings.some((w) => w.startsWith('INTAKE_TESSDATA_DIR:')));
+
 });
 
 test('messages never contain values', () => {

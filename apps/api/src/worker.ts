@@ -50,5 +50,10 @@ if (process.argv.includes('--healthcheck')) {
     heartbeatIsFresh(process.env.WORKER_HEARTBEAT_FILE || DEFAULT_HEARTBEAT_FILE) ? 0 : 1,
   );
 } else {
-  void bootstrap();
+  bootstrap().catch((err: unknown) => {
+    const meta =
+      err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { err };
+    Logger.error('Worker failed to start', meta, 'WorkerBootstrap');
+    process.exit(1);
+  });
 }

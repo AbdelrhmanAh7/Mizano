@@ -9,6 +9,7 @@ set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 out="$DATA_DIR/soak"
+assert_ssd || exit 1
 mkdir -p "$out"
 tsv="$out/samples.tsv"
 now="$(date +%s)"

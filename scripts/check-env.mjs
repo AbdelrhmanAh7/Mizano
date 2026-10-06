@@ -164,11 +164,7 @@ export function checkPiEnv(env, template) {
   } else if (Number(get('INTAKE_CONCURRENCY')) > 1) {
     warnings.push('INTAKE_CONCURRENCY: above 1 may exceed the worker memory budget on the Pi');
   }
-  if (!get('INTAKE_TESSDATA_DIR')) {
-    warnings.push(
-      'INTAKE_TESSDATA_DIR: unset; OCR language data must be baked into the worker image',
-    );
-  }
+
   if (get('BACKUP_AGE_RECIPIENT') && !AGE_RECIPIENT.test(get('BACKUP_AGE_RECIPIENT'))) {
     fail('BACKUP_AGE_RECIPIENT: must be an age public key (age1...)');
   }

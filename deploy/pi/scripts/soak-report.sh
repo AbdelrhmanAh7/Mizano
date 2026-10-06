@@ -56,7 +56,8 @@ END {
     printf "%-12s %8sMB %8sMB %8sMB %7.0f%% %9d %9d\n", s, cur[s] + 0, peak[s] + 0, lim[s] + 0, pct, rs, bad[s] + 0
     if (cgoom[s] > 0) printf "  %s: %d cgroup OOM kill(s)\n", s, cgoom[s]
   }
-  verdict = fail ? "FAIL" : (rate > swap_max ? "SWAP-THRASH" : (secs < hours * 3600 ? "INCOMPLETE" : "PASS"))
+  expected_samples = (hours * 3600) / 60
+  verdict = fail ? "FAIL" : (rate > swap_max ? "SWAP-THRASH" : (secs < hours * 3600 || n < expected_samples * 0.9 ? "INCOMPLETE" : "PASS"))
   printf "\nverdict     %s\n", verdict
   exit (verdict == "PASS" ? 0 : 1)
 }' "$tsv"

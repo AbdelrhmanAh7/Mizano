@@ -67,12 +67,17 @@ persist_deployment() {
 # mount, DATA_DIR would sit on the SD card's root filesystem. A Pi booting from an SSD
 # (root on nvme/sda) passes.
 assert_ssd() {
-  local data_src
+  local data_src data_target
   if [ ! -d "$DATA_DIR" ]; then
     echo "data dir $DATA_DIR does not exist; is the SSD mounted?" >&2
     return 1
   fi
   data_src="$(findmnt -n -o SOURCE --target "$DATA_DIR" || true)"
+  data_target="$(findmnt -n -o TARGET --target "$DATA_DIR" || true)"
+  if [ "$data_target" = "/" ]; then
+    echo "data dir $DATA_DIR is on the root filesystem (/), which is not an attached SSD mount" >&2
+    return 1
+  fi
   case "$data_src" in
     /dev/mmcblk*)
       echo "data dir $DATA_DIR is on the SD card ($data_src), not the SSD" >&2
