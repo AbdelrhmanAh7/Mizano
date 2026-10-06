@@ -4,6 +4,7 @@
 
 - **Issue**: #102 (Post-merge: CI red after #98)
 - **Base Commit (`master`)**: `615060ed6294e16375a1f1ea9385cb7e812cd24f`
+- **Tested Head SHA**: `526c43b4a15190ed7c5f081b183268b3118ccb35`
 - **Audit Date**: 2026-10-07
 - **Failing Check**: Deploy to GCP (Workflow: `Deploy to Production`)
 - **Root Cause Classification**: **(B) & (C)** — Infrastructure Unreachable & Workflow Configuration
