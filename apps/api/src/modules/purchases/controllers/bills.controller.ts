@@ -26,6 +26,7 @@ import { CacheInvalidationInterceptor } from '../../../common/interceptors/cache
 import { BillCursorQueryDto } from '../dto/bill-cursor-query.dto';
 import { BillQueryDto } from '../dto/bill-query.dto';
 import { CheckDuplicateBillDto } from '../dto/check-duplicate-bill.dto';
+import { CheckPossibleDuplicateBillsDto } from '../dto/check-possible-duplicate-bills.dto';
 import { CreateBillDto } from '../dto/create-bill.dto';
 import { UpdateBillDto } from '../dto/update-bill.dto';
 import { BillsService } from '../services/bills.service';
@@ -74,6 +75,23 @@ export class BillsController {
   @ApiOperation({ summary: 'List bills with cursor-based pagination' })
   findAllCursor(@CurrentOrg() orgId: string, @Query() query: BillCursorQueryDto) {
     return this.billsService.findAllCursor(orgId, query);
+  }
+
+  @Get('possible-duplicates')
+  @Permissions('purchases.view')
+  @ApiOperation({ summary: 'Find possible duplicate bills for a draft bill or document' })
+  findPossibleDuplicates(
+    @CurrentOrg() orgId: string,
+    @Query() query: CheckPossibleDuplicateBillsDto,
+  ) {
+    return this.billsService.findPossibleDuplicateBills(orgId, query);
+  }
+
+  @Get(':id/possible-duplicates')
+  @Permissions('purchases.view')
+  @ApiOperation({ summary: 'Find possible duplicate bills for an existing draft bill' })
+  findPossibleDuplicatesForBill(@CurrentOrg() orgId: string, @Param('id') id: string) {
+    return this.billsService.findPossibleDuplicateBills(orgId, { billId: id });
   }
 
   @Get(':id')
