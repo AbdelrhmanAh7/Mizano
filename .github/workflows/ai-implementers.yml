@@ -1,9 +1,9 @@
 # .github/workflows/ai-implementers.yml
 # AI implementers on the Mac mini hub (self-hosted runner, local CLIs, no API tokens).
 # Managed from Notion: NileQuant Labs HQ -> Agent Team -> "Mac mini - Local Agent Stack".
-# Engines: local `claude -p` (owner's Claude login) -> fallback `codex exec` (owner's ChatGPT login).
+# Engines (free first, from providers.json): agy (Gemini) -> OpenRouter free via command-code -> claude -> codex.
 # Logic lives in AbdelrhmanAh7/nql-agents/bin (checked out at ~/agents/nql-agents on the Mac mini).
-#  - start   06:00 UTC Sun-Thu (+ manual): oldest ai-ready issue -> branch ai/<n> -> ONE PR "Closes #n"
+#  - start   every 2 h, 24/7 (+ manual): oldest ai-ready issue -> branch ai/<n> -> ONE PR "Closes #n"
 #  - rescue  every 3h: re-run stalled handoffs; after 2 handoffs -> ai-stuck
 #  - automerge hourly: squash only if CodeRabbit APPROVED head + CI green + no risky paths, else needs-owner
 #  - mention: "@claude" comments by the repo OWNER only
@@ -12,7 +12,7 @@ name: AI implementers (Claude <-> Codex)
 
 on:
   schedule:
-    - cron: "0 6 * * 0-4"    # 09:00 Riyadh, Sun-Thu: start the next task
+    - cron: "0 */2 * * *"    # every 2 h, 24/7: start the next task (free engines first)
     - cron: "30 */3 * * *"   # every 3h: rescue stalled handoffs (+ automerge)
     - cron: "15 * * * *"     # hourly: automerge
   workflow_dispatch:
@@ -27,7 +27,7 @@ env:
 
 jobs:
   start:
-    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 6 * * 0-4'
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 */2 * * *'
     runs-on: [self-hosted, macmini]
     timeout-minutes: 330
     concurrency:
