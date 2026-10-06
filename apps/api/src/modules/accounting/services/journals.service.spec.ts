@@ -109,6 +109,45 @@ describe('JournalsService', () => {
       expect(prisma.journal.create).not.toHaveBeenCalled();
     });
 
+    it('checks balance on stored values: rejects amounts Decimal(19, 4) would round', async () => {
+      // 0.00005 + 0.00005 = 0.0001 balances in memory, but the database stores each debit as
+      // 0.0001, so the ledger would hold 0.0002 of debits against 0.0001 of credits.
+      const dto = {
+        date: '2024-06-15T00:00:00.000Z',
+        lines: [
+          { accountId: 'acc-1', debit: '0.00005' },
+          { accountId: 'acc-1', debit: '0.00005' },
+          { accountId: 'acc-2', credit: '0.0001' },
+        ],
+      };
+
+      await expect(service.create(ORG_ID, dto)).rejects.toThrow(
+        'at most 15 integer digits and 4 decimal places',
+      );
+      expect(prisma.journal.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects amounts beyond Decimal(19, 4) up front and keeps the largest one exact', async () => {
+      const lines = (amount: string) => [
+        { accountId: 'acc-1', debit: amount },
+        { accountId: 'acc-2', credit: amount },
+      ];
+      const date = '2024-06-15T00:00:00.000Z';
+      await expect(
+        service.create(ORG_ID, { date, lines: lines('1000000000000000') }),
+      ).rejects.toThrow('at most 15 integer digits and 4 decimal places');
+      expect(prisma.journal.create).not.toHaveBeenCalled();
+
+      prisma.account.findMany.mockResolvedValue([
+        { id: 'acc-1', organizationId: ORG_ID },
+        { id: 'acc-2', organizationId: ORG_ID },
+      ] as any);
+      prisma.journal.create.mockResolvedValue(createMockJournalEntry({ lines: [] }) as any);
+      await service.create(ORG_ID, { date, lines: lines('999999999999999.9999') });
+      const createCall = prisma.journal.create.mock.calls[0]![0]!;
+      expect(JSON.stringify(createCall.data)).toContain('"debit":"999999999999999.9999"');
+    });
+
     it('should allow two lines that use the same account', async () => {
       prisma.account.findMany.mockResolvedValue([
         { id: 'acc-exp', organizationId: ORG_ID },
