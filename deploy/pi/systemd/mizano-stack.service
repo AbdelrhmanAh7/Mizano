@@ -9,6 +9,7 @@ RequiresMountsFor=/mnt/ssd/mizano
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+Environment=SKIP_ENV_CHECK=1
 ExecStart=/opt/mizano/deploy/pi/scripts/stack.sh up
 # `stop` (not `down`) on shutdown; containers stopped this way are not auto-started by
 # dockerd at boot, so this unit starts them only after the SSD mount is ready.

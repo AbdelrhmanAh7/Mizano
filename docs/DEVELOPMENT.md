@@ -39,7 +39,7 @@ Health: `GET /api/health`, `/api/health/ready`, `/api/health/live`.
 | Dev       | `pnpm dev`, `pnpm dev:api`, `pnpm dev:web`                                                           | `dev:local` forces `APP_ENV=local`      |
 | Build     | `pnpm build`, `pnpm build:{dev,sit,prod}`                                                            | sets `APP_ENV` for the build            |
 | Quality   | `pnpm lint`, `pnpm lint:fix`, `pnpm type-check`, `pnpm format:check`                                 | `pnpm format` rewrites files            |
-| Tests     | `pnpm test`, `pnpm test:api`, `pnpm test:web`, `pnpm test:cov`, `pnpm test:e2e`                      | E2E needs a seeded database             |
+| Tests     | `pnpm test`, `pnpm test:api`, `pnpm test:web`, `pnpm test:cov`, `pnpm test:e2e`, `pnpm test:deploy`  | E2E needs a seeded database             |
 | CI gate   | `pnpm ci:full`                                                                                       | lint + type-check + unit tests (no E2E) |
 | Database  | `pnpm db:{generate,push,migrate,seed,reset,studio,check}`                                            | `db:reset` drops data                   |
 | Docker    | `pnpm docker:{up,down,logs,dev,sit,prod,prod:down}`, `pnpm status`                                   |                                         |
@@ -58,22 +58,27 @@ Four environment templates are tracked at the repository root. They hold placeho
 | `.env.sit`   | `sit`     | production  | System integration testing |
 | `.env.prod`  | `prod`    | production  | Production template        |
 
-- **API** (`app.module.ts`): `ConfigModule` loads `.env.${APP_ENV || 'local'}`, then `.env`. Check with `pnpm env:check`.
+The Raspberry Pi deployment has its own file: copy `deploy/pi/.env.pi.example` to `deploy/pi/.env.pi` (gitignored, `chmod 600`) and validate it with `APP_ENV=pi pnpm env:check`. That check names every missing or still-placeholder key, weak or reused secrets, images not pinned by digest, non-https origins, a `DATABASE_URL` that disagrees with the Postgres credentials and anything that breaks the CPU-only demo rules. It prints key names only, never values. `pnpm env:check --template` confirms the template covers every variable in `deploy/pi/docker-compose.pi.yml`.
+
+- **API** (`app.module.ts`): `ConfigModule` loads `.env.${APP_ENV || 'local'}`, then `.env`. Check with `pnpm env:check` (exits 1 when the file is missing or, for `pi`, invalid).
 - **Web**: Next.js loads its own `.env*` files from `apps/web`. Only `NEXT_PUBLIC_*` reaches the browser and is fixed at build time. `NEXT_PUBLIC_API_URL` must include the `/api` prefix (default `http://localhost:6001/api`).
 - When adding a variable, add it to all four templates (secret placeholders as `__CHANGE_ME__`) and to the table below.
 
-| Group        | Variables                                                                                                                                                                                                                       |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Core         | `APP_ENV`, `NODE_ENV`, `API_PORT` (6001), `CORS_ORIGIN` (comma-separated; required in production), `FRONTEND_URL`                                                                                                               |
-| Database     | `DATABASE_URL`, `DATABASE_POOL_SIZE`, `DATABASE_POOL_TIMEOUT`, `READ_DATABASE_URL`, `DATABASE_READ_POOL_SIZE`, `SLOW_QUERY_THRESHOLD_MS`                                                                                        |
-| Redis        | `REDIS_URL`                                                                                                                                                                                                                     |
-| Auth         | `JWT_SECRET`, `JWT_REFRESH_SECRET`, `JWT_EXPIRATION` (15m), `JWT_REFRESH_EXPIRATION` (7d), `NEXTAUTH_SECRET`, `NEXTAUTH_URL`                                                                                                    |
-| Web          | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_APP_URL`, `API_INTERNAL_URL`                                                                                                                                        |
-| Limits       | `RATE_LIMIT_TTL`, `RATE_LIMIT_MAX`, `RATE_LIMIT_AUTH_MAX`                                                                                                                                                                       |
-| Logging      | `LOG_LEVEL`, `PRISMA_LOG_QUERIES` (default off)                                                                                                                                                                                 |
-| AI (current) | `OLLAMA_BASE_URL`, `OLLAMA_ENABLED`, `OLLAMA_{TEXT,VISION,FAST,SLOW}_MODEL`, `OLLAMA_TIMEOUT_MS`, `OLLAMA_MAX_CONCURRENT`, `OLLAMA_NUM_CTX`, `OLLAMA_NUM_THREAD`, `OLLAMA_WEBHOOK_SECRET`                                       |
-| Extraction   | `EXTRACTION_STRATEGY` (`vlm`/`ocr-llm`/`hybrid`), `EXTRACTION_OCR_CONFIDENCE_THRESHOLD`, `EXTRACTION_MAX_PDF_PAGES`, `PADDLE_OCR_{LANG,PKG_PATH,MODELS_DIR,TIMEOUT_MS}`, `PADDLE_OCR_API_{URL,TOKEN,TIMEOUT_MS}`, `PYTHON_PATH` |
-| Email        | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`                                                                                                                                     |
+| Group        | Variables                                                                                                                                                                                                                                    |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core         | `APP_ENV`, `NODE_ENV`, `API_PORT` (6001), `CORS_ORIGIN` (comma-separated; required in production), `FRONTEND_URL`                                                                                                                            |
+| Database     | `DATABASE_URL`, `DATABASE_POOL_SIZE`, `DATABASE_POOL_TIMEOUT`, `READ_DATABASE_URL`, `DATABASE_READ_POOL_SIZE`, `SLOW_QUERY_THRESHOLD_MS`                                                                                                     |
+| Redis        | `REDIS_URL`                                                                                                                                                                                                                                  |
+| Auth         | `JWT_SECRET`, `JWT_REFRESH_SECRET`, `JWT_EXPIRATION` (15m), `JWT_REFRESH_EXPIRATION` (7d), `NEXTAUTH_SECRET`, `NEXTAUTH_URL`                                                                                                                 |
+| Web          | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_APP_URL`, `API_INTERNAL_URL`                                                                                                                                                     |
+| Limits       | `RATE_LIMIT_TTL`, `RATE_LIMIT_MAX`, `RATE_LIMIT_AUTH_MAX`                                                                                                                                                                                    |
+| Logging      | `LOG_LEVEL`, `PRISMA_LOG_QUERIES` (default off)                                                                                                                                                                                              |
+| AI (current) | `OLLAMA_BASE_URL`, `OLLAMA_ENABLED`, `OLLAMA_{TEXT,VISION,FAST,SLOW}_MODEL`, `OLLAMA_TIMEOUT_MS`, `OLLAMA_MAX_CONCURRENT`, `OLLAMA_NUM_CTX`, `OLLAMA_NUM_THREAD`, `OLLAMA_WEBHOOK_SECRET`                                                    |
+| Extraction   | `EXTRACTION_STRATEGY` (`vlm`/`ocr-llm`/`hybrid`), `EXTRACTION_OCR_CONFIDENCE_THRESHOLD`, `EXTRACTION_MAX_PDF_PAGES`, `PADDLE_OCR_{LANG,PKG_PATH,MODELS_DIR,TIMEOUT_MS}`, `PADDLE_OCR_API_{URL,TOKEN,TIMEOUT_MS}`, `PYTHON_PATH`              |
+| Email        | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`                                                                                                                                                  |
+| Intake       | `INTAKE_STORAGE_DIR`, `INTAKE_EXTRACTION_STRATEGY` (`rules`/`llm`), `INTAKE_CONCURRENCY` (1–4), `INTAKE_TESSDATA_DIR`, `INTAKE_LEASE_MS`, `INTAKE_MAX_ACTIVE_JOBS`, `INTAKE_RETRY_BASE_MS`, `INTAKE_WORKER_ENABLED`, `WORKER_HEARTBEAT_FILE` |
+
+Intake jobs run in the API process by default. `INTAKE_WORKER_ENABLED=false` (only honoured when `REDIS_URL` is set) makes the API enqueue only, and a separate `node dist/worker.js` process (same image) consumes the queue; `node dist/worker.js --healthcheck` exits 0 while its heartbeat file (`WORKER_HEARTBEAT_FILE`, default `/tmp/mizano-worker.heartbeat`) is fresh. The Pi stack uses this split.
 
 `OCR_SERVICE_*` and `VLM_*` entries still present in `.env.local` belong to removed Python services and are not read by the code.
 
@@ -112,6 +117,7 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 | API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database               |
 | Browser E2E    | not wired yet                                              | tracked by the seeded API/browser journey issue         |
 | Planning tools | `scripts/test_*.py`                                        | `python -m unittest discover -s scripts -p 'test_*.py'` |
+| Deploy tooling | `scripts/check-env.test.mjs` (Pi env validation)           | `pnpm test:deploy` (`node --test`)                      |
 
 `_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly.
 
@@ -161,4 +167,13 @@ The workflow still pulls an Ollama vision model on the host; the CPU-only demo m
 
 Historical VPS sizing and provider notes: [archive/deployment-requirements-2026-03.md](archive/deployment-requirements-2026-03.md).
 
-**Raspberry Pi 5.** The tiny live deployment (compose, Cloudflare Tunnel, digest deploys, encrypted backups, monitoring) is documented in [deploy/pi/README.md](../deploy/pi/README.md).
+**Raspberry Pi 5.** The tiny live deployment (compose, Cloudflare Tunnel, digest deploys, encrypted backups, monitoring, soak test) is documented in [deploy/pi/README.md](../deploy/pi/README.md). `deploy/pi/docker-compose.pi.yml` runs Postgres 16, Redis, API, intake worker, web and the Cloudflare Tunnel reverse proxy under hard memory limits that sum to 5.5 GB of the 8 GB (postgres 1.5G, redis 256M, api 1G, worker 2G, web 512M, cloudflared 128M). All data stays under `MIZANO_DATA_DIR` on the SSD, and container logs are capped at 3 × 10 MB. On the Pi, from `/opt/mizano`:
+
+```bash
+deploy/pi/scripts/stack.sh check          # = APP_ENV=pi pnpm env:check (node or a node container)
+deploy/pi/scripts/stack.sh up             # check the SSD mount, start everything, wait until healthy
+deploy/pi/scripts/stack.sh status         # containers, health, docker stats, free -m
+deploy/pi/scripts/stack.sh down           # stop and remove containers; data on the SSD is kept
+```
+
+`stack.sh up` refuses to start if `MIZANO_DATA_DIR` is not on its own mounted filesystem, so data never lands on the SD card. After a reboot, `mizano-stack.service` brings the stack back once the SSD is mounted (README section 1). Deploys still go through `deploy/pi/scripts/deploy.sh` with image digests.

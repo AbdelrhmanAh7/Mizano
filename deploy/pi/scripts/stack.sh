@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# One command to start/stop the Pi stack. Usage: stack.sh up|down|restart|status|logs [svc]
-#   up       check the SSD, start everything (waits for api, worker and web to be healthy)
+# One command to start/stop the Pi stack. Usage: stack.sh up|down|stop|restart|status|logs|check
+#   check    validate .env.pi (same rules as `APP_ENV=pi pnpm env:check`)
+#   up       check .env.pi and the SSD, start everything (waits for api, worker, web healthy)
 #   down     stop and remove containers; data on the SSD is kept
 #   stop     stop containers without removing them (used by mizano-stack.service)
 #   status   container state, health and memory use
@@ -11,7 +12,13 @@ set -euo pipefail
 
 cmd="${1:-}"
 case "$cmd" in
+  check)
+    check_env
+    ;;
   up)
+    # mizano-stack.service sets SKIP_ENV_CHECK=1: a reboot must not be blocked by a
+    # newer check rule; the operator ran `check` when changing the config.
+    if [ "${SKIP_ENV_CHECK:-0}" != "1" ]; then check_env; fi
     assert_ssd
     dc up -d --remove-orphans
     if wait_healthy "${WAIT_SECONDS:-300}"; then
@@ -45,7 +52,7 @@ case "$cmd" in
     dc logs -f --tail=200 "$@"
     ;;
   *)
-    echo "usage: $0 up|down|stop|restart|status|logs [service]" >&2
+    echo "usage: $0 check|up|down|stop|restart|status|logs [service]" >&2
     exit 2
     ;;
 esac

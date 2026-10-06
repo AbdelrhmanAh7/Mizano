@@ -2,26 +2,68 @@
 
 Tiny live deployment: Raspberry Pi 5 (8GB, arm64), Raspberry Pi OS 64-bit, Docker Engine + compose plugin, data on an attached SSD, private HTTPS through a Cloudflare Tunnel. Nothing here has been run on a Pi yet; treat every step as unverified until the first real deployment.
 
-Memory budget (8GB): postgres 1.5G, redis 256M, api 1G, web 512M, cloudflared 128M, 2G reserved for the extraction worker, remainder for the OS and page cache.
+Memory budget (8GB), enforced as hard container limits in `docker-compose.pi.yml`:
+
+| Service     | Limit | Notes                                                                                                         |
+| ----------- | ----- | ------------------------------------------------------------------------------------------------------------- |
+| postgres    | 1.5G  | `shared_buffers=384MB`, `effective_cache_size=1GB`, `work_mem=8MB`, `max_connections=40`, SSD planner costs   |
+| redis       | 256M  | `maxmemory 192mb`, `noeviction` (queue data must not be evicted), AOF on the SSD                              |
+| api         | 1G    | V8 heap capped at 768M; enqueues intake jobs only (`INTAKE_WORKER_ENABLED=false`)                             |
+| worker      | 2G    | `node dist/worker.js` from the api image; CPU OCR/rules extraction, one document at a time, heap capped 1536M |
+| web         | 512M  | Next.js standalone, heap capped at 384M                                                                       |
+| cloudflared | 128M  | reverse proxy (Cloudflare Tunnel), outbound only                                                              |
+| **total**   | 5.5G  | about 2.5G left for the OS, Docker and page cache; `migrate` (768M) is a one-shot before api/worker start     |
+
+`memswap_limit` equals `mem_limit` for every service, so a container that outgrows its budget is restarted by its own limit rather than pushing the whole Pi into swap.
 
 ## 1. Prepare the Pi
 
 1. Flash Raspberry Pi OS Lite 64-bit, enable SSH with a key, disable password login, run `sudo apt update && sudo apt full-upgrade`.
 2. Install Docker Engine and the compose plugin from Docker's apt repository. Add your user to the `docker` group.
 3. Install `age` (`sudo apt install age`) and `curl`.
-4. Mount the SSD at `/mnt/ssd` (ext4, `UUID=... /mnt/ssd ext4 defaults,noatime 0 2` in `/etc/fstab`), then:
-   `sudo mkdir -p /mnt/ssd/mizano/{postgres,redis,originals,backups,monitor}`.
-5. Use an official Pi power supply and active cooling; the health check alerts on undervoltage and throttling.
+4. Mount the SSD at `/mnt/ssd` (ext4, `UUID=... /mnt/ssd ext4 defaults,noatime,nofail 0 2` in `/etc/fstab`), then:
+
+   ```bash
+   sudo mkdir -p /mnt/ssd/mizano/{postgres,redis,originals,backups,monitor,soak}
+   sudo chown 1001 /mnt/ssd/mizano/originals && sudo chmod 700 /mnt/ssd/mizano/originals  # api/worker run as uid 1001
+   ```
+
+   Every bind mount uses `create_host_path: false`, and `stack.sh up`/`deploy.sh` refuse to run when `MIZANO_DATA_DIR` is missing or sits on the SD card (`/dev/mmcblk*`). If the SSD fails to mount, the stack stays down instead of writing a fresh database to the SD card.
+
+5. Move Docker's own storage (images, container logs) to the SSD and cap its logs:
+
+   ```bash
+   sudo systemctl stop docker docker.socket
+   sudo rsync -aHAX /var/lib/docker/ /mnt/ssd/docker/
+   sudo cp deploy/pi/docker-daemon.json /etc/docker/daemon.json
+   sudo mkdir -p /etc/systemd/system/docker.service.d
+   sudo cp deploy/pi/systemd/docker.service.d/10-mizano-ssd.conf /etc/systemd/system/docker.service.d/
+   sudo systemctl daemon-reload && sudo systemctl start docker
+   docker info --format '{{.DockerRootDir}}'   # /mnt/ssd/docker
+   ```
+
+6. Cap the host journal and keep swap off the SD card. The compose limits leave about 2.5G of headroom, so swap is only a last-resort buffer for the host:
+
+   ```bash
+   sudo mkdir -p /etc/systemd/journald.conf.d
+   sudo cp deploy/pi/journald-mizano.conf /etc/systemd/journald.conf.d/mizano.conf
+   sudo systemctl restart systemd-journald
+   # Raspberry Pi OS: disable the SD-card swap file; zram swap (if enabled by the OS) can stay
+   sudo dphys-swapfile swapoff && sudo systemctl disable dphys-swapfile || true
+   echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-mizano.conf && sudo sysctl --system
+   ```
+
+7. Use an official Pi power supply and active cooling; the health check alerts on undervoltage and throttling.
 
 ## 2. Get the deploy files (no source build on the Pi)
 
 ```bash
 sudo git clone --depth 1 --filter=blob:none --sparse https://github.com/AbdelrhmanAh7/mizano /opt/mizano
-cd /opt/mizano && sudo git sparse-checkout set deploy/pi
+cd /opt/mizano && sudo git sparse-checkout set deploy/pi scripts
 cp deploy/pi/.env.pi.example deploy/pi/.env.pi && chmod 600 deploy/pi/.env.pi
 ```
 
-Fill `.env.pi` (generate secrets with `openssl rand -base64 48`). Never commit it.
+Fill `.env.pi` (generate secrets with `openssl rand -base64 48`). It is gitignored; never commit it. Validate it with `deploy/pi/scripts/stack.sh check`, which runs the same rules as `APP_ENV=pi pnpm env:check`. It uses the host's `node` if there is one, otherwise a throwaway `node:20-alpine` container with no network. It names every missing or placeholder key, weak or reused secret, unpinned image, non-https origin and `DATABASE_URL`/Postgres mismatch, and prints key names only. Before the first deploy, the two image keys still hold the template digest and are the only expected errors; `deploy.sh` pins them.
 
 ## 3. Private HTTPS with Cloudflare Tunnel
 
@@ -72,7 +114,28 @@ deploy/pi/scripts/deploy.sh <commit-sha> sha256:<api-digest> sha256:<web-digest>
 
 It pulls by digest, runs `prisma migrate deploy` (one-shot `migrate` service; the api only starts when it succeeds), restarts, waits for healthy, and appends `OK`/`FAILED` lines to `$MIZANO_DATA_DIR/deployments.log`. On failed health it rolls back to the previous recorded digests. Migrations are never reverted, so keep them backward compatible with the previous release.
 
-## 5. Backups and restore drill
+## 5. Start, stop and reboot
+
+```bash
+deploy/pi/scripts/stack.sh check     # validate .env.pi
+deploy/pi/scripts/stack.sh up        # env check + SSD check, start, wait until api/worker/web are healthy
+deploy/pi/scripts/stack.sh status    # containers, health, docker stats, free -m
+deploy/pi/scripts/stack.sh logs api  # follow one service (logs are capped at 3 x 10 MB per container)
+deploy/pi/scripts/stack.sh down      # stop and remove containers; data on the SSD is kept
+```
+
+Start order comes from health checks: postgres (`pg_isready` over TCP) and redis, then the one-shot `migrate`, then api and worker, then web (once the api is healthy), then cloudflared (once the web is healthy). Every long-running service has `restart: unless-stopped`.
+
+Recover automatically after a reboot or power cut:
+
+```bash
+sudo cp deploy/pi/systemd/mizano-stack.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable mizano-stack.service
+```
+
+The unit waits for the SSD mount (`RequiresMountsFor=/mnt/ssd/mizano`) and Docker, then runs `stack.sh up`. On shutdown it runs `stack.sh stop`, giving Postgres 60 s for a clean stop. Reboot test: `sudo reboot`, then without touching anything run `stack.sh status` and confirm every service is `healthy` and `systemctl is-active mizano-stack` prints `active`. Record the time from boot to healthy.
+
+## 6. Backups and restore drill
 
 ```bash
 sudo cp deploy/pi/systemd/*.{service,timer} /etc/systemd/system/
@@ -86,12 +149,28 @@ The units assume the repo at `/opt/mizano`; edit `ExecStart` otherwise, and ensu
 - `backup.sh` runs nightly at 02:30 Africa/Cairo: encrypted `pg_dump` (custom format) and a tar of `originals/` in `$MIZANO_DATA_DIR/backups`, retention `BACKUP_RETENTION_DAYS`, status in `backup.status`. Copy the folder off the Pi as well (a backup on the same SSD is not a disaster backup).
 - Run a drill monthly and before every demo: `AGE_IDENTITY_FILE=/path/mizano-backup.key deploy/pi/scripts/restore-drill.sh`. It restores the latest dump into a scratch Postgres container, then checks that tables exist and journal debits equal credits.
 
-## 6. Monitoring
+## 7. Monitoring
 
-`mizano-healthcheck.timer` runs `healthcheck.sh` every 5 minutes: API and web health endpoints, disk above 80%, low available memory, CPU temperature, throttling (`vcgencmd get_throttled`), and backup status older than 26 hours. Alerts and recovery messages go to Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`). Messages contain only short check names; no secrets or document data. A state file in `$MIZANO_DATA_DIR/monitor` suppresses repeats. Create the bot with BotFather and get the chat id from `getUpdates`.
+`mizano-healthcheck.timer` runs `healthcheck.sh` every 5 minutes: API and web health endpoints, worker container health (heartbeat), any new OOM kill (kernel `oom_kill` counter), disk above 80%, low available memory, CPU temperature, throttling (`vcgencmd get_throttled`), and backup status older than 26 hours. Alerts and recovery messages go to Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`). Messages contain only short check names; no secrets or document data. A state file in `$MIZANO_DATA_DIR/monitor` suppresses repeats. Create the bot with BotFather and get the chat id from `getUpdates`.
 
-## 7. Upgrade and rollback
+## 8. 24-hour soak test (acceptance evidence)
 
-- Upgrade: run `deploy.sh` with the new SHA and digests (section 4).
+The acceptance for #39 is 24 h under the demo workload with no OOM kills and no swap thrash, plus automatic recovery after a reboot.
+
+```bash
+sudo cp deploy/pi/systemd/mizano-soak.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl start mizano-soak.timer    # one sample per minute
+# ... run the demo workload (acceptance contract journeys, intake uploads, reports) for 24 h ...
+deploy/pi/scripts/soak-report.sh                                          # summary + verdict
+sudo systemctl stop mizano-soak.timer
+```
+
+`soak-sample.sh` appends to `$MIZANO_DATA_DIR/soak/`: `samples.tsv` (host MemAvailable, swap used, `pswpin`/`pswpout`, `oom_kill`; per service cgroup `memory.current`/`memory.peak`/`memory.max`, cgroup OOM kills, restart count, health) and `stats.log` (raw `free -m` and `docker stats` output). It records resource numbers and container names only.
+
+`soak-report.sh` prints the window, minimum MemAvailable, swap traffic, the OOM-kill delta and per-service peak memory against its limit. Its verdict is `FAIL` on any OOM kill or container restart, `SWAP-THRASH` when average swap-in exceeds `SWAP_IN_MAX_PER_SEC` (default 10 pages/s), `INCOMPLETE` under `SOAK_HOURS` (default 24), and `PASS` otherwise. Do the reboot test (section 5) after the soak, because a reboot resets the kernel counters. Attach the report output and the first, middle and last `stats.log` blocks to the issue. Without that evidence the acceptance stays unverified.
+
+## 9. Upgrade and rollback
+
+- Upgrade: run `deploy.sh` with the new SHA and digests (section 4). The worker runs the api image, so it is upgraded and rolled back together with the api.
 - Manual rollback: `deploy/pi/scripts/rollback.sh` restores the previous `OK` digests from `deployments.log`.
 - Back up before any upgrade that includes a migration: `sudo systemctl start mizano-backup.service`.

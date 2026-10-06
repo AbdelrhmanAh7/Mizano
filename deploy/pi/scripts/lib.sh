@@ -17,7 +17,8 @@ set -a
 set +a
 
 export DATA_DIR="${MIZANO_DATA_DIR:-/mnt/ssd/mizano}"
-DATA_SUBDIRS=(postgres redis originals backups monitor soak)
+# Bind-mounted by compose with create_host_path: false; the scripts create the rest.
+DATA_SUBDIRS=(postgres redis originals)
 
 dc() {
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
@@ -62,24 +63,49 @@ persist_deployment() {
   mv "$tmp" "$ENV_FILE"
 }
 
-# Refuse to run when DATA_DIR is not on its own mounted filesystem (the SSD). If the
-# SSD failed to mount, DATA_DIR would sit on the SD card's root filesystem.
+# Refuse to run when DATA_DIR is on the SD card (mmcblk device). If the SSD failed to
+# mount, DATA_DIR would sit on the SD card's root filesystem. A Pi booting from an SSD
+# (root on nvme/sda) passes.
 assert_ssd() {
-  local data_src root_src
+  local data_src
   if [ ! -d "$DATA_DIR" ]; then
     echo "data dir $DATA_DIR does not exist; is the SSD mounted?" >&2
     return 1
   fi
-  data_src="$(findmnt -n -o SOURCE --target "$DATA_DIR")"
-  root_src="$(findmnt -n -o SOURCE --target /)"
-  if [ -z "$data_src" ] || [ "$data_src" = "$root_src" ]; then
-    echo "data dir $DATA_DIR is on the root filesystem ($root_src), not the SSD" >&2
-    return 1
-  fi
+  data_src="$(findmnt -n -o SOURCE --target "$DATA_DIR" || true)"
+  case "$data_src" in
+    /dev/mmcblk*)
+      echo "data dir $DATA_DIR is on the SD card ($data_src), not the SSD" >&2
+      return 1
+      ;;
+    '')
+      echo "cannot tell which device holds $DATA_DIR" >&2
+      return 1
+      ;;
+  esac
   for sub in "${DATA_SUBDIRS[@]}"; do
     if [ ! -d "$DATA_DIR/$sub" ]; then
       echo "missing $DATA_DIR/$sub (see README section 1)" >&2
       return 1
     fi
   done
+}
+
+# Validate .env.pi with scripts/check-env.mjs (prints key names only). Uses the host's
+# node if present, else a throwaway node container with no network and read-only mounts.
+check_env() {
+  local root
+  root="$(cd "$PI_DIR/../.." && pwd)"
+  if [ ! -f "$root/scripts/check-env.mjs" ]; then
+    echo "missing $root/scripts/check-env.mjs; add scripts to the sparse checkout" >&2
+    return 1
+  fi
+  if command -v node >/dev/null 2>&1; then
+    APP_ENV=pi node "$root/scripts/check-env.mjs" --file "$ENV_FILE"
+  else
+    docker run --rm --network none -e APP_ENV=pi \
+      -v "$root/scripts:/repo/scripts:ro" -v "$PI_DIR:/repo/deploy/pi:ro" \
+      -v "$ENV_FILE:/repo/env.pi:ro" -w /repo \
+      node:20-alpine node scripts/check-env.mjs --file /repo/env.pi
+  fi
 }
