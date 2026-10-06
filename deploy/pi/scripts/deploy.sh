@@ -34,6 +34,7 @@ record() {
   printf '%s %s %s %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$sha" "$MIZANO_API_IMAGE" "$MIZANO_WEB_IMAGE" >>"$logfile"
 }
 
+assert_ssd
 log "pulling $sha"
 dc pull api web
 log "running migrations"

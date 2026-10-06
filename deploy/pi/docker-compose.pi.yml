@@ -1,6 +1,13 @@
 # Mizano on Raspberry Pi 5 (8GB, arm64). Unverified until run on a Pi.
-# Usage: docker compose -f docker-compose.pi.yml --env-file .env.pi up -d
+# Start/stop: deploy/pi/scripts/stack.sh up|down (checks the SSD first; see README).
 # No ports are published: cloudflared reaches web/api over the internal network.
+#
+# Memory budget (hard limits, swap disabled per container via memswap_limit):
+#   postgres 1536M + redis 256M + api 1024M + worker 2048M + web 512M + cloudflared 128M
+#   = 5504M, leaving ~2.5G for the OS, Docker and page cache. `migrate` (768M) is a
+#   one-shot that finishes before api/worker start.
+# Data lives only under MIZANO_DATA_DIR on the SSD. Binds use create_host_path: false,
+# so an unmounted SSD makes the stack fail to start instead of writing to the SD card.
 
 x-logging: &logging
   driver: json-file
@@ -15,10 +22,18 @@ services:
     image: postgres:16
     restart: unless-stopped
     mem_limit: 1536m
+    memswap_limit: 1536m
+    shm_size: 128m
+    # Clean shutdown avoids crash recovery on reboot.
+    stop_grace_period: 60s
+    # Prefer killing anything else if the host itself runs out of memory.
+    oom_score_adj: -500
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-mizano}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-mizano_db}
+    # Sized for the 1.5G limit: shared_buffers ~25%, small per-sort work_mem,
+    # connections for api (10 + 10 read) + worker (3 + 3) + migrate/backup.
     command:
       - postgres
       - -c
@@ -31,14 +46,29 @@ services:
       - maintenance_work_mem=64MB
       - -c
       - max_connections=40
+      - -c
+      - max_parallel_workers_per_gather=1
+      - -c
+      - wal_buffers=16MB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
     volumes:
-      - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/postgres:/var/lib/postgresql/data
+      - type: bind
+        source: ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/postgres
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      # TCP, not the socket: the temporary init server only listens on the socket.
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 10s
       timeout: 5s
       retries: 6
-      start_period: 20s
+      start_period: 30s
     logging: *logging
     networks: [internal]
 
@@ -46,6 +76,7 @@ services:
     image: redis:7
     restart: unless-stopped
     mem_limit: 256m
+    memswap_limit: 256m
     command:
       [
         'redis-server',
@@ -57,7 +88,11 @@ services:
         'noeviction',
       ]
     volumes:
-      - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/redis:/data
+      - type: bind
+        source: ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/redis
+        target: /data
+        bind:
+          create_host_path: false
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
@@ -71,6 +106,7 @@ services:
     image: ${MIZANO_API_IMAGE:?set MIZANO_API_IMAGE}
     restart: 'no'
     mem_limit: 768m
+    memswap_limit: 768m
     working_dir: /app/apps/api
     command: ['npx', 'prisma', 'migrate', 'deploy']
     environment:
@@ -85,10 +121,14 @@ services:
     image: ${MIZANO_API_IMAGE:?set MIZANO_API_IMAGE}
     restart: unless-stopped
     mem_limit: 1024m
+    memswap_limit: 1024m
     environment:
       NODE_ENV: production
+      # V8 heap below the container limit so Node GCs before the cgroup OOM-kills it.
+      NODE_OPTIONS: --max-old-space-size=768
       API_PORT: '6001'
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      DATABASE_POOL_SIZE: '10'
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET}
@@ -97,8 +137,14 @@ services:
       OLLAMA_ENABLED: ${OLLAMA_ENABLED:-false}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       INTAKE_STORAGE_DIR: /data/originals
+      # Uploads are queued in Redis; only the worker container extracts.
+      INTAKE_WORKER_ENABLED: 'false'
     volumes:
-      - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/originals:/data/originals
+      - type: bind
+        source: ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/originals
+        target: /data/originals
+        bind:
+          create_host_path: false
     depends_on:
       postgres:
         condition: service_healthy
@@ -108,7 +154,7 @@ services:
         condition: service_completed_successfully
     healthcheck:
       test:
-        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:6001/api/health']
+        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:6001/api/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -116,16 +162,60 @@ services:
     logging: *logging
     networks: [internal]
 
-  # Reserved for the CPU extraction worker (2048m budget); enable when it exists.
-  # worker:
-  #   mem_limit: 2048m
+  # Intake extraction (CPU OCR + rules), same image as the api, own memory budget.
+  worker:
+    image: ${MIZANO_API_IMAGE:?set MIZANO_API_IMAGE}
+    restart: unless-stopped
+    mem_limit: 2048m
+    memswap_limit: 2048m
+    # Lets an in-flight document finish; an interrupted one is reclaimed after its lease.
+    stop_grace_period: 30s
+    working_dir: /app/apps/api
+    command: ['node', 'dist/worker.js']
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=1536
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      DATABASE_POOL_SIZE: '3'
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      OLLAMA_ENABLED: ${OLLAMA_ENABLED:-false}
+      INTAKE_STORAGE_DIR: /data/originals
+      INTAKE_EXTRACTION_STRATEGY: ${INTAKE_EXTRACTION_STRATEGY:-rules}
+      INTAKE_CONCURRENCY: ${INTAKE_CONCURRENCY:-1}
+      INTAKE_TESSDATA_DIR: ${INTAKE_TESSDATA_DIR:-}
+    volumes:
+      # The worker only reads originals; the api writes them.
+      - type: bind
+        source: ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/originals
+        target: /data/originals
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # No HTTP server: fresh heartbeat file while the queue consumer runs.
+      test: ['CMD', 'node', 'dist/worker.js', '--healthcheck']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging: *logging
+    networks: [internal]
 
   web:
     image: ${MIZANO_WEB_IMAGE:?set MIZANO_WEB_IMAGE}
     restart: unless-stopped
     mem_limit: 512m
+    memswap_limit: 512m
     environment:
       NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=384
       HOSTNAME: 0.0.0.0
       PORT: '5001'
       NEXTAUTH_URL: ${NEXTAUTH_URL:?set NEXTAUTH_URL}
@@ -144,10 +234,12 @@ services:
     logging: *logging
     networks: [internal]
 
+  # Reverse proxy: Cloudflare Tunnel (outbound only, no open ports).
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     mem_limit: 128m
+    memswap_limit: 128m
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN}

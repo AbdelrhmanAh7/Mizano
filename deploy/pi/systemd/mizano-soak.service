@@ -1,0 +1,7 @@
+[Unit]
+Description=Mizano soak-test resource sample (docker stats, free, OOM counters)
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/mizano/deploy/pi/scripts/soak-sample.sh

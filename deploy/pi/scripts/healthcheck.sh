@@ -27,6 +27,23 @@ check_service() { # name port path
 check_service api 6001
 check_service web 5001 /robots.txt
 
+# The worker has no HTTP port; trust its container health check (heartbeat file).
+worker_cid="$(dc ps -q worker 2>/dev/null || true)"
+if [ -z "$worker_cid" ]; then
+  problems+=("worker-down|worker not running")
+elif [ "$(docker inspect -f '{{.State.Health.Status}}' "$worker_cid" 2>/dev/null || true)" != "healthy" ]; then
+  problems+=("worker-unhealthy|worker unhealthy")
+fi
+
+# A container killed by its memory limit restarts quietly; the kernel's cumulative
+# oom_kill counter (container and host OOMs alike) rising since the last run shows it.
+oom_now="$(awk '/^oom_kill / {print $2}' /proc/vmstat 2>/dev/null || true)"
+if [ -n "$oom_now" ]; then
+  oom_prev="$(cat "$state_dir/oom_kill" 2>/dev/null || echo "$oom_now")"
+  [ "$oom_now" -le "$oom_prev" ] || problems+=("oom|process OOM-killed")
+  printf '%s\n' "$oom_now" >"$state_dir/oom_kill"
+fi
+
 used="$(df --output=pcent "$DATA_DIR" | tail -n 1 | tr -dc '0-9')"
 [ "${used:-0}" -le 80 ] || problems+=("disk|disk ${used}% used")
 

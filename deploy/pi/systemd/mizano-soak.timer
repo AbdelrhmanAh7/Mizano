@@ -1,0 +1,10 @@
+[Unit]
+Description=Sample Mizano resource use every minute during a soak test
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

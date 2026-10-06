@@ -34,6 +34,7 @@ fi
 read -r _ _ sha api_img web_img <<<"$target"
 export MIZANO_API_IMAGE="$api_img"
 export MIZANO_WEB_IMAGE="$web_img"
+assert_ssd
 log "rolling back to $sha"
 dc pull api web
 dc up -d --remove-orphans

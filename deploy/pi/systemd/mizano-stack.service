@@ -1,0 +1,20 @@
+[Unit]
+Description=Mizano stack (docker compose, data on the SSD)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+# Never start before the SSD is mounted (data must not land on the SD card).
+RequiresMountsFor=/mnt/ssd/mizano
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/mizano/deploy/pi/scripts/stack.sh up
+# `stop` (not `down`) on shutdown; containers stopped this way are not auto-started by
+# dockerd at boot, so this unit starts them only after the SSD mount is ready.
+ExecStop=/opt/mizano/deploy/pi/scripts/stack.sh stop
+TimeoutStartSec=600
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target
