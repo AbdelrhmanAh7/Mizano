@@ -24,6 +24,17 @@ export function needsReview(result: DocumentIntakeResult): boolean {
   );
 }
 
+/**
+ * Whether this process consumes intake jobs. Defaults to on; the Pi stack sets
+ * `INTAKE_WORKER_ENABLED=false` on the API so only the separate worker container
+ * (`dist/worker.js`, its own memory budget) runs extraction. The API still
+ * enqueues uploads and recovery sweeps through Redis.
+ */
+export function intakeWorkerEnabled(config: ConfigService): boolean {
+  const raw = config.get<string>('INTAKE_WORKER_ENABLED');
+  return raw === undefined || raw.trim().toLowerCase() !== 'false';
+}
+
 class LeaseLostError extends Error {
   constructor() {
     super('Intake lease lost');
@@ -44,6 +55,14 @@ export class IntakeProcessorService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
+    if (!intakeWorkerEnabled(this.config)) {
+      if (this.config.get<string>('REDIS_URL')) {
+        this.logger.log('Intake worker disabled in this process; jobs run in the worker container');
+        return;
+      }
+      // Without Redis no other process can pick jobs up, so ignore the flag.
+      this.logger.warn('INTAKE_WORKER_ENABLED=false needs REDIS_URL; processing jobs in-process');
+    }
     this.queue.registerHandler((payload) => this.handle(payload));
   }
 

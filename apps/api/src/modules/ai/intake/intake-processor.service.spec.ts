@@ -3,7 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { IntakeJob, IntakeJobStatus } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { DocumentIntakeResult, DocumentIntakeService } from '../services/document-intake.service';
-import { IntakeProcessorService, needsReview } from './intake-processor.service';
+import {
+  IntakeProcessorService,
+  intakeWorkerEnabled,
+  needsReview,
+} from './intake-processor.service';
 import { IntakeQueueService } from './intake-queue.service';
 import { FakeIntakeJobTable, MemoryIntakeStorage } from './intake-test-utils';
 import { sha256Hex } from './intake-storage';
@@ -74,6 +78,33 @@ describe('IntakeProcessorService', () => {
   it('registers itself as the queue handler', () => {
     processor.onModuleInit();
     expect(queue.registerHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not consume jobs when INTAKE_WORKER_ENABLED=false and Redis carries them', () => {
+    const env: Record<string, string> = {
+      INTAKE_WORKER_ENABLED: 'false',
+      REDIS_URL: 'redis://redis:6379',
+    };
+    config.get.mockImplementation((key: string) => env[key]);
+    processor.onModuleInit();
+    expect(queue.registerHandler).not.toHaveBeenCalled();
+  });
+
+  it('keeps consuming in-process when the flag is off but there is no Redis', () => {
+    config.get.mockImplementation((key: string) =>
+      key === 'INTAKE_WORKER_ENABLED' ? 'false' : undefined,
+    );
+    processor.onModuleInit();
+    expect(queue.registerHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats anything but "false" as enabled', () => {
+    for (const value of [undefined, '', 'true', '1', ' TRUE ']) {
+      config.get.mockReturnValue(value);
+      expect(intakeWorkerEnabled(config as unknown as ConfigService)).toBe(true);
+    }
+    config.get.mockReturnValue(' False ');
+    expect(intakeWorkerEnabled(config as unknown as ConfigService)).toBe(false);
   });
 
   it('runs a QUEUED job to EXTRACTED and stores the result', async () => {

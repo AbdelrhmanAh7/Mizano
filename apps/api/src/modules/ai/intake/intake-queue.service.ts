@@ -53,6 +53,11 @@ export class IntakeQueueService implements OnModuleDestroy {
     return Number.isInteger(n) && n >= 1 && n <= 4 ? n : 1;
   }
 
+  /** True while a BullMQ worker in this process is consuming the intake queue. */
+  isConsuming(): boolean {
+    return this.worker?.isRunning() ?? false;
+  }
+
   /** Called once by the processor; starts consuming. */
   registerHandler(handler: IntakeQueueHandler): void {
     this.handler = handler;
