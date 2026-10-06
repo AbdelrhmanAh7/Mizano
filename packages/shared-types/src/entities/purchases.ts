@@ -262,3 +262,17 @@ export interface PaymentMadeQuery extends PaginationQuery {
   startDate?: string;
   endDate?: string;
 }
+
+// --- Duplicate Bill Check ---
+
+export interface DuplicateBillMatch {
+  billId: string;
+  documentDate: string;
+  amount: string;
+  currency: string;
+}
+
+export interface DuplicateCheckResult {
+  status: 'none' | 'possible' | 'unknown';
+  matches: DuplicateBillMatch[];
+}
