@@ -34,7 +34,7 @@ jobs:
       group: ai-implementer-${{ github.repository }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -45,8 +45,10 @@ jobs:
         run: echo "issue=$("$HUB_BIN/pick.sh" "$GITHUB_REPOSITORY")" >> "$GITHUB_OUTPUT"
       - name: Implement with local Claude (fallback Codex)
         if: steps.pick.outputs.issue != ''
+        env:
+          ISSUE: ${{ steps.pick.outputs.issue }}
         run: |
-          rc=0; "$HUB_BIN/implement.sh" "$GITHUB_REPOSITORY" "${{ steps.pick.outputs.issue }}" start || rc=$?
+          rc=0; "$HUB_BIN/implement.sh" "$GITHUB_REPOSITORY" "$ISSUE" start || rc=$?
           if [ "$rc" = 2 ]; then echo "::warning::Both engines failed; handed off to the rescue job."; elif [ "$rc" != 0 ]; then exit "$rc"; fi
       - name: Nothing to do
         if: steps.pick.outputs.issue == ''
@@ -60,7 +62,7 @@ jobs:
       group: ai-implementer-${{ github.repository }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -90,9 +92,12 @@ jobs:
     runs-on: [self-hosted, macmini]
     timeout-minutes: 100
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
       - name: Answer with local Claude
-        run: '"$HUB_BIN/mention.sh" "$GITHUB_REPOSITORY" "${{ github.event.issue.number }}" "${{ github.event.comment.id }}"'
+        env:
+          ISSUE: ${{ github.event.issue.number }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: '"$HUB_BIN/mention.sh" "$GITHUB_REPOSITORY" "$ISSUE" "$COMMENT_ID"'
