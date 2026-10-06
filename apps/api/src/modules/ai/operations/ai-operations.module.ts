@@ -23,7 +23,6 @@ import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-re
 
 import { IntakeJobOwnerGuard } from '../intake/intake-job-owner.guard';
 import { IntakeJobsService } from '../intake/intake-jobs.service';
-import { IntakeProcessorService } from '../intake/intake-processor.service';
 import { IntakeQueueService } from '../intake/intake-queue.service';
 import { IntakeStorage, LocalFsIntakeStorage } from '../intake/intake-storage';
 
@@ -56,7 +55,6 @@ import { OllamaTunnelController } from '../controllers/ollama-tunnel.controller'
     DocumentIntakeService,
     IntakeJobsService,
     IntakeJobOwnerGuard,
-    IntakeProcessorService,
     IntakeQueueService,
     { provide: IntakeStorage, useClass: LocalFsIntakeStorage },
     ReorderPointsService,

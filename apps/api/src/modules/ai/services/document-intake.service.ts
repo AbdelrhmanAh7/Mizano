@@ -114,6 +114,7 @@ export interface DocumentIntakeResult {
 
   /** Which AI engine extracted the data */
   extractionMethod:
+    | 'cpu-ocr'
     | 'ollama-vision'
     | 'ollama-text'
     | 'ocr-llm'

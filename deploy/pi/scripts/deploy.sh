@@ -36,6 +36,17 @@ record() {
 
 log "pulling $sha"
 dc pull api web
+
+# The api container runs as uid 1001 and writes intake originals to this bind
+# mount; a root-owned directory would fail every intake write with EACCES.
+originals="$DATA_DIR/originals"
+mkdir -p "$originals"
+log "checking $originals is writable by uid 1001 (api user)"
+if ! docker run --rm --user 1001:1001 -v "$originals:/data/originals" --entrypoint test "$MIZANO_API_IMAGE" -w /data/originals; then
+  echo "$originals is not writable by uid 1001; run: sudo chown -R 1001:1001 $originals" >&2
+  exit 1
+fi
+
 log "running migrations"
 dc run --rm migrate
 log "restarting stack"

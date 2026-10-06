@@ -4,10 +4,12 @@ import { ConfigService } from '@nestjs/config';
 import { IntakeJob, IntakeJobStatus, Prisma } from '@prisma/client';
 import { describeError } from '../../../common/utils/redact';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { DocumentIntakeResult, DocumentIntakeService } from '../services/document-intake.service';
+import { DocumentIntakeResult } from '../services/document-intake.service';
 import { intakeLeaseMs, queueJobId } from './intake-jobs.service';
 import { IntakeQueuePayload, IntakeQueueService } from './intake-queue.service';
-import { IntakeStorage } from './intake-storage';
+import { IntakeExecutorService } from './intake-executor.service';
+import { IntakeMatchingService } from './intake-matching.service';
+import { IntakeRuntimeError } from './intake-runtime';
 
 const LOW_CONFIDENCE = 0.6;
 const DEFAULT_RETRY_BASE_MS = 5000;
@@ -37,10 +39,10 @@ export class IntakeProcessorService implements OnModuleInit {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storage: IntakeStorage,
-    private readonly intake: DocumentIntakeService,
+    private readonly intake: IntakeExecutorService,
     private readonly queue: IntakeQueueService,
     private readonly config: ConfigService,
+    private readonly matching: IntakeMatchingService,
   ) {}
 
   onModuleInit(): void {
@@ -96,11 +98,8 @@ export class IntakeProcessorService implements OnModuleInit {
     });
     if (!job) return;
 
-    let lost: (error: Error) => void = () => undefined;
-    const lostLease = new Promise<never>((_, reject) => {
-      lost = reject;
-    });
-    lostLease.catch(() => undefined);
+    const cancellation = new AbortController();
+    let leaseLost = false;
     const heartbeat = setInterval(
       () => {
         this.prisma.intakeJob
@@ -109,7 +108,10 @@ export class IntakeProcessorService implements OnModuleInit {
             data: { leaseExpiresAt: new Date(Date.now() + leaseMs) },
           })
           .then((res) => {
-            if (res.count === 0) lost(new LeaseLostError());
+            if (res.count === 0) {
+              leaseLost = true;
+              cancellation.abort();
+            }
           })
           .catch(() => undefined);
       },
@@ -117,31 +119,12 @@ export class IntakeProcessorService implements OnModuleInit {
     );
 
     try {
-      const buffer = await this.storage.get(job.storageKey, job.sha256);
-      const result = await Promise.race([
-        this.intake.processDocument(
-          organizationId,
-          buffer,
-          job.mimeType,
-          job.originalFileName,
-          job.language ?? 'eng+ara',
-          (_stage, progress) => {
-            void this.prisma.intakeJob
-              .updateMany({
-                where: {
-                  id: jobId,
-                  organizationId,
-                  status: IntakeJobStatus.PROCESSING,
-                  leaseToken,
-                },
-                data: { progress },
-              })
-              .catch(() => undefined);
-          },
-          job.strategy ?? undefined,
-        ),
-        lostLease,
-      ]);
+      const extracted = await this.intake.run(job, cancellation.signal);
+      if (leaseLost) throw new LeaseLostError();
+      // The child holds no database access: vendor candidates and the duplicate check are
+      // tenant-scoped reads, made here after it has closed.
+      const result = await this.matching.enrich(job.organizationId, extracted);
+      if (leaseLost) throw new LeaseLostError();
       const status = needsReview(result) ? IntakeJobStatus.NEEDS_REVIEW : IntakeJobStatus.EXTRACTED;
       const written = await this.prisma.intakeJob.updateMany({
         where: { id: jobId, organizationId, status: IntakeJobStatus.PROCESSING, leaseToken },
@@ -157,7 +140,7 @@ export class IntakeProcessorService implements OnModuleInit {
       if (written.count === 0) throw new LeaseLostError();
       this.logger.log(`Intake job ${jobId} finished: status=${status} attempts=${job.attempts}`);
     } catch (error) {
-      if (error instanceof LeaseLostError) {
+      if (leaseLost || error instanceof LeaseLostError) {
         this.logger.warn(`Intake job ${jobId} lost its lease; abandoning this run`);
         return;
       }
@@ -183,7 +166,10 @@ export class IntakeProcessorService implements OnModuleInit {
 
   private async recordFailure(job: IntakeJob, leaseToken: string, error: unknown): Promise<void> {
     // Extractor errors may quote document text: keep the error type/code only.
-    const lastError = describeError(error, { includeMessage: false }).slice(0, 200);
+    const lastError =
+      error instanceof IntakeRuntimeError
+        ? error.code
+        : describeError(error, { includeMessage: false }).slice(0, 200);
     // `job` was read after the claim, so job.attempts already counts this run.
     const attempts = job.attempts;
     const dead = attempts >= job.maxAttempts;
