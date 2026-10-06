@@ -50,6 +50,7 @@ Alternative: Tailscale. Run `tailscale serve` on the host for `http://127.0.0.1:
 - `NEXTAUTH_URL` is HTTPS so NextAuth issues secure cookies. Verify in browser dev tools that session cookies are `Secure` and `HttpOnly`.
 - JWT and NextAuth secrets are unique, random, and at least 32 bytes.
 - `OLLAMA_ENABLED=false`; no paid cloud AI.
+- Rotate integration credentials (≤90 days).
 
 ### Verify no open ports
 
