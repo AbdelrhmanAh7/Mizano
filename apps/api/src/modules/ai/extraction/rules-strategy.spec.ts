@@ -1,7 +1,10 @@
+import Decimal from 'decimal.js';
+import * as invoiceRules from './rules/invoice-rules-extractor';
+import { Logger } from '@nestjs/common';
 import { resolve } from 'path';
-import { accessSync } from 'fs';
+import { accessSync, statSync } from 'fs';
 
-jest.mock('fs', () => ({ accessSync: jest.fn(), constants: { R_OK: 4 } }));
+jest.mock('fs', () => ({ accessSync: jest.fn(), statSync: jest.fn(), constants: { R_OK: 4 } }));
 import { RulesStrategy } from './rules-strategy.service';
 import { ExtractionContext } from './extraction-strategy.interface';
 
@@ -26,14 +29,53 @@ const worker = () => ({
 describe('RulesStrategy worker cache', () => {
   const originalDir = process.env.INTAKE_TESSDATA_DIR;
   beforeEach(() => {
-    delete process.env.INTAKE_TESSDATA_DIR;
+    process.env.INTAKE_TESSDATA_DIR = './tessdata';
     createWorker.mockReset();
     jest.mocked(accessSync).mockReset();
+    jest
+      .mocked(statSync)
+      .mockReset()
+      .mockReturnValue({ isFile: () => true, size: 1 } as ReturnType<typeof statSync>);
   });
   afterEach(() => {
     jest.useRealTimers();
     if (originalDir === undefined) delete process.env.INTAKE_TESSDATA_DIR;
     else process.env.INTAKE_TESSDATA_DIR = originalDir;
+  });
+  it('rejects unset assets without attempting worker creation', async () => {
+    delete process.env.INTAKE_TESSDATA_DIR;
+    expect(await new RulesStrategy().extract(context)).toBeNull();
+    expect(createWorker).not.toHaveBeenCalled();
+  });
+  it('preserves original Decimal money before the legacy numeric adapter', async () => {
+    const rules = invoiceRules.extractInvoiceFields('Total: 1.23', 0.95);
+    const spy = jest.spyOn(invoiceRules, 'extractInvoiceFields').mockReturnValue({
+      ...rules,
+      total: {
+        value: new Decimal('1.23454'),
+        confidence: 0.9,
+        evidence: { text: 'fixture', lineIndex: 0 },
+      },
+    });
+    const result = await new RulesStrategy().extract({
+      ...context,
+      isPdf: true,
+      pdfText: 'Total: 1.23454',
+      pdfIsNativeText: true,
+    });
+    expect(result?.exactMoney.total).toBe('1.23454');
+    spy.mockRestore();
+  });
+  it('never logs document content in OCR errors', async () => {
+    const spy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    createWorker.mockResolvedValue({
+      ...worker(),
+      recognize: jest.fn().mockRejectedValue(new Error('secret invoice value')),
+    });
+    expect(await new RulesStrategy().extract(context)).toBeNull();
+    expect(spy).toHaveBeenCalledWith('Tesseract OCR failed: Error');
+    expect(JSON.stringify(spy.mock.calls)).not.toContain('secret invoice value');
+    spy.mockRestore();
   });
   it('shares pending creation across concurrent normalized language requests', async () => {
     const w = worker();
@@ -78,6 +120,14 @@ describe('RulesStrategy worker cache', () => {
     jest.mocked(accessSync).mockImplementation(() => {
       throw new Error('missing');
     });
+    expect(await new RulesStrategy().extract(context)).toBeNull();
+    expect(createWorker).not.toHaveBeenCalled();
+  });
+  it.each([
+    { isFile: () => false, size: 1 },
+    { isFile: () => true, size: 0 },
+  ])('rejects a directory or empty asset before worker creation %#', async (stat) => {
+    jest.mocked(statSync).mockReturnValue(stat as ReturnType<typeof statSync>);
     expect(await new RulesStrategy().extract(context)).toBeNull();
     expect(createWorker).not.toHaveBeenCalled();
   });
