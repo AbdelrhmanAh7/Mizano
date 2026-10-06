@@ -29,7 +29,6 @@ import { useBulkAction } from '@/lib/hooks/use-bulk-action';
 import { LEDGER_QUERY_KEYS, invalidateLedgerQueries } from '@/lib/hooks/use-journals';
 import type { ImportEntityType } from '@/lib/hooks/use-import-export';
 import {
-  formatCurrency,
   formatPaymentMode,
   PaymentMade,
   useInfinitePaymentsMade,
@@ -42,11 +41,12 @@ import { format } from 'date-fns';
 import { Ban, Eye, Plus, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useState } from 'react';
-import { useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useBaseCurrencyQuery } from '@/lib/hooks/use-organization';
+import { BillAmount } from '@/components/purchases/bill-amount';
 
 function PaymentsMadePageContent() {
   const t = useTranslations('purchases');
-  const baseCurrency = useBaseCurrency();
+  const currencyQuery = useBaseCurrencyQuery();
   const tCommon = useTranslations('common');
   const { hasPermission } = usePermissions();
   const { toast } = useToast();
@@ -175,7 +175,8 @@ function PaymentsMadePageContent() {
         />
       ),
       meta: { headerClassName: 'text-right', cellClassName: 'text-right font-mono font-medium' },
-      cell: ({ row }) => formatCurrency(row.original.amount, baseCurrency),
+      // Payments are posted in the organization base currency, so they carry no currency of their own.
+      cell: ({ row }) => <BillAmount amount={row.original.amount} currencyQuery={currencyQuery} />,
     },
     {
       id: 'actions',

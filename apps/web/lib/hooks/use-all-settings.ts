@@ -113,7 +113,8 @@ function useUpdateSection<T>(section: string) {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
+      // The whole ['organization'] family, so a changed base currency is refetched too.
+      queryClient.invalidateQueries({ queryKey: ['organization'] });
       toast({
         title: 'Settings saved',
         description: `${section.charAt(0).toUpperCase() + section.slice(1)} settings updated.`,

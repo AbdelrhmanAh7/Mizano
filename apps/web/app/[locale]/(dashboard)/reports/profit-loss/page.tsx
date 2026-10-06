@@ -3,27 +3,36 @@
 import { useState } from 'react';
 import { format, startOfYear, endOfMonth } from 'date-fns';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
+import { ReportLoadError } from '@/components/reports/report-load-error';
 import { useProfitLossReport, formatCurrency, ReportAccount } from '@/lib/hooks/use-reports';
 
 export default function ProfitLossReportPage() {
   const t = useTranslations('reports');
+  const formatter = useFormatter();
   const today = new Date();
   const [dateRange, setDateRange] = useState({
     startDate: startOfYear(today),
     endDate: endOfMonth(today),
   });
 
-  const { data: report, isLoading } = useProfitLossReport({
+  const {
+    data: report,
+    isLoading,
+    isError,
+    refetch,
+  } = useProfitLossReport({
     startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
     endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
   });
+
+  const currencyCode = report?.currencyCode;
 
   const renderAccountRow = (account: ReportAccount, level = 0) => (
     <div key={account.id}>
@@ -39,7 +48,7 @@ export default function ProfitLossReportPage() {
           <span className="text-muted-foreground font-mono">{account.code}</span>
           {account.name}
         </span>
-        <span className="font-mono">{formatCurrency(account.balance)}</span>
+        <span className="font-mono">{formatCurrency(account.balance, currencyCode)}</span>
       </div>
       {account.children?.map((child) => renderAccountRow(child, level + 1))}
     </div>
@@ -74,8 +83,17 @@ export default function ProfitLossReportPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('profitLoss.title')}</h1>
           <p className="text-muted-foreground">
-            {format(dateRange.startDate, 'MMMM d, yyyy')} -{' '}
-            {format(dateRange.endDate, 'MMMM d, yyyy')}
+            {formatter.dateTime(dateRange.startDate, {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            })}{' '}
+            -{' '}
+            {formatter.dateTime(dateRange.endDate, {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            })}
           </p>
         </div>
       </div>
@@ -83,10 +101,12 @@ export default function ProfitLossReportPage() {
       {/* Filters */}
       <ReportFilters dateRange={dateRange} onDateRangeChange={setDateRange} showDateRange />
 
-      {!hasData ? (
+      {isError ? (
+        <ReportLoadError onRetry={() => void refetch()} />
+      ) : !hasData ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No profit & loss data available. Create some transactions first.
+            {t('profitLoss.empty')}
           </CardContent>
         </Card>
       ) : (
@@ -97,7 +117,7 @@ export default function ProfitLossReportPage() {
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">{t('profitLoss.revenue')}</p>
                 <p className="text-2xl font-bold font-mono text-green-600">
-                  {formatCurrency(totalIncome)}
+                  {formatCurrency(totalIncome, currencyCode)}
                 </p>
               </CardContent>
             </Card>
@@ -105,7 +125,7 @@ export default function ProfitLossReportPage() {
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">{t('profitLoss.operatingExpenses')}</p>
                 <p className="text-2xl font-bold font-mono text-red-600">
-                  {formatCurrency(totalExpenses)}
+                  {formatCurrency(totalExpenses, currencyCode)}
                 </p>
               </CardContent>
             </Card>
@@ -118,7 +138,7 @@ export default function ProfitLossReportPage() {
                     netProfit >= 0 ? 'text-green-600' : 'text-red-600',
                   )}
                 >
-                  {formatCurrency(netProfit)}
+                  {formatCurrency(netProfit, currencyCode)}
                 </p>
               </CardContent>
             </Card>
@@ -133,7 +153,9 @@ export default function ProfitLossReportPage() {
               {income.map((account: ReportAccount) => renderAccountRow(account))}
               <div className="flex justify-between py-3 border-t-2 font-bold">
                 <span>{t('profitLoss.revenue')}</span>
-                <span className="font-mono text-green-600">{formatCurrency(totalIncome)}</span>
+                <span className="font-mono text-green-600">
+                  {formatCurrency(totalIncome, currencyCode)}
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -146,7 +168,9 @@ export default function ProfitLossReportPage() {
               {expenses.map((account: ReportAccount) => renderAccountRow(account))}
               <div className="flex justify-between py-3 border-t-2 font-bold">
                 <span>{t('profitLoss.operatingExpenses')}</span>
-                <span className="font-mono text-red-600">{formatCurrency(totalExpenses)}</span>
+                <span className="font-mono text-red-600">
+                  {formatCurrency(totalExpenses, currencyCode)}
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -161,7 +185,7 @@ export default function ProfitLossReportPage() {
                     netProfit >= 0 ? 'text-green-600' : 'text-red-600',
                   )}
                 >
-                  {formatCurrency(netProfit)}
+                  {formatCurrency(netProfit, currencyCode)}
                 </span>
               </div>
             </CardContent>

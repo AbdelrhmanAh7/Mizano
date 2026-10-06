@@ -32,9 +32,9 @@ import {
   usePaymentMade,
   useDeletePaymentMade,
   formatPaymentMode,
-  formatCurrency,
 } from '@/lib/hooks/use-payments-made';
-import { useBaseCurrency } from '@/lib/hooks/use-organization';
+import { useBaseCurrencyQuery } from '@/lib/hooks/use-organization';
+import { BillAmount } from '@/components/purchases/bill-amount';
 
 interface PaymentDetailPageProps {
   params: { id: string };
@@ -43,14 +43,14 @@ interface PaymentDetailPageProps {
 export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
   const { id } = params;
   const t = useTranslations('purchases');
-  const baseCurrency = useBaseCurrency();
+  const currencyQuery = useBaseCurrencyQuery();
   const tCommon = useTranslations('common');
   const router = useRouter();
   const { data: payment, isLoading } = usePaymentMade(id);
   const deletePayment = useDeletePaymentMade();
 
-  // Payments are recorded and posted in the organization base currency.
-  const currency = baseCurrency;
+  // Payments are recorded and posted in the organization base currency, so their amounts resolve
+  // through the base-currency lookup (skeleton while loading, error with Retry on failure).
 
   const handleDelete = async () => {
     await deletePayment.mutateAsync(id);
@@ -150,7 +150,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
               <div>
                 <p className="text-sm text-muted-foreground">{t('payments.amount')}</p>
                 <p className="text-2xl font-bold font-mono">
-                  {formatCurrency(payment.amount, currency)}
+                  <BillAmount amount={payment.amount} currencyQuery={currencyQuery} />
                 </p>
               </div>
             </div>
@@ -253,7 +253,7 @@ export default function PaymentDetailPage({ params }: PaymentDetailPageProps) {
                           : '-'}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(allocation.amount, currency)}
+                        <BillAmount amount={allocation.amount} currencyQuery={currencyQuery} />
                       </TableCell>
                     </TableRow>
                   ))}

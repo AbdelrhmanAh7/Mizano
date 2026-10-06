@@ -1,18 +1,15 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { ErrorState } from '@/components/shared/error-state';
 
 export default function ReportsError({
-  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    console.error('Reports module error:', error.message);
-  }, [error]);
+  const t = useTranslations('reports');
 
-  return <ErrorState error={error} title="Reports Error" onRetry={reset} />;
+  return <ErrorState title={t('errorTitle')} retryLabel={t('retry')} onRetry={reset} />;
 }

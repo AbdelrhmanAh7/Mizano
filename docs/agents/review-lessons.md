@@ -85,8 +85,11 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 11. Web UI
 
 - **Every new string needs en and ar,** including dialog titles, confirm and cancel buttons, placeholders, selector labels and report row names. Shared components accept localized label props.
-- **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed.
+- **Keep error, loading and empty distinct.** Never collapse a failed query into `[]` ("no accounts"). Show an error with Retry, and block submit while a required lookup is loading or failed. A page that destructures only `isLoading` renders a failed report as its empty state; destructure `isError` and `refetch` too, and test the failure. _(report pages, #68)_
+- **Retain required lookup state, not only its value.** Currency consumers need loading/error/refetch state as well as the base currency; a failed refetch can retain cached data, so check failure before formatting a fallback amount. Explicit document currency remains usable independently of the base-currency lookup. _(bill currency follow-up #68)_
 - **Show the currency of the document**, falling back to the org base currency, never the counterparty's default. The API must actually return the fields the UI relies on (for example `baseCurrency`).
+- **A value every role needs gets its own authenticated lookup with no permission,** such as `GET /organization/base-currency`. Never put it behind a settings-guarded route, and never freeze it into the session, where it goes stale and is missing from older sessions. _(base currency)_
+- **Formatters never default to a currency.** Make the currency argument required so the type-checker finds every caller and nothing falls back to USD. A default parameter (`currency = 'USD'`) also replaces `undefined`, so a lookup that is still loading prints dollars; test the loading and failed states, not only the loaded one. _(report formatters; bill and payment formatters, #68)_
 - **Payment-wide effects get payment-wide warnings.** Voiding a payment affects every allocated bill.
 
 ## 12. Caches, tests and scope
@@ -95,6 +98,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
+- **Verify Unicode after generated translation edits.** Windows shell-to-native pipes may replace Arabic with question marks unless UTF-8 is configured. Check the saved dictionaries for readable Arabic, matching keys and matching interpolation placeholders; key presence alone does not prove a valid translation. _(report localization follow-up #68)_
 
 ## Review process
 

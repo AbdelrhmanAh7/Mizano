@@ -3,20 +3,29 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ReportFilters } from '@/components/reports/report-filters';
+import { ReportLoadError } from '@/components/reports/report-load-error';
 import { useBalanceSheetReport, formatCurrency, ReportAccount } from '@/lib/hooks/use-reports';
 
 export default function BalanceSheetReportPage() {
   const t = useTranslations('reports');
+  const formatter = useFormatter();
   const [asOfDate, setAsOfDate] = useState(new Date());
 
-  const { data: report, isLoading } = useBalanceSheetReport(format(asOfDate, 'yyyy-MM-dd'));
+  const {
+    data: report,
+    isLoading,
+    isError,
+    refetch,
+  } = useBalanceSheetReport(format(asOfDate, 'yyyy-MM-dd'));
+
+  const currencyCode = report?.currencyCode;
 
   const renderAccountRow = (account: ReportAccount, level = 0) => (
     <div key={account.id}>
@@ -32,7 +41,7 @@ export default function BalanceSheetReportPage() {
           <span className="text-muted-foreground font-mono">{account.code}</span>
           {account.name}
         </span>
-        <span className="font-mono">{formatCurrency(account.balance)}</span>
+        <span className="font-mono">{formatCurrency(account.balance, currencyCode)}</span>
       </div>
       {account.children?.map((child) => renderAccountRow(child, level + 1))}
     </div>
@@ -69,7 +78,15 @@ export default function BalanceSheetReportPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('balanceSheet.title')}</h1>
-          <p className="text-muted-foreground">As of {format(asOfDate, 'MMMM d, yyyy')}</p>
+          <p className="text-muted-foreground">
+            {t('asOf', {
+              date: formatter.dateTime(asOfDate, {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+              }),
+            })}
+          </p>
         </div>
       </div>
 
@@ -81,10 +98,12 @@ export default function BalanceSheetReportPage() {
         showAsOfDate
       />
 
-      {!hasData ? (
+      {isError ? (
+        <ReportLoadError onRetry={() => void refetch()} />
+      ) : !hasData ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
-            No balance sheet data available. Create some transactions first.
+            {t('balanceSheet.empty')}
           </CardContent>
         </Card>
       ) : (
@@ -94,7 +113,9 @@ export default function BalanceSheetReportPage() {
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">{t('balanceSheet.totalAssets')}</p>
-                <p className="text-2xl font-bold font-mono">{formatCurrency(totalAssets)}</p>
+                <p className="text-2xl font-bold font-mono">
+                  {formatCurrency(totalAssets, currencyCode)}
+                </p>
               </CardContent>
             </Card>
             <Card>
@@ -102,13 +123,17 @@ export default function BalanceSheetReportPage() {
                 <p className="text-sm text-muted-foreground">
                   {t('balanceSheet.totalLiabilities')}
                 </p>
-                <p className="text-2xl font-bold font-mono">{formatCurrency(totalLiabilities)}</p>
+                <p className="text-2xl font-bold font-mono">
+                  {formatCurrency(totalLiabilities, currencyCode)}
+                </p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">{t('balanceSheet.totalEquity')}</p>
-                <p className="text-2xl font-bold font-mono">{formatCurrency(totalEquity)}</p>
+                <p className="text-2xl font-bold font-mono">
+                  {formatCurrency(totalEquity, currencyCode)}
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -124,7 +149,7 @@ export default function BalanceSheetReportPage() {
                 {assets.map((account: ReportAccount) => renderAccountRow(account))}
                 <div className="flex justify-between py-3 border-t-2 font-bold">
                   <span>{t('balanceSheet.totalAssets')}</span>
-                  <span className="font-mono">{formatCurrency(totalAssets)}</span>
+                  <span className="font-mono">{formatCurrency(totalAssets, currencyCode)}</span>
                 </div>
               </CardContent>
             </Card>
@@ -139,7 +164,9 @@ export default function BalanceSheetReportPage() {
                   {liabilities.map((account: ReportAccount) => renderAccountRow(account))}
                   <div className="flex justify-between py-3 border-t-2 font-bold">
                     <span>{t('balanceSheet.totalLiabilities')}</span>
-                    <span className="font-mono">{formatCurrency(totalLiabilities)}</span>
+                    <span className="font-mono">
+                      {formatCurrency(totalLiabilities, currencyCode)}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -152,7 +179,7 @@ export default function BalanceSheetReportPage() {
                   {equity.map((account: ReportAccount) => renderAccountRow(account))}
                   <div className="flex justify-between py-3 border-t-2 font-bold">
                     <span>{t('balanceSheet.totalEquity')}</span>
-                    <span className="font-mono">{formatCurrency(totalEquity)}</span>
+                    <span className="font-mono">{formatCurrency(totalEquity, currencyCode)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -170,11 +197,11 @@ export default function BalanceSheetReportPage() {
               <div className="flex justify-between items-center">
                 <span className="font-bold">{t('balanceSheet.totalLiabilitiesAndEquity')}</span>
                 <span className="text-xl font-bold font-mono">
-                  {formatCurrency(report?.totalLiabilitiesAndEquity ?? '0')}
+                  {formatCurrency(report?.totalLiabilitiesAndEquity ?? '0', currencyCode)}
                 </span>
               </div>
               <p className={cn('text-sm mt-2', isBalanced ? 'text-success' : 'text-destructive')}>
-                {isBalanced ? 'Balance sheet is balanced' : 'Balance sheet is not balanced'}
+                {isBalanced ? t('balanceSheet.balanced') : t('balanceSheet.notBalanced')}
               </p>
             </CardContent>
           </Card>

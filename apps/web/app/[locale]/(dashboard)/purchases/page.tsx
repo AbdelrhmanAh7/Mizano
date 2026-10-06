@@ -20,13 +20,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useVendors } from '@/lib/hooks/use-vendors';
-import { useBills, formatCurrency, getStatusVariant } from '@/lib/hooks/use-bills';
+import { useBills, getStatusVariant } from '@/lib/hooks/use-bills';
 import { useExpenses } from '@/lib/hooks/use-expenses';
+import { useBaseCurrencyQuery } from '@/lib/hooks/use-organization';
+import { BillAmount } from '@/components/purchases/bill-amount';
+import { isPositiveDecimal, sumDecimals } from '@/lib/decimal';
 import { differenceInDays } from 'date-fns';
 
 export default function PurchasesPage() {
   const t = useTranslations('purchases');
   const tCommon = useTranslations('common');
+  const currencyQuery = useBaseCurrencyQuery();
 
   const { data: vendorsData, isLoading: vendorsLoading } = useVendors({ limit: 100 });
   const { data: billsData, isLoading: billsLoading } = useBills({ limit: 100 });
@@ -39,15 +43,16 @@ export default function PurchasesPage() {
   const isLoading = vendorsLoading || billsLoading || expensesLoading;
 
   // Calculate metrics
-  const totalPayable = bills.reduce((sum: number, b: { balanceDue?: string }) => {
-    const balance = parseFloat(b.balanceDue || '0');
-    return balance > 0 ? sum + balance : sum;
-  }, 0);
+  // Money stays a decimal string; the ledger is single-currency, so these totals are base currency.
+  const totalPayable = sumDecimals(
+    bills
+      .map((b: { balanceDue?: string }) => b.balanceDue || '0')
+      .filter((balance: string) => isPositiveDecimal(balance)),
+  );
 
   const overdueBills = bills.filter((b: { status: string }) => b.status === 'OVERDUE');
-  const overdueAmount = overdueBills.reduce(
-    (sum: number, b: { balanceDue?: string }) => sum + parseFloat(b.balanceDue || '0'),
-    0,
+  const overdueAmount = sumDecimals(
+    overdueBills.map((b: { balanceDue?: string }) => b.balanceDue || '0'),
   );
 
   const unpaidBills = bills.filter(
@@ -129,7 +134,9 @@ export default function PurchasesPage() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold">{formatCurrency(totalPayable, 'USD')}</div>
+              <div className="text-2xl font-bold">
+                <BillAmount amount={totalPayable} currencyQuery={currencyQuery} />
+              </div>
             )}
             <p className="text-xs text-muted-foreground">Across {vendors.length} vendors</p>
           </CardContent>
@@ -145,7 +152,7 @@ export default function PurchasesPage() {
               <Skeleton className="h-8 w-24" />
             ) : (
               <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(overdueAmount, 'USD')}
+                <BillAmount amount={overdueAmount} currencyQuery={currencyQuery} />
               </div>
             )}
             <p className="text-xs text-muted-foreground">{overdueBills.length} overdue bills</p>
@@ -252,6 +259,7 @@ export default function PurchasesPage() {
                       id: string;
                       billNumber: string;
                       status: string;
+                      currencyCode?: string | null;
                       grandTotal?: string;
                       date: string;
                       vendor?: { id: string; name: string };
@@ -285,7 +293,11 @@ export default function PurchasesPage() {
                             {bill.status}
                           </Badge>
                           <p className="text-sm font-mono mt-1">
-                            {formatCurrency(parseFloat(bill.grandTotal || '0'), 'USD')}
+                            <BillAmount
+                              amount={bill.grandTotal || '0'}
+                              currencyCode={bill.currencyCode}
+                              currencyQuery={currencyQuery}
+                            />
                           </p>
                         </div>
                       </div>
@@ -318,6 +330,7 @@ export default function PurchasesPage() {
                       id: string;
                       billNumber: string;
                       dueDate: string;
+                      currencyCode?: string | null;
                       balanceDue?: string;
                       vendor?: { id: string; name: string };
                     }) => {
@@ -339,7 +352,11 @@ export default function PurchasesPage() {
                           <div className="text-right">
                             <p className="text-xs text-red-600">{daysOverdue} days overdue</p>
                             <p className="text-sm font-mono font-semibold text-red-600">
-                              {formatCurrency(parseFloat(bill.balanceDue || '0'), 'USD')}
+                              <BillAmount
+                                amount={bill.balanceDue || '0'}
+                                currencyCode={bill.currencyCode}
+                                currencyQuery={currencyQuery}
+                              />
                             </p>
                           </div>
                         </div>

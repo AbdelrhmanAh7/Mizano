@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { OrganizationsService } from './organizations.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UpdateOrganizationDto } from './dto/update-organization.dto';
 
 const ORG_ID = 'org-001';
 
@@ -118,6 +119,43 @@ describe('OrganizationsService', () => {
       mockPrisma.organization.findUnique.mockResolvedValue(null);
 
       await expect(service.findOne('bad-id')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ── getBaseCurrency ─────────────────────────────────────────────
+
+  describe('getBaseCurrency', () => {
+    it('returns only the base currency of the caller organization', async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'EGP' });
+
+      await expect(service.getBaseCurrency(ORG_ID)).resolves.toEqual({ baseCurrency: 'EGP' });
+      expect(mockPrisma.organization.findUnique).toHaveBeenCalledWith({
+        where: { id: ORG_ID },
+        select: { baseCurrency: true },
+      });
+    });
+
+    it('throws NotFoundException when org not found', async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue(null);
+
+      await expect(service.getBaseCurrency('bad-id')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ── update (legacy PATCH /organization) ─────────────────────────
+
+  describe('update', () => {
+    it('never writes currency fields, even when an untyped payload carries them', async () => {
+      mockPrisma.organization.update.mockResolvedValue(mockOrg);
+      const payload = { name: 'Renamed', currency: 'EGP', baseCurrency: 'EGP' };
+
+      await service.update(ORG_ID, payload as unknown as UpdateOrganizationDto);
+
+      const { where, data } = mockPrisma.organization.update.mock.calls[0][0];
+      expect(where).toEqual({ id: ORG_ID });
+      expect(data.name).toBe('Renamed');
+      expect(data).not.toHaveProperty('currency');
+      expect(data).not.toHaveProperty('baseCurrency');
     });
   });
 

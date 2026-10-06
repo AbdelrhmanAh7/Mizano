@@ -30,7 +30,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { useUnpaidBills, paymentModeOptions, formatCurrency } from '@/lib/hooks/use-payments-made';
+import { useUnpaidBills, paymentModeOptions } from '@/lib/hooks/use-payments-made';
+import { useBaseCurrencyQuery } from '@/lib/hooks/use-organization';
+import { BillAmount } from '@/components/purchases/bill-amount';
 
 const paymentMadeSchema = z.object({
   vendorId: z.string().min(1, 'Vendor is required'),
@@ -49,6 +51,7 @@ interface BillAllocation {
   billNumber: string;
   date: string;
   dueDate: string;
+  currencyCode: string | null;
   grandTotal: number;
   balanceDue: number;
   allocated: number;
@@ -56,7 +59,7 @@ interface BillAllocation {
 }
 
 interface PaymentMadeFormProps {
-  vendors: Array<{ id: string; name: string; currency: string }>;
+  vendors: Array<{ id: string; name: string }>;
   bankAccounts: Array<{ id: string; name: string; type: string; linkedAccountId: string }>;
   onSubmit: (data: Record<string, unknown>) => void;
   onCancel: () => void;
@@ -97,9 +100,9 @@ export function PaymentMadeForm({
     selectedVendorId || undefined,
   );
 
-  // Get selected vendor's currency
-  const selectedVendor = vendors.find((v) => v.id === selectedVendorId);
-  const currency = selectedVendor?.currency || 'USD';
+  // Payments are posted in the organization base currency, never the vendor's default currency.
+  // A bill that carries its own currency keeps it.
+  const currencyQuery = useBaseCurrencyQuery();
 
   // Update allocations when bills data changes
   useEffect(() => {
@@ -110,6 +113,7 @@ export function PaymentMadeForm({
           billNumber: string;
           date: string;
           dueDate: string;
+          currencyCode?: string | null;
           grandTotal?: string;
           balanceDue?: string;
         }) => ({
@@ -117,6 +121,7 @@ export function PaymentMadeForm({
           billNumber: bill.billNumber,
           date: bill.date,
           dueDate: bill.dueDate,
+          currencyCode: bill.currencyCode ?? null,
           grandTotal: parseFloat(bill.grandTotal || '0'),
           balanceDue: parseFloat(bill.balanceDue || '0'),
           allocated: 0,
@@ -443,10 +448,18 @@ export function PaymentMadeForm({
                         <TableCell>{format(new Date(allocation.date), 'MMM d, yyyy')}</TableCell>
                         <TableCell>{format(new Date(allocation.dueDate), 'MMM d, yyyy')}</TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(allocation.grandTotal, currency)}
+                          <BillAmount
+                            amount={allocation.grandTotal}
+                            currencyCode={allocation.currencyCode}
+                            currencyQuery={currencyQuery}
+                          />
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatCurrency(allocation.balanceDue, currency)}
+                          <BillAmount
+                            amount={allocation.balanceDue}
+                            currencyCode={allocation.currencyCode}
+                            currencyQuery={currencyQuery}
+                          />
                         </TableCell>
                         <TableCell className="text-right">
                           <Input
@@ -472,13 +485,13 @@ export function PaymentMadeForm({
                     <div className="flex justify-between text-sm">
                       <span>Payment Amount:</span>
                       <span className="font-mono font-medium">
-                        {formatCurrency(paymentAmount, currency)}
+                        <BillAmount amount={paymentAmount} currencyQuery={currencyQuery} />
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Total Allocated:</span>
                       <span className="font-mono font-medium">
-                        {formatCurrency(totals.totalAllocated, currency)}
+                        <BillAmount amount={totals.totalAllocated} currencyQuery={currencyQuery} />
                       </span>
                     </div>
                     <div className="flex justify-between text-sm border-t pt-2">
@@ -489,7 +502,7 @@ export function PaymentMadeForm({
                           totals.unallocated !== 0 && 'text-yellow-600',
                         )}
                       >
-                        {formatCurrency(totals.unallocated, currency)}
+                        <BillAmount amount={totals.unallocated} currencyQuery={currencyQuery} />
                       </span>
                     </div>
                   </div>

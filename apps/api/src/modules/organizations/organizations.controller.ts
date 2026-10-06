@@ -54,6 +54,13 @@ export class OrganizationsController {
     return this.organizationsService.findOne(orgId);
   }
 
+  // Deliberately no @Permissions: every authenticated member may read the ledger currency.
+  @Get('base-currency')
+  @ApiOperation({ summary: 'Get the organization base (ledger) currency' })
+  getBaseCurrency(@CurrentOrg() orgId: string): Promise<{ baseCurrency: string }> {
+    return this.organizationsService.getBaseCurrency(orgId);
+  }
+
   @Patch()
   @Permissions('settings.edit')
   @ApiOperation({ summary: 'Update organization details' })

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { format, startOfYear, endOfMonth } from 'date-fns';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,11 +24,13 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReportFilters } from '@/components/reports/report-filters';
+import { ReportLoadError } from '@/components/reports/report-load-error';
 import { useGeneralLedgerReport, formatCurrency } from '@/lib/hooks/use-reports';
 import { useAccounts } from '@/lib/hooks/use-accounts';
 
 export default function GeneralLedgerPage() {
   const t = useTranslations('reports');
+  const formatter = useFormatter();
   const [dateRange, setDateRange] = useState({
     startDate: startOfYear(new Date()),
     endDate: endOfMonth(new Date()),
@@ -36,10 +38,17 @@ export default function GeneralLedgerPage() {
   const [accountId, setAccountId] = useState('');
 
   const { data: accounts } = useAccounts();
-  const { data: ledger, isLoading } = useGeneralLedgerReport(accountId, {
+  const {
+    data: ledger,
+    isLoading,
+    isError,
+    refetch,
+  } = useGeneralLedgerReport(accountId, {
     startDate: format(dateRange.startDate, 'yyyy-MM-dd'),
     endDate: format(dateRange.endDate, 'yyyy-MM-dd'),
   });
+  // Report amounts are labelled with the currency the API returns, never a default.
+  const currencyCode = ledger?.currencyCode;
 
   const accountList = accounts?.data || accounts || [];
 
@@ -68,17 +77,22 @@ export default function GeneralLedgerPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t('generalLedger.title')}</h1>
           <p className="text-muted-foreground">
-            {format(dateRange.startDate, 'MMMM d')} - {format(dateRange.endDate, 'MMMM d, yyyy')}
+            {formatter.dateTime(dateRange.startDate, { month: 'long', day: 'numeric' })} -{' '}
+            {formatter.dateTime(dateRange.endDate, {
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            })}
           </p>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-4 items-end">
         <div className="w-[300px]">
-          <label className="text-sm font-medium mb-1.5 block">Account</label>
+          <label className="text-sm font-medium mb-1.5 block">{t('trialBalance.account')}</label>
           <Select value={accountId} onValueChange={setAccountId}>
             <SelectTrigger>
-              <SelectValue placeholder="Select an account" />
+              <SelectValue placeholder={t('generalLedger.selectAccount')} />
             </SelectTrigger>
             <SelectContent>
               {Array.isArray(accountList) &&
@@ -97,48 +111,50 @@ export default function GeneralLedgerPage() {
         <Card>
           <CardContent className="py-12 text-center">
             <BookOpen className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Select an Account</h3>
-            <p className="text-muted-foreground">
-              Choose an account from the dropdown above to view its general ledger entries.
-            </p>
+            <h3 className="text-lg font-semibold mb-2">{t('generalLedger.selectAccountTitle')}</h3>
+            <p className="text-muted-foreground">{t('generalLedger.selectAccountHint')}</p>
           </CardContent>
         </Card>
+      ) : isError ? (
+        <ReportLoadError onRetry={() => void refetch()} />
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">{t('cashFlow.openingBalance')}</p>
-                <p className="text-2xl font-bold font-mono">{formatCurrency(openingBalance)}</p>
+                <p className="text-2xl font-bold font-mono">
+                  {formatCurrency(openingBalance, currencyCode)}
+                </p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">{t('cashFlow.closingBalance')}</p>
-                <p className="text-2xl font-bold font-mono">{formatCurrency(closingBalance)}</p>
+                <p className="text-2xl font-bold font-mono">
+                  {formatCurrency(closingBalance, currencyCode)}
+                </p>
               </CardContent>
             </Card>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Ledger Entries</CardTitle>
+              <CardTitle>{t('generalLedger.entries')}</CardTitle>
             </CardHeader>
             <CardContent>
               {entries.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">
-                  No entries found for this period.
-                </p>
+                <p className="text-center py-8 text-muted-foreground">{t('generalLedger.empty')}</p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Journal #</TableHead>
-                      <TableHead>Description</TableHead>
+                      <TableHead>{t('date')}</TableHead>
+                      <TableHead>{t('generalLedger.journalNumber')}</TableHead>
+                      <TableHead>{t('descriptionLabel')}</TableHead>
                       <TableHead className="text-right">{t('trialBalance.debit')}</TableHead>
                       <TableHead className="text-right">{t('trialBalance.credit')}</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead className="text-right">{t('balance')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -157,7 +173,13 @@ export default function GeneralLedgerPage() {
                         i: number,
                       ) => (
                         <TableRow key={i}>
-                          <TableCell>{format(new Date(entry.date), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>
+                            {formatter.dateTime(new Date(entry.date), {
+                              month: 'long',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </TableCell>
                           <TableCell>
                             {entry.journalNumber ? (
                               <Link
@@ -172,13 +194,13 @@ export default function GeneralLedgerPage() {
                           </TableCell>
                           <TableCell>{entry.description || entry.reference || '-'}</TableCell>
                           <TableCell className="text-right font-mono">
-                            {entry.debit > 0 ? formatCurrency(entry.debit) : '-'}
+                            {entry.debit > 0 ? formatCurrency(entry.debit, currencyCode) : '-'}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {entry.credit > 0 ? formatCurrency(entry.credit) : '-'}
+                            {entry.credit > 0 ? formatCurrency(entry.credit, currencyCode) : '-'}
                           </TableCell>
                           <TableCell className="text-right font-mono font-medium">
-                            {formatCurrency(entry.runningBalance || 0)}
+                            {formatCurrency(entry.runningBalance || 0, currencyCode)}
                           </TableCell>
                         </TableRow>
                       ),

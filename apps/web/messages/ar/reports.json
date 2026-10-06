@@ -7,7 +7,13 @@
     "sales": "تقارير المبيعات",
     "purchases": "تقارير المشتريات",
     "inventory": "تقارير المخزون",
-    "tax": "التقارير الضريبية"
+    "tax": "التقارير الضريبية",
+    "financialDescription": "القوائم المالية الأساسية",
+    "aging": "الذمم المدينة والدائنة",
+    "agingDescription": "تتبع ما عليك وما لك من مستحقات",
+    "salesDescription": "تحليل أداء المبيعات والمشتريات",
+    "accounting": "التقارير المحاسبية",
+    "accountingDescription": "السجلات المحاسبية التفصيلية"
   },
   "profitLoss": {
     "title": "الأرباح والخسائر",
@@ -19,7 +25,8 @@
     "operatingProfit": "الربح التشغيلي",
     "otherIncome": "إيرادات أخرى",
     "otherExpenses": "مصروفات أخرى",
-    "netProfit": "صافي الربح"
+    "netProfit": "صافي الربح",
+    "empty": "لا تتوفر بيانات للأرباح والخسائر. أنشئ بعض المعاملات أولاً."
   },
   "balanceSheet": {
     "title": "الميزانية العمومية",
@@ -34,7 +41,10 @@
     "totalLiabilities": "إجمالي الالتزامات",
     "equity": "حقوق الملكية",
     "totalEquity": "إجمالي حقوق الملكية",
-    "totalLiabilitiesAndEquity": "إجمالي الالتزامات وحقوق الملكية"
+    "totalLiabilitiesAndEquity": "إجمالي الالتزامات وحقوق الملكية",
+    "empty": "لا تتوفر بيانات للميزانية العمومية. أنشئ بعض المعاملات أولاً.",
+    "balanced": "الميزانية العمومية متوازنة",
+    "notBalanced": "الميزانية العمومية غير متوازنة"
   },
   "cashFlow": {
     "title": "قائمة التدفقات النقدية",
@@ -64,11 +74,22 @@
     "debit": "مدين",
     "credit": "دائن",
     "totalDebit": "إجمالي المدين",
-    "totalCredit": "إجمالي الدائن"
+    "totalCredit": "إجمالي الدائن",
+    "empty": "لا تتوفر بيانات لميزان المراجعة. أنشئ بعض المعاملات أولاً.",
+    "balanced": "ميزان المراجعة متوازن",
+    "notBalanced": "ميزان المراجعة غير متوازن",
+    "equalTotals": "إجمالي المدين يساوي إجمالي الدائن",
+    "accountBalances": "أرصدة الحسابات"
   },
   "generalLedger": {
     "title": "دفتر الأستاذ العام",
-    "description": "معاملات الحسابات التفصيلية"
+    "description": "معاملات الحسابات التفصيلية",
+    "selectAccount": "اختر حساباً",
+    "selectAccountTitle": "اختر حساباً",
+    "selectAccountHint": "اختر حساباً من القائمة أعلاه لعرض قيوده في دفتر الأستاذ العام.",
+    "entries": "قيود دفتر الأستاذ",
+    "empty": "لا توجد قيود لهذه الفترة.",
+    "journalNumber": "رقم القيد"
   },
   "arAging": {
     "title": "أعمار الذمم المدينة",
@@ -79,7 +100,14 @@
     "days31to60": "31-60 يوم",
     "days61to90": "61-90 يوم",
     "over90": "أكثر من 90 يوم",
-    "total": "الإجمالي"
+    "total": "الإجمالي",
+    "empty": "لا تتوفر بيانات لأعمار الذمم المدينة.",
+    "outstandingInvoices": "الفواتير المستحقة",
+    "invoiceNumber": "رقم الفاتورة",
+    "invoiceDate": "تاريخ الفاتورة",
+    "invoiceCount": "{count} فاتورة",
+    "bucketTitle": "فواتير {bucket}",
+    "emptyBucket": "لا توجد فواتير في هذه الفئة العمرية"
   },
   "apAging": {
     "title": "أعمار الذمم الدائنة",
@@ -90,15 +118,30 @@
     "days31to60": "31-60 يوم",
     "days61to90": "61-90 يوم",
     "over90": "أكثر من 90 يوم",
-    "total": "الإجمالي"
+    "total": "الإجمالي",
+    "totalPayable": "إجمالي المستحق للموردين",
+    "outstandingBills": "فواتير الموردين المستحقة",
+    "empty": "لا توجد مستحقات للموردين.",
+    "billNumber": "رقم فاتورة المورد",
+    "billDate": "تاريخ فاتورة المورد",
+    "billCount": "{count} فاتورة مورد",
+    "bucketTitle": "فواتير الموردين {bucket}",
+    "emptyBucket": "لا توجد فواتير موردين في هذه الفئة العمرية"
   },
   "salesByCustomer": {
     "title": "المبيعات حسب العميل",
-    "description": "تفصيل المبيعات حسب العميل"
+    "description": "تفصيل المبيعات حسب العميل",
+    "totalSales": "إجمالي المبيعات",
+    "customers": "العملاء",
+    "empty": "لا توجد بيانات مبيعات للفترة المحددة."
   },
   "salesByItem": {
     "title": "المبيعات حسب الصنف",
-    "description": "تفصيل المبيعات حسب الصنف"
+    "description": "تفصيل المبيعات حسب الصنف",
+    "totalRevenue": "إجمالي الإيرادات",
+    "totalQuantitySold": "إجمالي الكمية المباعة",
+    "uniqueItems": "الأصناف المميزة",
+    "empty": "لا توجد بيانات مبيعات أصناف للفترة المحددة."
   },
   "purchasesByVendor": {
     "title": "المشتريات حسب المورد",
@@ -106,7 +149,10 @@
     "unappliedCredits": "إشعارات دائنة غير مطبّقة",
     "netPayable": "صافي المستحق",
     "totalUnappliedCredits": "إشعارات الموردين غير المطبّقة",
-    "totalNetPayable": "صافي المستحق"
+    "totalNetPayable": "صافي المستحق",
+    "totalPurchases": "إجمالي المشتريات",
+    "vendors": "الموردون",
+    "empty": "لا توجد بيانات مشتريات للفترة المحددة."
   },
   "inventoryValuation": {
     "title": "تقييم المخزون",
@@ -131,12 +177,60 @@
     "lastQuarter": "الربع الماضي",
     "thisYear": "هذه السنة",
     "lastYear": "السنة الماضية",
-    "custom": "مخصص"
+    "custom": "مخصص",
+    "selectPeriod": "اختر الفترة",
+    "to": "إلى",
+    "asOf": "كما في:",
+    "exporting": "جارٍ التصدير..."
   },
   "actions": {
     "generate": "إنشاء التقرير",
     "export": "تصدير",
     "print": "طباعة",
     "refresh": "تحديث"
+  },
+  "total": "الإجمالي",
+  "asOf": "كما في {date}",
+  "difference": "الفرق: {amount}",
+  "agingSummary": "ملخص الأعمار",
+  "code": "الرمز",
+  "type": "النوع",
+  "date": "التاريخ",
+  "descriptionLabel": "الوصف",
+  "balance": "الرصيد",
+  "customer": "العميل",
+  "vendor": "المورد",
+  "invoices": "الفواتير",
+  "bills": "فواتير الموردين",
+  "item": "الصنف",
+  "quantitySold": "الكمية المباعة",
+  "averagePrice": "متوسط السعر",
+  "totalAmount": "إجمالي المبلغ",
+  "paid": "المدفوع",
+  "balanceDue": "الرصيد المستحق",
+  "totalPaid": "إجمالي المدفوع",
+  "outstanding": "المستحق",
+  "amount": "المبلغ",
+  "dueDate": "تاريخ الاستحقاق",
+  "daysOverdue": "أيام التأخير",
+  "errorTitle": "خطأ في التقارير",
+  "retry": "إعادة المحاولة",
+  "loadError": "تعذر تحميل هذا التقرير.",
+  "accountTypes": {
+    "ASSET": "أصول",
+    "LIABILITY": "التزامات",
+    "EQUITY": "حقوق الملكية",
+    "REVENUE": "إيرادات المبيعات",
+    "INCOME": "إيرادات",
+    "EXPENSE": "مصروفات"
+  },
+  "agingBuckets": {
+    "current": "جاري",
+    "1-15": "1-15 يوم",
+    "16-30": "16-30 يوم",
+    "1-30": "1-30 يوم",
+    "31-60": "31-60 يوم",
+    "61-90": "61-90 يوم",
+    "90+": "أكثر من 90 يوم"
   }
 }

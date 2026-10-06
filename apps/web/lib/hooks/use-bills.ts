@@ -365,7 +365,7 @@ export function getStatusText(status: BillStatus | string): string {
  */
 export function formatCurrency(
   amount: string | number,
-  currency: string = 'USD',
+  currency: string,
   locale = 'en-US',
 ): string {
   const num = typeof amount === 'string' ? decimalToDisplayNumber(amount) : amount;

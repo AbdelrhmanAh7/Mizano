@@ -2,6 +2,7 @@
 
 import { DataTable } from '@/components/data-table/data-table';
 import { ReportFilters } from '@/components/reports/report-filters';
+import { ReportLoadError } from '@/components/reports/report-load-error';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -31,39 +32,41 @@ function PurchasesByVendorContent() {
     [dateRange],
   );
 
-  const { data, isLoading } = usePurchasesByVendorReport(params);
+  const { data, isLoading, isError, refetch } = usePurchasesByVendorReport(params);
+  // Report amounts are labelled with the currency the API returns, never a default.
+  const currencyCode = data?.currencyCode;
 
   const columns: ColumnDef<PurchasesByVendorEntry>[] = useMemo(
     () => [
       {
         accessorKey: 'vendorName',
-        header: 'Vendor',
+        header: t('vendor'),
         cell: ({ row }) => <div className="font-medium">{row.original.vendorName}</div>,
       },
       {
         accessorKey: 'billCount',
-        header: 'Bills',
+        header: t('bills'),
         cell: ({ row }) => row.original.billCount,
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'totalAmount',
-        header: 'Total Amount',
-        cell: ({ row }) => formatCurrency(row.original.totalAmount),
+        header: t('totalAmount'),
+        cell: ({ row }) => formatCurrency(row.original.totalAmount, currencyCode),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'paidAmount',
-        header: 'Paid',
-        cell: ({ row }) => formatCurrency(row.original.paidAmount),
+        header: t('paid'),
+        cell: ({ row }) => formatCurrency(row.original.paidAmount, currencyCode),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'balanceDue',
-        header: 'Balance Due',
+        header: t('balanceDue'),
         cell: ({ row }) => (
           <span className={row.original.balanceDue > 0 ? 'text-red-600 font-medium' : ''}>
-            {formatCurrency(row.original.balanceDue)}
+            {formatCurrency(row.original.balanceDue, currencyCode)}
           </span>
         ),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
@@ -71,19 +74,21 @@ function PurchasesByVendorContent() {
       {
         accessorKey: 'unappliedCredits',
         header: t('purchasesByVendor.unappliedCredits'),
-        cell: ({ row }) => formatCurrency(row.original.unappliedCredits),
+        cell: ({ row }) => formatCurrency(row.original.unappliedCredits, currencyCode),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
       {
         accessorKey: 'netPayable',
         header: t('purchasesByVendor.netPayable'),
         cell: ({ row }) => (
-          <span className="font-medium">{formatCurrency(row.original.netPayable)}</span>
+          <span className="font-medium">
+            {formatCurrency(row.original.netPayable, currencyCode)}
+          </span>
         ),
         meta: { headerClassName: 'text-right', cellClassName: 'text-right' },
       },
     ],
-    [t],
+    [t, currencyCode],
   );
 
   return (
@@ -96,36 +101,40 @@ function PurchasesByVendorContent() {
       <ReportFilters dateRange={dateRange} onDateRangeChange={setDateRange} showDateRange />
 
       {/* Summary Cards */}
-      {data && (
+      {data && !isError && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Purchases</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('purchasesByVendor.totalPurchases')}
+              </CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(data.totalAmount)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
-              <Wallet className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(data.totalPaid)}
+              <div className="text-2xl font-bold">
+                {formatCurrency(data.totalAmount, currencyCode)}
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
+              <CardTitle className="text-sm font-medium">{t('totalPaid')}</CardTitle>
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {formatCurrency(data.totalPaid, currencyCode)}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">{t('outstanding')}</CardTitle>
               <Receipt className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(data.totalBalance)}
+                {formatCurrency(data.totalBalance, currencyCode)}
               </div>
             </CardContent>
           </Card>
@@ -137,7 +146,9 @@ function PurchasesByVendorContent() {
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(data.totalUnappliedCredits)}</div>
+              <div className="text-2xl font-bold">
+                {formatCurrency(data.totalUnappliedCredits, currencyCode)}
+              </div>
             </CardContent>
           </Card>
           <Card>
@@ -149,13 +160,15 @@ function PurchasesByVendorContent() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(data.totalNetPayable)}
+                {formatCurrency(data.totalNetPayable, currencyCode)}
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Vendors</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t('purchasesByVendor.vendors')}
+              </CardTitle>
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -165,18 +178,22 @@ function PurchasesByVendorContent() {
         </div>
       )}
 
-      <Card>
-        <CardContent className="pt-6">
-          <DataTable
-            columns={columns}
-            data={data?.entries || []}
-            isLoading={isLoading}
-            emptyMessage="No purchase data found for the selected period."
-            enableExport
-            exportFilename="purchases-by-vendor"
-          />
-        </CardContent>
-      </Card>
+      {isError ? (
+        <ReportLoadError onRetry={() => void refetch()} />
+      ) : (
+        <Card>
+          <CardContent className="pt-6">
+            <DataTable
+              columns={columns}
+              data={data?.entries || []}
+              isLoading={isLoading}
+              emptyMessage={t('purchasesByVendor.empty')}
+              enableExport
+              exportFilename="purchases-by-vendor"
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

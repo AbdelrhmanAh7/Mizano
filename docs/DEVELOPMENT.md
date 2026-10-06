@@ -126,6 +126,14 @@ Rules:
 
 ## CI
 
+For the bill currency/report localization follow-up (#68), the focused regression command from `apps/web` is:
+
+```powershell
+node ../../node_modules/jest/bin/jest.js --runInBand --runTestsByPath components/purchases/bill-amount.spec.tsx lib/hooks/use-organization.spec.ts lib/hooks/use-reports.spec.ts "app/[locale]/(dashboard)/purchases/purchases-currency.spec.tsx" "app/[locale]/(dashboard)/reports/report-currency.spec.tsx" "app/[locale]/(dashboard)/reports/report-labels.spec.tsx" "app/[locale]/(dashboard)/reports/report-load-error.spec.tsx"
+```
+
+This invokes the installed Jest directly, avoiding npm's warnings for pnpm settings and Windows `.cmd` argument handling for paths containing parentheses. Run the installed TypeScript/ESLint entrypoints similarly when PowerShell blocks `npx.ps1`. These targeted tests cover lookup loading/failure/retry, document-currency precedence, organization switching, bill/payment page currency states, report currency, en/ar labels and report load errors; they do not establish E2E or release acceptance. A worker restricted to targeted tests leaves the full suites/build and browser acceptance to the coordinator.
+
 `.github/workflows/ci.yml` runs on pushes and PRs to `master`/`develop`: install (pnpm 8, Node 20, `prisma generate`) → lint and type-check → unit tests (with PostgreSQL 16 and Redis 7 services, `db:push`) → build. E2E is not part of CI yet.
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
