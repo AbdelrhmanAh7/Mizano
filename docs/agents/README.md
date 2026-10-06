@@ -1,8 +1,19 @@
-# Four-provider operating guide
+# Agent operating guide
 
 Read [AGENTS.md](../../AGENTS.md) and [the Raspberry Pi live plan](../roadmap.md). This is an executable handover specification for the coordinator; it does not claim the local providers or daily timer are already running.
 
 Current goal: a tiny live deployment on a Raspberry Pi 5 (8GB, arm64), tracked by epic #45. This guide asserts no completed progress.
+
+## Documentation is part of the change
+
+Every agent and human must update **every affected `.md` file in the same PR**: READMEs,
+`docs/*`, `deploy/pi/README.md`, `AGENTS.md`/`CLAUDE.md` for rule or command changes,
+`docs/agents/review-lessons.md` for new root causes, and roadmap/status for milestone progress.
+Verify claims against current code; separate requirements, implementation and live evidence.
+If behavior changes without a documentation update, the PR body must contain a standalone
+line starting with `Docs: not needed because` followed by the reason. CI `docs-check` gates
+changes under `apps/`, `packages/`, `deploy/` and `.github/`; reviewers assess relevance,
+freshness and exemptions. An unrelated Markdown edit does not meet this rule.
 
 ## Roles and ownership
 
@@ -13,7 +24,7 @@ Current goal: a tiny live deployment on a Raspberry Pi 5 (8GB, arm64), tracked b
 | GLM         | CPU extraction implementation              | Parser/OCR adapter, field rules, fixtures and benchmark     | Codex                |
 | Antigravity | Accountant UX and charts                   | Inbox, preview/corrections, RTL/mobile, report presentation | Claude or Codex      |
 
-Either Claude or Codex can receive the entry prompt and coordinate. If Codex coordinates, it delegates its implementation work to a separate worker and Claude independently reviews those changes. The coordinator may implement bounded integration work, but cannot approve its own changes as independent review. Roles are defaults; use demonstrated availability and task fit. The P0 backlog alone is estimated at 21 agent-hours, so it cannot all sit with one Codex worker during the first two days. Split non-overlapping implementation across available providers (for example frontend session isolation, backend tenancy and the shared tax calculator), while the coordinator serializes shared-schema and posting integration. The ten-day demo schedule is superseded by the Pi plan (#45); milestone status requires current issue and acceptance evidence. Do not invent model IDs or pretend current ChatGPT subagents are the four external products.
+Either Claude or Codex can receive the entry prompt and coordinate. If Codex coordinates, it delegates its implementation work to a separate worker and Claude independently reviews those changes. The coordinator may implement bounded integration work, but cannot approve its own changes as independent review. Roles are defaults; use demonstrated availability and task fit. The ten-day demo schedule and its initial agent-hour estimates are historical; the Pi plan (#45, P1-P4) requires current issue and acceptance evidence. Keep one expensive build/test active at a time on a small host. Do not invent model IDs or pretend current ChatGPT subagents are the four external products.
 
 Shared contract owner: coordinator. Freeze document/job/result schemas before parallel integration. Shared schema/migrations, package locks, workflow files and root instructions have one active owner at a time. Workers coordinate schema requests through the coordinator instead of independently editing Prisma. Use branches `demo/<issue>-<topic>` from the current baseline and isolated `git worktree` directories.
 
@@ -21,7 +32,7 @@ Shared contract owner: coordinator. Freeze document/job/result schemas before pa
 
 1. Record host CPU architecture, RAM, free disk, repository SHA and dirty state. Do not overwrite user changes.
 2. Discover each installed executable and inspect its actual `--help`/version and authenticated status. GLM may be reached through an existing OpenCode or other verified provider interface. Antigravity may require a supported agent/UI interface rather than a headless CLI. **Do not guess flags or count a GUI as an unattended worker.**
-3. Run a read-only smoke task with each provider. Record executable/argv, model actually selected, output and exit code in `docs/agents/runs/YYYY-MM-DD.md`, redacting secrets.
+3. Run a read-only smoke task with each provider. Record executable/argv, model actually selected, output and exit code in the PR description or an issue comment (never as a committed file), redacting secrets.
 4. If a provider lacks a supported unattended route, mark that lane blocked. Use available workers on independent tasks while documenting the missing fourth lane. Do not claim all four started or promise unattended execution until smoke evidence exists.
 5. Implement or reuse a verified local launcher with argv arrays (no shell-evaluated prompt text), isolated process groups/worktrees, timeout, cancellation, quota handling, bounded logs and persistent queue/leases. Complete issue AGENTS before calling one-prompt orchestration operational.
 
@@ -38,9 +49,22 @@ Use a local systemd timer or the host's supported scheduler for the verified run
 
 ## Task lifecycle
 
-Ready issue → lease → scoped plan → branch/worktree → implement → affected tests → PR → independent review on exact head → full required gates → merge → demo deployment of exact tested SHA → health/acceptance evidence → close. Recheck dependencies before picking the next issue. `Needs review`, `Blocked` and `Done` mean real evidence states, not elapsed time.
+Ready issue → lease → scoped plan → branch/worktree → implement and update affected docs → affected tests → PR → independent review on exact head → full required gates → merge → Pi deployment of exact tested SHA/digests for runtime changes → health/acceptance evidence → close. Documentation/planning-only changes do not require an application redeploy. Recheck dependencies before picking the next issue. `Needs review`, `Blocked` and `Done` mean real evidence states, not elapsed time.
 
 A lease record contains issue key/number, provider, run ID, paths, baseline SHA, worktree, acquired/expiry time and heartbeat. Renew while active. Recover stale leases only after verifying no live worker still owns the process/worktree. Never steal work based only on a missing UI update.
+
+For local worktrees, use `pnpm wt:new <lane> [base]` (default cached
+`origin/master`) and `pnpm wt:clean`; see the [helper guide](../DEVELOPMENT.md#worktree-helpers).
+The lane is both the branch name and `.worktrees/<lane>` directory name; use a
+simple lane name without slashes, then `git branch -m` to the sprint's
+`demo/<issue>-<topic>` name if required. Refresh remote refs through the coordinator
+before use. Setup installs offline, generates Prisma and builds only shared
+packages sequentially. Schedule setup as one expensive task on the shared host.
+Record the actual base SHA in the lease; a helper invocation does not acquire a
+lease or verify GitHub issue status. Stop workers and release leases before
+cleanup. Cleanup preserves dirty, unmerged, detached, locked and outside
+worktrees; do not treat merged ancestry as proof that a worker has stopped.
+Run `bash scripts/test-wt.sh` for offline helper verification.
 
 For provider quota/failure: checkpoint diff and next step; permit one bounded retry if transient; reroute to a different authorized available provider with a fresh scoped prompt. Do not bypass permissions, disable checks or repeatedly relaunch a stuck model. Always distinguish provider rate limits from application defects.
 

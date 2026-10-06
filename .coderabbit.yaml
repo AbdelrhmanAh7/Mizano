@@ -15,6 +15,15 @@ reviews:
   path_instructions:
     - path: '**/*'
       instructions: >-
+        Documentation is part of the change. Flag missing or stale documentation for changed
+        behavior, APIs, commands, configuration, deployment, rules or milestone status. Check
+        affected READMEs, docs/*, deploy/pi/README.md, AGENTS.md, CLAUDE.md, review-lessons.md
+        for new root causes, and roadmap/status for milestone progress. An unrelated Markdown
+        edit does not satisfy this rule. If the PR body says "Docs: not needed because ...",
+        assess the explanation; flag unjustified exemptions. Verify claims against current
+        code and distinguish implemented behavior from planned work and historical context.
+    - path: '**/*'
+      instructions: >-
         Review against docs/agents/review-lessons.md and AGENTS.md. Every rule there is a past
         review finding; flag any change that repeats one of those root causes, even in a
         different module (lock order, original-journal accounts, dates, single-currency ledger,

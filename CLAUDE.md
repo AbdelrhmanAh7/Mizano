@@ -2,6 +2,17 @@
 
 Accountant-first accounting ERP for Egypt, Saudi Arabia and the UAE. Current goal: a tiny live deployment on a Raspberry Pi 5 (8GB, arm64) with the full accountant flow (ledger, invoice intake, Telegram ingestion). Read [AGENTS.md](AGENTS.md), [agent operations](docs/agents/README.md) and [review lessons](docs/agents/review-lessons.md) first; these supersede historical product/deployment assumptions below.
 
+## Documentation is part of the change
+
+Every agent and human must update **every affected `.md` file in the same PR**: READMEs,
+`docs/*`, `deploy/pi/README.md`, `AGENTS.md`/`CLAUDE.md` for rule or command changes,
+`docs/agents/review-lessons.md` for new root causes, and roadmap/status for milestone progress.
+Verify claims against current code; separate requirements, implementation and live evidence.
+If behavior changes without a documentation update, the PR body must contain a standalone
+line starting with `Docs: not needed because` followed by the reason. CI `docs-check` gates
+changes under `apps/`, `packages/`, `deploy/` and `.github/`; reviewers assess relevance,
+freshness and exemptions. An unrelated Markdown edit does not meet this rule.
+
 ## Tech Stack
 
 | Layer    | Technology                                            |
@@ -24,9 +35,10 @@ pnpm dev:api / dev:web
 pnpm build / lint / type-check
 pnpm db:generate / db:push / db:migrate / db:seed / db:studio
 pnpm test / test:api / test:web / test:cov / test:e2e
-pnpm ci:full          # lint + type-check + test + e2e (MUST pass)
+pnpm ci:full          # lint + type-check + unit tests (MUST pass; E2E separate)
 pnpm docker:up / docker:down / docker:prod
 pnpm env:check        # verify env file for current APP_ENV
+pnpm wt:new <lane> [base] / wt:clean  # Bash helpers; see development guide
 ```
 
 ## Environment System (4-env)
@@ -66,21 +78,21 @@ mizano/
 2. **Double-entry** — Debits MUST equal credits. Throw if unbalanced.
 3. **Money** — ALWAYS `Decimal` (Prisma). NEVER JS `number`/`float` for money.
 4. **Soft delete** — Financial records use `deletedAt`, never hard delete.
-5. **Audit trail** — Every write creates an audit log entry automatically.
+5. **Audit trail** — Preserve write audit metadata and source evidence. The API AuditInterceptor records HTTP writes, not every worker/database mutation automatically.
 6. **AI is advisory** — NEVER auto-post transactions. All AI suggestions are dismissible.
 
 ## Backend Conventions (NestJS)
 
 - Module structure: `{domain}.module.ts`, `{domain}.controller.ts`, `{domain}.service.ts`, `dto/`
-- All endpoints: `JwtAuthGuard` + `OrganizationGuard` (except auth routes)
+- Protected endpoints: `JwtAuthGuard` + `PermissionsGuard`, explicit `@Permissions`, and tenant-scoped service queries; intake also uses `OrganizationGuard`. Auth/public health routes are explicit exceptions.
 - RBAC: `@Permissions('module.action')` decorator
 - Transactions: `prisma.$transaction()` for multi-table writes
-- Doc numbers: INV-XXX, EST-XXX, JRN-XXX, BILL-XXX
+- Doc numbers: `DocumentNumberService` allocates per-org prefixes such as INV, QT, JRN and BILL (`PREFIX-001` by default; padding is configurable).
 
 ```typescript
 // Controller pattern
 @Controller('invoices')
-@UseGuards(JwtAuthGuard, OrganizationGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class InvoicesController {
   @Get()  @Permissions('sales.view')
   findAll(@CurrentOrg() orgId: string, @Query() query: ListQueryDto) {}
@@ -118,7 +130,7 @@ export function useCreateInvoice() {
 
 ## Database Conventions (Prisma)
 
-- All models: `id String @id @default(cuid())`, `createdAt`, `updatedAt`, `organizationId`
+- Tenant-owned models carry `organizationId`; child rows may scope through a tenant-owned parent. Check each model in `prisma/schema.prisma` instead of assuming identical fields.
 - Money: `Decimal @db.Decimal(19, 4)` — never JS floats
 - Financial models: `deletedAt DateTime?` for soft delete
 - Indexes: `[organizationId, status]`, `[organizationId, createdAt]`
@@ -132,25 +144,25 @@ if (!totalDebits.equals(totalCredits)) throw new BadRequestException('Journal en
 
 ## Business Domain Modules
 
-| Module        | Path                     | Key Entities                                          |
-| ------------- | ------------------------ | ----------------------------------------------------- |
-| Accounting    | `modules/accounting/`    | Accounts, Journals, RecurringProfiles                 |
-| Sales         | `modules/sales/`         | Customers, Quotes, Invoices, CreditNotes, Payments    |
-| Purchases     | `modules/purchases/`     | Vendors, Bills, Expenses, VendorCredits               |
-| Inventory     | `modules/inventory/`     | Items, Warehouses, Movements, Adjustments, PriceLists |
-| Banking       | `modules/banking/`       | BankAccounts, Transactions, Rules                     |
-| HR            | `modules/hr/`            | Employees, Attendance, PayrollRuns, Payslips          |
-| Manufacturing | `modules/manufacturing/` | BOMs, WorkOrders                                      |
-| Projects      | `modules/projects/`      | Projects, Tasks, TimesheetEntries                     |
-| Tax           | `modules/tax/`           | TaxRates, VATReturns, VATPayments                     |
-| CRM           | `modules/crm/`           | Leads, Deals                                          |
-| Reports       | `modules/reports/`       | P&L, Balance Sheet, AR/AP Aging                       |
-| AI            | `modules/ai/`            | 33 inference models, Ollama-backed (100% local)       |
-| Assets        | `modules/assets/`        | FixedAssets, Depreciation                             |
-| Documents     | `modules/documents/`     | Document management                                   |
-| Currency      | `modules/currency/`      | Exchange rates, multi-currency                        |
-| Notifications | `modules/notifications/` | In-app & email notifications                          |
-| Search        | `modules/search/`        | Global search                                         |
+| Module        | Path                     | Key Entities                                                           |
+| ------------- | ------------------------ | ---------------------------------------------------------------------- |
+| Accounting    | `modules/accounting/`    | Accounts, Journals, RecurringProfiles                                  |
+| Sales         | `modules/sales/`         | Customers, Quotes, Invoices, CreditNotes, Payments                     |
+| Purchases     | `modules/purchases/`     | Vendors, Bills, Expenses, VendorCredits                                |
+| Inventory     | `modules/inventory/`     | Items, Warehouses, Movements, Adjustments, PriceLists                  |
+| Banking       | `modules/banking/`       | BankAccounts, Transactions, Rules                                      |
+| HR            | `modules/hr/`            | Employees, Attendance, PayrollRuns, Payslips                           |
+| Manufacturing | `modules/manufacturing/` | BOMs, WorkOrders                                                       |
+| Projects      | `modules/projects/`      | Projects, Tasks, TimesheetEntries                                      |
+| Tax           | `modules/tax/`           | TaxRates, VATReturns, VATPayments                                      |
+| CRM           | `modules/crm/`           | Leads, Deals                                                           |
+| Reports       | `modules/reports/`       | P&L, Balance Sheet, AR/AP Aging                                        |
+| AI            | `modules/ai/`            | Durable intake, CPU rules/Tesseract, optional legacy Ollama strategies |
+| Assets        | `modules/assets/`        | FixedAssets, Depreciation                                              |
+| Documents     | `modules/documents/`     | Document management                                                    |
+| Currency      | `modules/currency/`      | Exchange rates, multi-currency                                         |
+| Notifications | `modules/notifications/` | In-app & email notifications                                           |
+| Search        | `modules/search/`        | Global search                                                          |
 
 ## CI Zero-Tolerance Policy
 
@@ -182,13 +194,14 @@ if (!totalDebits.equals(totalCredits)) throw new BadRequestException('Journal en
 - When modifying business logic, update/add corresponding tests
 - When modifying a service/controller/component, run its spec file and fix any broken assertions
 - When adding new features, add corresponding unit tests
-- API tests: `node apps/api/_run_tests.js [--testPathPattern="<pattern>"]` (required for Windows/WSL compatibility)
+- API tests (native Windows pnpm supported): `cd apps/api && npx jest [--testPathPattern="<pattern>"]`
 - Web tests: `cd apps/web && npx jest [--testPathPattern="<pattern>"]`
-- Always run the full suite (`node apps/api/_run_tests.js` + `cd apps/web && npx jest`) before finalizing changes
+- For application code changes, run affected tests plus full API/web suites and builds, and seeded E2E/browser acceptance separately. Documentation-only changes need content/link/format checks and repository CI; CI scripts need offline behavior tests.
+- `_run_tests.js` is a legacy WSL symlink workaround, not the standard runner. The API `tsconfig.json` and that runner both enable `esModuleInterop`, so import callable CommonJS modules such as `csv-parser` with a default import (a namespace import is not callable).
 
 ## Git Hooks
 
-- **pre-commit**: lint-staged (ESLint --fix + Prettier on staged files)
+- **pre-commit**: `_lint_staged.js` (ESLint --fix + Prettier on staged files; Windows-safe runner)
 - **pre-push**: `pnpm ci:full` — all checks must pass
 
 ## Code Quality Checklist
@@ -206,67 +219,52 @@ if (!totalDebits.equals(totalCredits)) throw new BadRequestException('Journal en
 
 All workflows are in `.agents/workflows/`. Use these commands for full project control:
 
-| Command          | Description                                         |
-| ---------------- | --------------------------------------------------- |
-| `/dev`           | Start dev servers (Docker + Web :5001 + API :6001)  |
-| `/build`         | Build for any environment (local/dev/sit/prod)      |
-| `/test`          | Run tests (unit/e2e/coverage/watch)                 |
-| `/lint`          | Lint + type-check + format (with auto-fix option)   |
-| `/ci`            | Full CI pipeline (lint → type-check → test → e2e)   |
-| `/db`            | Database ops (generate/push/migrate/seed/reset)     |
-| `/docker`        | Docker infra (up/down/logs/status/prod)             |
-| `/deploy`        | Deploy (pre-checks → build → docker prod)           |
-| `/git`           | Git ops (conventional commits, branch management)   |
-| `/env`           | Environment management (check/switch/validate)      |
-| `/new-module`    | Scaffold NestJS backend module                      |
-| `/new-page`      | Scaffold Next.js frontend page + hooks + API client |
-| `/add-component` | Add shadcn/ui components                            |
-| `/debug-api`     | Debug API (Docker/ports/DB/logs/endpoints)          |
+| Command          | Description                                               |
+| ---------------- | --------------------------------------------------------- |
+| `/dev`           | Start dev servers (Docker + Web :5001 + API :6001)        |
+| `/build`         | Build for any environment (local/dev/sit/prod)            |
+| `/test`          | Run tests (unit/e2e/coverage/watch)                       |
+| `/lint`          | Lint + type-check + format (with auto-fix option)         |
+| `/ci`            | Package gate: lint, type-check, unit tests (E2E separate) |
+| `/db`            | Database ops (generate/push/migrate/seed/reset)           |
+| `/docker`        | Docker infra (up/down/logs/status/prod)                   |
+| `/deploy`        | Deploy (pre-checks → build → docker prod)                 |
+| `/git`           | Git ops (conventional commits, branch management)         |
+| `/env`           | Environment management (check/switch/validate)            |
+| `/new-module`    | Scaffold NestJS backend module                            |
+| `/new-page`      | Scaffold Next.js frontend page + hooks + API client       |
+| `/add-component` | Add shadcn/ui components                                  |
+| `/debug-api`     | Debug API (Docker/ports/DB/logs/endpoints)                |
 
-## Historical AI Infrastructure — Ollama via Google Colab
+## CPU-only invoice intake and historical AI infrastructure
 
-> Current runtime description only, not the target architecture. The CPU-only demo mandate in AGENTS.md supersedes the old Colab-only constraints in this section. Replace this dependency through the CPU runtime/extraction issues; paid cloud AI remains disabled in the demo. Do not mistake this documented migration plan for an implemented change.
+The Pi live goal (epic #45, P1-P4) requires CPU-only intake with Tesseract and Poppler,
+no Ollama/LLM in the live path, no GPU/Colab/paid API, and pinned language assets built into
+the image. These are requirements; packaging and all formats are not complete.
 
-Ollama does NOT run locally in production. It runs on a Google Colab notebook
-(T4 GPU, free tier) and is accessed through a reverse proxy.
+Current code (`modules/ai/extraction/rules-strategy.service.ts`):
 
-There is NO external AI API fallback. No Gemini, no OpenAI, no cloud AI.
-When Colab is down, AI features return 503 until the notebook is restarted.
+- `INTAKE_EXTRACTION_STRATEGY=rules` selects deterministic header-field extraction when
+  no request strategy overrides it. Set `OLLAMA_ENABLED=false` for optional advisory inference.
+  Existing UI presets and the request DTO still select legacy LLM strategies; rules mode
+  is not yet a server-enforced restriction on overrides.
+- Native PDF text comes from `pdf-parse`; images use `tesseract.js` (default `eng+ara`).
+  `INTAKE_TESSDATA_DIR` selects local `.traineddata` assets and fails offline if missing.
+  Without it Tesseract may download assets. Poppler rendering, scanned-PDF OCR in rules
+  mode, Word parsing and pinned language packaging are not implemented here.
+- Rules return header fields, confidence, evidence and warnings; missing fields stay null.
+  Line items are empty, and the legacy extraction result still converts rule Decimal totals
+  to numbers. Financial commands must retain the Decimal/fixed 4-dp string contract.
+- PostgreSQL intake jobs preserve originals and hashes; BullMQ processes them inside the API
+  with leases, retry/dead-letter states, authenticated SSE/polling and explicit confirmation
+  to create a draft. Full automatic draft preparation and batch posting remain acceptance work.
+- Telegram invoice ingestion is pending; `deploy/pi/scripts/healthcheck.sh` sends operator alerts.
 
-### Architecture
-
-```
-services (Docker) → ollama-proxy:11434 → Cloudflare tunnel → Colab (Ollama + GPU)
-                         ↓ (if Colab down)
-                    503 "AI temporarily unavailable"
-```
-
-### How it works
-
-- `ollama-proxy` service listens on port 11434 (same as real Ollama)
-- Reads tunnel URL from `/data/ollama_tunnel_url` in its container volume
-- All services use `OLLAMA_BASE_URL=http://ollama-proxy:11434` — no code changes
-- When Colab disconnects, all AI features return 503
-- Colab notebook pushes new tunnel URLs via `POST /api/internal/tunnel-update`
-- Telegram bot alerts admin when Ollama goes down
-
-### Key env vars
-
-- `OLLAMA_WEBHOOK_SECRET` — shared secret for tunnel URL updates
-- `OLLAMA_MODEL` — model name on Colab (default: qwen3-vl:8b)
-
-### Endpoints
-
-- `GET http://ollama-proxy:11434/health` — proxy + Ollama status
-- `GET /api/internal/ollama-status` — same, via NestJS (admin only)
-- `POST /api/internal/tunnel-update` — webhook from Colab (secret required)
-
-### Never
-
-- Add local Ollama or GPU config to docker-compose.yml
-- Add any external AI API (Gemini, OpenAI, etc.) as fallback
-- Assume Ollama is always available — always handle 503 gracefully
-- Hardcode tunnel URLs — they change every Colab restart
+`services/ollama-proxy` and the `vlm`/`ocr-llm`/`hybrid` strategies remain legacy optional
+code. The old Colab diagram is historical, not a Pi deployment dependency. The legacy VM
+workflow still enables Ollama; Pi Compose disables it but does not yet pass rules-mode or
+tessdata settings. See [Architecture](docs/ARCHITECTURE.md#pi-invoice-pipeline) and
+[Pi operations](deploy/pi/README.md#cpu-intake-readiness).
 
 ## Docs Reference
 
@@ -278,3 +276,5 @@ services (Docker) → ollama-proxy:11434 → Cloudflare tunnel → Colab (Ollama
 | [`docs/roadmap.md`](docs/roadmap.md)                                   | Raspberry Pi live plan (milestones P1–P4)                           |
 | [`docs/strategy/demo-acceptance.md`](docs/strategy/demo-acceptance.md) | Demo go/no-go contract                                              |
 | [`docs/strategy/`](docs/strategy/)                                     | Vision, repository review, extraction and regional research         |
+| [`deploy/pi/README.md`](deploy/pi/README.md)                           | Raspberry Pi setup, deploy, backup, monitoring and rollback         |
+| [`deploy/pi/RUNBOOK.md`](deploy/pi/RUNBOOK.md)                         | Pi live acceptance checklist with GO/NO-GO criteria                 |
