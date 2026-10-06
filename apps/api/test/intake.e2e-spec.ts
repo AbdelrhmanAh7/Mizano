@@ -690,5 +690,27 @@ describe('Document intake (e2e)', () => {
       for (const id of ids) await waitForStatus(id, IntakeJobStatus.EXTRACTED);
       expect(gate.maxInFlight).toBe(1);
     });
+
+    it('the API stays responsive (p95 under threshold) while the worker processes a batch', async () => {
+      gate.delayMs = 200;
+      await restartWorker();
+      const ids = await uploadMany(4);
+
+      // Concurrently issue API requests while the worker churns through the batch
+      const latencies: number[] = [];
+      const requests = Array.from({ length: 15 }, async () => {
+        const start = Date.now();
+        const res = await a.get('/documents/intake/jobs');
+        latencies.push(Date.now() - start);
+        expect(res.status).toBe(200);
+      });
+      await Promise.all(requests);
+
+      for (const id of ids) await waitForStatus(id, IntakeJobStatus.EXTRACTED);
+
+      latencies.sort((x, y) => x - y);
+      const p95 = latencies[Math.floor(latencies.length * 0.95)];
+      expect(p95).toBeLessThan(500);
+    });
   });
 });
