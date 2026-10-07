@@ -3,8 +3,8 @@
 Implementation of Slice 1: read-only duplicate-check service and endpoint in `apps/api` with full domain and multi-tenancy tests.
 
 - **Base commit:** `master` at `b83d72b4cfa358f3a6ba4be9d9f1b613ac9fe1f2`
-- **Tested SHA:** `bcc65a236fe01f5b5dfec15cbfdbd7e8daa342ad`
-- **Author:** Antigravity (Gemini 3.8 Flash High)
+- **Tested SHA:** `71b7110050f520a9af1c0c23cbf44ac7c05fb028`
+- **Author:** AI implementer (Command Code)
 - **Host:** Darwin arm64 (macOS), Node v22.13.1, pnpm 8.14.0
 
 ---

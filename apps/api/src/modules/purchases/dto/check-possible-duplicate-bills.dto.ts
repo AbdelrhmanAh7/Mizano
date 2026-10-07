@@ -1,5 +1,6 @@
 import { IsOptional, IsString, Matches } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsDecimalString } from '../../../common/dto/decimal-string';
 
 export class CheckPossibleDuplicateBillsDto {
   @ApiPropertyOptional({ description: 'Resolved vendor ID if known' })
@@ -16,7 +17,7 @@ export class CheckPossibleDuplicateBillsDto {
 
   @ApiPropertyOptional({ description: 'Total amount as exact decimal string' })
   @IsOptional()
-  @IsString()
+  @IsDecimalString()
   amount?: string;
 
   @ApiPropertyOptional({ description: 'Document date (strict ISO YYYY-MM-DD)' })

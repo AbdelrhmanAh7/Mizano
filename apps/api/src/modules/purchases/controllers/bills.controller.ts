@@ -77,12 +77,12 @@ export class BillsController {
     return this.billsService.findAllCursor(orgId, query);
   }
 
-  @Get('possible-duplicates')
+  @Post('possible-duplicates')
   @Permissions('purchases.view')
   @ApiOperation({ summary: 'Find possible duplicate bills for a draft bill or document' })
   findPossibleDuplicates(
     @CurrentOrg() orgId: string,
-    @Query() query: CheckPossibleDuplicateBillsDto,
+    @Body() query: CheckPossibleDuplicateBillsDto,
   ) {
     return this.billsService.findPossibleDuplicateBills(orgId, query);
   }
