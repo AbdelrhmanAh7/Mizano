@@ -50,7 +50,7 @@ Alternative: Tailscale. Run `tailscale serve` on the host for `http://127.0.0.1:
 - `NEXTAUTH_URL` is HTTPS so NextAuth issues secure cookies. Verify in browser dev tools that session cookies are `Secure` and `HttpOnly`.
 - JWT and NextAuth secrets are unique, random, and at least 32 bytes.
 - `OLLAMA_ENABLED=false`; no paid cloud AI.
-- Rotate integration credentials (≤90 days): Telegram bot token, Cloudflare tunnel token and any future ETA/VAT token. Record each rotation date; slice 2 of #97 will read it from `.env.pi`.
+- Rotate integration credentials (≤90 days): Telegram bot token, Cloudflare tunnel token, each organization's SMTP password (`PATCH /organization/settings/email`, used by invoice e-mail) and any future ETA/VAT token. Record each rotation date; slice 2 of #97 will read it from `.env.pi` (host tokens) and per organization (SMTP).
 
 ### Verify no open ports
 
