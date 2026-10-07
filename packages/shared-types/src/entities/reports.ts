@@ -124,3 +124,22 @@ export interface DashboardChartData {
   expensesByCategory: { category: string; amount: number }[];
   receivablesVsPayables: { receivables: number; payables: number };
 }
+
+// --- VAT Return Draft ---
+
+export interface VatReturnDraftException {
+  id: string;
+  type: 'invoice' | 'bill';
+  documentNumber: string;
+  reason: string;
+}
+
+export interface VatReturnDraft {
+  from: string;
+  to: string;
+  status: 'complete' | 'incomplete';
+  outputTax: string;
+  inputTax: string;
+  netPayable: string;
+  exceptions: VatReturnDraftException[];
+}

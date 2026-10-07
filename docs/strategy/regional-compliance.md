@@ -4,11 +4,11 @@ Research checked 5 September 2026. Product/engineering guidance, not a customer-
 
 ## Distinguish the systems
 
-| Market | Authority and system | Required product direction |
-| --- | --- | --- |
-| Egypt | Egyptian Tax Authority (ETA): eInvoice and distinct eReceipt | Taxpayer-authorized ERP onboarding, country schema/code lists, eInvoice signing, submission/status tracking. eReceipt is a separate POS/B2C scope. |
-| Saudi Arabia | ZATCA Fatoora, phased generation/integration | UBL2.1 plus KSA rules, certificate lifecycle, standard clearance and simplified reporting, QR/hash/counter requirements. |
-| UAE | MoF/FTA eInvoicing through accredited service providers (ASPs) | PINT-AE/Peppol sending and receiving through an ASP, tax reporting/status evidence. Partner with an ASP before considering becoming one. |
+| Market       | Authority and system                                           | Required product direction                                                                                                                         |
+| ------------ | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Egypt        | Egyptian Tax Authority (ETA): eInvoice and distinct eReceipt   | Taxpayer-authorized ERP onboarding, country schema/code lists, eInvoice signing, submission/status tracking. eReceipt is a separate POS/B2C scope. |
+| Saudi Arabia | ZATCA Fatoora, phased generation/integration                   | UBL2.1 plus KSA rules, certificate lifecycle, standard clearance and simplified reporting, QR/hash/counter requirements.                           |
+| UAE          | MoF/FTA eInvoicing through accredited service providers (ASPs) | PINT-AE/Peppol sending and receiving through an ASP, tax reporting/status evidence. Partner with an ASP before considering becoming one.           |
 
 An ordinary PDF, Word file or scanned image is not itself a statutory UAE eInvoice; OCR converts evidence into fields and does not prove authenticity or compliance. [MoF portal](https://mof.gov.ae/en/about-us/initiatives/einvoicing/).
 
@@ -30,11 +30,11 @@ Implement UBL2.1/KSA validation, tax/rounding rules, UUID/counter/hash-chain con
 
 The architecture uses ASP-mediated PINT-AE/Peppol exchange and parallel tax reporting. Sending and receiving both matter; it is not a copy of Saudi clearance. B2C is currently excluded from this mandate. Check an ASP's final accreditation status, not only pre-approval. [MoF portal](https://mof.gov.ae/en/about-us/initiatives/einvoicing/), [guidelines v1.1, June 2026](https://mof.gov.ae/wp-content/uploads/2026/06/UAE-Electronic-Invoicing-Guidelines_V-1.1-01June2026.pdf).
 
-| Cohort | ASP appointment | Implementation |
-| --- | --- | --- |
+| Cohort                   | ASP appointment | Implementation |
+| ------------------------ | --------------- | -------------- |
 | Revenue >= AED50 million | 30 October 2026 | 1 January 2027 |
-| Revenue < AED50 million | 31 March 2027 | 1 July 2027 |
-| Government entities | 31 March 2027 | 1 October 2027 |
+| Revenue < AED50 million  | 31 March 2027   | 1 July 2027    |
+| Government entities      | 31 March 2027   | 1 October 2027 |
 
 Pilot/voluntary start: 1 July 2026. **Conflict resolved:** the June guideline still prints 31 July for the first cohort's ASP appointment; binding MD66/2026 amends that deadline to 30 October. Read MD244/2025 with its amendment. [MD244](https://mof.gov.ae/wp-content/uploads/2025/09/Ministerial-Decision-No.-244-of-2025-on-the-Implementation-of-the-Electronic-Invoicing-System.pdf), [MD66 amendment](https://mof.gov.ae/wp-content/uploads/2026/05/Ministerial-Resolution-No.-66-of-2026-Amending-Certain-Provisions-of-Ministerial-Resolution-No.-244-of-2025-Regarding-the-Implementation-of-the-Electronic-Invoicing-System-En-20260514.pdf), [MoF announcement, 10 May 2026](https://mof.gov.ae/en/news/ministry-of-finance-announces-targeted-amendments-to-einvoicing-system-decisions/).
 

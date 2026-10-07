@@ -788,6 +788,16 @@ export const createVATReturnSchema = z.object({
   endDate: dateSchema,
 });
 
+export const vatReturnDraftQuerySchema = z
+  .object({
+    from: z.string().or(z.date()),
+    to: z.string().or(z.date()),
+  })
+  .refine((data) => new Date(data.from) <= new Date(data.to), {
+    message: 'from date must be before or equal to to date',
+    path: ['from'],
+  });
+
 // ============================================
 // VAT PAYMENT SCHEMAS
 // ============================================
