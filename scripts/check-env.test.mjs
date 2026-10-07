@@ -1,9 +1,11 @@
 // Run: node --test scripts/check-env.test.mjs
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { test } from 'node:test';
 import {
   PI_COMPOSE,
+  PI_DIR,
   PI_TEMPLATE,
   checkPiEnv,
   checkTemplate,
@@ -210,4 +212,28 @@ test('parseEnv handles comments, quotes and export', () => {
   assert.equal(env.get('C'), '');
   assert.equal(env.has('D'), false);
   assert.equal(env.get('E'), 'a=b');
+});
+
+test('STACK_SERVICES in lib.sh and the soak-report default equal the long-running compose services', () => {
+  const longRunning = [];
+  let current = null;
+  let inServices = false;
+  for (const line of compose.split('\n')) {
+    if (/^services:/.test(line)) {
+      inServices = true;
+      continue;
+    }
+    if (/^[A-Za-z]/.test(line)) inServices = false;
+    if (!inServices) continue;
+    const m = /^  ([A-Za-z0-9_-]+):\s*$/.exec(line);
+    if (m) current = m[1];
+    else if (current && /^\s+restart:\s*unless-stopped\s*$/.test(line)) longRunning.push(current);
+  }
+  const lib = readFileSync(path.join(PI_DIR, 'scripts', 'lib.sh'), 'utf8');
+  const stack = /^STACK_SERVICES=\(([^)]*)\)/m.exec(lib)[1].trim().split(/\s+/);
+  const report = readFileSync(path.join(PI_DIR, 'scripts', 'soak-report.sh'), 'utf8');
+  const fallback = /SOAK_SERVICES:-([a-z ]+)\}/.exec(report)[1].trim().split(/\s+/);
+  assert.deepEqual(stack, longRunning);
+  assert.deepEqual(fallback, longRunning);
+  assert.ok(!longRunning.includes('migrate'));
 });
