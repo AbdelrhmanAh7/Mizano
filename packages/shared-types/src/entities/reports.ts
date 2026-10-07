@@ -134,7 +134,10 @@ export interface VatReturnDraftException {
   reason: string;
 }
 
+export const VAT_RETURN_DRAFT_LABEL = 'DRAFT, not for filing' as const;
+
 export interface VatReturnDraft {
+  label: typeof VAT_RETURN_DRAFT_LABEL;
   from: string;
   to: string;
   status: 'complete' | 'incomplete';

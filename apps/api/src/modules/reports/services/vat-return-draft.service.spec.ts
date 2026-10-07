@@ -31,7 +31,7 @@ describe('VatReturnDraftService', () => {
   });
 
   it('Totals are correct for mixed rates', async () => {
-    jest.spyOn(prisma.organization, 'findUnique').mockResolvedValue({ currency: 'EGP' } as any);
+    jest.spyOn(prisma.organization, 'findUnique').mockResolvedValue({ baseCurrency: 'EGP' } as any);
     jest.spyOn(prisma.invoice, 'findMany').mockResolvedValue([
       {
         id: '1',
@@ -75,7 +75,7 @@ describe('VatReturnDraftService', () => {
   });
 
   it('Decimal rounding is exact', async () => {
-    jest.spyOn(prisma.organization, 'findUnique').mockResolvedValue({ currency: 'EGP' } as any);
+    jest.spyOn(prisma.organization, 'findUnique').mockResolvedValue({ baseCurrency: 'EGP' } as any);
     jest.spyOn(prisma.invoice, 'findMany').mockResolvedValue([
       {
         id: '1',
@@ -97,7 +97,7 @@ describe('VatReturnDraftService', () => {
   });
 
   it('Missing tax or foreign currency lands in exceptions', async () => {
-    jest.spyOn(prisma.organization, 'findUnique').mockResolvedValue({ currency: 'EGP' } as any);
+    jest.spyOn(prisma.organization, 'findUnique').mockResolvedValue({ baseCurrency: 'EGP' } as any);
     jest.spyOn(prisma.invoice, 'findMany').mockResolvedValue([
       {
         id: '1',
@@ -115,16 +115,55 @@ describe('VatReturnDraftService', () => {
     const result = await service.getDraft('org_1', '2023-01-01', '2023-01-31');
     expect(result.status).toBe('incomplete');
     expect(result.exceptions).toHaveLength(2);
-    expect(result.exceptions[0].id).toBe('1');
-    expect(result.exceptions[1].id).toBe('2');
+    expect(result.exceptions[0]).toMatchObject({ id: '1', reason: 'Foreign currency' });
+    expect(result.exceptions[1]).toMatchObject({ id: '2', reason: 'Missing tax amount' });
+    expect(result.outputTax).toBe('0.0000');
+    expect(result.inputTax).toBe('0.0000');
+  });
+
+  it('A document without a currency code counts as base currency, case-insensitively', async () => {
+    jest.spyOn(prisma.organization, 'findUnique').mockResolvedValue({ baseCurrency: 'EGP' } as any);
+    jest.spyOn(prisma.invoice, 'findMany').mockResolvedValue([
+      { id: '1', invoiceNumber: 'INV-1', taxAmount: new Prisma.Decimal('140'), currencyCode: null },
+      { id: '2', invoiceNumber: 'INV-2', taxAmount: new Prisma.Decimal('10'), currencyCode: 'egp' },
+    ] as any);
+    jest
+      .spyOn(prisma.bill, 'findMany')
+      .mockResolvedValue([
+        { id: '3', billNumber: 'BILL-1', taxAmount: new Prisma.Decimal('70'), currencyCode: null },
+      ] as any);
+
+    const result = await service.getDraft('org_1', '2023-01-01', '2023-01-31');
+    expect(result.status).toBe('complete');
+    expect(result.exceptions).toEqual([]);
+    expect(result.outputTax).toBe('150.0000');
+    expect(result.inputTax).toBe('70.0000');
+    expect(result.netPayable).toBe('80.0000');
+  });
+
+  it('Only reads the requesting organization, never DRAFT, VOID or deleted documents', async () => {
+    jest.spyOn(prisma.organization, 'findUnique').mockResolvedValue({ baseCurrency: 'EGP' } as any);
+    const invoices = jest.spyOn(prisma.invoice, 'findMany').mockResolvedValue([]);
+    const bills = jest.spyOn(prisma.bill, 'findMany').mockResolvedValue([]);
+
+    await service.getDraft('org_1', '2023-01-01', '2023-01-31');
+
+    for (const spy of [invoices, bills]) {
+      expect(spy.mock.calls[0][0]?.where).toMatchObject({
+        organizationId: 'org_1',
+        status: { notIn: ['DRAFT', 'VOID'] },
+        deletedAt: null,
+      });
+    }
   });
 
   it('An empty period returns zeros as strings', async () => {
-    jest.spyOn(prisma.organization, 'findUnique').mockResolvedValue({ currency: 'EGP' } as any);
+    jest.spyOn(prisma.organization, 'findUnique').mockResolvedValue({ baseCurrency: 'EGP' } as any);
     jest.spyOn(prisma.invoice, 'findMany').mockResolvedValue([]);
     jest.spyOn(prisma.bill, 'findMany').mockResolvedValue([]);
 
     const result = await service.getDraft('org_1', '2023-01-01', '2023-01-31');
+    expect(result.label).toBe('DRAFT, not for filing');
     expect(result.outputTax).toBe('0.0000');
     expect(result.inputTax).toBe('0.0000');
     expect(result.netPayable).toBe('0.0000');
