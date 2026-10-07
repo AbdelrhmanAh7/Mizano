@@ -150,8 +150,9 @@
 Gate items: "Decimal arithmetic correct" and "Atomic, idempotent posting".
 
 - **Base:** `master` at `b83d72b4cfa358f3a6ba4be9d9f1b613ac9fe1f2`
-- **Tested SHA:** `6e0891e8ea06db5518588bc96de9e70446850f22`, clean tree. Later commits on `ai/94` only add this file and `AI_QUESTIONS.md`.
-- **Author:** Claude Opus 5.5 (`claude-opus-5-5`) in Claude Code. This is the implementer's own evidence, not an independent review.
+- **Tested SHA (round 1):** `6e0891e8ea06db5518588bc96de9e70446850f22`, clean tree. The commits after it up to `835f161` only add this file and `AI_QUESTIONS.md`.
+- **Tested SHA (round 2, review fixes):** `a997dd7` on top of a merge of `master` `615060e`; see "Round 2" at the end of this section. Later commits only edit this file and `AI_QUESTIONS.md`.
+- **Author:** Claude Opus 5.5 (`claude-opus-5-5`) in Claude Code for round 1, Claude Fable 5.1 (`claude-fable-5-1`) for round 2. This is the implementer's own evidence, not an independent review.
 - **Host:** Darwin arm64, Node v26.10.0, pnpm 8.14.0.
 - **Database:** a throwaway PostgreSQL 16.15 cluster. No mocks, SQLite or in-memory database were used for the database tests.
 
@@ -294,3 +295,67 @@ git grep -nE 'parseFloat\(|(^|[^A-Za-z0-9_.])Number\(|\.toNumber\(\)|Math\.round
 - **Web lint warnings.** `next lint` reports 13 pre-existing warnings in untouched `apps/web` files.
 - **No CI coverage for E2E.** `pnpm ci:full` runs no E2E, so this spec needs a Postgres CI job (AI_QUESTIONS.md, CI suggestions).
 - **Diff size.** The diff is about 30 lines of source and about 355 lines of tests, over the ~300-line guide. Most of it is the evidence tests the issue asked for.
+
+## Round 2: quality-review fixes on PR #99
+
+The review asked for an explicit duplicate-posting test, more rounding tests, a test of the exact validator balance check, and Postgres instructions for the E2E spec. Commit `cd79694` adds the tests, `a997dd7` the docs. No production code changed in this round.
+
+| Finding                                                                | Done                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `journals.service.ts`: no test posting the same document twice         | `journals.service.spec.ts` › "idempotent posting (@issue-94)": the replay of one source key hits the unique index and gets a 409, both attempts carry the tenant and key, a unique violation without a source key is not masked, a replay in a locked period never opens a transaction. E2E: the same invoice sent twice keeps the first journal as the only one. |
+| `document-totals.spec.ts`: missing decimal and rounding tests          | The round-1 block (five half-up cases, 14% VAT, per-line rounding, 15 digits, zero, Arabic-Indic digits) is kept and extended: 15% VAT on 99.99 → 15.00 / 114.99, and no result is ever a JS `number` (0.3 × 0.9 = 0.27 exactly).                                                                                                                                 |
+| `posting-integrity.e2e-spec.ts`: no CI integration, no Postgres set-up | The spec header and `docs/DEVELOPMENT.md` › "API E2E against a throwaway PostgreSQL" give the full recipe. `.github/workflows` is owner-only, so the CI job is proposed in `AI_QUESTIONS.md`. Every test title now carries `@issue-94` and its AC.                                                                                                                |
+| `validators/src/index.ts`: exact balance check has no test             | `apps/api/src/common/dto/shared-journal-schema.spec.ts` (round 1, now tagged `@issue-94 AC2`) plus "1234.10 equals 1234.1 without parsing a float". `@mizano/validators` has no test runner, so the spec lives in the API suite, which maps the package to its source.                                                                                            |
+
+### Output at `a997dd7`
+
+```text
+$ node apps/api/_run_tests.js '--testPathPattern="(journals.service|document-totals|decimal-string|shared-journal-schema).spec"'
+PASS src/common/dto/decimal-string.spec.ts
+PASS src/common/utils/document-totals.spec.ts
+PASS src/modules/accounting/services/journals.service.spec.ts
+PASS src/common/dto/shared-journal-schema.spec.ts
+Tests:       77 passed, 77 total
+
+$ npx jest --config ./test/jest-e2e.json --runInBand test/posting-integrity.e2e-spec.ts   # PostgreSQL 16.15, fresh cluster, migrate deploy
+  Posting integrity (e2e, real database)
+    ✓ @issue-94 AC2: leaves the tenant ledger balanced as stored (2 ms)
+    the single ledger command
+      ✓ @issue-94 AC3: posts a retried source event once and rejects the replay with a conflict (71 ms)
+      ✓ @issue-94 AC4: posts exactly one balanced journal when one event is posted 8 times at once (94 ms)
+      ✓ @issue-94 AC5: rolls back the header and every line when the post fails after the insert (32 ms)
+    money transport and storage
+      ✓ @issue-94 AC2: round-trips 1234.10 as an exact decimal string (34 ms)
+      ✓ @issue-94 AC2: round-trips 999999999999999.9999 as an exact decimal string (23 ms)
+      ✓ @issue-94 AC2: rejects amounts storage would round instead of storing an unbalanced journal (13 ms)
+    document posting (invoice send)
+      ✓ @issue-94 AC3: sends the same invoice twice and keeps the first journal as the only one (76 ms)
+      ✓ @issue-94 AC4: sends one invoice 5 times at once and posts exactly one journal (60 ms)
+      ✓ @issue-94 AC5: keeps the invoice a draft with no journal when posting fails mid-send (83 ms)
+      ✓ @issue-94 AC3: rejects a repeated send once the period is locked, still with one journal (70 ms)
+Tests:       11 passed, 11 total
+
+$ psql ... -c 'SELECT count(*) FROM (SELECT j.id FROM journals j JOIN journal_lines l ON l."journalId" = j.id
+    GROUP BY j.id HAVING sum(l.debit) <> sum(l.credit)) x'
+0
+$ psql ... -c 'SELECT "sourceType", "sourceId", count(*) FROM journals WHERE "sourceId" IS NOT NULL GROUP BY 1, 2 HAVING count(*) > 1'
+(0 rows)
+
+$ # AC4 tests rerun with log_lock_waits=on, deadlock_timeout=1ms; both passed. Lock waits in the server log:
+   7 ExclusiveLock on advisory        (pg_advisory_xact_lock: the per-org ledger lock)
+   5 AccessExclusiveLock on tuple     (the invoice row, FOR UPDATE)
+   4 ShareLock on transaction
+
+$ pnpm ci:full            # outside the sandbox; api lint, type-check and test were cache misses
+api:test: Test Suites: 137 passed, 137 total
+api:test: Tests:       2220 passed, 2220 total
+@mizano/web:test: Tests:       458 passed, 458 total
+ Tasks:    12 successful, 12 total
+exit=0
+
+$ npx jest --config ./test/jest-e2e.json --runInBand      # every seeded E2E suite
+Test Suites: 12 passed, 12 total
+Tests:       268 passed, 268 total
+```
+
+Sandbox note: inside the sandbox `pnpm install` cannot reflink into `node_modules` and jest cannot write `/private/tmp/jest_dx`, so the install, `pnpm ci:full` and the Postgres commands ran outside it.

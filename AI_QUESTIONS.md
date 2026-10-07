@@ -25,7 +25,7 @@ This slice is complete; see [EVIDENCE.md](EVIDENCE.md). Nothing below blocks it.
 
 ## CI suggestions (not applied, because workflows are owner-only)
 
-- `pnpm ci:full` runs no E2E tests. The new `posting-integrity.e2e-spec.ts`, like every seeded E2E spec, needs Postgres. A CI job with a `postgres:16` service that runs `prisma migrate deploy` and then `pnpm test:e2e` would cover them.
+- `pnpm ci:full` runs no E2E tests. The new `posting-integrity.e2e-spec.ts`, like every seeded E2E spec, needs Postgres. The local recipe is in `docs/DEVELOPMENT.md` › Testing › "API E2E against a throwaway PostgreSQL" and in the spec header. A CI job with a `postgres:16` service that runs the shared-package builds, `prisma migrate deploy` and then `pnpm test:e2e` (with `DATABASE_URL`, `APP_ENV=e2e`, no `REDIS_URL`) would cover them; `log_lock_waits=on` is not needed for the assertions.
 - On this host, `node apps/api/_run_tests.js` fails 4 tests in `import.service.hardening.spec.ts` with "csv is not a function", and fails the same way with master's code. The suite passes under `pnpm ci:full`, so the runner's `csv-parser` interop needs a look.
 - `next lint` reports 13 pre-existing warnings in `apps/web`, against the zero-warning policy. Turbo also warns that the lint and test tasks have no `outputs`.
 
