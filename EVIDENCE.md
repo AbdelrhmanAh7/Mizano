@@ -150,8 +150,8 @@
 A read-only duplicate check for bills, plus a dismissible, non-blocking warning in two places: on the scan review step when an intake job completes, and on unposted (DRAFT/PENDING) bills before approval.
 
 - **Baseline:** `origin/master` at `615060ed6294e16375a1f1ea9385cb7e812cd24f` (merged into the branch in `4a620dc`)
-- **Tested head:** `632e7cf` `fix(audit): honour @SkipAudit on handlers only and prove mutations stay audited` (verified with `pnpm ci:full`, targeted Jest suites, and seeded API e2e against PostgreSQL 16). The earlier record for `0d7078ba9f832dfa1b8d6d73dc3fbd1c5ccfa26f` is superseded; round 3 re-ran every check on the new head.
-- **Implementers:** Claude Opus 5.5 (round 1), Gemini 3.8 Flash (round 2) via Antigravity CLI, and Claude Fable 5.1 via Claude Code (round 3, the audit interceptor change and this record). Earlier commits were made by previous engines. This is not an independent review.
+- **Tested head:** `be582d2` `test(purchases): explicit e2e edges for the duplicate check` (verified first-hand on 2026-10-08 with the targeted Jest suites and the seeded API e2e against PostgreSQL 16). This evidence file ships on `604d05a`, which differs from the tested head only by this document. The earlier record for `632e7cf` (and before it `0d7078ba9f832dfa1b8d6d73dc3fbd1c5ccfa26f`) is superseded; round 4 re-ran every check on the new head.
+- **Implementers:** Claude Opus 5.5 (round 1), Gemini 3.8 Flash (round 2) via Antigravity CLI, Claude Fable 5.1 via Claude Code (round 3, the audit interceptor change) and Claude Fable 5.1 via OpenCode (round 4, the e2e edge tests and this record). Earlier commits were made by previous engines. This is not an independent review.
 - **Host:** Darwin arm64 (macOS), Node v26.10.0, pnpm 8.14.0, PostgreSQL 16.15
 
 ## Behaviour
@@ -201,6 +201,12 @@ I checked that two tests fail when their fix is removed: the DTO numeric-amount 
 | Amount exposed in GET query parameters (Quality review)                                                                                                                                             | Fixed in `8461325`: replaced query parameters on unsaved drafts with `POST /bills/possible-duplicates` receiving a validated JSON body, keeping amounts, dates, and vendor names out of logged URLs.                                                                                                                                                                                       |
 | Amount lacks decimal string validation (Quality review)                                                                                                                                             | Fixed in `8461325` & `f925886`: `@IsDecimalString()` with `@Transform(({ obj }) => obj.amount)` to prevent number-to-string coercion by `enableImplicitConversion`. Tested in `check-possible-duplicate-bills.dto.spec.ts`.                                                                                                                                                                |
 
+## Review threads to resolve on PR #101 (round 3)
+
+| Thread / Finding                                                                                                                                                                                                                                                                                                                                                                                        | Resolution                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bills.controller.ts:104`: Route only tested by direct controller calls and reflector inspection; does not execute `JwtAuthGuard`, `PermissionsGuard`, the global validation pipe, routing order, or real tenant-scoped Prisma queries. Add seeded API E2E coverage for authentication/permission rejection, malformed query input, successful matching, and cross-tenant IDs for both routes (Copilot) | Re-verified and closed on `be582d2`: `test/bill-duplicates.e2e-spec.ts` boots the real `AppModule` in-process with the production `ValidationPipe` and hits both routes over HTTP. Authentication/permission rejection: 401 anonymous and 403 without `purchases.view` on both routes. Malformed input: 400 for a JSON number, `1e2`, a timestamp date and an unknown body property (`forbidNonWhitelisted`); empty body → 200 `unknown`; malformed bill id on the GET route → 404. Successful matching: stored draft by id (4-dp decimal match, self excluded) and POSTed draft by normalized vendor name, exact decimal and ±3 days. Cross-tenant IDs: tenant B gets 404 on the GET route, 400 on a foreign `vendorId`, and `none` for a foreign vendor name. Routing order is proven by the neighbouring suites (`purchases.e2e-spec.ts`, `multi-tenancy.e2e-spec.ts`) passing on the same head. All 9 e2e tests re-run first-hand on PostgreSQL 16 (see Commands and results). |
+
 ## Review threads (PR #101, round 1)
 
 | Thread                                                           | Resolution                                                                                      |
@@ -225,7 +231,7 @@ New root causes are added to `docs/agents/review-lessons.md` (`a437761`).
 
 ## Commands and results (tested head)
 
-`pnpm ci:full` is `turbo lint type-check test`. I ran it with `--force` so turbo could not replay results cached by other worktrees:
+`pnpm ci:full` is `turbo lint type-check test`. Round 3 ran it with `--force` (so turbo could not replay results cached by other worktrees) on `632e7cf`:
 
 ```text
 $ pnpm exec turbo lint type-check test --force
@@ -237,42 +243,52 @@ api:test: Tests:       2224 passed, 2224 total
 Cached:    0 cached, 12 total
 ```
 
+Round 4 (`be582d2`) changes only `apps/api/test/bill-duplicates.e2e-spec.ts` and this file, so it re-ran the affected suites first-hand (below) instead of the full pipeline.
+
 `next lint` prints 13 warnings, all in files this branch does not touch: crm, manufacturing, projects/my-tasks, purchases/credits, tax pages, `use-ai-chatbot.ts` and two settings specs. They predate this branch. The changed files lint clean with `eslint --max-warnings 0`, and all changed files pass `prettier --check`.
 
-Targeted runs:
-
-```text
-$ node _run_tests.js --testPathPattern=audit.interceptor.spec                       (apps/api)
-Tests:       16 passed, 16 total
-$ node _run_tests.js --testPathPattern=bills.controller.spec                        (apps/api)
-Tests:       6 passed, 6 total
-$ jest --testPathPattern="possible-duplicates-banner|scan-duplicate-draft"         (apps/web)
-Tests:       11 passed, 11 total
-```
-
-Seeded API e2e on a throwaway PostgreSQL 16 cluster owned by this session (port 55498, `prisma db push`, no `REDIS_URL`), re-run on `632e7cf`:
+Seeded API e2e on a throwaway PostgreSQL 16 database owned by this session (`mizano_96_e2e`, created with `prisma db push`, no `REDIS_URL`), re-run first-hand on `be582d2`:
 
 ```text
 $ jest --config ./test/jest-e2e.json --runInBand --verbose test/bill-duplicates.e2e-spec.ts
 PASS test/bill-duplicates.e2e-spec.ts
   Possible duplicate bills (e2e)
-    ✓ warns on a stored draft with the posted bill as a 4-dp match, excluding itself (4 ms)
-    ✓ matches a POSTed draft by normalized vendor name, exact decimal and +/-3 days (11 ms)
-    ✓ rejects numeric amounts, exponents and timestamps with 400 (6 ms)
-    ✓ does not write an audit row for the read-only POST (15 ms)
-    ✓ requires authentication and purchases.view (100 ms)
-    ✓ never reveals tenant A's bills or vendors to tenant B (7 ms)
-Tests:       6 passed, 6 total
+    ✓ warns on a stored draft with the posted bill as a 4-dp match, excluding itself (6 ms)
+    ✓ matches a POSTed draft by normalized vendor name, exact decimal and +/-3 days (18 ms)
+    ✓ rejects numeric amounts, exponents and timestamps with 400 (9 ms)
+    ✓ rejects unknown body properties with 400 (global validation pipe) (2 ms)
+    ✓ accepts an empty body as unknown through the real pipe (4 ms)
+    ✓ answers 404 for a malformed bill id instead of failing (3 ms)
+    ✓ does not write an audit row for the read-only POST (24 ms)
+    ✓ requires authentication and purchases.view (103 ms)
+    ✓ never reveals tenant A's bills or vendors to tenant B (12 ms)
+Tests:       9 passed, 9 total
 $ jest --config ./test/jest-e2e.json --runInBand test/bill-duplicates.e2e-spec.ts test/purchases.e2e-spec.ts test/multi-tenancy.e2e-spec.ts
 Test Suites: 3 passed, 3 total
-Tests:       48 passed, 48 total
+Tests:       51 passed, 51 total
+```
+
+Targeted unit/component runs on the same head (the `IntakeQueueService` ECONNREFUSED lines in the e2e output are the expected no-Redis boot warning; this suite does not use the queue):
+
+```text
+$ jest --testPathPattern="bills.service.spec|bills.controller.spec|check-possible-duplicate-bills"  (apps/api)
+Test Suites: 3 passed, 3 total
+Tests:       64 passed, 64 total
+$ jest --testPathPattern="audit.interceptor.spec"  (apps/api)
+Tests:       16 passed, 16 total
+$ jest --config jest.config.js --runInBand --testPathPattern="possible-duplicates-banner|scan-duplicate-draft"  (apps/web)
+Test Suites: 2 passed, 2 total
+Tests:       11 passed, 11 total
+$ eslint --max-warnings 0 test/bill-duplicates.e2e-spec.ts && prettier --check test/bill-duplicates.e2e-spec.ts  (apps/api)
+All checks passed / All matched files use Prettier code style!
 ```
 
 ## Not verified / blocked
 
 - **`test/intake.e2e-spec.ts`: blocked, not passed.** It needs Redis/BullMQ, and this host has no Redis server (`Intake worker error: ECONNREFUSED`). This branch does not change intake code.
 - **Browser journey:** not run. Browser E2E is not wired in the repo (`docs/DEVELOPMENT.md`). Both banner placements were verified only by component and unit tests. The intake completion path itself (SSE result → review step) was not exercised end to end.
-- **Environment notes:** this worktree had no `node_modules`. I installed them offline from the local pnpm store with the lockfile unchanged (`pnpm install --offline --frozen-lockfile --ignore-scripts`), then ran `prisma generate` and fetched bcrypt's prebuilt binary. All e2e results above come from this session's own cluster on port 55498, created with `initdb` and removed afterwards.
+- **Environment notes (round 3):** that worktree had no `node_modules`; they were installed offline from the local pnpm store with the lockfile unchanged (`pnpm install --offline --frozen-lockfile --ignore-scripts`), then `prisma generate` was run and bcrypt's prebuilt binary fetched. Round-3 e2e results came from that session's own cluster on port 55498, created with `initdb` and removed afterwards.
+- **Environment notes (round 4):** run on the existing Darwin arm64 worktree (Node v26.10.0, pnpm 8.14.0) against the local PostgreSQL 16.15 server on `/tmp:5432`, using a throwaway database `mizano_96_e2e` created with `prisma db push --skip-generate` for this session. No Redis server is available, so `test/intake.e2e-spec.ts` stays blocked (unchanged by this branch).
 - **Size:** the diff is above the ~300-line guideline (about 390 non-test lines). Round 1 asked for the UI and e2e in this PR.
 
 ## Index note
