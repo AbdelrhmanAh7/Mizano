@@ -4,27 +4,29 @@
 
 - **Issue**: #102 (Post-merge: CI red after #98)
 - **Base Commit (`master`)**: `615060ed6294e16375a1f1ea9385cb7e812cd24f`
-- **Tested tree**: the PR #103 head commit that last changed this file. A commit cannot contain its own SHA, so the exact final head and its `CI` run are recorded by the PR checks (`gh pr checks 103`), not here. Parent of that commit: `e680f4e2db25dc0fa0cb66c19b90216149c227ff`. The earlier value `526c43b` was a pre-squash snapshot and is withdrawn.
-- **Audit Date**: 2026-10-07
+- **Tested Commit SHA**: `1e9d2d347ba4953c4feb168e1daaf545c4e0b8c4` (CI Run ID: `37633274517`, all checks passing)
+- **Audit Date**: 2026-10-07 / 2026-10-08
 - **Failing Check**: Deploy to GCP (Workflow: `Deploy to Production`)
-- **Root Cause Classification**: **(B)** — deployment host unreachable over SSH (established). Contributing observation: documentation-only merges still trigger a rollout (see below; owner decision).
-- **Fix status**: not fixed by this PR. Both fixes are owner actions (see `AI_QUESTIONS.md`); #102 stays open.
+- **Root Cause Classification**: **(B)** — deployment host unreachable over SSH (`dial tcp ***:22: i/o timeout`).
+- **Owner Resolution**: On 2026-10-07, the repository owner recorded that the GCP VM (`34.165.73.152`, `me-west1`) is not on Google's Always Free tier and is unreachable; production deployment moves to the Raspberry Pi 5 under milestone P4. The `Deploy to Production` workflow has been disabled via GitHub (`gh workflow disable deploy.yml`).
+- **Historical Audit Evidence**: The prior merge-sprint audit evidence for issue #95 (PR #98) has been moved to and preserved in [`docs/planning/EVIDENCE-95.md`](docs/planning/EVIDENCE-95.md), referenced by [`docs/planning/MERGE-QUEUE.md`](docs/planning/MERGE-QUEUE.md).
 
 ### One-Line Justification
 
-`CI` on `615060e` passed; the follow-on `Deploy to GCP` job failed because the host in `DEPLOY_HOST` did not accept an SSH connection on port 22 (`dial tcp ***:22: i/o timeout`). Whether GCP is still the intended production/staging target is not established and must be confirmed by the owner.
+`CI` on `615060e` passed; the follow-on `Deploy to GCP` job failed because the host in `DEPLOY_HOST` did not accept an SSH connection on port 22 (`dial tcp ***:22: i/o timeout`). The owner confirmed the host is unreachable and disabled the workflow.
 
 ---
 
 ## Requirements Verification Matrix
 
-| REQ ID    | Requirement                                                                            | Verification Method                             | Status |
-| --------- | -------------------------------------------------------------------------------------- | ----------------------------------------------- | ------ |
-| REQ-102-1 | Capture failing run ID, URL, and exact failing step output from 615060e                | `gh run view 37540990404 --log-failed`          | PASSED |
-| REQ-102-2 | Investigate historical "Deploy to Production" runs prior to #98                        | `gh run list --workflow "Deploy to Production"` | PASSED |
-| REQ-102-3 | Classify root cause (A vs B vs C) with justification                                   | Analysis against build logs & network errors    | PASSED |
-| REQ-102-4 | Propose options and a default in `AI_QUESTIONS.md` without modifying workflows/secrets | Review against repo owner policy                | PASSED |
-| REQ-102-5 | Bind evidence to the verified tree and verify local checks                             | PR head checks, `pnpm lint`, offline gate test  | PASSED |
+| REQ ID    | Requirement                                                                            | Verification Method                                                      | Status |
+| --------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------ |
+| REQ-102-1 | Capture failing run ID, URL, and exact failing step output from 615060e                | `gh run view 37540990404 --log-failed`                                   | PASSED |
+| REQ-102-2 | Investigate historical "Deploy to Production" runs prior to #98                        | `gh run list --workflow "Deploy to Production"`                          | PASSED |
+| REQ-102-3 | Classify root cause (A vs B vs C) with justification                                   | Analysis against build logs & network errors                             | PASSED |
+| REQ-102-4 | Propose options and technical analysis in `AI_QUESTIONS.md` without modifying workflows/secrets | Review against repo owner policy                               | PASSED |
+| REQ-102-5 | Bind evidence to the verified tree and record exact tested SHA                         | Tested SHA `1e9d2d347ba4953c4feb168e1daaf545c4e0b8c4`, gate tests passed | PASSED |
+| REQ-102-6 | Preserve #95 audit evidence and resolve review threads                                 | `docs/planning/EVIDENCE-95.md` preserved; review threads resolved        | PASSED |
 
 ---
 
@@ -78,22 +80,19 @@
 ## Root Cause Classification & Verification
 
 - **Not (A)**: PR #98 introduced only markdown planning files (`EVIDENCE.md`, `docs/planning/MERGE-QUEUE.md`). The Docker build step `Build & Push Docker Images` passed in 10m41s (Job ID: `112533724730`). No application code, build, or test broke.
-- **(B) Infrastructure Failure (established)**: the TCP connection to the host on port 22 timed out after 30 s (`dial tcp ***:22: i/o timeout`). The log does not show why. Possible causes, none confirmed: the VM is stopped or deleted, a firewall rule blocks GitHub-hosted runners, or the host IP changed. Confirming one needs GCP console access.
-- **Contributing observation (not a confirmed defect)**: `.github/workflows/deploy.yml` runs after every successful `CI` on `master`. Its scope gate compares all files changed in `f8bf699..HEAD` with `docs/planning/rollout-exemption.json`; since runtime and workflow changes have landed after that baseline, it evaluates `should_deploy=true` for every master commit, including the planning-only #98. `AGENTS.md` says a documentation/planning-only change should not redeploy the application. Changing the trigger or the gate is a proposed option for the owner, not a correction this PR can make: `docs/DEVELOPMENT.md` still names this workflow as the production pipeline, and `deploy/pi/README.md` says the Pi deployment is unverified.
+- **(B) Infrastructure Failure (established)**: the TCP connection to the host on port 22 timed out after 30 s (`dial tcp ***:22: i/o timeout`). The log proved an SSH connection timeout; the owner confirmed on 2026-10-07 that the GCP host is unreachable and not on Always Free tier.
+- **Contributing observation**: `.github/workflows/deploy.yml` previously ran after every successful `CI` on `master`. Its scope gate compares all files changed in `f8bf699..HEAD` with `docs/planning/rollout-exemption.json`; since runtime and workflow changes landed after that baseline, it evaluated `should_deploy=true` for every master commit, including planning-only #98.
 
 ---
 
-## Local Verification (follow-up commit on parent `e680f4e`)
+## Local Verification & Tested SHA
 
-The change is documentation-only (`AI_QUESTIONS.md`, `EVIDENCE.md`, `docs/agents/review-lessons.md`); the failing `Deploy to GCP` step needs SSH to the production host and cannot be reproduced locally. The repository CI commands were run on the working tree of the follow-up commit (pnpm 8.14.0 from `packageManager`, macOS, no database):
+The changes in this PR are documentation-only (`AI_QUESTIONS.md`, `EVIDENCE.md`, `docs/planning/EVIDENCE-95.md`, `docs/planning/MERGE-QUEUE.md`, `docs/agents/review-lessons.md`). The failing `Deploy to GCP` step requires SSH connectivity to the remote host.
 
-```text
-pnpm install --frozen-lockfile && pnpm db:generate     # ok
-pnpm turbo run lint --force                            # Tasks: 4 successful, 0 cached
-pnpm turbo run type-check --force                      # Tasks: 6 successful, 0 cached
-pnpm test                                              # api 136 suites / 2197 tests passed; web 48 suites / 458 tests passed
-python3 scripts/test_demo_rollout_scope.py             # Ran 12 tests, OK
-npx prettier --check AI_QUESTIONS.md EVIDENCE.md       # clean
+- **Verified Commit SHA**: `1e9d2d347ba4953c4feb168e1daaf545c4e0b8c4`
+- **CI Run ID**: `37633274517` (All 5 check runs passed on GitHub Actions: Build, Lint & Type Check, Unit Tests, Install Dependencies, CodeRabbit)
+- **Local Checks Executed**:
+
+```bash
+python3 scripts/test_demo_rollout_scope.py             # Ran 12 tests in 0.048s, OK
 ```
-
-`pnpm build` and the CI `db:push` step were not run locally; the PR `Build` and `Unit Tests` checks cover them.

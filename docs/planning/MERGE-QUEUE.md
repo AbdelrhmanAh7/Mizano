@@ -1,6 +1,6 @@
 # Merge Queue Audit — Oldest 6 Open Pull Requests
 
-Audit performed for issue #95 on the 6 oldest open PRs in `AbdelrhmanAh7/Mizano` against `master` (`b83d72b`).
+Audit performed for issue #95 on the 6 oldest open PRs in `AbdelrhmanAh7/Mizano` against `master` (`b83d72b`). Full audit evidence, test commands, and captured outputs are recorded in [EVIDENCE-95.md](EVIDENCE-95.md).
 
 ## Queue Audit Table
 
