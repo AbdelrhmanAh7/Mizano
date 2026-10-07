@@ -53,13 +53,13 @@ export class AuditInterceptor implements NestInterceptor {
     );
   }
 
+  /**
+   * Only a handler-level `@SkipAudit()` opts out, and it exists for read-only queries sent as
+   * POST. A class-level marker is ignored on purpose so a controller cannot silence the audit
+   * trail for every posting or mutation it exposes.
+   */
   private isSkipped(context: ExecutionContext): boolean {
-    return (
-      this.reflector.getAllAndOverride<boolean>(SKIP_AUDIT_KEY, [
-        context.getHandler(),
-        context.getClass(),
-      ]) === true
-    );
+    return this.reflector.get<boolean | undefined>(SKIP_AUDIT_KEY, context.getHandler()) === true;
   }
 
   private async record(

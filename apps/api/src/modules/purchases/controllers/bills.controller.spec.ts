@@ -65,6 +65,34 @@ describe('BillsController - Duplicate Warning', () => {
     });
   });
 
+  describe('audit trail', () => {
+    it('opts out only the read-only duplicate query; every posting and mutation stays audited', () => {
+      const skipped = Object.getOwnPropertyNames(BillsController.prototype)
+        .filter((name) => name !== 'constructor')
+        .filter((name) => {
+          const handler = (controller as unknown as Record<string, unknown>)[name];
+          return typeof handler === 'function' && reflector.get(SKIP_AUDIT_KEY, handler) === true;
+        });
+      expect(skipped).toEqual(['findPossibleDuplicates']);
+      expect(reflector.get(SKIP_AUDIT_KEY, BillsController)).toBeUndefined();
+
+      for (const mutation of [
+        controller.create,
+        controller.update,
+        controller.open,
+        controller.clone,
+        controller.approve,
+        controller.remove,
+        controller.bulkDelete,
+        controller.bulkOpen,
+        controller.bulkApprove,
+        controller.bulkPay,
+      ]) {
+        expect(reflector.get(SKIP_AUDIT_KEY, mutation)).toBeUndefined();
+      }
+    });
+  });
+
   describe('findPossibleDuplicatesForBill', () => {
     it('is protected by purchases.view permission', () => {
       const perms = reflector.get('permissions', controller.findPossibleDuplicatesForBill);
