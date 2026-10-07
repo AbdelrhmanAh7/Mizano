@@ -65,11 +65,20 @@ function download(url, dest) {
       }
       const file = fs.createWriteStream(dest);
       res.pipe(file);
-      file.on('finish', () => { file.close(); resolve(); });
-      file.on('error', (err) => { fs.unlinkSync(dest); reject(err); });
+      file.on('finish', () => {
+        file.close();
+        resolve();
+      });
+      file.on('error', (err) => {
+        fs.unlinkSync(dest);
+        reject(err);
+      });
     });
     req.on('error', reject);
-    req.setTimeout(120000, () => { req.destroy(); reject(new Error('Timeout')); });
+    req.setTimeout(120000, () => {
+      req.destroy();
+      reject(new Error('Timeout'));
+    });
   });
 }
 
@@ -93,7 +102,10 @@ async function downloadWithFallback(name, urls) {
     } catch (err) {
       console.log(`  [!!] Failed from this source: ${err.message}`);
       // Clean up partial download
-      if (fs.existsSync(dest)) try { fs.unlinkSync(dest); } catch {}
+      if (fs.existsSync(dest))
+        try {
+          fs.unlinkSync(dest);
+        } catch {}
     }
   }
   console.log(`  [FAIL] Could not download ${name} from any source`);

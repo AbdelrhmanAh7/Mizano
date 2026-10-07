@@ -23,12 +23,12 @@ Desired private user Project: **Mizano | CPU Invoice Demo | 10 Days**, linked to
 
 When authorized Project access is available, the reconciler creates/reuses the private Project, links this repository and adds all planned issues. Suggested views (configure using supported Project UI/API; not created by the current reconciler):
 
-| View | Filter/group | Purpose |
-| --- | --- | --- |
-| Demo board | `demo:required`, group by Status | Ready work, In progress, In review, Blocked, Done |
-| Ten-day roadmap | Milestone and due date | Gates M0–M3 and dependencies |
-| P0 blockers | `priority:P0` and open | Financial/tenant release risk |
-| After demo | `demo:later`, group by country | ETA/ZATCA/UAE research and pilots |
+| View            | Filter/group                     | Purpose                                           |
+| --------------- | -------------------------------- | ------------------------------------------------- |
+| Demo board      | `demo:required`, group by Status | Ready work, In progress, In review, Blocked, Done |
+| Ten-day roadmap | Milestone and due date           | Gates M0–M3 and dependencies                      |
+| P0 blockers     | `priority:P0` and open           | Financial/tenant release risk                     |
+| After demo      | `demo:later`, group by country   | ETA/ZATCA/UAE research and pilots                 |
 
 Use existing default Status fields where possible; only claim custom views/options or automatic field transitions when actually configured and verified. The coordinator updates status from real issue/PR evidence. Repo labels and milestones remain fully usable if the optional Project is pending.
 
