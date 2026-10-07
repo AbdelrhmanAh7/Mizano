@@ -108,9 +108,7 @@ describe('EmployeeForm', () => {
 
   it('does not crash when dateOfJoining is null (regression: Invalid time value)', () => {
     expect(() =>
-      render(
-        <EmployeeForm employee={makeEmployee({ dateOfJoining: null as unknown as string })} />,
-      ),
+      render(<EmployeeForm employee={makeEmployee({ dateOfJoining: null as unknown as string })} />),
     ).not.toThrow();
   });
 
