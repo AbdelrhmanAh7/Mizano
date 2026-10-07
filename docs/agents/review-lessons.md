@@ -1,6 +1,6 @@
 # Review lessons
 
-Every rule below comes from a real review finding on PRs #33–#47. Each one cost a review round. Read this file before you write code, a worker brief or a review, whatever agent you are (Claude, Codex, CodeRabbit or any other). Apply the _root cause_, not just the example: most findings came back in a different module with the same cause.
+Every rule below comes from a real review finding on PRs #33–#47 and #100. Each one cost a review round. Read this file before you write code, a worker brief or a review, whatever agent you are (Claude, Codex, CodeRabbit or any other). Apply the _root cause_, not just the example: most findings came back in a different module with the same cause.
 
 **When a review raises a new kind of problem, add it here in the same PR that fixes it.**
 
@@ -101,6 +101,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - Run `/code-review` on every PR (inline comments). CodeRabbit (configured in `.coderabbit.yaml`, which points it at this file) does full reviews once a seat is assigned; if one doesn't start automatically then, comment `@coderabbitai review`.
 - Fix every valid finding at its root, reply on the thread with the commit, and resolve it. When a finding is wrong, reply once with the reason and resolve it.
 - Add any new root cause to this file in the same PR.
+- **EVIDENCE.md names the baseline and the exact tested head separately.** Record `master` as the baseline, run the checks on the commit you are shipping, paste their real output, and record that SHA as the tested head. A baseline SHA labelled as tested, or a template with no output, is not evidence. _(PR #100)_
 
 ## Ops and deploy
 
@@ -110,3 +111,5 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Rollback must be repeatable.** Track an active pointer in `deployments.log` (`OK`/`ROLLBACK` lines), not "the previous OK line", or the second rollback is a no-op.
 - **Check DB readiness over TCP** (`pg_isready -h 127.0.0.1`). The temporary init server listens on the unix socket only and passes a socket probe.
 - **Dedupe alerts on stable keys** (check name), never on live values like percentages; alert once on start and once on recovery.
+- **A runtime variable the Pi needs goes in `.env.pi` (and `.env.pi.example`) _and_ the service's `environment:` list in `docker-compose.pi.yml`.** The Pi checks out only `deploy/pi`, so root `.env.*` files never reach it, and compose passes an explicit list, so a key present only in `.env.pi` is invisible to the container. _(credential rotation metadata, PR #100)_
+- **Ratio alerts need a warm-up and a nonzero floor.** "2× the 30-day average" is undefined with no history and zero on a quiet baseline, so the first ordinary event alerts. Alert on `max(floor, ratio × baseline)` and keep the ratio off until enough full days exist. _(notify-volume anomaly rule, PR #100)_
