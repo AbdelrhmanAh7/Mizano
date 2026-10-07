@@ -153,8 +153,17 @@ services:
       migrate:
         condition: service_completed_successfully
     healthcheck:
+      # /api/health/ready answers 503 until Postgres and Redis respond, so this
+      # status-only probe cannot pass on a dead dependency (/api/health is always 200).
       test:
-        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:6001/api/health']
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://127.0.0.1:6001/api/health/ready',
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -225,8 +234,9 @@ services:
       api:
         condition: service_healthy
     healthcheck:
+      # The web route answers 503 while the api readiness probe fails.
       test:
-        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:5001/robots.txt']
+        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:5001/api/health']
       interval: 30s
       timeout: 10s
       retries: 3

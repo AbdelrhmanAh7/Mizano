@@ -30,7 +30,7 @@ Never initialize, migrate or reset a shared or production database from a workst
 | PostgreSQL | 5435       | `postgresql://mizano:…@localhost:5435/mizano_db`   |
 | Redis      | 6380       | `redis://localhost:6380`                           |
 
-Health: `GET /api/health`, `/api/health/ready`, `/api/health/live`.
+Health: `GET /api/health` (always 200; status in the JSON), `/api/health/ready` (503 until Postgres and, when configured, Redis answer; the route for container probes), `/api/health/live`. The web app serves its own `GET /api/health`, which answers 503 while the API readiness route fails.
 
 ## Commands
 

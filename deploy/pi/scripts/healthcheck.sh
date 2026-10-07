@@ -29,19 +29,19 @@ mkdir -p "$state_dir"
 container_ip() {
   docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$1" 2>/dev/null || true
 }
-check_service() { # name port path
+check_service() { # name port path (the route must answer non-2xx when not ready)
   local cid ip
   cid="$(dc ps -q "$1" 2>/dev/null || true)"
   ip=""
   [ -z "$cid" ] || ip="$(container_ip "$cid")"
   if [ -z "$ip" ]; then
     problems+=("$1-down|$1 not running")
-  elif ! curl -fsS --max-time 10 -o /dev/null "http://$ip:$2${3:-/api/health}" >/dev/null 2>&1; then
+  elif ! curl -fsS --max-time 10 -o /dev/null "http://$ip:$2$3" >/dev/null 2>&1; then
     problems+=("$1-unhealthy|$1 unhealthy")
   fi
 }
-check_service api 6001
-check_service web 5001 /robots.txt
+check_service api 6001 /api/health/ready # 503 while Postgres or Redis is down
+check_service web 5001 /api/health       # 503 while the api readiness probe fails
 
 # The worker has no HTTP port; trust its container health check (heartbeat file).
 worker_cid="$(dc ps -q worker 2>/dev/null || true)"

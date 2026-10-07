@@ -124,7 +124,7 @@ deploy/pi/scripts/stack.sh logs api  # follow one service (logs are capped at 3 
 deploy/pi/scripts/stack.sh down      # stop and remove containers; data on the SSD is kept
 ```
 
-Start order comes from health checks: postgres (`pg_isready` over TCP) and redis, then the one-shot `migrate`, then api and worker, then web (once the api is healthy), then cloudflared (once the web is healthy). Every long-running service has `restart: unless-stopped`.
+Start order comes from health checks: postgres (`pg_isready` over TCP) and redis, then the one-shot `migrate`, then api and worker, then web (once the api is healthy), then cloudflared (once the web is healthy). Every long-running service has `restart: unless-stopped`. The api probe is `GET /api/health/ready`, which answers 503 until Postgres and Redis respond, and the web probe is the web app's `GET /api/health`, which answers 503 while that api readiness route fails; `/api/health` on the api itself is always 200 and only carries the status in its JSON, so no probe uses it.
 
 Recover automatically after a reboot or power cut:
 
@@ -151,7 +151,7 @@ The units assume the repo at `/opt/mizano`; edit `ExecStart` otherwise, and ensu
 
 ## 7. Monitoring
 
-`mizano-healthcheck.timer` runs `healthcheck.sh` every 5 minutes: API and web health endpoints, worker container health (heartbeat), any new OOM kill (kernel `oom_kill` counter), disk above 80%, low available memory, CPU temperature, throttling (`vcgencmd get_throttled`), and backup status older than 26 hours. Alerts and recovery messages go to Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`). Messages contain only short check names; no secrets or document data. A state file in `$MIZANO_DATA_DIR/monitor` suppresses repeats. Create the bot with BotFather and get the chat id from `getUpdates`.
+`mizano-healthcheck.timer` runs `healthcheck.sh` every 5 minutes: api readiness (`/api/health/ready`, 503 while Postgres or Redis is down), web readiness (`/api/health`, 503 while the api readiness route fails), worker container health (heartbeat), any new OOM kill (kernel `oom_kill` counter), disk above 80%, low available memory, CPU temperature, throttling (`vcgencmd get_throttled`), and backup status older than 26 hours. Alerts and recovery messages go to Telegram (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALERT_CHAT_ID`). Messages contain only short check names; no secrets or document data. A state file in `$MIZANO_DATA_DIR/monitor` suppresses repeats. The script checks the SSD mount before writing anything: with `MIZANO_DATA_DIR` missing or on the SD card it sends an alert on every run (there is no state file to dedupe with) and exits. Create the bot with BotFather and get the chat id from `getUpdates`.
 
 ## 8. 24-hour soak test (acceptance evidence)
 
