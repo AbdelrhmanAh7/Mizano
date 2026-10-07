@@ -3,9 +3,9 @@
 A read-only duplicate check for bills, plus a dismissible, non-blocking warning in two places: on the scan review step when an intake job completes, and on unposted (DRAFT/PENDING) bills before approval.
 
 - **Baseline:** `origin/master` at `615060ed6294e16375a1f1ea9385cb7e812cd24f` (merged into the branch in `4a620dc`)
-- **Tested head:** `6cc3d6c86782d9ee46bc3b9485023ce71ae74b65` (`turbo lint type-check test --force` and the targeted web tests ran here). Later commits change only this file. The seeded API e2e ran at `a437761`; `git diff --stat a437761 6cc3d6c -- apps/api` is empty, so it covers this head's API.
-- **Author:** Claude Opus 5.5 (`claude-opus-5-5`) via Claude Code, AI implementer for review round 1 on PR #101. Earlier commits were made by previous engines. This is not an independent review.
-- **Host:** Darwin arm64 (macOS), Node v26.10.0, pnpm 8.14.0
+- **Tested head:** `0d7078ba9f832dfa1b8d6d73dc3fbd1c5ccfa26f` (verified with `pnpm ci:full`, targeted Jest suites, and seeded API e2e against PostgreSQL 16)
+- **Implementers:** Claude Opus 5.5 (round 1) and Gemini 3.8 Flash (round 2) via Antigravity CLI. Earlier commits were made by previous engines. This is not an independent review.
+- **Host:** Darwin arm64 (macOS), Node v26.10.0, pnpm 8.14.0, PostgreSQL 16.15
 
 ## Behaviour
 
@@ -35,6 +35,15 @@ Both routes require `purchases.view`. The response is `{ status: 'possible' | 'n
 | REQ-13 | On intake completion the scan review step sends the selected vendor (else the extracted name), extracted total, date and currency as a POST body; unclean values are left out. | `scan-duplicate-draft.spec.ts` (3 tests); banner spec › `checks a stored bill by ID or an unsaved intake draft by its fields`                       | **PASS** |
 
 I checked that two tests fail when their fix is removed: the DTO numeric-amount test fails without `@Transform`, and the e2e audit test fails without `@SkipAudit()` (`Expected: 8, Received: 9`).
+
+## Review threads to resolve on PR #101 (round 2/3)
+
+| Thread / Finding                                                                                                                                                                                    | Resolution                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bills.controller.ts:89`: Neither web API hooks nor the intake/bill UI calls either new endpoint, so intake completion and pre-posting still cannot show the required dismissible warning (Copilot) | Done: `usePossibleDuplicates` hook and `billsApi` methods added in `2fe0abd` and `6cc3d6c`. Localized `PossibleDuplicatesBanner` integrated on the bill page before approval (`/purchases/bills/[id]`) and on intake completion review step (`/purchases/bills/scan`) via `scanDuplicateDraft`. Banner tested in `possible-duplicates-banner.spec.tsx` and `scan-duplicate-draft.spec.ts`. |
+| `bills.controller.ts:104`: Route only tested by direct controller calls; needs seeded API E2E coverage for auth/perms, malformed query, matching, and cross-tenant isolation (Copilot)              | Done in `f26147e`: `test/bill-duplicates.e2e-spec.ts` executes `JwtAuthGuard` (401), `PermissionsGuard` (`purchases.view` 403), global `ValidationPipe` (400 for numbers, exponents, timestamps), cross-tenant isolation (404 / 400), and read-only `@SkipAudit()`. Verified first-hand against PostgreSQL 16.                                                                             |
+| Amount exposed in GET query parameters (Quality review)                                                                                                                                             | Fixed in `8461325`: replaced query parameters on unsaved drafts with `POST /bills/possible-duplicates` receiving a validated JSON body, keeping amounts, dates, and vendor names out of logged URLs.                                                                                                                                                                                       |
+| Amount lacks decimal string validation (Quality review)                                                                                                                                             | Fixed in `8461325` & `f925886`: `@IsDecimalString()` with `@Transform(({ obj }) => obj.amount)` to prevent number-to-string coercion by `enableImplicitConversion`. Tested in `check-possible-duplicate-bills.dto.spec.ts`.                                                                                                                                                                |
 
 ## Review threads (PR #101, round 1)
 
