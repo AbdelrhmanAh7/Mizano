@@ -108,15 +108,15 @@ describe('VAT return draft - filing corrections metric (e2e)', () => {
       const invForeign = await a.post('/invoices').send({
         customerId: cust.body.id,
         date: '2024-02-10',
-        dueDate: '2024-02-28',
-        lines: [{ description: 'Line P2', quantity: '1', rate: '500', taxRate: '14' }],
+        dueDate: '2024-02-29',
+        lines: [{ description: 'Line P2', quantity: '1', rate: '500' }],
       });
       expect(invForeign.status).toBe(201);
       await a.patch(`/invoices/${invForeign.body.id}/send`);
 
       const draft2 = await a.get('/reports/vat-return-draft').query({
         from: '2024-02-01',
-        to: '2024-02-28',
+        to: '2024-02-29',
       });
       expect(draft2.status).toBe(200);
       expect(draft2.body.status).toBe('incomplete');
@@ -124,7 +124,7 @@ describe('VAT return draft - filing corrections metric (e2e)', () => {
       const p2 = await a.post('/vat-returns').send({
         period: '2024-02',
         startDate: '2024-02-01',
-        endDate: '2024-02-28',
+        endDate: '2024-02-29',
       });
       expect(p2.status).toBe(201);
       await a.post(`/vat-returns/${p2.body.id}/calculate`);
