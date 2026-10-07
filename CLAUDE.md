@@ -188,8 +188,11 @@ if (!totalDebits.equals(totalCredits)) throw new BadRequestException('Journal en
 
 ## Git Hooks
 
-- **pre-commit**: lint-staged (ESLint --fix + Prettier on staged files)
-- **pre-push**: `pnpm ci:full` — all checks must pass
+- **pre-commit**: `_lint_staged.js` (ESLint --fix + Prettier on staged files only)
+- **commit-msg**: commitlint (conventional commits)
+- **pre-push**: `turbo run type-check test` (type-check + unit tests only; no lint, build or E2E)
+- Full CI (`pnpm ci:full`, build, E2E) runs on the Mac mini via the hub's `localci` job, which posts the GitHub commit statuses; `pnpm ci:full` must still pass before acceptance
+- Hooks skip with a one-line note in a worktree without `node_modules`; bypass deliberately with `HUSKY=0` (or `SKIP_LOCAL_CI=1` for pre-push)
 
 ## Code Quality Checklist
 

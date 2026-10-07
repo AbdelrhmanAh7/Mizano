@@ -1,1 +1,18 @@
-NODE_OPTIONS="--max-old-space-size=8192" node "$(git rev-parse --show-toplevel)/_lint_staged.js"
+#!/usr/bin/env sh
+# Mizano pre-commit: FAST, staged files only (ESLint --fix + Prettier via
+# _lint_staged.js, the Windows-safe lint-staged replacement).
+#
+# Full CI (lint, type-check, unit tests, build, E2E) runs on the Mac mini via
+# the hub's `localci` job, which posts the GitHub commit statuses.
+# Escape hatch: HUSKY=0 git commit ...
+#
+# Linked-worktree safe and non-interactive: a worktree without node_modules
+# skips with a one-line note instead of failing or installing anything.
+root=$(git rev-parse --show-toplevel)
+if [ ! -f "$root/node_modules/eslint/bin/eslint.js" ] || [ ! -f "$root/node_modules/prettier/bin/prettier.cjs" ]; then
+  echo "pre-commit: node_modules missing in this worktree; skipping staged lint (localci runs full CI)"
+  exit 0
+fi
+# _lint_staged.js reads and re-stages the index itself, so git's hook
+# environment (GIT_INDEX_FILE etc.) is deliberately kept.
+NODE_OPTIONS="--max-old-space-size=8192" node "$root/_lint_staged.js" </dev/null

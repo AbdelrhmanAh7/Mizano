@@ -1,1 +1,40 @@
-pnpm ci:full
+#!/usr/bin/env sh
+# Mizano pre-push: type-check + unit tests only (turbo `type-check` + `test`;
+# the jest unit suites need no database). No lint (pre-commit lints staged
+# files), no build, no E2E/browser.
+#
+# The full CI (`pnpm ci:full`, build, E2E) runs on the Mac mini via the hub's
+# `localci` job, which posts the GitHub commit statuses under the workflows'
+# job names. Run `pnpm ci:full` by hand when you need it locally.
+#
+# Escape hatches: HUSKY=0 git push ...  (or SKIP_LOCAL_CI=1 git push ...)
+#
+# Linked-worktree safe and non-interactive: a worktree without node_modules
+# skips with a one-line note instead of failing or installing anything.
+set -eu
+
+if [ "${SKIP_LOCAL_CI:-0}" = "1" ]; then
+  echo "pre-push: local checks skipped via SKIP_LOCAL_CI=1"
+  exit 0
+fi
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+if [ ! -x node_modules/.bin/turbo ] || [ ! -x node_modules/.bin/tsc ] || [ ! -x node_modules/.bin/jest ]; then
+  echo "pre-push: node_modules missing in this worktree; skipping type-check + unit tests (localci runs full CI)"
+  exit 0
+fi
+
+# Tools spawn git and run in package sub-directories; a hook's GIT_DIR (set in
+# linked worktrees) would make those calls resolve the wrong work tree.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_QUARANTINE_PATH GIT_PREFIX
+
+# The API type-check needs the generated Prisma client (offline, ~2 s).
+if [ ! -f node_modules/.prisma/client/index.d.ts ] && [ -x node_modules/.bin/prisma ]; then
+  node_modules/.bin/prisma generate --schema apps/api/prisma/schema.prisma </dev/null
+fi
+
+echo "pre-push: turbo type-check + test..."
+node_modules/.bin/turbo run type-check test --output-logs=errors-only </dev/null
+echo "pre-push: type-check + unit tests passed (full CI runs on localci)"
