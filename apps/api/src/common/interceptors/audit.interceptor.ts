@@ -1,9 +1,11 @@
 import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { Prisma, AuditAction } from '@prisma/client';
 import { Request } from 'express';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SKIP_AUDIT_KEY } from '../decorators/skip-audit.decorator';
 import { describeError } from '../utils/redact';
 import {
   buildAuditSummary,
@@ -29,15 +31,18 @@ const AUDITED_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 export class AuditInterceptor implements NestInterceptor {
   private readonly logger = new Logger(AuditInterceptor.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private reflector: Reflector,
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest<Request & { user?: AuditedUser }>();
     const method = request.method;
     const user = request.user;
 
-    // Only audit write operations by authenticated users
-    if (!AUDITED_METHODS.has(method) || !user) {
+    // Only audit write operations by authenticated users; read-only POST queries opt out.
+    if (!AUDITED_METHODS.has(method) || !user || this.isSkipped(context)) {
       return next.handle();
     }
 
@@ -45,6 +50,15 @@ export class AuditInterceptor implements NestInterceptor {
       tap((response) => {
         void this.record(request, user, method, response);
       }),
+    );
+  }
+
+  private isSkipped(context: ExecutionContext): boolean {
+    return (
+      this.reflector.getAllAndOverride<boolean>(SKIP_AUDIT_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]) === true
     );
   }
 

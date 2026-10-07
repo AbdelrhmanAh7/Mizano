@@ -1,7 +1,9 @@
 import { ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { AuditAction, Prisma } from '@prisma/client';
 import { lastValueFrom, of } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SkipAudit } from '../decorators/skip-audit.decorator';
 import { AuditInterceptor } from './audit.interceptor';
 
 interface FakeRequest {
@@ -14,8 +16,19 @@ interface FakeRequest {
   user?: { id: string; organizationId?: string };
 }
 
-function makeContext(request: FakeRequest): ExecutionContext {
-  return { switchToHttp: () => ({ getRequest: () => request }) } as unknown as ExecutionContext;
+class FakeController {
+  write(): void {}
+
+  @SkipAudit()
+  readOnlyCheck(): void {}
+}
+
+function makeContext(request: FakeRequest, handler: () => void): ExecutionContext {
+  return {
+    switchToHttp: () => ({ getRequest: () => request }),
+    getHandler: () => handler,
+    getClass: () => FakeController,
+  } as unknown as ExecutionContext;
 }
 
 const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
@@ -34,9 +47,13 @@ describe('AuditInterceptor', () => {
     user: { id: 'user-1', organizationId: 'org-1' },
   });
 
-  const run = async (request: FakeRequest, response: unknown): Promise<unknown> => {
+  const run = async (
+    request: FakeRequest,
+    response: unknown,
+    handler: () => void = FakeController.prototype.write,
+  ): Promise<unknown> => {
     const result = await lastValueFrom(
-      interceptor.intercept(makeContext(request), { handle: () => of(response) }),
+      interceptor.intercept(makeContext(request, handler), { handle: () => of(response) }),
     );
     await flush();
     return result;
@@ -44,7 +61,10 @@ describe('AuditInterceptor', () => {
 
   beforeEach(() => {
     create = jest.fn().mockResolvedValue({});
-    interceptor = new AuditInterceptor({ auditLog: { create } } as unknown as PrismaService);
+    interceptor = new AuditInterceptor(
+      { auditLog: { create } } as unknown as PrismaService,
+      new Reflector(),
+    );
   });
 
   it('does not touch the response it passes through', async () => {
@@ -144,6 +164,11 @@ describe('AuditInterceptor', () => {
     const request = baseRequest();
     mutate(request);
     await run(request, { id: 'x' });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('does not audit read-only POST routes marked @SkipAudit()', async () => {
+    await run(baseRequest(), { status: 'none' }, FakeController.prototype.readOnlyCheck);
     expect(create).not.toHaveBeenCalled();
   });
 
