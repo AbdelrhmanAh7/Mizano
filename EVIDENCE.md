@@ -1,144 +1,128 @@
-# EVIDENCE.md — PR Merge Sprint Audit (#95)
+# EVIDENCE.md — Payslip PDF Generator (#115)
 
 ## Overview
 
-- **Issue**: #95 (MZ · PR merge sprint until queue ≤ 5)
-- **Base Commit (`master`)**: `b83d72b5a1900350d7575dfa39396e95b058a5c4`
-- **Audit Date**: 2026-10-07
-- **Reviewed Scope**: 6 oldest open pull requests (#58, #60, #65, #66, #67, #68)
+- **Issue**: #115 (Payslip PDF generator from Mizano payroll data)
+- **Tested Commit SHA**: `1065a29fa5998c0afc33ca002c1c21f308a8b164`
+- **Branch**: `ai/115`
+- **Date**: 2026-10-08
 
 ---
 
-## Requirements Verification Matrix
+## Pinned Assets & Dependencies
 
-| REQ ID | Requirement                                         | Verification Method                                | Status |
-| ------ | --------------------------------------------------- | -------------------------------------------------- | ------ |
-| REQ-1  | Retrieve 6 oldest open PRs                          | `gh pr list --search "sort:created-asc" --limit 6` | PASSED |
-| REQ-2  | Record exact tested commit SHAs                     | Git ref inspection (`headRefOid` per PR)           | PASSED |
-| REQ-3  | Execute local test suites per PR                    | Run unit/web suites with output captured           | PASSED |
-| REQ-4  | Domain risk audit (money, tenant, idempotency, RTL) | Diff inspection against AGENTS.md rules            | PASSED |
-| REQ-5  | Commit audit table & gh commands                    | Committed to `docs/planning/MERGE-QUEUE.md`        | PASSED |
-| REQ-6  | Non-destructive execution (<300 doc lines)          | No PRs merged; doc-only additions                  | PASSED |
+| Asset / Package     | Version / Checksum                                                          | License / Source                      | Rationale                                                                    |
+| ------------------- | --------------------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------- |
+| `pdfkit`            | `0.15.0` (pinned)                                                           | MIT                                   | Pure JS, arm64 (Raspberry Pi 5) compatible, CPU-only, no native C++ bindings |
+| `Amiri-Regular.ttf` | SHA-256: `ab391c4147d054c48976e98322ad0eefe1427aa0e0502a12a4c75d80a70cfcd7` | SIL Open Font License 1.1 (`OFL.txt`) | Embedded OpenType font with Arabic glyph shaping and Latin coverage          |
+| `OFL.txt`           | SHA-256: `72de68e5954f4fdd24702292ef5a32f003ca960ec9330dc86e5eefb5dffb9b22` | SIL Open Font License 1.1             | Font license bundled in `apps/api/assets/fonts/`                             |
 
 ---
 
-## Detailed Test Logs & Commit Evidence
+## Acceptance Criteria Verification Matrix
 
-### PR #58
+| REQ / AC | Requirement                                                                                                                              | Verification Method                                                | Status     |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------- |
+| **AC1**  | `GET /payslips/:id/pdf` returns valid PDF with `Content-Type: application/pdf` for authorized in-organization payslip                    | `test/payslip-pdf.e2e-spec.ts` AC1                                 | **PASSED** |
+| **AC2**  | `lang=ar` and `lang=en` both work, default documented as `ar`, unsupported `lang` returns 400                                            | `test/payslip-pdf.e2e-spec.ts` AC2 & `payslip-pdf.service.spec.ts` | **PASSED** |
+| **AC3**  | Amounts appear exactly as stored decimal strings (`12345.60` not `12345.6`, no float conversion, no re-rounding)                         | `test/payslip-pdf.e2e-spec.ts` AC3 & `payslip-pdf.service.spec.ts` | **PASSED** |
+| **AC4**  | Output is byte-identical across repeated renders of identical input (deterministic PDF)                                                  | `test/payslip-pdf.e2e-spec.ts` AC4 & `payslip-pdf.service.spec.ts` | **PASSED** |
+| **AC5**  | Cross-organization, soft-deleted employee and invalid IDs return 404; unauthenticated returns 401                                        | `test/payslip-pdf.e2e-spec.ts` AC5                                 | **PASSED** |
+| **AC6**  | Missing required data returns 422 with sanitized reason containing no values                                                             | `test/payslip-pdf.e2e-spec.ts` AC6 & `payslip-pdf.service.spec.ts` | **PASSED** |
+| **AC7**  | Error logging uses Nest `Logger` with `describeError(error, { includeMessage: false })`, no `console.error`, no payslip contents in logs | `payslip-pdf.service.spec.ts` & `payslip-pdf.e2e-spec.ts` AC7      | **PASSED** |
+| **AC8**  | Synchronous, CPU-only execution capped strictly at 1 page for arm64 / Pi 5                                                               | `payslip-pdf.service.spec.ts` (caps page count at 1)               | **PASSED** |
 
-- **Commit SHA**: `2b3f01c3d7e9fe4877bb29b8af903437b3eee92a`
-- **Branch**: `demo/20-telegram-intake`
-- **Commands**:
-  ```bash
-  git checkout --detach 2b3f01c3d7e9fe4877bb29b8af903437b3eee92a
-  pnpm --filter ./apps/api exec prisma generate
-  pnpm --filter ./apps/api test telegram
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/telegram/telegram.client.spec.ts
-  PASS src/modules/telegram/telegram-link.service.spec.ts
-  PASS src/modules/telegram/telegram-intake.service.spec.ts
-  Test Suites: 3 passed, 3 total
-  Tests:       74 passed, 74 total
-  Lint: 4 packages successful
-  ```
+---
 
-### PR #60
+## Test Execution Evidence
 
-- **Commit SHA**: `d01e25239b4a3a62c1034a0258c53e614655ed69`
-- **Branch**: `demo/38-arm64-images`
-- **Commands**:
-  ```bash
-  git checkout --detach d01e25239b4a3a62c1034a0258c53e614655ed69
-  pnpm --filter ./apps/api test intake
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  Test Suites: 1 skipped, 17 passed, 17 of 18 total
-  Tests:       9 skipped, 284 passed, 293 total
-  Lint: 4 packages successful
-  ```
+### 1. E2E Acceptance Suite (`apps/api/test/payslip-pdf.e2e-spec.ts`)
 
-### PR #65
+```bash
+DATABASE_URL="postgresql://abdelrahmanahmed@localhost:5432/mizano_db?schema=public" REDIS_URL="" pnpm --filter api test:e2e test/payslip-pdf.e2e-spec.ts
+```
 
-- **Commit SHA**: `5eb0340b0e002730f52709d3a7ad8a6097203f77`
-- **Branch**: `demo/followup-vat`
-- **Commands**:
-  ```bash
-  git checkout --detach 5eb0340b0e002730f52709d3a7ad8a6097203f77
-  pnpm --filter ./apps/api test vat
-  pnpm --filter ./apps/api test default-roles
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/tax/controllers/vat-returns.controller.spec.ts
-  PASS src/modules/tax/interceptors/vat-decimal.interceptor.spec.ts
-  PASS src/modules/tax/services/vat-returns.service.spec.ts
-  Test Suites: 3 passed, 3 total | Tests: 74 passed, 74 total
-  PASS src/modules/roles/constants/default-roles.constant.spec.ts (1 passed)
-  Lint: 4 packages successful
-  ```
+```text
+PASS test/payslip-pdf.e2e-spec.ts
+  Payslip PDF generator (e2e)
+    ✓ @e2e @flow:payslip-pdf @issue-115 AC1: returns valid PDF for an authorized in-organization payslip (108 ms)
+    ✓ @e2e @flow:payslip-pdf @issue-115 AC2: supports lang=ar and lang=en query parameters with documented default and rejects unsupported lang with 400 (310 ms)
+    ✓ @e2e @flow:payslip-pdf @issue-115 AC3: amounts appear exactly as the stored decimal strings without float conversion or rounding (88 ms)
+    ✓ @e2e @flow:payslip-pdf @issue-115 AC4: output is byte-identical across repeated renders of the same input (169 ms)
+    ✓ @e2e @flow:payslip-pdf @issue-115 AC5: cross-organization, soft-deleted and invalid IDs return 404, unauthenticated returns 401 (16 ms)
+    ✓ @e2e @flow:payslip-pdf @issue-115 AC6: missing required data returns 422 with a sanitized reason that contains no values (5 ms)
+    ✓ @e2e @flow:payslip-pdf @issue-115 AC7: thrown render errors log only the exception type name and no raw message or payslip data (3 ms)
 
-### PR #66
+Test Suites: 1 passed, 1 total
+Tests:       7 passed, 7 total
+Snapshots:   0 total
+Time:        4.194 s
+```
 
-- **Commit SHA**: `310ac2b1aa7129b4c51403f46eb6ee36f4d1e778`
-- **Branch**: `demo/followup-reports-ledger`
-- **Commands**:
-  ```bash
-  git checkout --detach 310ac2b1aa7129b4c51403f46eb6ee36f4d1e778
-  pnpm --filter ./apps/api test aging-reports
-  pnpm --filter ./apps/api test depreciation
-  pnpm --filter ./apps/api test work-orders
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/reports/services/aging-reports.receivables.spec.ts (28 passed)
-  PASS src/modules/assets/services/depreciation.service.spec.ts (22 passed)
-  PASS src/modules/manufacturing/services/work-orders.service.spec.ts (29 passed)
-  Test Suites: 6 passed, 6 total | Tests: 79 passed, 79 total
-  Lint: 4 packages successful
-  ```
+### 2. Unit Test Suite (`apps/api/src/modules/hr/services/payslip-pdf.service.spec.ts`)
 
-### PR #67
+```bash
+pnpm --filter api test src/modules/hr/services/payslip-pdf.service.spec.ts
+```
 
-- **Commit SHA**: `be7478f715f1e0f0efb8447e922db9d79d37fbc1`
-- **Branch**: `demo/followup-sales-banking`
-- **Commands**:
-  ```bash
-  git checkout --detach be7478f715f1e0f0efb8447e922db9d79d37fbc1
-  pnpm --filter ./apps/api test recurring-profiles credit-notes
-  pnpm --filter ./apps/web test payments bill-form invoices
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/accounting/services/recurring-profiles.service.spec.ts (41 passed)
-  PASS src/modules/sales/services/credit-notes.service.spec.ts (47 passed)
-  PASS @mizano/web (payments, bill-form, invoices): 4 passed, 16 passed
-  Total: 8 suites passed, 104 tests passed
-  Lint: 4 packages successful
-  ```
+```text
+PASS src/modules/hr/services/payslip-pdf.service.spec.ts
+  PayslipPdfService & renderPayslipPdf
+    renderPayslipPdf (pure function)
+      ✓ produces a buffer starting with %PDF (64 ms)
+      ✓ produces byte-identical output across repeated renders of identical input (200 ms)
+      ✓ renders exact decimal strings without float conversion or rounding (e.g. 12345.60 not 12345.6) (105 ms)
+      ✓ renders English labels in en mode (53 ms)
+      ✓ renders Arabic labels and shapes Arabic glyphs in ar mode with RTL alignment (52 ms)
+      ✓ strictly caps the page count at 1 page for CPU efficiency on arm64/Pi 5 (99 ms)
+      ✓ handles long employee names without crashing or overflowing page boundary (51 ms)
+      ✓ handles zero or negative deductions without crashing or layout breaks (142 ms)
+    PayslipPdfService
+      ✓ generates a valid PDF buffer for an authorized in-organization payslip (45 ms)
+      ✓ throws BadRequestException for an unsupported language (11 ms)
+      ✓ propagates NotFoundException when payslip does not belong to organization (cross-tenant 404)
+      ✓ throws NotFoundException when organization is not found
+      ✓ throws UnprocessableEntityException when required basicSalary is missing or zero, containing no values in error reason (1 ms)
+      ✓ throws UnprocessableEntityException when employee name is missing
+      ✓ logs only the exception type name and no raw message or payslip payload on render error
 
-### PR #68
+Test Suites: 1 passed, 1 total
+Tests:       15 passed, 15 total
+Snapshots:   0 total
+Time:        3.319 s
+```
 
-- **Commit SHA**: `7c632bdf74832cfc94f97cb49c196d168e99127f`
-- **Branch**: `demo/followup-org-currency`
-- **Commands**:
-  ```bash
-  git checkout --detach 7c632bdf74832cfc94f97cb49c196d168e99127f
-  pnpm --filter ./apps/api test organizations
-  pnpm --filter ./apps/web test report-currency report-labels purchases-currency
-  pnpm lint
-  ```
-- **Output**:
-  ```text
-  PASS src/modules/organizations/organizations.service.spec.ts (26 passed)
-  PASS @mizano/web (report-currency, report-labels, purchases-currency): 3 passed, 78 passed
-  Total: 4 suites passed, 104 tests passed
-  Lint: 4 packages successful
-  ```
+### 3. TypeScript Type-Check & ESLint
+
+```bash
+pnpm --filter api type-check && pnpm --filter api lint
+```
+
+```text
+> api@0.1.0 type-check /Users/abdelrahmanahmed/agents/work/impl/Mizano-115/apps/api
+> tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json
+
+> api@0.1.0 lint /Users/abdelrahmanahmed/agents/work/impl/Mizano-115/apps/api
+> eslint "{src,apps,libs,test}/**/*.ts"
+```
+
+Output: 0 errors, 0 warnings.
+
+### 4. NestJS Production Build
+
+```bash
+pnpm --filter api build
+```
+
+```text
+> api@0.1.0 build /Users/abdelrahmanahmed/agents/work/impl/Mizano-115/apps/api
+> nest build
+
+-  TSC  Initializing type checker...
+✔  TSC  Initializing type checker...
+>  TSC  Found 0 issues.
+>  SWC  Running...
+Successfully compiled: 654 files with swc (192.96ms)
+```
+
+Output: 0 issues, compiled 654 files.
