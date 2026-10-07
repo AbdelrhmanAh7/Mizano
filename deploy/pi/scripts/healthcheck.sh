@@ -5,10 +5,26 @@ set -euo pipefail
 # shellcheck source=deploy/pi/scripts/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-state_dir="$DATA_DIR/monitor"
-mkdir -p "$state_dir"
 host="$(hostname -s)"
 problems=()
+
+notify() {
+  if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_ALERT_CHAT_ID:-}" ]; then return 0; fi
+  curl -fsS --max-time 15 -o /dev/null \
+    --data-urlencode "chat_id=$TELEGRAM_ALERT_CHAT_ID" \
+    --data-urlencode "text=$1" \
+    "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" >/dev/null 2>&1 || true
+}
+
+# Before any write: with the SSD unmounted there is no state dir, so alert on every
+# run (no dedupe) and stop instead of creating one on the SD card.
+if ! assert_ssd; then
+  notify "[Mizano $host] ALERT: data dir not on the SSD"
+  log "problems: ssd" >&2
+  exit 1
+fi
+state_dir="$DATA_DIR/monitor"
+mkdir -p "$state_dir"
 
 container_ip() {
   docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$1" 2>/dev/null || true
@@ -67,14 +83,6 @@ else
   [ "$age_s" -le $((26 * 3600)) ] || problems+=("backup-stale|backup older than 26h")
   grep -q '^OK' "$bstatus" || problems+=("backup-failed|last backup failed")
 fi
-
-notify() {
-  if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_ALERT_CHAT_ID:-}" ]; then return 0; fi
-  curl -fsS --max-time 15 -o /dev/null \
-    --data-urlencode "chat_id=$TELEGRAM_ALERT_CHAT_ID" \
-    --data-urlencode "text=$1" \
-    "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" >/dev/null 2>&1 || true
-}
 
 # Dedupe on stable keys (check name), never on live numbers: one alert when a check
 # starts failing, one recovery when it clears.

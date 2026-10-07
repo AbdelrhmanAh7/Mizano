@@ -8,6 +8,8 @@ set -euo pipefail
 retention="${BACKUP_RETENTION_DAYS:-14}"
 dir="$DATA_DIR/backups"
 status="$dir/backup.status"
+# Before any write: never put a backup on the SD card when the SSD is unmounted.
+assert_ssd
 mkdir -p "$dir"
 umask 077
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"

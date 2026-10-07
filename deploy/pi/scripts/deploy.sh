@@ -20,8 +20,10 @@ sha_re='^[0-9a-f]{7,40}$'
 
 api_repo="${MIZANO_API_IMAGE%%@*}"
 web_repo="${MIZANO_WEB_IMAGE%%@*}"
+
+# Before any write: an unmounted SSD must not get a deployments.log on the SD card.
+assert_ssd
 logfile="$DATA_DIR/deployments.log"
-mkdir -p "$DATA_DIR"
 touch "$logfile"
 
 # Is there a previous good deployment to fall back to?
@@ -34,7 +36,6 @@ record() {
   printf '%s %s %s %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$sha" "$MIZANO_API_IMAGE" "$MIZANO_WEB_IMAGE" >>"$logfile"
 }
 
-assert_ssd
 log "pulling $sha"
 dc pull api web
 log "running migrations"
