@@ -140,7 +140,7 @@ export class IntakeMatchingService {
     // `total` is the 4-dp string of the result boundary: compare as Decimal, not float.
     if (typeof total === 'string' && total.trim() !== '') {
       const amount = new Prisma.Decimal(total);
-      if (amount.gt(0)) {
+      if (amount.gt(0) && amount.isFinite()) {
         const recent = await this.prisma.bill.findMany({
           where: {
             organizationId,

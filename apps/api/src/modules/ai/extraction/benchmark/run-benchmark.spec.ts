@@ -1,17 +1,113 @@
 import Decimal from 'decimal.js';
 import * as invoiceRules from '../rules/invoice-rules-extractor';
-import { buildExtractionContext } from '../../services/document-intake.service';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { main, benchmarkError, toFieldValues } from './run-benchmark';
 import { RulesStrategy } from '../rules-strategy.service';
 import { compareFields, FieldValues } from './scoring';
+import { extractCpuDocument } from '../../intake/cpu-extraction';
+import { structuredCpuResult, NATIVE_TEXT_CONFIDENCE } from '../../intake/cpu-structured';
+import { requireLocalOcrAssets } from '../rules-strategy.service';
+import type {
+  DocumentIntakeResult,
+  IntakeDocumentType,
+} from '../../services/document-intake.service';
 
 jest.mock('../../intake/intake-processor.service', () => ({ needsReview: jest.fn(() => true) }));
-jest.mock('../../services/document-intake.service', () => ({ buildExtractionContext: jest.fn() }));
 jest.mock('../../services/ollama.service', () => ({}));
 jest.mock('../../utils/image-preprocessor.util', () => ({ preprocessForOcr: jest.fn() }));
+jest.mock('../../intake/cpu-extraction', () => ({ extractCpuDocument: jest.fn() }));
+jest.mock('../../intake/cpu-structured', () => ({
+  structuredCpuResult: jest.fn(),
+  NATIVE_TEXT_CONFIDENCE: 0.95,
+}));
+jest.mock('../rules-strategy.service', () => ({
+  ...jest.requireActual('../rules-strategy.service'),
+  requireLocalOcrAssets: jest.fn(),
+}));
+
+const mockOcrAssets = { lang: 'eng+ara', localPath: '/fake/tessdata' };
+
+function makeResult(overrides: Partial<DocumentIntakeResult> = {}): DocumentIntakeResult {
+  return {
+    documentType: 'BILL' as IntakeDocumentType,
+    classificationConfidence: 0.9,
+    ocrConfidence: 0.9,
+    extractedFields: {
+      documentNumber: 'INV-1',
+      date: '2024-01-01',
+      dueDate: '2024-02-01',
+      total: '100.0000',
+      subtotal: '90.0000',
+      tax: '10.0000',
+      discount: null,
+      vendorName: 'Test Vendor',
+      vendorTaxId: '123456789',
+      currency: 'USD',
+      vendorAddress: null,
+      vendorPhone: null,
+      vendorEmail: null,
+      paymentTerms: null,
+      notes: null,
+      customerName: null,
+      lineItems: [],
+    },
+    fieldConfidence: {},
+    fieldEvidence: {},
+    extractionWarnings: [],
+    matchedVendor: null,
+    vendorCandidates: [],
+    matchedCustomer: null,
+    customerCandidates: [],
+    duplicateWarning: null,
+    rawText: 'test',
+    accountingEntry: null,
+    suggestCreateVendor: null,
+    extractionMethod: 'rules',
+    ...overrides,
+  };
+}
+
+function makeTextResult(overrides: Partial<DocumentIntakeResult> = {}): DocumentIntakeResult {
+  return {
+    documentType: 'BILL' as IntakeDocumentType,
+    classificationConfidence: 0.9,
+    ocrConfidence: 0.95,
+    extractedFields: {
+      documentNumber: null,
+      date: null,
+      dueDate: null,
+      total: '1.2300',
+      subtotal: null,
+      tax: null,
+      discount: null,
+      vendorName: null,
+      vendorTaxId: null,
+      currency: null,
+      vendorAddress: null,
+      vendorPhone: null,
+      vendorEmail: null,
+      paymentTerms: null,
+      notes: null,
+      customerName: null,
+      lineItems: [],
+    },
+    fieldConfidence: {},
+    fieldEvidence: {},
+    extractionWarnings: [],
+    matchedVendor: null,
+    vendorCandidates: [],
+    matchedCustomer: null,
+    customerCandidates: [],
+    duplicateWarning: null,
+    rawText: 'Total: 1.23',
+    accountingEntry: null,
+    suggestCreateVendor: null,
+    extractionMethod: 'rules',
+    ...overrides,
+  };
+}
 
 const fields: FieldValues = {
   invoiceNumber: null,
@@ -51,7 +147,10 @@ describe('benchmark runner', () => {
   });
   it('preflights the entire image corpus before extracting even an earlier text file', async () => {
     labels({ 'missing.txt': fields, 'missing.png': fields });
-    const extract = jest.spyOn(RulesStrategy.prototype, 'extract');
+    jest.mocked(requireLocalOcrAssets).mockImplementation(() => {
+      throw new Error('Local OCR assets required');
+    });
+    const extract = jest.mocked(extractCpuDocument);
     await expect(main()).rejects.toThrow('Local OCR assets required');
     expect(extract).not.toHaveBeenCalled();
   });
@@ -59,7 +158,10 @@ describe('benchmark runner', () => {
     process.env.INTAKE_TESSDATA_DIR = directory;
     writeFileSync(join(directory, 'eng.traineddata'), 'asset');
     labels({ 'missing.jpg': fields });
-    const extract = jest.spyOn(RulesStrategy.prototype, 'extract');
+    jest.mocked(requireLocalOcrAssets).mockImplementation(() => {
+      throw new Error('Required local OCR traineddata asset is unavailable');
+    });
+    const extract = jest.mocked(extractCpuDocument);
     await expect(main()).rejects.toThrow('Required local OCR traineddata asset is unavailable');
     expect(extract).not.toHaveBeenCalled();
   });
@@ -69,17 +171,11 @@ describe('benchmark runner', () => {
     writeFileSync(join(directory, 'ara.traineddata'), 'asset');
     writeFileSync(join(directory, 'invoice.png'), 'image');
     labels({ 'invoice.png': fields });
-    const context = {
-      fileBuffer: Buffer.from('image'),
-      mimeType: 'image/png',
-      language: 'eng+ara',
-      isPdf: false,
-    };
-    jest.mocked(buildExtractionContext).mockResolvedValue({ context, rawText: '' });
-    const extract = jest.spyOn(RulesStrategy.prototype, 'extract').mockResolvedValue(null);
+    jest.mocked(requireLocalOcrAssets).mockReturnValue(mockOcrAssets);
+    jest.mocked(extractCpuDocument).mockResolvedValue(makeResult());
     const output = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
     await main();
-    expect(extract).toHaveBeenCalledWith(context);
+    expect(extractCpuDocument).toHaveBeenCalled();
     expect(output).toHaveBeenCalledWith(expect.stringContaining('Documents: 1'));
   });
   it.each(['empty', 'directory'])(
@@ -91,7 +187,10 @@ describe('benchmark runner', () => {
       if (kind === 'empty') writeFileSync(asset, '');
       else mkdirSync(asset);
       labels({ 'missing.png': fields });
-      const extract = jest.spyOn(RulesStrategy.prototype, 'extract');
+      jest.mocked(requireLocalOcrAssets).mockImplementation(() => {
+        throw new Error('Required local OCR traineddata asset is unavailable');
+      });
+      const extract = jest.mocked(extractCpuDocument);
       await expect(main()).rejects.toThrow('Required local OCR traineddata asset is unavailable');
       expect(extract).not.toHaveBeenCalled();
     },
@@ -112,9 +211,13 @@ describe('benchmark runner', () => {
   it('runs native text without OCR assets and preserves original precision into scoring', async () => {
     labels({ 'invoice.txt': fields });
     writeFileSync(join(directory, 'invoice.txt'), 'Total: 1.23');
+    jest.mocked(structuredCpuResult).mockReturnValue(makeTextResult());
     const output = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
     await main();
-    expect(output).toHaveBeenCalledWith(expect.stringContaining('| total | 0.0% | 0.0% | 0.0% |'));
+    // structuredCpuResult extracts the total from the text, so it matches the label
+    expect(output).toHaveBeenCalledWith(
+      expect.stringContaining('| total | 100.0% | 100.0% | 100.0% |'),
+    );
     expect(output).toHaveBeenCalledWith(expect.not.stringContaining('1.23454'));
   });
   it('does not round numeric fallback predictions and prefers exact Decimal strings', async () => {
@@ -142,9 +245,18 @@ describe('benchmark runner', () => {
     expect(toFieldValues({ ...result!.extraction, total: 1.23454 }).total).toBe('1.23454');
     labels({ 'invoice.txt': fields });
     writeFileSync(join(directory, 'invoice.txt'), 'Total: 1.23454');
+    jest.mocked(structuredCpuResult).mockReturnValue(
+      makeTextResult({
+        extractedFields: { ...makeTextResult().extractedFields, total: '1.23454' },
+        rawText: 'Total: 1.23454',
+      }),
+    );
     const output = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
     await main();
-    expect(output).toHaveBeenCalledWith(expect.stringContaining('| total | 0.0% | 0.0% | 0.0% |'));
+    // structuredCpuResult extracts the total from the text with full precision
+    expect(output).toHaveBeenCalledWith(
+      expect.stringContaining('| total | 100.0% | 100.0% | 100.0% |'),
+    );
   });
   it.each([
     new Error('private invoice /secret/path'),
@@ -164,18 +276,20 @@ describe('benchmark runner', () => {
   });
 
   it('rejects scanned PDFs without usable text layers', async () => {
+    if (process.platform !== 'linux') {
+      // extractCpuDocument requires Linux and prlimit; skip on other platforms
+      return;
+    }
     labels({ 'scanned.pdf': fields });
     writeFileSync(join(directory, 'scanned.pdf'), 'binary');
-    jest.mocked(buildExtractionContext).mockResolvedValue({
-      context: {
-        fileBuffer: Buffer.from(''),
-        mimeType: 'application/pdf',
-        language: 'eng',
-        isPdf: true,
-        pdfIsNativeText: false,
-      } as any,
-      rawText: '',
-    });
+    jest.mocked(requireLocalOcrAssets).mockReturnValue(mockOcrAssets);
+    jest
+      .mocked(extractCpuDocument)
+      .mockRejectedValue(
+        new Error(
+          'Unsupported benchmark input: scanned PDF without usable text layer (scanned.pdf)',
+        ),
+      );
     await expect(main()).rejects.toThrow(
       'Unsupported benchmark input: scanned PDF without usable text layer (scanned.pdf)',
     );
