@@ -131,6 +131,24 @@ describe('Possible duplicate bills (e2e)', () => {
     }
   });
 
+  it('rejects unknown body properties with 400 (global validation pipe)', async () => {
+    const res = await a
+      .post(CHECK)
+      .send({ vendorId, amount: '100.10', date: day, currency, memo: 'x' });
+    expect(res.status).toBe(400);
+  });
+
+  it('accepts an empty body as unknown through the real pipe', async () => {
+    const res = await a.post(CHECK).send({});
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: 'unknown', matches: [] });
+  });
+
+  it('answers 404 for a malformed bill id instead of failing', async () => {
+    const res = await a.get('/bills/not-a-cuid/possible-duplicates');
+    expect(res.status).toBe(404);
+  });
+
   it('does not write an audit row for the read-only POST', async () => {
     const billAudits = () =>
       prisma.auditLog.count({
