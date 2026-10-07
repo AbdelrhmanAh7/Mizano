@@ -1,5 +1,6 @@
 'use client';
 
+import type { DuplicateCheckResult } from '@mizano/shared-types';
 import { useToast } from '@/components/ui/use-toast';
 import { billsApi } from '@/lib/api';
 import { decimalToDisplayNumber } from '@/lib/decimal';
@@ -182,6 +183,21 @@ export function useBill(id: string | undefined) {
       return response.data as Bill;
     },
     enabled: !!id,
+  });
+}
+
+/**
+ * Possible duplicates of a stored bill: posted bills of the same vendor with the identical
+ * amount and currency within ±3 days. Advisory only; it never blocks approval.
+ */
+export function useBillPossibleDuplicates(id: string, enabled = true) {
+  return useQuery({
+    queryKey: ['bills', id, 'possible-duplicates'],
+    queryFn: async (): Promise<DuplicateCheckResult> => {
+      const response = await billsApi.possibleDuplicates(id);
+      return response.data as DuplicateCheckResult;
+    },
+    enabled,
   });
 }
 

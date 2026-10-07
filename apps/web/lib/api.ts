@@ -297,6 +297,8 @@ export const billsApi = {
   /** Approves a draft bill and posts its journal (Dr expense/VAT, Cr AP) on the bill date. */
   approve: (id: string) => api.post(`/bills/${id}/approve`),
   clone: (id: string) => api.post(`/bills/${id}/clone`),
+  /** Posted bills of the same vendor, amount and currency within ±3 days (read-only). */
+  possibleDuplicates: (id: string) => api.get(`/bills/${id}/possible-duplicates`),
   bulkDelete: (ids: string[]) => api.post('/bills/bulk-delete', { ids }),
   bulkOpen: (ids: string[]) => api.post('/bills/bulk-open', { ids }),
   bulkApprove: (ids: string[]) => api.post('/bills/bulk-approve', { ids }),

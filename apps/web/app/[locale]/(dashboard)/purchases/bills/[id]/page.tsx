@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
+import { PossibleDuplicatesBanner } from '@/components/purchases/possible-duplicates-banner';
 import { paymentsMadeApi } from '@/lib/api';
 import { getApiErrorMessage } from '@/lib/api-error';
 import {
@@ -208,6 +209,11 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
           )}
         </div>
       </div>
+
+      {/* Advisory check before posting; it never blocks approval. */}
+      {(bill.status === 'DRAFT' || bill.status === 'PENDING') && (
+        <PossibleDuplicatesBanner billId={bill.id} />
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
