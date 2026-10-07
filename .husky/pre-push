@@ -1,7 +1,13 @@
 #!/usr/bin/env sh
-# Mizano pre-push: type-check + unit tests only (turbo `type-check` + `test`;
-# the jest unit suites need no database). No lint (pre-commit lints staged
-# files), no build, no E2E/browser.
+# Mizano pre-push: type-check + unit tests for the packages the push CHANGES
+# (and the packages that depend on them), hard-capped at 290 s (owner rule: no
+# hook or CI job runs longer than 5 minutes):
+#   turbo run type-check test --filter=...[<base>]
+# base = the remote ref's old sha (or the merge-base with origin/master); a new
+# branch with no known base, or a change to root config (package.json,
+# pnpm-lock.yaml, turbo.json, tsconfig*) checks every package. The jest unit
+# suites need no database. No lint (pre-commit lints staged files), no build,
+# no E2E/browser.
 #
 # The full CI (`pnpm ci:full`, build, E2E) runs on the Mac mini via the hub's
 # `localci` job, which posts the GitHub commit statuses under the workflows'
@@ -11,18 +17,55 @@
 #
 # Linked-worktree safe and non-interactive: a worktree without node_modules
 # skips with a one-line note instead of failing or installing anything.
-set -eu
-
 if [ "${SKIP_LOCAL_CI:-0}" = "1" ]; then
   echo "pre-push: local checks skipped via SKIP_LOCAL_CI=1"
   exit 0
 fi
+
+# Hard wall-clock limit: re-run this hook under a perl watchdog that kills the
+# whole process group after the limit (macOS has no `timeout`); stdin is inherited.
+if [ -z "${MZ_HOOK_LIMITED:-}" ] && command -v perl >/dev/null 2>&1; then
+  MZ_HOOK_LIMITED=1 exec perl -e '
+    my ($t, $name) = (shift, shift); my $p = fork; die "fork: $!" unless defined $p;
+    if (!$p) { setpgrp(0, 0); exec @ARGV; exit 127 }
+    my $stop = sub { kill "TERM", -$p; sleep 2; kill "KILL", -$p };
+    $SIG{INT} = $SIG{TERM} = sub { $stop->(); exit 130 };
+    $SIG{ALRM} = sub { $stop->(); print STDERR "\n$name exceeded the ${t}s limit: split the check, or push with SKIP_LOCAL_CI=1 - localci runs the full CI\n"; exit 124 };
+    alarm $t; waitpid($p, 0); exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
+  ' "${MZ_PREPUSH_LIMIT_SECONDS:-290}" pre-push sh "$0" "$@"
+fi
+set -eu
 
 root=$(git rev-parse --show-toplevel)
 cd "$root"
 if [ ! -x node_modules/.bin/turbo ] || [ ! -x node_modules/.bin/tsc ] || [ ! -x node_modules/.bin/jest ]; then
   echo "pre-push: node_modules missing in this worktree; skipping type-check + unit tests (localci runs full CI)"
   exit 0
+fi
+
+# Which commits does this push introduce? git pipes "<local ref> <local sha>
+# <remote ref> <remote sha>" lines; never read an interactive terminal.
+NULL_SHA="0000000000000000000000000000000000000000"
+bases=""
+all=0
+if [ -t 0 ]; then
+  all=1
+else
+  while read -r local_ref local_sha remote_ref remote_sha; do
+    [ -n "${local_ref:-}" ] || continue
+    [ "$local_sha" = "$NULL_SHA" ] && continue        # deletion: nothing to check
+    base=""
+    if [ "$remote_sha" != "$NULL_SHA" ] && git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+      base="$remote_sha"
+    else
+      base="$(git merge-base origin/master "$local_sha" 2>/dev/null || true)"
+    fi
+    if [ -z "$base" ]; then all=1; continue; fi
+    if git diff --name-only "$base" "$local_sha" | grep -qE '^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|turbo\.json|tsconfig[^/]*\.json|\.npmrc)$'; then
+      all=1
+    fi
+    bases="$bases $base"
+  done
 fi
 
 # Tools spawn git and run in package sub-directories; a hook's GIT_DIR (set in
@@ -35,6 +78,16 @@ if [ ! -f node_modules/.prisma/client/index.d.ts ] && [ -x node_modules/.bin/pri
   node_modules/.bin/prisma generate --schema apps/api/prisma/schema.prisma </dev/null
 fi
 
-echo "pre-push: turbo type-check + test..."
-node_modules/.bin/turbo run type-check test --output-logs=errors-only </dev/null
+if [ "$all" = "1" ]; then
+  echo "pre-push: turbo type-check + test (all packages)..."
+  node_modules/.bin/turbo run type-check test --output-logs=errors-only </dev/null
+elif [ -n "$bases" ]; then
+  filters=""
+  for b in $bases; do filters="$filters --filter=...[$b]"; done
+  echo "pre-push: turbo type-check + test for changed packages and their dependents..."
+  # shellcheck disable=SC2086
+  node_modules/.bin/turbo run type-check test $filters --output-logs=errors-only </dev/null
+else
+  echo "pre-push: nothing to check (deletions only)"
+fi
 echo "pre-push: type-check + unit tests passed (full CI runs on localci)"
