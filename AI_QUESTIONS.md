@@ -9,7 +9,7 @@ The implementer harness opens every PR with `Closes #n` (`.github/workflows/ai-i
 - #104: slice 2, credential-age check and rotation metadata (items 1 and 2 below are its defaults).
 - #105: slice 3, anomaly alert on outbound invoice e-mail volume (item 3 below is its default).
 
-Both carry `type:feature` and `area:security` and are not labelled `ai-ready`: the owner queues each one for the implementers by adding that label once its open question below is answered or its default accepted. Close #97 when #105 merges.
+Both were filed with `type:feature` and `area:security` only; the owner's dashboard then skipped #104 (`ai-skip`: left for a human) and queued #105 (`ai-ready`), and the implementer hub picked #105 up (`ai-claude`) before this round ended. Close #97 when #105 has merged and #104 is either merged or deliberately dropped.
 
 Suggestion for the owner (CI, not changed here): when the Tech Lead plan splits an issue, let the harness write `Refs #n` instead of `Closes #n`.
 
