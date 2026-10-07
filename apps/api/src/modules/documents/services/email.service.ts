@@ -18,6 +18,8 @@ export class EmailService {
     private pdfService: PdfService,
   ) {}
 
+  private anomalyState = new Map<string, boolean>();
+
   // ============ Invoice Emails ============
 
   async sendInvoice(
@@ -94,6 +96,8 @@ export class EmailService {
         },
       });
 
+      await this.checkVolumeAnomaly(organizationId).catch(console.error);
+
       return { success: true, emailLogId: emailLog.id };
     } catch (error: unknown) {
       // Log the failed email
@@ -109,6 +113,8 @@ export class EmailService {
           organizationId,
         },
       });
+
+      await this.checkVolumeAnomaly(organizationId).catch(console.error);
 
       return { success: false, error: errorMessage };
     }
@@ -617,5 +623,99 @@ export class EmailService {
     ]);
 
     return { data, total };
+  }
+
+  // ============ Anomaly Alert ============
+
+  async checkVolumeAnomaly(organizationId: string): Promise<void> {
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+
+    const thirtyDaysAgo = new Date(todayStart);
+    thirtyDaysAgo.setUTCDate(todayStart.getUTCDate() - 30);
+
+    // Get today's count
+    const todayCount = await this.prisma.emailLog.count({
+      where: {
+        organizationId,
+        entityType: 'invoice',
+        sentAt: { gte: todayStart },
+      },
+    });
+
+    // Get historical logs to calculate baseline
+    const historyLogs = await this.prisma.emailLog.findMany({
+      where: {
+        organizationId,
+        entityType: 'invoice',
+        sentAt: { gte: thirtyDaysAgo, lt: todayStart },
+      },
+      select: { sentAt: true },
+    });
+
+    const firstLog = await this.prisma.emailLog.findFirst({
+      where: { organizationId, entityType: 'invoice' },
+      orderBy: { sentAt: 'asc' },
+      select: { sentAt: true },
+    });
+
+    let fullDaysAvailable = 0;
+    if (firstLog && firstLog.sentAt < todayStart) {
+      const firstLogDate = new Date(firstLog.sentAt);
+      firstLogDate.setUTCHours(0, 0, 0, 0);
+      const msPerDay = 24 * 60 * 60 * 1000;
+      const totalDaysHistory = Math.floor(
+        (todayStart.getTime() - firstLogDate.getTime()) / msPerDay,
+      );
+      fullDaysAvailable = Math.min(30, totalDaysHistory);
+    }
+
+    let baseline = 0;
+    if (fullDaysAvailable > 0) {
+      baseline = historyLogs.length / fullDaysAvailable;
+    }
+
+    const minDaily = parseInt(process.env.NOTIFY_ANOMALY_MIN_DAILY || '50', 10);
+    const threshold = Math.floor(Math.max(minDaily, 2 * baseline));
+
+    const activeThreshold = fullDaysAvailable < 7 ? minDaily : threshold;
+
+    const stateKey = `notify-volume-${organizationId}`;
+    const currentlyFailing = this.anomalyState.get(stateKey) || false;
+
+    if (todayCount > activeThreshold) {
+      if (!currentlyFailing) {
+        this.anomalyState.set(stateKey, true);
+        await this.notifyTelegram(
+          `[Mizano] ALERT: Outbound invoice email volume anomaly detected for organization ${organizationId}. Count: ${todayCount}, Threshold: ${activeThreshold}`,
+        );
+      }
+    } else {
+      if (currentlyFailing) {
+        this.anomalyState.set(stateKey, false);
+        await this.notifyTelegram(
+          `[Mizano] RECOVERED: Outbound invoice email volume normalized for organization ${organizationId}.`,
+        );
+      }
+    }
+  }
+
+  private async notifyTelegram(message: string): Promise<void> {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_ALERT_CHAT_ID;
+    if (!token || !chatId) return;
+
+    try {
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+        }),
+      });
+    } catch (error) {
+      // Ignore errors for notifications
+    }
   }
 }

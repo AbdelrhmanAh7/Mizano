@@ -34,7 +34,12 @@ function buildPrisma(): Record<string, Record<string, jest.Mock>> {
     organization: {
       findUnique: jest.fn().mockResolvedValue({ id: ORG_A, name: 'Org A', primaryColor: null }),
     },
-    emailLog: { create: jest.fn().mockResolvedValue({ id: 'log-1' }) },
+    emailLog: {
+      create: jest.fn().mockResolvedValue({ id: 'log-1' }),
+      count: jest.fn().mockResolvedValue(0),
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
     payrollRun: {
       findFirst: jest.fn().mockResolvedValue({
         payslips: [{ id: 'payslip-1', employeeId: 'emp-1', employee: {} }],
@@ -156,5 +161,128 @@ describe('EmailService HTML safety', () => {
     expect(html).not.toContain('<script>');
     expect(html).not.toContain('evil.example');
     expect(html).toContain('&lt;script&gt;');
+  });
+});
+
+describe('EmailService.checkVolumeAnomaly', () => {
+  let prisma: any;
+  let service: any;
+  let fetchSpy: jest.SpyInstance;
+  const orgId = 'org-123';
+  const origEnv = process.env;
+
+  beforeEach(() => {
+    process.env = {
+      ...origEnv,
+      NOTIFY_ANOMALY_MIN_DAILY: '50',
+      TELEGRAM_BOT_TOKEN: 'token',
+      TELEGRAM_ALERT_CHAT_ID: '123',
+    };
+    prisma = {
+      emailLog: {
+        count: jest.fn(),
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+      },
+    };
+    service = new EmailService(prisma as any, {} as any);
+    fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({} as any);
+  });
+
+  afterEach(() => {
+    process.env = origEnv;
+    jest.restoreAllMocks();
+  });
+
+  it('no history (cold start) - uses floor and notifies if floor exceeded', async () => {
+    prisma.emailLog.count.mockResolvedValue(51); // today count
+    prisma.emailLog.findMany.mockResolvedValue([]); // zero history
+    prisma.emailLog.findFirst.mockResolvedValue(null); // cold start
+
+    await service.checkVolumeAnomaly(orgId);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const callArgs = JSON.parse(fetchSpy.mock.calls[0][1].body as string);
+    expect(callArgs.text).toContain('ALERT');
+    expect(callArgs.text).toContain('Count: 51');
+    expect(callArgs.text).toContain('Threshold: 50');
+  });
+
+  it('zero baseline, warm-up boundary (under 7 days) uses floor', async () => {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const fiveDaysAgo = new Date(today);
+    fiveDaysAgo.setUTCDate(today.getUTCDate() - 5);
+
+    prisma.emailLog.count.mockResolvedValue(60);
+    prisma.emailLog.findMany.mockResolvedValue([{ sentAt: fiveDaysAgo }]);
+    prisma.emailLog.findFirst.mockResolvedValue({ sentAt: fiveDaysAgo });
+
+    await service.checkVolumeAnomaly(orgId);
+
+    // baseline would be 1/5 = 0.2, 2*baseline = 0. But warm-up enforces floor 50.
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const callArgs = JSON.parse(fetchSpy.mock.calls[0][1].body as string);
+    expect(callArgs.text).toContain('Threshold: 50');
+  });
+
+  it('alert text contains no invoice data or addresses', async () => {
+    prisma.emailLog.count.mockResolvedValue(100);
+    prisma.emailLog.findMany.mockResolvedValue([]);
+    prisma.emailLog.findFirst.mockResolvedValue(null);
+
+    await service.checkVolumeAnomaly(orgId);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const callArgs = JSON.parse(fetchSpy.mock.calls[0][1].body as string);
+    // Let's assert more carefully.
+    expect(callArgs.text).not.toContain('@'); // no email addresses
+    expect(callArgs.text).not.toContain('.com');
+    // Ensure the message format matches expectations
+    expect(callArgs.text).toMatch(
+      /^\[Mizano\] ALERT: Outbound invoice email volume anomaly detected for organization org-123\. Count: 100, Threshold: 50$/,
+    );
+  });
+
+  it('warm-up boundary at 8 days uses ratio if higher', async () => {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const tenDaysAgo = new Date(today);
+    tenDaysAgo.setUTCDate(today.getUTCDate() - 10);
+
+    // 10 full days history. Baseline = 40. 2 * 40 = 80.
+    // threshold should be max(50, 80) = 80.
+    const historyLogs = Array(400).fill({ sentAt: tenDaysAgo });
+
+    prisma.emailLog.count.mockResolvedValue(85);
+    prisma.emailLog.findMany.mockResolvedValue(historyLogs);
+    prisma.emailLog.findFirst.mockResolvedValue({ sentAt: tenDaysAgo });
+
+    await service.checkVolumeAnomaly(orgId);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const callArgs = JSON.parse(fetchSpy.mock.calls[0][1].body as string);
+    expect(callArgs.text).toContain('Threshold: 80');
+  });
+
+  it('dedupes alerts and sends recovery when clears', async () => {
+    prisma.emailLog.count.mockResolvedValue(60);
+    prisma.emailLog.findMany.mockResolvedValue([]);
+    prisma.emailLog.findFirst.mockResolvedValue(null);
+
+    await service.checkVolumeAnomaly(orgId);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    // Call again, should not alert
+    await service.checkVolumeAnomaly(orgId);
+    expect(fetchSpy).toHaveBeenCalledTimes(1); // Still 1
+
+    // Now it drops below threshold
+    prisma.emailLog.count.mockResolvedValue(40);
+    await service.checkVolumeAnomaly(orgId);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2); // Recovery sent
+    const recoveryArgs = JSON.parse(fetchSpy.mock.calls[1][1].body as string);
+    expect(recoveryArgs.text).toContain('RECOVERED');
   });
 });
