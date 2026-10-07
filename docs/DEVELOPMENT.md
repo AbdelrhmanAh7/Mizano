@@ -78,7 +78,7 @@ The Raspberry Pi deployment has its own file: copy `deploy/pi/.env.pi.example` t
 | Email        | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`                                                                                                                                                  |
 | Intake       | `INTAKE_STORAGE_DIR`, `INTAKE_EXTRACTION_STRATEGY` (`rules`/`llm`), `INTAKE_CONCURRENCY` (1–4), `INTAKE_TESSDATA_DIR`, `INTAKE_LEASE_MS`, `INTAKE_MAX_ACTIVE_JOBS`, `INTAKE_RETRY_BASE_MS`, `INTAKE_WORKER_ENABLED`, `WORKER_HEARTBEAT_FILE` |
 
-Intake jobs run in the API process by default. `INTAKE_WORKER_ENABLED=false` (only honoured when `REDIS_URL` is set) makes the API enqueue only, and a separate `node dist/worker.js` process (same image) consumes the queue; `node dist/worker.js --healthcheck` exits 0 while its heartbeat file (`WORKER_HEARTBEAT_FILE`, default `/tmp/mizano-worker.heartbeat`) is fresh. The Pi stack uses this split.
+Intake jobs run in the API process by default. `INTAKE_WORKER_ENABLED=false` (only honoured when `REDIS_URL` is set) makes the API enqueue only, and a separate `node dist/worker.js` process (same image) consumes the queue; `node dist/worker.js --healthcheck` exits 0 while its heartbeat file (`WORKER_HEARTBEAT_FILE`, default `/tmp/mizano-worker.heartbeat`) is fresh; the probe resolves that path from the process environment and the same env files the worker loads, in the same order. The Pi stack uses this split.
 
 `OCR_SERVICE_*` and `VLM_*` entries still present in `.env.local` belong to removed Python services and are not read by the code.
 
