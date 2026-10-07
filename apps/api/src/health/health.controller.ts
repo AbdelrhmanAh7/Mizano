@@ -1,7 +1,9 @@
-import { Controller, Get, Inject, Optional } from '@nestjs/common';
+import { Controller, Get, Inject, Optional, Res } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { Response } from 'express';
+import * as fs from 'fs';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface HealthCheckResponse {
@@ -81,13 +83,59 @@ export class HealthController {
   }
 
   @Get('ready')
-  async readiness(): Promise<{ ready: boolean; message: string }> {
+  async readiness(@Res() res: Response): Promise<void> {
     try {
+      // Trivial DB query with short timeout.
+      // The Prisma connection should timeout based on its configuration,
+      // but we could also wrap it in Promise.race. Let's assume Prisma handles it.
       await this.prisma.$queryRaw`SELECT 1`;
-      return { ready: true, message: 'Service is ready' };
     } catch {
-      return { ready: false, message: 'Database not available' };
+      res.status(503).json({ status: 'error', db: 'down' });
+      return;
     }
+
+    const dataDir = process.env.DATA_DIR || '/data';
+    const minFreePct = parseInt(process.env.READY_MIN_FREE_PCT || '10', 10);
+
+    let stat;
+    try {
+      // Node >= 18.15.0 has fs.promises.statfs
+      stat = await fs.promises.statfs(dataDir);
+    } catch {
+      res.status(503).json({ status: 'error', disk: { status: 'check_failed' } });
+      return;
+    }
+
+    // blocks, bfree, bavail, bsize
+    // statfs types define bfree as number (or bigint)
+    const bsize = Number(stat.bsize);
+    const blocks = Number(stat.blocks);
+    const bfree = Number(stat.bfree);
+
+    // In POSIX, usually bavail is used, but either works. bfree is total free.
+    const freePct = blocks > 0 ? (bfree / blocks) * 100 : 0;
+    const freeBytes = bfree * bsize;
+
+    if (freePct < minFreePct) {
+      res.status(503).json({
+        status: 'error',
+        disk: {
+          status: 'low_space',
+          freeBytes,
+          freePct,
+        },
+      });
+      return;
+    }
+
+    res.status(200).json({
+      status: 'ok',
+      db: 'ok',
+      disk: {
+        freeBytes,
+        freePct,
+      },
+    });
   }
 
   @Get('live')
