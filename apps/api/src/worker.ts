@@ -1,13 +1,14 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { describeError } from './common/utils/redact';
 import { IntakeQueueService } from './modules/ai/intake/intake-queue.service';
 import { resolveLogLevels } from './modules/logger/log-level';
 import {
-  DEFAULT_HEARTBEAT_FILE,
   HEARTBEAT_INTERVAL_MS,
   beat,
   heartbeatIsFresh,
+  resolveHeartbeatFile,
 } from './worker-heartbeat';
 import { WorkerModule } from './worker.module';
 
@@ -31,7 +32,8 @@ async function bootstrap(): Promise<void> {
 
   app.enableShutdownHooks();
   const queue = app.get(IntakeQueueService);
-  const file = config.get<string>('WORKER_HEARTBEAT_FILE') || DEFAULT_HEARTBEAT_FILE;
+  // ConfigModule has loaded the env files into process.env by now.
+  const file = resolveHeartbeatFile();
   const tick = (): void => {
     try {
       beat(file, () => queue.isConsuming());
@@ -46,14 +48,15 @@ async function bootstrap(): Promise<void> {
 }
 
 if (process.argv.includes('--healthcheck')) {
-  process.exit(
-    heartbeatIsFresh(process.env.WORKER_HEARTBEAT_FILE || DEFAULT_HEARTBEAT_FILE) ? 0 : 1,
-  );
+  // No Nest context here (this runs every 30 s): read the same env files ConfigModule would.
+  process.exit(heartbeatIsFresh(resolveHeartbeatFile()) ? 0 : 1);
 } else {
   bootstrap().catch((err: unknown) => {
-    const meta =
-      err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { err };
-    Logger.error('Worker failed to start', meta, 'WorkerBootstrap');
+    // Dependency errors can quote connection strings: log the type only, never the message.
+    Logger.error(
+      `Worker failed to start: ${describeError(err, { includeMessage: false })}`,
+      'WorkerBootstrap',
+    );
     process.exit(1);
   });
 }
