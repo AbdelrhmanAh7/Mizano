@@ -2,6 +2,19 @@
  * Posting integrity on the real database (issue #94): the single ledger command posts a source
  * event at most once under retries and concurrency, a failure mid-post leaves no partial rows,
  * and money travels and is stored as exact decimals.
+ *
+ * Needs PostgreSQL. `pnpm ci:full` does not run E2E specs (see docs/DEVELOPMENT.md › Testing ›
+ * "API E2E against a throwaway PostgreSQL"). Short version, from the repo root:
+ *
+ *   initdb -D $TMPDIR/mz-pg/data -U mizano --auth=trust -E UTF8 --locale=C
+ *   pg_ctl -D $TMPDIR/mz-pg/data -o "-p 55494 -c listen_addresses=127.0.0.1" -w start
+ *   createdb -h 127.0.0.1 -p 55494 -U mizano mizano_e2e
+ *   export DATABASE_URL=postgresql://mizano@127.0.0.1:55494/mizano_e2e APP_ENV=e2e
+ *   (cd apps/api && npx prisma migrate deploy && \
+ *     npx jest --config ./test/jest-e2e.json --runInBand test/posting-integrity.e2e-spec.ts)
+ *
+ * Without REDIS_URL the cache falls back to memory, so Redis is not required. Row locking is
+ * only meaningful on PostgreSQL: do not point this spec at SQLite or an in-memory database.
  */
 import { ConflictException, INestApplication } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -74,7 +87,7 @@ describe('Posting integrity (e2e, real database)', () => {
   }
 
   describe('the single ledger command', () => {
-    it('posts a retried source event once and rejects the replay with a conflict', async () => {
+    it('@issue-94 AC3: posts a retried source event once and rejects the replay with a conflict', async () => {
       const source = { type: SOURCE, id: `retry-${uniqueSuffix()}` };
       const first = await journals.create(tenant.organizationId, entry('250.50'), { source });
       await expect(
@@ -86,7 +99,7 @@ describe('Posting integrity (e2e, real database)', () => {
       expectBalanced(posted[0].lines, '250.5000');
     });
 
-    it('posts exactly one balanced journal when one event is posted 8 times at once', async () => {
+    it('@issue-94 AC4: posts exactly one balanced journal when one event is posted 8 times at once', async () => {
       const source = { type: SOURCE, id: `race-${uniqueSuffix()}` };
       const [journalsBefore, linesBefore] = await rowCounts();
       const results = await Promise.allSettled(
@@ -106,7 +119,7 @@ describe('Posting integrity (e2e, real database)', () => {
       expect(await rowCounts()).toEqual([journalsBefore + 1, linesBefore + 2]);
     });
 
-    it('rolls back the header and every line when the post fails after the insert', async () => {
+    it('@issue-94 AC5: rolls back the header and every line when the post fails after the insert', async () => {
       const source = { type: SOURCE, id: `fail-${uniqueSuffix()}` };
       const before = await rowCounts();
       await expect(
@@ -125,7 +138,7 @@ describe('Posting integrity (e2e, real database)', () => {
 
   describe('money transport and storage', () => {
     it.each(['1234.10', '999999999999999.9999'])(
-      'round-trips %s as an exact decimal string',
+      '@issue-94 AC2: round-trips %s as an exact decimal string',
       async (amount) => {
         const created = await a.post('/journals').send(entry(amount));
         expect(created.status).toBe(201);
@@ -141,7 +154,7 @@ describe('Posting integrity (e2e, real database)', () => {
       },
     );
 
-    it('rejects amounts storage would round instead of storing an unbalanced journal', async () => {
+    it('@issue-94 AC2: rejects amounts storage would round instead of storing an unbalanced journal', async () => {
       const before = await rowCounts();
       const res = await a.post('/journals').send({
         date: midnightIso(day),
@@ -168,7 +181,21 @@ describe('Posting integrity (e2e, real database)', () => {
       return res.body.id;
     }
 
-    it('sends one invoice 5 times at once and posts exactly one journal', async () => {
+    it('@issue-94 AC3: sends the same invoice twice and keeps the first journal as the only one', async () => {
+      const id = await draftInvoice();
+      expect((await a.patch(`/invoices/${id}/send`)).status).toBe(200);
+      const first = await journalsFor(INVOICE_SEND, id);
+      expect(first).toHaveLength(1);
+
+      const again = await a.patch(`/invoices/${id}/send`);
+      expect([400, 409]).toContain(again.status);
+      const posted = await journalsFor(INVOICE_SEND, id);
+      expect(posted.map((j) => j.id)).toEqual([first[0].id]);
+      expect(posted[0].lines).toHaveLength(first[0].lines.length);
+      expectBalanced(posted[0].lines, '113.9900');
+    });
+
+    it('@issue-94 AC4: sends one invoice 5 times at once and posts exactly one journal', async () => {
       const id = await draftInvoice();
       const results = await Promise.all(
         Array.from({ length: 5 }, () => a.patch(`/invoices/${id}/send`)),
@@ -182,7 +209,7 @@ describe('Posting integrity (e2e, real database)', () => {
       expectBalanced(posted[0].lines, '113.9900'); // 99.99 + 14% VAT (13.9986 -> 14.00)
     });
 
-    it('keeps the invoice a draft with no journal when posting fails mid-send', async () => {
+    it('@issue-94 AC5: keeps the invoice a draft with no journal when posting fails mid-send', async () => {
       const id = await draftInvoice();
       const before = await rowCounts();
       const realCreate = journals.create.bind(journals);
@@ -202,7 +229,7 @@ describe('Posting integrity (e2e, real database)', () => {
       expect(await journalsFor(INVOICE_SEND, id)).toHaveLength(1);
     });
 
-    it('rejects a repeated send once the period is locked, still with one journal', async () => {
+    it('@issue-94 AC3: rejects a repeated send once the period is locked, still with one journal', async () => {
       const id = await draftInvoice();
       expect((await a.patch(`/invoices/${id}/send`)).status).toBe(200);
       const lock = await a.patch('/organization/lock-date').send({ lockDate: midnightIso(day) });
@@ -216,7 +243,7 @@ describe('Posting integrity (e2e, real database)', () => {
     });
   });
 
-  it('leaves the tenant ledger balanced as stored', async () => {
+  it('@issue-94 AC2: leaves the tenant ledger balanced as stored', async () => {
     const { _sum } = await prisma.journalLine.aggregate({
       where: { journal: { organizationId: tenant.organizationId } },
       _sum: { debit: true, credit: true },

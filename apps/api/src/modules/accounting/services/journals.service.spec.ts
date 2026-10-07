@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { JournalSourceType, JournalsService } from './journals.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { OrganizationsService } from '../../organizations/organizations.service';
@@ -146,6 +147,64 @@ describe('JournalsService', () => {
       await service.create(ORG_ID, { date, lines: lines('999999999999999.9999') });
       const createCall = prisma.journal.create.mock.calls[0]![0]!;
       expect(JSON.stringify(createCall.data)).toContain('"debit":"999999999999999.9999"');
+    });
+
+    describe('idempotent posting (@issue-94)', () => {
+      const source = { type: JournalSourceType.INVOICE_SEND, id: 'inv-94-001' };
+      const uniqueViolation = () =>
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+          meta: { target: ['organizationId', 'sourceType', 'sourceId'] },
+        });
+
+      beforeEach(() => {
+        prisma.account.findMany.mockResolvedValue([
+          { id: 'acc-1', organizationId: ORG_ID },
+          { id: 'acc-2', organizationId: ORG_ID },
+        ] as any);
+      });
+
+      it('@issue-94 AC3: posting the same document twice creates exactly one ledger entry', async () => {
+        const stored = createMockJournalEntry({ id: 'jrn-first', lines: [] });
+        prisma.journal.create
+          .mockResolvedValueOnce(stored as any)
+          .mockRejectedValueOnce(uniqueViolation());
+
+        const first = await service.create(ORG_ID, balancedDto, { source });
+        expect(first.id).toBe('jrn-first');
+
+        await expect(service.create(ORG_ID, balancedDto, { source })).rejects.toThrow(
+          ConflictException,
+        );
+
+        // Both attempts carry the tenant and the same source key, so the unique index on
+        // (organizationId, sourceType, sourceId) is what keeps the second row out.
+        expect(prisma.journal.create).toHaveBeenCalledTimes(2);
+        for (const [call] of prisma.journal.create.mock.calls) {
+          expect(call.data).toMatchObject({
+            organizationId: ORG_ID,
+            sourceType: source.type,
+            sourceId: source.id,
+          });
+        }
+      });
+
+      it('@issue-94 AC3: a unique violation on a post without a source key is not reported as a replay', async () => {
+        prisma.journal.create.mockRejectedValueOnce(uniqueViolation());
+        await expect(service.create(ORG_ID, balancedDto)).rejects.toBeInstanceOf(
+          Prisma.PrismaClientKnownRequestError,
+        );
+      });
+
+      it('@issue-94 AC5: a replay in a locked period is rejected before the ledger is touched', async () => {
+        organizationsService.getLockDate.mockResolvedValue(new Date('2024-12-31T00:00:00.000Z'));
+        await expect(service.create(ORG_ID, balancedDto, { source })).rejects.toThrow(
+          BadRequestException,
+        );
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(prisma.journal.create).not.toHaveBeenCalled();
+      });
     });
 
     it('should allow two lines that use the same account', async () => {

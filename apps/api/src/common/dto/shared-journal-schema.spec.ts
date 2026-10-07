@@ -10,7 +10,7 @@ function parse(lines: Array<{ debit?: string; credit?: string }>) {
   });
 }
 
-describe('createJournalSchema balance (@mizano/validators)', () => {
+describe('createJournalSchema balance (@mizano/validators, @issue-94 AC2)', () => {
   it('accepts exactly balanced decimals (0.1 + 0.2 = 0.3)', () => {
     expect(parse([{ debit: '0.1' }, { debit: '0.2' }, { credit: '0.3' }]).success).toBe(true);
   });
@@ -24,6 +24,10 @@ describe('createJournalSchema balance (@mizano/validators)', () => {
     expect(result.error?.issues.map((i) => i.message)).toEqual([
       'Total debits must equal total credits',
     ]);
+  });
+
+  it('treats 1234.10 and 1234.1 as the same amount without parsing a float', () => {
+    expect(parse([{ debit: '1234.10' }, { credit: '1234.1' }]).success).toBe(true);
   });
 
   it('reports invalid amounts as validation errors instead of throwing', () => {
