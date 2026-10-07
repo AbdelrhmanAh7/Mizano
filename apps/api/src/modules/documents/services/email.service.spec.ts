@@ -58,7 +58,11 @@ describe('EmailService.sendPayslip tenant scoping', () => {
   beforeEach(() => {
     prisma = buildPrisma();
     pdf = { generatePayslipPdf: jest.fn().mockResolvedValue(Buffer.from('%PDF')) };
-    service = new EmailService(prisma as unknown as PrismaService, pdf as unknown as PdfService);
+    service = new EmailService(
+      prisma as unknown as PrismaService,
+      pdf as unknown as PdfService,
+      { get: jest.fn(), set: jest.fn() } as any,
+    );
     sendEmail = jest
       .spyOn(service as unknown as { sendEmail: () => Promise<void> }, 'sendEmail')
       .mockResolvedValue(undefined);
@@ -145,6 +149,7 @@ describe('EmailService HTML safety', () => {
       {
         generateInvoicePdf: jest.fn(),
       } as unknown as PdfService,
+      { get: jest.fn(), set: jest.fn() } as any,
     );
     const sendEmail = jest
       .spyOn(
@@ -185,7 +190,15 @@ describe('EmailService.checkVolumeAnomaly', () => {
         findFirst: jest.fn(),
       },
     };
-    service = new EmailService(prisma as any, {} as any);
+    const mockCache = new Map<string, any>();
+    service = new EmailService(
+      prisma as any,
+      {} as any,
+      {
+        get: jest.fn().mockImplementation((key) => mockCache.get(key)),
+        set: jest.fn().mockImplementation((key, value) => mockCache.set(key, value)),
+      } as any,
+    );
     fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({} as any);
   });
 
@@ -244,19 +257,47 @@ describe('EmailService.checkVolumeAnomaly', () => {
     );
   });
 
-  it('warm-up boundary at 8 days uses ratio if higher', async () => {
+  it('warm-up boundary exactly 7 days old uses floor threshold if ratio is lower, or floor threshold strictly applies because history is under 7 full days?', async () => {
+    // Note: If exactly 7 days old (first log exactly 7 days ago), totalDaysHistory = 7.
+    // The requirement says "until 7 full UTC days of history exist ... only the floor applies; from day 8 ... baseline uses the full days available."
+    // Wait, the issue says: "Warm-up: until 7 full UTC days of history exist for the organization only the floor applies; from day 8 to day 30 the baseline uses the full days available."
+    // This implies that at day 7, it's still only the floor? Or "7 full days exist" means it starts using the baseline *after* 7 days?
+    // The logic is: fullDaysAvailable < 7 ? minDaily : threshold.
+    // If fullDaysAvailable === 7, threshold is used. Let's make sure it covers it.
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
-    const tenDaysAgo = new Date(today);
-    tenDaysAgo.setUTCDate(today.getUTCDate() - 10);
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setUTCDate(today.getUTCDate() - 7);
 
-    // 10 full days history. Baseline = 40. 2 * 40 = 80.
+    // 7 full days history. Baseline = 40. 2 * 40 = 80.
     // threshold should be max(50, 80) = 80.
-    const historyLogs = Array(400).fill({ sentAt: tenDaysAgo });
+    const historyLogs = Array(280).fill({ sentAt: sevenDaysAgo }); // 280 / 7 = 40
 
     prisma.emailLog.count.mockResolvedValue(85);
     prisma.emailLog.findMany.mockResolvedValue(historyLogs);
-    prisma.emailLog.findFirst.mockResolvedValue({ sentAt: tenDaysAgo });
+    prisma.emailLog.findFirst.mockResolvedValue({ sentAt: sevenDaysAgo });
+
+    await service.checkVolumeAnomaly(orgId);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const callArgs = JSON.parse(fetchSpy.mock.calls[0][1].body as string);
+    // At exactly 7 days, fullDaysAvailable is 7. activeThreshold uses minDaily (50) per updated logic (fullDaysAvailable < 8).
+    expect(callArgs.text).toContain('Threshold: 50');
+  });
+
+  it('warm-up boundary exactly 8 days old uses ratio threshold', async () => {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const eightDaysAgo = new Date(today);
+    eightDaysAgo.setUTCDate(today.getUTCDate() - 8);
+
+    // 8 full days history. Baseline = 40. 2 * 40 = 80.
+    // threshold should be max(50, 80) = 80.
+    const historyLogs = Array(320).fill({ sentAt: eightDaysAgo }); // 320 / 8 = 40
+
+    prisma.emailLog.count.mockResolvedValue(85);
+    prisma.emailLog.findMany.mockResolvedValue(historyLogs);
+    prisma.emailLog.findFirst.mockResolvedValue({ sentAt: eightDaysAgo });
 
     await service.checkVolumeAnomaly(orgId);
 

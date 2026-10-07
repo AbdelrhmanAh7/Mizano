@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PdfService } from './pdf.service';
 import {
@@ -11,14 +11,17 @@ import { escapeHtml, formatCurrency, formatDate, safeColor } from '../templates/
 import nodemailer from 'nodemailer';
 import type { Attachment } from 'nodemailer/lib/mailer';
 
+import { CacheService } from '../../../cache/cache.service';
+
 @Injectable()
 export class EmailService {
+  private readonly logger = new Logger(EmailService.name);
+
   constructor(
     private prisma: PrismaService,
     private pdfService: PdfService,
+    private cacheService: CacheService,
   ) {}
-
-  private anomalyState = new Map<string, boolean>();
 
   // ============ Invoice Emails ============
 
@@ -96,7 +99,9 @@ export class EmailService {
         },
       });
 
-      await this.checkVolumeAnomaly(organizationId).catch(console.error);
+      await this.checkVolumeAnomaly(organizationId).catch((e) =>
+        this.logger.error('Failed to check volume anomaly', e),
+      );
 
       return { success: true, emailLogId: emailLog.id };
     } catch (error: unknown) {
@@ -114,7 +119,9 @@ export class EmailService {
         },
       });
 
-      await this.checkVolumeAnomaly(organizationId).catch(console.error);
+      await this.checkVolumeAnomaly(organizationId).catch((e) =>
+        this.logger.error('Failed to check volume anomaly', e),
+      );
 
       return { success: false, error: errorMessage };
     }
@@ -678,21 +685,21 @@ export class EmailService {
     const minDaily = parseInt(process.env.NOTIFY_ANOMALY_MIN_DAILY || '50', 10);
     const threshold = Math.floor(Math.max(minDaily, 2 * baseline));
 
-    const activeThreshold = fullDaysAvailable < 7 ? minDaily : threshold;
+    const activeThreshold = fullDaysAvailable < 8 ? minDaily : threshold;
 
     const stateKey = `notify-volume-${organizationId}`;
-    const currentlyFailing = this.anomalyState.get(stateKey) || false;
+    const currentlyFailing = (await this.cacheService.get<boolean>(stateKey)) || false;
 
     if (todayCount > activeThreshold) {
       if (!currentlyFailing) {
-        this.anomalyState.set(stateKey, true);
+        await this.cacheService.set(stateKey, true);
         await this.notifyTelegram(
           `[Mizano] ALERT: Outbound invoice email volume anomaly detected for organization ${organizationId}. Count: ${todayCount}, Threshold: ${activeThreshold}`,
         );
       }
     } else {
       if (currentlyFailing) {
-        this.anomalyState.set(stateKey, false);
+        await this.cacheService.set(stateKey, false);
         await this.notifyTelegram(
           `[Mizano] RECOVERED: Outbound invoice email volume normalized for organization ${organizationId}.`,
         );
