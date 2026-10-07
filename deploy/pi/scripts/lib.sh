@@ -31,18 +31,25 @@ log() {
   printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
 }
 
-# Wait until api, worker and web report healthy. $1 = timeout in seconds.
+# Wait until api, worker and web report healthy and the tunnel container is running.
+# cloudflared has no health check (the image is a bare binary), but a bad token or a
+# crash loop shows as a container that is not `running`; nothing is reachable through it
+# then, since the stack publishes no ports. $1 = timeout in seconds.
 wait_healthy() {
-  local deadline=$((SECONDS + ${1:-240})) svc cid status ok
+  local deadline=$((SECONDS + ${1:-240})) svc cid state ok
   while [ "$SECONDS" -lt "$deadline" ]; do
     ok=1
-    for svc in api worker web; do
+    for svc in api worker web cloudflared; do
       cid="$(dc ps -q "$svc" 2>/dev/null || true)"
-      status=""
+      state=""
       if [ -n "$cid" ]; then
-        status="$(docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || true)"
+        # "<status> <health|none>", e.g. "running healthy", "restarting none".
+        state="$(docker inspect -f '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid" 2>/dev/null || true)"
       fi
-      [ "$status" = "healthy" ] || ok=0
+      case "$state" in
+        "running healthy" | "running none") ;;
+        *) ok=0 ;;
+      esac
     done
     if [ "$ok" -eq 1 ]; then
       return 0

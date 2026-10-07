@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # One command to start/stop the Pi stack. Usage: stack.sh up|down|stop|restart|status|logs|check
 #   check    validate .env.pi (same rules as `APP_ENV=pi pnpm env:check`)
-#   up       check .env.pi and the SSD, start everything (waits for api, worker, web healthy)
+#   up       check .env.pi and the SSD, start everything (waits for api, worker, web healthy
+#            and the cloudflared container running)
 #   down     stop and remove containers; data on the SSD is kept
 #   stop     stop containers without removing them (used by mizano-stack.service)
 #   status   container state (stopped ones too), health and memory use
