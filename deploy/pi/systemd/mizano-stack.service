@@ -5,12 +5,25 @@ After=docker.service network-online.target
 Wants=network-online.target
 # Never start before the SSD is mounted (data must not land on the SD card).
 RequiresMountsFor=/mnt/ssd/mizano
+# Bound the retries below: at most 5 starts per hour (each may run for
+# TimeoutStartSec + RestartSec), then the unit stays failed and
+# mizano-healthcheck.timer alerts. `systemctl reset-failed mizano-stack` re-arms it.
+StartLimitIntervalSec=1h
+StartLimitBurst=5
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 Environment=SKIP_ENV_CHECK=1
 ExecStart=/opt/mizano/deploy/pi/scripts/stack.sh up
+# A transient boot failure (compose exits while Postgres or Redis is still
+# recovering, the wait times out) must not leave the stack down until someone
+# logs in: rerun `stack.sh up` after 30 s. `compose up -d` keeps the containers
+# that already run, and ExecStop does not run after a failed start, so a retry
+# never tears healthy services down. Restart= on a oneshot needs systemd >= 244
+# (Raspberry Pi OS bookworm ships 252).
+Restart=on-failure
+RestartSec=30
 # `stop` (not `down`) on shutdown; containers stopped this way are not auto-started by
 # dockerd at boot, so this unit starts them only after the SSD mount is ready.
 ExecStop=/opt/mizano/deploy/pi/scripts/stack.sh stop
