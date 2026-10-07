@@ -291,16 +291,43 @@ reachability preflight the owner can add to the deploy job instead.
 
 ## Local gate on this branch
 
-Commands run from the branch head, output pasted after the run (see "Tested commit"):
+Run on commit `628525baf084e4a2ba55c3dab763e05cb43a4e70` (the diagnosis commit; the final commit
+only adds this section). Mac mini, Node v26.10.0, offline `pnpm install --frozen-lockfile`
+followed by `pnpm db:generate`.
 
 ```text
-pnpm install --offline --frozen-lockfile   (node_modules present; puppeteer Chrome download skipped, no network)
-node_modules/.bin/prettier --check EVIDENCE.md AI_QUESTIONS.md
-pnpm lint
-pnpm type-check
+$ node_modules/.bin/prettier --check EVIDENCE.md AI_QUESTIONS.md
+Checking formatting...
+All matched files use Prettier code style!
+
+$ pnpm lint
+ Tasks:    4 successful, 4 total
+LINT_EXIT=0
+
+$ pnpm type-check
+ Tasks:    6 successful, 6 total
+TYPECHECK_EXIT=0
+
+$ cd apps/web && npx jest
+Test Suites: 48 passed, 48 total
+Tests:       458 passed, 458 total
+
+$ node apps/api/_run_tests.js
+FAIL src/modules/import-export/services/import.service.hardening.spec.ts
+Test Suites: 1 failed, 135 passed, 136 total
+Tests:       4 failed, 2193 passed, 2197 total
 ```
+
+The one API failure is pre-existing and environment-dependent, not caused by this branch (which
+changes two markdown files): all four assertions fail with `TypeError: csv is not a function`
+from `import * as csv from 'csv-parser'` in `apps/api/src/modules/import-export/services/import.service.ts`
+line 5, called at lines 87 and 1488. The same spec fails identically when run alone on this
+machine under Node v26.10.0. The `Unit Tests` check on master `615060e` (GitHub runner, Node 20
+per `deploy.yml` and `ci.yml`) is `success`, so the difference is the local Node major, not the
+code. Reported, not fixed here.
 
 ## Tested commit
 
-Filled in by the last commit on this branch, after the gate above was run on the preceding
-commit and re-run on the final head.
+- Diagnosis and gate: `628525baf084e4a2ba55c3dab763e05cb43a4e70`
+- Final head (this section added, `prettier --check` re-run on it): see the last commit on
+  branch `ai/113`; its SHA is in the PR description.
