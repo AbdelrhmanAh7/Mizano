@@ -1,6 +1,6 @@
 'use client';
 
-import type { DuplicateCheckResult } from '@mizano/shared-types';
+import type { DuplicateCheckResult, PossibleDuplicateDraft } from '@mizano/shared-types';
 import { useToast } from '@/components/ui/use-toast';
 import { billsApi } from '@/lib/api';
 import { decimalToDisplayNumber } from '@/lib/decimal';
@@ -186,18 +186,23 @@ export function useBill(id: string | undefined) {
   });
 }
 
+/** A stored bill (by ID) or unsaved bill fields such as a completed intake. */
+export type PossibleDuplicatesTarget = { billId: string } | { draft: PossibleDuplicateDraft };
+
 /**
- * Possible duplicates of a stored bill: posted bills of the same vendor with the identical
- * amount and currency within ±3 days. Advisory only; it never blocks approval.
+ * Possible duplicates: posted bills of the same vendor with the identical amount and currency
+ * within ±3 days. Advisory only; it never blocks approval.
  */
-export function useBillPossibleDuplicates(id: string, enabled = true) {
+export function usePossibleDuplicates(target: PossibleDuplicatesTarget) {
   return useQuery({
-    queryKey: ['bills', id, 'possible-duplicates'],
+    queryKey: ['bills', 'possible-duplicates', target],
     queryFn: async (): Promise<DuplicateCheckResult> => {
-      const response = await billsApi.possibleDuplicates(id);
+      const response =
+        'billId' in target
+          ? await billsApi.possibleDuplicates(target.billId)
+          : await billsApi.checkPossibleDuplicates(target.draft);
       return response.data as DuplicateCheckResult;
     },
-    enabled,
   });
 }
 

@@ -279,3 +279,14 @@ export interface DuplicateCheckResult {
   status: 'none' | 'possible' | 'unknown';
   matches: DuplicateBillMatch[];
 }
+
+/** Unsaved bill fields to check, e.g. a completed intake; missing fields give "unknown". */
+export interface PossibleDuplicateDraft {
+  vendorId?: string;
+  vendorName?: string;
+  /** Exact decimal string. */
+  amount?: string;
+  /** YYYY-MM-DD */
+  date?: string;
+  currency?: string;
+}

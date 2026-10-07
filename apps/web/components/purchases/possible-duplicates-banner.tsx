@@ -6,22 +6,26 @@ import { useTranslations } from 'next-intl';
 import { TriangleAlert, X } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { formatCurrency, useBillPossibleDuplicates } from '@/lib/hooks/use-bills';
+import {
+  formatCurrency,
+  usePossibleDuplicates,
+  type PossibleDuplicatesTarget,
+} from '@/lib/hooks/use-bills';
 
 interface PossibleDuplicatesBannerProps {
-  billId: string;
+  target: PossibleDuplicatesTarget;
 }
 
 /**
- * Dismissible, non-blocking warning on an unposted bill when posted bills of the same vendor
+ * Dismissible, non-blocking warning on an unposted bill or a completed intake when posted bills of the same vendor
  * have the identical amount and currency within ±3 days. Nothing shows while loading or when
  * there is no match; a failed check says so with Retry rather than looking like "no match".
  */
 export function PossibleDuplicatesBanner({
-  billId,
+  target,
 }: PossibleDuplicatesBannerProps): JSX.Element | null {
   const t = useTranslations('purchases.bills.duplicates');
-  const { data, isError, refetch } = useBillPossibleDuplicates(billId);
+  const { data, isError, refetch } = usePossibleDuplicates(target);
   const [dismissed, setDismissed] = useState(false);
 
   if (dismissed) return null;

@@ -212,7 +212,7 @@ export default function BillDetailPage({ params }: BillDetailPageProps) {
 
       {/* Advisory check before posting; it never blocks approval. */}
       {(bill.status === 'DRAFT' || bill.status === 'PENDING') && (
-        <PossibleDuplicatesBanner billId={bill.id} />
+        <PossibleDuplicatesBanner target={{ billId: bill.id }} />
       )}
 
       {/* Summary Cards */}

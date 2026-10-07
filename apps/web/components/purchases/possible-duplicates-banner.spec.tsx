@@ -13,9 +13,10 @@ const query: { data?: DuplicateCheckResult; isError: boolean; refetch: jest.Mock
   isError: false,
   refetch: jest.fn(),
 };
+const usePossibleDuplicates = jest.fn((_target: unknown) => query);
 jest.mock('@/lib/hooks/use-bills', () => ({
   ...jest.requireActual('@/lib/hooks/use-bills'),
-  useBillPossibleDuplicates: () => query,
+  usePossibleDuplicates: (target: unknown) => usePossibleDuplicates(target),
 }));
 
 const possible: DuplicateCheckResult = {
@@ -36,11 +37,27 @@ describe('PossibleDuplicatesBanner', () => {
     query.data = undefined;
     query.isError = false;
     query.refetch.mockReset();
+    usePossibleDuplicates.mockClear();
+  });
+
+  it('checks a stored bill by ID or an unsaved intake draft by its fields', () => {
+    render(<PossibleDuplicatesBanner target={{ billId: 'draft-1' }} />);
+    const draft = {
+      vendorName: 'شركة الأمل',
+      amount: '100.1',
+      date: '2026-10-06',
+      currency: 'EGP',
+    };
+    render(<PossibleDuplicatesBanner target={{ draft }} />);
+    expect(usePossibleDuplicates.mock.calls.map(([target]) => target)).toEqual([
+      { billId: 'draft-1' },
+      { draft },
+    ]);
   });
 
   it('lists each possible duplicate with a link, date and amount', () => {
     query.data = possible;
-    render(<PossibleDuplicatesBanner billId="draft-1" />);
+    render(<PossibleDuplicatesBanner target={{ billId: 'draft-1' }} />);
     expect(screen.getByTestId('possible-duplicates')).toHaveTextContent('title');
     expect(screen.getByRole('link', { name: 'BILL-007' })).toHaveAttribute(
       'href',
@@ -52,7 +69,7 @@ describe('PossibleDuplicatesBanner', () => {
 
   it('can be dismissed', () => {
     query.data = possible;
-    render(<PossibleDuplicatesBanner billId="draft-1" />);
+    render(<PossibleDuplicatesBanner target={{ billId: 'draft-1' }} />);
     fireEvent.click(screen.getByRole('button', { name: 'dismiss' }));
     expect(screen.queryByTestId('possible-duplicates')).not.toBeInTheDocument();
   });
@@ -63,13 +80,13 @@ describe('PossibleDuplicatesBanner', () => {
     ['an unknown result', { status: 'unknown', matches: [] }],
   ] as const)('renders nothing for %s', (_label, data) => {
     query.data = data as DuplicateCheckResult | undefined;
-    const { container } = render(<PossibleDuplicatesBanner billId="draft-1" />);
+    const { container } = render(<PossibleDuplicatesBanner target={{ billId: 'draft-1' }} />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it('shows a failed check with Retry instead of hiding it', () => {
     query.isError = true;
-    render(<PossibleDuplicatesBanner billId="draft-1" />);
+    render(<PossibleDuplicatesBanner target={{ billId: 'draft-1' }} />);
     expect(screen.getByTestId('possible-duplicates-error')).toHaveTextContent('checkFailed');
     fireEvent.click(screen.getByRole('button', { name: 'retry' }));
     expect(query.refetch).toHaveBeenCalledTimes(1);
