@@ -110,3 +110,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Rollback must be repeatable.** Track an active pointer in `deployments.log` (`OK`/`ROLLBACK` lines), not "the previous OK line", or the second rollback is a no-op.
 - **Check DB readiness over TCP** (`pg_isready -h 127.0.0.1`). The temporary init server listens on the unix socket only and passes a socket probe.
 - **Dedupe alerts on stable keys** (check name), never on live values like percentages; alert once on start and once on recovery.
+- **A failure diagnosis states only what the log proves.** `dial tcp …:22: i/o timeout` proves an SSH timeout, not a stopped VM or a firewall rule; list those as possible causes. Do not call a workflow or environment "legacy" or "obsolete" unless the owner or an issue says so; the docs may still name it the production path. _(#103 deploy diagnosis)_
+- **A diagnosis-only PR does not close the issue.** If the fix is an owner action (workflows, secrets, infrastructure), write `Refs #N`, not `Closes #N`, and keep the issue open until the fix lands. _(#103)_
+- **Any edit to `deploy.yml` must update `deployment_workflow_sha256` in `docs/planning/rollout-exemption.json`** and pass `python3 scripts/test_demo_rollout_scope.py`; proposed workflow patches must say so. _(#103)_
+- **Evidence names a SHA that contains the verified tree.** A commit cannot record its own SHA, and a squashed or rebased snapshot is not an ancestor of the final head; bind evidence to the PR head's check runs instead. _(#103)_
