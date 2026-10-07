@@ -142,3 +142,22 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+## Issue #110 (API readiness endpoint)
+
+- **Commit SHA**: $(git rev-parse HEAD)
+- **Branch**: `ai/110`
+- **Audit Date**: $(date -I)
+
+| REQ ID | Requirement                                              | Verification Method                 | Status |
+| ------ | -------------------------------------------------------- | ----------------------------------- | ------ |
+| AC1    | A healthy DB and enough disk returns 200 with JSON shape | E2E test `health-ready.e2e-spec.ts` | PASSED |
+| AC2    | Failing DB check returns 503, body names db as failing   | E2E test `health-ready.e2e-spec.ts` | PASSED |
+| AC3    | Free space below threshold returns 503, body names disk  | E2E test `health-ready.e2e-spec.ts` | PASSED |
+| AC4    | Response contains no secrets/tenant data                 | E2E test `health-ready.e2e-spec.ts` | PASSED |
+| AC5    | Change is ≤ ~200 lines                                   | `git diff --stat origin/master`     | PASSED |
+
+- **Test Commands**:
+  ```bash
+  pnpm run --filter api test:e2e health-ready
+  ```
