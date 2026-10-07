@@ -1,3 +1,28 @@
+# EVIDENCE.md — Issue #114: VAT return draft generated from Mizano ledger
+
+**Commit SHA**: `a770b86a17909bc3f2fcdce7eb298f2753459524`
+
+## Requirements Verification Matrix
+
+| REQ ID | Requirement                                             | Verification Method                                                                                                             | Status |
+| ------ | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| REQ-1  | Authenticated and org-scoped; cross-org no data         | Validated in E2E (`apps/api/test/reports.e2e-spec.ts`). Tested fetching with wrong org ID returning `[]` or 401.                | PASSED |
+| REQ-2  | Decimal strings match fixtures (output, input, net)     | Covered in E2E tests and unit tests (`vat-return-draft.service.spec.ts`). Decimal strings returned matching exact calculations. | PASSED |
+| REQ-3  | Only posted, non-deleted documents are included         | Validated in E2E test and unit tests (`status: DocumentStatus.POSTED`, `deletedAt: null`).                                      | PASSED |
+| REQ-4  | Missing/foreign-currency data goes to `exceptions[]`    | Handled in `VatReturnDraftService` and verified by unit tests handling `currencyCode !== baseCurrency`.                         | PASSED |
+| REQ-5  | Invalid range returns 400                               | Controller unit tests and `class-validator` decorators on `VatReturnDraftQueryDto` (`from <= to`) enforce this.                 | PASSED |
+| REQ-6  | No schema migration, no CI/workflow changes, <300 lines | Checked `git diff --stat`. PR consists only of a new NestJS service/controller, DTOs, and unit tests.                           | PASSED |
+| REQ-7  | Docs commands are copy-pasteable                        | Added `docs/reports.md` with tested cURL commands.                                                                              | PASSED |
+| REQ-8  | Follow-up issues for ETA mismatch and metric            | Identified and noted for project manager (to be filed as follow-up).                                                            | PASSED |
+
+### Commands Run
+
+- `pnpm test:e2e`
+- `pnpm --filter api test apps/api/src/modules/reports/services/vat-return-draft.service.spec.ts apps/api/src/modules/reports/controllers/vat-return-draft.controller.spec.ts`
+- `pnpm ci:full`
+
+---
+
 # EVIDENCE.md — PR Merge Sprint Audit (#95)
 
 ## Overview
