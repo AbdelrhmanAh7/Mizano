@@ -61,6 +61,35 @@ test('a template with a real-looking secret is reported', () => {
   assert.ok(checkTemplate(t, compose).some((e) => e.startsWith('JWT_SECRET:')));
 });
 
+test('every secret-bearing template key is checked, not only the long secrets', () => {
+  const real = new Map(template);
+  real.set('DATABASE_URL', `postgresql://mizano:${encodeURIComponent(pgPassword)}@postgres:5432/mizano_db`);
+  real.set('POSTGRES_PASSWORD', pgPassword);
+  real.set('CLOUDFLARE_TUNNEL_TOKEN', 'eyJhIjoiYWJjIn0.real-looking-token');
+  real.set('TELEGRAM_BOT_TOKEN', '123456:ABC-real-bot-token');
+  const errors = checkTemplate(real, compose);
+  for (const key of ['DATABASE_URL', 'POSTGRES_PASSWORD', 'CLOUDFLARE_TUNNEL_TOKEN']) {
+    assert.ok(errors.includes(`${key}: template must hold a placeholder, not a value`), key);
+  }
+  assert.ok(errors.includes('TELEGRAM_BOT_TOKEN: optional secret must be empty in the template'));
+  for (const line of errors) assert.ok(!line.includes(pgPassword) && !line.includes('real'), line);
+});
+
+test('a DATABASE_URL placeholder outside the password does not count', () => {
+  const t = new Map(template);
+  t.set('DATABASE_URL', `postgresql://mizano:${encodeURIComponent(pgPassword)}@postgres:5432/REPLACE_ME`);
+  assert.ok(checkTemplate(t, compose).some((e) => e.startsWith('DATABASE_URL: template must hold')));
+});
+
+test('a template that drops a secret key is reported', () => {
+  const t = new Map(template);
+  t.delete('TELEGRAM_BOT_TOKEN');
+  t.delete('NEXTAUTH_SECRET');
+  const errors = checkTemplate(t, compose);
+  assert.ok(errors.includes('TELEGRAM_BOT_TOKEN: secret key missing from the template'));
+  assert.ok(errors.includes('NEXTAUTH_SECRET: secret key missing from the template'));
+});
+
 test('empty template values are optional, the rest required', () => {
   const required = requiredKeys(template);
   assert.ok(required.includes('DATABASE_URL'));

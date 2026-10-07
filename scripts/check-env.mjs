@@ -17,6 +17,17 @@ export const PI_COMPOSE = path.join(PI_DIR, 'docker-compose.pi.yml');
 export const PI_ENV_FILE = path.join(PI_DIR, '.env.pi');
 
 const LONG_SECRETS = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'NEXTAUTH_SECRET'];
+/** Every key whose value is a credential. Required ones hold a placeholder in the
+ * template, optional ones stay empty; anything else is a committed secret. */
+const SECRET_KEYS = {
+  POSTGRES_PASSWORD: 'required',
+  DATABASE_URL: 'required',
+  JWT_SECRET: 'required',
+  JWT_REFRESH_SECRET: 'required',
+  NEXTAUTH_SECRET: 'required',
+  CLOUDFLARE_TUNNEL_TOKEN: 'required',
+  TELEGRAM_BOT_TOKEN: 'optional',
+};
 const PLACEHOLDER = /REPLACE|OWNER\/|example\.com/;
 const DIGEST_REF = /^[^@\s]+@sha256:[0-9a-f]{64}$/;
 const AGE_RECIPIENT = /^age1[02-9ac-hj-np-z]{58}$/;
@@ -59,6 +70,16 @@ function httpsOrigin(value) {
   }
 }
 
+/** The credential part of a template value is a placeholder (for DATABASE_URL: its password). */
+function holdsPlaceholder(name, value) {
+  if (name !== 'DATABASE_URL') return PLACEHOLDER.test(value);
+  try {
+    return PLACEHOLDER.test(decodeURIComponent(new URL(value).password));
+  } catch {
+    return false;
+  }
+}
+
 /** Template must cover every compose variable and must not hold real secrets. */
 export function checkTemplate(template, composeText) {
   const errors = [];
@@ -66,10 +87,13 @@ export function checkTemplate(template, composeText) {
     if (!template.has(name))
       errors.push(`${name}: used by docker-compose.pi.yml, missing in template`);
   }
-  for (const name of [...LONG_SECRETS, 'POSTGRES_PASSWORD', 'CLOUDFLARE_TUNNEL_TOKEN']) {
-    if (!PLACEHOLDER.test(template.get(name) ?? '')) {
+  for (const [name, need] of Object.entries(SECRET_KEYS)) {
+    const value = template.get(name);
+    if (value === undefined) errors.push(`${name}: secret key missing from the template`);
+    else if (need === 'optional' && value !== '')
+      errors.push(`${name}: optional secret must be empty in the template`);
+    else if (need === 'required' && !holdsPlaceholder(name, value))
       errors.push(`${name}: template must hold a placeholder, not a value`);
-    }
   }
   return errors;
 }
