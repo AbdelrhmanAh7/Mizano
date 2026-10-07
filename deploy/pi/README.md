@@ -133,7 +133,7 @@ sudo cp deploy/pi/systemd/mizano-stack.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable mizano-stack.service
 ```
 
-The unit waits for the SSD mount (`RequiresMountsFor=/mnt/ssd/mizano`) and Docker, then runs `stack.sh up`. On shutdown it runs `stack.sh stop`, giving Postgres 60 s for a clean stop. Reboot test: `sudo reboot`, then without touching anything run `stack.sh status` and confirm every service is `healthy` and `systemctl is-active mizano-stack` prints `active`. Record the time from boot to healthy.
+The unit waits for the SSD mount (`RequiresMountsFor=/mnt/ssd/mizano`) and Docker, then runs `stack.sh up`. On shutdown it runs `stack.sh stop`, giving Postgres 60 s for a clean stop. If `stack.sh up` fails (for example the health wait times out while Postgres is still recovering), systemd reruns it after 30 s, at most 5 starts per hour (`Restart=on-failure`, `StartLimitBurst=5`); a retry reuses the containers that are already running. After the fifth failure the unit stays `failed` and `mizano-healthcheck.timer` alerts; fix the cause, then `sudo systemctl reset-failed mizano-stack && sudo systemctl start mizano-stack`. Reboot test: `sudo reboot`, then without touching anything run `stack.sh status` and confirm every service is `healthy` and `systemctl is-active mizano-stack` prints `active`. Record the time from boot to healthy.
 
 ## 6. Backups and restore drill
 
