@@ -142,3 +142,25 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+## Issue #109 — Arabic-Indic/Persian digit normalization
+
+Tested code head: `a5aeed02dcd38442bca11c75ca6b13d4945152e5` (this file is committed after it; only EVIDENCE.md differs).
+
+`normalizeDigits` (`apps/api/src/modules/ai/extraction/rules/rules-normalize.ts`) and its use in the intake rules extractor already exist on master. This PR only adds the acceptance spec `rules-normalize.spec.ts` (tagged `@issue-109`); no production code changes remain. An earlier attempt that also wired the helper into `entity-extraction.service.ts` and `ollama.service.ts` was reverted because dropped bidi marks shift entity offsets.
+
+| REQ | Verified by |
+|---|---|
+| AC1 `١٢٣٫٤٥` → 123.45, `١٬٢٣٤٫٥٠` → 1234.50 | `normalizeDigits` + `findAmounts` cases in rules-normalize.spec.ts |
+| AC2 `٠٧/١٠/٢٠٢٦` = `07/10/2026` | `parseDate` cases (Arabic-Indic and Persian) |
+| AC3 mixed script `EGP ١٢٠٠` | mixed-script `normalizeDigits` and `extractInvoiceFields` cases |
+| AC4 English tests unchanged | `invoice-rules-extractor.spec.ts`, `rules-strategy.spec.ts` untouched and passing |
+| AC5 no float math | `parseAmount` returns Decimal (asserted) |
+| AC6 ≤ ~200 lines | no production code in the diff |
+
+Commands run (sandbox off, local):
+- `npx jest src/modules/ai` in apps/api: Test Suites 60 passed, Tests 1096 passed
+- `npx tsc --noEmit -p .` in apps/api: no errors
+- `prettier --check` on the spec: clean
+
+Not run: the seeded PDF e2e (removed; see commit a5aeed0).
