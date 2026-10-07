@@ -63,7 +63,10 @@ test('a template with a real-looking secret is reported', () => {
 
 test('every secret-bearing template key is checked, not only the long secrets', () => {
   const real = new Map(template);
-  real.set('DATABASE_URL', `postgresql://mizano:${encodeURIComponent(pgPassword)}@postgres:5432/mizano_db`);
+  real.set(
+    'DATABASE_URL',
+    `postgresql://mizano:${encodeURIComponent(pgPassword)}@postgres:5432/mizano_db`,
+  );
   real.set('POSTGRES_PASSWORD', pgPassword);
   real.set('CLOUDFLARE_TUNNEL_TOKEN', 'eyJhIjoiYWJjIn0.real-looking-token');
   real.set('TELEGRAM_BOT_TOKEN', '123456:ABC-real-bot-token');
@@ -77,8 +80,13 @@ test('every secret-bearing template key is checked, not only the long secrets', 
 
 test('a DATABASE_URL placeholder outside the password does not count', () => {
   const t = new Map(template);
-  t.set('DATABASE_URL', `postgresql://mizano:${encodeURIComponent(pgPassword)}@postgres:5432/REPLACE_ME`);
-  assert.ok(checkTemplate(t, compose).some((e) => e.startsWith('DATABASE_URL: template must hold')));
+  t.set(
+    'DATABASE_URL',
+    `postgresql://mizano:${encodeURIComponent(pgPassword)}@postgres:5432/REPLACE_ME`,
+  );
+  assert.ok(
+    checkTemplate(t, compose).some((e) => e.startsWith('DATABASE_URL: template must hold')),
+  );
 });
 
 test('a template that drops a secret key is reported', () => {
@@ -184,7 +192,6 @@ test('demo guardrails: CPU-only extraction, SSD path, age key', () => {
   assert.ok(errors.some((e) => e.startsWith('MIZANO_DATA_DIR:')));
   assert.ok(errors.some((e) => e.startsWith('BACKUP_AGE_RECIPIENT:')));
   assert.ok(warnings.some((w) => w.startsWith('TELEGRAM_BOT_TOKEN/')));
-
 });
 
 test('messages never contain values', () => {
