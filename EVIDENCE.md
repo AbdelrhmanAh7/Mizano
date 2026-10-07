@@ -1,149 +1,113 @@
 # Evidence: Issue #96 Duplicate-invoice warning before posting (vendor + exact amount + date window)
 
-Implementation of Slice 1: read-only duplicate-check service and endpoint in `apps/api` with full domain and multi-tenancy tests.
+A read-only duplicate check for bills, plus a dismissible, non-blocking warning on unposted bills. Intake drafts are saved as DRAFT bills and posted from the bill page, so the warning appears there before approval.
 
-- **Base commit:** `master` at `b83d72b4cfa358f3a6ba4be9d9f1b613ac9fe1f2`
-- **Tested SHA:** `71b7110050f520a9af1c0c23cbf44ac7c05fb028`
-- **Author:** AI implementer (Command Code)
-- **Host:** Darwin arm64 (macOS), Node v22.13.1, pnpm 8.14.0
+- **Baseline:** `origin/master` at `615060ed6294e16375a1f1ea9385cb7e812cd24f` (merged into the branch in `4a620dc`)
+- **Tested head:** `a437761b8f5ea68ae150351f829c5208b3b6911d`. `apps/` and `packages/` are identical to `2fe0abd`, where `turbo lint type-check test` ran (`git diff --stat 2fe0abd a437761 -- apps packages` is empty).
+- **Author:** Claude Opus 5.5 (`claude-opus-5-5`) via Claude Code, AI implementer for review round 1 on PR #101. Earlier commits were made by previous engines. This is not an independent review.
+- **Host:** Darwin arm64 (macOS), Node v26.10.0, pnpm 8.14.0
 
----
+## Behaviour
 
-## Requirements Verification
+| Route                                   | Use                                                                |
+| --------------------------------------- | ------------------------------------------------------------------ |
+| `GET /bills/:id/possible-duplicates`    | Check a stored bill. It is excluded from its own matches.          |
+| `POST /bills/possible-duplicates` (200) | Check unsaved draft values sent in the body. Not written to audit. |
 
-| REQ    | Requirement                                                                                                                                                                                                   | Verified By                                                                                                  | Result   |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | -------- |
-| REQ-1  | **Date window (±3 days inclusive)**: Day 0, −3, and +3 match (`possible`); day ±4 does not (`none`). Calendar date comparison in UTC across timezones.                                                        | `bills.service.spec.ts` › `exact match on day 0, -3 and +3 returns possible; day +/-4 returns none`          | **PASS** |
-| REQ-2  | **Exact Decimal comparison**: `"100.10"` vs `"100.1"` matches; `"100.10"` vs `"100.11"` does not. No float conversion / `Number()` / `parseFloat()` on monetary values.                                       | `bills.service.spec.ts` › `matches 100.10 vs 100.1 but rejects 100.10 vs 100.11 without float conversion`    | **PASS** |
-| REQ-3  | **Currency isolation**: Different currency does not match. Evaluates explicit draft currency vs bill currency / org base currency.                                                                            | `bills.service.spec.ts` › `rejects different currency as no match`                                           | **PASS** |
-| REQ-4  | **Vendor matching & normalization**: Normalizes vendor name (NFKC, casefold, trimmed, whitespace collapsed). Arabic vendor name (`'شركة الأمل'`) matches exactly. Resolves vendor ID directly when available. | `bills.service.spec.ts` › `matches vendor name differing only in case or whitespace, and Arabic vendor name` | **PASS** |
-| REQ-5  | **Multi-tenant scoping**: All queries strictly scoped by authorized `organizationId` from session (`@CurrentOrg()`). Bills from other organizations are never returned even if known.                         | `bills.service.spec.ts` › `scopes by organization: a bill in another org is never queried or returned`       | **PASS** |
-| REQ-6  | **Posted bills only**: Draft and unposted bills (`DRAFT`, `PENDING`) are ignored. Only posted bills (`OPEN`, `PARTIALLY_PAID`, `PAID`, `OVERDUE`, `VOID`) are candidates.                                     | `bills.service.spec.ts` › `ignores draft and unposted bills`                                                 | **PASS** |
-| REQ-7  | **Missing values handling**: Missing amount, date, or vendor returns `status: "unknown"` with empty matches.                                                                                                  | `bills.service.spec.ts` › `returns unknown when amount, date or vendor is missing`                           | **PASS** |
-| REQ-8  | **Strict ISO date validation**: Malformed date (`2026-10-06x`) rejected with 400 `BadRequestException` via strict anchored ISO calendar validation.                                                           | `bills.service.spec.ts` › `rejects malformed date (2026-10-06x) using strict ISO validation`                 | **PASS** |
-| REQ-9  | **Ordering & stable tiebreaker**: Matches sorted by `document_date DESC, id DESC`. Stable ID tiebreaker when two matches share a date.                                                                        | `bills.service.spec.ts` › `sorts matches by document_date DESC, id DESC with stable ID tiebreaker`           | **PASS** |
-| REQ-10 | **Result limit & read-only guarantee**: Returns at most 5 matches. Takes no locks, writes no rows, and never blocks or alters posting.                                                                        | `bills.service.spec.ts` › `returns at most 5 matches`                                                        | **PASS** |
-| REQ-11 | **Route protection & permissions**: `GET /bills/possible-duplicates` and `GET /bills/:id/possible-duplicates` protected by `purchases.view` permission.                                                       | `bills.controller.spec.ts` › `is protected by purchases.view permission`                                     | **PASS** |
+Both routes require `purchases.view`. The response is `{ status: 'possible' | 'none' | 'unknown', matches: [{ billId, billNumber, documentDate, amount, currency }] }`, with at most 5 matches and `amount` as a fixed 4-dp string.
 
----
+## Requirements verification
 
-## Acceptance Checklist
+| REQ    | Requirement                                                                                                                                                                  | Verified by                                                                                                                                         | Result   |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| REQ-1  | ±3 calendar days inclusive: day 0, −3 and +3 match; ±4 does not.                                                                                                             | `bills.service.spec.ts` › `exact match on day 0, -3 and +3…`; e2e › `matches a POSTed draft by normalized vendor name, exact decimal and +/-3 days` | **PASS** |
+| REQ-2  | Exact Decimal comparison (`100.10` = `100.1`, ≠ `100.11`). Matches are returned as fixed 4-dp strings (`100.1000`).                                                          | `bills.service.spec.ts` › `matches 100.10 vs 100.1…`; e2e › `warns on a stored draft… 4-dp match`                                                   | **PASS** |
+| REQ-3  | Same currency only. A stored bill without a currency is in the base currency. A draft without a currency returns `unknown`, not a guess.                                     | `bills.service.spec.ts` › `rejects different currency…`, `returns unknown when … currency is missing`; e2e (`noCurrency`)                           | **PASS** |
+| REQ-4  | Vendor by tenant-checked id or by normalized name (NFKC, case, whitespace; Arabic). A vendor id from another tenant returns 400.                                             | `bills.service.spec.ts` › `matches vendor name…`, `rejects a vendor id from another organization…`; e2e tenant B                                    | **PASS** |
+| REQ-5  | Tenant scoping: another tenant's bill id returns 404, its vendor id returns 400, and its vendor name finds nothing.                                                          | e2e › `never reveals tenant A's bills or vendors to tenant B`                                                                                       | **PASS** |
+| REQ-6  | Only posted bills (OPEN, PARTIALLY_PAID, PAID, OVERDUE, VOID) are candidates; DRAFT/PENDING are not.                                                                         | `bills.service.spec.ts` › `scopes by organization and to posted bills in the +/-3 day window`                                                       | **PASS** |
+| REQ-7  | Missing amount, date, vendor or currency returns `unknown`, and no bill query runs.                                                                                          | `bills.service.spec.ts` › `returns unknown when amount, date, vendor or currency is missing`                                                        | **PASS** |
+| REQ-8  | Input contract: `YYYY-MM-DD` only (timestamps rejected); amounts are decimal strings (JSON numbers, `1e2` and >4 dp rejected); the error never echoes the input.             | `check-possible-duplicate-bills.dto.spec.ts`; `bills.service.spec.ts` › `accepts date-only input…`; e2e › `rejects numeric amounts…` (400)          | **PASS** |
+| REQ-9  | Ordering: date DESC, then id DESC; at most 5 matches.                                                                                                                        | `bills.service.spec.ts` › `sorts matches by document_date DESC, id DESC and returns at most 5`                                                      | **PASS** |
+| REQ-10 | Read-only: the POST check writes no audit row, and soft-deleted bills return 404.                                                                                            | `audit.interceptor.spec.ts` › `does not audit read-only POST routes marked @SkipAudit()`; e2e › `does not write an audit row…`                      | **PASS** |
+| REQ-11 | Guards: 401 without a token and 403 without `purchases.view`, on both routes.                                                                                                | e2e › `requires authentication and purchases.view`                                                                                                  | **PASS** |
+| REQ-12 | Dismissible, non-blocking banner on DRAFT/PENDING bills, linking each match. Nothing shows while loading or with no match. A failed check shows Retry. Copy is in en and ar. | `possible-duplicates-banner.spec.tsx` (7 tests)                                                                                                     | **PASS** |
 
-- [x] The endpoint returns `possible`, `none` or `unknown` as the tests specify.
-- [x] Results are scoped by organization; the cross-organization test passes.
-- [x] Amounts stay decimal strings end to end; there are no `Number`/`parseFloat` calls on money.
-- [x] Posting behaviour is unchanged; all existing posting and approval tests pass (150/150 passed in purchases module).
-- [x] The diff is kept minimal, and no CI workflows or secrets files are touched.
-- [x] EVIDENCE.md contains the real command output and the tested commit SHA.
+I checked that two tests fail when their fix is removed: the DTO numeric-amount test fails without `@Transform`, and the e2e audit test fails without `@SkipAudit()` (`Expected: 8, Received: 9`).
 
----
+## Review threads (PR #101, round 1)
 
-## Performance & Database Index Note
+| Thread                                                           | Resolution                                                                                      |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Values in query string (Copilot, quality review)                 | Done in `8461325`: the check is a POST body. `f925886` also returns 200.                        |
+| Offset timestamps compared by text prefix (Copilot, Codex)       | `f925886`: date-only input (DTO and service). Timestamps are rejected.                          |
+| No web client or banner (Copilot)                                | `2fe0abd`: hook, banner (en/ar) and integration on the bill page before Approve & post.         |
+| `@IsString()` amount (Copilot, quality review)                   | Done in `8461325` (`@IsDecimalString()`).                                                       |
+| JSON numbers converted implicitly (Codex)                        | `f925886`: `@Transform` keeps the raw value. The DTO test runs with `enableImplicitConversion`. |
+| Soft-deleted bill id still readable (Copilot, CodeRabbit, Codex) | `f925886`: `deletedAt: null` on the lookup → 404 (unit + e2e).                                  |
+| `Decimal#toString()` amounts (Copilot, Codex)                    | `f925886`: `toFixed(4)`.                                                                        |
+| No seeded e2e (Copilot)                                          | `f26147e`: `test/bill-duplicates.e2e-spec.ts`.                                                  |
+| No `billId` path tests (CodeRabbit)                              | `f925886`: same-tenant exclusion and the not-found path, with no candidate query.               |
+| POST is audited as a CREATE (Codex P1)                           | `7f36808`: `@SkipAudit()` plus an AuditInterceptor check.                                       |
+| Foreign vendor id trusted (Codex)                                | `f925886`: vendor resolved with `organizationId` and `deletedAt: null` → 400.                   |
+| Error message echoes the date (Codex)                            | `f925886`: constant message (asserted in the unit test).                                        |
+| Missing draft currency assumed base (Codex)                      | `f925886`: returns `unknown`.                                                                   |
+| DTO date regex differs from the service (CodeRabbit)             | Both now accept `^\d{4}-\d{2}-\d{2}$` only.                                                     |
+| Stale EVIDENCE (CodeRabbit, Codex)                               | This file, recorded for the tested head above.                                                  |
 
-Per the Tech Lead plan notes:
+New root causes are added to `docs/agents/review-lessons.md` (`a437761`).
 
-> "Performance: confirm an index on (org, vendor, amount) exists. If one is needed, write it in AI_QUESTIONS.md rather than adding a migration silently."
+## Commands and results (tested head)
 
-Inspection of `apps/api/prisma/schema.prisma` shows existing indexes on `Bill`:
-
-- `@@index([organizationId, vendorId])`
-- `@@index([organizationId, deletedAt, status, date])`
-
-There is currently no composite index on `(organizationId, vendorId, grandTotal)`. The query filters on `(organizationId, vendorId)` and a narrow `[date - 4d, date + 4d]` window, which effectively leverages `@@index([organizationId, vendorId])`. For high-volume tenants with tens of thousands of bills per vendor, adding an index on `(organizationId, vendorId, grandTotal)` is recommended in a future dedicated schema migration. No migration was added silently in this PR.
-
----
-
-## Test Execution Outputs
-
-### Red Test Run (commit `7a05e13`)
-
-Failing tests before implementation of `findPossibleDuplicateBills`:
-
-```text
-> api@0.1.0 test /Users/abdelrahmanahmed/agents/work/impl/Mizano/apps/api
-> jest --maxWorkers=2 "apps/api/src/modules/purchases/services/bills.service.spec.ts"
-
-FAIL src/modules/purchases/services/bills.service.spec.ts
-  ● Test suite failed to run
-
-    src/modules/purchases/services/bills.service.spec.ts:647:34 - error TS2339: Property 'findPossibleDuplicateBills' does not exist on type 'BillsService'.
-
-    647       const day0 = await service.findPossibleDuplicateBills(ORG_ID, {
-                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~
-```
-
-### Green Test Run (commit `bcc65a2`)
-
-Targeted unit tests for bills service and controller:
+`pnpm ci:full` is `turbo lint type-check test`. I ran it with `--force` so turbo could not replay results cached by other worktrees:
 
 ```text
-> api@0.1.0 test /Users/abdelrahmanahmed/agents/work/impl/Mizano/apps/api
-> jest --maxWorkers=2 "apps/api/src/modules/purchases/services/bills.service.spec.ts" "apps/api/src/modules/purchases/controllers/bills.controller.spec.ts"
-
-PASS src/modules/purchases/services/bills.service.spec.ts (6.309 s)
-PASS src/modules/purchases/controllers/bills.controller.spec.ts (6.319 s)
-
-Test Suites: 2 passed, 2 total
-Tests:       57 passed, 57 total
-Snapshots:   0 total
-Time:        6.984 s
-Ran all test suites matching /apps\/api\/src\/modules\/purchases\/services\/bills.service.spec.ts|apps\/api\/src\/modules\/purchases\/controllers\/bills.controller.spec.ts/i.
+$ pnpm exec turbo lint type-check test --force
+@mizano/web:test: Test Suites: 49 passed, 49 total
+@mizano/web:test: Tests:       465 passed, 465 total
+api:test: Test Suites: 138 passed, 138 total
+api:test: Tests:       2218 passed, 2218 total
+ Tasks:    12 successful, 12 total
+Cached:    0 cached, 12 total
 ```
 
-Full purchases module regression suite:
+`next lint` prints 13 warnings, all in files this branch does not touch: crm, manufacturing, projects/my-tasks, purchases/credits, tax pages, `use-ai-chatbot.ts` and two settings specs. They predate this branch. The changed files lint clean with `eslint --max-warnings 0`, and all changed files pass `prettier --check`.
+
+Targeted runs:
 
 ```text
-> api@0.1.0 test /Users/abdelrahmanahmed/agents/work/impl/Mizano/apps/api
-> jest --maxWorkers=2 "apps/api/src/modules/purchases"
-
-PASS src/modules/purchases/services/vendor-credits.posting.spec.ts (9.995 s)
-PASS src/modules/purchases/services/expenses.posting.spec.ts (10.358 s)
-PASS src/modules/purchases/services/expenses.pending.spec.ts
-PASS src/modules/purchases/services/payments-made.service.spec.ts
-PASS src/modules/purchases/services/vendor-credits.review.spec.ts
-PASS src/modules/purchases/services/expenses.service.spec.ts
-PASS src/modules/purchases/services/vendor-credits.service.spec.ts
-PASS src/modules/purchases/services/expenses.categorize.spec.ts
-PASS src/modules/purchases/services/bills.service.spec.ts
-PASS src/modules/purchases/controllers/bills.controller.spec.ts
-
-Test Suites: 10 passed, 10 total
-Tests:       150 passed, 150 total
-Snapshots:   0 total
-Time:        13.699 s, estimated 15 s
-Ran all test suites matching /apps\/api\/src\/modules\/purchases/i.
+$ jest src/modules/purchases src/common/interceptors/audit.interceptor.spec.ts   (apps/api)
+Test Suites: 12 passed, 12 total
+Tests:       167 passed, 167 total
+$ jest components/purchases/possible-duplicates-banner.spec.tsx                  (apps/web)
+Tests:       7 passed, 7 total
 ```
 
-### Turbo Type-Check
+Seeded API e2e on a throwaway PostgreSQL 16 cluster (`prisma db push`, no `REDIS_URL`):
 
 ```text
-> mizano@0.1.0 type-check /Users/abdelrahmanahmed/agents/work/impl/Mizano
-> turbo type-check
-
-• turbo 2.8.12
-• Packages in scope: @mizano/shared-types, @mizano/validators, @mizano/web, api
-• Running type-check in 4 packages
-• Remote caching disabled, using shared worktree cache
-@mizano/validators:build: cache hit, replaying logs 8d836b18215331a3
-@mizano/shared-types:type-check: cache hit, replaying logs b114151b7b26044f
-@mizano/validators:type-check: cache hit, replaying logs 3b2af16a1570bd0c
-@mizano/shared-types:build: cache hit, replaying logs cb70284cf0116b75
-api:type-check: cache miss, executing 1a79b9b3716a08b7
-@mizano/web:type-check: cache hit, replaying logs 84e3d652988325a7
-
- Tasks:    6 successful, 6 total
-Cached:    5 cached, 6 total
-  Time:    12.625s
+$ jest --config ./test/jest-e2e.json --runInBand --verbose test/bill-duplicates.e2e-spec.ts
+PASS test/bill-duplicates.e2e-spec.ts
+  Possible duplicate bills (e2e)
+    ✓ warns on a stored draft with the posted bill as a 4-dp match, excluding itself (4 ms)
+    ✓ matches a POSTed draft by normalized vendor name, exact decimal and +/-3 days (11 ms)
+    ✓ rejects numeric amounts, exponents and timestamps with 400 (7 ms)
+    ✓ does not write an audit row for the read-only POST (13 ms)
+    ✓ requires authentication and purchases.view (101 ms)
+    ✓ never reveals tenant A's bills or vendors to tenant B (8 ms)
+Tests:       6 passed, 6 total
+$ jest --config ./test/jest-e2e.json --runInBand test/bill-duplicates.e2e-spec.ts test/purchases.e2e-spec.ts test/multi-tenancy.e2e-spec.ts
+Test Suites: 3 passed, 3 total
+Tests:       48 passed, 48 total
 ```
 
-### ESLint & Prettier
+## Not verified / blocked
 
-```text
-> api@0.1.0 lint /Users/abdelrahmanahmed/agents/work/impl/Mizano/apps/api
-> eslint "{src,apps,libs,test}/**/*.ts"
+- **`test/intake.e2e-spec.ts`: blocked, not passed.** It needs Redis/BullMQ, and this host has no Redis server (`Intake worker error: ECONNREFUSED`). This branch does not change intake code.
+- **Browser journey:** not run. Browser E2E is not wired in the repo (`docs/DEVELOPMENT.md`). The banner was verified only by component tests.
+- **Environment notes:** this worktree had no `node_modules`. I installed them offline from the local pnpm store with the lockfile unchanged (`pnpm install --offline --frozen-lockfile --ignore-scripts`), then ran `prisma generate` and fetched bcrypt's prebuilt binary. Some intermediate e2e runs hit a PostgreSQL server owned by another local session on the same port. Those runs are discarded. All e2e results above come from this session's own cluster on port 55496, and the database I had created on the other server was dropped.
+- **Size:** the diff is above the ~300-line guideline (about 390 non-test lines). Round 1 asked for the UI and e2e in this PR.
 
-> @mizano/shared-types@0.1.0 lint /Users/abdelrahmanahmed/agents/work/impl/Mizano/packages/shared-types
-> eslint "src/**/*.ts"
-```
+## Index note
 
-Both exited with code 0.
+`Bill` has `@@index([organizationId, vendorId])`, and the candidate query is bounded to one vendor and a 7-day window. No migration was added. An index on `(organizationId, vendorId, date)` can be considered if tenants grow large.
