@@ -1,3 +1,34 @@
+# EVIDENCE.md — Issue #120: VAT return draft: measure reduction in filing corrections
+
+**Commit SHA**: `1f46a9b4fe22c54f5933010b91e7ee4be7f093a3`
+
+## Requirements Verification Matrix
+
+| REQ ID | Requirement                                                     | Verification Method                                                                                                                                                                                                                                                                                                  | Status |
+| ------ | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| REQ-1  | Metric definition and data source documented in `docs/`         | Fully documented in `docs/reports.md` with mathematical formula, cohort breakdown, minimum event schema, and documented PostgreSQL query.                                                                                                                                                                            | PASSED |
+| REQ-2  | Minimum event recording without invoice text or PII             | Verified in E2E (`apps/api/test/vat-filing-corrections.e2e-spec.ts` AC2) and unit tests (`vat-return-draft.service.spec.ts`). Logs `VAT_RETURN_DRAFT_EVENT` and `VAT_RETURN_CORRECTION_EVENT` in `audit_logs` containing only period, timestamps, status, exceptionCount. Zero document text, invoice lines, or PII. | PASSED |
+| REQ-3  | Baseline handling: report "no data" until real filings exist    | Verified in E2E (AC1) and unit tests. When organization has 0 filed periods, returns `status: "no data"`, `hasData: false`, `filedPeriodsCount: 0`. No baseline invented.                                                                                                                                            | PASSED |
+| REQ-4  | Seeded scenario produces a verifiable number                    | Verified in E2E (AC3) and unit tests. 2 draft-assisted periods (1 correction) vs 1 unassisted period (2 corrections) computes exact rates: draft 0.5000, unassisted 2.0000, reduction rate 1.5000, reduction percentage 75.00%.                                                                                      | PASSED |
+| REQ-5  | Tenant isolation and authorization                              | Verified in E2E (AC4). Tenant B sees no Tenant A data (`status: "no data"`), anonymous callers are rejected with 401.                                                                                                                                                                                                | PASSED |
+| REQ-6  | Internal/admin view & documented query without external service | Exposed via `GET /api/v1/reports/vat-filing-corrections-metric` and documented copy-pasteable PostgreSQL CTE query in `docs/reports.md`.                                                                                                                                                                             | PASSED |
+
+### Commands Run
+
+```bash
+# E2E acceptance tests
+DATABASE_URL="postgresql://abdelrahmanahmed@localhost:5432/mizano_120_e2e" pnpm --filter api test:e2e test/vat-filing-corrections.e2e-spec.ts
+
+# Unit tests
+pnpm --filter api test src/modules/reports/services/vat-return-draft.service.spec.ts src/modules/reports/controllers/vat-return-draft.controller.spec.ts src/modules/tax/services/vat-returns.service.spec.ts
+
+# Type checking & linting
+pnpm --filter api type-check
+pnpm --filter api exec eslint "src/modules/reports/**/*.ts" "test/vat-filing-corrections.e2e-spec.ts"
+```
+
+---
+
 # EVIDENCE.md — PR Merge Sprint Audit (#95)
 
 ## Overview
