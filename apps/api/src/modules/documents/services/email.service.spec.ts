@@ -1,4 +1,5 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Logger } from '@nestjs/common';
+import { CacheService } from '../../../cache/cache.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EmailService } from './email.service';
 import { PdfService } from './pdf.service';
@@ -37,7 +38,6 @@ function buildPrisma(): Record<string, Record<string, jest.Mock>> {
     emailLog: {
       create: jest.fn().mockResolvedValue({ id: 'log-1' }),
       count: jest.fn().mockResolvedValue(0),
-      findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue(null),
     },
     payrollRun: {
@@ -61,7 +61,7 @@ describe('EmailService.sendPayslip tenant scoping', () => {
     service = new EmailService(
       prisma as unknown as PrismaService,
       pdf as unknown as PdfService,
-      { get: jest.fn(), set: jest.fn() } as any,
+      { get: jest.fn(), set: jest.fn() } as unknown as CacheService,
     );
     sendEmail = jest
       .spyOn(service as unknown as { sendEmail: () => Promise<void> }, 'sendEmail')
@@ -149,7 +149,7 @@ describe('EmailService HTML safety', () => {
       {
         generateInvoicePdf: jest.fn(),
       } as unknown as PdfService,
-      { get: jest.fn(), set: jest.fn() } as any,
+      { get: jest.fn(), set: jest.fn() } as unknown as CacheService,
     );
     const sendEmail = jest
       .spyOn(
@@ -170,11 +170,34 @@ describe('EmailService HTML safety', () => {
 });
 
 describe('EmailService.checkVolumeAnomaly', () => {
-  let prisma: any;
-  let service: any;
-  let fetchSpy: jest.SpyInstance;
   const orgId = 'org-123';
+  const stateKey = `notify-volume-${orgId}`;
   const origEnv = process.env;
+  let prisma: { emailLog: { count: jest.Mock; findFirst: jest.Mock } };
+  let cache: Map<string, unknown>;
+  let cacheSet: jest.Mock;
+  let service: EmailService;
+  let fetchSpy: jest.SpyInstance;
+
+  /** Midnight UTC, `days` full days before today. */
+  function utcDaysAgo(days: number): Date {
+    const d = new Date();
+    d.setUTCHours(0, 0, 0, 0);
+    d.setUTCDate(d.getUTCDate() - days);
+    return d;
+  }
+
+  /** `today`: attempts so far today; `history`: attempts in the 30 full days before today. */
+  function mockCounts(today: number, history = 0): void {
+    prisma.emailLog.count.mockImplementation(({ where }: { where: { sentAt: { lt?: Date } } }) =>
+      Promise.resolve(where.sentAt.lt ? history : today),
+    );
+  }
+
+  function telegramText(call = 0): string {
+    const body = JSON.parse(fetchSpy.mock.calls[call][1].body as string) as { text: string };
+    return body.text;
+  }
 
   beforeEach(() => {
     process.env = {
@@ -183,23 +206,23 @@ describe('EmailService.checkVolumeAnomaly', () => {
       TELEGRAM_BOT_TOKEN: 'token',
       TELEGRAM_ALERT_CHAT_ID: '123',
     };
-    prisma = {
-      emailLog: {
-        count: jest.fn(),
-        findMany: jest.fn(),
-        findFirst: jest.fn(),
-      },
-    };
-    const mockCache = new Map<string, any>();
+    prisma = { emailLog: { count: jest.fn(), findFirst: jest.fn().mockResolvedValue(null) } };
+    cache = new Map();
+    cacheSet = jest.fn((key: string, value: unknown) => {
+      cache.set(key, value);
+      return Promise.resolve();
+    });
     service = new EmailService(
-      prisma as any,
-      {} as any,
+      prisma as unknown as PrismaService,
+      {} as PdfService,
       {
-        get: jest.fn().mockImplementation((key) => mockCache.get(key)),
-        set: jest.fn().mockImplementation((key, value) => mockCache.set(key, value)),
-      } as any,
+        get: jest.fn((key: string) => Promise.resolve(cache.get(key) ?? null)),
+        set: cacheSet,
+      } as unknown as CacheService,
     );
-    fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({} as any);
+    fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue({ ok: true, status: 200 } as unknown as Response);
   });
 
   afterEach(() => {
@@ -207,123 +230,225 @@ describe('EmailService.checkVolumeAnomaly', () => {
     jest.restoreAllMocks();
   });
 
-  it('no history (cold start) - uses floor and notifies if floor exceeded', async () => {
-    prisma.emailLog.count.mockResolvedValue(51); // today count
-    prisma.emailLog.findMany.mockResolvedValue([]); // zero history
-    prisma.emailLog.findFirst.mockResolvedValue(null); // cold start
+  it('cold start: with no history only the floor applies and the first attempt over it alerts', async () => {
+    mockCounts(51);
 
     await service.checkVolumeAnomaly(orgId);
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    const callArgs = JSON.parse(fetchSpy.mock.calls[0][1].body as string);
-    expect(callArgs.text).toContain('ALERT');
-    expect(callArgs.text).toContain('Count: 51');
-    expect(callArgs.text).toContain('Threshold: 50');
+    expect(telegramText()).toContain('ALERT');
+    expect(telegramText()).toContain('Count: 51');
+    expect(telegramText()).toContain('Threshold: 50');
   });
 
-  it('zero baseline, warm-up boundary (under 7 days) uses floor', async () => {
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const fiveDaysAgo = new Date(today);
-    fiveDaysAgo.setUTCDate(today.getUTCDate() - 5);
-
-    prisma.emailLog.count.mockResolvedValue(60);
-    prisma.emailLog.findMany.mockResolvedValue([{ sentAt: fiveDaysAgo }]);
-    prisma.emailLog.findFirst.mockResolvedValue({ sentAt: fiveDaysAgo });
+  it('cold start: reaching the floor exactly is not an anomaly', async () => {
+    mockCounts(50);
 
     await service.checkVolumeAnomaly(orgId);
 
-    // baseline would be 1/5 = 0.2, 2*baseline = 0. But warm-up enforces floor 50.
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    const callArgs = JSON.parse(fetchSpy.mock.calls[0][1].body as string);
-    expect(callArgs.text).toContain('Threshold: 50');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(cacheSet).not.toHaveBeenCalled();
   });
 
-  it('alert text contains no invoice data or addresses', async () => {
-    prisma.emailLog.count.mockResolvedValue(100);
-    prisma.emailLog.findMany.mockResolvedValue([]);
-    prisma.emailLog.findFirst.mockResolvedValue(null);
+  it('zero baseline inside the warm-up (5 full days) keeps the floor', async () => {
+    prisma.emailLog.findFirst.mockResolvedValue({ sentAt: utcDaysAgo(5) });
+    mockCounts(60, 1); // 0.2/day, so 2 x baseline rounds to 0: the floor must win
 
     await service.checkVolumeAnomaly(orgId);
 
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    const callArgs = JSON.parse(fetchSpy.mock.calls[0][1].body as string);
-    // Let's assert more carefully.
-    expect(callArgs.text).not.toContain('@'); // no email addresses
-    expect(callArgs.text).not.toContain('.com');
-    // Ensure the message format matches expectations
-    expect(callArgs.text).toMatch(
+    expect(telegramText()).toContain('Threshold: 50');
+  });
+
+  it('warm-up boundary: 7 full days of history still use the floor', async () => {
+    prisma.emailLog.findFirst.mockResolvedValue({ sentAt: utcDaysAgo(7) });
+    mockCounts(85, 280); // 40/day: the ratio would give 80
+
+    await service.checkVolumeAnomaly(orgId);
+
+    expect(telegramText()).toContain('Threshold: 50');
+  });
+
+  it('warm-up boundary: 8 full days of history switch to 2 x baseline', async () => {
+    prisma.emailLog.findFirst.mockResolvedValue({ sentAt: utcDaysAgo(8) });
+    mockCounts(85, 320); // 40/day: max(50, 80) = 80
+
+    await service.checkVolumeAnomaly(orgId);
+
+    expect(telegramText()).toContain('Threshold: 80');
+  });
+
+  it('after the warm-up a low baseline falls back to the floor (floor versus ratio)', async () => {
+    prisma.emailLog.findFirst.mockResolvedValue({ sentAt: utcDaysAgo(20) });
+    mockCounts(55, 100); // 5/day: 2 x baseline = 10 < floor 50
+
+    await service.checkVolumeAnomaly(orgId);
+
+    expect(telegramText()).toContain('Threshold: 50');
+  });
+
+  it('the baseline never averages over more than 30 full days', async () => {
+    prisma.emailLog.findFirst.mockResolvedValue({ sentAt: utcDaysAgo(400) });
+    mockCounts(130, 1800); // 1800 / 30 days = 60/day: threshold 120, not 1800 / 400
+
+    await service.checkVolumeAnomaly(orgId);
+
+    expect(telegramText()).toContain('Threshold: 120');
+  });
+
+  it('alert text carries the count and threshold only: no invoice data or addresses', async () => {
+    mockCounts(100);
+
+    await service.checkVolumeAnomaly(orgId);
+
+    expect(telegramText()).not.toMatch(/@|INV-|\.com/);
+    expect(telegramText()).toMatch(
       /^\[Mizano\] ALERT: Outbound invoice email volume anomaly detected for organization org-123\. Count: 100, Threshold: 50$/,
     );
   });
 
-  it('warm-up boundary exactly 7 days old uses floor threshold if ratio is lower, or floor threshold strictly applies because history is under 7 full days?', async () => {
-    // Note: If exactly 7 days old (first log exactly 7 days ago), totalDaysHistory = 7.
-    // The requirement says "until 7 full UTC days of history exist ... only the floor applies; from day 8 ... baseline uses the full days available."
-    // Wait, the issue says: "Warm-up: until 7 full UTC days of history exist for the organization only the floor applies; from day 8 to day 30 the baseline uses the full days available."
-    // This implies that at day 7, it's still only the floor? Or "7 full days exist" means it starts using the baseline *after* 7 days?
-    // The logic is: fullDaysAvailable < 7 ? minDaily : threshold.
-    // If fullDaysAvailable === 7, threshold is used. Let's make sure it covers it.
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setUTCDate(today.getUTCDate() - 7);
-
-    // 7 full days history. Baseline = 40. 2 * 40 = 80.
-    // threshold should be max(50, 80) = 80.
-    const historyLogs = Array(280).fill({ sentAt: sevenDaysAgo }); // 280 / 7 = 40
-
-    prisma.emailLog.count.mockResolvedValue(85);
-    prisma.emailLog.findMany.mockResolvedValue(historyLogs);
-    prisma.emailLog.findFirst.mockResolvedValue({ sentAt: sevenDaysAgo });
+  it('an invalid NOTIFY_ANOMALY_MIN_DAILY falls back to the default floor of 50', async () => {
+    process.env.NOTIFY_ANOMALY_MIN_DAILY = 'lots';
+    mockCounts(51);
 
     await service.checkVolumeAnomaly(orgId);
 
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    const callArgs = JSON.parse(fetchSpy.mock.calls[0][1].body as string);
-    // At exactly 7 days, fullDaysAvailable is 7. activeThreshold uses minDaily (50) per updated logic (fullDaysAvailable < 8).
-    expect(callArgs.text).toContain('Threshold: 50');
+    expect(telegramText()).toContain('Threshold: 50');
   });
 
-  it('warm-up boundary exactly 8 days old uses ratio threshold', async () => {
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const eightDaysAgo = new Date(today);
-    eightDaysAgo.setUTCDate(today.getUTCDate() - 8);
-
-    // 8 full days history. Baseline = 40. 2 * 40 = 80.
-    // threshold should be max(50, 80) = 80.
-    const historyLogs = Array(320).fill({ sentAt: eightDaysAgo }); // 320 / 8 = 40
-
-    prisma.emailLog.count.mockResolvedValue(85);
-    prisma.emailLog.findMany.mockResolvedValue(historyLogs);
-    prisma.emailLog.findFirst.mockResolvedValue({ sentAt: eightDaysAgo });
+  it('a zero floor is rejected so a quiet tenant never alerts on its first send', async () => {
+    process.env.NOTIFY_ANOMALY_MIN_DAILY = '0';
+    mockCounts(1);
 
     await service.checkVolumeAnomaly(orgId);
 
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    const callArgs = JSON.parse(fetchSpy.mock.calls[0][1].body as string);
-    expect(callArgs.text).toContain('Threshold: 80');
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('dedupes alerts and sends recovery when clears', async () => {
-    prisma.emailLog.count.mockResolvedValue(60);
-    prisma.emailLog.findMany.mockResolvedValue([]);
-    prisma.emailLog.findFirst.mockResolvedValue(null);
-
+  it('alerts once while failing and once on recovery', async () => {
+    mockCounts(60);
+    await service.checkVolumeAnomaly(orgId);
     await service.checkVolumeAnomaly(orgId);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
 
-    // Call again, should not alert
+    mockCounts(40);
     await service.checkVolumeAnomaly(orgId);
-    expect(fetchSpy).toHaveBeenCalledTimes(1); // Still 1
-
-    // Now it drops below threshold
-    prisma.emailLog.count.mockResolvedValue(40);
     await service.checkVolumeAnomaly(orgId);
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2); // Recovery sent
-    const recoveryArgs = JSON.parse(fetchSpy.mock.calls[1][1].body as string);
-    expect(recoveryArgs.text).toContain('RECOVERED');
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(telegramText(1)).toContain('RECOVERED');
+  });
+
+  it('keeps the dedupe state well past the 5-minute cache default', async () => {
+    mockCounts(60);
+
+    await service.checkVolumeAnomaly(orgId);
+
+    expect(cacheSet).toHaveBeenCalledWith(
+      stateKey,
+      true,
+      expect.objectContaining({ ttl: expect.any(Number) }),
+    );
+    const { ttl } = cacheSet.mock.calls[0][2] as { ttl: number };
+    expect(ttl).toBeGreaterThanOrEqual(24 * 60 * 60);
+  });
+
+  it('bounds the Telegram call with a timeout signal', async () => {
+    mockCounts(60);
+
+    await service.checkVolumeAnomaly(orgId);
+
+    const init = fetchSpy.mock.calls[0][1] as { signal?: AbortSignal };
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('does not record the alert when Telegram rejects it, so the next check retries', async () => {
+    fetchSpy.mockResolvedValueOnce({ ok: false, status: 502 } as unknown as Response);
+    mockCounts(60);
+
+    await service.checkVolumeAnomaly(orgId);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(cacheSet).not.toHaveBeenCalled();
+
+    await service.checkVolumeAnomaly(orgId); // delivered this time
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(cacheSet).toHaveBeenCalledTimes(1);
+
+    await service.checkVolumeAnomaly(orgId); // now deduped
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('a timed-out Telegram call neither throws nor records the alert', async () => {
+    fetchSpy.mockRejectedValueOnce(new Error('This operation was aborted'));
+    mockCounts(60);
+
+    await expect(service.checkVolumeAnomaly(orgId)).resolves.toBeUndefined();
+
+    expect(cacheSet).not.toHaveBeenCalled();
+  });
+
+  it('retries the recovery message until Telegram accepts it', async () => {
+    mockCounts(60);
+    await service.checkVolumeAnomaly(orgId); // ALERT delivered
+
+    mockCounts(40);
+    fetchSpy.mockResolvedValueOnce({ ok: false, status: 500 } as unknown as Response);
+    await service.checkVolumeAnomaly(orgId); // RECOVERED rejected
+    expect(cache.get(stateKey)).toBe(true);
+
+    await service.checkVolumeAnomaly(orgId); // RECOVERED delivered
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(telegramText(2)).toContain('RECOVERED');
+    expect(cache.get(stateKey)).toBe(false);
+  });
+
+  it('without a Telegram chat id nothing is sent or recorded', async () => {
+    delete process.env.TELEGRAM_ALERT_CHAT_ID;
+    mockCounts(60);
+
+    await service.checkVolumeAnomaly(orgId);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(cacheSet).not.toHaveBeenCalled();
+  });
+});
+
+describe('EmailService.sendInvoice anomaly check isolation', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('a failing check is logged without the raw error and the send still succeeds', async () => {
+    const prisma = buildPrisma();
+    prisma.invoice.findFirst.mockResolvedValue({
+      invoiceNumber: 'INV-001',
+      date: new Date('2026-09-01'),
+      dueDate: new Date('2026-10-01'),
+      grandTotal: { toString: () => '10' },
+      currencyCode: 'SAR',
+      customer: { name: 'Cust', email: 'c@example.com' },
+    });
+    const rawError = new Error('query failed for to = c@example.com');
+    prisma.emailLog.count.mockRejectedValue(rawError);
+    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const service = new EmailService(
+      prisma as unknown as PrismaService,
+      {} as PdfService,
+      { get: jest.fn(), set: jest.fn() } as unknown as CacheService,
+    );
+    jest
+      .spyOn(service as unknown as { sendEmail: () => Promise<void> }, 'sendEmail')
+      .mockResolvedValue(undefined);
+
+    const result = await service.sendInvoice(ORG_A, 'inv-1', {
+      to: 'c@example.com',
+      attachPdf: false,
+    } as never);
+
+    expect(result.success).toBe(true);
+    expect(errorSpy).toHaveBeenCalledWith('Volume anomaly check failed: Error');
+    for (const call of errorSpy.mock.calls) {
+      for (const arg of call) {
+        expect(typeof arg).toBe('string');
+        expect(arg).not.toContain(rawError.message);
+      }
+    }
   });
 });
