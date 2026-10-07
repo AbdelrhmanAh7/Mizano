@@ -16,7 +16,7 @@ async function parsePdf(buffer: Buffer): Promise<{ text: string; numpages: numbe
     const res = await parser.getText();
     return { text: res.text || '', numpages: res.total || 1 };
   }
-  return pdfParse(buffer);
+  return pdfParse({ data: new Uint8Array(buffer) });
 }
 
 describe('Payslip PDF generator (e2e)', () => {
