@@ -8,7 +8,6 @@ import {
 } from '../prompts/ollama-extraction.prompts';
 import { preprocessForVlm } from '../utils/image-preprocessor.util';
 import { describeError } from '../../../common/utils/redact';
-import { normalizeDigits } from '../extraction/rules/rules-normalize';
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -158,9 +157,7 @@ export class OllamaService {
   async extractFromText(rawText: string): Promise<DocumentExtractionResult | null> {
     this.logger.log(`Ollama text extraction: textLen=${rawText.length}`);
 
-    // Normalize Arabic-Indic/Persian digits and separators before extraction
-    const normalizedText = normalizeDigits(rawText);
-    const prompt = buildTextExtractionPrompt(normalizedText);
+    const prompt = buildTextExtractionPrompt(rawText);
 
     const result = await this.gateway.infer<OllamaExtractionRaw>(prompt, {
       systemPrompt: OLLAMA_EXTRACTION_SYSTEM_PROMPT,
@@ -188,9 +185,7 @@ export class OllamaService {
       `[LLM INPUT] OCR text (${ocrText.length} chars, conf=${ocrConfidence}%) → sending to ${model}`,
     );
 
-    // Normalize Arabic-Indic/Persian digits and separators before extraction
-    const normalizedText = normalizeDigits(ocrText);
-    const prompt = buildOcrTextExtractionPrompt(normalizedText, ocrConfidence);
+    const prompt = buildOcrTextExtractionPrompt(ocrText, ocrConfidence);
 
     const result = await this.gateway.infer<OllamaExtractionRaw>(prompt, {
       systemPrompt: OLLAMA_EXTRACTION_SYSTEM_PROMPT,

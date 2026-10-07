@@ -5,7 +5,6 @@ import { buildEntityExtractionPrompt } from '../prompts/nlp.prompts';
 import { PredictionMethod } from '../types/prediction-method.type';
 import { findBestMatch } from '../utils/text-similarity.util';
 import { describeError } from '../../../common/utils/redact';
-import { normalizeDigits } from '../extraction/rules/rules-normalize';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const nlp = require('compromise');
@@ -138,15 +137,13 @@ export class EntityExtractionService {
       return this.emptyResult();
     }
 
-    // Normalize Arabic-Indic/Persian digits and separators for regex-based extraction
-    const normalizedText = normalizeDigits(text);
-    const doc = nlp(normalizedText);
+    const doc = nlp(text);
 
     const people = this.extractPeople(doc, text);
     const organizations = this.extractOrganizations(doc, text);
-    const dates = this.extractDates(doc, normalizedText);
+    const dates = this.extractDates(doc, text);
     const places = this.extractPlaces(doc, text);
-    const money = this.extractMoney(normalizedText);
+    const money = this.extractMoney(text);
     const emails = this.extractEmails(text);
     const phones = this.extractPhones(text);
 
