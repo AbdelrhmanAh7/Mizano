@@ -28,11 +28,12 @@ describe('Possible duplicate bills (e2e)', () => {
   const day = isoDay(-10);
   let vendorId = '';
   let postedBillId = '';
+  let postedBillNumber = '';
   let draftBillId = '';
   let currency = '';
   let rentAccountId = '';
 
-  async function createBill(date: string): Promise<string> {
+  async function createBill(date: string): Promise<{ id: string; billNumber: string }> {
     const res = await a.post('/bills').send({
       vendorId,
       date,
@@ -40,7 +41,7 @@ describe('Possible duplicate bills (e2e)', () => {
       lines: [{ description: 'Paper', accountId: rentAccountId, quantity: '1', rate: '100.10' }],
     });
     expect(res.status).toBe(201);
-    return res.body.id as string;
+    return res.body;
   }
 
   async function viewerWithoutPermissions(tenant: TestTenant): Promise<ApiHelper> {
@@ -79,9 +80,9 @@ describe('Possible duplicate bills (e2e)', () => {
     expect(vendor.status).toBe(201);
     vendorId = vendor.body.id;
 
-    postedBillId = await createBill(day);
+    ({ id: postedBillId, billNumber: postedBillNumber } = await createBill(day));
     expect((await a.post(`/bills/${postedBillId}/approve`)).status).toBe(201);
-    draftBillId = await createBill(day);
+    draftBillId = (await createBill(day)).id;
   });
 
   afterAll(async () => {
@@ -95,6 +96,7 @@ describe('Possible duplicate bills (e2e)', () => {
     expect(res.body.matches).toHaveLength(1);
     expect(res.body.matches[0]).toMatchObject({
       billId: postedBillId,
+      billNumber: postedBillNumber,
       documentDate: day,
       amount: '100.1000',
     });
@@ -138,7 +140,7 @@ describe('Possible duplicate bills (e2e)', () => {
     const check = await a.post(CHECK).send({ vendorId, amount: '100.10', date: day, currency });
     expect(check.status).toBe(200);
     // An audited write afterwards: once its row lands, an audit of the check would have too.
-    const marker = await createBill(day);
+    const marker = (await createBill(day)).id;
     await eventually(async () => {
       expect(
         await prisma.auditLog.count({

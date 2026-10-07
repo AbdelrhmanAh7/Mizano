@@ -20,7 +20,13 @@ describe('BillsController - Duplicate Warning', () => {
       findPossibleDuplicateBills: jest.fn().mockResolvedValue({
         status: 'possible',
         matches: [
-          { billId: 'bill-1', documentDate: '2026-10-06', amount: '100.1000', currency: 'EGP' },
+          {
+            billId: 'bill-1',
+            billNumber: 'BILL-001',
+            documentDate: '2026-10-06',
+            amount: '100.1000',
+            currency: 'EGP',
+          },
         ],
       }),
     };

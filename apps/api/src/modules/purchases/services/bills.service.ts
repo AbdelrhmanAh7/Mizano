@@ -424,12 +424,13 @@ export class BillsService {
         },
         ...(input.billId ? { id: { not: input.billId } } : {}),
       },
-      select: { id: true, date: true, grandTotal: true, currencyCode: true },
+      select: { id: true, billNumber: true, date: true, grandTotal: true, currencyCode: true },
     });
 
     const matches = candidates
       .map((c) => ({
         billId: c.id,
+        billNumber: c.billNumber,
         documentDate: utcDay(c.date),
         amount: new Decimal(c.grandTotal),
         currency: (c.currencyCode || baseCurrency).trim().toUpperCase(),

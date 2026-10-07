@@ -267,7 +267,10 @@ export interface PaymentMadeQuery extends PaginationQuery {
 
 export interface DuplicateBillMatch {
   billId: string;
+  billNumber: string;
+  /** YYYY-MM-DD */
   documentDate: string;
+  /** Fixed 4-dp decimal string. */
   amount: string;
   currency: string;
 }

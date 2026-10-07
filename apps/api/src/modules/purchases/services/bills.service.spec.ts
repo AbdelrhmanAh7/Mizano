@@ -666,7 +666,13 @@ describe('BillsService', () => {
       expect(matchRes.status).toBe('possible');
       // Money leaves the API as a fixed 4-dp string.
       expect(matchRes.matches).toEqual([
-        { billId: 'b-exact', documentDate: '2026-10-06', amount: '100.1000', currency: 'EGP' },
+        {
+          billId: 'b-exact',
+          billNumber: 'B',
+          documentDate: '2026-10-06',
+          amount: '100.1000',
+          currency: 'EGP',
+        },
       ]);
 
       prisma.bill.findMany.mockResolvedValueOnce(mockCand('b-diff', '2026-10-06', '100.11'));
@@ -778,7 +784,13 @@ describe('BillsService', () => {
       expect(prisma.vendor.findFirst).not.toHaveBeenCalled();
       // A bill without its own currency is in the base currency.
       expect(res.matches).toEqual([
-        { billId: 'b-posted', documentDate: '2026-10-05', amount: '100.1000', currency: 'EGP' },
+        {
+          billId: 'b-posted',
+          billNumber: 'B',
+          documentDate: '2026-10-05',
+          amount: '100.1000',
+          currency: 'EGP',
+        },
       ]);
 
       prisma.bill.findFirst.mockResolvedValueOnce(null);
