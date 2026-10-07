@@ -50,7 +50,7 @@
     "status": "docker-compose ps",
     "// — Utilities ————————————————————": "",
     "env:check": "node scripts/check-env.mjs",
-    "test:deploy": "node --test scripts/check-env.test.mjs scripts/pi-systemd.test.mjs",
+    "test:deploy": "node --test scripts/check-env.test.mjs scripts/pi-systemd.test.mjs scripts/pi-scripts.test.mjs",
     "generate:types": "pnpm --filter @mizano/shared-types build",
     "generate:validators": "pnpm --filter @mizano/validators build",
     "clean": "turbo clean && node -e \"const fs=require('fs');['node_modules','.turbo'].forEach(d=>fs.rmSync(d,{recursive:true,force:true}))\"",

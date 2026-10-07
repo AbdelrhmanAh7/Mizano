@@ -1,7 +1,13 @@
-import { mkdtempSync, readFileSync, rmSync, utimesSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import * as path from 'path';
-import { HEARTBEAT_MAX_AGE_MS, beat, heartbeatIsFresh } from './worker-heartbeat';
+import {
+  DEFAULT_HEARTBEAT_FILE,
+  HEARTBEAT_MAX_AGE_MS,
+  beat,
+  heartbeatIsFresh,
+  resolveHeartbeatFile,
+} from './worker-heartbeat';
 
 describe('worker heartbeat', () => {
   let dir: string;
@@ -34,5 +40,26 @@ describe('worker heartbeat', () => {
 
   it('a missing file is unhealthy', () => {
     expect(heartbeatIsFresh(path.join(dir, 'missing'))).toBe(false);
+  });
+
+  describe('resolveHeartbeatFile (the --healthcheck probe reads the same env files as the worker)', () => {
+    it('defaults when nothing configures it', () => {
+      expect(resolveHeartbeatFile({}, [path.join(dir, '.env.missing')])).toBe(
+        DEFAULT_HEARTBEAT_FILE,
+      );
+    });
+
+    it('reads WORKER_HEARTBEAT_FILE from an env file that only ConfigModule would load', () => {
+      writeFileSync(path.join(dir, '.env.pi'), 'WORKER_HEARTBEAT_FILE=/data/hb\nOTHER=1\n');
+      expect(resolveHeartbeatFile({}, [path.join(dir, '.env.pi')])).toBe('/data/hb');
+    });
+
+    it('prefers the process environment, then the earlier env file, like ConfigModule', () => {
+      writeFileSync(path.join(dir, '.env.pi'), 'WORKER_HEARTBEAT_FILE=/from-pi\n');
+      writeFileSync(path.join(dir, '.env'), 'WORKER_HEARTBEAT_FILE=/from-default\n');
+      const files = [path.join(dir, '.env.pi'), path.join(dir, '.env')];
+      expect(resolveHeartbeatFile({}, files)).toBe('/from-pi');
+      expect(resolveHeartbeatFile({ WORKER_HEARTBEAT_FILE: '/from-env' }, files)).toBe('/from-env');
+    });
   });
 });
