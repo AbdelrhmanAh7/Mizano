@@ -4,7 +4,7 @@
 
 - **Issue**: #102 (Post-merge: CI red after #98)
 - **Base Commit (`master`)**: `615060ed6294e16375a1f1ea9385cb7e812cd24f`
-- **Tested Commit SHA**: `1e9d2d347ba4953c4feb168e1daaf545c4e0b8c4` (CI Run ID: `37633274517`, all checks passing)
+- **Tested Commit SHA**: `c5625cf03bdf8bf47738f658cbaf3910ee2a9fd3` (gate tests passing; parent `1e9d2d347b` CI Run ID: `37633274517`)
 - **Audit Date**: 2026-10-07 / 2026-10-08
 - **Failing Check**: Deploy to GCP (Workflow: `Deploy to Production`)
 - **Root Cause Classification**: **(B)** — deployment host unreachable over SSH (`dial tcp ***:22: i/o timeout`).
@@ -25,7 +25,7 @@
 | REQ-102-2 | Investigate historical "Deploy to Production" runs prior to #98                        | `gh run list --workflow "Deploy to Production"`                          | PASSED |
 | REQ-102-3 | Classify root cause (A vs B vs C) with justification                                   | Analysis against build logs & network errors                             | PASSED |
 | REQ-102-4 | Propose options and technical analysis in `AI_QUESTIONS.md` without modifying workflows/secrets | Review against repo owner policy                               | PASSED |
-| REQ-102-5 | Bind evidence to the verified tree and record exact tested SHA                         | Tested SHA `1e9d2d347ba4953c4feb168e1daaf545c4e0b8c4`, gate tests passed | PASSED |
+| REQ-102-5 | Bind evidence to the verified tree and record exact tested SHA                         | Tested SHA `c5625cf03bdf8bf47738f658cbaf3910ee2a9fd3`, gate tests passed | PASSED |
 | REQ-102-6 | Preserve #95 audit evidence and resolve review threads                                 | `docs/planning/EVIDENCE-95.md` preserved; review threads resolved        | PASSED |
 
 ---
@@ -89,7 +89,7 @@
 
 The changes in this PR are documentation-only (`AI_QUESTIONS.md`, `EVIDENCE.md`, `docs/planning/EVIDENCE-95.md`, `docs/planning/MERGE-QUEUE.md`, `docs/agents/review-lessons.md`). The failing `Deploy to GCP` step requires SSH connectivity to the remote host.
 
-- **Verified Commit SHA**: `1e9d2d347ba4953c4feb168e1daaf545c4e0b8c4`
+- **Verified Commit SHA**: `c5625cf03bdf8bf47738f658cbaf3910ee2a9fd3` (parent `1e9d2d347b` CI Run `37633274517`)
 - **CI Run ID**: `37633274517` (All 5 check runs passed on GitHub Actions: Build, Lint & Type Check, Unit Tests, Install Dependencies, CodeRabbit)
 - **Local Checks Executed**:
 
