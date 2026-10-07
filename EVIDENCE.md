@@ -1,3 +1,5 @@
+Tested commit: 32f352e64de06b58ebddf1727da36394f98a4583
+
 # Evidence for Issue #42: [Pi] CPU extraction runtime on the Pi 5 with pinned Arabic/English assets
 
 Part of the tiny live deployment on a Raspberry Pi 5 (Cortex-A76, 8GB). Complements #16 and #24.
@@ -6,7 +8,7 @@ Part of the tiny live deployment on a Raspberry Pi 5 (Cortex-A76, 8GB). Compleme
 
 | Field             | Value                                                                                            |
 | ----------------- | ------------------------------------------------------------------------------------------------ |
-| Tested commit     | `6c99f75e73179335cfc5bf95ad52243506fbbbd4` (`ai/42` after merging master)                        |
+| Tested commit     | `32f352e64de06b58ebddf1727da36394f98a4583` (`ai/42` after merging master)                        |
 | Baseline (master) | `615060e` — docs(planning): audit 6 oldest open prs for merge sprint (#95) (#98)                 |
 | Commits after it  | Only `EVIDENCE.md` and `AI_QUESTIONS.md` change; check with `git diff --stat 6c99f75 HEAD`       |
 | Host              | Apple M4, macOS (Darwin 27.0.0), arm64, Node v26.10.0, pnpm `install --frozen-lockfile`          |
@@ -73,8 +75,7 @@ is executed. The PR should reference the issue (`Refs #42`), not close it.
 
 - **Implementation**: `INTAKE_JOB_DEADLINE_MS` (default 120 s) is enforced by the executor's
   wall-clock timer; `intake-runtime.ts` classifies `INTAKE_TIMEOUT`, `INTAKE_RESOURCE_LIMIT` and
-  `INTAKE_EXECUTION_FAILED`; `intake-processor.service.ts` moves those jobs to `NEEDS_REVIEW` with a
-  sanitized note.
+  `INTAKE_WORKER_FAILED`; `intake-processor.service.ts` records `FAILED`, schedules retries, and eventually moves these to `DEAD_LETTER` with a sanitized note.
 - **Verification (first-hand)**: `intake-runtime.spec.ts`, `intake-executor.service.spec.ts` and
   `intake-processor.service.spec.ts` pass.
 

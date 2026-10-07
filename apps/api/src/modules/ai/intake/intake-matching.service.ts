@@ -120,7 +120,7 @@ export class IntakeMatchingService {
     organizationId: string,
     vendorId: string,
     documentNumber: string | null,
-    total: number | null,
+    total: string | null,
   ): Promise<DuplicateWarning | null> {
     if (documentNumber) {
       const existing = await this.prisma.bill.findFirst({
@@ -137,26 +137,28 @@ export class IntakeMatchingService {
       }
     }
 
-    // `total` is the 4-dp number of the legacy result boundary: compare as Decimal, not float.
-    if (typeof total === 'number' && Number.isFinite(total) && total > 0) {
-      const amount = new Prisma.Decimal(total.toFixed(4));
-      const recent = await this.prisma.bill.findMany({
-        where: {
-          organizationId,
-          vendorId,
-          deletedAt: null,
-          createdAt: { gte: new Date(Date.now() - DUPLICATE_WINDOW_MS) },
-        },
-        select: { id: true, grandTotal: true },
-      });
-      const same = recent.find((bill) => bill.grandTotal.sub(amount).abs().lt(AMOUNT_TOLERANCE));
-      if (same) {
-        return {
-          isDuplicate: true,
-          existingId: same.id,
-          matchType: 'amount_match',
-          similarity: 0.9,
-        };
+    // `total` is the 4-dp string of the result boundary: compare as Decimal, not float.
+    if (typeof total === 'string' && total.trim() !== '') {
+      const amount = new Prisma.Decimal(total);
+      if (amount.gt(0)) {
+        const recent = await this.prisma.bill.findMany({
+          where: {
+            organizationId,
+            vendorId,
+            deletedAt: null,
+            createdAt: { gte: new Date(Date.now() - DUPLICATE_WINDOW_MS) },
+          },
+          select: { id: true, grandTotal: true },
+        });
+        const same = recent.find((bill) => bill.grandTotal.sub(amount).abs().lt(AMOUNT_TOLERANCE));
+        if (same) {
+          return {
+            isDuplicate: true,
+            existingId: same.id,
+            matchType: 'amount_match',
+            similarity: 0.9,
+          };
+        }
       }
     }
     return null;

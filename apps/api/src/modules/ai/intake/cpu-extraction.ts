@@ -4,6 +4,7 @@ import { join } from 'path';
 import { promisify } from 'util';
 import { createOfflineTesseractWorker } from '../extraction/offline-tesseract';
 import type { DocumentIntakeResult } from '../services/document-intake.service';
+import { preprocessForOcr } from '../utils/image-preprocessor.util';
 import { writeSecureFile } from '../utils/secure-temp.util';
 import { NATIVE_TEXT_CONFIDENCE, structuredCpuResult } from './cpu-structured';
 
@@ -74,6 +75,8 @@ export async function extractCpuDocument(
           prefix,
         ]);
         image = await readFile(`${prefix}.png`);
+      } else {
+        image = await preprocessForOcr(buffer, mimeType);
       }
       const result = await engine.recognize(image);
       texts.push(result.data.text);

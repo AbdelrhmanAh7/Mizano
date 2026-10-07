@@ -63,7 +63,9 @@ export class OcrLlmStrategy implements ExtractionStrategy, OnModuleDestroy {
             `[STEP 1] PaddleOCR result: textLen=${ocrText.length}, confidence=${ocrConfidence.toFixed(1)}%`,
           );
         } catch (err) {
-          this.logger.warn(`[STEP 1] PaddleOCR failed, falling back to Tesseract: ${err}`);
+          this.logger.warn(
+            `[STEP 1] PaddleOCR failed, falling back to Tesseract: ${describeError(err, { includeMessage: false })}`,
+          );
         }
       } else {
         this.logger.log('[STEP 1] PaddleOCR not available, using Tesseract.js fallback');
@@ -71,24 +73,34 @@ export class OcrLlmStrategy implements ExtractionStrategy, OnModuleDestroy {
 
       // Step 2: Fallback to Tesseract.js if PaddleOCR didn't produce text
       if (!ocrText || ocrText.trim().length < 10) {
-        this.logger.log('[STEP 2] Running Tesseract.js fallback...');
-        let processedBuffer: Buffer;
-        try {
-          processedBuffer = await preprocessForOcr(context.fileBuffer, context.mimeType);
-        } catch {
-          processedBuffer = context.fileBuffer;
-        }
-        try {
-          const tessResult = await this.runTesseract(processedBuffer, context.language);
-          ocrText = tessResult.text;
-          ocrConfidence = tessResult.confidence;
-          this.logger.log(
-            `[STEP 2] Tesseract.js result: textLen=${ocrText.length}, confidence=${ocrConfidence.toFixed(1)}%`,
-          );
-        } catch (err) {
-          this.logger.error(
-            `[STEP 2] Tesseract.js OCR failed: ${describeError(err, { includeMessage: false })}`,
-          );
+        if (context.isPdf) {
+          if (context.pdfText && context.pdfText.length > 20) {
+            this.logger.log('[STEP 2] PaddleOCR text insufficient, using native PDF text');
+            ocrText = context.pdfText;
+            ocrConfidence = 90;
+          } else {
+            this.logger.log('[STEP 2] Skipping Tesseract.js fallback for PDF bytes');
+          }
+        } else {
+          this.logger.log('[STEP 2] Running Tesseract.js fallback...');
+          let processedBuffer: Buffer;
+          try {
+            processedBuffer = await preprocessForOcr(context.fileBuffer, context.mimeType);
+          } catch {
+            processedBuffer = context.fileBuffer;
+          }
+          try {
+            const tessResult = await this.runTesseract(processedBuffer, context.language);
+            ocrText = tessResult.text;
+            ocrConfidence = tessResult.confidence;
+            this.logger.log(
+              `[STEP 2] Tesseract.js result: textLen=${ocrText.length}, confidence=${ocrConfidence.toFixed(1)}%`,
+            );
+          } catch (err) {
+            this.logger.error(
+              `[STEP 2] Tesseract.js OCR failed: ${describeError(err, { includeMessage: false })}`,
+            );
+          }
         }
       }
 

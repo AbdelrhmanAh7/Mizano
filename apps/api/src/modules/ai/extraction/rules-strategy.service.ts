@@ -11,6 +11,7 @@ import {
   StrategyExtractionResult,
 } from './extraction-strategy.interface';
 import { extractInvoiceFields, RuleField, RulesExtraction } from './rules/invoice-rules-extractor';
+import { createOfflineTesseractWorker } from './offline-tesseract';
 
 const MIN_TEXT_LENGTH = 10;
 const WORKER_INIT_TIMEOUT_MS = 30_000;
@@ -193,8 +194,6 @@ export class RulesStrategy implements ExtractionStrategy {
     const { lang, localPath } = requireLocalOcrAssets(language);
     let pending = this.workers.get(lang);
     if (!pending) {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const Tesseract = require('tesseract.js');
       pending = new Promise<TesseractWorker>((done, reject) => {
         let failed = false;
         const fail = () => {
@@ -203,24 +202,14 @@ export class RulesStrategy implements ExtractionStrategy {
           reject(new Error('OCR worker initialization failed'));
         };
         const timer = setTimeout(fail, WORKER_INIT_TIMEOUT_MS);
-        Promise.resolve()
-          .then(() =>
-            Tesseract.createWorker(lang, undefined, {
-              langPath: localPath,
-              cachePath: localPath,
-              cacheMethod: 'readOnly',
-              gzip: false,
-              errorHandler: fail,
-            }),
-          )
-          .then((worker: TesseractWorker) => {
-            clearTimeout(timer);
-            if (failed) {
-              void worker.terminate().catch(() => undefined);
-            } else {
-              done(worker);
-            }
-          }, fail);
+        createOfflineTesseractWorker().then((worker: TesseractWorker) => {
+          clearTimeout(timer);
+          if (failed) {
+            void worker.terminate().catch(() => undefined);
+          } else {
+            done(worker);
+          }
+        }, fail);
       });
       this.workers.set(lang, pending);
       void pending.catch(() => this.workers.delete(lang));

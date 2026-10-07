@@ -239,9 +239,9 @@ describe('IntakeProcessorService', () => {
         extractedFields: {
           documentNumber: 'INV-2024-0042',
           date: '2024-03-15',
-          subtotal: 1000,
-          tax: 140,
-          total: 1140,
+          subtotal: '1000.0000',
+          tax: '140.0000',
+          total: '1140.0000',
           currency: 'EGP',
           vendorName: 'Cairo Office Supplies Co.',
         },

@@ -66,31 +66,10 @@ export function toFieldValues(
  * `.txt` fixtures stand in for a PDF's native text layer (what pdf-parse returns); real
  * `.pdf`/image files go through the processor's own context builder (pdf-parse / Tesseract).
  */
-async function contextFor(
-  file: string,
-  buffer: Buffer,
-  language: string,
-): Promise<ExtractionContext> {
-  const mimeType = MIME_BY_EXT[extname(file).toLowerCase()];
-  if (!mimeType) throw new Error(`Unsupported corpus file type: ${file}`);
-  if (mimeType === 'text/plain') {
-    return {
-      fileBuffer: buffer,
-      mimeType: 'application/pdf',
-      filename: file,
-      language,
-      isPdf: true,
-      pdfText: buffer.toString('utf8').trim(),
-      pdfIsNativeText: true,
-      pdfPageCount: 1,
-    };
-  }
-  const ctx = (await buildExtractionContext(buffer, mimeType, language, file)).context;
-  if (ctx.isPdf && !ctx.pdfIsNativeText) {
-    throw new Error(`Unsupported benchmark input: scanned PDF without usable text layer (${file})`);
-  }
-  return ctx;
-}
+import { extractCpuDocument } from '../../intake/cpu-extraction';
+import { NATIVE_TEXT_CONFIDENCE, structuredCpuResult } from '../../intake/cpu-structured';
+import { withSecureTempDir } from '../../utils/secure-temp.util';
+import { DocumentIntakeResult } from '../../services/document-intake.service';
 
 export async function main(): Promise<void> {
   const corpus = arg('corpus');
@@ -115,27 +94,47 @@ export async function main(): Promise<void> {
   ) {
     requireLocalOcrAssets(language);
   }
-  const strategy = new RulesStrategy();
+
   const rows: Array<{ predicted: FieldValues; label: FieldValues; score: DocumentScore }> = [];
   let peakRss = process.memoryUsage().rss;
 
   for (const [file, label] of Object.entries(labels.documents)) {
     const buffer = readFileSync(join(corpusDir, file));
+    const mimeType = MIME_BY_EXT[extname(file).toLowerCase()];
+    if (!mimeType) throw new Error(`Unsupported corpus file type: ${file}`);
+
     const start = process.hrtime.bigint();
-    const context = await contextFor(file, buffer, language);
-    const result = await strategy.extract(context);
+
+    let result: DocumentIntakeResult;
+    if (mimeType === 'text/plain') {
+      result = structuredCpuResult(buffer.toString('utf8').trim(), NATIVE_TEXT_CONFIDENCE);
+    } else {
+      result = await withSecureTempDir('benchmark-', (dir) =>
+        extractCpuDocument(buffer, mimeType, dir),
+      );
+    }
+
     const latencyMs = Number(process.hrtime.bigint() - start) / 1e6;
     peakRss = Math.max(peakRss, process.memoryUsage().rss);
 
-    const extraction = result?.extraction ?? null;
-    const predicted = toFieldValues(extraction, result?.exactMoney);
-    // Classification and duplicate checks need the database; the benchmark assumes an
-    // invoice with no duplicate, so only extraction-driven review reasons count.
+    const predicted: FieldValues = {
+      invoiceNumber: result.extractedFields.documentNumber,
+      date: result.extractedFields.date,
+      dueDate: result.extractedFields.dueDate,
+      vendorTaxId: result.extractedFields.vendorTaxId,
+      currency: result.extractedFields.currency,
+      subtotal: result.extractedFields.subtotal,
+      tax: result.extractedFields.tax,
+      total: result.extractedFields.total,
+    };
+
     const review = needsReview({
-      ocrConfidence: extraction?.ocrConfidence ?? 0,
-      documentType: 'BILL',
-      extractedFields: { total: extraction?.total ?? null, date: extraction?.date ?? null },
+      ocrConfidence: result.ocrConfidence ?? 0,
+      classificationConfidence: result.classificationConfidence ?? 0,
+      documentType: result.documentType,
+      extractedFields: result.extractedFields,
     });
+
     rows.push({
       predicted,
       label,

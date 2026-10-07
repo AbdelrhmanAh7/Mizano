@@ -24,9 +24,9 @@ describe('structuredCpuResult: rules extraction over worker text', () => {
         documentNumber: 'INV-2024-0042',
         date: '2024-03-15',
         dueDate: '2024-04-14',
-        subtotal: 1000,
-        tax: 140,
-        total: 1140,
+        subtotal: '1000.0000',
+        tax: '140.0000',
+        total: '1140.0000',
         currency: 'EGP',
         vendorName: 'Cairo Office Supplies Co.',
         vendorTaxId: '123456789',
@@ -48,18 +48,18 @@ describe('structuredCpuResult: rules extraction over worker text', () => {
       documentNumber: 'INV-2024-0150',
       date: '2024-03-15',
       dueDate: '2024-04-14',
-      subtotal: 1000,
-      tax: 140,
-      total: 1140,
+      subtotal: '1000.0000',
+      tax: '140.0000',
+      total: '1140.0000',
       currency: 'EGP',
       vendorName: 'شركة النيل للتوريدات',
     });
   });
 
   it.each([
-    ['ar-sa-invoice.txt', 2300, 'SAR'],
-    ['en-sa-invoice.txt', 2300, 'SAR'],
-    ['en-ae-invoice.txt', 1260, 'AED'],
+    ['ar-sa-invoice.txt', '2300.0000', 'SAR'],
+    ['en-sa-invoice.txt', '2300.0000', 'SAR'],
+    ['en-ae-invoice.txt', '1260.0000', 'AED'],
   ])('reads totals and currency from %s', (name, total, currency) => {
     const fields = structuredCpuResult(fixture(name), NATIVE_TEXT_CONFIDENCE).extractedFields;
     expect(fields.total).toBe(total);
@@ -163,9 +163,9 @@ describe('structuredCpuResult: rules extraction over worker text', () => {
       expect(worker.extractedFields).toMatchObject({
         date: expected?.date,
         dueDate: expected?.dueDate,
-        total: expected?.total,
-        subtotal: expected?.subtotal,
-        tax: expected?.tax,
+        total: expected?.total != null ? expected.total.toFixed(4) : null,
+        subtotal: expected?.subtotal != null ? expected.subtotal.toFixed(4) : null,
+        tax: expected?.tax != null ? expected.tax.toFixed(4) : null,
         documentNumber: expected?.invoiceNumber,
         vendorName: expected?.vendorName,
         vendorTaxId: expected?.vendorTaxId,

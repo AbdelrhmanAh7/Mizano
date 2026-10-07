@@ -700,7 +700,7 @@ describe('Document intake (e2e)', () => {
       const latencies: number[] = [];
       const requests = Array.from({ length: 15 }, async () => {
         const start = Date.now();
-        const res = await a.get('/documents/intake/jobs');
+        const res = await a.get('/ai/document-intake/jobs');
         latencies.push(Date.now() - start);
         expect(res.status).toBe(200);
       });

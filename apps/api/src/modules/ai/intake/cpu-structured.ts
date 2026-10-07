@@ -119,7 +119,8 @@ export function structuredCpuResult(rawText: string, textConfidence: number): Do
 }
 
 function parsedResult(rawText: string, textConfidence: number): DocumentIntakeResult {
-  const extraction = toExtractionResult(extractInvoiceFields(rawText, textConfidence), rawText, 0);
+  const rules = extractInvoiceFields(rawText, textConfidence);
+  const extraction = toExtractionResult(rules, rawText, 0);
   const classification = classifyDocumentText(rawText);
   return {
     documentType: classification.documentType,
@@ -127,10 +128,10 @@ function parsedResult(rawText: string, textConfidence: number): DocumentIntakeRe
     extractedFields: {
       date: extraction.date,
       dueDate: extraction.dueDate,
-      total: extraction.total,
-      subtotal: extraction.subtotal,
-      tax: extraction.tax,
-      discount: extraction.discount,
+      total: rules.total?.value.toFixed(4) ?? null,
+      subtotal: rules.subtotal?.value.toFixed(4) ?? null,
+      tax: rules.tax?.value.toFixed(4) ?? null,
+      discount: extraction.discount?.toString() ?? null,
       documentNumber: extraction.invoiceNumber,
       vendorName: extraction.vendorName,
       vendorAddress: extraction.vendorAddress,

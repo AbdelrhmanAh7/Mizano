@@ -22,7 +22,7 @@ function extracted(
       vendorName: 'Cairo Office Supplies Co.',
       vendorTaxId: '123456789',
       documentNumber: 'INV-1',
-      total: 115,
+      total: '115',
       date: '2026-09-01',
       ...fields,
     },
@@ -266,7 +266,7 @@ describe('IntakeMatchingService', () => {
     it.each([0, -5, Number.NaN, Number.POSITIVE_INFINITY])(
       'ignores the implausible total %s',
       async (total) => {
-        await service.enrich(ORG, extracted({ documentNumber: null, total }));
+        await service.enrich(ORG, extracted({ documentNumber: null, total: total.toString() }));
         expect(prisma.bill.findMany).not.toHaveBeenCalled();
       },
     );

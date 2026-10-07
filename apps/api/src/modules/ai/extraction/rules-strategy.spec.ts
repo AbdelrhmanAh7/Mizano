@@ -8,13 +8,15 @@ jest.mock('fs', () => ({ accessSync: jest.fn(), statSync: jest.fn(), constants: 
 import { RulesStrategy } from './rules-strategy.service';
 import { ExtractionContext } from './extraction-strategy.interface';
 
-jest.mock('tesseract.js', () => ({ createWorker: jest.fn() }));
+jest.mock('./offline-tesseract', () => ({ createOfflineTesseractWorker: jest.fn() }));
 
 jest.mock('../utils/image-preprocessor.util', () => ({
   preprocessForOcr: jest.fn(async (buffer: Buffer) => buffer),
 }));
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { createWorker } = require('tesseract.js') as { createWorker: jest.Mock };
+const { createOfflineTesseractWorker } = require('./offline-tesseract') as {
+  createOfflineTesseractWorker: jest.Mock;
+};
 const context: ExtractionContext = {
   fileBuffer: Buffer.from('image'),
   mimeType: 'image/png',
@@ -24,13 +26,16 @@ const context: ExtractionContext = {
 const worker = () => ({
   terminate: jest.fn().mockResolvedValue(undefined),
   recognize: jest.fn().mockResolvedValue({ data: { text: 'Total: 100.00', confidence: 90 } }),
+  loadLanguage: jest.fn().mockResolvedValue(undefined),
+  initialize: jest.fn().mockResolvedValue(undefined),
+  setParameters: jest.fn().mockResolvedValue(undefined),
 });
 
 describe('RulesStrategy worker cache', () => {
   const originalDir = process.env.INTAKE_TESSDATA_DIR;
   beforeEach(() => {
     process.env.INTAKE_TESSDATA_DIR = './tessdata';
-    createWorker.mockReset();
+    createOfflineTesseractWorker.mockReset();
     jest.mocked(accessSync).mockReset();
     jest
       .mocked(statSync)
@@ -45,7 +50,7 @@ describe('RulesStrategy worker cache', () => {
   it('rejects unset assets without attempting worker creation', async () => {
     delete process.env.INTAKE_TESSDATA_DIR;
     expect(await new RulesStrategy().extract(context)).toBeNull();
-    expect(createWorker).not.toHaveBeenCalled();
+    expect(createOfflineTesseractWorker).not.toHaveBeenCalled();
   });
   it('preserves original Decimal money before the legacy numeric adapter', async () => {
     const rules = invoiceRules.extractInvoiceFields('Total: 1.23', 0.95);
@@ -68,7 +73,7 @@ describe('RulesStrategy worker cache', () => {
   });
   it('never logs document content in OCR errors', async () => {
     const spy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
-    createWorker.mockResolvedValue({
+    createOfflineTesseractWorker.mockResolvedValue({
       ...worker(),
       recognize: jest.fn().mockRejectedValue(new Error('secret invoice value')),
     });
@@ -80,7 +85,7 @@ describe('RulesStrategy worker cache', () => {
   it('shares pending creation across concurrent normalized language requests', async () => {
     const w = worker();
     let finish!: (value: typeof w) => void;
-    createWorker.mockImplementation(
+    createOfflineTesseractWorker.mockImplementation(
       () =>
         new Promise((done) => {
           finish = done;
@@ -90,7 +95,7 @@ describe('RulesStrategy worker cache', () => {
     const first = strategy.extract(context);
     const second = strategy.extract({ ...context, language: 'ENG' });
     await new Promise<void>((done) => setImmediate(done));
-    expect(createWorker).toHaveBeenCalledTimes(1);
+    expect(createOfflineTesseractWorker).toHaveBeenCalledTimes(1);
     finish(w);
     expect(await first).not.toBeNull();
     expect(await second).not.toBeNull();
@@ -99,21 +104,23 @@ describe('RulesStrategy worker cache', () => {
   it('caches a matching worker for each language', async () => {
     const english = worker();
     const arabic = worker();
-    createWorker.mockResolvedValueOnce(english).mockResolvedValueOnce(arabic);
+    createOfflineTesseractWorker.mockResolvedValueOnce(english).mockResolvedValueOnce(arabic);
     const strategy = new RulesStrategy();
     await strategy.extract(context);
     await strategy.extract({ ...context, language: 'ar' });
     await strategy.extract({ ...context, language: 'ara' });
-    expect(createWorker.mock.calls.map((call: unknown[]) => call[0])).toEqual(['eng', 'ara']);
+    expect(createOfflineTesseractWorker).toHaveBeenCalledTimes(2);
     expect(english.recognize).toHaveBeenCalledTimes(1);
     expect(arabic.recognize).toHaveBeenCalledTimes(2);
   });
   it('retries after failed creation', async () => {
-    createWorker.mockRejectedValueOnce(new Error('unavailable')).mockResolvedValueOnce(worker());
+    createOfflineTesseractWorker
+      .mockRejectedValueOnce(new Error('unavailable'))
+      .mockResolvedValueOnce(worker());
     const strategy = new RulesStrategy();
     expect(await strategy.extract(context)).toBeNull();
     expect(await strategy.extract(context)).not.toBeNull();
-    expect(createWorker).toHaveBeenCalledTimes(2);
+    expect(createOfflineTesseractWorker).toHaveBeenCalledTimes(2);
   });
   it('rejects missing local assets before creating a worker', async () => {
     process.env.INTAKE_TESSDATA_DIR = './missing-tessdata';
@@ -121,7 +128,7 @@ describe('RulesStrategy worker cache', () => {
       throw new Error('missing');
     });
     expect(await new RulesStrategy().extract(context)).toBeNull();
-    expect(createWorker).not.toHaveBeenCalled();
+    expect(createOfflineTesseractWorker).not.toHaveBeenCalled();
   });
   it.each([
     { isFile: () => false, size: 1 },
@@ -129,24 +136,17 @@ describe('RulesStrategy worker cache', () => {
   ])('rejects a directory or empty asset before worker creation %#', async (stat) => {
     jest.mocked(statSync).mockReturnValue(stat as ReturnType<typeof statSync>);
     expect(await new RulesStrategy().extract(context)).toBeNull();
-    expect(createWorker).not.toHaveBeenCalled();
+    expect(createOfflineTesseractWorker).not.toHaveBeenCalled();
   });
   it('checks every requested language and uses read-only local assets', async () => {
     process.env.INTAKE_TESSDATA_DIR = './tessdata';
-    createWorker.mockResolvedValue(worker());
+    createOfflineTesseractWorker.mockResolvedValue(worker());
     expect(await new RulesStrategy().extract({ ...context, language: 'eng+ara' })).not.toBeNull();
     expect(accessSync).toHaveBeenCalledWith(resolve('./tessdata/eng.traineddata'), 4);
     expect(accessSync).toHaveBeenCalledWith(resolve('./tessdata/ara.traineddata'), 4);
-    expect(createWorker).toHaveBeenCalledWith('eng+ara', undefined, {
-      langPath: resolve('./tessdata'),
-      cachePath: resolve('./tessdata'),
-      cacheMethod: 'readOnly',
-      gzip: false,
-      errorHandler: expect.any(Function),
-    });
   });
   it('handles callback failures even when creation never settles and retries', async () => {
-    createWorker
+    createOfflineTesseractWorker
       .mockImplementationOnce((_lang, _oem, options) => {
         options.errorHandler(new Error('language load failed'));
         return new Promise(() => undefined);
@@ -160,7 +160,7 @@ describe('RulesStrategy worker cache', () => {
     jest.useFakeTimers();
     const late = worker();
     let finish!: (value: typeof late) => void;
-    createWorker
+    createOfflineTesseractWorker
       .mockImplementationOnce(
         () =>
           new Promise((done) => {

@@ -24,7 +24,9 @@ COPY packages ./packages
 # Generates the client plus engines for every binaryTarget in schema.prisma,
 # then keeps only the TARGET musl engine (each engine is ~15 MB).
 ARG TARGETARCH
-RUN cd apps/api && pnpm exec prisma generate \
+RUN cd apps/api \
+  && if [ "$TARGETARCH" = arm64 ]; then target=linux-musl-arm64-openssl-3.0.x; else target=linux-musl-openssl-3.0.x; fi \
+  && PRISMA_CLI_BINARY_TARGETS=$target pnpm exec prisma generate \
   && if [ "$TARGETARCH" = arm64 ]; then keep=linux-musl-arm64-openssl; else keep=linux-musl-openssl; fi \
   && find /app/node_modules/.prisma/client -name 'libquery_engine-*' ! -name "*${keep}*" -delete \
   && test "$(find /app/node_modules/.prisma/client -name 'libquery_engine-*' | wc -l)" = 1
