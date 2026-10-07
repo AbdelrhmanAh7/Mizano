@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -11,6 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { DuplicateCheckResult } from '@mizano/shared-types';
 import {
   CacheResponse,
   CacheTTL,
@@ -19,6 +22,7 @@ import {
   InvalidateCache,
   InvalidatesLedger,
   Permissions,
+  SkipAudit,
 } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
@@ -77,20 +81,26 @@ export class BillsController {
     return this.billsService.findAllCursor(orgId, query);
   }
 
+  /** A read-only query sent as POST so amounts and vendor names stay out of logged URLs. */
   @Post('possible-duplicates')
+  @HttpCode(HttpStatus.OK)
+  @SkipAudit()
   @Permissions('purchases.view')
   @ApiOperation({ summary: 'Find possible duplicate bills for a draft bill or document' })
   findPossibleDuplicates(
     @CurrentOrg() orgId: string,
-    @Body() query: CheckPossibleDuplicateBillsDto,
-  ) {
-    return this.billsService.findPossibleDuplicateBills(orgId, query);
+    @Body() dto: CheckPossibleDuplicateBillsDto,
+  ): Promise<DuplicateCheckResult> {
+    return this.billsService.findPossibleDuplicateBills(orgId, dto);
   }
 
   @Get(':id/possible-duplicates')
   @Permissions('purchases.view')
   @ApiOperation({ summary: 'Find possible duplicate bills for an existing draft bill' })
-  findPossibleDuplicatesForBill(@CurrentOrg() orgId: string, @Param('id') id: string) {
+  findPossibleDuplicatesForBill(
+    @CurrentOrg() orgId: string,
+    @Param('id') id: string,
+  ): Promise<DuplicateCheckResult> {
     return this.billsService.findPossibleDuplicateBills(orgId, { billId: id });
   }
 

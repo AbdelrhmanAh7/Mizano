@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
+import { Prisma } from '@prisma/client';
 import { BillsService } from './bills.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalsService } from '../../accounting/services/journals.service';
@@ -625,19 +626,20 @@ describe('BillsService', () => {
   });
 
   describe('findPossibleDuplicateBills', () => {
-    const mockCand = (id: string, date: string, amount = '100.10', currencyCode = 'EGP') =>
-      [
-        {
-          id,
-          billNumber: 'B',
-          date: new Date(`${date}T00:00:00.000Z`),
-          grandTotal: dec(amount),
-          currencyCode,
-        },
-      ] as any;
+    const draft = { vendorId: 'vendor-1', amount: '100.10', date: '2026-10-06', currency: 'EGP' };
+    const candidate = (id: string, date: string, amount = '100.10', currencyCode = 'EGP') => ({
+      id,
+      billNumber: 'B',
+      date: new Date(`${date}T00:00:00.000Z`),
+      grandTotal: dec(amount),
+      currencyCode,
+    });
+    const mockCand = (...args: Parameters<typeof candidate>) => [candidate(...args)] as any;
+    const billWhere = (): Prisma.BillWhereInput => prisma.bill.findMany.mock.calls[0]![0]!.where!;
 
     beforeEach(() => {
       prisma.organization.findUnique.mockResolvedValue({ baseCurrency: 'EGP' } as any);
+      prisma.vendor.findFirst.mockResolvedValue({ id: 'vendor-1' } as any);
       prisma.vendor.findMany.mockResolvedValue([
         { id: 'vendor-1', name: 'Acme Corp', displayName: null },
       ] as any);
@@ -652,11 +654,7 @@ describe('BillsService', () => {
         ['2026-10-10', 'bill-day-plus-4', 'none'],
       ] as const) {
         prisma.bill.findMany.mockResolvedValueOnce(mockCand(billId, date));
-        const res = await service.findPossibleDuplicateBills(ORG_ID, {
-          vendorId: 'vendor-1',
-          amount: '100.10',
-          date: '2026-10-06',
-        });
+        const res = await service.findPossibleDuplicateBills(ORG_ID, draft);
         expect(res.status).toBe(expected);
         if (expected === 'possible') expect(res.matches[0].billId).toBe(billId);
       }
@@ -664,78 +662,59 @@ describe('BillsService', () => {
 
     it('matches 100.10 vs 100.1 but rejects 100.10 vs 100.11 without float conversion', async () => {
       prisma.bill.findMany.mockResolvedValueOnce(mockCand('b-exact', '2026-10-06', '100.1'));
-      const matchRes = await service.findPossibleDuplicateBills(ORG_ID, {
-        vendorId: 'vendor-1',
-        amount: '100.10',
-        date: '2026-10-06',
-      });
+      const matchRes = await service.findPossibleDuplicateBills(ORG_ID, draft);
       expect(matchRes.status).toBe('possible');
-      expect(matchRes.matches).toHaveLength(1);
+      // Money leaves the API as a fixed 4-dp string.
+      expect(matchRes.matches).toEqual([
+        { billId: 'b-exact', documentDate: '2026-10-06', amount: '100.1000', currency: 'EGP' },
+      ]);
 
       prisma.bill.findMany.mockResolvedValueOnce(mockCand('b-diff', '2026-10-06', '100.11'));
-      const noMatchRes = await service.findPossibleDuplicateBills(ORG_ID, {
-        vendorId: 'vendor-1',
-        amount: '100.10',
-        date: '2026-10-06',
-      });
-      expect(noMatchRes.status).toBe('none');
-      expect(noMatchRes.matches).toHaveLength(0);
+      const noMatchRes = await service.findPossibleDuplicateBills(ORG_ID, draft);
+      expect(noMatchRes).toEqual({ status: 'none', matches: [] });
     });
 
     it('rejects different currency as no match', async () => {
-      prisma.bill.findMany.mockResolvedValueOnce(mockCand('b-usd', '2026-10-06', '100.00', 'USD'));
-      const res = await service.findPossibleDuplicateBills(ORG_ID, {
-        vendorId: 'vendor-1',
-        amount: '100.00',
-        date: '2026-10-06',
-        currency: 'EUR',
-      });
-      expect(res.status).toBe('none');
-      expect(res.matches).toHaveLength(0);
+      prisma.bill.findMany.mockResolvedValueOnce(mockCand('b-usd', '2026-10-06', '100.10', 'USD'));
+      const res = await service.findPossibleDuplicateBills(ORG_ID, { ...draft, currency: 'EUR' });
+      expect(res).toEqual({ status: 'none', matches: [] });
     });
 
     it('matches vendor name differing only in case or whitespace, and Arabic vendor name', async () => {
-      prisma.vendor.findMany.mockResolvedValueOnce([
-        { id: 'v-acme', name: 'Acme Corp', displayName: null },
-      ] as any);
+      const byName = { amount: '50.00', date: '2026-10-06', currency: 'EGP' };
       prisma.bill.findMany.mockResolvedValueOnce(mockCand('b-acme', '2026-10-06', '50.00'));
       const caseRes = await service.findPossibleDuplicateBills(ORG_ID, {
+        ...byName,
         vendorName: '   ACME    corp   ',
-        amount: '50.00',
-        date: '2026-10-06',
       });
       expect(caseRes.status).toBe('possible');
+      expect(prisma.vendor.findMany.mock.calls[0]![0]!.where).toEqual({
+        organizationId: ORG_ID,
+        deletedAt: null,
+      });
 
       prisma.vendor.findMany.mockResolvedValueOnce([
         { id: 'v-arab', name: 'شركة الأمل', displayName: null },
       ] as any);
-      prisma.bill.findMany.mockResolvedValueOnce(mockCand('b-arab', '2026-10-06', '75.00'));
+      prisma.bill.findMany.mockResolvedValueOnce(mockCand('b-arab', '2026-10-06', '50.00'));
       const arabRes = await service.findPossibleDuplicateBills(ORG_ID, {
+        ...byName,
         vendorName: '  شركة   الأمل  ',
-        amount: '75.00',
-        date: '2026-10-06',
       });
       expect(arabRes.status).toBe('possible');
     });
 
-    it('scopes by organization: a bill in another org is never queried or returned', async () => {
+    it('scopes by organization and to posted bills in the +/-3 day window', async () => {
       prisma.bill.findMany.mockResolvedValueOnce([]);
-      await service.findPossibleDuplicateBills(ORG_ID, {
-        vendorId: 'vendor-1',
-        amount: '100.00',
-        date: '2026-10-06',
+      await service.findPossibleDuplicateBills(ORG_ID, draft);
+      const where = billWhere();
+      expect(where.organizationId).toBe(ORG_ID);
+      expect(where.vendorId).toBe('vendor-1');
+      expect(where.date).toEqual({
+        gte: new Date('2026-10-03T00:00:00.000Z'),
+        lt: new Date('2026-10-10T00:00:00.000Z'),
       });
-      expect(prisma.bill.findMany.mock.calls[0]![0]!.where!.organizationId).toBe(ORG_ID);
-    });
-
-    it('ignores draft and unposted bills', async () => {
-      prisma.bill.findMany.mockResolvedValueOnce([]);
-      await service.findPossibleDuplicateBills(ORG_ID, {
-        vendorId: 'vendor-1',
-        amount: '100.00',
-        date: '2026-10-06',
-      });
-      const inStatuses = (prisma.bill.findMany.mock.calls[0]![0]!.where!.status as any).in;
+      const inStatuses = (where.status as { in: string[] }).in;
       expect(inStatuses).toEqual(
         expect.arrayContaining(['OPEN', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'VOID']),
       );
@@ -743,89 +722,87 @@ describe('BillsService', () => {
       expect(inStatuses).not.toContain('PENDING');
     });
 
-    it('returns unknown when amount, date or vendor is missing', async () => {
-      expect(
-        (
-          await service.findPossibleDuplicateBills(ORG_ID, {
-            vendorId: 'vendor-1',
-            date: '2026-10-06',
-          })
-        ).status,
-      ).toBe('unknown');
-      expect(
-        (
-          await service.findPossibleDuplicateBills(ORG_ID, {
-            vendorId: 'vendor-1',
-            amount: '100.00',
-          })
-        ).status,
-      ).toBe('unknown');
-      expect(
-        (await service.findPossibleDuplicateBills(ORG_ID, { amount: '100.00', date: '2026-10-06' }))
-          .status,
-      ).toBe('unknown');
-    });
-
-    it('rejects malformed date (2026-10-06x) using strict ISO validation', async () => {
+    it('rejects a vendor id from another organization without querying bills', async () => {
+      prisma.vendor.findFirst.mockResolvedValueOnce(null);
       await expect(
-        service.findPossibleDuplicateBills(ORG_ID, {
-          vendorId: 'vendor-1',
-          amount: '100.00',
-          date: '2026-10-06x',
-        }),
+        service.findPossibleDuplicateBills(ORG_ID, { ...draft, vendorId: 'vendor-other-org' }),
       ).rejects.toThrow(BadRequestException);
+      expect(prisma.vendor.findFirst.mock.calls[0]![0]!.where).toEqual({
+        id: 'vendor-other-org',
+        organizationId: ORG_ID,
+        deletedAt: null,
+      });
+      expect(prisma.bill.findMany).not.toHaveBeenCalled();
     });
 
-    it('sorts matches by document_date DESC, id DESC with stable ID tiebreaker', async () => {
+    it('returns unknown when amount, date, vendor or currency is missing', async () => {
+      const { amount: _a, ...noAmount } = draft;
+      const { date: _d, ...noDate } = draft;
+      const { vendorId: _v, ...noVendor } = draft;
+      const { currency: _c, ...noCurrency } = draft;
+      for (const input of [noAmount, noDate, noVendor, noCurrency]) {
+        await expect(service.findPossibleDuplicateBills(ORG_ID, input)).resolves.toEqual({
+          status: 'unknown',
+          matches: [],
+        });
+      }
+      expect(prisma.bill.findMany).not.toHaveBeenCalled();
+    });
+
+    it('accepts date-only input and rejects timestamps or invalid days without echoing them', async () => {
+      for (const date of ['2026-10-06x', '2026-10-06T23:30:00-02:00', '2026-02-30']) {
+        const err = await service
+          .findPossibleDuplicateBills(ORG_ID, { ...draft, date })
+          .catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(BadRequestException);
+        expect((err as BadRequestException).message).not.toContain(date);
+      }
+    });
+
+    it('checks a stored bill by id, excluding itself; deleted or foreign ids are not found', async () => {
+      prisma.bill.findFirst.mockResolvedValueOnce({
+        id: 'draft-1',
+        vendorId: 'vendor-1',
+        date: new Date('2026-10-06T00:00:00.000Z'),
+        grandTotal: dec('100.1'),
+        currencyCode: null,
+      } as any);
+      prisma.bill.findMany.mockResolvedValueOnce(mockCand('b-posted', '2026-10-05', '100.1'));
+      const res = await service.findPossibleDuplicateBills(ORG_ID, { billId: 'draft-1' });
+      expect(prisma.bill.findFirst.mock.calls[0]![0]!.where).toEqual({
+        id: 'draft-1',
+        organizationId: ORG_ID,
+        deletedAt: null,
+      });
+      expect(billWhere().id).toEqual({ not: 'draft-1' });
+      expect(prisma.vendor.findFirst).not.toHaveBeenCalled();
+      // A bill without its own currency is in the base currency.
+      expect(res.matches).toEqual([
+        { billId: 'b-posted', documentDate: '2026-10-05', amount: '100.1000', currency: 'EGP' },
+      ]);
+
+      prisma.bill.findFirst.mockResolvedValueOnce(null);
+      await expect(
+        service.findPossibleDuplicateBills(ORG_ID, { billId: 'other-org-or-deleted' }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.bill.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('sorts matches by document_date DESC, id DESC and returns at most 5', async () => {
       prisma.bill.findMany.mockResolvedValueOnce([
-        {
-          id: 'bill-aaa',
-          billNumber: 'B-1',
-          date: new Date('2026-10-06T00:00:00.000Z'),
-          grandTotal: dec('100.00'),
-          currencyCode: 'EGP',
-        },
-        {
-          id: 'bill-zzz',
-          billNumber: 'B-2',
-          date: new Date('2026-10-06T00:00:00.000Z'),
-          grandTotal: dec('100.00'),
-          currencyCode: 'EGP',
-        },
-        {
-          id: 'bill-newer',
-          billNumber: 'B-3',
-          date: new Date('2026-10-07T00:00:00.000Z'),
-          grandTotal: dec('100.00'),
-          currencyCode: 'EGP',
-        },
+        candidate('bill-aaa', '2026-10-06'),
+        candidate('bill-zzz', '2026-10-06'),
+        candidate('bill-newer', '2026-10-07'),
       ] as any);
+      const res = await service.findPossibleDuplicateBills(ORG_ID, draft);
+      expect(res.matches.map((m) => m.billId)).toEqual(['bill-newer', 'bill-zzz', 'bill-aaa']);
 
-      const res = await service.findPossibleDuplicateBills(ORG_ID, {
-        vendorId: 'vendor-1',
-        amount: '100.00',
-        date: '2026-10-06',
-      });
-      expect(res.status).toBe('possible');
-      expect(res.matches.map((m: any) => m.billId)).toEqual(['bill-newer', 'bill-zzz', 'bill-aaa']);
-    });
-
-    it('returns at most 5 matches', async () => {
-      const bills = Array.from({ length: 8 }, (_, i) => ({
-        id: `bill-${i}`,
-        billNumber: `B-${i}`,
-        date: new Date(`2026-10-0${(i % 3) + 4}T00:00:00.000Z`),
-        grandTotal: dec('100.00'),
-        currencyCode: 'EGP',
-      }));
-      prisma.bill.findMany.mockResolvedValueOnce(bills as any);
-      const res = await service.findPossibleDuplicateBills(ORG_ID, {
-        vendorId: 'vendor-1',
-        amount: '100.00',
-        date: '2026-10-06',
-      });
-      expect(res.status).toBe('possible');
-      expect(res.matches).toHaveLength(5);
+      prisma.bill.findMany.mockResolvedValueOnce(
+        Array.from({ length: 8 }, (_, i) =>
+          candidate(`bill-${i}`, `2026-10-0${(i % 3) + 4}`),
+        ) as any,
+      );
+      expect((await service.findPossibleDuplicateBills(ORG_ID, draft)).matches).toHaveLength(5);
     });
   });
 });

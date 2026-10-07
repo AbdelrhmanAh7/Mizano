@@ -40,65 +40,39 @@ export const POSTED_BILL_STATUSES: BillStatus[] = [
 export interface PossibleDuplicateDraftInput {
   vendorId?: string;
   vendorName?: string;
-  amount?: string | number | Decimal;
-  date?: string | Date;
+  /** Exact decimal string. */
+  amount?: string;
+  /** Calendar date, YYYY-MM-DD. */
+  date?: string;
   currency?: string;
-  currencyCode?: string;
+  /** A stored bill to check: fills missing fields from it and excludes it from matches. */
   billId?: string;
-  excludeBillId?: string;
 }
+
+/** How far either side of the document date a posted bill counts as a possible duplicate. */
+const DUPLICATE_WINDOW_DAYS = 3;
+const DUPLICATE_MAX_MATCHES = 5;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function normalizeVendorName(name: string): string {
   return name.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-export function parseStrictIsoCalendarDate(dateStr: string): {
-  year: number;
-  month: number;
-  day: number;
-  dateOnly: string;
-} {
-  const regex =
-    /^(\d{4})-(\d{2})-(\d{2})(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
-  const match = regex.exec(dateStr);
-  if (!match) {
-    throw new BadRequestException(`Malformed document date: ${dateStr}`);
-  }
-  const year = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
-  const day = parseInt(match[3], 10);
-
-  if (month < 1 || month > 12 || day < 1 || day > 31) {
-    throw new BadRequestException(`Malformed document date: ${dateStr}`);
-  }
-  const d = new Date(Date.UTC(year, month - 1, day));
-  if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) {
-    throw new BadRequestException(`Malformed document date: ${dateStr}`);
-  }
-  const dateOnly = `${match[1]}-${match[2]}-${match[3]}`;
-  return { year, month, day, dateOnly };
+function utcDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
 }
 
-function toCalendarDateComponents(d: Date): {
-  year: number;
-  month: number;
-  day: number;
-  dateOnly: string;
-} {
-  const year = d.getUTCFullYear();
-  const month = d.getUTCMonth() + 1;
-  const day = d.getUTCDate();
-  const dateOnly = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  return { year, month, day, dateOnly };
-}
-
-function calendarDaysDifference(
-  d1: { year: number; month: number; day: number },
-  d2: { year: number; month: number; day: number },
-): number {
-  const utc1 = Date.UTC(d1.year, d1.month - 1, d1.day);
-  const utc2 = Date.UTC(d2.year, d2.month - 1, d2.day);
-  return Math.round((utc1 - utc2) / (1000 * 60 * 60 * 24));
+/**
+ * Parses a date-only `YYYY-MM-DD` value to UTC midnight. Timestamps are rejected: their
+ * calendar day depends on the offset. The message never echoes the input (it is logged).
+ */
+export function parseCalendarDate(value: string): Date {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  // The round trip rejects anything but YYYY-MM-DD as well as impossible days (2026-02-30).
+  if (Number.isNaN(date.getTime()) || utcDay(date) !== value) {
+    throw new BadRequestException('date must be a calendar date (YYYY-MM-DD)');
+  }
+  return date;
 }
 
 @Injectable()
@@ -370,175 +344,112 @@ export class BillsService {
   }
 
   /**
-   * Read-only duplicate bill detection before posting.
-   * Compares posted bills of the authorized tenant within +/-3 days,
-   * matching vendor (by ID or normalized name), currency, and exact decimal amount.
+   * Read-only duplicate bill detection before posting: posted bills of the same tenant and
+   * vendor with the identical amount and currency dated within +/-3 calendar days. Missing
+   * inputs give `unknown`; nothing is locked or written.
    */
   async findPossibleDuplicateBills(
     organizationId: string,
     draft: PossibleDuplicateDraftInput,
   ): Promise<DuplicateCheckResult> {
-    const input: PossibleDuplicateDraftInput = { ...draft };
-
-    if (input.billId) {
-      const targetBill = await this.prisma.bill.findFirst({
-        where: { id: input.billId, organizationId },
-        include: { vendor: { select: { id: true, name: true } } },
-      });
-      if (!targetBill) {
-        throw new NotFoundException('Bill not found');
-      }
-      input.vendorId = input.vendorId ?? targetBill.vendorId;
-      input.vendorName = input.vendorName ?? targetBill.vendor?.name;
-      input.amount = input.amount ?? targetBill.grandTotal.toString();
-      input.date = input.date ?? toCalendarDateComponents(targetBill.date).dateOnly;
-      input.currency = input.currency ?? input.currencyCode ?? targetBill.currencyCode ?? undefined;
-      input.excludeBillId = targetBill.id;
-    }
-
-    const hasAmount =
-      input.amount !== undefined && input.amount !== null && String(input.amount).trim() !== '';
-    const hasDate =
-      input.date !== undefined && input.date !== null && String(input.date).trim() !== '';
-    const hasVendor = Boolean(
-      (input.vendorId && input.vendorId.trim() !== '') ||
-      (input.vendorName && input.vendorName.trim() !== ''),
-    );
-
-    if (!hasAmount || !hasDate || !hasVendor) {
-      return { status: 'unknown', matches: [] };
-    }
-
-    const dateStr =
-      typeof input.date === 'string'
-        ? input.date.trim()
-        : toCalendarDateComponents(input.date!).dateOnly;
-    const targetDate = parseStrictIsoCalendarDate(dateStr);
-
-    let targetAmount: Decimal;
-    try {
-      targetAmount = new Decimal(input.amount!);
-    } catch {
-      throw new BadRequestException('Invalid amount format');
-    }
-    if (targetAmount.isNaN()) {
-      throw new BadRequestException('Invalid amount format');
-    }
-
+    const input = { ...draft };
     const org = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { baseCurrency: true },
     });
     const baseCurrency = org?.baseCurrency || 'EGP';
-    const targetCurrency = (input.currency || input.currencyCode || baseCurrency)
-      .trim()
-      .toUpperCase();
 
-    let matchingVendorIds: string[] | undefined;
-    if (input.vendorId && input.vendorId.trim() !== '') {
-      matchingVendorIds = undefined;
+    if (input.billId) {
+      const target = await this.prisma.bill.findFirst({
+        where: { id: input.billId, organizationId, deletedAt: null },
+        select: { id: true, vendorId: true, date: true, grandTotal: true, currencyCode: true },
+      });
+      if (!target) {
+        throw new NotFoundException('Bill not found');
+      }
+      input.vendorId ??= target.vendorId;
+      input.amount ??= target.grandTotal.toFixed(4);
+      input.date ??= utcDay(target.date);
+      input.currency ??= target.currencyCode || baseCurrency;
+    }
+
+    const vendorId = input.vendorId?.trim();
+    const vendorName = input.vendorName?.trim();
+    const currency = input.currency?.trim().toUpperCase();
+    if (!input.amount?.trim() || !input.date?.trim() || !(vendorId || vendorName) || !currency) {
+      return { status: 'unknown', matches: [] };
+    }
+    const targetDate = parseCalendarDate(input.date.trim());
+    const targetAmount = new Decimal(input.amount.trim());
+
+    let vendorIds: string[];
+    if (vendorId) {
+      // A caller-supplied vendor must belong to this tenant; a stored bill's vendor already does.
+      if (draft.vendorId) {
+        const vendor = await this.prisma.vendor.findFirst({
+          where: { id: vendorId, organizationId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!vendor) {
+          throw new BadRequestException('Vendor not found');
+        }
+      }
+      vendorIds = [vendorId];
     } else {
-      const normalizedDraftVendor = normalizeVendorName(input.vendorName!);
-      const orgVendors = await this.prisma.vendor.findMany({
-        where: { organizationId },
+      const wanted = normalizeVendorName(vendorName!);
+      const vendors = await this.prisma.vendor.findMany({
+        where: { organizationId, deletedAt: null },
         select: { id: true, name: true, displayName: true },
       });
-      matchingVendorIds = orgVendors
-        .filter((v) => {
-          if (normalizeVendorName(v.name) === normalizedDraftVendor) return true;
-          if (v.displayName && normalizeVendorName(v.displayName) === normalizedDraftVendor) {
-            return true;
-          }
-          return false;
-        })
+      vendorIds = vendors
+        .filter(
+          (v) =>
+            normalizeVendorName(v.name) === wanted ||
+            (v.displayName !== null && normalizeVendorName(v.displayName) === wanted),
+        )
         .map((v) => v.id);
-
-      if (matchingVendorIds.length === 0) {
+      if (vendorIds.length === 0) {
         return { status: 'none', matches: [] };
       }
     }
 
-    const targetUtc = Date.UTC(targetDate.year, targetDate.month - 1, targetDate.day);
-    const queryMinDate = new Date(targetUtc - 4 * 24 * 60 * 60 * 1000);
-    const queryMaxDate = new Date(targetUtc + 4 * 24 * 60 * 60 * 1000 + 86400000 - 1);
-
-    const where: Prisma.BillWhereInput = {
-      organizationId,
-      status: { in: POSTED_BILL_STATUSES },
-      date: {
-        gte: queryMinDate,
-        lte: queryMaxDate,
-      },
-    };
-
-    if (input.vendorId && input.vendorId.trim() !== '') {
-      where.vendorId = input.vendorId.trim();
-    } else if (matchingVendorIds) {
-      where.vendorId = { in: matchingVendorIds };
-    }
-
-    if (input.excludeBillId) {
-      where.id = { not: input.excludeBillId };
-    }
-
     const candidates = await this.prisma.bill.findMany({
-      where,
-      select: {
-        id: true,
-        billNumber: true,
-        date: true,
-        grandTotal: true,
-        currencyCode: true,
+      where: {
+        organizationId,
+        status: { in: POSTED_BILL_STATUSES },
+        vendorId: vendorIds.length === 1 ? vendorIds[0] : { in: vendorIds },
+        date: {
+          gte: new Date(targetDate.getTime() - DUPLICATE_WINDOW_DAYS * DAY_MS),
+          lt: new Date(targetDate.getTime() + (DUPLICATE_WINDOW_DAYS + 1) * DAY_MS),
+        },
+        ...(input.billId ? { id: { not: input.billId } } : {}),
       },
+      select: { id: true, date: true, grandTotal: true, currencyCode: true },
     });
 
-    const matches: Array<{
-      billId: string;
-      documentDate: string;
-      dateUtc: number;
-      amount: string;
-      currency: string;
-      id: string;
-    }> = [];
+    const matches = candidates
+      .map((c) => ({
+        billId: c.id,
+        documentDate: utcDay(c.date),
+        amount: new Decimal(c.grandTotal),
+        currency: (c.currencyCode || baseCurrency).trim().toUpperCase(),
+      }))
+      .filter(
+        (m) =>
+          Math.abs(Date.parse(m.documentDate) - targetDate.getTime()) <=
+            DUPLICATE_WINDOW_DAYS * DAY_MS &&
+          m.currency === currency &&
+          m.amount.equals(targetAmount),
+      )
+      .sort((a, b) =>
+        a.documentDate === b.documentDate
+          ? b.billId.localeCompare(a.billId)
+          : b.documentDate.localeCompare(a.documentDate),
+      )
+      .slice(0, DUPLICATE_MAX_MATCHES)
+      .map((m) => ({ ...m, amount: m.amount.toFixed(4) }));
 
-    for (const candidate of candidates) {
-      const candDate = toCalendarDateComponents(candidate.date);
-      const dayDiff = calendarDaysDifference(candDate, targetDate);
-      if (Math.abs(dayDiff) > 3) continue;
-
-      const candCurrency = (candidate.currencyCode || baseCurrency).trim().toUpperCase();
-      if (candCurrency !== targetCurrency) continue;
-
-      const candAmount = new Decimal(candidate.grandTotal);
-      if (!candAmount.equals(targetAmount)) continue;
-
-      matches.push({
-        billId: candidate.id,
-        documentDate: candDate.dateOnly,
-        dateUtc: Date.UTC(candDate.year, candDate.month - 1, candDate.day),
-        amount: candAmount.toString(),
-        currency: candCurrency,
-        id: candidate.id,
-      });
-    }
-
-    matches.sort((a, b) => {
-      const dateDiff = b.dateUtc - a.dateUtc;
-      if (dateDiff !== 0) return dateDiff;
-      return b.id.localeCompare(a.id);
-    });
-
-    const topMatches = matches.slice(0, 5).map(({ billId, documentDate, amount, currency }) => ({
-      billId,
-      documentDate,
-      amount,
-      currency,
-    }));
-
-    return {
-      status: topMatches.length > 0 ? 'possible' : 'none',
-      matches: topMatches,
-    };
+    return { status: matches.length > 0 ? 'possible' : 'none', matches };
   }
 
   /** "Open" is the same accounting event as approval: it must post to the ledger. */

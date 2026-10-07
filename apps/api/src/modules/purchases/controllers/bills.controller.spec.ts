@@ -1,4 +1,7 @@
+import { HttpStatus } from '@nestjs/common';
+import { HTTP_CODE_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
+import { SKIP_AUDIT_KEY } from '../../../common/decorators';
 import { BillsController } from './bills.controller';
 import { BillsService } from '../services/bills.service';
 import { PaymentsMadeService } from '../services/payments-made.service';
@@ -17,7 +20,7 @@ describe('BillsController - Duplicate Warning', () => {
       findPossibleDuplicateBills: jest.fn().mockResolvedValue({
         status: 'possible',
         matches: [
-          { billId: 'bill-1', documentDate: '2026-10-06', amount: '100.10', currency: 'EGP' },
+          { billId: 'bill-1', documentDate: '2026-10-06', amount: '100.1000', currency: 'EGP' },
         ],
       }),
     };
@@ -34,15 +37,23 @@ describe('BillsController - Duplicate Warning', () => {
       expect(perms).toEqual(['purchases.view']);
     });
 
-    it('delegates to billsService with organizationId from decorator and query dto', async () => {
-      const query = {
+    it('is a read-only POST: answers 200 and is not written to the audit log', () => {
+      expect(reflector.get(HTTP_CODE_METADATA, controller.findPossibleDuplicates)).toBe(
+        HttpStatus.OK,
+      );
+      expect(reflector.get(SKIP_AUDIT_KEY, controller.findPossibleDuplicates)).toBe(true);
+    });
+
+    it('delegates to billsService with organizationId from decorator and body dto', async () => {
+      const body = {
         vendorId: 'vendor-1',
         amount: '100.10',
         date: '2026-10-06',
+        currency: 'EGP',
       };
-      const res = await controller.findPossibleDuplicates(ORG_ID, query);
+      const res = await controller.findPossibleDuplicates(ORG_ID, body);
 
-      expect(billsService.findPossibleDuplicateBills).toHaveBeenCalledWith(ORG_ID, query);
+      expect(billsService.findPossibleDuplicateBills).toHaveBeenCalledWith(ORG_ID, body);
       expect(res.status).toBe('possible');
       expect(res.matches).toHaveLength(1);
     });
