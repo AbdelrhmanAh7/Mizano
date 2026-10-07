@@ -4,7 +4,7 @@
 #   up       check .env.pi and the SSD, start everything (waits for api, worker, web healthy)
 #   down     stop and remove containers; data on the SSD is kept
 #   stop     stop containers without removing them (used by mizano-stack.service)
-#   status   container state, health and memory use
+#   status   container state (stopped ones too), health and memory use
 #   logs     follow logs (optionally of one service)
 set -euo pipefail
 # shellcheck source=deploy/pi/scripts/lib.sh
@@ -39,7 +39,8 @@ case "$cmd" in
     "$0" up
     ;;
   status)
-    dc ps
+    # -a also lists a service whose container has stopped.
+    dc ps -a
     ids="$(dc ps -q)"
     if [ -n "$ids" ]; then
       # shellcheck disable=SC2086 # one argument per container id

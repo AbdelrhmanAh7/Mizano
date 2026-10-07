@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # Summarise the soak samples for the issue evidence. Usage: soak-report.sh [samples.tsv]
 # Verdict:
-#   FAIL        any OOM kill (kernel counter or container cgroup) or a container restart
+#   FAIL        any OOM kill (kernel counter or container cgroup), a container restart,
+#               a sample where a service is not healthy (unhealthy, starting, stopped
+#               or missing), or a service with no row in some sample
 #   SWAP-THRASH average swap-in above SWAP_IN_MAX_PER_SEC pages/s (default 10)
-#   INCOMPLETE  no failure, but the window is shorter than SOAK_HOURS (default 24)
+#   INCOMPLETE  no failure, but the window is shorter than SOAK_HOURS (default 24) or
+#               fewer than 90% of the expected one-per-minute samples exist
 #   PASS        otherwise
-# A reboot inside the window resets the kernel counters; run the reboot test separately.
+# Every service in SOAK_SERVICES (default: STACK_SERVICES from lib.sh) needs one row per
+# sample. A reboot inside the window resets the kernel counters; run the reboot test
+# separately.
 set -euo pipefail
 
 tsv="${1:-}"
@@ -13,11 +18,16 @@ if [ -z "$tsv" ]; then
   # shellcheck source=deploy/pi/scripts/lib.sh
   . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
   tsv="$DATA_DIR/soak/samples.tsv"
+  services="${SOAK_SERVICES:-${STACK_SERVICES[*]}}"
+else
+  # Standalone use on a copied samples.tsv; keep this default equal to STACK_SERVICES.
+  services="${SOAK_SERVICES:-postgres redis api worker web cloudflared}"
 fi
 [ -s "$tsv" ] || { echo "no samples in $tsv" >&2; exit 1; }
 
-awk -F'\t' -v hours="${SOAK_HOURS:-24}" -v swap_max="${SWAP_IN_MAX_PER_SEC:-10}" '
+awk -F'\t' -v hours="${SOAK_HOURS:-24}" -v swap_max="${SWAP_IN_MAX_PER_SEC:-10}" -v services="$services" '
 function num(v) { return v ~ /^[0-9]+$/ }
+BEGIN { nexp = split(services, expected, " ") }
 $1 == "host" {
   n++
   if (n == 1) { t0 = $2; iso0 = $3; in0 = $7; out0 = $8; oom0 = $9; minavail = $5 }
@@ -28,13 +38,16 @@ $1 == "host" {
 $1 == "ctr" {
   s = $4
   # ctr fields: 4 service, 5 cur, 6 peak, 7 limit, 8 cgroup oom_kill, 9 restarts, 10 health
-  if (!(s in seen)) { seen[s] = 1; order[++ns] = s; r0[s] = $9; r1[s] = $9; c0[s] = $8 }
+  if (!(s in seen)) { seen[s] = 1; order[++ns] = s; c0[s] = $8 }
+  cnt[s]++
   if (num($5) && $5 > cur[s]) cur[s] = $5
   if (num($6) && $6 > peak[s]) peak[s] = $6
   if (num($7)) lim[s] = $7
   # The cgroup counter restarts at 0 with the container; count only increases.
   if (num($8)) { if (num(c0[s]) && $8 > c0[s]) cgoom[s] += $8 - c0[s]; c0[s] = $8 }
-  if ($9 + 0 > r1[s]) r1[s] = $9 + 0
+  # Docker restart count ("na" while the container is missing).
+  if (num($9)) { if (!(s in r0)) r0[s] = $9; if ($9 > r1[s]) r1[s] = $9 }
+  # Anything but healthy (or a running container without a health check) is a failure.
   if ($10 != "healthy" && $10 != "none") bad[s]++
 }
 END {
@@ -45,16 +58,21 @@ END {
   rate = secs > 0 ? swapin / secs : 0
   printf "swap        %d pages in, %d pages out (%.2f pages/s in)\n", swapin, swapout, rate
   printf "oom_kill    %d (kernel counter delta)\n", ooms
-  printf "\n%-12s %10s %10s %10s %8s %9s %9s\n", "service", "max_cur", "peak", "limit", "peak%", "restarts", "unhealthy"
   fail = (ooms > 0)
+  # An expected service with no row at all is listed too, with every sample as a gap.
+  for (i = 1; i <= nexp; i++) if (!(expected[i] in seen)) { seen[expected[i]] = 1; order[++ns] = expected[i] }
+  printf "\n%-12s %10s %10s %10s %8s %9s %9s %9s\n", "service", "max_cur", "peak", "limit", "peak%", "restarts", "unhealthy", "gaps"
   for (i = 1; i <= ns; i++) {
     s = order[i]
     p = peak[s] > 0 ? peak[s] : cur[s]
     pct = lim[s] > 0 ? 100 * p / lim[s] : 0
     rs = r1[s] - r0[s]
-    if (rs > 0 || cgoom[s] > 0) fail = 1
-    printf "%-12s %8sMB %8sMB %8sMB %7.0f%% %9d %9d\n", s, cur[s] + 0, peak[s] + 0, lim[s] + 0, pct, rs, bad[s] + 0
+    gaps = n - cnt[s]
+    if (rs > 0 || cgoom[s] > 0 || bad[s] > 0 || gaps > 0) fail = 1
+    printf "%-12s %8sMB %8sMB %8sMB %7.0f%% %9d %9d %9d\n", s, cur[s] + 0, peak[s] + 0, lim[s] + 0, pct, rs, bad[s] + 0, gaps
     if (cgoom[s] > 0) printf "  %s: %d cgroup OOM kill(s)\n", s, cgoom[s]
+    if (bad[s] > 0) printf "  %s: not healthy in %d sample(s)\n", s, bad[s]
+    if (gaps > 0) printf "  %s: no row in %d sample(s)\n", s, gaps
   }
   expected_samples = (hours * 3600) / 60
   verdict = fail ? "FAIL" : (rate > swap_max ? "SWAP-THRASH" : (secs < hours * 3600 || n < expected_samples * 0.9 ? "INCOMPLETE" : "PASS"))

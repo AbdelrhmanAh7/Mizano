@@ -45,12 +45,22 @@ bytes_mb() { # file -> MB, or "na"
 }
 
 # ctr <epoch> <iso> <service> <mem_current_mb> <mem_peak_mb> <mem_limit_mb> <cgroup_oom_kills> <restarts> <health>
-for cid in $(dc ps -q 2>/dev/null || true); do
-  info="$(docker inspect -f '{{.Id}} {{index .Config.Labels "com.docker.compose.service"}} {{.RestartCount}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid" 2>/dev/null || true)"
-  [ -n "$info" ] || continue
-  read -r full svc restarts health <<<"$info"
-  cur=na peak=na limit=na ooms=na
-  if dir="$(cgroup_dir "$full")"; then
+# One row per service in STACK_SERVICES every sample, so a service that stops or
+# disappears shows up as a row instead of silently dropping out of the report.
+# health: the container health (healthy|unhealthy|starting), none for a running
+# container without a health check, missing when there is no container, otherwise the
+# container state (exited, restarting, dead, created, paused).
+for svc in "${STACK_SERVICES[@]}"; do
+  cid="$(dc ps -a -q "$svc" 2>/dev/null | head -n 1 || true)"
+  full="" restarts=na health=missing cur=na peak=na limit=na ooms=na
+  if [ -n "$cid" ]; then
+    info="$(docker inspect -f '{{.Id}} {{.RestartCount}} {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid" 2>/dev/null || true)"
+    if [ -n "$info" ]; then
+      read -r full restarts state hstatus <<<"$info"
+      if [ "$state" = "running" ]; then health="$hstatus"; else health="$state"; fi
+    fi
+  fi
+  if [ -n "$full" ] && dir="$(cgroup_dir "$full")"; then
     cur="$(bytes_mb "$dir/memory.current")"
     peak="$(bytes_mb "$dir/memory.peak")"
     limit="$(bytes_mb "$dir/memory.max")"

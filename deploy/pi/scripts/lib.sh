@@ -19,6 +19,9 @@ set +a
 export DATA_DIR="${MIZANO_DATA_DIR:-/mnt/ssd/mizano}"
 # Bind-mounted by compose with create_host_path: false; the scripts create the rest.
 DATA_SUBDIRS=(postgres redis originals)
+# Long-running services in docker-compose.pi.yml (migrate is a one-shot). The soak
+# sampler records every one of these each minute, present or not.
+STACK_SERVICES=(postgres redis api worker web cloudflared)
 
 dc() {
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"

@@ -119,7 +119,7 @@ It pulls by digest, runs `prisma migrate deploy` (one-shot `migrate` service; th
 ```bash
 deploy/pi/scripts/stack.sh check     # validate .env.pi
 deploy/pi/scripts/stack.sh up        # env check + SSD check, start, wait until api/worker/web are healthy
-deploy/pi/scripts/stack.sh status    # containers, health, docker stats, free -m
+deploy/pi/scripts/stack.sh status    # containers (stopped ones too), health, docker stats, free -m
 deploy/pi/scripts/stack.sh logs api  # follow one service (logs are capped at 3 x 10 MB per container)
 deploy/pi/scripts/stack.sh down      # stop and remove containers; data on the SSD is kept
 ```
@@ -165,9 +165,9 @@ deploy/pi/scripts/soak-report.sh                                          # summ
 sudo systemctl stop mizano-soak.timer
 ```
 
-`soak-sample.sh` appends to `$MIZANO_DATA_DIR/soak/`: `samples.tsv` (host MemAvailable, swap used, `pswpin`/`pswpout`, `oom_kill`; per service cgroup `memory.current`/`memory.peak`/`memory.max`, cgroup OOM kills, restart count, health) and `stats.log` (raw `free -m` and `docker stats` output). It records resource numbers and container names only.
+`soak-sample.sh` appends to `$MIZANO_DATA_DIR/soak/`: `samples.tsv` (host MemAvailable, swap used, `pswpin`/`pswpout`, `oom_kill`; per service cgroup `memory.current`/`memory.peak`/`memory.max`, cgroup OOM kills, restart count, health) and `stats.log` (raw `free -m` and `docker stats` output). Every long-running service (`STACK_SERVICES` in `lib.sh`: postgres, redis, api, worker, web, cloudflared) gets one row per minute whether or not its container exists, with `missing`, `exited` or `restarting` as its health, so a service that disappears cannot drop out of the report. It records resource numbers and container names only.
 
-`soak-report.sh` prints the window, minimum MemAvailable, swap traffic, the OOM-kill delta and per-service peak memory against its limit. Its verdict is `FAIL` on any OOM kill or container restart, `SWAP-THRASH` when average swap-in exceeds `SWAP_IN_MAX_PER_SEC` (default 10 pages/s), `INCOMPLETE` under `SOAK_HOURS` (default 24), and `PASS` otherwise. Do the reboot test (section 5) after the soak, because a reboot resets the kernel counters. Attach the report output and the first, middle and last `stats.log` blocks to the issue. Without that evidence the acceptance stays unverified.
+`soak-report.sh` prints the window, minimum MemAvailable, swap traffic, the OOM-kill delta and, per service, peak memory against its limit, restarts, samples in which it was not healthy and samples in which it had no row. Its verdict is `FAIL` on any OOM kill, container restart, any sample in which a service is not `healthy` (unhealthy, still starting, stopped or missing) or any sample in which a service has no row; `SWAP-THRASH` when average swap-in exceeds `SWAP_IN_MAX_PER_SEC` (default 10 pages/s); `INCOMPLETE` under `SOAK_HOURS` (default 24) or with fewer than 90% of the one-per-minute samples; and `PASS` otherwise. Start the timer only after `stack.sh up` reports healthy: a sample taken while a service is still starting fails the soak. Do the reboot test (section 5) after the soak, because a reboot resets the kernel counters. Attach the report output and the first, middle and last `stats.log` blocks to the issue. Without that evidence the acceptance stays unverified.
 
 ## 9. Upgrade and rollback
 
