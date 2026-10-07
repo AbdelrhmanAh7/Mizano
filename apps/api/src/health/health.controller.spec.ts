@@ -1,22 +1,18 @@
 import { HttpStatus } from '@nestjs/common';
-import { Cache } from 'cache-manager';
 import { Response } from 'express';
 import { HealthController } from './health.controller';
+import { CacheService } from '../cache/cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 type PrismaMock = { $queryRaw: jest.Mock };
-type CacheMock = { set: jest.Mock; get: jest.Mock; del: jest.Mock };
+type CacheMock = { pingRedis: jest.Mock };
 
 function makePrisma(): PrismaMock {
   return { $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]) };
 }
 
 function makeCache(): CacheMock {
-  return {
-    set: jest.fn().mockResolvedValue(undefined),
-    get: jest.fn().mockResolvedValue('ok'),
-    del: jest.fn().mockResolvedValue(undefined),
-  };
+  return { pingRedis: jest.fn().mockResolvedValue({ status: 'connected', latency: 1 }) };
 }
 
 function makeRes(): Response & { status: jest.Mock } {
@@ -28,7 +24,7 @@ function makeRes(): Response & { status: jest.Mock } {
 function controller(prisma: PrismaMock, cache?: CacheMock): HealthController {
   return new HealthController(
     prisma as unknown as PrismaService,
-    cache as unknown as Cache | undefined,
+    cache as unknown as CacheService | undefined,
   );
 }
 
@@ -56,9 +52,9 @@ describe('HealthController', () => {
       expect(body.message).toBe('database not available');
     });
 
-    it('answers 503 when redis throws', async () => {
+    it('answers 503 when the redis ping fails', async () => {
       const cache = makeCache();
-      cache.set.mockRejectedValue(new Error('ECONNREFUSED'));
+      cache.pingRedis.mockResolvedValue({ status: 'disconnected' });
       const res = makeRes();
       const body = await controller(makePrisma(), cache).readiness(res);
       expect(res.status).toHaveBeenCalledWith(HttpStatus.SERVICE_UNAVAILABLE);
@@ -66,25 +62,35 @@ describe('HealthController', () => {
       expect(body.message).toBe('redis not available');
     });
 
-    it('answers 503 when the redis round trip returns the wrong value', async () => {
+    it('does not write a shared probe key (overlapping probes cannot delete each other)', async () => {
       const cache = makeCache();
-      cache.get.mockResolvedValue(undefined);
+      await Promise.all([
+        controller(makePrisma(), cache).readiness(makeRes()),
+        controller(makePrisma(), cache).readiness(makeRes()),
+      ]);
+      expect(cache.pingRedis).toHaveBeenCalledTimes(2);
+      expect(Object.keys(cache)).toEqual(['pingRedis']);
+    });
+
+    it('is ready when redis is not configured on the cache service', async () => {
+      const cache = makeCache();
+      cache.pingRedis.mockResolvedValue({ status: 'not_configured' });
       const res = makeRes();
       const body = await controller(makePrisma(), cache).readiness(res);
-      expect(res.status).toHaveBeenCalledWith(HttpStatus.SERVICE_UNAVAILABLE);
-      expect(body.ready).toBe(false);
+      expect(body.ready).toBe(true);
+      expect(res.status).not.toHaveBeenCalled();
     });
 
     it('names both dependencies when both are down', async () => {
       const prisma = makePrisma();
       prisma.$queryRaw.mockRejectedValue(new Error('down'));
       const cache = makeCache();
-      cache.set.mockRejectedValue(new Error('down'));
+      cache.pingRedis.mockResolvedValue({ status: 'disconnected' });
       const body = await controller(prisma, cache).readiness(makeRes());
       expect(body.message).toBe('database and redis not available');
     });
 
-    it('is ready without a cache manager (redis not configured)', async () => {
+    it('is ready without a cache service (redis not configured)', async () => {
       const res = makeRes();
       const body = await controller(makePrisma()).readiness(res);
       expect(body.ready).toBe(true);
@@ -111,9 +117,9 @@ describe('HealthController', () => {
       expect(body.services.database).toEqual({ status: 'disconnected' });
     });
 
-    it('reports unhealthy when redis throws', async () => {
+    it('reports unhealthy when the redis ping fails', async () => {
       const cache = makeCache();
-      cache.get.mockRejectedValue(new Error('down'));
+      cache.pingRedis.mockResolvedValue({ status: 'disconnected' });
       const body = await controller(makePrisma(), cache).check();
       expect(body.status).toBe('unhealthy');
       expect(body.services.redis).toEqual({ status: 'disconnected' });

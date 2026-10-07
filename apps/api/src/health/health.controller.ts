@@ -1,12 +1,10 @@
-import { Controller, Get, HttpStatus, Inject, Optional, Res } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Optional, Res } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
 import { Response } from 'express';
+import { CacheService, RedisStatus } from '../cache/cache.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 type DatabaseStatus = 'connected' | 'disconnected';
-type RedisStatus = 'connected' | 'disconnected' | 'not_configured';
 
 interface HealthCheckResponse {
   status: 'healthy' | 'unhealthy';
@@ -39,7 +37,7 @@ interface ReadinessResponse {
 export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
+    @Optional() private readonly cache?: CacheService,
   ) {}
 
   @Get()
@@ -100,21 +98,15 @@ export class HealthController {
     }
   }
 
+  /**
+   * A real PING on the direct Redis client (see CacheService.pingRedis). No shared key is
+   * written, so overlapping probes from the api, web and healthcheck.sh cannot delete each
+   * other's round trip and report a healthy Redis as down.
+   */
   private async checkRedis(): Promise<{ status: RedisStatus; latency?: number }> {
-    if (!this.cacheManager) {
+    if (!this.cache) {
       return { status: 'not_configured' };
     }
-    try {
-      const start = Date.now();
-      const testKey = '__health_check__';
-      await this.cacheManager.set(testKey, 'ok', 5000);
-      const result = await this.cacheManager.get(testKey);
-      await this.cacheManager.del(testKey);
-      return result === 'ok'
-        ? { status: 'connected', latency: Date.now() - start }
-        : { status: 'disconnected' };
-    } catch {
-      return { status: 'disconnected' };
-    }
+    return this.cache.pingRedis();
   }
 }

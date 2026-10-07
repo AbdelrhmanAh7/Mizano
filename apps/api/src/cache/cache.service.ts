@@ -1,5 +1,5 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cache } from 'cache-manager';
 import Redis from 'ioredis';
@@ -23,8 +23,13 @@ export interface CacheKeyInfo {
   ttl: number; // remaining TTL in seconds, -1 = no expiry, -2 = key gone
 }
 
+export type RedisStatus = 'connected' | 'disconnected' | 'not_configured';
+
+/** Upper bound for one readiness PING so a hung Redis cannot stall the probe. */
+const PING_TIMEOUT_MS = 2000;
+
 @Injectable()
-export class CacheService implements OnModuleInit {
+export class CacheService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CacheService.name);
   private redisClient: Redis | null = null;
   private hits = 0;
@@ -45,18 +50,27 @@ export class CacheService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     const redisUrl = this.configService.get<string>('REDIS_URL');
     if (redisUrl) {
+      // The client is kept even when the first connect fails: ioredis keeps reconnecting,
+      // so a Redis that comes up later (reboot start order) is picked up without a restart.
+      this.redisClient = new Redis(redisUrl, {
+        maxRetriesPerRequest: 3,
+        lazyConnect: true,
+      });
+      // ioredis prints every connection error unless someone listens; the readiness probe
+      // reports the state instead, and the error text could carry the URL.
+      this.redisClient.on('error', () => undefined);
       try {
-        this.redisClient = new Redis(redisUrl, {
-          maxRetriesPerRequest: 3,
-          lazyConnect: true,
-        });
         await this.redisClient.connect();
         this.logger.log('Redis client connected for cache operations');
-      } catch (error) {
+      } catch {
         this.logger.warn('Failed to connect direct Redis client; pattern operations unavailable');
-        this.redisClient = null;
       }
     }
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    this.redisClient?.disconnect();
+    this.redisClient = null;
   }
 
   /**
@@ -64,6 +78,30 @@ export class CacheService implements OnModuleInit {
    */
   get isRedisAvailable(): boolean {
     return this.redisClient !== null && this.redisClient.status === 'ready';
+  }
+
+  /**
+   * Readiness of the configured Redis, from a real PING on the direct client. The
+   * cache-manager store behind CACHE_MANAGER is in-process memory (cache-manager v7
+   * ignores the legacy redis `store` option), so a set/get through it never reaches Redis.
+   */
+  async pingRedis(): Promise<{ status: RedisStatus; latency?: number }> {
+    if (!this.configService.get<string>('REDIS_URL')) return { status: 'not_configured' };
+    if (!this.redisClient) return { status: 'disconnected' };
+    const start = Date.now();
+    try {
+      const pong = await Promise.race([
+        this.redisClient.ping(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('ping timeout')), PING_TIMEOUT_MS).unref(),
+        ),
+      ]);
+      return pong === 'PONG'
+        ? { status: 'connected', latency: Date.now() - start }
+        : { status: 'disconnected' };
+    } catch {
+      return { status: 'disconnected' };
+    }
   }
 
   /**

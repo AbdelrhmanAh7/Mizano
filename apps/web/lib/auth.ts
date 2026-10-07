@@ -3,10 +3,11 @@ import { JWT } from 'next-auth/jwt';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import axios from 'axios';
 import { createTokenRefresher, type RefreshedTokens } from './auth-refresh';
-import { serverApiBaseUrl } from './server-api-url';
 
-// Server-side API URL: the internal compose address first (see lib/server-api-url.ts)
-const API_BASE_URL = serverApiBaseUrl();
+// Server-side API URL: prefer internal Docker network URL, fallback to public URL
+// API_INTERNAL_URL is NOT a NEXT_PUBLIC_ var, so it's always read at runtime (not inlined at build)
+const API_BASE_URL =
+  process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:6001/api';
 
 // Access token refresh buffer: refresh 1 minute before expiry
 const REFRESH_BUFFER_MS = 60_000;
