@@ -115,6 +115,12 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 
 `_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly.
 
+To run the intake worker isolation e2e test (#142):
+
+```bash
+DATABASE_URL="postgresql://mizano:mizano_secret@localhost:5435/mizano_db" REDIS_URL="" pnpm --filter api exec jest --runInBand --config test/jest-e2e.json test/intake-worker-isolation.e2e-spec.ts
+```
+
 Unit-test infrastructure lives in `apps/api/src/test/`: `mocks/prisma.mock.ts` (deep Prisma mock, transactions call back with the mock), `mocks/redis.mock.ts` (in-memory cache), `mocks/{sharp,tesseract}.mock.js` (heavy native/OCR libraries), `helpers/test-utils.ts` (typed factories) and `helpers/decimal.helpers.ts`. Unit tests must not need Redis, PostgreSQL, Ollama or the network.
 
 Rules:
