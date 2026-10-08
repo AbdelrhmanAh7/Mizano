@@ -65,7 +65,7 @@ This file lists the owner decisions and every float hit deferred to a follow-up,
 
 ## Float audit: every hit on HEAD
 
-The command is in EVIDENCE.md. Master had 697 hits; HEAD has 695.
+The command is in docs/evidence/94/EVIDENCE.md. Master had 697 hits; HEAD has 695.
 
 **Fixed in this PR:** `packages/validators/src/index.ts:251-252`, the float balance check, which is now exact. Separately, the ledger command now bounds amounts to the `Decimal(19,4)` storage scale.
 
