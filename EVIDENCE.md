@@ -145,15 +145,15 @@
 
 ### Issue #105 (PR #106) — outbound invoice e-mail volume anomaly alert
 
-- **Tested commit SHA**: `99a4a7d` (branch `ai/105`; code under test unchanged since `5cafcc3c4ece8ada25372096348ffa63b9c4a036`)
+- **Tested commit SHA**: `744ed04` (branch `ai/105`; adds the atomic alert claim on top of `5cafcc3c4ece8ada25372096348ffa63b9c4a036`)
 - **Commands**:
   ```bash
   cd apps/api
-  npx jest src/modules/documents/services/email.service.spec.ts
+  npx jest -c _jest.config.js --testPathPattern='(email|cache)\.service\.spec'
   npx jest
   npx eslint src/modules/documents && npx prettier --check src/modules/documents ../../deploy/pi
   ```
-- **Result**: `email.service.spec.ts` 26 passed (acceptance tests are titled `@issue-105 AC1`/`AC2`). Earlier full API run: 131 of 136 suites pass; after building
+- **Result**: `email.service.spec.ts` + `cache.service.spec.ts` 34 passed, 2 suites (acceptance tests are titled `@issue-105 AC1`/`AC2`). Earlier full API run: 131 of 136 suites pass; after building
   `@mizano/shared-types` the 4 logger suites pass too. `auth.service.spec.ts` cannot load the native
   `bcrypt` binding (worktree installed with `--ignore-scripts`); no auth file is changed here.
   ESLint and Prettier are clean.
@@ -168,6 +168,7 @@
 | REQ-105-6 | Alert text is count and threshold only, no invoice data or addresses            | `alert text carries the count and threshold only`                              |
 | REQ-105-7 | Notify only: a failing check never changes the send result; no raw error logged | `a failing check is logged without the raw error ...`                          |
 | REQ-105-8 | `NOTIFY_ANOMALY_MIN_DAILY` (and the Telegram chat id) wired for the Pi          | `Pi deployment wiring ...` (2 tests: compose api env, `.env.pi.example`)       |
+| REQ-105-9 | Concurrent sends crossing the threshold emit exactly one alert (atomic claim)   | `concurrent sends ... exactly one alert`, `cache.service.spec.ts` `claim` (3)  |
 
 Not verified here: the `EmailLog (organizationId, entityType, sentAt)` index (requested in `AI_QUESTIONS.md`,
 schema change left to the coordinator) and an HTTP-level E2E, which needs Postgres and Redis (no Redis in this worktree).
