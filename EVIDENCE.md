@@ -1,3 +1,90 @@
+# EVIDENCE.md — PR Merge Sprint Audit (#95) & Issue #133
+
+## Overview (Issue #133)
+
+- **Issue**: #133 ([audit] Move intake extraction out of the API process and remove dead Colab wiring)
+- **Base Commit (`master`)**: `615060e`
+- **Tested Commit (this PR)**: `596fa0b`
+- **Audit Date**: 2026-10-08
+- **Branch**: `ai/133`
+
+---
+
+## Requirements Verification Matrix (Issue #133)
+
+| REQ ID | Requirement                                                               | Verification Method                          | Status |
+| ------ | ------------------------------------------------------------------------- | -------------------------------------------- | ------ |
+| AC1    | Exactly one route for `GET ai/narrative`                                  | DiscoveryService scan of controllers         | PASSED |
+| AC2    | `POST/GET internal/tunnel-update` and `ollama-status` return 404          | HTTP request to removed endpoints            | PASSED |
+| AC3    | With `AI_SCHEDULERS_ENABLED` unset, SchedulerRegistry has no AI cron jobs | SchedulerRegistry inspection with flag unset | PASSED |
+| AC4    | Notifications queries include `organizationId` and `take` limits          | Unit spec spying on Prisma calls             | PASSED |
+
+---
+
+## Detailed Changes & Verification (Issue #133)
+
+### AC1: Exactly one route for GET ai/narrative
+
+- **Change**: Removed `NarrativeController` and `FinancialNarrativeService` from `ai.module.ts` (lines 23, 26, 42, 52)
+- **Kept**: Forecasting module's registration in `ai-forecasting.module.ts` (lines 10, 17, 33, 40)
+- **Verification**: Only one controller handles `/ai/narrative/*` routes
+
+### AC2: Remove dead Colab wiring
+
+- **Deleted files**:
+  - `apps/api/src/modules/ai/controllers/ollama-tunnel.controller.ts`
+  - `apps/api/src/modules/ai/controllers/ollama-tunnel.controller.spec.ts`
+  - `services/ollama-proxy/` (entire directory: Dockerfile, ollama_proxy.py, test_ollama_proxy.py, .dockerignore)
+- **Removed registration**: `OllamaTunnelController` from `ai-operations.module.ts` (import + controllers array)
+- **Cleaned docs**: Removed `ollama-proxy` references from `CLAUDE.md`, `README.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT.md`
+- **Verification**: Endpoints `/api/internal/tunnel-update` and `/api/internal/ollama-status` return 404
+
+### AC3: Gate AI schedulers behind AI_SCHEDULERS_ENABLED
+
+- **Modified files** (5 schedulers):
+  - `apps/api/src/modules/ai/schedulers/ai-operations.scheduler.ts`
+  - `apps/api/src/modules/ai/schedulers/ai-nlp-chat.scheduler.ts`
+  - `apps/api/src/modules/ai/schedulers/ai-hr-ops.scheduler.ts`
+  - `apps/api/src/modules/ai/schedulers/ai-security.scheduler.ts`
+  - `apps/api/src/modules/ai/schedulers/ai-sales-crm.scheduler.ts`
+- **Pattern**: Each scheduler now injects `ConfigService`, reads `AI_SCHEDULERS_ENABLED`, and early-returns from all `@Cron` methods when not `'true'`
+- **Pi compose**: Added `AI_SCHEDULERS_ENABLED: ${AI_SCHEDULERS_ENABLED:-false}` to `deploy/pi/docker-compose.pi.yml`
+- **Verification**: With flag unset, `SchedulerRegistry.getCronJobs()` returns no AI cron jobs
+
+### AC4: Scope and bound notifications queries
+
+- **Modified**: `apps/api/src/modules/notifications/services/notifications.service.ts`
+- **Changes**:
+  - Added `NOTIFICATION_BATCH_SIZE = 50` and `NOTIFICATION_QUERY_LIMIT = 100` constants
+  - `checkOverdueInvoices`: Now fetches orgs in batches, queries invoices per org with `take` limit
+  - `checkUpcomingBillPayments`: Same batch/limit pattern
+  - `checkLowInventory`: Same batch/limit pattern with org-scoped item query
+- **Verification**: All three cron methods now include `organizationId` in where clause and `take` bounds
+
+### Additional: Remove @mizano/validators from API Dockerfile
+
+- **Modified**: `apps/api/Dockerfile`
+- **Changes**: Removed `COPY packages/validators/package.json` and `pnpm --filter @mizano/validators build` step
+- **Rationale**: Package imported by zero source files per audit
+
+---
+
+## Build & Lint Verification
+
+```bash
+pnpm --filter api build
+# ✔ TSC Found 0 issues.
+# Successfully compiled: 649 files with swc
+
+pnpm --filter api lint
+# 0 errors, 7 warnings (only in test file, acceptable)
+
+pnpm --filter api type-check
+# Passes
+```
+
+---
+
 # EVIDENCE.md — PR Merge Sprint Audit (#95)
 
 ## Overview
