@@ -151,9 +151,9 @@
 | ---------------- | -------------------------------------------------------------------------------------- |
 | Master SHA       | `615060ed6294e16375a1f1ea9385cb7e812cd24f` (merge of PR #98)                           |
 | Red check        | `Deploy to GCP`, workflow `Deploy to Production`, run 37540990404                      |
-| Root cause       | Infrastructure: the VM behind `DEPLOY_HOST` does not answer on TCP 22                  |
+| Observed cause   | TCP 22 connection to `DEPLOY_HOST` times out; the underlying reason is unknown         |
 | Caused by #98?   | No. The same error is on every deploy run since 2026-10-01                             |
-| Code fix         | None possible; owner questions are tracked in issue #113                               |
+| Code fix         | None in this PR. Deploy fix not done, green master CI not verified; #113 stays open    |
 | Regression test  | `apps/api/test/ci-health.e2e-spec.ts` (AC1: API boots and `/health` healthy)           |
 
 ## What PR #98 changed
@@ -194,5 +194,6 @@ exists for this PR. Retiring the GCP deploy is a separate follow-up.
 
 ## Regression test
 
-`apps/api/test/ci-health.e2e-spec.ts` checks that the API boots and `/health` is healthy. The SSH
-timeout itself is external and cannot fail a repository test.
+`apps/api/test/ci-health.e2e-spec.ts` checks that the API boots and `/health` is healthy. This
+test cannot detect the deploy SSH timeout. `CI` and `Deploy to Production` are disabled, so this
+head has no GitHub run and has not been verified end to end.
