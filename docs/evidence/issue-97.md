@@ -7,9 +7,9 @@ Slice 1 is documentation only. No `apps/api` code changed: the repository has no
 | Field                                           | Value                                                                                                                                                                                                                                                                                  |
 | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Baseline** (`master` when the branch was cut) | `b83d72b4cfa358f3a6ba4be9d9f1b613ac9fe1f2`                                                                                                                                                                                                                                             |
-| **Merged `master`**                             | `615060ed6294e16375a1f1ea9385cb7e812cd24f` (#98), merge commit `bd2a619`; the add/add conflict on `docs/evidence/issue-97.md` was resolved by keeping this file                                                                                                                                      |
-| **Tested head**                                 | `e40f0526bc0ee4206642a0f904669180c95768a4`, the last content commit (round 3). Every check below ran on that commit with a clean tree plus this file in its final form                                                                                                                 |
-| **Evidence commit** (final PR head)             | The commit directly after `e40f052` adds only this file. Verify with `git diff --stat e40f052..HEAD`, which must list `docs/evidence/issue-97.md` alone. If a later review round adds commits, the checks are rerun and this table is updated                                                        |
+| **Merged `master`**                             | `615060ed6294e16375a1f1ea9385cb7e812cd24f` (#98), merge commit `bd2a619`; the add/add conflict on `docs/evidence/issue-97.md` was resolved by keeping this file                                                                                                                        |
+| **Tested head**                                 | `cc4a3fb0aa5fb6745ffbca71c23cf1e7f19263b6`, the last content commit before this evidence update (round 4). Every check under "Round 4 recheck" below ran on it; the round 3 output further down was recorded at `e40f052` and is kept as history                                       |
+| **Evidence commit** (final PR head)             | The commit directly after `cc4a3fb`. Verify with `git diff --stat cc4a3fb..HEAD`, which must list `docs/evidence/issue-97.md` alone. If a later review round adds commits, the checks are rerun and this table is updated                                                              |
 | **Host / tools**                                | macOS (Darwin arm64), git, prettier 3.8.1 (the version pinned in `pnpm-lock.yaml`; binary taken from a sibling checkout because this worktree has no `node_modules`), python3 for the link and secret scans, GitHub CLI (`gh`) with the owner's existing login for the round 3 actions |
 
 ## Changed files (vs `master`)
@@ -46,12 +46,12 @@ $ gh issue view 97 / 104 / 105 --json number,state,title,labels
 | Round | Thread                                  | Finding                                                                                 | Fix                                                                                                                                                                        | Commit               |
 | ----- | --------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
 | 1     | `AI_QUESTIONS.md:10`                    | `.env.prod` is not available to the Pi deployment                                       | Default moved to `.env.pi` + `docker-compose.pi.yml` `environment:` list, documented in `.env.pi.example`                                                                  | `730135c`            |
-| 1     | `docs/evidence/issue-97.md:5`                         | Baseline SHA labelled as tested; no checks run                                          | Baseline and tested head recorded separately; checks run with output below                                                                                                 | `fd94af2`            |
+| 1     | `docs/evidence/issue-97.md:5`           | Baseline SHA labelled as tested; no checks run                                          | Baseline and tested head recorded separately; checks run with output below                                                                                                 | `fd94af2`            |
 | 1     | `AI_QUESTIONS.md:14`                    | Anomaly rule undefined for cold start or zero baseline                                  | Warm-up (floor only until 7 full UTC days) and nonzero floor (`max(50/day, 2 × 30-day mean)`)                                                                              | `730135c`            |
 | 2     | `AI_QUESTIONS.md:3`                     | Merging slice 1 would close #97 (harness PR body says `Closes #97`)                     | Item 0: two follow-up issues drafted (slice 2, slice 3 including the invoice e-mail path), owner asked to file or re-link                                                  | `480a6de`            |
-| 2     | `docs/evidence/issue-97.md:12`                        | Tested head was not the final PR head; evidence commit vague                            | Tested head is the last content commit; evidence commit is last and changes only this file; all checks rerun at the new head                                               | `c5ebbc0`            |
-| 2     | `docs/evidence/issue-97.md:101`                       | Claimed no outbound invoice sender exists                                               | `POST /documents/invoice/:id/send` → `EmailService.sendInvoice` through the organization's SMTP settings is now recorded; VAT submit stays a local settlement journal      | `480a6de`            |
-| 2     | `docs/evidence/issue-97.md:119`                       | Diff-size / no-CI-paths row had no recorded output (thread text truncated in the brief) | Real `git diff --stat`, `--name-only` and path filter output recorded below                                                                                                | `c5ebbc0`            |
+| 2     | `docs/evidence/issue-97.md:12`          | Tested head was not the final PR head; evidence commit vague                            | Tested head is the last content commit; evidence commit is last and changes only this file; all checks rerun at the new head                                               | `c5ebbc0`            |
+| 2     | `docs/evidence/issue-97.md:101`         | Claimed no outbound invoice sender exists                                               | `POST /documents/invoice/:id/send` → `EmailService.sendInvoice` through the organization's SMTP settings is now recorded; VAT submit stays a local settlement journal      | `480a6de`            |
+| 2     | `docs/evidence/issue-97.md:119`         | Diff-size / no-CI-paths row had no recorded output (thread text truncated in the brief) | Real `git diff --stat`, `--name-only` and path filter output recorded below                                                                                                | `c5ebbc0`            |
 | 3     | `AI_QUESTIONS.md:5-14` (quality review) | Drafted `gh` commands and a post-merge reopen still let the merge close #97             | PR #100 body edited to `Refs #97` (GitHub lists no closing reference), #104 and #105 filed and linked from item 0, review lesson revised to put the fix on the implementer | `a4ccbae`, `e40f052` |
 | 3     | `AI_QUESTIONS.md:18` (quality review)   | "The earlier claim in this file" referenced text that never existed in the merged file  | Reworded to "An earlier draft of this file claimed …"                                                                                                                      | `a4ccbae`            |
 
@@ -230,13 +230,45 @@ $ git diff --numstat master (with this block in place; its last line below is th
 docs/evidence/issue-97.md added=242 deleted=144; all files added=294 deleted=145 total=439
 ```
 
+## Round 4 recheck (tested head `cc4a3fb`)
+
+CodeRabbit's review of `fd94af2` (changes requested) asked for the final head SHA, the real `git diff --stat master..HEAD`, the invoice-send correction and a `Refs #97` tracking plan. The last three were fixed in rounds 2 and 3; the head had since moved to `cc4a3fb`, which also changed `.gitignore` (LF), `AI_QUESTIONS.md` and the root `EVIDENCE.md`, so the checks below were rerun on it. The root `EVIDENCE.md` is byte-identical to `master` (earlier issues' records are untouched).
+
+```text
+$ git rev-parse HEAD   (before this evidence commit)
+cc4a3fb0aa5fb6745ffbca71c23cf1e7f19263b6
+$ git diff --stat master..HEAD   (before this evidence commit; docs/evidence/issue-97.md is replaced by this file)
+ .gitignore                    | 228 +++++++++++++++++++--------------------
+ AI_QUESTIONS.md               |  43 ++++++++
+ deploy/pi/README.md           |   1 +
+ docs/agents/review-lessons.md |   7 +-
+ docs/evidence/issue-97.md     | 242 ++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 407 insertions(+), 114 deletions(-)
+$ git diff --stat master..HEAD -- EVIDENCE.md
+(no output: root EVIDENCE.md identical to master)
+$ git diff -w --ignore-cr-at-eol --stat master..HEAD -- .gitignore
+ .gitignore | 2 ++
+ 1 file changed, 2 insertions(+)
+$ git diff --check master..HEAD; echo exit=$?
+exit=0
+$ git diff --name-only master..HEAD | grep -E "^\.github/|secret|\.env" || echo "no CI, secrets or .env path touched"
+no CI, secrets or .env path touched
+$ prettier --config .prettierrc --check AI_QUESTIONS.md deploy/pi/README.md docs/agents/review-lessons.md EVIDENCE.md
+Checking formatting...
+All matched files use Prettier code style!
+$ grep -n "notify-volume" AI_QUESTIONS.md | cut -c1-110
+40:- **Delivery.** Same channel and dedupe as `deploy/pi/scripts/healthcheck.sh`: one Telegram alert keyed `no
+```
+
+`.gitignore` was LF-normalised in round 3 at the reviewer's request (`master` mixes CRLF and LF), so the plain `--stat` shows a whole-file rewrite; ignoring line endings the real change is the two lines that ignore `deploy/pi/.env.pi`.
+
 ## Acceptance checklist (Tech Lead plan)
 
-| Item                                                                           | Status                                                                                                                                          |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Classification at the 89/90/91-day boundaries; malformed dates give `unknown`  | Not applicable in slice 1: no ETA integration, so no `credential-age` code (plan step 0); tracked in #104                                       |
-| No credential value appears in logs, asserted by a test                        | Not applicable in slice 1 (no code); the secret scan above shows no values in the docs; the test is an acceptance item of #104 and #105         |
-| Release checklist contains the rotation item                                   | PASS: `deploy/pi/README.md` line 53                                                                                                             |
-| `AI_QUESTIONS.md` lists the slice 2 and slice 3 decisions, each with a default | PASS: items 2 and 3, defaults marked `_Default:_`; item 0 links #104 and #105 and records that PR #100 now says `Refs #97`                      |
-| `docs/evidence/issue-97.md` has real recorded output and the exact tested SHA                | PASS: tested head `e40f0526bc0ee4206642a0f904669180c95768a4`, output above                                                                      |
+| Item                                                                           | Status                                                                                                                                                        |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Classification at the 89/90/91-day boundaries; malformed dates give `unknown`  | Not applicable in slice 1: no ETA integration, so no `credential-age` code (plan step 0); tracked in #104                                                     |
+| No credential value appears in logs, asserted by a test                        | Not applicable in slice 1 (no code); the secret scan above shows no values in the docs; the test is an acceptance item of #104 and #105                       |
+| Release checklist contains the rotation item                                   | PASS: `deploy/pi/README.md` line 53                                                                                                                           |
+| `AI_QUESTIONS.md` lists the slice 2 and slice 3 decisions, each with a default | PASS: items 2 and 3, defaults marked `_Default:_`; item 0 links #104 and #105 and records that PR #100 now says `Refs #97`                                    |
+| `docs/evidence/issue-97.md` has real recorded output and the exact tested SHA  | PASS: tested head `cc4a3fb0aa5fb6745ffbca71c23cf1e7f19263b6`, output under "Round 4 recheck"                                                                  |
 | Under 300 changed lines; no CI or secrets files touched                        | See the diff block above: no `.github/`, secrets or `.env` path is touched; 53 content lines, the rest is this per-PR `docs/evidence/issue-97.md` replacement |
