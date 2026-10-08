@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { BadRequestException, Logger } from '@nestjs/common';
 import { CacheService } from '../../../cache/cache.service';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -230,7 +232,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     jest.restoreAllMocks();
   });
 
-  it('cold start: with no history only the floor applies and the first attempt over it alerts', async () => {
+  it('@issue-105 AC1: cold start: with no history only the floor applies and the first attempt over it alerts', async () => {
     mockCounts(51);
 
     await service.checkVolumeAnomaly(orgId);
@@ -241,7 +243,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(telegramText()).toContain('Threshold: 50');
   });
 
-  it('cold start: reaching the floor exactly is not an anomaly', async () => {
+  it('@issue-105 AC1: cold start: reaching the floor exactly is not an anomaly', async () => {
     mockCounts(50);
 
     await service.checkVolumeAnomaly(orgId);
@@ -250,7 +252,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(cacheSet).not.toHaveBeenCalled();
   });
 
-  it('zero baseline inside the warm-up (5 full days) keeps the floor', async () => {
+  it('@issue-105 AC1: zero baseline inside the warm-up (5 full days) keeps the floor', async () => {
     prisma.emailLog.findFirst.mockResolvedValue({ sentAt: utcDaysAgo(5) });
     mockCounts(60, 1); // 0.2/day, so 2 x baseline rounds to 0: the floor must win
 
@@ -259,7 +261,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(telegramText()).toContain('Threshold: 50');
   });
 
-  it('warm-up boundary: 7 full days of history still use the floor', async () => {
+  it('@issue-105 AC1: warm-up boundary: 7 full days of history still use the floor', async () => {
     prisma.emailLog.findFirst.mockResolvedValue({ sentAt: utcDaysAgo(7) });
     mockCounts(85, 280); // 40/day: the ratio would give 80
 
@@ -268,7 +270,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(telegramText()).toContain('Threshold: 50');
   });
 
-  it('warm-up boundary: 8 full days of history switch to 2 x baseline', async () => {
+  it('@issue-105 AC1: warm-up boundary: 8 full days of history switch to 2 x baseline', async () => {
     prisma.emailLog.findFirst.mockResolvedValue({ sentAt: utcDaysAgo(8) });
     mockCounts(85, 320); // 40/day: max(50, 80) = 80
 
@@ -277,7 +279,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(telegramText()).toContain('Threshold: 80');
   });
 
-  it('after the warm-up a low baseline falls back to the floor (floor versus ratio)', async () => {
+  it('@issue-105 AC1: after the warm-up a low baseline falls back to the floor (floor versus ratio)', async () => {
     prisma.emailLog.findFirst.mockResolvedValue({ sentAt: utcDaysAgo(20) });
     mockCounts(55, 100); // 5/day: 2 x baseline = 10 < floor 50
 
@@ -286,7 +288,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(telegramText()).toContain('Threshold: 50');
   });
 
-  it('the baseline never averages over more than 30 full days', async () => {
+  it('@issue-105 AC1: the baseline never averages over more than 30 full days', async () => {
     prisma.emailLog.findFirst.mockResolvedValue({ sentAt: utcDaysAgo(400) });
     mockCounts(130, 1800); // 1800 / 30 days = 60/day: threshold 120, not 1800 / 400
 
@@ -295,7 +297,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(telegramText()).toContain('Threshold: 120');
   });
 
-  it('alert text carries the count and threshold only: no invoice data or addresses', async () => {
+  it('@issue-105 AC2: alert text carries the count and threshold only: no invoice data or addresses', async () => {
     mockCounts(100);
 
     await service.checkVolumeAnomaly(orgId);
@@ -313,7 +315,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     );
   });
 
-  it('an invalid NOTIFY_ANOMALY_MIN_DAILY falls back to the default floor of 50', async () => {
+  it('@issue-105 AC1: an invalid NOTIFY_ANOMALY_MIN_DAILY falls back to the default floor of 50', async () => {
     process.env.NOTIFY_ANOMALY_MIN_DAILY = 'lots';
     mockCounts(51);
 
@@ -322,7 +324,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(telegramText()).toContain('Threshold: 50');
   });
 
-  it('a zero floor is rejected so a quiet tenant never alerts on its first send', async () => {
+  it('@issue-105 AC1: a zero floor is rejected so a quiet tenant never alerts on its first send', async () => {
     process.env.NOTIFY_ANOMALY_MIN_DAILY = '0';
     mockCounts(1);
 
@@ -331,7 +333,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('alerts once while failing and once on recovery', async () => {
+  it('@issue-105 AC1: alerts once while failing and once on recovery', async () => {
     mockCounts(60);
     await service.checkVolumeAnomaly(orgId);
     await service.checkVolumeAnomaly(orgId);
@@ -345,7 +347,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(telegramText(1)).toContain('RECOVERED');
   });
 
-  it('keeps the dedupe state well past the 5-minute cache default', async () => {
+  it('@issue-105 AC1: keeps the dedupe state well past the 5-minute cache default', async () => {
     mockCounts(60);
 
     await service.checkVolumeAnomaly(orgId);
@@ -359,7 +361,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(ttl).toBeGreaterThanOrEqual(24 * 60 * 60);
   });
 
-  it('bounds the Telegram call with a timeout signal', async () => {
+  it('@issue-105 AC1: bounds the Telegram call with a timeout signal', async () => {
     mockCounts(60);
 
     await service.checkVolumeAnomaly(orgId);
@@ -368,7 +370,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it('does not record the alert when Telegram rejects it, so the next check retries', async () => {
+  it('@issue-105 AC1: does not record the alert when Telegram rejects it, so the next check retries', async () => {
     fetchSpy.mockResolvedValueOnce({ ok: false, status: 502 } as unknown as Response);
     mockCounts(60);
 
@@ -384,7 +386,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
-  it('a timed-out Telegram call neither throws nor records the alert', async () => {
+  it('@issue-105 AC1: a timed-out Telegram call neither throws nor records the alert', async () => {
     fetchSpy.mockRejectedValueOnce(new Error('This operation was aborted'));
     mockCounts(60);
 
@@ -393,7 +395,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(cacheSet).not.toHaveBeenCalled();
   });
 
-  it('retries the recovery message until Telegram accepts it', async () => {
+  it('@issue-105 AC1: retries the recovery message until Telegram accepts it', async () => {
     mockCounts(60);
     await service.checkVolumeAnomaly(orgId); // ALERT delivered
 
@@ -408,7 +410,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(cache.get(stateKey)).toBe(false);
   });
 
-  it('without a Telegram chat id nothing is sent or recorded', async () => {
+  it('@issue-105 AC1: without a Telegram chat id nothing is sent or recorded', async () => {
     delete process.env.TELEGRAM_ALERT_CHAT_ID;
     mockCounts(60);
 
@@ -416,6 +418,27 @@ describe('EmailService.checkVolumeAnomaly', () => {
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(cacheSet).not.toHaveBeenCalled();
+  });
+});
+
+describe('Pi deployment wiring for the volume anomaly alert', () => {
+  const repoRoot = resolve(__dirname, '../../../../../..');
+  const read = (relative: string): string => readFileSync(resolve(repoRoot, relative), 'utf8');
+
+  it('@issue-105 AC1: the api service receives the threshold, bot token and alert chat id', () => {
+    const compose = read('deploy/pi/docker-compose.pi.yml');
+    const api = compose.slice(compose.indexOf('\n  api:'), compose.indexOf('\n  web:'));
+    for (const name of [
+      'NOTIFY_ANOMALY_MIN_DAILY',
+      'TELEGRAM_BOT_TOKEN',
+      'TELEGRAM_ALERT_CHAT_ID',
+    ]) {
+      expect(api).toContain(`${name}: \${${name}`);
+    }
+  });
+
+  it('@issue-105 AC1: the example env file documents the threshold with the default of 50', () => {
+    expect(read('deploy/pi/.env.pi.example')).toMatch(/^NOTIFY_ANOMALY_MIN_DAILY=50\r?$/m);
   });
 });
 
