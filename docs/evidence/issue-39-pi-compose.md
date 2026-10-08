@@ -109,3 +109,7 @@ Environment: macOS arm64, Node 26, no Docker, no Redis; throwaway Postgres 16 on
 4. README section 8: start `mizano-soak.timer` only after `stack.sh up` reports healthy, run the acceptance-contract workload for 24 h, attach the `soak-report.sh` output and `stats.log` excerpts.
 5. README section 5: reboot test. Attach `stack.sh status` after boot and the time to healthy.
 6. Run `shellcheck -x deploy/pi/scripts/*.sh` on a machine that has it.
+
+## Review round 6 (PR #92): e2e-army gate
+
+All review threads were already resolved; the remaining `CHANGES_REQUESTED` is CodeRabbit's stale 2026-10-06 review. The hub's feature map ties `apps/api/src/health/**` to `mz-health`, which this PR touches, so `e2e-army/39-pi-health.e2e.ts` (3 request-level tests, `@issue-39` AC2, tag `feat:mz-health`) covers the readiness routes the compose probes use. It runs in the hub's verify job against the built app (not runnable here). `pnpm test:deploy`: 27/27 pass after merging master. A1 and A2 still need the Pi.
