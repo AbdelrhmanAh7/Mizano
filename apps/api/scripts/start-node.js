@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 const { spawn } = require('child_process');
+const os = require('os');
 const { buildNodeArgs } = require('./node-heap');
 
 try {
@@ -12,17 +13,24 @@ try {
     }
   };
 
-  process.on('SIGTERM', () => forwardSignal('SIGTERM'));
-  process.on('SIGINT', () => forwardSignal('SIGINT'));
-  process.on('SIGHUP', () => forwardSignal('SIGHUP'));
+  const handleSigterm = () => forwardSignal('SIGTERM');
+  const handleSigint = () => forwardSignal('SIGINT');
+  const handleSighup = () => forwardSignal('SIGHUP');
+
+  process.on('SIGTERM', handleSigterm);
+  process.on('SIGINT', handleSigint);
+  process.on('SIGHUP', handleSighup);
 
   child.on('exit', (code, signal) => {
-    // Remove listeners to avoid memory leaks
-    process.off('SIGTERM', forwardSignal);
-    process.off('SIGINT', forwardSignal);
-    process.off('SIGHUP', forwardSignal);
+    process.off('SIGTERM', handleSigterm);
+    process.off('SIGINT', handleSigint);
+    process.off('SIGHUP', handleSighup);
     if (signal) {
-      process.exit(128 + signal);
+      const signum = os.constants.signals[signal];
+      if (typeof signum === 'number') {
+        process.exit(128 + signum);
+      }
+      process.kill(process.pid, signal);
     }
     process.exit(code ?? 0);
   });

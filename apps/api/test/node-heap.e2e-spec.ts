@@ -1,4 +1,4 @@
-import { spawnSync, SpawnSyncReturns } from 'child_process';
+import { spawn, spawnSync, SpawnSyncReturns } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -129,6 +129,59 @@ describe('Node Heap Launcher (@flow:node-heap @issue-127)', () => {
       const readmePath = path.resolve(rootDir, 'README.md');
       const content = fs.readFileSync(readmePath, 'utf-8');
       expect(content).toContain('MIZANO_NODE_HEAP_MB');
+    });
+  });
+
+  describe('@issue-127 AC5: Signal forwarding to child process', () => {
+    it('@e2e @flow:node-heap @issue-127: forwards SIGTERM to the child and exits non-zero or by signal', async () => {
+      const probe = [
+        '-e',
+        'console.log("CHILD_READY"); process.on("SIGTERM", () => { console.log("CHILD_RECEIVED_SIGTERM"); process.exit(42); }); setInterval(() => {}, 1000);',
+      ];
+      const env = { ...process.env };
+      delete env.MIZANO_NODE_HEAP_MB;
+
+      const child = spawn(process.execPath, [startNodeScriptPath, ...probe], {
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      if (!child.stdout) {
+        child.kill('SIGTERM');
+        throw new Error('Failed to capture launcher stdout');
+      }
+
+      let stdout = '';
+      child.stdout.on('data', (chunk: Buffer) => {
+        stdout += chunk.toString();
+      });
+
+      const waitForMarker = (marker: string) =>
+        new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(
+            () => reject(new Error(`Timed out waiting for ${marker} in child output`)),
+            15000,
+          );
+          const onData = () => {
+            if (stdout.includes(marker)) {
+              clearTimeout(timer);
+              child.stdout?.off('data', onData);
+              resolve();
+            }
+          };
+          child.stdout.on('data', onData);
+        });
+
+      await waitForMarker('CHILD_READY');
+      child.kill('SIGTERM');
+
+      const [exitCode, exitSignal] = await new Promise<[number | null, NodeJS.Signals | null]>(
+        (resolve) => {
+          child.on('exit', (code, signal) => resolve([code, signal]));
+        },
+      );
+
+      expect(stdout).toContain('CHILD_RECEIVED_SIGTERM');
+      expect(exitCode !== 0 || exitSignal !== null).toBe(true);
     });
   });
 });
