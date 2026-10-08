@@ -88,6 +88,12 @@ pnpm test:e2e
 
 `pnpm ci:full` currently combines lint/type-check/unit tests; it does **not** run E2E. Browser acceptance also requires a configured test harness and seeded environment; the [acceptance contract](docs/strategy/demo-acceptance.md) decides readiness.
 
+### Configuration
+
+Runtime environment settings can be configured in `.env.local` or environment-specific files (see `.env.example`):
+
+- `MIZANO_NODE_HEAP_MB`: Optional integer between 128 and 4096. Caps Node V8 heap space (`--max-old-space-size=<n>`) via the start launcher. When unset, Node default heap limits apply. For Raspberry Pi 5 (8GB) deployments, `1024` (1GB) is recommended to prevent memory contention.
+
 ## Repository layout
 
 ```
