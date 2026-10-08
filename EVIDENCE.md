@@ -142,3 +142,26 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+# Issue #141 — intake worker entrypoint, processor out of the API, Pi compose worker
+
+Tested commit: `57f9a0d` (branch `ai/141`; this file is committed after it). Fresh Postgres 16, `REDIS_URL=` blank, in band.
+
+"Move out" is read as: `IntakeProcessorService` is no longer provided by `AiOperationsModule` (so `AppModule`), and the only place it is provided is `IntakeWorkerModule`. `IntakeQueueService` stays in the API as the producer (`enqueue`/`cancel`); the consumer handler is registered only when the processor exists, that is, in the worker.
+
+| REQ                                                         | Verified by                                                                                             |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| AC1 API does not resolve the processor; upload stays QUEUED | `test/intake-worker.e2e-spec.ts` AC1 (`app.get(IntakeProcessorService)` throws; job QUEUED, attempts 0) |
+| AC2 worker boots headless and processes a QUEUED job        | AC2 (`IntakeWorkerModule` has no HTTP adapter; job reaches EXTRACTED, attempts 1)                       |
+| AC3 heartbeat fails when stale or missing                   | AC3 (missing, invalid, future, stale -> false; fresh -> true, real files)                               |
+| AC4 compose defines `worker`                                | AC4 (mem_limit 2048m, `dist/intake-worker.js`, healthcheck, 30s grace, read-only originals)             |
+
+Commands and results:
+
+```
+npx jest -c test/jest-e2e.json --runInBand intake   2 suites, 20 tests passed
+node apps/api/_run_tests.js --testPathPattern=intake   7 suites, 99 tests passed
+tsc --noEmit (src + e2e), eslint, prettier --check   clean
+```
+
+Not run: the full API suite and a real container start of the worker image (no Docker on this machine). `dist/intake-worker.js` is only compiled by `tsc`.
