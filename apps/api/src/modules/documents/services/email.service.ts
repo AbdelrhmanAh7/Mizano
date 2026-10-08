@@ -21,6 +21,8 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 /** Alert state outlives the 5-minute cache default so one alert covers a whole incident. */
 const ALERT_STATE_TTL_SECONDS = 7 * 24 * 60 * 60;
 const TELEGRAM_TIMEOUT_MS = 5000;
+/** Outlives the bounded Telegram call, so a crashed holder cannot block alerts for long. */
+const ALERT_CLAIM_TTL_SECONDS = 30;
 
 @Injectable()
 export class EmailService {
@@ -694,22 +696,28 @@ export class EmailService {
 
     const stateKey = `notify-volume-${organizationId}`;
     const alerting = (await this.cacheService.get<boolean>(stateKey)) === true;
+    const shouldAlert = todayCount > threshold && !alerting;
+    const shouldRecover = todayCount <= threshold && alerting;
+    if (!shouldAlert && !shouldRecover) return;
 
-    // Dedupe state is recorded only after Telegram confirms delivery, so a failed call is retried.
-    if (todayCount > threshold && !alerting) {
+    // Concurrent sends cross the threshold together: only the request holding the claim may notify.
+    const claimKey = `${stateKey}-claim`;
+    if (!(await this.cacheService.claim(claimKey, ALERT_CLAIM_TTL_SECONDS))) return;
+    try {
+      // Another request may have finished the same transition between our read and our claim.
+      if (((await this.cacheService.get<boolean>(stateKey)) === true) !== alerting) return;
+
+      // Dedupe state is recorded only after Telegram confirms delivery, so a failed call is retried.
       const delivered = await this.notifyTelegram(
-        `[Mizano] ALERT: Outbound invoice email volume anomaly. Count: ${todayCount}, Threshold: ${threshold}`,
+        shouldAlert
+          ? `[Mizano] ALERT: Outbound invoice email volume anomaly. Count: ${todayCount}, Threshold: ${threshold}`
+          : `[Mizano] RECOVERED: Outbound invoice email volume back to normal. Count: ${todayCount}, Threshold: ${threshold}`,
       );
       if (delivered) {
-        await this.cacheService.set(stateKey, true, { ttl: ALERT_STATE_TTL_SECONDS });
+        await this.cacheService.set(stateKey, shouldAlert, { ttl: ALERT_STATE_TTL_SECONDS });
       }
-    } else if (todayCount <= threshold && alerting) {
-      const delivered = await this.notifyTelegram(
-        `[Mizano] RECOVERED: Outbound invoice email volume back to normal. Count: ${todayCount}, Threshold: ${threshold}`,
-      );
-      if (delivered) {
-        await this.cacheService.set(stateKey, false, { ttl: ALERT_STATE_TTL_SECONDS });
-      }
+    } finally {
+      await this.cacheService.releaseClaim(claimKey);
     }
   }
 

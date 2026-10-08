@@ -36,6 +36,8 @@ export class CacheService implements OnModuleInit {
    */
   private readonly knownKeys = new Set<string>();
   private static readonly MAX_TRACKED_KEYS = 50_000;
+  /** In-process claims (key -> expiry ms) used when Redis is not connected. */
+  private readonly localClaims = new Map<string, number>();
 
   constructor(
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -99,6 +101,37 @@ export class CacheService implements OnModuleInit {
     const ttl = options?.ttl ? options.ttl * 1000 : undefined; // Convert to ms
     await this.cacheManager.set(cacheKey, value, ttl);
     this.track(cacheKey);
+  }
+
+  /**
+   * Atomically claim a short-lived lock: true for exactly one concurrent caller.
+   * Redis `SET NX EX` when connected; otherwise a synchronous in-process check (single API process).
+   */
+  async claim(key: string, ttlSeconds: number): Promise<boolean> {
+    if (this.isRedisAvailable) {
+      try {
+        return (await this.redisClient!.set(key, '1', 'EX', ttlSeconds, 'NX')) === 'OK';
+      } catch {
+        this.logger.warn('Redis claim failed; falling back to an in-process claim');
+      }
+    }
+    const now = Date.now();
+    const expiresAt = this.localClaims.get(key);
+    if (expiresAt !== undefined && expiresAt > now) return false;
+    this.localClaims.set(key, now + ttlSeconds * 1000);
+    return true;
+  }
+
+  /** Release a claim taken with {@link claim}. */
+  async releaseClaim(key: string): Promise<void> {
+    this.localClaims.delete(key);
+    if (this.isRedisAvailable) {
+      try {
+        await this.redisClient!.del(key);
+      } catch {
+        // The claim expires on its own TTL.
+      }
+    }
   }
 
   /**

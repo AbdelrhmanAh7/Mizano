@@ -178,6 +178,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
   let prisma: { emailLog: { count: jest.Mock; findFirst: jest.Mock } };
   let cache: Map<string, unknown>;
   let cacheSet: jest.Mock;
+  let claims: Set<string>;
   let service: EmailService;
   let fetchSpy: jest.SpyInstance;
 
@@ -210,6 +211,7 @@ describe('EmailService.checkVolumeAnomaly', () => {
     };
     prisma = { emailLog: { count: jest.fn(), findFirst: jest.fn().mockResolvedValue(null) } };
     cache = new Map();
+    claims = new Set();
     cacheSet = jest.fn((key: string, value: unknown) => {
       cache.set(key, value);
       return Promise.resolve();
@@ -220,6 +222,15 @@ describe('EmailService.checkVolumeAnomaly', () => {
       {
         get: jest.fn((key: string) => Promise.resolve(cache.get(key) ?? null)),
         set: cacheSet,
+        claim: jest.fn((key: string) => {
+          if (claims.has(key)) return Promise.resolve(false);
+          claims.add(key);
+          return Promise.resolve(true);
+        }),
+        releaseClaim: jest.fn((key: string) => {
+          claims.delete(key);
+          return Promise.resolve();
+        }),
       } as unknown as CacheService,
     );
     fetchSpy = jest
@@ -408,6 +419,25 @@ describe('EmailService.checkVolumeAnomaly', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(3);
     expect(telegramText(2)).toContain('RECOVERED');
     expect(cache.get(stateKey)).toBe(false);
+  });
+
+  it('@issue-105 AC1: concurrent sends crossing the threshold produce exactly one alert', async () => {
+    mockCounts(60);
+
+    await Promise.all(Array.from({ length: 5 }, () => service.checkVolumeAnomaly(orgId)));
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(cache.get(stateKey)).toBe(true);
+    expect(claims.size).toBe(0);
+  });
+
+  it('@issue-105 AC1: a delivery failure releases the claim so the next check can retry', async () => {
+    fetchSpy.mockRejectedValueOnce(new Error('aborted'));
+    mockCounts(60);
+
+    await service.checkVolumeAnomaly(orgId);
+
+    expect(claims.size).toBe(0);
   });
 
   it('@issue-105 AC1: without a Telegram chat id nothing is sent or recorded', async () => {
