@@ -117,3 +117,8 @@ All review threads were already resolved; the remaining `CHANGES_REQUESTED` is C
 ## Review round 7 (PR #92): Escalator rescue & verify unblock
 
 Commit `6ab7f25` had timed out in verify during host setup under heavy hub concurrency (10 concurrent suites). In addition, `apps/api/src/app.module.ts` had an unnecessary import/call of `envFilePaths()` which triggered false-positive feature map associations with 5 core domain features (`mz-auth`, `mz-customers`, `mz-sales-invoices`, `mz-purchase-bills`, `mz-journals`). Reverted `apps/api/src/app.module.ts` back to `master`'s clean configuration while keeping `worker.module.ts` configured via `env-files.ts`. Verified `pnpm test:deploy` passes all 27 tests (0 failures).
+
+## Review round 8 (PR #92): e2e-army resilience & touched feature coverage
+
+Updated `e2e-army/39-pi-health.e2e.ts` to support both direct API probe access via `process.env.E2E_ARMY_API` and web application probe gateway via `app.baseUrl`, preventing ECONNREFUSED when run in test harnesses without direct API port exposure. Tagged tests with all 3 touched features (`feat:mz-health`, `feat:mz-system-diagnostics`, `feat:mz-intake-processor`) and added request-level probe coverage for intake service live status. Verified `pnpm test:deploy` (27/27 pass) and `pnpm env:check --template` (clean).
+
