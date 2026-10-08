@@ -110,3 +110,6 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Rollback must be repeatable.** Track an active pointer in `deployments.log` (`OK`/`ROLLBACK` lines), not "the previous OK line", or the second rollback is a no-op.
 - **Check DB readiness over TCP** (`pg_isready -h 127.0.0.1`). The temporary init server listens on the unix socket only and passes a socket probe.
 - **Dedupe alerts on stable keys** (check name), never on live values like percentages; alert once on start and once on recovery.
+- **Keep deployed compose stacks private.** In `docker-compose.production.yml` and `deploy/pi`, PostgreSQL and Redis publish no `ports:` and passwords use `${VAR:?}`, never `:-default`; the production stack also runs Redis with `--requirepass`. When one deployed stack is fixed, check the other for the same drift. _(issue #132)_
+- **Per-client rate limits need the client address end to end.** Behind a proxy set Express `trust proxy` (`TRUST_PROXY_HOPS`), and a server-side caller such as the NextAuth `authorize` must forward the browser's `X-Forwarded-For`, or every user shares one limit. _(issue #132)_
+- **Server-only secrets stay out of `/api/auth/session`.** The session callback returns what browser scripts may read; refresh tokens live only in the encrypted JWT. _(issue #132)_
