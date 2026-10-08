@@ -142,3 +142,45 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+---
+
+# Evidence for Issue #104: credential-age check and rotation metadata
+
+- **Baseline (`master`)**: `615060ed6294e16375a1f1ea9385cb7e812cd24f`
+- **Tested head**: `93ab0c5a0b08faea6e5a2bdc23192e6a01179ddc` (clean tree). The next commit adds only this record.
+- **Host**: macOS arm64, Node 26, PostgreSQL 16 throwaway cluster on 127.0.0.1:55104, no Redis (`REDIS_URL=` blank).
+- **First commit** `96f259f` holds only the failing tests; before the implementation all 6 e2e tests failed (missing `smtpPasswordRotatedAt` column, no boot line).
+
+## Requirements
+
+| REQ | Requirement                                                                                     | Verified by                                                                                                                             |
+| --- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | `classifyCredentialAge`: 89 days `ok`, 90 `due`, 91 `expired`, whole UTC days                   | `credential-age.spec.ts`; e2e boot line: `TELEGRAM_BOT` (89 days) `ok`, `CLOUDFLARE_TUNNEL` (91) `expired`, SMTP (90) `due`             |
+| AC2 | Missing or malformed date (not strict `YYYY-MM-DD`, impossible, future) gives `unknown`         | 13 unit cases; e2e boot with `2026-7-11` and an empty key                                                                               |
+| AC3 | `smtpPasswordRotatedAt` set server-side only when `smtpPassword` changes; never client-supplied | e2e: stamp on change, unchanged for other fields or the same password, `400` for a client-sent stamp; `organizations.service.spec.ts`   |
+| AC4 | One line per boot with names and classifications; host keys via `ConfigService`                 | e2e `AC1 AC4` (exactly one `warn` line; org without a password not listed; legacy row without a stamp `unknown`)                        |
+| AC5 | No credential value in logs                                                                     | e2e `AC5` scans every `Logger` call and stdout/stderr for the four sentinel secrets; it fails when the service logs the token (checked) |
+
+## Commands and results (on the tested head)
+
+```text
+$ npx turbo lint type-check test --force
+api:test: Test Suites: 137 passed, 137 total
+api:test: Tests:       2218 passed, 2218 total
+@mizano/web:test: Test Suites: 48 passed, 48 total
+@mizano/web:test: Tests:       458 passed, 458 total
+ Tasks:    12 successful, 12 total
+
+$ REDIS_URL= DATABASE_URL=postgresql://postgres@127.0.0.1:55104/mizano_e2e npx jest --config ./test/jest-e2e.json --runInBand
+PASS test/credential-rotation.e2e-spec.ts
+Test Suites: 12 passed, 12 total
+Tests:       263 passed, 263 total
+```
+
+## Notes and open items
+
+- `@mizano/web:lint` prints 13 warnings that predate this branch; no `apps/web` file changed. An earlier full run hit one timing flake in `intake-processor.service.spec.ts` (lease heartbeat); it passed 3/3 in isolation and in the recorded run.
+- Size: 162 changed lines outside tests (the ~300 budget), 304 lines of tests, plus this record.
+- Schema: `Organization.smtpPasswordRotatedAt` (nullable, migration `20261008000000_smtp_password_rotated_at`, no backfill). The brief asks for coordinator sign-off on the schema change; this PR is that request.
+- Root `.env.local/.dev/.sit` are CRLF; the new keys keep CRLF. No CI workflow or secret value was touched.
