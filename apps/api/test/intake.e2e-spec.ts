@@ -691,7 +691,10 @@ describe('Document intake (e2e)', () => {
       expect(gate.maxInFlight).toBe(1);
     });
 
-    it('the API stays responsive (p95 under threshold) while the worker processes a batch', async () => {
+    // Smoke check only: the executor is stubbed with a timer, so this proves the API serves
+    // authenticated requests while the queue drains, not a measured p95 under real extraction load
+    // (that stays Unknown until measured on the Pi, see EVIDENCE.md REQ-42-6).
+    it('the API keeps serving authenticated requests while a stubbed worker drains a batch', async () => {
       gate.delayMs = 200;
       await restartWorker();
       const ids = await uploadMany(4);

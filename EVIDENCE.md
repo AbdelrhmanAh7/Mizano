@@ -209,7 +209,7 @@ is executed. The PR should reference the issue (`Refs #42`), not close it.
 
 - **Implementation**: Architecture decoupling: API process only enqueues to Redis queue;
   worker processes in dedicated child processes with concurrency capped at 1–2.
-- **Verification**: `intake-queue.service.spec.ts` passes. Real HTTP p95 on the Pi during batch processing remains **Unknown on the Pi; threshold not agreed**.
+- **Verification**: `intake-queue.service.spec.ts` passes. `intake.e2e-spec.ts` only smoke-checks that the API serves authenticated requests while a stubbed, timer-based executor drains a batch; it is not a load measurement. Real HTTP p95 on the Pi during batch processing remains **Unknown on the Pi; threshold not agreed**.
 
 ### REQ-42-7: Worker healthcheck and Pi deployment topology
 
