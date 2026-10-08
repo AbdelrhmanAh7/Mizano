@@ -7,13 +7,13 @@
 - **Tested Commit SHA**: `70f7eeddd326d07f093cc7550a315d62b47fe20c` (all gate tests passing; subsequent commit changes only `EVIDENCE.md`)
 - **Audit Date**: 2026-10-07 / 2026-10-08
 - **Failing Check**: Deploy to GCP (Workflow: `Deploy to Production`)
-- **Root Cause Classification**: **(B)** — deployment host unreachable over SSH (`dial tcp ***:22: i/o timeout`).
-- **Owner Resolution**: On 2026-10-07, the repository owner recorded that the GCP VM (`34.165.73.152`, `me-west1`) is not on Google's Always Free tier and is unreachable; production deployment moves to the Raspberry Pi 5 under milestone P4. The `Deploy to Production` workflow has been disabled via GitHub (`gh workflow disable deploy.yml`).
+- **Root Cause Classification**: **(B)** — deployment host unreachable over SSH (`dial tcp ***:22: i/o timeout`). Contributing observation: documentation-only merges still trigger a rollout (owner decision needed; see `AI_QUESTIONS.md`).
+- **Fix status**: not fixed by this PR. Both fixes are owner actions (see `AI_QUESTIONS.md`); #102 stays open.
 - **Historical Audit Evidence**: The prior merge-sprint audit evidence for issue #95 (PR #98) has been moved to and preserved in [`docs/planning/EVIDENCE-95.md`](docs/planning/EVIDENCE-95.md), referenced by [`docs/planning/MERGE-QUEUE.md`](docs/planning/MERGE-QUEUE.md).
 
 ### One-Line Justification
 
-`CI` on `615060e` passed; the follow-on `Deploy to GCP` job failed because the host in `DEPLOY_HOST` did not accept an SSH connection on port 22 (`dial tcp ***:22: i/o timeout`). The owner confirmed the host is unreachable and disabled the workflow.
+`CI` on `615060e` passed; the follow-on `Deploy to GCP` job failed because the host in `DEPLOY_HOST` did not accept an SSH connection on port 22 (`dial tcp ***:22: i/o timeout`). Root cause is an SSH connection timeout to the host in `DEPLOY_HOST`; resolution options are documented in `AI_QUESTIONS.md` for owner action.
 
 ---
 
@@ -80,8 +80,8 @@
 ## Root Cause Classification & Verification
 
 - **Not (A)**: PR #98 introduced only markdown planning files (`EVIDENCE.md`, `docs/planning/MERGE-QUEUE.md`). The Docker build step `Build & Push Docker Images` passed in 10m41s (Job ID: `112533724730`). No application code, build, or test broke.
-- **(B) Infrastructure Failure (established)**: the TCP connection to the host on port 22 timed out after 30 s (`dial tcp ***:22: i/o timeout`). The log proved an SSH connection timeout; the owner confirmed on 2026-10-07 that the GCP host is unreachable and not on Always Free tier.
-- **Contributing observation**: `.github/workflows/deploy.yml` previously ran after every successful `CI` on `master`. Its scope gate compares all files changed in `f8bf699..HEAD` with `docs/planning/rollout-exemption.json`; since runtime and workflow changes landed after that baseline, it evaluated `should_deploy=true` for every master commit, including planning-only #98.
+- **(B) Infrastructure Failure (established)**: the TCP connection to the host in `DEPLOY_HOST` on port 22 timed out after 30 s (`dial tcp ***:22: i/o timeout`). The log does not show why. Possible causes (none confirmed): the VM is stopped or deleted, a firewall rule blocks GitHub-hosted runners, or the host IP changed. Confirming one needs GCP console access.
+- **Contributing observation**: `.github/workflows/deploy.yml` runs after every successful `CI` on `master`. Its scope gate compares all files changed in `f8bf699..HEAD` with `docs/planning/rollout-exemption.json`; since runtime and workflow changes landed after that baseline, it evaluated `should_deploy=true` for every master commit, including planning-only #98. Changing the trigger or the gate is a proposed option for the owner, not a correction this PR can make: `docs/DEVELOPMENT.md` still names this workflow as the production pipeline, and `deploy/pi/README.md` says the Pi deployment is unverified.
 
 ---
 
