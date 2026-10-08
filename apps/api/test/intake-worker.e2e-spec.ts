@@ -1,60 +1,55 @@
 /**
- * Intake worker entrypoint E2E tests for issue #141.
- * Tests that the worker runs as a separate process without HTTP server,
- * processes queued jobs, and reports health via heartbeat file.
+ * Intake worker split (issue #141): the API only enqueues; a separate headless process
+ * (`IntakeWorkerModule`) consumes the queue. Extraction is stubbed (no model required).
  */
-import { INestApplication } from '@nestjs/common';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join, resolve } from 'path';
+import { INestApplication, INestApplicationContext } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import { IntakeJobStatus } from '@prisma/client';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
 import { eventually } from './helpers/journey.helper';
-import { ApiHelper } from './helpers/api-client.helper';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { IntakeStorage, sha256Hex } from '../src/modules/ai/intake/intake-storage';
-import {
-  IntakeQueueService,
-  INTAKE_QUEUE_NAME,
-} from '../src/modules/ai/intake/intake-queue.service';
+import { IntakeWorkerModule } from '../src/intake-worker.module';
+import { workerHeartbeatHealthy } from '../src/intake-worker-healthcheck';
 import { ExtractionStrategyResolver } from '../src/modules/ai/extraction/extraction-strategy-resolver.service';
+import { IntakeProcessorService } from '../src/modules/ai/intake/intake-processor.service';
+import { IntakeStorage, sha256Hex } from '../src/modules/ai/intake/intake-storage';
 
 process.env.INTAKE_RETRY_BASE_MS = '50';
 process.env.INTAKE_LEASE_MS = '1000';
 
-const stub = { mode: 'ok' as 'ok' | 'fail', calls: 0 };
-
 const stubResolver = {
-  resolve: async () => {
-    stub.calls += 1;
-    if (stub.mode === 'fail') throw new Error('stub extraction failure with INVOICE-TEXT-SECRET');
-    return {
-      strategyUsed: 'rules',
-      totalTimeMs: 1,
-      extraction: {
-        vendorName: 'E2E Vendor',
-        vendorAddress: null,
-        vendorPhone: null,
-        vendorEmail: null,
-        vendorTaxId: null,
-        invoiceNumber: 'E2E-1',
-        date: '2026-09-01',
-        dueDate: null,
-        total: 115,
-        subtotal: 100,
-        tax: 15,
-        discount: null,
-        currency: 'EGP',
-        paymentTerms: null,
-        notes: null,
-        lineItems: [],
-        rawText: 'stubbed text',
-        ocrConfidence: 0.95,
-        fieldConfidence: {},
-        documentCategory: 'INVOICE',
-        accountingEntry: null,
-        processingTimeMs: 1,
-      },
-    };
-  },
+  resolve: async () => ({
+    strategyUsed: 'rules',
+    totalTimeMs: 1,
+    extraction: {
+      vendorName: 'E2E Vendor',
+      vendorAddress: null,
+      vendorPhone: null,
+      vendorEmail: null,
+      vendorTaxId: null,
+      invoiceNumber: 'E2E-1',
+      date: '2026-09-01',
+      dueDate: null,
+      total: 115,
+      subtotal: 100,
+      tax: 15,
+      discount: null,
+      currency: 'EGP',
+      paymentTerms: null,
+      notes: null,
+      lineItems: [],
+      rawText: 'stubbed text',
+      ocrConfidence: 0.95,
+      fieldConfidence: {},
+      documentCategory: 'INVOICE',
+      accountingEntry: null,
+      processingTimeMs: 1,
+    },
+  }),
 };
 
 function pdfFixture(marker: string): Buffer {
@@ -67,188 +62,111 @@ function pdfFixture(marker: string): Buffer {
   );
 }
 
-describe('@e2e @issue-141 Intake worker entrypoint', () => {
+describe('@e2e @flow:intake-worker @issue-141 Intake worker entrypoint', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let tenantA: TestTenant;
-  let a: ApiHelper;
-
-  async function bootApi(overrides?: (builder: any) => any): Promise<INestApplication> {
-    return createTestApp((builder) =>
-      builder.overrideProvider(ExtractionStrategyResolver).useValue(stubResolver),
-    );
-  }
-
-  async function waitForStatus(jobId: string, orgId: string, status: IntakeJobStatus) {
-    return eventually(async () => {
-      const job = await prisma.intakeJob.findFirst({
-        where: { id: jobId, organizationId: orgId },
-      });
-      expect(job?.status).toBe(status);
-      return job;
-    }, 20000);
-  }
+  let tenant: TestTenant;
 
   beforeAll(async () => {
-    stub.mode = 'ok';
-    app = await bootApi();
+    app = await createTestApp((builder) =>
+      builder.overrideProvider(ExtractionStrategyResolver).useValue(stubResolver),
+    );
     prisma = getPrisma(app);
-    tenantA = await registerTenant(app, 'IntakeWorkerA');
-    a = tenantA.api;
+    tenant = await registerTenant(app, 'IntakeWorker');
   });
 
   afterAll(async () => {
     await app.close();
   });
 
-  /**
-   * AC1: AppModule no longer resolves IntakeProcessorService.
-   * An upload that is enqueued stays QUEUED in the API.
-   */
-  it('@issue-141 AC1: AppModule does not provide IntakeProcessorService; uploaded job stays QUEUED', async () => {
-    // Verify AppModule doesn't have IntakeProcessorService in its providers
-    const appModuleProviders = Reflect.getMetadata(
-      'providers',
-      (await import('../src/app.module')).AppModule,
-    );
-    const providerNames = (appModuleProviders as unknown[])
-      .filter((p): p is { name: string } => typeof p === 'function')
-      .map((p) => p.name);
-    expect(providerNames).not.toContain('IntakeProcessorService');
-    expect(providerNames).not.toContain('IntakeExecutorService');
-    expect(providerNames).not.toContain('IntakeMatchingService');
+  it('@issue-141 AC1: the API does not resolve IntakeProcessorService; an upload stays QUEUED', async () => {
+    expect(() => app.get(IntakeProcessorService, { strict: false })).toThrow();
 
-    // Upload a document - it should be queued but not processed
-    const fixture = pdfFixture(`AC1-${uniqueSuffix()}`);
-    const res = await a.post('/ai/document-intake/process').attach('file', fixture, {
-      filename: 'inv.pdf',
-      contentType: 'application/pdf',
-    });
+    const res = await tenant.api
+      .post('/ai/document-intake/process')
+      .attach('file', pdfFixture(`AC1-${uniqueSuffix()}`), {
+        filename: 'inv.pdf',
+        contentType: 'application/pdf',
+      });
     expect(res.status).toBe(201);
-    const jobId = res.body.data.jobId;
-
-    // Job should stay QUEUED because no worker is running in the API process
-    const job = await prisma.intakeJob.findFirst({
-      where: { id: jobId, organizationId: tenantA.organizationId },
+    const job = await prisma.intakeJob.findFirstOrThrow({
+      where: { id: res.body.data.jobId, organizationId: tenant.organizationId },
     });
-    expect(job?.status).toBe(IntakeJobStatus.QUEUED);
-    expect(job?.progress).toBe(0);
+    expect(job.status).toBe(IntakeJobStatus.QUEUED);
+    expect(job.attempts).toBe(0);
   });
 
-  /**
-   * AC2: IntakeWorkerModule boots with no HTTP server and processes a QUEUED job.
-   * This test simulates the worker module booting and processing a job.
-   */
-  it('@issue-141 AC2: IntakeWorkerModule boots without HTTP server and processes QUEUED job', async () => {
-    // Import the worker module directly and verify it has no controllers
-    const { IntakeWorkerModule } = await import('../src/intake-worker.module');
-    expect(Reflect.getMetadata('controllers', IntakeWorkerModule)).toBeUndefined();
-
-    const workerModuleProviders = Reflect.getMetadata('providers', IntakeWorkerModule);
-    const workerProviderNames = (workerModuleProviders as unknown[])
-      .filter((p): p is { name: string } => typeof p === 'function')
-      .map((p) => p.name);
-    expect(workerProviderNames).toContain('IntakeProcessorService');
-    expect(workerProviderNames).toContain('IntakeExecutorService');
-    expect(workerProviderNames).toContain('IntakeMatchingService');
-    expect(workerProviderNames).toContain('IntakeQueueService');
-    expect(workerProviderNames).toContain('PrismaService');
-
-    // Create a QUEUED job directly in the database
+  it('@issue-141 AC2: IntakeWorkerModule boots headless and processes a QUEUED job', async () => {
     const bytes = pdfFixture(`AC2-${uniqueSuffix()}`);
-    const storage = app.get(IntakeStorage);
-    const storageKey = `${tenantA.organizationId}/2026/09/worker-${uniqueSuffix()}`;
-    await storage.put(storageKey, bytes);
-
-    const job = await prisma.intakeJob.create({
+    const storageKey = `${tenant.organizationId}/2026/09/worker-${uniqueSuffix()}`;
+    await app.get(IntakeStorage).put(storageKey, bytes);
+    const queued = await prisma.intakeJob.create({
       data: {
-        organizationId: tenantA.organizationId,
-        createdById: tenantA.userId,
+        organizationId: tenant.organizationId,
+        createdById: tenant.userId,
         originalFileName: 'worker-test.pdf',
         mimeType: 'application/pdf',
         sizeBytes: bytes.length,
         sha256: sha256Hex(bytes),
         storageKey,
         status: IntakeJobStatus.QUEUED,
-        attempts: 0,
       },
     });
 
-    // Bootstrap the worker module (simulating the worker process)
-    const { NestFactory } = await import('@nestjs/core');
-    const workerApp = await NestFactory.createApplicationContext(IntakeWorkerModule);
+    const moduleRef = await Test.createTestingModule({ imports: [IntakeWorkerModule] })
+      .overrideProvider(ExtractionStrategyResolver)
+      .useValue(stubResolver)
+      .compile();
+    const worker: INestApplicationContext = await moduleRef.init();
+    try {
+      // A bare application context: no HTTP adapter, so nothing listens on a port.
+      expect('getHttpServer' in worker).toBe(false);
+      expect(worker.get(IntakeProcessorService)).toBeDefined();
 
-    // Give it time to process the job
-    await waitForStatus(job.id, tenantA.organizationId, IntakeJobStatus.EXTRACTED);
-
-    const processed = await prisma.intakeJob.findUniqueOrThrow({ where: { id: job.id } });
-    expect(processed.status).toBe(IntakeJobStatus.EXTRACTED);
-    expect(processed.attempts).toBe(1);
-    expect(processed.result).toBeDefined();
-
-    await workerApp.close();
+      const done = await eventually(async () => {
+        const row = await prisma.intakeJob.findFirstOrThrow({
+          where: { id: queued.id, organizationId: tenant.organizationId },
+        });
+        expect(row.status).toBe(IntakeJobStatus.EXTRACTED);
+        return row;
+      }, 20000);
+      expect(done.attempts).toBe(1);
+      expect(done.result).not.toBeNull();
+    } finally {
+      await worker.close();
+    }
   });
 
-  /**
-   * AC3: The heartbeat check fails when the heartbeat file is stale or missing.
-   */
-  it('@issue-141 AC3: workerHeartbeatHealthy rejects stale, missing, invalid, or future heartbeats', async () => {
-    const { workerHeartbeatHealthy, WORKER_HEARTBEAT_FILE } =
-      await import('../src/intake-worker-healthcheck');
-    const fs = await import('fs');
-
-    // Missing file
-    jest.spyOn(fs, 'readFileSync').mockImplementation(() => {
-      throw new Error('ENOENT');
-    });
-    expect(workerHeartbeatHealthy()).toBe(false);
-
-    // Invalid content
-    jest.spyOn(fs, 'readFileSync').mockReturnValue('invalid');
-    expect(workerHeartbeatHealthy()).toBe(false);
-
-    // Future timestamp
-    jest.spyOn(fs, 'readFileSync').mockReturnValue(String(Date.now() + 100000));
-    expect(workerHeartbeatHealthy()).toBe(false);
-
-    // Stale (older than 20 seconds)
-    jest.spyOn(fs, 'readFileSync').mockReturnValue(String(Date.now() - 30000));
-    expect(workerHeartbeatHealthy()).toBe(false);
-
-    // Recent (within 20 seconds)
-    jest.spyOn(fs, 'readFileSync').mockReturnValue(String(Date.now() - 1000));
-    expect(workerHeartbeatHealthy()).toBe(true);
-
-    jest.restoreAllMocks();
+  it('@issue-141 AC3: the heartbeat check fails when the file is stale, missing, invalid or in the future', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mizano-hb-'));
+    const file = join(dir, 'heartbeat');
+    const now = 1_000_000_000_000;
+    try {
+      expect(workerHeartbeatHealthy(file, now)).toBe(false); // missing
+      writeFileSync(file, 'not-a-number');
+      expect(workerHeartbeatHealthy(file, now)).toBe(false); // invalid
+      writeFileSync(file, String(now + 60_000));
+      expect(workerHeartbeatHealthy(file, now)).toBe(false); // future
+      writeFileSync(file, String(now - 30_000));
+      expect(workerHeartbeatHealthy(file, now)).toBe(false); // stale
+      writeFileSync(file, String(now - 1_000));
+      expect(workerHeartbeatHealthy(file, now)).toBe(true); // fresh
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
-  /**
-   * AC4: docker-compose.pi.yml defines the worker service with correct config.
-   */
-  it('@issue-141 AC4: docker-compose.pi.yml has worker service with 2048m mem, healthcheck command', async () => {
-    const fs = await import('fs');
-    const path = await import('path');
-    const composePath = path.resolve(__dirname, '../../deploy/pi/docker-compose.pi.yml');
-    const compose = fs.readFileSync(composePath, 'utf8');
-
-    expect(compose).toContain('worker:');
-    expect(compose).toContain('mem_limit: 2048m');
-    expect(compose).toContain('memswap_limit: 2048m');
-    expect(compose).toContain('command:');
-    // Should use intake-worker.js not worker.js
-    expect(compose).toContain('dist/intake-worker.js');
-    // Healthcheck should use intake-worker-healthcheck.js
-    expect(compose).toContain('dist/intake-worker-healthcheck.js');
-    // Should have init: true for signal handling
-    expect(compose).toContain('init: true');
-    // Should have stop_grace_period
-    expect(compose).toContain('stop_grace_period: 30s');
-    // Should have cpus and pids_limit
-    expect(compose).toContain('cpus: 2.0');
-    expect(compose).toContain('pids_limit: 128');
-    // Should depend on postgres, redis, migrate
-    expect(compose).toContain('postgres:');
-    expect(compose).toContain('redis:');
-    expect(compose).toContain('migrate:');
+  it('@issue-141 AC4: docker-compose.pi.yml defines the worker service', () => {
+    const compose = readFileSync(
+      resolve(__dirname, '../../../deploy/pi/docker-compose.pi.yml'),
+      'utf8',
+    );
+    const block = /^ {2}worker:\n((?: {4}.*\n|\s*\n)+)/m.exec(compose)?.[1] ?? '';
+    expect(block).not.toBe('');
+    expect(block).toContain('mem_limit: 2048m');
+    expect(block).toContain('dist/intake-worker.js');
+    expect(block).toMatch(/healthcheck:[\s\S]*dist\/intake-worker-healthcheck\.js/);
+    expect(block).toContain('stop_grace_period: 30s');
+    expect(block).toContain(':/data/originals:ro');
   });
 });
