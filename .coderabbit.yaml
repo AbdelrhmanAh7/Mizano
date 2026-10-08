@@ -9,7 +9,7 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
-    auto_incremental_review: true
+    auto_incremental_review: false   # the hub requests reviews within the 5/hour quota; no automatic review on every push
     base_branches:
       - master
   path_filters:
