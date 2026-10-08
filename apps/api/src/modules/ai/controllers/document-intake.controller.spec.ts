@@ -198,21 +198,28 @@ describe('DocumentIntakeController', () => {
     it.each([
       ['en', 'Document processing timed out. Retry or split the document.'],
       ['ar', 'انتهت مهلة معالجة المستند. يمكنك إعادة المحاولة أو تقسيم المستند.'],
-    ])('sends a localized message (%s) instead of the raw code on failure', async (lang, message) => {
-      jobs.getForOrg.mockResolvedValue(
-        makeJob({ status: IntakeJobStatus.DEAD_LETTER, result: null, lastError: 'INTAKE_TIMEOUT' }),
-      );
-      const current = jest
-        .spyOn(I18nContext, 'current')
-        .mockReturnValue({ lang } as unknown as I18nContext);
-      try {
-        const stream = await controller.streamProgress(ORG_A, 'job-1');
-        const events = await firstValueFrom(stream.pipe(toArray()));
-        expect(events[0].data).toMatchObject({ stage: 'error', error: message });
-      } finally {
-        current.mockRestore();
-      }
-    });
+    ])(
+      'sends a localized message (%s) instead of the raw code on failure',
+      async (lang, message) => {
+        jobs.getForOrg.mockResolvedValue(
+          makeJob({
+            status: IntakeJobStatus.DEAD_LETTER,
+            result: null,
+            lastError: 'INTAKE_TIMEOUT',
+          }),
+        );
+        const current = jest
+          .spyOn(I18nContext, 'current')
+          .mockReturnValue({ lang } as unknown as I18nContext);
+        try {
+          const stream = await controller.streamProgress(ORG_A, 'job-1');
+          const events = await firstValueFrom(stream.pipe(toArray()));
+          expect(events[0].data).toMatchObject({ stage: 'error', error: message });
+        } finally {
+          current.mockRestore();
+        }
+      },
+    );
   });
 
   describe('confirm', () => {
