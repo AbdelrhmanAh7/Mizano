@@ -18,23 +18,12 @@ const TUNNEL_SECRET = `cf-sentinel-${suffix}`;
 const SMTP_SECRET = `smtp-sentinel-${suffix}`;
 const SMTP_SECRET_2 = `smtp-sentinel-2-${suffix}`;
 
-/** Every timer API except Date, so only the clock is frozen while the app boots. */
-const REAL_TIMERS = [
-  'hrtime',
-  'nextTick',
-  'performance',
-  'queueMicrotask',
-  'requestAnimationFrame',
-  'cancelAnimationFrame',
-  'requestIdleCallback',
-  'cancelIdleCallback',
-  'setImmediate',
-  'clearImmediate',
-  'setInterval',
-  'clearInterval',
-  'setTimeout',
-  'clearTimeout',
-] as const;
+/** Every faked API except Date, so only the clock is frozen while the app boots. */
+const REAL_TIMERS = (
+  'hrtime nextTick performance queueMicrotask requestAnimationFrame cancelAnimationFrame ' +
+  'requestIdleCallback cancelIdleCallback setImmediate clearImmediate setInterval clearInterval ' +
+  'setTimeout clearTimeout'
+).split(' ') as FakeableAPI[];
 
 describe('Credential rotation (e2e) @issue-104', () => {
   let app: INestApplication;
@@ -54,14 +43,16 @@ describe('Credential rotation (e2e) @issue-104', () => {
   function capture(): void {
     for (const level of ['log', 'warn', 'error', 'debug', 'verbose'] as const) {
       const original = Logger.prototype[level];
-      const spy = jest
-        .spyOn(Logger.prototype, level)
-        .mockImplementation(function (this: Logger, message: unknown, ...rest: unknown[]) {
-          const text = [message, ...rest].map((part) => String(part)).join(' ');
-          captured.push(text);
-          if (text.includes(LINE_PREFIX)) credentialLines.push({ level, text });
-          return original.call(this, message, ...rest);
-        });
+      const spy = jest.spyOn(Logger.prototype, level).mockImplementation(function (
+        this: Logger,
+        message: unknown,
+        ...rest: unknown[]
+      ) {
+        const text = [message, ...rest].map((part) => String(part)).join(' ');
+        captured.push(text);
+        if (text.includes(LINE_PREFIX)) credentialLines.push({ level, text });
+        return original.call(this, message, ...rest);
+      });
       restorers.push(() => spy.mockRestore());
     }
     for (const stream of [process.stdout, process.stderr]) {
@@ -75,26 +66,24 @@ describe('Credential rotation (e2e) @issue-104', () => {
   }
 
   async function rotatedAt(organizationId: string): Promise<Date | null> {
-    const rows = await getPrisma(app).$queryRawUnsafe<Array<{ smtpPasswordRotatedAt: Date | null }>>(
-      'SELECT "smtpPasswordRotatedAt" FROM "organizations" WHERE "id" = $1',
-      organizationId,
-    );
-    expect(rows).toHaveLength(1);
-    return rows[0].smtpPasswordRotatedAt;
+    const org = await getPrisma(app).organization.findUniqueOrThrow({
+      where: { id: organizationId },
+      select: { smtpPasswordRotatedAt: true },
+    });
+    return org.smtpPasswordRotatedAt;
   }
 
   async function setRotatedAt(organizationId: string, value: Date | null): Promise<void> {
-    await getPrisma(app).$executeRawUnsafe(
-      'UPDATE "organizations" SET "smtpPasswordRotatedAt" = $1 WHERE "id" = $2',
-      value,
-      organizationId,
-    );
+    await getPrisma(app).organization.update({
+      where: { id: organizationId },
+      data: { smtpPasswordRotatedAt: value },
+    });
   }
 
   /** Boots a second app with the clock frozen at BOOT_NOW and returns the one line it logged. */
   async function bootAndReadLine(): Promise<{ level: string; entries: Map<string, string> }> {
     credentialLines.length = 0;
-    jest.useFakeTimers({ now: BOOT_NOW, doNotFake: [...REAL_TIMERS] });
+    jest.useFakeTimers({ now: BOOT_NOW, doNotFake: REAL_TIMERS });
     let booted: INestApplication;
     try {
       booted = await createTestApp();
