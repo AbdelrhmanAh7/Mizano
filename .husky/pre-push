@@ -4,10 +4,10 @@
 # hook or CI job runs longer than 5 minutes):
 #   turbo run type-check test --filter=...[<base>]
 # base = the remote ref's old sha (or the merge-base with origin/master); a new
-# branch with no known base, or a change to root config (package.json,
-# pnpm-lock.yaml, turbo.json, tsconfig*) checks every package. The jest unit
-# suites need no database. No lint (pre-commit lints staged files), no build,
-# no E2E/browser.
+# branch with no known base, a pushed commit differing from checked-out HEAD,
+# or a change to root config (package.json, pnpm-lock.yaml, turbo.json, tsconfig*)
+# checks every package. The jest unit suites need no database. No lint (pre-commit
+# lints staged files), no build, no E2E/browser.
 #
 # The full CI (`pnpm ci:full`, build, E2E) runs on the Mac mini via the hub's
 # `localci` job, which posts the GitHub commit statuses under the workflows'
@@ -48,21 +48,39 @@ fi
 NULL_SHA="0000000000000000000000000000000000000000"
 bases=""
 all=0
+schema_changed=0
+head_sha="$(git rev-parse HEAD 2>/dev/null || true)"
+
 if [ -t 0 ]; then
   all=1
+  if git diff --name-only origin/master HEAD 2>/dev/null | grep -qE '^apps/api/prisma/schema\.prisma$'; then
+    schema_changed=1
+  fi
 else
   while read -r local_ref local_sha remote_ref remote_sha; do
     [ -n "${local_ref:-}" ] || continue
     [ "$local_sha" = "$NULL_SHA" ] && continue        # deletion: nothing to check
+    if [ -n "$head_sha" ] && [ "$local_sha" != "$head_sha" ]; then
+      all=1
+    fi
     base=""
     if [ "$remote_sha" != "$NULL_SHA" ] && git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
       base="$remote_sha"
     else
       base="$(git merge-base origin/master "$local_sha" 2>/dev/null || true)"
     fi
-    if [ -z "$base" ]; then all=1; continue; fi
+    if [ -z "$base" ]; then
+      all=1
+      if git show --name-only --format="" "$local_sha" 2>/dev/null | grep -qE '^apps/api/prisma/schema\.prisma$'; then
+        schema_changed=1
+      fi
+      continue
+    fi
     if git diff --name-only "$base" "$local_sha" | grep -qE '^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|turbo\.json|tsconfig[^/]*\.json|\.npmrc)$'; then
       all=1
+    fi
+    if git diff --name-only "$base" "$local_sha" | grep -qE '^apps/api/prisma/schema\.prisma$'; then
+      schema_changed=1
     fi
     bases="$bases $base"
   done
@@ -74,8 +92,11 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
   GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_QUARANTINE_PATH GIT_PREFIX
 
 # The API type-check needs the generated Prisma client (offline, ~2 s).
-if [ ! -f node_modules/.prisma/client/index.d.ts ] && [ -x node_modules/.bin/prisma ]; then
-  node_modules/.bin/prisma generate --schema apps/api/prisma/schema.prisma </dev/null
+# Regenerate if the declaration is missing, or if the pushed changes include the schema.
+if [ -x node_modules/.bin/prisma ]; then
+  if [ ! -f node_modules/.prisma/client/index.d.ts ] || [ "$schema_changed" = "1" ]; then
+    node_modules/.bin/prisma generate --schema apps/api/prisma/schema.prisma </dev/null
+  fi
 fi
 
 if [ "$all" = "1" ]; then

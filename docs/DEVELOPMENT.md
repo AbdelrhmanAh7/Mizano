@@ -126,7 +126,11 @@ Rules:
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pushes and PRs to `master`/`develop`: install (pnpm 8, Node 20, `prisma generate`) → lint and type-check → unit tests (with PostgreSQL 16 and Redis 7 services, `db:push`) → build. E2E is not part of CI yet.
+Active CI checks and gates on PRs and pushes to `master`:
+
+- **Push and PR pipeline (`.github/workflows/ci.yml` / GitHub-hosted runners & localci):** runs four parallel jobs under 5 minutes each (`timeout-minutes: 5`)—**Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (with PostgreSQL 16 and Redis 7 service containers, `db:push`), and **Build**. These job names match the commit status checks required by automerge gates. Statuses are reported by GitHub-hosted CI or the hub's `localci` job when running on the local Mac runner.
+- **E2E verification (`e2e-army`):** feature-level E2E tests run via the hub's verify suite against throwaway environments, reporting status under `e2e-army` for touched features rather than running inside the basic unit CI jobs.
+- **Local pre-push hook:** runs fast targeted type-check and unit tests for changed packages and their dependents (`turbo run type-check test --filter=...[<base>]`) under a 290 s watchdog, ensuring changes pass type-check and unit tests before push while deferring full CI (`pnpm ci:full`, build, E2E) to CI / the hub's `localci` job.
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 
@@ -136,7 +140,7 @@ Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `
 
 - Branch from current `master`; one issue, branch and worktree per worker (`demo/<issue>-<topic>` during the sprint). Every change goes through a PR linked to an issue, using `.github/pull_request_template.md`, with independent review of the exact tested head.
 - Conventional commits enforced by commitlint (`commitlint.config.js`): types `feat fix docs style refactor perf test build ci chore revert`, lower-case subject, max 72 characters, no trailing period.
-- Hooks (husky): `pre-commit` runs `_lint_staged.js` (ESLint `--fix` + Prettier on staged files, Windows-safe replacement for lint-staged); `commit-msg` runs commitlint; `pre-push` runs `turbo run type-check test --filter=...[<base>]` (type-check + unit tests for the changed packages and their dependents — every package when root config such as `package.json`/`pnpm-lock.yaml`/`turbo.json` changes; ~20–40 s, ≤ 2.5 min cold for all packages; no lint, build or E2E). Both hooks run under a watchdog: 60 s for pre-commit, 290 s for pre-push (the 5-minute rule). The full CI (`pnpm ci:full`, build, E2E) runs on the Mac mini via the hub's `localci` job, which posts the GitHub commit statuses. Hooks work in linked worktrees and skip with a one-line note when that worktree has no `node_modules` (they never install); bypass deliberately with `HUSKY=0` (or `SKIP_LOCAL_CI=1` for pre-push).
+- Hooks (husky): `pre-commit` runs `_lint_staged.js` (ESLint `--fix` + Prettier on staged files, Windows-safe replacement for lint-staged); `commit-msg` runs commitlint; `pre-push` runs `turbo run type-check test --filter=...[<base>]` (type-check + unit tests for the changed packages and their dependents — every package when root config such as `package.json`/`pnpm-lock.yaml`/`turbo.json` changes, or when the pushed commit differs from checked-out HEAD; ~20–40 s, ≤ 2.5 min cold for all packages; no lint, build or E2E). Both hooks run under a watchdog: 60 s for pre-commit, 290 s for pre-push (the 5-minute rule). The full CI (`pnpm ci:full`, build, E2E) runs on CI / via the hub's `localci` job, which posts the GitHub commit statuses. Hooks work in linked worktrees and skip with a one-line note when that worktree has no `node_modules` (they never install); bypass deliberately with `HUSKY=0` (or `SKIP_LOCAL_CI=1` for pre-push).
 - Prettier: single quotes, semicolons, trailing commas, width 100 (`.prettierrc`).
 
 ## Deployment
