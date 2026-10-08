@@ -5,6 +5,7 @@ import { redisStore } from 'cache-manager-redis-yet';
 import { CacheAdminController } from './cache-admin.controller';
 import { CacheInvalidationListener } from './cache-invalidation.listener';
 import { CacheService } from './cache.service';
+import { redisUrlFromConfig } from './redis-url';
 
 @Global()
 @Module({
@@ -13,7 +14,7 @@ import { CacheService } from './cache.service';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (config: ConfigService) => {
-        const redisUrl = config.get<string>('REDIS_URL');
+        const redisUrl = redisUrlFromConfig(config);
 
         if (!redisUrl) {
           // Fallback to in-memory cache if Redis URL is not provided

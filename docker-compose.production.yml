@@ -19,7 +19,11 @@ services:
       - NODE_ENV=production
       - API_PORT=6001
       - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}}
-      - REDIS_URL=redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD}@redis:6379
+      - REDIS_URL=redis://redis:6379
+      # Same value as redis --requirepass below; the API percent-encodes it into REDIS_URL.
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}}
+      # Proxies in front of the API that append X-Forwarded-For; login throttling counts clients by it.
+      - TRUST_PROXY_HOPS=${TRUST_PROXY_HOPS:-1}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5001}
@@ -135,10 +139,21 @@ services:
     container_name: mizano-redis
     restart: unless-stopped
     # Not published: only services on mizano-network reach Redis, and only with the password.
-    # REDIS_PASSWORD is embedded in REDIS_URL, so use a URL-safe value (openssl rand -hex 32).
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+    # Set a separate REDIS_PASSWORD (openssl rand -hex 32). Unset, it falls back to the required
+    # POSTGRES_PASSWORD, which the deploy workflow already writes, so Redis is never open.
+    # List form keeps the password one argument whatever characters it holds.
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --requirepass
+      - ${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}}
     environment:
-      - REDISCLI_AUTH=${REDIS_PASSWORD:?set REDIS_PASSWORD}
+      - REDISCLI_AUTH=${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}}
     deploy:
       resources:
         limits:
