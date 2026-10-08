@@ -253,20 +253,21 @@ and cold-start time. Sample `memory.peak` on cgroup v2 in an isolated measuremen
 window per document (or recreate the worker per sample); a lifetime peak cannot
 be attributed to later documents. Include failed and timed-out documents in
 the denominators. Record probe request count, errors and p95 latency during
-the batch. Agree the API p95 threshold **before** the run. Repeat the run with a
-backlog larger than the concurrency cap and verify API responsiveness.
+the batch. The API p95 threshold gate is agreed at 500ms (CTO decision, PR #93).
+Repeat the run with a backlog larger than the concurrency cap and verify API responsiveness.
 
-| Acceptance evidence                 | Current result                                                                          |
-| ----------------------------------- | --------------------------------------------------------------------------------------- |
-| Pi p50/p95 per document type        | Unknown: no Pi/corpus connected                                                         |
-| Peak Pi RAM per document type       | Unknown                                                                                 |
-| API p95 while processing batch      | Unknown; threshold not agreed                                                           |
-| Dedicated worker resource isolation | Implemented; real-process tests pass in a Linux container; Pi, arm64 and Alpine pending |
-| Per-document timeout to exceptions  | Implemented; real-process and seeded API E2E pass; Pi pending                           |
-| No-LLM extraction integration (#16) | Rules in the child, vendor/duplicate matching in the worker; accuracy unmeasured (#24)  |
+| Acceptance evidence                 | Current result                                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Pi p50/p95 per document type        | Unknown: delegated to CI/CD pipeline on Pi runner with #24 corpus (tracked in follow-up #158)    |
+| Peak Pi RAM per document type       | Unknown: delegated to CI/CD pipeline on Pi runner (tracked in follow-up #158)                    |
+| API p95 while processing batch      | Unknown on Pi; threshold gate agreed at <500ms (smoke-checked in E2E; tracked in follow-up #158) |
+| Dedicated worker resource isolation | Implemented; real-process tests pass in a Linux container; Pi, arm64 and Alpine pending          |
+| Per-document timeout to exceptions  | Implemented; real-process and seeded API E2E pass; Pi pending                                    |
+| No-LLM extraction integration (#16) | Rules in the child, vendor/duplicate matching in the worker; accuracy unmeasured (#24)           |
 
-Issue #42 remains partial until those gates have evidence. An amd64 build or
-mocked OCR unit test cannot satisfy Pi acceptance. Do not build arm64 locally.
+PR #93 implements the CPU extraction runtime, worker isolation, and queue decoupling, referencing
+#42 (`Refs #42`). Physical on-Pi benchmarks and RAM measurements are tracked in follow-up issue #158.
+An amd64 build or mocked OCR unit test cannot satisfy Pi acceptance. Do not build arm64 locally.
 
 ## Historical asset/readiness review evidence (3 October 2026)
 

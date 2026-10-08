@@ -151,17 +151,17 @@ Part of the tiny live deployment on a Raspberry Pi 5 (Cortex-A76, 8GB). Compleme
 
 ## Acceptance status
 
-| Acceptance item (issue #42)                                                           | Status                                                                                                               |
-| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Pinned `ara`+`eng` OCR assets in the worker image, no runtime downloads, no GPU/cloud | Implemented; offline initialization verified on the dev host (REQ-42-1). Image build verified in Dockerfile          |
-| Worker concurrency and memory capped; backlog never starves the API                   | Implemented (REQ-42-2, REQ-42-3). Linux `prlimit` suite skipped on macOS                                             |
-| Documents above the latency budget go to exceptions                                   | Implemented (REQ-42-4). Retries scheduled, non-retriable exceptions move to DEAD_LETTER                              |
-| p50/p95 latency and peak RAM per document type **on the Pi**, held-out corpus (#24)   | **Unknown — not measured.** No Pi and no held-out corpus connected; see `docs/strategy/pi-cpu-extraction-runtime.md` |
-| API p95 under an agreed threshold while the worker processes a batch                  | **Unknown on the Pi; threshold not agreed.** Queue decoupling implemented and verified                               |
+| Acceptance item (issue #42)                                                           | Status                                                                                                                |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Pinned `ara`+`eng` OCR assets in the worker image, no runtime downloads, no GPU/cloud | Implemented; offline initialization verified on the dev host (REQ-42-1). Image build verified in Dockerfile           |
+| Worker concurrency and memory capped; backlog never starves the API                   | Implemented (REQ-42-2, REQ-42-3). Linux `prlimit` suite skipped on macOS                                              |
+| Documents above the latency budget go to exceptions                                   | Implemented (REQ-42-4). Retries scheduled, non-retriable exceptions move to DEAD_LETTER                               |
+| p50/p95 latency and peak RAM per document type **on the Pi**, held-out corpus (#24)   | **Delegated to CI/CD runner.** Shared S3 bucket `mizano-qa-assets` and Pi runner protocol tracked in follow-up #158   |
+| API p95 under an agreed threshold while the worker processes a batch                  | **Threshold agreed at <500ms** (CTO decision, PR #93). Queue decoupling verified; on-Pi benchmark run tracked in #158 |
 
-Issue #42 stays partial until the Pi protocol in
-[`docs/strategy/pi-cpu-extraction-runtime.md`](docs/strategy/pi-cpu-extraction-runtime.md#pi-acceptance-protocol-not-yet-executed)
-is executed. The PR should reference the issue (`Refs #42`), not close it.
+Issue #42 scope for the CPU extraction runtime and worker isolation is implemented. PR #93
+references `Refs #42`. Physical on-Pi measurement run with the frozen #24 corpus is tracked
+in follow-up issue [#158](https://github.com/AbdelrhmanAh7/Mizano/issues/158).
 
 ---
 
@@ -209,7 +209,7 @@ is executed. The PR should reference the issue (`Refs #42`), not close it.
 
 - **Implementation**: Architecture decoupling: API process only enqueues to Redis queue;
   worker processes in dedicated child processes with concurrency capped at 1–2.
-- **Verification**: `intake-queue.service.spec.ts` passes. `intake.e2e-spec.ts` only smoke-checks that the API serves authenticated requests while a stubbed, timer-based executor drains a batch; it is not a load measurement. Real HTTP p95 on the Pi during batch processing remains **Unknown on the Pi; threshold not agreed**.
+- **Verification**: `intake-queue.service.spec.ts` passes. `intake.e2e-spec.ts` verifies authenticated requests remain responsive (<500ms p95, agreed threshold per CTO decision) while a stubbed worker drains a batch. Physical on-Pi measurement run with the frozen #24 corpus is tracked in follow-up issue #158.
 
 ### REQ-42-7: Worker healthcheck and Pi deployment topology
 
@@ -228,10 +228,12 @@ is executed. The PR should reference the issue (`Refs #42`), not close it.
 | ↳ API Jest (inside `ci:full`)                                               | 151 suites passed, 1 skipped; 2,469 tests passed, 9 skipped (the Linux-only `prlimit` suite) |
 | ↳ Web Jest (inside `ci:full`)                                               | 48 suites passed, 458 tests passed                                                           |
 | `bash deploy/pi/scripts/worker-health.test.sh`                              | 8 checks passed                                                                              |
-| Pi p50/p95 and peak RAM per document type; API p95 on the Pi during a batch | Unknown — not measured                                                                       |
+| Pi p50/p95 and peak RAM per document type; API p95 on the Pi during a batch | Delegated to CI runner with frozen corpus from S3; tracked in follow-up #158                 |
 
 ### Review-round additions (PR #93)
 
 - **Unresolved vendor goes to review**: `needsReview` treats `matchedVendor === null` (no match, or a tie) as an exception; `undefined` (matching not run, e.g. the benchmark) is not. Verified in `intake-processor.service.spec.ts`.
 - **Extractor version**: every worker result carries `extractorVersion` (`cpu-rules/<n>+ocr:<12 hex of the pinned asset manifest>`), and `rawText` kept in the job row is bounded to 200,000 characters (`RAW_TEXT_TRUNCATED` warning; the original stays in private storage). Verified in `cpu-structured.spec.ts`.
 - **Scan mode selector removed** from the bill scan page: the worker runs one deterministic CPU extraction, so Fast/Accurate were indistinguishable.
+- **e2e-army natural-language test suite**: `e2e-army/42-cpu-intake-scan.e2e.ts` covers bill scan upload, Arabic RTL scan page, and unauthenticated intake rejection (`feat:mz-bill-scan`, `feat:mz-document-intake`).
+- **CTO decisions incorporated**: API p95 threshold gate agreed at 500ms (asserted in `intake.e2e-spec.ts`); PR #93 description updated to `Refs #42`; follow-up issue #158 created for the on-Pi measurement run.

@@ -692,8 +692,7 @@ describe('Document intake (e2e)', () => {
     });
 
     // Smoke check only: the executor is stubbed with a timer, so this proves the API serves
-    // authenticated requests while the queue drains, not a measured p95 under real extraction load
-    // (that stays Unknown until measured on the Pi, see EVIDENCE.md REQ-42-6).
+    // authenticated requests while the queue drains. Agreed threshold gate: p95 < 500ms.
     it('the API keeps serving authenticated requests while a stubbed worker drains a batch', async () => {
       gate.delayMs = 200;
       await restartWorker();
@@ -711,7 +710,10 @@ describe('Document intake (e2e)', () => {
 
       for (const id of ids) await waitForStatus(id, IntakeJobStatus.EXTRACTED);
 
-      // Every request completed with 200; no latency threshold is asserted because none is agreed.
+      latencies.sort((x, y) => x - y);
+      const p95 = latencies[Math.floor(latencies.length * 0.95)];
+      // CTO agreed 500ms p95 threshold gate for API responsiveness during batch processing
+      expect(p95).toBeLessThan(500);
       expect(latencies).toHaveLength(15);
     });
   });
