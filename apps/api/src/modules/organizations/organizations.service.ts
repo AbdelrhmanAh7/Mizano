@@ -366,17 +366,25 @@ export class OrganizationsService {
   }
 
   async updateEmailSettings(id: string, dto: EmailSettingsDto) {
-    return this.prisma.organization.update({
-      where: { id },
-      data: {
-        smtpHost: dto.smtpHost,
-        smtpPort: dto.smtpPort,
-        smtpUser: dto.smtpUser,
-        smtpPassword: dto.smtpPassword,
-        smtpFromEmail: dto.smtpFromEmail,
-        smtpFromName: dto.smtpFromName,
-      },
-      select: { id: true, updatedAt: true },
+    // The rotation stamp is server-side only (#104): lock the row, compare, then write.
+    return this.prisma.$transaction(async (tx) => {
+      const [current] = await tx.$queryRaw<Array<{ smtpPassword: string | null }>>`
+        SELECT "smtpPassword" FROM "organizations" WHERE "id" = ${id} FOR UPDATE`;
+      const passwordChanged =
+        dto.smtpPassword !== undefined && dto.smtpPassword !== current?.smtpPassword;
+      return tx.organization.update({
+        where: { id },
+        data: {
+          smtpHost: dto.smtpHost,
+          smtpPort: dto.smtpPort,
+          smtpUser: dto.smtpUser,
+          smtpPassword: dto.smtpPassword,
+          smtpPasswordRotatedAt: passwordChanged ? new Date() : undefined,
+          smtpFromEmail: dto.smtpFromEmail,
+          smtpFromName: dto.smtpFromName,
+        },
+        select: { id: true, updatedAt: true },
+      });
     });
   }
 
