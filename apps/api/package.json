@@ -16,7 +16,7 @@
     "test:watch": "jest --config _jest.config.js --watch --maxWorkers=2",
     "test:cov": "jest --config _jest.config.js --coverage --maxWorkers=2",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --config _jest.config.js --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
     "download-ocr-models": "bash scripts/download-paddle-models.sh"
   },
   "dependencies": {
