@@ -1,4 +1,4 @@
-import { nodeHeapMbSchema, NodeHeapMb } from '../src/index';
+import { nodeHeapMbSchema } from '../src/index';
 
 describe('nodeHeapMbSchema', () => {
   it('returns undefined when unset', () => {
