@@ -25,6 +25,18 @@ function describeAuthError(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown error';
 }
 
+/**
+ * Logins reach the API from this server, so pass on the X-Forwarded-For chain the browser's
+ * request arrived with; the API trusts one proxy hop and rate-limits each client by it.
+ */
+export function forwardedForHeaders(
+  headers: Record<string, unknown> | undefined,
+): Record<string, string> {
+  const forwardedFor = headers?.['x-forwarded-for'];
+  const value = Array.isArray(forwardedFor) ? forwardedFor.join(', ') : forwardedFor;
+  return typeof value === 'string' && value.trim() !== '' ? { 'X-Forwarded-For': value } : {};
+}
+
 export async function requestTokenRefresh(refreshToken: string): Promise<RefreshedTokens | null> {
   try {
     const response = await axios.post(
@@ -84,16 +96,17 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
 
         try {
-          const response = await axios.post(`${API_BASE_URL}/auth/login`, {
-            email: credentials.email,
-            password: credentials.password,
-          });
+          const response = await axios.post(
+            `${API_BASE_URL}/auth/login`,
+            { email: credentials.email, password: credentials.password },
+            { headers: forwardedForHeaders(req?.headers) },
+          );
           const { user, organization, tokens } = response.data;
 
           return {
@@ -153,7 +166,8 @@ export const authOptions: NextAuthOptions = {
       session.user.organizationId = token.organizationId as string;
       session.user.role = token.role as string;
       session.accessToken = token.accessToken as string;
-      session.refreshToken = token.refreshToken as string;
+      // The refresh token stays in the encrypted JWT cookie: only the server-side jwt
+      // callback uses it, and /api/auth/session is readable by any script on the page.
 
       if (token.error) {
         session.error = token.error as string;
@@ -211,7 +225,6 @@ declare module 'next-auth' {
       role: string;
     };
     accessToken: string;
-    refreshToken: string;
     error?: string;
   }
 
