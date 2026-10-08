@@ -1,28 +1,85 @@
-# CodeRabbit configuration: https://docs.coderabbit.ai/reference/configuration
+# CodeRabbit config (Essentials plan: 5 reviews/hour/repo shared by PR + CLI, 50 chat messages, 150 files/review).
+# Schema: https://coderabbit.ai/integrations/schema.v2.json
 language: en-US
 reviews:
   profile: assertive
   request_changes_workflow: true
-  high_level_summary: true
+  high_level_summary: false
   poem: false
   auto_review:
     enabled: true
-    # One review per PR; follow-up pushes do not consume the hourly review allowance.
-    auto_incremental_review: false
     drafts: false
+    auto_incremental_review: true
     base_branches:
       - master
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/.next/**"
+    - "!**/coverage/**"
+    - "!**/*.lock"
+    - "!**/pnpm-lock.yaml"
+    - "!**/package-lock.json"
+    - "!**/uv.lock"
+    - "!public/media/**"
+    - "!**/*.mp4"
+    - "!**/*.webm"
+    - "!**/*.{png,jpg,jpeg,gif,webp,ico,pdf,pptx,traineddata}"
+    - "!**/__snapshots__/**"
+    - "!**/*.snap"
+    - "!**/*.tsbuildinfo"
+    - "!**/*.min.js"
+    - "!apps/api/prisma/migrations/**/migration_lock.toml"
   path_instructions:
-    - path: '**/*'
-      instructions: >-
-        Review against docs/agents/review-lessons.md and AGENTS.md. Every rule there is a past
-        review finding; flag any change that repeats one of those root causes, even in a
-        different module (lock order, original-journal accounts, dates, single-currency ledger,
-        Decimal money, tenant scoping, voided records, report reconciliation, logging, en/ar
-        strings, error vs empty states).
+    - path: "**/*"
+      instructions: "Review against docs/agents/review-lessons.md and AGENTS.md. Every rule there is a past review finding; flag any change that repeats one of those root causes, even in a different module (lock order, original-journal accounts, dates, single-currency ledger, Decimal money, tenant scoping, voided records, report reconciliation, logging, en/ar strings, error vs empty states)."
+    - path: "apps/api/src/**"
+      instructions: "Ledger/VAT/invoices/money: amounts must use Decimal, never float. Flag rounding done per line where the total must reconcile, VAT computed on the wrong base, unbalanced journals, edits to posted/voided records, and missing tenant scoping. Money paths need tests."
+    - path: "apps/web/**"
+      instructions: "User-facing strings: Arabic/RTL. Flag hardcoded English or Arabic literals outside the i18n catalog, missing en/ar key pairs, physical left/right CSS where logical start/end is needed, and unmirrored icons or numerals."
+    - path: "packages/**"
+      instructions: "Shared types/validators: flag changes that loosen money, VAT or date validation, or that break api/web consumers."
+  tools:
+    eslint:
+      enabled: true
+    ruff:
+      enabled: true
+    hadolint:
+      enabled: true
+    shellcheck:
+      enabled: true
+    yamllint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    actionlint:
+      enabled: true
+    markdownlint:
+      enabled: true
+  pre_merge_checks:
+    issue_assessment:
+      mode: warning
+    custom_checks:
+      - name: "Linked issue"
+        mode: warning
+        instructions: "The PR description must reference an issue (Closes/Fixes/Refs #N). Warn if none is linked."
+      - name: "Tests changed with code"
+        mode: warning
+        instructions: "If the PR changes production source code (not docs, config or comments only), it must also add or modify a test file. Warn otherwise."
+      - name: "e2e-army test for UI flows"
+        mode: warning
+        instructions: "If the PR changes a user-facing UI flow (routes, forms, navigation, checkout/auth screens), it should add or update a test file under e2e-army/. Warn only; never fail."
 knowledge_base:
+  learnings:
+    scope: local
   code_guidelines:
     enabled: true
     filePatterns:
-      - docs/agents/review-lessons.md
+      - README.md
+      - CONTRIBUTING.md
       - AGENTS.md
+      - CLAUDE.md
+      - docs/agents/review-lessons.md
+chat:
+  auto_reply: true
