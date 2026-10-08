@@ -4,8 +4,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { describeError } from '../utils/redact';
 import { CredentialAge, classifyCredentialAge } from './credential-age';
 
-/** Host credentials; each has a `<NAME>_CREDENTIAL_ROTATED_AT=YYYY-MM-DD` key (date only). */
-export const HOST_CREDENTIALS = ['TELEGRAM_BOT', 'CLOUDFLARE_TUNNEL'] as const;
+/** Host secret env names; each has a `<NAME>_CREDENTIAL_ROTATED_AT=YYYY-MM-DD` key (date only). */
+export const HOST_CREDENTIALS = ['TELEGRAM_BOT_TOKEN', 'CLOUDFLARE_TUNNEL_TOKEN'] as const;
 const MAX_AGE_DAYS = 90;
 
 /**
