@@ -9,17 +9,13 @@ function parseHeapMb(env = process.env) {
   }
 
   const str = String(raw).trim();
-  if (str === '' || !/^-?\d+$/.test(str)) {
-    throw new Error(
-      `MIZANO_NODE_HEAP_MB must be an integer between 128 and 4096, received "${raw}"`,
-    );
+  if (str === '' || !/^(?:0x[0-9a-fA-F]+|\d+)$/.test(str)) {
+    throw new Error('MIZANO_NODE_HEAP_MB must be an integer between 128 and 4096');
   }
 
   const val = Number(str);
-  if (val < 128 || val > 4096) {
-    throw new Error(
-      `MIZANO_NODE_HEAP_MB must be an integer between 128 and 4096, received "${raw}"`,
-    );
+  if (!Number.isInteger(val) || val < 128 || val > 4096) {
+    throw new Error('MIZANO_NODE_HEAP_MB must be an integer between 128 and 4096');
   }
 
   return val;

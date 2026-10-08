@@ -7,8 +7,10 @@ try {
   const args = buildNodeArgs(process.env, process.argv.slice(2));
   const child = spawn(process.execPath, args, { stdio: 'inherit' });
 
+  let childExited = false;
+
   const forwardSignal = (signal) => {
-    if (!child.killed && child.pid) {
+    if (!childExited && child.exitCode === null && child.signalCode === null && child.pid) {
       child.kill(signal);
     }
   };
@@ -22,6 +24,7 @@ try {
   process.on('SIGHUP', handleSighup);
 
   child.on('exit', (code, signal) => {
+    childExited = true;
     process.off('SIGTERM', handleSigterm);
     process.off('SIGINT', handleSigint);
     process.off('SIGHUP', handleSighup);

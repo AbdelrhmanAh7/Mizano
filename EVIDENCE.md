@@ -236,7 +236,7 @@ Output:
 
 ```text
 
-> @mizano/validators@0.1.0 test /Users/abdelrahmanahmed/agents/work/impl/Mizano-127/packages/validators
+> @mizano/validators@0.1.0 test packages/validators
 > jest
 
 PASS test/node-heap-mb.schema.spec.ts
@@ -270,7 +270,7 @@ Output:
 
 ```text
 
-> mizano@0.1.0 lint /Users/abdelrahmanahmed/agents/work/impl/Mizano-127
+> mizano@0.1.0 lint <repo-root>
 > turbo lint
 
 • turbo 2.8.12
@@ -282,33 +282,18 @@ Output:
 @mizano/validators:lint: cache hit, replaying logs 851394bb75a7aaaa
 api:lint: cache hit, replaying logs 691713db4e17a8a6
 @mizano/shared-types:lint:
-@mizano/shared-types:lint: > @mizano/shared-types@0.1.0 lint /Users/abdelrahmanahmed/agents/work/ci/wt.noindex/Mizano-7a33833/packages/shared-types
+@mizano/shared-types:lint: > @mizano/shared-types@0.1.0 lint packages/shared-types
 @mizano/shared-types:lint: > eslint "src/**/*.ts"
 api:lint:
-api:lint: 
-api:lint: > api@0.1.0 lint /Users/abdelrahmanahmed/agents/work/impl/Mizano-127/apps/api
-api:lint: > eslint "{src,apps,libs,test}/**/*.ts"
 api:lint:
-api:lint: =============
-api:lint:
-api:lint: WARNING: You are currently running a version of TypeScript which is not officially supported by @typescript-eslint/typescript-estree.
-api:lint:
-api:lint: You may find that it works just fine, or you may not.
-api:lint:
-api:lint: SUPPORTED TYPESCRIPT VERSIONS: >=4.3.5 <5.4.0
-api:lint:
-api:lint: YOUR TYPESCRIPT VERSION: 5.9.3
-api:lint:
-api:lint: Please only submit bug reports when using the officially supported version.
-api:lint:
-api:lint: =============
+api:lint: > api@0.1.0 lint apps/api
 @mizano/validators:lint:
-@mizano/validators:lint: > @mizano/validators@0.1.0 lint /Users/abdelrahmanahmed/agents/work/impl/Mizano-127/packages/validators
+@mizano/validators:lint: > @mizano/validators@0.1.0 lint packages/validators
 @mizano/validators:lint: > eslint "src/**/*.ts"
 @mizano/validators:lint:
 @mizano/shared-types:lint:
 @mizano/web:lint:
-@mizano/web:lint: > @mizano/web@0.1.0 lint /Users/abdelrahmanahmed/agents/work/ci/wt.noindex/Mizano-7a33833/apps/web
+@mizano/web:lint: > @mizano/web@0.1.0 lint apps/web
 @mizano/web:lint: > next lint
 @mizano/web:lint:
 @mizano/web:lint: Attention: Next.js now collects completely anonymous telemetry regarding usage.
@@ -371,7 +356,7 @@ Output:
 
 ```text
 
-> mizano@0.1.0 type-check /Users/abdelrahmanahmed/agents/work/impl/Mizano-127
+> mizano@0.1.0 type-check <repo-root>
 > turbo type-check
 
 • turbo 2.8.12
@@ -380,32 +365,32 @@ Output:
 • Remote caching disabled, using shared worktree cache
 @mizano/shared-types:type-check: cache hit, replaying logs e26600acb9ca954a
 @mizano/shared-types:type-check:
-@mizano/shared-types:type-check: > @mizano/shared-types@0.1.0 type-check /Users/abdelrahmanahmed/agents/work/ci/wt.noindex/Mizano-7a33833/packages/shared-types
+@mizano/shared-types:type-check: > @mizano/shared-types@0.1.0 type-check packages/shared-types
 @mizano/shared-types:type-check: > tsc --noEmit
 @mizano/shared-types:type-check:
 @mizano/validators:type-check: cache hit, replaying logs 62be3bc3e2848b56
 @mizano/validators:type-check:
-@mizano/validators:type-check: > @mizano/validators@0.1.0 type-check /Users/abdelrahmanahmed/agents/work/impl/Mizano-127/packages/validators
+@mizano/validators:type-check: > @mizano/validators@0.1.0 type-check packages/validators
 @mizano/validators:type-check: > tsc --noEmit
 @mizano/validators:type-check:
 @mizano/validators:build: cache hit, replaying logs afa7cfa3d71ae01a
 @mizano/validators:build:
-@mizano/validators:build: > @mizano/validators@0.1.0 build /Users/abdelrahmanahmed/agents/work/impl/Mizano-127/packages/validators
+@mizano/validators:build: > @mizano/validators@0.1.0 build packages/validators
 @mizano/validators:build: > tsc
 @mizano/validators:build:
 @mizano/shared-types:build: cache hit, replaying logs 909af9a27f09790d
 @mizano/shared-types:build:
-@mizano/shared-types:build: > @mizano/shared-types@0.1.0 build /Users/abdelrahmanahmed/agents/work/ci/wt.noindex/Mizano-7a33833/packages/shared-types
+@mizano/shared-types:build: > @mizano/shared-types@0.1.0 build packages/shared-types
 @mizano/shared-types:build: > tsc
 @mizano/shared-types:build:
 api:type-check: cache hit, replaying logs 1dafe9d60e276705
 @mizano/web:type-check: cache hit, replaying logs 062ee90525c8cae0
 api:type-check:
-api:type-check: > api@0.1.0 type-check /Users/abdelrahmanahmed/agents/work/impl/Mizano-127/apps/api
+api:type-check: > api@0.1.0 type-check apps/api
 api:type-check: > tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json
 api:type-check:
 @mizano/web:type-check:
-@mizano/web:type-check: > @mizano/web@0.1.0 type-check /Users/abdelrahmanahmed/agents/work/impl/Mizano-127/apps/web
+@mizano/web:type-check: > @mizano/web@0.1.0 type-check apps/web
 @mizano/web:type-check: > tsc --noEmit
 @mizano/web:type-check:
 

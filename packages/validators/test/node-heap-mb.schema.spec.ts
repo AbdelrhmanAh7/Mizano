@@ -43,8 +43,38 @@ describe('nodeHeapMbSchema', () => {
     }
   });
 
+  it('parses valid hex representation 0x80 as 128', () => {
+    const result = nodeHeapMbSchema.safeParse('0x80');
+    expect(result.success).toBe(true);
+    expect(result.data).toBe(128);
+  });
+
   it('rejects decimal number (1.5)', () => {
     const result = nodeHeapMbSchema.safeParse('1.5');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toContain('MIZANO_NODE_HEAP_MB');
+    }
+  });
+
+  it('rejects fractional number within range (128.5)', () => {
+    const result = nodeHeapMbSchema.safeParse('128.5');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toContain('MIZANO_NODE_HEAP_MB');
+    }
+  });
+
+  it('rejects hex value below minimum (0x7f)', () => {
+    const result = nodeHeapMbSchema.safeParse('0x7f');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toContain('MIZANO_NODE_HEAP_MB');
+    }
+  });
+
+  it('rejects hex value above maximum (0x1001)', () => {
+    const result = nodeHeapMbSchema.safeParse('0x1001');
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0].message).toContain('MIZANO_NODE_HEAP_MB');

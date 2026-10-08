@@ -92,7 +92,7 @@ pnpm test:e2e
 
 Runtime environment settings can be configured in `.env.local` or environment-specific files (see `.env.example`):
 
-- `MIZANO_NODE_HEAP_MB`: Optional integer between 128 and 4096. Caps Node V8 heap space (`--max-old-space-size=<n>`) via the start launcher. When unset, Node default heap limits apply. For Raspberry Pi 5 (8GB) deployments, `1024` (1GB) is recommended to prevent memory contention.
+- `MIZANO_NODE_HEAP_MB`: Optional integer between 128 and 4096. Caps Node V8 heap space (`--max-old-space-size=<n>`) via the start launcher. Because the launcher evaluates this setting to configure Node arguments before the application process boots and before `.env.local` is loaded by NestJS, this variable must be exported in the service/process environment (e.g. shell, systemd, or container environment). In containerized setups, this variable will not reach containers until the compose profile (#39) passes it. When unset, Node default heap limits apply. For Raspberry Pi 5 (8GB) deployments, `1024` (1GB) is a suggested starting value to tune (not a measured benchmark).
 
 ## Repository layout
 
