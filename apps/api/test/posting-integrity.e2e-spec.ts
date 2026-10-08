@@ -244,10 +244,30 @@ describe('Posting integrity (e2e, real database)', () => {
   });
 
   it('@issue-94 AC2: leaves the tenant ledger balanced as stored', async () => {
+    const where = { journal: { organizationId: tenant.organizationId } };
     const { _sum } = await prisma.journalLine.aggregate({
-      where: { journal: { organizationId: tenant.organizationId } },
+      where,
       _sum: { debit: true, credit: true },
     });
+    // An empty ledger sums to null: the earlier tests posted, so null must fail, not pass.
+    expect(_sum.debit).not.toBeNull();
+    expect(_sum.credit).not.toBeNull();
     expect(_sum.debit?.toFixed(4)).toBe(_sum.credit?.toFixed(4));
+
+    // Equal tenant totals can hide one journal off by +x and another by -x, so check each journal.
+    const perJournal = await prisma.journalLine.groupBy({
+      by: ['journalId'],
+      where,
+      _sum: { debit: true, credit: true },
+    });
+    expect(perJournal.length).toBeGreaterThan(0);
+    for (const row of perJournal) {
+      expect(row._sum.debit).not.toBeNull();
+      expect(row._sum.credit).not.toBeNull();
+      expect([row.journalId, row._sum.debit?.toFixed(4)]).toEqual([
+        row.journalId,
+        row._sum.credit?.toFixed(4),
+      ]);
+    }
   });
 });

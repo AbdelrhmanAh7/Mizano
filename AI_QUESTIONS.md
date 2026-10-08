@@ -1,6 +1,16 @@
 # AI questions and follow-ups: issue #94
 
-This slice is complete; see [EVIDENCE.md](EVIDENCE.md). Nothing below blocks it. It lists the owner decisions and every float hit deferred to a follow-up, as the Tech Lead plan asked.
+**Status: partly done, and not complete against the brief.** The brief asks to audit every money calculation and replace float use, and to prove atomic, idempotent posting. Only these parts are done and tested (see [EVIDENCE.md](EVIDENCE.md)):
+
+- the single ledger command (`JournalsService.create`) and the invoice-send path that goes through it: exact decimal storage and transport, one journal per source event under replay and 8-way concurrency, and no partial rows on failure;
+- the float balance check in `packages/validators`.
+
+These gates stay **open** until the owner either accepts the follow-ups below or narrows the acceptance criteria:
+
+- **Atomic, idempotent posting** does not hold for assets (depreciation and disposal), payroll and manufacturing. They write journals with `tx.journal.create`, outside the single command, with no ledger lock and no source key (Decision 2, F1–F3).
+- **Decimal arithmetic** is not done everywhere. The audit still finds 695 float hits on HEAD, including 53 ledger-class and 12 DTO-class hits, listed below (F1–F8).
+
+This file lists the owner decisions and every float hit deferred to a follow-up, as the Tech Lead plan asked.
 
 ## Decisions for the owner
 
