@@ -351,6 +351,21 @@ $ git diff --stat origin/master...HEAD -- .gitignore
  1 file changed, 115 insertions(+), 113 deletions(-)
 ```
 
+## Round 9 recheck (merge of origin/master, no .gitignore change needed)
+
+```text
+$ git rev-parse HEAD   (before this evidence commit)
+130c4351e6d862ed3e6d647e80d8cd39f6b07eb0
+$ git diff --check origin/master HEAD; echo exit=$?
+exit=0
+$ grep -c "$(printf '\r')" .gitignore
+0
+$ git ls-files --eol .gitignore
+i/lf    w/lf    attr/ .gitignore
+$ git check-ignore -v deploy/pi/.env.pi
+.gitignore:16:deploy/pi/.env.pi deploy/pi/.env.pi
+```
+
 ## Acceptance checklist (Tech Lead plan)
 
 | Item                                                                           | Status                                                                                                                                                        |
