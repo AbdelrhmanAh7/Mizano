@@ -97,7 +97,10 @@ describe('CPU extraction without an LLM', () => {
   it('stays evidence-only when OCR returns no usable text', async () => {
     recognize.mockResolvedValue({ data: { text: ' . ', confidence: 12 } });
     const result = await extractCpuDocument(Buffer.from('image'), 'image/png', '/tmp/job');
-    expect(result).toEqual(cpuReviewResult(' . ', 0.12));
+    expect(result).toEqual({
+      ...cpuReviewResult(' . ', 0.12),
+      extractorVersion: expect.any(String),
+    });
   });
 
   it('terminates the OCR engine after recognition failure', async () => {
