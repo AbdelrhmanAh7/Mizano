@@ -142,3 +142,28 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+---
+
+# EVIDENCE — Adopt tester-army/e2e in-repo as the E2E gate (#153)
+
+- **Base (`origin/master`)**: `cc1443bfe31d5ca3e97f53dc5d4275738bfcd435`
+- **Tested code SHA**: `ac21ae8bd57c7e8c10de8d70c3f5592de1d20125` (later commits add only the workflow, docs and this file)
+- **Date**: 2026-10-08, Mac mini (Node 26, pnpm 8.14.0), throwaway PostgreSQL 16 cluster (`mizano_e2e_army`), runs through the hub's suite governor
+
+| REQ   | Requirement                                                                         | How it is verified                                                                                                                                                                                 | Result                                       |
+| ----- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| REQ-1 | `e2e` devDependency + `e2e.config.ts` (env base URL, headless, cache, no telemetry) | `package.json`, `e2e.config.ts`; `pnpm install --frozen-lockfile --offline` accepts the lockfile                                                                                                   | PASSED                                       |
+| REQ-2 | Suite in `e2e-army/` for login, invoice / ledger entry, Arabic RTL                  | `pnpm e2e:army e2e-army/153-e2e-army-gate.e2e.ts`: AC1 sign-in, AC2 balanced/unbalanced journal, AC3 draft invoice/empty invoice, AC4 RTL/LTR                                                      | 4/4 passed, 38.8 s                           |
+| REQ-3 | Hub feature suite ported with its tags, every feature covered                       | `e2e-army/features/` = hub `tests-dev/Mizano/`; tag scan: 79/79 features of `ops/verify/features/Mizano.json` have a test; 22 shards in `e2e-army/shards.json`                                     | PASSED                                       |
+| REQ-4 | `pnpm e2e:army` starts the app on the test DB, runs in ≤ 5 min                      | `DATABASE_URL=… pnpm e2e:army --tag shard:smoke` with `E2E_ARMY_CLI=agy` (Gemini Flash): 8/8 in 3 m 14 s; without a model 4 passed / 4 skipped in 44 s                                             | PASSED                                       |
+| REQ-5 | CI job `e2e-army`, `timeout-minutes: 5`, sharded                                    | `.github/workflows/e2e-army.yml`: matrix `pr` + `smoke`, aggregate job `e2e-army`; GitHub timing is measured on the PR's first run, not here                                                       | Written; not run locally                     |
+| REQ-6 | Contributor rule documented                                                         | `CONTRIBUTING.md`, `README.md`, `docs/DEVELOPMENT.md`, PR template                                                                                                                                 | PASSED                                       |
+| REQ-7 | No secrets committed; model config from env / Keychain only                         | `e2e.config.ts` reads `E2E_ARMY_MODEL_*` / `E2E_ARMY_CLI` and the Keychain item `e2e-army-model-key`; app secrets are random per run in `scripts/e2e-army.sh`                                      | PASSED                                       |
+| REQ-8 | The hub's verify job picks up the in-repo PR tests                                  | `153-e2e-army-gate.e2e.ts` imports only `@e2e-dev/web` and `e2e` and matches the hub copier's `^[\w.-]+\.e2e\.ts$`; the feature suite sits in `features/`, which the copier (top level only) skips | PASSED by inspection of `src/lib/e2earmy.ts` |
+
+Repository CI at the tested code: `pnpm turbo lint type-check test --force` → 12/12 tasks, API 136 suites / 2197 tests, web 48 suites / 458 tests, all passed.
+
+Whole suite without a model (`pnpm e2e:army`, before the stub-model fix): 54 passed, 62 skipped (agent steps), 29 failed in the API / job shards, 11 m 10 s. The failing tests, for the hub's `[e2e] … failing on master` issues: mz-asset-depreciation.1, mz-attendance.2, mz-bank-rules.2, mz-bank-transactions.2, mz-bom.2, mz-crm-deals.2, mz-currency.1, mz-dashboard.2, mz-delivery-challans.2, mz-documents.1, mz-error-logger.1, mz-fixed-assets.2, mz-general-ledger.2, mz-global-search.2, mz-import-export.1, mz-items.2, mz-payroll.2, mz-price-lists.2, mz-report-exports.1, mz-sales-purchase-reports.2, mz-stock-movements.2, mz-stock-transfers.2, mz-system-diagnostics.2, mz-tax-rates.2, mz-timesheets.2, mz-user-preferences.1, mz-vendors.2, mz-warehouses.2, mz-work-orders.2. These shards are not part of the GitHub `e2e-army` job.
+
+Known risk: the form sign-in of AC1 timed out once (150 s) while the Mac was under load (load average > 10, another e2e stack running); it passed in 31 s on the rerun.
