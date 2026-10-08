@@ -151,7 +151,7 @@
 
 - **Issue**: #102 (Post-merge: CI red after #98)
 - **Base Commit (`master`)**: `615060ed6294e16375a1f1ea9385cb7e812cd24f`
-- **Tested Commit SHA**: `e00065a4d5fc3b8dd31cc730a06ab7fd70b025aa` (all gate tests passing; this commit changes only `EVIDENCE.md`)
+- **Tested Commit SHA**: `373cd82487a2050b2b7ff8af1766db1fee891b09` (from `git rev-parse HEAD`; the commit the tests ran on; the later commit changes only `EVIDENCE.md`)
 - **Audit Date**: 2026-10-08
 - **Failing Check**: Deploy to GCP (Workflow: `Deploy to Production`)
 - **Root Cause Classification**: **(B)** — deployment host unreachable over SSH (`dial tcp ***:22: i/o timeout`). Contributing observation: documentation-only merges still trigger a rollout (owner decision needed; see `AI_QUESTIONS.md`).
@@ -165,14 +165,14 @@
 
 ## Requirements Verification Matrix
 
-| REQ ID    | Requirement                                                                                     | Verification Method                                                      | Status |
-| --------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------ |
-| REQ-102-1 | Capture failing run ID, URL, and exact failing step output from 615060e                         | `gh run view 37540990404 --log-failed`                                   | PASSED |
-| REQ-102-2 | Investigate historical "Deploy to Production" runs prior to #98                                 | `gh run list --workflow "Deploy to Production"`                          | PASSED |
-| REQ-102-3 | Classify root cause (A vs B vs C) with justification                                            | Analysis against build logs & network errors                             | PASSED |
-| REQ-102-4 | Propose options and technical analysis in `AI_QUESTIONS.md` without modifying workflows/secrets | Review against repo owner policy                                         | PASSED |
-| REQ-102-5 | Bind evidence to the verified tree and record exact tested SHA                                  | Tested SHA `e00065a4d5fc3b8dd31cc730a06ab7fd70b025aa`, gate tests passed | PASSED |
-| REQ-102-6 | Preserve #95 audit evidence                                                                     | #95 audit preserved above; `docs/planning/EVIDENCE-95.md` removed        | PASSED |
+| REQ ID    | Requirement                                                                                     | Verification Method                                                                                        | Status |
+| --------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------ |
+| REQ-102-1 | Capture failing run ID, URL, and exact failing step output from 615060e                         | `gh run view 37540990404 --log-failed`                                                                     | PASSED |
+| REQ-102-2 | Investigate historical "Deploy to Production" runs prior to #98                                 | `gh run list --workflow "Deploy to Production"`                                                            | PASSED |
+| REQ-102-3 | Classify root cause (A vs B vs C) with justification                                            | Analysis against build logs & network errors                                                               | PASSED |
+| REQ-102-4 | Propose options and technical analysis in `AI_QUESTIONS.md` without modifying workflows/secrets | Review against repo owner policy                                                                           | PASSED |
+| REQ-102-5 | Bind evidence to the verified tree and record exact tested SHA                                  | Tested SHA `373cd82487a2050b2b7ff8af1766db1fee891b09` (from `git rev-parse HEAD`), local gate tests passed | PASSED |
+| REQ-102-6 | Preserve #95 audit evidence                                                                     | #95 audit preserved above; `docs/planning/EVIDENCE-95.md` removed                                          | PASSED |
 
 ---
 
@@ -235,13 +235,13 @@
 
 The changes in this PR are documentation-only (`AI_QUESTIONS.md`, `EVIDENCE.md`, `docs/agents/review-lessons.md`). The failing `Deploy to GCP` step requires SSH connectivity to the remote host.
 
-- **Verified Commit SHA**: `e00065a4d5fc3b8dd31cc730a06ab7fd70b025aa` (all local checks and PR checks passed; this commit modifies only `EVIDENCE.md`)
+- **Verified Commit SHA**: `373cd82487a2050b2b7ff8af1766db1fee891b09` (from `git rev-parse HEAD`; the commit the tests ran on; the later commit changes only `EVIDENCE.md`)
 - **Local Checks Executed**:
 
 ```bash
 # 1. Rollout scope unit tests (offline gate)
 python3 scripts/test_demo_rollout_scope.py
-# Ran 12 tests in 0.025s, OK
+# Ran 12 tests in 0.028s, OK
 
 # 2. Monorepo lint check
 pnpm lint
@@ -252,4 +252,4 @@ npx prettier --check EVIDENCE.md AI_QUESTIONS.md docs/agents/review-lessons.md
 # All matched files use Prettier code style!
 ```
 
-- **Diff from tested SHA to HEAD**: `git diff --stat e00065a4d5fc3b8dd31cc730a06ab7fd70b025aa..HEAD` shows only `EVIDENCE.md` changed.
+- **Diff from tested SHA to HEAD**: `git diff --stat 373cd82487a2050b2b7ff8af1766db1fee891b09..HEAD` shows only `EVIDENCE.md` changed.
