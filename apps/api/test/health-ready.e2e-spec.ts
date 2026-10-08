@@ -4,8 +4,9 @@ import * as fs from 'fs';
 import { createTestApp, getPrisma } from './helpers/app.helper';
 import { PrismaService } from '../src/prisma/prisma.service';
 
-const okDisk = { bsize: 4096, blocks: 1000, bfree: 500, bavail: 500 } as fs.StatsFs;
-const diskWith = (bfree: number): fs.StatsFs => ({ ...okDisk, bfree, bavail: bfree });
+// bfree includes root-reserved blocks; readiness must judge on bavail, so fixtures keep bfree higher.
+const okDisk = { bsize: 4096, blocks: 1000, bfree: 550, bavail: 500 } as fs.StatsFs;
+const diskWith = (bavail: number): fs.StatsFs => ({ ...okDisk, bfree: bavail + 50, bavail });
 const SECRET_DSN = 'postgres://user:password@localhost/db';
 const SECRET_PATH = '/data/secret_tenant_file';
 
@@ -78,18 +79,24 @@ describe('Health Ready Endpoint (e2e)', () => {
     });
   });
 
-  it('@e2e @health-ready @issue-110 AC2 timeout: a hung DB returns 503 within the configured timeout', async () => {
+  it('@e2e @health-ready @issue-110 AC2 timeout: a hung DB returns 503 within the timeout and probes are not stacked', async () => {
     process.env.READY_DB_TIMEOUT_MS = '100';
-    queryRawSpy.mockReturnValue(new Promise(() => undefined));
+    let release: (value: unknown) => void = () => undefined;
+    queryRawSpy.mockReturnValue(new Promise((resolve) => (release = resolve)));
     statfsSpy.mockResolvedValue(okDisk);
 
     const started = Date.now();
-    const response = await ready();
+    const responses = await Promise.all([ready(), ready()]);
     const elapsedMs = Date.now() - started;
+    const again = await ready();
+    release([{ '?column?': 1 }]);
 
-    expect(response.status).toBe(503);
-    expect(response.body.db).toBe('fail');
+    for (const response of [...responses, again]) {
+      expect(response.status).toBe(503);
+      expect(response.body.db).toBe('fail');
+    }
     expect(elapsedMs).toBeLessThan(2000);
+    expect(queryRawSpy).toHaveBeenCalledTimes(1);
   });
 
   it('@e2e @health-ready @issue-110 AC3: Free space below the threshold returns 503 and the body names disk as failing', async () => {
@@ -110,6 +117,16 @@ describe('Health Ready Endpoint (e2e)', () => {
 
     expect(response.status).toBe(503);
     expect(response.body).toEqual({ status: 'fail', db: 'ok', disk: 'fail' });
+  });
+
+  it('@e2e @health-ready @issue-110 AC3: the threshold uses blocks available to the API, unrounded', async () => {
+    queryRawSpy.mockResolvedValue([{ '?column?': 1 }]);
+    statfsSpy.mockResolvedValue({ ...okDisk, blocks: 100_000, bfree: 20_000, bavail: 9_999 });
+
+    const response = await ready();
+
+    expect(response.status).toBe(503);
+    expect(response.body.disk).toBe('fail');
   });
 
   it.each(['abc', '-5', '150'])(
