@@ -4,7 +4,10 @@
 
 - **Issue**: #133 ([audit] Move intake extraction out of the API process and remove dead Colab wiring)
 - **Base Commit (`master`)**: `615060e`
-- **Tested Commit (this PR)**: `596fa0b`
+- **Tested Commit (this PR head)**: `bbd3cc4`
+- **Branch commits** (newest first):
+  - `bbd3cc4` — implementation (this PR head): gates `ai/schedulers/*` behind `AI_SCHEDULERS_ENABLED`, names all 29 AI cron jobs, paginates notification cron checks over all orgs, rewrites AC1–AC4 tests, Dockerfile + env + docs fixes
+  - `99e1c27`, `596fa0b`, `e0954ee` — evidence draft, refactor, and failing AC tests (earlier commits on this branch)
 - **Audit Date**: 2026-10-08
 - **Branch**: `ai/133`
 
@@ -12,76 +15,100 @@
 
 ## Requirements Verification Matrix (Issue #133)
 
-| REQ ID | Requirement                                                               | Verification Method                          | Status |
-| ------ | ------------------------------------------------------------------------- | -------------------------------------------- | ------ |
-| AC1    | Exactly one route for `GET ai/narrative`                                  | DiscoveryService scan of controllers         | PASSED |
-| AC2    | `POST/GET internal/tunnel-update` and `ollama-status` return 404          | HTTP request to removed endpoints            | PASSED |
-| AC3    | With `AI_SCHEDULERS_ENABLED` unset, SchedulerRegistry has no AI cron jobs | SchedulerRegistry inspection with flag unset | PASSED |
-| AC4    | Notifications queries include `organizationId` and `take` limits          | Unit spec spying on Prisma calls             | PASSED |
+| REQ ID | Requirement                                                                      | Verification Method                                                                     | Status |
+| ------ | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------ |
+| AC1    | Exactly one handler for `GET ai/narrative/monthly` and it works                  | DiscoveryService route-metadata scan + live HTTP request (guard 401, not 404)           | PASSED |
+| AC2    | `POST/GET internal/tunnel-update` and `ollama-status` return 404                 | supertest against removed endpoints (plain and `/api`-prefixed)                         | PASSED |
+| AC3    | With `AI_SCHEDULERS_ENABLED` unset, SchedulerRegistry has no AI cron jobs        | Registry key inspection (derived from class metadata, non-vacuous) + provider absence   | PASSED |
+| AC3b   | Positive control: with `AI_SCHEDULERS_ENABLED=true`, all 29 `ai:` crons register | Second module graph booted via `jest.resetModules()` with the flag set                  | PASSED |
+| AC4    | Notification cron queries are org-scoped, `take`-bounded, and page all orgs      | Mocked Prisma assertions: cursor pagination, per-org scoping, bounds, no duplicate orgs | PASSED |
 
 ---
 
 ## Detailed Changes & Verification (Issue #133)
 
-### AC1: Exactly one route for GET ai/narrative
+### AC1: Exactly one narrative handler, no DI break
 
-- **Change**: Removed `NarrativeController` and `FinancialNarrativeService` from `ai.module.ts` (lines 23, 26, 42, 52)
-- **Kept**: Forecasting module's registration in `ai-forecasting.module.ts` (lines 10, 17, 33, 40)
-- **Verification**: Only one controller handles `/ai/narrative/*` routes
+- **Change**: `NarrativeController` and `FinancialNarrativeService` are no longer registered in `apps/api/src/modules/ai/ai.module.ts`.
+- **Kept (single source)**: `AiForecastingModule` registers `NarrativeController` and **provides + exports** `FinancialNarrativeService`
+  (`apps/api/src/modules/ai/forecasting/ai-forecasting.module.ts` lines 26/33/40).
+- **DI consumers of the single exported service**: `narrative.controller.ts`, `ai-operations.scheduler.ts`, `reports/controllers/reports.controller.ts` — all resolve through the forecasting module's export. `grep` confirms no other provider registration exists.
+- **Verified at head**: `grep -rn NarrativeController apps/api/src` matches only `ai-forecasting.module.ts` and `controllers/narrative.controller.ts`.
 
 ### AC2: Remove dead Colab wiring
 
-- **Deleted files**:
+- **Deleted files** (confirmed present on `master`, removed on this branch):
   - `apps/api/src/modules/ai/controllers/ollama-tunnel.controller.ts`
   - `apps/api/src/modules/ai/controllers/ollama-tunnel.controller.spec.ts`
   - `services/ollama-proxy/` (entire directory: Dockerfile, ollama_proxy.py, test_ollama_proxy.py, .dockerignore)
-- **Removed registration**: `OllamaTunnelController` from `ai-operations.module.ts` (import + controllers array)
-- **Cleaned docs**: Removed `ollama-proxy` references from `CLAUDE.md`, `README.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT.md`
-- **Verification**: Endpoints `/api/internal/tunnel-update` and `/api/internal/ollama-status` return 404
+- **Removed registration**: `OllamaTunnelController` from `ai-operations.module.ts` (import + controllers array).
+- **Docs cleanup**: `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT.md`; `CLAUDE.md` AI section rewritten to current facts (BullMQ worker runs inside the API process; worker container is a _target_ pending issues #39/#42 — see `AI_QUESTIONS.md`).
+- **Verification**: `POST/GET /internal/tunnel-update` and `/internal/ollama-status` (and `/api/...` variants) all return 404. `grep` finds no `ollama-tunnel`/`ollama-proxy` references left in `apps/api/src` or `deploy/`.
 
-### AC3: Gate AI schedulers behind AI_SCHEDULERS_ENABLED
+### AC3: Gate AI schedulers behind AI_SCHEDULERS_ENABLED (default off)
 
-- **Modified files** (5 schedulers):
-  - `apps/api/src/modules/ai/schedulers/ai-operations.scheduler.ts`
-  - `apps/api/src/modules/ai/schedulers/ai-nlp-chat.scheduler.ts`
-  - `apps/api/src/modules/ai/schedulers/ai-hr-ops.scheduler.ts`
-  - `apps/api/src/modules/ai/schedulers/ai-security.scheduler.ts`
-  - `apps/api/src/modules/ai/schedulers/ai-sales-crm.scheduler.ts`
-- **Pattern**: Each scheduler now injects `ConfigService`, reads `AI_SCHEDULERS_ENABLED`, and early-returns from all `@Cron` methods when not `'true'`
-- **Pi compose**: Added `AI_SCHEDULERS_ENABLED: ${AI_SCHEDULERS_ENABLED:-false}` to `deploy/pi/docker-compose.pi.yml`
-- **Verification**: With flag unset, `SchedulerRegistry.getCronJobs()` returns no AI cron jobs
+- **New**: `apps/api/src/modules/ai/schedulers/ai-schedulers.enabled.ts` — `aiSchedulersEnabled()`/`aiSchedulerProviders()` read `process.env.AI_SCHEDULERS_ENABLED` at module-import time (before ConfigModule loads `.env`), so the flag must be exported in the process environment.
+- **Gated modules** (conditional provider spread `...aiSchedulerProviders([...])`): `ai.module.ts`, `hr/ai-hr.module.ts`, `nlp/ai-nlp.module.ts`, `sales-crm/ai-sales-crm.module.ts`, `security/ai-security.module.ts`.
+- **Named crons**: all 29 `@Cron` jobs across the 5 schedulers now carry deterministic `ai:` names (13 operations, 5 hr, 2 nlp, 5 sales-crm, 4 security). Previously `@nestjs/schedule` fell back to UUID keys, which made any registry assertion vacuous.
+- **Runtime guards kept**: the ConfigService early-return guards oc-ling added remain as defense-in-depth.
+- **Pi deployment**: `deploy/pi/.env.pi.example` documents `AI_SCHEDULERS_ENABLED=false`; `deploy/pi/docker-compose.pi.yml` sets `AI_SCHEDULERS_ENABLED: ${AI_SCHEDULERS_ENABLED:-false}`.
+- **Test isolation**: `apps/api/test/setup-e2e.ts` deletes the flag before any spec imports `AppModule`, so e2e always runs the flag-off contract.
+- **Verification**: e2e asserts zero `ai:` cron keys + no scheduler providers with flag unset **and** the registry still contains non-AI cron jobs (not vacuous); AC3b boots a second graph with the flag set and asserts all 29 register.
 
-### AC4: Scope and bound notifications queries
+### AC4: Notification cron checks paginate all orgs, org-scoped and bounded
 
-- **Modified**: `apps/api/src/modules/notifications/services/notifications.service.ts`
+- **Modified**: `apps/api/src/modules/notifications/services/notifications.service.ts`.
 - **Changes**:
-  - Added `NOTIFICATION_BATCH_SIZE = 50` and `NOTIFICATION_QUERY_LIMIT = 100` constants
-  - `checkOverdueInvoices`: Now fetches orgs in batches, queries invoices per org with `take` limit
-  - `checkUpcomingBillPayments`: Same batch/limit pattern
-  - `checkLowInventory`: Same batch/limit pattern with org-scoped item query
-- **Verification**: All three cron methods now include `organizationId` in where clause and `take` bounds
+  - Exported `NOTIFICATION_BATCH_SIZE = 50` / `NOTIFICATION_QUERY_LIMIT = 100` constants.
+  - New cursor-pagination generator `eachOrganizationBatch()` pages **every** organization in id order (`take: 50`, cursor + `skip: 1`), instead of only the first 50 orgs.
+  - `checkOverdueInvoices`, `checkUpcomingBillPayments`, `checkLowInventory` iterate all org batches; every entity query is scoped by `organizationId` and bounded by `take: NOTIFICATION_QUERY_LIMIT`.
+- **Verification**: e2e mocks `organization.findMany` to return a full first page + a second page and asserts two fetches, correct cursor (`{ id: 'org-49' }`), per-org scoping of every invoice/bill/item query, `take` bounds, and no duplicated org visits. Unit spec regression fixed (added `organization.findMany` mock).
 
-### Additional: Remove @mizano/validators from API Dockerfile
+### Additional: API Dockerfile and validators
 
-- **Modified**: `apps/api/Dockerfile`
-- **Changes**: Removed `COPY packages/validators/package.json` and `pnpm --filter @mizano/validators build` step
-- **Rationale**: Package imported by zero source files per audit
+- **Modified**: `apps/api/Dockerfile`.
+- **Changes**: Removed the `@mizano/validators` **build step**; **kept** `COPY packages/validators/package.json` because `apps/api/package.json` still declares `@mizano/validators: workspace:*` and `pnpm install` needs the manifest. Source tree has zero imports of the package.
+- **Verification**: `pnpm --filter api build` (below); `dist/` contains no `@mizano/validators` reference.
 
 ---
 
-## Build & Lint Verification
+## Build, Test & Lint Verification (tested at `bbd3cc4`)
 
 ```bash
+# Unit suite (full API unit tests, standard jest config)
+pnpm exec jest
+# Test Suites: 135 passed, 135 total; Tests: 2188 passed, 2188 total
+
+# Repository-wide gates
+pnpm run lint
+# ESLint: 0 errors; 4 warnings (no-var-requires in apps/api/test/issue-133.e2e-spec.ts,
+# intentional for the jest.resetModules() positive control in AC3b)
+
+pnpm run type-check
+# All tasks OK (6)
+
 pnpm --filter api build
-# ✔ TSC Found 0 issues.
-# Successfully compiled: 649 files with swc
+# TSC: 0 issues; 650 files compiled (swc)
 
-pnpm --filter api lint
-# 0 errors, 7 warnings (only in test file, acceptable)
-
-pnpm --filter api type-check
-# Passes
+# E2E suite (fresh DB, local Redis) — apps/api/test/jest-e2e.json
+# DATABASE_URL=...mizano_133_e2e?schema=public REDIS_URL=redis://localhost:6379
+pnpm --filter api test:e2e -- --runInBand
+# 266 passed, 266 total
+pnpm --filter api test:e2e -- --maxWorkers=2
+# 266 passed, 266 total (second parallel run)
 ```
+
+Additionally `node apps/api/_run_tests.js` reports **134 passed / 4 failed**: the 4 failures are a pre-existing runner artifact
+(`TypeError: csv is not a function` in `import.service.hardening.spec.ts` — csv-parser interop under the custom
+`_jest.config.js` resolver). They fail identically at `master`, and this branch does not touch those files; the same tests
+pass under the standard config above. Documented here as a known artifact, not introduced by this PR.
+
+### Noted flake (not caused by this branch)
+
+One parallel e2e run reported 5 transient failures in **intake** specs (untouched by this branch); they did not reproduce
+(`--runInBand` pass, second `--maxWorkers=2` pass, intake suite standalone 16/16). Suspected cross-suite
+shared-Redis BullMQ queue contention during parallel extraction. Tracked as a remaining risk in the handover; no code on
+this branch was involved.
 
 ---
 
