@@ -1811,6 +1811,7 @@ model Payslip {
   taxes              Decimal  @default(0) @db.Decimal(19, 4)
   netSalary          Decimal  @db.Decimal(19, 4)
   netPay             Decimal? @db.Decimal(19, 4) // Alias
+  deletedAt          DateTime?
 
   // Relations
   payrollRun PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)

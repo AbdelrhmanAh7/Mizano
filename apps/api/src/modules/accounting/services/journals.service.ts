@@ -40,6 +40,13 @@ export enum JournalSourceType {
   OPENING_BALANCE = 'OPENING_BALANCE',
   /** sourceId is `${profileId}:${YYYY-MM-DD}` so each scheduled run posts once. */
   RECURRING_JOURNAL = 'RECURRING_JOURNAL',
+  PAYROLL = 'PAYROLL',
+  /** sourceId is the schedule id; a re-run after a reversal appends `:<n>` (n = prior reversals). */
+  DEPRECIATION = 'DEPRECIATION',
+  /** sourceId is the reversed depreciation journal's id. */
+  DEPRECIATION_REVERSAL = 'DEPRECIATION_REVERSAL',
+  ASSET_DISPOSAL = 'ASSET_DISPOSAL',
+  COGM = 'COGM',
 }
 
 export interface JournalSource {
