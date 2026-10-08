@@ -36,6 +36,11 @@ record() {
 
 log "pulling $sha"
 dc pull api web
+# Migrations are forward-only, so back up first: a bad migration is undone by restoring.
+if [ -n "$(dc ps -q postgres 2>/dev/null)" ]; then
+  log "pre-deploy backup"
+  "$here/backup.sh" || { echo "pre-deploy backup failed; not deploying" >&2; exit 1; }
+fi
 log "running migrations"
 dc run --rm migrate
 log "restarting stack"
@@ -43,12 +48,14 @@ dc up -d --remove-orphans
 
 if wait_healthy 300; then
   record OK
+  record_evidence OK "$sha" "$MIZANO_API_IMAGE" "$MIZANO_WEB_IMAGE"
   persist_deployment "$sha" "$MIZANO_API_IMAGE" "$MIZANO_WEB_IMAGE"
   log "deploy OK $sha"
   exit 0
 fi
 
 record FAILED
+record_evidence FAILED "$sha" "$MIZANO_API_IMAGE" "$MIZANO_WEB_IMAGE"
 log "health check failed for $sha"
 if [ "$prev_ok" -ge 1 ]; then
   log "rolling back to previous deployment"

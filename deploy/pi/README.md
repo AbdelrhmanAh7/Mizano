@@ -70,7 +70,22 @@ Only SSH (ideally LAN-only) should answer. No container should list a published 
 deploy/pi/scripts/deploy.sh <commit-sha> sha256:<api-digest> sha256:<web-digest>
 ```
 
-It pulls by digest, runs `prisma migrate deploy` (one-shot `migrate` service; the api only starts when it succeeds), restarts, waits for healthy, and appends `OK`/`FAILED` lines to `$MIZANO_DATA_DIR/deployments.log`. On failed health it rolls back to the previous recorded digests. Migrations are never reverted, so keep them backward compatible with the previous release.
+It pulls by digest, takes a pre-deploy backup when Postgres is already running, runs `prisma migrate deploy` (one-shot `migrate` service; the api only starts when it succeeds), restarts, waits for healthy, and appends `OK`/`FAILED` lines to `$MIZANO_DATA_DIR/deployments.log`. On failed health it rolls back to the previous recorded digests. Each deploy and rollback also appends its evidence (SHA, both digests, the API `/api/health` JSON and every service's state) to `$MIZANO_DATA_DIR/deploy-evidence.log` and prints it.
+
+### Migration policy (forward-only)
+
+- Migrations only move forward. Rollback swaps images back; it never reverts the schema.
+- Every migration must keep the previous release working on the new schema (expand, then contract): add nullable columns or tables first, backfill, and drop or tighten only in a later release once no deployed image uses the old shape.
+- Never edit or delete a migration that has been applied anywhere; fix forward with a new one.
+- If a migration itself is broken, do not hand-edit the database. Stop `api` and `web`, restore the pre-deploy backup into the live database, then run `rollback.sh`:
+
+  ```bash
+  dc() { docker compose -f deploy/pi/docker-compose.pi.yml --env-file deploy/pi/.env.pi "$@"; }
+  dc stop api web
+  age -d -i /path/mizano-backup.key /mnt/ssd/mizano/backups/db-<stamp>.dump.age |
+    dc exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner'
+  deploy/pi/scripts/rollback.sh
+  ```
 
 ## 5. Backups and restore drill
 
@@ -83,8 +98,12 @@ sudo systemctl enable --now mizano-backup.timer mizano-healthcheck.timer
 The units assume the repo at `/opt/mizano`; edit `ExecStart` otherwise, and ensure the user running them can use Docker (they run as root by default).
 
 - Generate a key pair on your own machine: `age-keygen -o mizano-backup.key`. Put only the public key in `BACKUP_AGE_RECIPIENT`. Store the private key offline (password manager); the Pi must not hold it.
-- `backup.sh` runs nightly at 02:30 Africa/Cairo: encrypted `pg_dump` (custom format) and a tar of `originals/` in `$MIZANO_DATA_DIR/backups`, retention `BACKUP_RETENTION_DAYS`, status in `backup.status`. Copy the folder off the Pi as well (a backup on the same SSD is not a disaster backup).
-- Run a drill monthly and before every demo: `AGE_IDENTITY_FILE=/path/mizano-backup.key deploy/pi/scripts/restore-drill.sh`. It restores the latest dump into a scratch Postgres container, then checks that tables exist and journal debits equal credits.
+- `backup.sh` runs nightly at 02:30 Africa/Cairo: encrypted `pg_dump` (custom format) and a tar of `originals/` in `$MIZANO_DATA_DIR/backups`, retention `BACKUP_RETENTION_DAYS`, status in `backup.status`.
+- Off-site copy: set `BACKUP_REMOTE` (for example `backup@nas.lan:/srv/mizano-backups`) and install `rsync`. After each backup the encrypted files the remote lacks are copied over SSH (a missed night catches up; a failed copy marks the backup `FAILED` and the health check alerts). The backup runs as root, so give root's SSH key access to that account only. The script never deletes remotely; on the remote, keep retention with a daily cron such as `find /srv/mizano-backups -name '*.age' -mtime +30 -delete`. Files are age-encrypted, so the remote never sees plaintext.
+- Restore drill, monthly and before every demo, run on the Pi (or any host with Docker, the backups folder and `.env.pi`):
+  `AGE_IDENTITY_FILE=/path/mizano-backup.key deploy/pi/scripts/restore-drill.sh`.
+  It refuses a backup older than 26 hours (`DRILL_MAX_AGE_HOURS`, `0` = any), so a green drill proves last night's backup. It decrypts the dump and the originals, restores into a scratch Postgres on a throwaway network, checks that tables exist, that every posted journal balances and that every live intake job's original is present with its recorded sha256. Then it runs `prisma migrate deploy` with the deployed API image, starts that image against the scratch database and runs the seeded smoke (`drill-smoke.mjs`: register a throwaway organization, log in, trial balance balanced). The result line with per-phase timings (`decrypt`, `restore`, `checks`, `smoke`, `total`) is appended to `backups/drill.log`; everything scratch is removed afterwards. Copy the private key to the Pi only for the drill and delete it afterwards.
+- Offline tests for the drill helpers: `bash deploy/pi/scripts/test/restore-drill.test.sh` and `node --test deploy/pi/scripts/test/`.
 
 ## 6. Monitoring
 
@@ -93,5 +112,9 @@ The units assume the repo at `/opt/mizano`; edit `ExecStart` otherwise, and ensu
 ## 7. Upgrade and rollback
 
 - Upgrade: run `deploy.sh` with the new SHA and digests (section 4).
-- Manual rollback: `deploy/pi/scripts/rollback.sh` restores the previous `OK` digests from `deployments.log`.
-- Back up before any upgrade that includes a migration: `sudo systemctl start mizano-backup.service`.
+- Manual rollback, one command: `deploy/pi/scripts/rollback.sh` restores the previous `OK` digests from `deployments.log`; running it again moves one more release back. The schema stays as is (see the migration policy in section 4).
+- `deploy.sh` backs up before migrating; to back up by hand: `sudo systemctl start mizano-backup.service`.
+
+## 8. Acceptance evidence (#41)
+
+Record in the issue, from a real run on the Pi: the `deploy-evidence.log` entries of one deploy and one rollback (SHA, digests, health JSON, service states) and the `drill.log` line of a drill against the previous night's backup (timings). Until that run exists, every step here stays unverified.

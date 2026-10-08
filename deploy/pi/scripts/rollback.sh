@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Roll back to the previous good deployment recorded in deployments.log.
 # Called after a FAILED record it restores the last OK entry; run manually it
-# restores the OK entry before the current one. Migrations are NOT reverted, so
-# migrations must stay backward compatible with the previous release.
+# restores the OK entry before the current one. Migrations are forward-only and NOT
+# reverted (README, "Migration policy"): the previous release must run on the newer schema.
 set -euo pipefail
 # shellcheck source=deploy/pi/scripts/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -40,9 +40,11 @@ dc up -d --remove-orphans
 if wait_healthy 300; then
   printf '%s ROLLBACK %s %s %s
 ' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$sha" "$api_img" "$web_img" >>"$logfile"
+  record_evidence ROLLBACK "$sha" "$api_img" "$web_img"
   persist_deployment "$sha" "$api_img" "$web_img"
   log "rollback OK"
   exit 0
 fi
+record_evidence ROLLBACK_FAILED "$sha" "$api_img" "$web_img"
 echo "rollback target is unhealthy; manual intervention required" >&2
 exit 1

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Nightly backup: pg_dump (custom format) + tar of originals, encrypted with age.
+# Nightly backup: pg_dump (custom format) + tar of originals, encrypted with age,
+# copied off the Pi when BACKUP_REMOTE is set.
 set -euo pipefail
 # shellcheck source=deploy/pi/scripts/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -33,7 +34,18 @@ if [ -d "$DATA_DIR/originals" ]; then
   mv "$files_out.part" "$files_out"
 fi
 
+# Off-site copy (rsync over SSH): a backup on the Pi's own SSD is not a disaster backup.
+# Copies every encrypted file the remote lacks, so a missed night catches up. Never
+# deletes remotely: retention there is the remote's own job (see README).
+offsite="none"
+if [ -n "${BACKUP_REMOTE:-}" ]; then
+  command -v rsync >/dev/null || fail "rsync not installed"
+  rsync -a --ignore-existing --include='db-*.dump.age' --include='originals-*.tar.age' --exclude='*' \
+    "$dir/" "$BACKUP_REMOTE/" || fail "offsite copy"
+  offsite="ok"
+fi
+
 find "$dir" -maxdepth 1 -type f \( -name 'db-*.age' -o -name 'originals-*.age' \) -mtime +"$retention" -delete
 
-printf 'OK %s db=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(basename "$db_out")" >"$status"
+printf 'OK %s db=%s offsite=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(basename "$db_out")" "$offsite" >"$status"
 log "backup OK ($(basename "$db_out"))"
