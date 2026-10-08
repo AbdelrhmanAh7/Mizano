@@ -28,6 +28,7 @@
     "test:watch": "pnpm --filter api test:watch",
     "test:cov": "pnpm --filter api test:cov",
     "test:e2e": "pnpm --filter api test:e2e",
+    "e2e:army": "bash scripts/e2e-army.sh",
     "// — CI ———————————————————————————": "",
     "ci": "turbo lint type-check test && pnpm format",
     "ci:full": "turbo lint type-check test",
