@@ -359,3 +359,19 @@ Tests:       268 passed, 268 total
 ```
 
 Sandbox note: inside the sandbox `pnpm install` cannot reflink into `node_modules` and jest cannot write `/private/tmp/jest_dx`, so the install, `pnpm ci:full` and the Postgres commands ran outside it.
+
+## Round 3: review threads on PR #99 (round 1/3)
+
+Tested SHA: `328ca68`. It changes one test and `AI_QUESTIONS.md`; no production code changed. Rounds 1 and 2 above still describe the production code.
+
+| Thread                                                       | Done                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AI_QUESTIONS.md`: status said the slice was complete        | Now says partly done: the single ledger command, invoice send and the validator balance check are proven; the idempotent-posting gate stays open for assets, payroll and manufacturing, and the float audit stays open for F1–F8, until the owner accepts them. |
+| `posting-integrity.e2e-spec.ts`: final ledger check was weak | The AC2 ledger test asserts the debit and credit sums are not null (an empty ledger cannot pass), keeps the tenant-wide check, and adds a `groupBy` journal that compares debit and credit for every journal.                                                   |
+
+```text
+$ npx jest --config ./test/jest-e2e.json --runInBand test/posting-integrity.e2e-spec.ts   # fresh PostgreSQL 16 cluster, migrate deploy, REDIS_URL blank
+Tests:       11 passed, 11 total
+```
+
+The ledger test is defined last, so Jest runs it after the posting tests and the ledger is not empty. I did not rerun `pnpm ci:full` or the other E2E suites in this round, because only this spec and a markdown file changed.
