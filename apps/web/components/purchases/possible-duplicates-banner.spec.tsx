@@ -92,11 +92,16 @@ describe('PossibleDuplicatesBanner', () => {
   it.each([
     ['loading', undefined],
     ['no match', { status: 'none', matches: [] }],
-    ['an unknown result', { status: 'unknown', matches: [] }],
   ] as const)('renders nothing for %s', (_label, data) => {
     query.data = data as DuplicateCheckResult | undefined;
     const { container } = render(<PossibleDuplicatesBanner target={{ billId: 'draft-1' }} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('says so when the check was inconclusive instead of looking like no match', () => {
+    query.data = { status: 'unknown', matches: [] };
+    render(<PossibleDuplicatesBanner target={{ billId: 'draft-1' }} />);
+    expect(screen.getByTestId('possible-duplicates-unknown')).toHaveTextContent('unknown');
   });
 
   it('shows a failed check with Retry instead of hiding it', () => {
@@ -110,7 +115,7 @@ describe('PossibleDuplicatesBanner', () => {
   it('has the copy in English and Arabic', () => {
     for (const messages of [enPurchases, arPurchases]) {
       expect(Object.keys(messages.bills.duplicates).sort()).toEqual(
-        ['body', 'checkFailed', 'dismiss', 'retry', 'title'].sort(),
+        ['body', 'checkFailed', 'dismiss', 'retry', 'title', 'unknown'].sort(),
       );
       for (const value of Object.values(messages.bills.duplicates)) {
         expect(value).toEqual(expect.any(String));

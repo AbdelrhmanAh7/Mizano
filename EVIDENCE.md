@@ -300,3 +300,12 @@ All checks passed / All matched files use Prettier code style!
 ## Index note
 
 `Bill` has `@@index([organizationId, vendorId])`, and the candidate query is bounded to one vendor and a 7-day window. No migration was added. An index on `(organizationId, vendorId, date)` can be considered if tenants grow large.
+
+## Review round 5 (#96)
+
+- Copilot (E2E for both routes): already covered by `apps/api/test/bill-duplicates.e2e-spec.ts` (401/403 on both routes, malformed input 400/404, success by id and by POST, cross-tenant 404/400/none); no code change.
+- Codex (permission gate): already fixed in 8f7867a (`PossibleDuplicatesBanner` returns null without `purchases.view`).
+- Codex (unknown result): banner renders `possible-duplicates-unknown` with localized `bills.duplicates.unknown` (en/ar); spec `says so when the check was inconclusive`.
+- Codex (stale none): `usePossibleDuplicates` uses `staleTime: 0`, `refetchOnWindowFocus: 'always'`, `refetchInterval: 30_000`.
+- e2e-army test added: `e2e-army/96-duplicate-bill-warning.e2e.ts` (@issue-96 AC1, AC2).
+- Verified: `npx jest --testPathPattern="possible-duplicates|scan-duplicate"` in apps/web, 12 tests pass.

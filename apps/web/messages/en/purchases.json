@@ -227,6 +227,7 @@
       "title": "Possible duplicate bill",
       "body": "Posted bills from this vendor have the same amount and currency within 3 days of this bill's date. Check them before approving; you can still approve.",
       "dismiss": "Dismiss",
+      "unknown": "Could not check for duplicate bills because the vendor, amount, date or currency is missing.",
       "checkFailed": "Could not check for duplicate bills.",
       "retry": "Retry"
     }

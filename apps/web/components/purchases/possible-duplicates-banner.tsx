@@ -20,7 +20,8 @@ interface PossibleDuplicatesBannerProps {
 /**
  * Dismissible, non-blocking warning on an unposted bill or a completed intake when posted bills of the same vendor
  * have the identical amount and currency within ±3 days. Nothing shows while loading or when
- * there is no match; a failed check says so with Retry rather than looking like "no match".
+ * there is no match; a failed or inconclusive (missing vendor, amount, date or currency) check says so
+ * rather than looking like "no match".
  */
 export function PossibleDuplicatesBanner({
   target,
@@ -47,6 +48,14 @@ function DuplicatesAlert({ target }: PossibleDuplicatesBannerProps): JSX.Element
             {t('retry')}
           </Button>
         </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (data?.status === 'unknown') {
+    return (
+      <Alert data-testid="possible-duplicates-unknown">
+        <AlertDescription>{t('unknown')}</AlertDescription>
       </Alert>
     );
   }

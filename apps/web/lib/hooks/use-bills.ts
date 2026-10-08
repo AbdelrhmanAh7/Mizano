@@ -203,6 +203,11 @@ export function usePossibleDuplicates(target: PossibleDuplicatesTarget) {
           : await billsApi.checkPossibleDuplicates(target.draft);
       return response.data as DuplicateCheckResult;
     },
+    // Another accountant can post a matching bill while this page stays open: the global defaults
+    // (5-minute staleTime, no focus refetch) would keep showing a stale "none" until approval.
+    staleTime: 0,
+    refetchOnWindowFocus: 'always',
+    refetchInterval: 30_000,
   });
 }
 
