@@ -1,15 +1,9 @@
 import { BadRequestException, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { DocumentIntakeService, ConfirmIntakeInput } from './document-intake.service';
-import { OllamaService } from './ollama.service';
-import { DocumentClassificationService } from './document-classification.service';
-import { EntityExtractionService } from './entity-extraction.service';
-import { AiFeedbackService } from './ai-feedback.service';
+import { IntakeConfirmationService, ConfirmIntakeInput } from './intake-confirmation.service';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { BillsService } from '../../purchases/services/bills.service';
-import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-resolver.service';
 
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
@@ -93,23 +87,13 @@ function baseBill(overrides: Partial<ConfirmIntakeInput> = {}): ConfirmIntakeInp
   };
 }
 
-describe('DocumentIntakeService', () => {
+describe('IntakeConfirmationService', () => {
   let prisma: PrismaMock;
-  let feedback: { processFeedback: jest.Mock };
-  let service: DocumentIntakeService;
+  let service: IntakeConfirmationService;
 
   beforeEach(() => {
     prisma = buildPrisma();
-    feedback = { processFeedback: jest.fn().mockResolvedValue(undefined) };
-    service = new DocumentIntakeService(
-      prisma as unknown as PrismaService,
-      {} as OllamaService,
-      { resolve: jest.fn().mockResolvedValue(null) } as unknown as ExtractionStrategyResolver,
-      {} as DocumentClassificationService,
-      {} as EntityExtractionService,
-      feedback as unknown as AiFeedbackService,
-      {} as ConfigService,
-    );
+    service = new IntakeConfirmationService(prisma as unknown as PrismaService);
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
@@ -449,7 +433,6 @@ describe('DocumentIntakeService', () => {
       await expect(promise).rejects.toBeInstanceOf(BadRequestException);
       await expect(promise).rejects.toThrow(field);
       expect(prisma.bill.create).not.toHaveBeenCalled();
-      expect(feedback.processFeedback).not.toHaveBeenCalled();
     });
 
     it('rejects a foreign customerId on invoices with 400 and writes nothing', async () => {

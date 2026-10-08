@@ -1,17 +1,68 @@
 /**
- * E2E tests for issue #142: Worker isolation of heavy dependencies.
+ * E2E tests for issue #142: heavy OCR/PDF dependencies live in the worker only.
  *
- * AC1: API process has no tesseract.js or pdf-parse in require.cache
- * AC2: Intake passes through the worker container (not in-process)
+ * Jest runs each test file in its own module registry, so `require.cache` is not a faithful
+ * view of what the process loaded. The two heavy packages are therefore replaced with
+ * recording mocks: any `require('pdf-parse')` / `require('tesseract.js')` is logged in
+ * `loaded`, which is the registry-level equivalent of inspecting `require.cache`.
  */
 import { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import { IntakeJobStatus } from '@prisma/client';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
 import { eventually } from './helpers/journey.helper';
-import { ApiHelper } from './helpers/api-client.helper';
-import { sha256Hex } from '../src/modules/ai/intake/intake-storage';
+import { IntakeJobsService } from '../src/modules/ai/intake/intake-jobs.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+
+const loaded: string[] = [];
+
+jest.mock('pdf-parse', () => {
+  loaded.push('pdf-parse');
+  return jest.requireActual('pdf-parse');
+});
+jest.mock(
+  'tesseract.js',
+  () => {
+    loaded.push('tesseract.js');
+    return {};
+  },
+  { virtual: true },
+);
+
+process.env.INTAKE_RETRY_BASE_MS = '50';
+process.env.INTAKE_LEASE_MS = '1000';
+
+const stubResolver = {
+  resolve: async () => ({
+    strategyUsed: 'ocr',
+    totalTimeMs: 1,
+    extraction: {
+      vendorName: 'Worker Vendor',
+      vendorAddress: null,
+      vendorPhone: null,
+      vendorEmail: null,
+      vendorTaxId: null,
+      invoiceNumber: 'W-1',
+      date: '2026-09-01',
+      dueDate: null,
+      total: 115,
+      subtotal: 100,
+      tax: 15,
+      discount: null,
+      currency: 'EGP',
+      paymentTerms: null,
+      notes: null,
+      lineItems: [],
+      rawText: 'stubbed text',
+      ocrConfidence: 0.95,
+      fieldConfidence: {},
+      documentCategory: 'INVOICE',
+      accountingEntry: null,
+      processingTimeMs: 1,
+    },
+  }),
+};
 
 function pdfFixture(marker: string): Buffer {
   const text = `Invoice ${marker} Total 115.00`;
@@ -23,99 +74,68 @@ function pdfFixture(marker: string): Buffer {
   );
 }
 
-async function boot(): Promise<INestApplication> {
-  return createTestApp();
-}
-
 describe('Intake worker isolation (e2e) @issue-142', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  let tenantA: TestTenant;
-  let a: ApiHelper;
-
-  async function upload(api: ApiHelper, file: Buffer, name = 'inv.pdf') {
-    return api.post('/ai/document-intake/process').attach('file', file, {
-      filename: name,
-      contentType: 'application/pdf',
-    });
-  }
-
-  async function waitForStatus(jobId: string, status: IntakeJobStatus) {
-    return eventually(async () => {
-      const job = await prisma.intakeJob.findFirst({
-        where: { id: jobId, organizationId: tenantA.organizationId },
-      });
-      expect(job?.status).toBe(status);
-      return job;
-    }, 30000);
-  }
+  let tenant: TestTenant;
+  let jobId = '';
 
   beforeAll(async () => {
-    app = await boot();
+    app = await createTestApp();
     prisma = getPrisma(app);
-    tenantA = await registerTenant(app, 'IntakeWorkerIsolation');
-    a = tenantA.api;
+    tenant = await registerTenant(app, 'IntakeWorkerIsolation');
   });
 
   afterAll(async () => {
     await app.close();
   });
 
-  describe('AC1: API process has no tesseract.js or pdf-parse in require.cache', () => {
-    it('@e2e @flow:intake @issue-142 AC1: require.cache contains no tesseract.js', () => {
-      const tesseractKeys = Object.keys(require.cache).filter((k) => k.includes('tesseract.js'));
-      expect(tesseractKeys).toHaveLength(0);
-    });
+  it('@e2e @flow:intake @issue-142 AC1: API process has no tesseract.js or pdf-parse loaded, even after an upload', async () => {
+    expect(loaded).toEqual([]);
 
-    it('@e2e @flow:intake @issue-142 AC1: require.cache contains no pdf-parse', () => {
-      const pdfParseKeys = Object.keys(require.cache).filter((k) => k.includes('pdf-parse'));
-      expect(pdfParseKeys).toHaveLength(0);
-    });
+    const res = await tenant.api
+      .post('/ai/document-intake/process')
+      .attach('file', pdfFixture(`ISOLATION-${uniqueSuffix()}`), {
+        filename: 'inv.pdf',
+        contentType: 'application/pdf',
+      });
+    expect(res.status).toBe(201);
+    jobId = res.body.data.jobId;
+
+    expect(loaded).toEqual([]);
   });
 
-  describe('AC2: Intake passes through the worker container', () => {
-    let jobId = '';
-    const fixture = pdfFixture(`ISOLATION-${uniqueSuffix()}`);
+  it('@e2e @flow:intake @issue-142 AC2: without a worker the job is only queued, never extracted by the API', async () => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const job = await prisma.intakeJob.findUniqueOrThrow({ where: { id: jobId } });
+    expect(job.status).toBe(IntakeJobStatus.QUEUED);
+    expect(job.attempts).toBe(0);
+  });
 
-    it('@e2e @flow:intake @issue-142 AC2: upload creates a job that reaches EXTRACTED via worker', async () => {
-      const res = await upload(a, fixture);
-      expect(res.status).toBe(201);
-      expect(res.body.data).toMatchObject({ duplicate: false });
-      jobId = res.body.data.jobId;
+  it('@e2e @flow:intake @issue-142 AC2: the worker container picks the job up and extracts it', async () => {
+    const { AiWorkerModule } = await import('../src/modules/ai/worker/ai-worker.module');
+    const { ExtractionStrategyResolver } =
+      await import('../src/modules/ai/extraction/extraction-strategy-resolver.service');
+    const worker = await Test.createTestingModule({ imports: [AiWorkerModule] })
+      .overrideProvider(ExtractionStrategyResolver)
+      .useValue(stubResolver)
+      .compile();
+    await worker.init();
+    try {
+      // The worker graph is what loads the PDF stack.
+      expect(loaded).toContain('pdf-parse');
 
-      const done = await waitForStatus(jobId, IntakeJobStatus.EXTRACTED);
-      expect(done).toMatchObject({
-        organizationId: tenantA.organizationId,
-        createdById: tenantA.userId,
-        sha256: sha256Hex(fixture),
-        sizeBytes: fixture.length,
-        attempts: 1,
-      });
-      expect(done?.storageKey.startsWith(`${tenantA.organizationId}/`)).toBe(true);
-
-      const result = await a.get(`/ai/document-intake/${jobId}/result`);
-      expect(result.status).toBe(200);
-      expect(result.body.data).toMatchObject({ id: jobId, status: 'EXTRACTED', stage: 'complete' });
-      expect(result.body.data).not.toHaveProperty('storageKey');
-    });
-
-    it('@e2e @flow:intake @issue-142 AC2: job was processed by worker (not in-process resolver)', async () => {
-      // The worker sets a marker on the job indicating it was processed by the worker.
-      // This could be a field like `processedByWorker: true` or checking that the
-      // job went through the queue (leaseToken was set, etc.).
-      const job = await prisma.intakeJob.findUniqueOrThrow({ where: { id: jobId } });
-
-      // A worker-processed job should have had a lease token at some point
-      // and should show evidence of queue processing (attempts >= 1, proper status flow)
-      expect(job.attempts).toBeGreaterThanOrEqual(1);
-      expect(job.status).toBe(IntakeJobStatus.EXTRACTED);
-
-      // The key assertion: the API process did not run the extraction synchronously.
-      // In the old architecture, the extraction would run in-process during the upload request.
-      // In the new architecture, the upload only enqueues the job and returns immediately.
-      // The worker then processes it asynchronously.
-      // We verify this by ensuring the job was not EXTRACTED at upload time.
-      // (This is implicit in the flow: upload returns 201 with jobId, then we poll for EXTRACTED)
-    });
+      await app.get(IntakeJobsService).recoverJobs();
+      const done = await eventually(async () => {
+        const job = await prisma.intakeJob.findFirst({
+          where: { id: jobId, organizationId: tenant.organizationId },
+        });
+        expect(job?.status).toBe(IntakeJobStatus.EXTRACTED);
+        return job;
+      }, 30000);
+      expect(done?.attempts).toBe(1);
+    } finally {
+      await worker.close();
+    }
   });
 });

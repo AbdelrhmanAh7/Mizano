@@ -7,23 +7,15 @@ import { AiNlpModule } from '../nlp/ai-nlp.module';
 
 // Operations Services
 import { OllamaService } from '../services/ollama.service';
-import { PaddleOcrService } from '../services/paddle-ocr.service';
-import { DocumentIntakeService } from '../services/document-intake.service';
+import { IntakeConfirmationService } from '../services/intake-confirmation.service';
 import { ReorderPointsService } from '../services/reorder-points.service';
 import { PatternDetectionService } from '../services/pattern-detection.service';
 import { AnomalyDetectionService } from '../services/anomaly-detection.service';
 import { ReconciliationMatcherService } from '../services/reconciliation-matcher.service';
 
-// Extraction Strategies
-import { VlmStrategy } from '../extraction/vlm-strategy.service';
-import { OcrLlmStrategy } from '../extraction/ocr-llm-strategy.service';
-import { HybridStrategy } from '../extraction/hybrid-strategy.service';
-import { RulesStrategy } from '../extraction/rules-strategy.service';
-import { ExtractionStrategyResolver } from '../extraction/extraction-strategy-resolver.service';
-
+// Intake Queue & Processing (API side: enqueue only)
 import { IntakeJobOwnerGuard } from '../intake/intake-job-owner.guard';
 import { IntakeJobsService } from '../intake/intake-jobs.service';
-import { IntakeProcessorService } from '../intake/intake-processor.service';
 import { IntakeQueueService } from '../intake/intake-queue.service';
 import { IntakeStorage, LocalFsIntakeStorage } from '../intake/intake-storage';
 
@@ -47,16 +39,9 @@ import { OllamaTunnelController } from '../controllers/ollama-tunnel.controller'
   ],
   providers: [
     OllamaService,
-    PaddleOcrService,
-    VlmStrategy,
-    OcrLlmStrategy,
-    HybridStrategy,
-    RulesStrategy,
-    ExtractionStrategyResolver,
-    DocumentIntakeService,
+    IntakeConfirmationService,
     IntakeJobsService,
     IntakeJobOwnerGuard,
-    IntakeProcessorService,
     IntakeQueueService,
     { provide: IntakeStorage, useClass: LocalFsIntakeStorage },
     ReorderPointsService,
@@ -66,9 +51,9 @@ import { OllamaTunnelController } from '../controllers/ollama-tunnel.controller'
   ],
   exports: [
     OllamaService,
-    PaddleOcrService,
-    ExtractionStrategyResolver,
-    DocumentIntakeService,
+    IntakeQueueService,
+    IntakeJobsService,
+    IntakeConfirmationService,
     ReorderPointsService,
     PatternDetectionService,
     AnomalyDetectionService,

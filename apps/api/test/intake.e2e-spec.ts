@@ -4,14 +4,29 @@
  * fixed extraction, or throws when `stub.mode === 'fail'`.
  */
 import { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { ThrottlerStorage } from '@nestjs/throttler';
 import { IntakeJobStatus } from '@prisma/client';
-import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
+import { getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
 import { eventually } from './helpers/journey.helper';
 import { ApiHelper } from './helpers/api-client.helper';
 import { ExtractionStrategyResolver } from '../src/modules/ai/extraction/extraction-strategy-resolver.service';
 import { IntakeStorage, sha256Hex } from '../src/modules/ai/intake/intake-storage';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { AiWorkerModule } from '../src/modules/ai/worker/ai-worker.module';
+import { AppModule } from '../src/app.module';
+
+/**
+ * Rate limiting is keyed by client IP, and every supertest request comes from 127.0.0.1, so a
+ * suite that registers a few tenants would trip the 5-per-minute auth limit. The guard itself
+ * stays installed; only its counter is replaced so it never blocks.
+ */
+class UnlimitedThrottlerStorage implements ThrottlerStorage {
+  async increment(_key: string, ttl: number): ReturnType<ThrottlerStorage['increment']> {
+    return { totalHits: 1, timeToExpire: ttl, isBlocked: false, timeToBlockExpire: 0 };
+  }
+}
 
 process.env.INTAKE_RETRY_BASE_MS = '50';
 process.env.INTAKE_LEASE_MS = '1000';
@@ -64,9 +79,25 @@ function pdfFixture(marker: string): Buffer {
 }
 
 async function boot(): Promise<INestApplication> {
-  return createTestApp((builder) =>
-    builder.overrideProvider(ExtractionStrategyResolver).useValue(stubResolver),
+  const { ValidationPipe } = await import('@nestjs/common');
+  const builder = Test.createTestingModule({ imports: [AppModule, AiWorkerModule] })
+    .overrideProvider(ThrottlerStorage)
+    .useValue(new UnlimitedThrottlerStorage())
+    .overrideProvider(ExtractionStrategyResolver)
+    .useValue(stubResolver);
+  const moduleFixture = await builder.compile();
+
+  const app = moduleFixture.createNestApplication();
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
   );
+  await app.init();
+  return app;
 }
 
 describe('Document intake (e2e)', () => {
