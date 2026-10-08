@@ -142,3 +142,55 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+---
+
+# EVIDENCE.md — Pi digest deploys, backups and restore drill (#41)
+
+- **Issue**: #41 ([Pi] Exact-digest deploys, nightly backups and a tested restore/rollback)
+- **Base commit (`master`)**: `615060ed6294e16375a1f1ea9385cb7e812cd24f`
+- **Tested commit**: `b2a7bfe78859b357aa56a530c9544d7a97546e8b` (last code commit on `ai/41`; this file is added after it)
+- **Date**: 2026-10-08, macOS dev machine (no Docker, no Raspberry Pi)
+- **e2e-army**: no test added. The change is deploy/ops shell and Node scripts under `deploy/pi/`; no UI or user-facing flow changes.
+
+## Requirements
+
+| REQ ID | Requirement                                                           | How it is verified                                                                                                              | Status                              |
+| ------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| REQ-1  | Deploy by digest for a tested SHA, migrate, restart, health, record   | `deploy.sh` (from #48) plus pre-deploy backup and `deploy-evidence.log` (SHA, digests, health JSON, service states)             | Code done; not run on a Pi          |
+| REQ-2  | One-command rollback; forward-only migration policy documented        | `rollback.sh` (from #48) now records evidence; README section 4 "Migration policy (forward-only)" and live restore steps        | Code done; not run on a Pi          |
+| REQ-3  | Nightly encrypted `pg_dump` + originals, off-site, retention          | `backup.sh` + systemd timer (from #48); new `BACKUP_REMOTE` rsync copy, FAILED status on copy failure                           | Code done; not run on a Pi          |
+| REQ-4  | Restore drill into scratch DB + seeded smoke                          | `restore-drill.sh`: age check, originals sha256, balanced journals, `migrate deploy`, `drill-smoke.mjs`, timings in `drill.log` | Offline tests pass; not run on a Pi |
+| AC-1   | A deploy and a rollback performed on the Pi with evidence             | Needs the Pi, registry digests from #38 and operator access                                                                     | **NOT VERIFIED**                    |
+| AC-2   | Restore drill from the previous night's backup succeeds, with timings | Needs the Pi, a real nightly backup and the age private key                                                                     | **NOT VERIFIED**                    |
+
+## Commands and output (tested commit)
+
+```text
+$ bash deploy/pi/scripts/test/restore-drill.test.sh
+ok   no backup found
+ok   stale backup is refused
+ok   max age 0 accepts any backup
+ok   newest backup is picked
+ok   originals match
+ok   no intake jobs is fine
+ok   missing original fails
+ok   checksum mismatch fails
+ok   traversal key is refused
+all passed
+
+$ node --test deploy/pi/scripts/test/
+✔ registers a throwaway org, logs in and checks the trial balance
+✔ fails when the trial balance does not balance
+✔ fails on an unexpected status without echoing the response body
+✔ times out when the API never reports healthy
+ℹ tests 4  ℹ pass 4  ℹ fail 0
+
+$ bash -n deploy/pi/scripts/*.sh   # syntax OK
+$ prettier --check deploy/pi/README.md deploy/pi/scripts/*.mjs deploy/pi/scripts/test/*.mjs
+All matched files use Prettier code style!
+```
+
+A full drill run with stub `docker` and `age` binaries on `PATH` (not committed) exercised the control flow: the happy path wrote `OK backup=db-20261008T003000Z.dump.age image=... tables=42 originals=1 decrypt=0s restore=0s checks=0s smoke=0s total=0s` to `drill.log` and removed the network, containers and work dir. A tampered original stopped the drill with `DRILL FAILED: original checksum mismatch` and a `FAILED` line.
+
+Not run: `shellcheck` (not installed on this machine), any Docker command, and anything on the Pi. The API/web suites were not rerun because no application code changed.
