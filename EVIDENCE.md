@@ -145,19 +145,24 @@
 
 ## Issue #110 (API readiness endpoint)
 
-- **Commit SHA**: $(git rev-parse HEAD)
+- **Tested commit SHA**: `9527405cbf64b3b9a605c72cc4c12f0f133199bd` (no source change after it; later commits touch only this file)
 - **Branch**: `ai/110`
-- **Audit Date**: $(date -I)
+- **Run date**: 2026-10-08
+- **Environment**: throwaway local PostgreSQL 16 on port 55481 (fresh database, `prisma migrate deploy`), `REDIS_URL` blank, Jest `--runInBand`. The DB query and `fs.promises.statfs` are stubbed inside the spec; the app, routing and guards are real.
 
-| REQ ID | Requirement                                              | Verification Method                 | Status |
-| ------ | -------------------------------------------------------- | ----------------------------------- | ------ |
-| AC1    | A healthy DB and enough disk returns 200 with JSON shape | E2E test `health-ready.e2e-spec.ts` | PASSED |
-| AC2    | Failing DB check returns 503, body names db as failing   | E2E test `health-ready.e2e-spec.ts` | PASSED |
-| AC3    | Free space below threshold returns 503, body names disk  | E2E test `health-ready.e2e-spec.ts` | PASSED |
-| AC4    | Response contains no secrets/tenant data                 | E2E test `health-ready.e2e-spec.ts` | PASSED |
-| AC5    | Change is ≤ ~200 lines                                   | `git diff --stat origin/master`     | PASSED |
+| REQ ID | Requirement                                                 | Verification                                                                                       | Status   |
+| ------ | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------- |
+| AC1    | Healthy DB and enough disk returns 200 with the JSON shape  | `health-ready.e2e-spec.ts`: AC1, AC1 boundary (exactly 10 % passes), `/health` liveness unchanged  | VERIFIED |
+| AC2    | Failing DB returns 503 within the timeout, names `db`       | `health-ready.e2e-spec.ts`: AC2 and AC2 timeout (hung query, 216 ms, one shared probe)             | VERIFIED |
+| AC3    | Free space below the threshold returns 503, names `disk`    | `health-ready.e2e-spec.ts`: AC3 (below threshold, statfs error, unrounded `bavail`, env fallbacks) | VERIFIED |
+| AC4    | No connection strings, paths or tenant data in the response | `health-ready.e2e-spec.ts`: AC4 (DSN and path in thrown errors absent from body and warn logs)     | VERIFIED |
+| AC5    | Change is ≤ ~200 lines                                      | Implementation 96 added / 8 removed lines in `apps/api/src`; see line counts below                 | VERIFIED |
 
-- **Test Commands**:
+- **Test command** (from `apps/api`, `DATABASE_URL` pointing at the throwaway database):
   ```bash
-  pnpm run --filter api test:e2e health-ready
+  npx jest --config ./test/jest-e2e.json --runInBand health-ready
   ```
+- **Result**: `Test Suites: 1 passed, 1 total`, `Tests: 13 passed, 13 total` (26.3 s).
+- **Static checks on the changed files**: `eslint src/health test/health-ready.e2e-spec.ts` no output, `tsc --noEmit -p tsconfig.json` no output, `prettier --check` clean.
+- **Line counts** (`git diff origin/master...HEAD --shortstat`): `apps/api/src` 3 files, +96/−8; `apps/api/test` +184; `docs` +6/−1; whole branch 7 files, +312/−9 including this file and `AI_QUESTIONS.md`. The ≤ ~200 line limit holds for the implementation; the e2e spec (184 lines) is additional.
+- **Not run locally**: the full API unit suite and the web suite (the full suite runs on GitHub-hosted CI after the push). Status of those is unverified here. No e2e-army test was added: the endpoint has no UI flow, and its request-level behaviour is covered by the e2e spec above.
