@@ -328,3 +328,13 @@ Results (first-hand, this head):
 - Seeded e2e: `npx jest --config ./test/jest-e2e.json --runInBand` with `REDIS_URL=` on a fresh throwaway PostgreSQL 16 cluster (port 57391, `prisma migrate deploy`), removed afterwards: 12 suites, 266 tests passed, including `bill-duplicates.e2e-spec.ts` and `intake.e2e-spec.ts`. This supersedes the earlier "intake blocked, no Redis" note: intake passes with `REDIS_URL` blank.
 - Not run: browser journey. The `e2e-army` test (`e2e-army/96-duplicate-bill-warning.e2e.ts`) runs in the hub's verify job, not locally.
 - Size: the diff is above the ~300-line guideline (see "Not verified / blocked"); unchanged this round.
+
+## Round 7: threads re-posted, no new defect (#96)
+
+Tested head: `073b569` (origin/master `cc1443b` merged into `ai/96`; the merge only adds `.github/workflows/claude.yml`). Darwin arm64, Node v26.
+
+The two threads the hub re-sent (Copilot: seeded API E2E for both routes; Codex P2: banner vs. `purchases.view`) were already resolved in code in rounds 5 and 6; they stayed open only because nobody replied on them. No product code changed this round.
+
+- Copilot: `apps/api/test/bill-duplicates.e2e-spec.ts` covers 401/403 on both routes, malformed input 400/404, success by id and by POST, and cross-tenant 404/400/none. Last full seeded e2e run: round 6 (12 suites, 266 tests). Not re-run here; no API code changed since.
+- Codex: `PossibleDuplicatesBanner` renders nothing without `purchases.view` (8f7867a), so a `purchases.create`-only role sees no failed-check state.
+- Verified this head: `npx jest --testPathPattern="possible-duplicates-banner|scan-duplicate-draft"` in apps/web, 12 passed; `node apps/api/_run_tests.js --testPathPattern=purchases/`, 11 suites / 157 tests passed.
