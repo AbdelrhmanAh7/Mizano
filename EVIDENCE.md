@@ -153,8 +153,8 @@
 | Red check        | `Deploy to GCP`, workflow `Deploy to Production`, run 37540990404                      |
 | Root cause       | Infrastructure: the VM behind `DEPLOY_HOST` does not answer on TCP 22                  |
 | Caused by #98?   | No. The same error is on every deploy run since 2026-10-01                             |
-| Code fix         | None possible; owner decisions are in `AI_QUESTIONS.md`                                |
-| Regression tests | `apps/api/test/ci-health.e2e-spec.ts` (AC1 API healthy, AC2/AC3 #98 touched docs only) |
+| Code fix         | None possible; owner questions are tracked in issue #113                               |
+| Regression test  | `apps/api/test/ci-health.e2e-spec.ts` (AC1: API boots and `/health` healthy)           |
 
 ## What PR #98 changed
 
@@ -189,57 +189,10 @@ commit with "all green" instead of with its parent.
 
 ## State of workflows
 
-`gh workflow list --all`: `CI` and `Deploy to Production` are `disabled_manually`. No GitHub run
-exists for this PR or for master after it merges, so the "post-merge master run is green" item
-cannot be met with a run link. The local gate below stands in; the owner decides in `AI_QUESTIONS.md`.
+`gh workflow list --all`: `CI` and `Deploy to Production` are `disabled_manually`, so no GitHub run
+exists for this PR. Retiring the GCP deploy is a separate follow-up.
 
-## Regression test and local run
+## Regression test
 
-`apps/api/test/ci-health.e2e-spec.ts` pins what is checkable in the repo: the API boots and
-`/health` is healthy, and PR #98 changed only `.md` files. The SSH timeout itself is external and
-cannot fail a repository test. Run on a fresh Postgres 16 cluster, in band, `REDIS_URL` blank:
-
-```text
-$ npx jest --config ./test/jest-e2e.json --runInBand test/ci-health
-PASS test/ci-health.e2e-spec.ts
-  ✓ @e2e @flow:ci-health @issue-113 AC1: API boots and /health reports healthy
-  ✓ @e2e @flow:ci-health @issue-113 AC2: PR #98 touched only markdown docs
-  ✓ @e2e @flow:ci-health @issue-113 AC3: PR #98 changed no code, lockfile, compose or workflow
-Tests:       3 passed, 3 total
-```
-
-Lint, type-check and unit-test output for the final head is under "Tested commit".
-
-## Tested commit
-
-b8e32b84bbeffb25a7c949492600f1f768994817 (`test(e2e): fail loudly when the #98 merge commit is missing (#113)`). The only commit after it edits this file.
-
-Run 2026-10-08 on own Postgres 16 (port 56432, fresh DB, `prisma migrate deploy`), `REDIS_URL=` blank, `--runInBand`:
-
-```
-$ npx eslint test/ci-health.e2e-spec.ts            -> no output, exit 0
-$ npx prettier --check test/ci-health.e2e-spec.ts EVIDENCE.md AI_QUESTIONS.md
-All matched files use Prettier code style!
-$ npx tsc --noEmit -p test/tsconfig.e2e.json        -> no output, exit 0
-$ npx jest --config ./test/jest-e2e.json --runInBand ci-health
-  PASS test/ci-health.e2e-spec.ts
-    AC1 API boots and /health reports healthy
-    AC2 PR #98 touched only markdown docs
-    AC3 PR #98 changed no code, lockfile, compose or workflow
-  Tests: 3 passed, 3 total
-```
-
-Loud failure check: with the merge SHA temporarily altered, AC2 and AC3 fail (`Tests: 2 failed, 1 passed`) with
-"PR #98 merge commit ... is not in this clone, so AC2/AC3 cannot be verified. Run "git fetch --unshallow origin master" and retry."
-The change was reverted before committing.
-
-Unit suite (`node apps/api/_run_tests.js`): 134 of 136 suites passed. Failures, none touching this PR (`git diff master -- apps/api/src` is empty):
-
-- `import.service.hardening.spec.ts`: 4 tests fail with `TypeError: csv is not a function`. Pre-existing jest config drift (`esModuleInterop`), reproduced alone on this branch.
-- `intake-storage.spec.ts`: failed once in the full run, passes alone (9/9). Flake.
-
-Not run: web tests and full `pnpm ci:full` (only a test file and markdown changed); full e2e suite (only `ci-health` run).
-
-## PR #116 review findings
-
-The QA comment (sha 40a29ea) arrived with its four bullet items rendered as `[object Object]`, so they cannot be read. Its readable claim is that this PR must also fix CI and close MZ #102. That is out of scope: the red check is the `Deploy to GCP` SSH timeout to an unreachable VM, which needs the owner (see AI_QUESTIONS.md). The security review passed and the E2E-first exemption was accepted.
+`apps/api/test/ci-health.e2e-spec.ts` checks that the API boots and `/health` is healthy. The SSH
+timeout itself is external and cannot fail a repository test.
