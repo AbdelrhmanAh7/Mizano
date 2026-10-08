@@ -1,6 +1,8 @@
 [Unit]
 Description=Mizano soak-test resource sample (docker stats, free, OOM counters)
 After=docker.service
+# Never sample before the SSD is mounted (samples must not land on the SD card).
+RequiresMountsFor=/mnt/ssd/mizano
 
 [Service]
 Type=oneshot

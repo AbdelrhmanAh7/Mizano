@@ -2,7 +2,7 @@
 // Issue #39 AC2 (reboot recovers all services automatically): the boot unit must
 // retry a failed `stack.sh up` with a bounded back-off instead of staying failed.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { PI_DIR } from './check-env.mjs';
@@ -66,6 +66,26 @@ test('@e2e @flow:pi-boot @issue-39 AC2: the boot unit retries a failed stack.sh 
     interval >= burst * (timeout + restartSec),
     `StartLimitIntervalSec ${interval}s < ${burst} x (${timeout}s + ${restartSec}s)`,
   );
+});
+
+test('@e2e @flow:pi-boot @issue-39 AC1: the soak sampler never runs without the SSD mounted', () => {
+  // soak-sample.sh appends every minute; without the mount its mkdir -p would put
+  // samples on the SD card. The script guards itself (assert_ssd); the unit must too.
+  const soak = parseUnit(readFileSync(path.join(PI_DIR, 'systemd', 'mizano-soak.service'), 'utf8'));
+  assert.equal(soak.Unit.RequiresMountsFor, unit.Unit.RequiresMountsFor);
+});
+
+test('@e2e @flow:pi-boot @issue-39 AC1: the worker ships its pinned OCR language data in the image', () => {
+  // INTAKE_TESSDATA_DIR points inside the image; no runtime download on an offline Pi.
+  const compose = readFileSync(path.join(PI_DIR, 'docker-compose.pi.yml'), 'utf8');
+  assert.match(compose, /INTAKE_TESSDATA_DIR: \/app\/apps\/api\n/);
+  const root = path.join(PI_DIR, '..', '..');
+  for (const lang of ['eng', 'ara']) {
+    const file = path.join(root, 'apps', 'api', `${lang}.traineddata`);
+    assert.ok(existsSync(file), `${lang}.traineddata`);
+  }
+  const dockerfile = readFileSync(path.join(root, 'apps', 'api', 'Dockerfile'), 'utf8');
+  assert.match(dockerfile, /^COPY apps\/api \.\/apps\/api$/m);
 });
 
 test('@e2e @flow:pi-boot @issue-39 AC2: stack.sh up is safe to rerun after a partial start', () => {
