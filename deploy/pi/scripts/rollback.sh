@@ -38,8 +38,7 @@ log "rolling back to $sha"
 dc pull api web
 dc up -d --remove-orphans
 if wait_healthy 300; then
-  printf '%s ROLLBACK %s %s %s
-' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$sha" "$api_img" "$web_img" >>"$logfile"
+  printf '%s ROLLBACK %s %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$sha" "$api_img" "$web_img" >>"$logfile"
   record_evidence ROLLBACK "$sha" "$api_img" "$web_img"
   persist_deployment "$sha" "$api_img" "$web_img"
   log "rollback OK"

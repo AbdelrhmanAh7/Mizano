@@ -9,7 +9,7 @@ set -euo pipefail
 retention="${BACKUP_RETENTION_DAYS:-14}"
 dir="$DATA_DIR/backups"
 status="$dir/backup.status"
-mkdir -p "$dir"
+mkdir -p "$dir" "$DATA_DIR/originals"
 umask 077
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 
@@ -29,10 +29,9 @@ dc exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
   | age -r "$BACKUP_AGE_RECIPIENT" >"$db_out.part" || fail "pg_dump"
 mv "$db_out.part" "$db_out"
 
-if [ -d "$DATA_DIR/originals" ]; then
-  tar -C "$DATA_DIR" -cf - originals | age -r "$BACKUP_AGE_RECIPIENT" >"$files_out.part" || fail "tar originals"
-  mv "$files_out.part" "$files_out"
-fi
+# Paired originals archive is always created, preserving intake documents.
+tar -C "$DATA_DIR" -cf - originals | age -r "$BACKUP_AGE_RECIPIENT" >"$files_out.part" || fail "tar originals"
+mv "$files_out.part" "$files_out"
 
 # Off-site copy (rsync over SSH): a backup on the Pi's own SSD is not a disaster backup.
 # Copies every encrypted file the remote lacks, so a missed night catches up. Never

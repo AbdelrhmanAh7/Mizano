@@ -66,7 +66,7 @@ persist_deployment() {
 record_evidence() {
   {
     printf '%s %s %s %s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$2" "$3" "$4"
-    dc exec -T api wget -qO- http://127.0.0.1:6001/api/health 2>/dev/null || echo "api health: unavailable"
+    dc exec -T api wget -q -T 5 -O- http://127.0.0.1:6001/api/health 2>/dev/null || echo "api health: unavailable"
     echo
     dc ps --format '{{.Service}} {{.Status}}' 2>/dev/null || true
   } | tee -a "$DATA_DIR/deploy-evidence.log"

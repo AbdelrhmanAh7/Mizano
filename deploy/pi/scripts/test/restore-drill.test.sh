@@ -24,12 +24,21 @@ check() { # check <name> <expected-exit> <cmd...>
 b="$tmp/backups"
 mkdir -p "$b"
 check "no backup found" 1 pick_backup "$b" 26
-touch -t 202601010230 "$b/db-20260101T003000Z.dump.age"
+# Stale backup timestamp in filename is refused even if file has current mtime
+touch "$b/db-20200101T003000Z.dump.age"
 check "stale backup is refused" 1 pick_backup "$b" 26
 check "max age 0 accepts any backup" 0 pick_backup "$b" 0
-touch "$b/db-20261007T003000Z.dump.age"
+
+# Fresh backup timestamp in filename is accepted
+now_stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+touch "$b/db-$now_stamp.dump.age"
 pick_backup "$b" 26 >"$tmp/picked"
-check "newest backup is picked" 0 grep -qx "$b/db-20261007T003000Z.dump.age" "$tmp/picked"
+check "newest backup is picked" 0 grep -qx "$b/db-$now_stamp.dump.age" "$tmp/picked"
+
+# Invalid timestamp format in filename is refused
+touch "$b/db-corrupt-stamp.dump.age"
+check "invalid timestamp format is refused" 1 pick_backup "$b" 26
+rm -f "$b/db-corrupt-stamp.dump.age"
 
 root="$tmp/files"
 mkdir -p "$root/originals/org1/2026/10"

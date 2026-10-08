@@ -31,12 +31,14 @@ rand_secret() { head -c 32 /dev/urandom | base64 | tr -d '/+=\n'; }
 start=$SECONDS
 t=$SECONDS
 
-log "decrypting $(basename "$latest")"
+orig_archive="$dir/originals-$stamp.tar.age"
+[ -f "$orig_archive" ] || { echo "DRILL FAILED: matching originals archive missing: $(basename "$orig_archive")" >&2; exit 1; }
+
+log "decrypting $(basename "$latest") and $(basename "$orig_archive")"
 age -d -i "$AGE_IDENTITY_FILE" -o "$work/db.dump" "$latest"
 mkdir -m 700 "$work/files"
-if [ -f "$dir/originals-$stamp.tar.age" ]; then
-  age -d -i "$AGE_IDENTITY_FILE" "$dir/originals-$stamp.tar.age" | tar -C "$work/files" -xf -
-fi
+age -d -i "$AGE_IDENTITY_FILE" "$orig_archive" | tar -C "$work/files" -xf -
+[ -d "$work/files/originals" ] || { echo "DRILL FAILED: originals archive missing originals directory" >&2; exit 1; }
 chmod 644 "$work/db.dump"
 chmod 755 "$work"
 timings="decrypt=$((SECONDS - t))s"
@@ -71,10 +73,11 @@ exists="$(psql_q "select to_regclass('public.journal_lines') is not null and to_
 # Every posted, non-deleted journal must balance on its own (debits = credits).
 unbalanced="$(psql_q 'select count(*) > 0 from (select j.id from journals j join journal_lines l on l."journalId" = j.id where j."isPosted" and j."deletedAt" is null group by j.id having sum(l.debit) <> sum(l.credit)) u')"
 [ "$unbalanced" = "f" ] || { echo "DRILL FAILED: debits do not equal credits" >&2; exit 1; }
-# Every live intake job's original must come back with its recorded checksum.
+# Every retained intake job's original must come back with its recorded checksum.
+# Retain soft-deleted jobs too: originals are part of the permanent audit history (AGENTS.md).
 originals=0
 if [ "$(psql_q "select to_regclass('public.intake_jobs') is not null")" = "t" ]; then
-  originals="$(psql_q "select \"storageKey\" || ' ' || sha256 from intake_jobs where \"deletedAt\" is null" |
+  originals="$(psql_q 'select "storageKey" || '\'' '\'' || sha256 from intake_jobs where "storageKey" is not null and sha256 is not null' |
     verify_originals "$work/files")"
 fi
 timings="$timings checks=$((SECONDS - t))s"

@@ -77,13 +77,21 @@ It pulls by digest, takes a pre-deploy backup when Postgres is already running, 
 - Migrations only move forward. Rollback swaps images back; it never reverts the schema.
 - Every migration must keep the previous release working on the new schema (expand, then contract): add nullable columns or tables first, backfill, and drop or tighten only in a later release once no deployed image uses the old shape.
 - Never edit or delete a migration that has been applied anywhere; fix forward with a new one.
-- If a migration itself is broken, do not hand-edit the database. Stop `api` and `web`, restore the pre-deploy backup into the live database, then run `rollback.sh`:
+- If a migration itself is broken, do not hand-edit the database. Stop `api` and `web`, restore the pre-deploy backup into a freshly recreated database (dropping any leftover tables/types created by the broken migration), and roll back the images only after the restore succeeds:
+
+  ```bash
+  AGE_IDENTITY_FILE=/path/mizano-backup.key deploy/pi/scripts/restore-live.sh /mnt/ssd/mizano/backups/db-<stamp>.dump.age && \
+    deploy/pi/scripts/rollback.sh
+  ```
+
+  Or step-by-step:
 
   ```bash
   dc() { docker compose -f deploy/pi/docker-compose.pi.yml --env-file deploy/pi/.env.pi "$@"; }
-  dc stop api web
-  age -d -i /path/mizano-backup.key /mnt/ssd/mizano/backups/db-<stamp>.dump.age |
-    dc exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner'
+  dc stop api web && \
+  dc exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '\''$POSTGRES_DB'\'' AND pid <> pg_backend_pid(); DROP DATABASE IF EXISTS \"$POSTGRES_DB\"; CREATE DATABASE \"$POSTGRES_DB\" OWNER \"$POSTGRES_USER\";"' && \
+  age -d -i /path/mizano-backup.key /mnt/ssd/mizano/backups/db-<stamp>.dump.age | \
+    dc exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --exit-on-error' && \
   deploy/pi/scripts/rollback.sh
   ```
 
@@ -103,7 +111,7 @@ The units assume the repo at `/opt/mizano`; edit `ExecStart` otherwise, and ensu
 - Restore drill, monthly and before every demo, run on the Pi (or any host with Docker, the backups folder and `.env.pi`):
   `AGE_IDENTITY_FILE=/path/mizano-backup.key deploy/pi/scripts/restore-drill.sh`.
   It refuses a backup older than 26 hours (`DRILL_MAX_AGE_HOURS`, `0` = any), so a green drill proves last night's backup. It decrypts the dump and the originals, restores into a scratch Postgres on a throwaway network, checks that tables exist, that every posted journal balances and that every live intake job's original is present with its recorded sha256. Then it runs `prisma migrate deploy` with the deployed API image, starts that image against the scratch database and runs the seeded smoke (`drill-smoke.mjs`: register a throwaway organization, log in, trial balance balanced). The result line with per-phase timings (`decrypt`, `restore`, `checks`, `smoke`, `total`) is appended to `backups/drill.log`; everything scratch is removed afterwards. The decrypted dump is staged under `$TMPDIR` (default `/tmp`); if `/tmp` is RAM-backed, point `TMPDIR` at the SSD. Copy the private key to the Pi only for the drill and delete it afterwards.
-- Offline tests for the drill helpers: `bash deploy/pi/scripts/test/restore-drill.test.sh` and `node --test deploy/pi/scripts/test/`.
+- Offline tests for the drill helpers: `bash deploy/pi/scripts/test/restore-drill.test.sh` and `node --test 'deploy/pi/scripts/test/*.test.mjs'`.
 
 ## 6. Monitoring
 
