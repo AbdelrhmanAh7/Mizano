@@ -9,7 +9,7 @@
 //   E2E_ARMY_MODEL_URL + E2E_ARMY_MODEL_ID  OpenAI-compatible endpoint (e.g. a free vision + tools model); key from E2E_ARMY_MODEL_KEY
 //                                           or, on macOS, the Keychain item `e2e-army-model-key`
 //   E2E_ARMY_CLI=agy|claude                 subscription CLI adapter (e2e-army/cli-model.ts): Gemini Flash via agy (free) or Claude Haiku
-//   none                                    E2E_ARMY_NOAGENT=1: agent tests skip themselves, locator and request-level tests still run
+//   none                                    E2E_ARMY_NOAGENT=1 + a stub model: agent tests skip themselves, locator and API tests run
 // Headless browser (engine default), replay cache read-write under .e2e/cache (also in CI), telemetry off.
 import { execFileSync } from 'node:child_process';
 import type { E2EConfig } from 'e2e';
@@ -50,8 +50,27 @@ async function agentModel(): Promise<unknown> {
   return undefined;
 }
 
-const model = await agentModel();
-if (!model) process.env.E2E_ARMY_NOAGENT = '1';
+/**
+ * Stand-in when no model is configured: a test that takes the `agent` fixture in its parameter list acquires it before its
+ * needsModel() skip runs, and e2e stops the whole run with MODEL_UNAVAILABLE when agents.default has no model. This one only
+ * lets the fixture resolve; any call fails loudly instead of passing.
+ */
+const noModel = {
+  specificationVersion: 'v4',
+  provider: 'none',
+  modelId: 'none',
+  supportedUrls: {},
+  doGenerate(): never {
+    throw new Error('e2e-army: no model configured (set E2E_ARMY_MODEL_URL/ID or E2E_ARMY_CLI)');
+  },
+  doStream(): never {
+    throw new Error('e2e-army: no model configured (set E2E_ARMY_MODEL_URL/ID or E2E_ARMY_CLI)');
+  },
+};
+
+const configured = await agentModel();
+if (!configured) process.env.E2E_ARMY_NOAGENT = '1';
+const model = configured ?? noModel;
 
 export default {
   tests: ['e2e-army/**/*.e2e.ts'],
@@ -62,16 +81,7 @@ export default {
   retries: 0,
   timeout: 150_000,
   cache: 'read-write',
-  ...(model
-    ? {
-        agents: {
-          default: {
-            model: model as never,
-            maxModelCalls: 14,
-            maxSteps: 14,
-            judgmentTimeout: 90_000,
-          },
-        },
-      }
-    : {}),
+  agents: {
+    default: { model: model as never, maxModelCalls: 14, maxSteps: 14, judgmentTimeout: 90_000 },
+  },
 } satisfies E2EConfig;

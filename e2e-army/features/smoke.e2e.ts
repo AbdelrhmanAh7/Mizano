@@ -45,7 +45,7 @@ test("[mz-auth.3] the auth API issues tokens, refuses bad credentials and rotate
   const t = await tenant("auth");
   const weak = await anon.post("/auth/register", { email: "weak@army-e2e.test", password: "alllowercase1", firstName: "A", lastName: "B", organizationName: "Weak Org" });
   expect(weak.status).toBe(400);
-  expect(JSON.stringify(weak.body.message)).toMatch(/uppercase/i);
+  expect(JSON.stringify(weak.body.details)).toMatch(/uppercase/i); // the exception filter keeps message "Validation failed" and the field errors in details
   const badMail = await anon.post("/auth/register", { email: "not-an-email", password: "ArmyE2e2026x", firstName: "A", lastName: "B", organizationName: "Bad Mail" });
   expect(badMail.status).toBe(400);
   const dup = await anon.post("/auth/register", { email: t.email, password: "ArmyE2e2026x", firstName: "A", lastName: "B", organizationName: "Duplicate" });

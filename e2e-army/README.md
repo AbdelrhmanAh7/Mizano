@@ -11,6 +11,6 @@
 | `cli-model.ts`          | Model adapter for agent steps through a subscription CLI (`E2E_ARMY_CLI=agy` for Gemini Flash, free, or `claude` for Haiku).                                                       |
 | `shards.json`           | Shard ids (feature groups), each run within 5 minutes: `pnpm e2e:army --tag shard:<id>`.                                                                                           |
 
-`features/`, `lib.ts` and `cli-model.ts` are ported from the hub (nql-agents `ops/verify/e2e-army/tests-dev/Mizano/`, `tests-dev/lib.ts` and `cli-model.ts`, 2026-10-08). The test files are unchanged, so they diff cleanly against the hub copy. When a test changes, change it here and in the hub.
+`features/`, `lib.ts` and `cli-model.ts` are ported from the hub (nql-agents `ops/verify/e2e-army/tests-dev/Mizano/`, `tests-dev/lib.ts` and `cli-model.ts`, 2026-10-08). The test files are unchanged except one assertion in `smoke.e2e.ts` (`[mz-auth.3]` reads the field errors from `details`, where the API puts them), so they diff cleanly against the hub copy. When a test changes, change it here and in the hub.
 
 Shards: `smoke` (sign-in, health, dashboard, landing, Arabic/RTL; it also runs for files no feature claims), browser shards `ui-*` and request-level shards `*-api`. Without a model the `ui` agent tests skip themselves (`needsModel()`), and the locator and API tests still run.
