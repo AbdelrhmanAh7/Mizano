@@ -109,11 +109,6 @@ export class DocumentIntakeController {
           enum: ['BILL', 'INVOICE'],
           description: 'Force document type instead of auto-classification',
         },
-        strategy: {
-          type: 'string',
-          enum: ['fast', 'slow', 'ocr', 'hybrid', 'vlm', 'auto'],
-          description: 'Scan mode',
-        },
       },
       required: ['file'],
     },
@@ -141,7 +136,6 @@ export class DocumentIntakeController {
       mimeType: file.mimetype,
       fileName: file.originalname,
       forceType: dto.forceType,
-      strategy: dto.strategy,
       language: dto.language,
     });
 

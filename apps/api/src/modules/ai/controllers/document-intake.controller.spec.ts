@@ -128,7 +128,6 @@ describe('DocumentIntakeController', () => {
 
     const res = await controller.processDocument(ORG_A, 'user-1', file, {
       forceType: 'BILL',
-      strategy: 'fast',
     });
 
     expect(res).toEqual({ data: { jobId: 'job-1', status: 'EXTRACTED', duplicate: false } });
@@ -138,7 +137,6 @@ describe('DocumentIntakeController', () => {
         userId: 'user-1',
         buffer: file.buffer,
         forceType: 'BILL',
-        strategy: 'fast',
       }),
     );
   });

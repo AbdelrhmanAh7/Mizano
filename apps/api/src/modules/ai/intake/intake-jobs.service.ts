@@ -34,7 +34,6 @@ export interface CreateIntakeUpload {
   fileName: string;
   source?: IntakeSource;
   forceType?: 'BILL' | 'INVOICE';
-  strategy?: string;
   language?: string;
 }
 
@@ -223,7 +222,6 @@ export class IntakeJobsService implements OnApplicationBootstrap, OnModuleDestro
           sha256,
           storageKey,
           forceType: input.forceType ?? null,
-          strategy: input.strategy ?? null,
           language: input.language ?? null,
         },
       });
