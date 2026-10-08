@@ -109,11 +109,13 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 | -------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
 | API unit       | `apps/api/src/**/*.spec.ts`                                | `node apps/api/_run_tests.js [--testPathPattern=…]`     |
 | Web unit       | `apps/web/**/*.spec.ts(x)` (Jest + Testing Library, jsdom) | `cd apps/web && npx jest [--testPathPattern=…]`         |
-| API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database               |
+| API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a migrated database (in band)   |
 | Browser E2E    | not wired yet                                              | tracked by the seeded API/browser journey issue         |
 | Planning tools | `scripts/test_*.py`                                        | `python -m unittest discover -s scripts -p 'test_*.py'` |
 
-`_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly.
+`_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly. `_jest.config.js` is the only API unit-test config: `pnpm --filter api test` and `_run_tests.js` both load it, and it compiles with `apps/api/tsconfig.json`.
+
+The E2E suites boot the full app against one shared database, so `test:e2e` runs them in band: in parallel, one suite's intake sweep picks up another suite's jobs. Run them on a fresh database (`prisma migrate deploy`) with `REDIS_URL=` blank so the cache and intake queue run in-process.
 
 Unit-test infrastructure lives in `apps/api/src/test/`: `mocks/prisma.mock.ts` (deep Prisma mock, transactions call back with the mock), `mocks/redis.mock.ts` (in-memory cache), `mocks/{sharp,tesseract}.mock.js` (heavy native/OCR libraries), `helpers/test-utils.ts` (typed factories) and `helpers/decimal.helpers.ts`. Unit tests must not need Redis, PostgreSQL, Ollama or the network.
 
@@ -126,7 +128,7 @@ Rules:
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pushes and PRs to `master`/`develop`: install (pnpm 8, Node 20, `prisma generate`) → lint and type-check → unit tests (with PostgreSQL 16 and Redis 7 services, `db:push`) → build. E2E is not part of CI yet.
+`.github/workflows/ci.yml` runs on pushes and PRs to `master`/`develop`: install (pnpm 8, Node 20, `prisma generate`) → lint and type-check → unit tests (with PostgreSQL 16 and Redis 7 services, `db:push`) → build, plus an `e2e` job (PostgreSQL 16 service, `prisma migrate deploy`, `pnpm test:e2e`) that fails when any `apps/api/test/*.e2e-spec.ts` suite fails. `pnpm ci:full` and the pre-push hook still run no E2E.
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 
