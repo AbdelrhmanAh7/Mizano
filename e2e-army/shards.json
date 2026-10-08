@@ -1,0 +1,93 @@
+{
+  "_doc": "Feature-group shards of the e2e-army suite (ported from the hub: nql-agents ops/verify/e2e-army/Mizano.next.json, #153). Each shard runs in <= 5 min: pnpm e2e:army --tag shard:<id>. estMs are the hub's budgets, not measurements.",
+  "shards": [
+    {
+      "id": "smoke",
+      "estMs": 90000
+    },
+    {
+      "id": "ui-sales",
+      "estMs": 270000
+    },
+    {
+      "id": "ui-purchases",
+      "estMs": 270000
+    },
+    {
+      "id": "ui-accounting",
+      "estMs": 270000
+    },
+    {
+      "id": "ui-tax",
+      "estMs": 270000
+    },
+    {
+      "id": "ui-reports",
+      "estMs": 270000
+    },
+    {
+      "id": "ui-inventory",
+      "estMs": 270000
+    },
+    {
+      "id": "ui-stock-extras",
+      "estMs": 270000
+    },
+    {
+      "id": "ui-banking",
+      "estMs": 270000
+    },
+    {
+      "id": "ui-people",
+      "estMs": 270000
+    },
+    {
+      "id": "ui-projects-mfg",
+      "estMs": 270000
+    },
+    {
+      "id": "ui-shell",
+      "estMs": 270000
+    },
+    {
+      "id": "ui-settings",
+      "estMs": 270000
+    },
+    {
+      "id": "sales-api",
+      "estMs": 120000
+    },
+    {
+      "id": "purchases-api",
+      "estMs": 120000
+    },
+    {
+      "id": "ledger-api",
+      "estMs": 120000
+    },
+    {
+      "id": "reports-api",
+      "estMs": 120000
+    },
+    {
+      "id": "inventory-api",
+      "estMs": 120000
+    },
+    {
+      "id": "banking-api",
+      "estMs": 120000
+    },
+    {
+      "id": "people-api",
+      "estMs": 120000
+    },
+    {
+      "id": "platform-api",
+      "estMs": 120000
+    },
+    {
+      "id": "ai-api",
+      "estMs": 240000
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+# Mizano E2E gate (#153): tester-army/e2e (npm `e2e`, tests in e2e-army/, config e2e.config.ts) against the app built from this
+# commit. The aggregate job posts the check `e2e-army`.
+#
+# GitHub-hosted runners only, PostgreSQL service container, no secrets beyond the automatic GITHUB_TOKEN: without a model the agent
+# steps skip themselves (needsModel) and every locator and request-level test runs. Selection, one shard per matrix job:
+#   pr     the PRs' own tests, the top-level e2e-army/*.e2e.ts files
+#   smoke  the smoke shard of the feature suite (sign-in, health, dashboard, landing, Arabic/RTL)
+# The hub's verify job runs the feature shards of the features a PR touches, with a model, and separates pre-existing failures.
+#
+# Owner rule: every job stays under 5 minutes (timeout-minutes: 5). When a shard grows past that, split it into more matrix entries
+# (shard ids: e2e-army/shards.json) instead of raising the limit.
+# Fork PRs: `pull_request` (read-only token, no secrets), never `pull_request_target`.
+
+name: e2e-army
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-army-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '8'
+
+jobs:
+  shard:
+    name: e2e-army (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: pr
+            args: "'e2e-army/*.e2e.ts' --pass-with-no-tests"
+          - shard: smoke
+            args: '--tag shard:smoke'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: mizano_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/mizano_e2e?schema=public
+      E2E_TELEMETRY_DISABLED: '1'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache the browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: e2e-army-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install the browser
+        run: pnpm exec e2e-web install chromium --with-deps
+
+      - name: Run e2e-army (${{ matrix.shard }})
+        run: eval "pnpm e2e:army ${{ matrix.args }}"
+
+      - name: Upload the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-army-${{ matrix.shard }}
+          path: |
+            .e2e/report.json
+            .e2e/junit.xml
+            .e2e/artifacts
+            .e2e/app-*.log
+          if-no-files-found: warn
+          retention-days: 7
+
+  e2e-army:
+    name: e2e-army
+    needs: shard
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every shard passed
+        run: test "${{ needs.shard.result }}" = success

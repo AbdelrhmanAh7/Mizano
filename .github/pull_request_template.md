@@ -6,6 +6,7 @@
 
 - Tested head SHA:
 - Commands/results and fixture IDs:
+- e2e-army tests (`e2e-army/<issue>-<flow>.e2e.ts`, tagged `feat:<id>`) or `E2E: not needed — <reason>`:
 - Financial/tenant/retry implications, when relevant:
 - Independent reviewer/provider:
 - Remaining limitations:

@@ -105,13 +105,13 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 
 ## Testing
 
-| Layer          | Location                                                   | Run                                                     |
-| -------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
-| API unit       | `apps/api/src/**/*.spec.ts`                                | `node apps/api/_run_tests.js [--testPathPattern=…]`     |
-| Web unit       | `apps/web/**/*.spec.ts(x)` (Jest + Testing Library, jsdom) | `cd apps/web && npx jest [--testPathPattern=…]`         |
-| API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database               |
-| Browser E2E    | not wired yet                                              | tracked by the seeded API/browser journey issue         |
-| Planning tools | `scripts/test_*.py`                                        | `python -m unittest discover -s scripts -p 'test_*.py'` |
+| Layer          | Location                                                   | Run                                                       |
+| -------------- | ---------------------------------------------------------- | --------------------------------------------------------- |
+| API unit       | `apps/api/src/**/*.spec.ts`                                | `node apps/api/_run_tests.js [--testPathPattern=…]`       |
+| Web unit       | `apps/web/**/*.spec.ts(x)` (Jest + Testing Library, jsdom) | `cd apps/web && npx jest [--testPathPattern=…]`           |
+| API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database                 |
+| Browser E2E    | `e2e-army/**/*.e2e.ts` (tester-army/e2e, `e2e.config.ts`)  | `DATABASE_URL=<test db> pnpm e2e:army [--tag shard:<id>]` |
+| Planning tools | `scripts/test_*.py`                                        | `python -m unittest discover -s scripts -p 'test_*.py'`   |
 
 `_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly.
 
@@ -126,7 +126,7 @@ Rules:
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (PostgreSQL 16 and Redis 7 service containers, `db:push`) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); fork PRs run only after approval in the repository settings. E2E is not part of CI yet. `deploy.yml` stays disabled (it needs deployment secrets).
+`.github/workflows/ci.yml` runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (PostgreSQL 16 and Redis 7 service containers, `db:push`) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); fork PRs run only after approval in the repository settings. `.github/workflows/e2e-army.yml` posts the `e2e-army` check: it starts the API and web app on a PostgreSQL service container and runs the PR tests (`e2e-army/*.e2e.ts`) plus the `smoke` shard with `pnpm e2e:army`, within 5 minutes and without a model or secrets (agent steps skip themselves there). The hub's verify job runs the feature shards of the touched features with a model; see [CONTRIBUTING.md](../CONTRIBUTING.md#e2e-tests-e2e-army-blocking). `deploy.yml` stays disabled (it needs deployment secrets).
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 
