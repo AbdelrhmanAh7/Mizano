@@ -1,0 +1,141 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgres
+    environment:
+      POSTGRES_USER: mizano
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: mizano
+      POSTGRES_SHARED_BUFFERS: "128MB"
+      POSTGRES_WORK_MEM: "64MB"
+      POSTGRES_MAX_CONNECTIONS: "100"
+    deploy:
+      resources:
+        limits:
+          memory: 1.5GB
+        reservations:
+          memory: 1GB
+    healthcheck:
+      test: "pg_isready -U mizano -d mizano"
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+    deploy:
+      resources:
+        limits:
+          memory: 256MB
+        reservations:
+          memory: 128MB
+    healthcheck:
+      test: "redis-cli -q ping"
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  api:
+    build: ./api
+    container_name: api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      DB_PASSWORD: "${DB_PASSWORD}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+    deploy:
+      resources:
+        limits:
+          memory: 1GB
+        reservations:
+          memory: 512MB
+    healthcheck:
+      test: curl --fail http://localhost:3000/health
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  web:
+    build: ./web
+    container_name: web
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    environment:
+      API_URL: http://api:3000
+    deploy:
+      resources:
+        limits:
+          memory: 512MB
+        reservations:
+          memory: 256MB
+    healthcheck:
+      test: curl --fail http://localhost/
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  worker:
+    build: ./worker
+    container_name: worker
+    ports:
+      - "3001:3001"
+    depends_on:
+      - api
+    environment:
+      API_URL: http://api:3000
+    deploy:
+      resources:
+        limits:
+          memory: 2GB
+        reservations:
+          memory: 1GB
+    healthcheck:
+      test: curl --fail http://localhost:3001/health
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  proxy:
+    build: ./proxy
+    container_name: proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - web
+    deploy:
+      resources:
+        limits:
+          memory: 128MB
+        reservations:
+          memory: 64MB
+    healthcheck:
+      test: curl --fail http://localhost/
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  data:
+    driver: local
