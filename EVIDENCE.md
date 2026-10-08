@@ -164,3 +164,5 @@ Commands run (sandbox off, local):
 - `prettier --check` on the spec: clean
 
 Not run: the seeded PDF e2e (removed; see commit a5aeed0).
+
+E2E gate note (#109): this PR changes no production code and no UI or user-flow files, only the unit acceptance spec `rules-normalize.spec.ts`. It is therefore not a user-facing change for e2e-army, which reports "n/a" for PRs that touch no UI. The legacy `e2e-first` status is the retired Playwright gate (owner 2026-10-08) and fails only because the added test is a jest `.spec.ts`, not an e2e file. No e2e-army test was added: it could not exercise the Arabic-digit acceptance criteria, and a smoke test that never checks them would only satisfy the gate.
