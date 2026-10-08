@@ -142,3 +142,49 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+---
+
+# EVIDENCE.md — Cross-tenant isolation of ledger and invoice reads (#108)
+
+- **Tested commit**: `8da8aea0d286c73af6c4f2a846c88d0a88a4f152` (branch `ai/108`; this doc is the only later change)
+- **Suite**: `apps/api/test/tenant-isolation.e2e-spec.ts`. Two registered tenants (A: 1111, B: 7777), each with a sent invoice, an approved bill and a manual journal
+- **Database**: throwaway Postgres 16 on `127.0.0.1:55461`, `prisma migrate deploy`, `REDIS_URL=` blank. No new services or secrets
+- **Production code changed**: none. No endpoint leaked, so no fix was needed
+
+| REQ | Requirement                                                                | Test (`@issue-108`)                                                                            | Status |
+| --- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------ |
+| AC1 | A's token on B's invoice, bill, journal or GL account id returns 404       | `AC1: returns 404 for every foreign id`; `AC1: returns 404 for soft-deleted and malformed ids` | PASSED |
+| AC2 | Lists, AP aging and both trial balances hold no B rows or totals           | four `AC2:` tests, checked against the tenant's own DB ground truth                            | PASSED |
+| AC3 | No token, an expired token or a forged signature gets 401 on all 13 routes | three `AC3:` tests                                                                             | PASSED |
+| AC4 | Existing command, no new services                                          | `jest --config ./test/jest-e2e.json` (`pnpm --filter api test:e2e`)                            | PASSED |
+| AC5 | Change ≤ ~300 lines                                                        | 280 test lines plus this record; no production code                                            | PASSED |
+
+**Commands and output** (at the tested commit):
+
+```text
+$ npx jest --config ./test/jest-e2e.json tenant-isolation
+Tests:       9 passed, 9 total
+$ npx jest --config ./test/jest-e2e.json        # fresh DB, all 12 suites in parallel
+Tests:       2 failed, 264 passed, 266 total   # ai + intake: HTTP 407, unrelated
+$ npx jest --config ./test/jest-e2e.json "ai|intake|purchases"
+Tests:       65 passed, 65 total
+$ pnpm --filter api lint && pnpm --filter api type-check   # clean
+$ node apps/api/_run_tests.js                   # API unit suite
+Tests:       4 failed, 2193 passed, 2197 total  # import.service.hardening: "csv is not a function"
+```
+
+The full parallel run is flaky outside this suite. One run failed one `purchases` test and the next failed `ai` and `intake` with 407s. Each of those suites passes when rerun. `tenant-isolation` passed in every run. The unit failures come from this worktree's offline dependency install. This branch changes no file under `apps/api/src` and no unit spec.
+
+**Mutation check** (issue test plan): each filter was removed, the suite was rerun, and the file was restored.
+
+| Removed tenant guard                                                                                 | Failing test                   |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `bills.service.ts:127` `deletedAt: null` in `findOne`                                                | AC1 soft-deleted/malformed ids |
+| `bills.service.ts:78` `organizationId` in list                                                       | AC2 invoice and bill lists     |
+| `invoices.service.ts:211` / `journals.service.ts:237` `organizationId` in `findOne`                  | AC1 every foreign id           |
+| `aging-reports.service.ts:171` `organizationId` in payables aging                                    | AC2 AP aging                   |
+| `report-utils.ts:230` org filter on line totals plus the account-list filter of either trial balance | AC2 trial balances             |
+| `jwt.strategy.ts:23` `ignoreExpiration: true`                                                        | AC3 expired token              |
+
+Each trial balance has two tenant filters: the account list and the line totals. Removing only one of them leaks nothing, because foreign totals are keyed by foreign account ids that the org-scoped account list never holds. The suite passes in that case, which is correct. Removing both makes the AC2 trial balance test fail.
