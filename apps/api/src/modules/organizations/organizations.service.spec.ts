@@ -76,6 +76,7 @@ const mockPrisma = {
     count: jest.fn(),
   },
   $executeRaw: jest.fn(),
+  $queryRaw: jest.fn(),
 };
 // Interactive transactions run against the same mock client.
 const prismaWithTx = {
@@ -330,6 +331,7 @@ describe('OrganizationsService', () => {
 
   describe('updateEmailSettings', () => {
     it('updates SMTP configuration', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([{ smtpPassword: 'old-pass' }]);
       mockPrisma.organization.update.mockResolvedValue({ id: ORG_ID, updatedAt: new Date() });
 
       await service.updateEmailSettings(ORG_ID, {
@@ -341,7 +343,26 @@ describe('OrganizationsService', () => {
           data: expect.objectContaining({ smtpHost: 'smtp.test.com', smtpPort: 587 }),
         }),
       );
+      expect(mockPrisma.organization.update.mock.calls[0][0].data.smtpPasswordRotatedAt).toBe(
+        undefined,
+      );
     });
+
+    it.each([
+      ['a new password', 'old-pass', 'new-pass', true],
+      ['the same password', 'old-pass', 'old-pass', false],
+      ['a first password', null, 'new-pass', true],
+    ])(
+      'stamps smtpPasswordRotatedAt for %s only when it changes (#104)',
+      async (_l, cur, next, stamped) => {
+        mockPrisma.$queryRaw.mockResolvedValue([{ smtpPassword: cur }]);
+        mockPrisma.organization.update.mockResolvedValue({ id: ORG_ID, updatedAt: new Date() });
+
+        await service.updateEmailSettings(ORG_ID, { smtpPassword: next as string });
+        const { data } = mockPrisma.organization.update.mock.calls[0][0];
+        expect(data.smtpPasswordRotatedAt instanceof Date).toBe(stamped);
+      },
+    );
   });
 
   // ── updateLocalizationSettings ─────────────────────────────────
