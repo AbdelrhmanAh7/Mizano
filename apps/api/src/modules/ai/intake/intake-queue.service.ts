@@ -134,4 +134,17 @@ export class IntakeQueueService implements OnModuleDestroy {
     this.worker = null;
     this.queue = null;
   }
+
+  /** True when Redis answers on the consumer (or producer) connection; always true without REDIS_URL. */
+  async isHealthy(): Promise<boolean> {
+    if (!this.redisUrl) return true;
+    try {
+      const client = await (this.worker ?? this.queue)?.client;
+      if (!client) return false;
+      await client.ping();
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
