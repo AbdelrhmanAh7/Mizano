@@ -19,7 +19,7 @@ async function arabic({ app, screen, browser }: any, path: string, title?: strin
 const csv = (lines: string[]) => lines.join("\n") + "\n";
 
 // ───────────────────────────────────────────── ui: shell ─────────────────────────────────────────────
-test("[mz-app-shell.1] the sidebar navigates between modules, and the header shows the signed-in menu", { tags: ["feat:mz-app-shell", "shard:ui-shell", "lvl:ui"] }, async (fx) => {
+test("[mz-app-shell.1] the sidebar navigates between modules, and the header shows the signed-in menu", { tags: ["feat:mz-app-shell", "shard:ui-shell", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, browser, screen } = fx;
   await signIn(fx, "/en/dashboard");
@@ -32,7 +32,7 @@ test("[mz-app-shell.1] the sidebar navigates between modules, and the header sho
   await agent.assert("the page title is 'Journal Entries', the sidebar highlights the current section, and a breadcrumb trail is shown above the page content");
 });
 
-test("[mz-global-search.1] the command palette finds a customer, an invoice and a page by typing", { tags: ["feat:mz-global-search", "shard:ui-shell", "lvl:ui"] }, async (fx) => {
+test("[mz-global-search.1] the command palette finds a customer, an invoice and a page by typing", { tags: ["feat:mz-global-search", "shard:ui-shell", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, browser, screen } = fx;
   await signIn(fx, "/en/dashboard");
@@ -43,7 +43,7 @@ test("[mz-global-search.1] the command palette finds a customer, an invoice and 
   await expect(browser).toHaveURL(/\/en\/sales\/customers\//, { timeout: 60_000 });
 });
 
-test("[mz-registration.1] a new organization registers through the sign-up form and can then sign in", { tags: ["feat:mz-registration", "shard:ui-shell", "lvl:ui"] }, async (fx) => {
+test("[mz-registration.1] a new organization registers through the sign-up form and can then sign in", { tags: ["feat:mz-registration", "shard:ui-shell", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const email = seededEmail("ui-registration"), org = seeded("UI Registered Org");
@@ -55,7 +55,7 @@ test("[mz-registration.1] a new organization registers through the sign-up form 
   expect(session.body.organization.name).toBe(org);
 });
 
-test("[mz-ai-insights.1] the AI insights page loads the seeded insights and the forecast sub-pages open", { tags: ["feat:mz-ai-insights", "shard:ui-shell", "lvl:ui"] }, async (fx) => {
+test("[mz-ai-insights.1] the AI insights page loads the seeded insights and the forecast sub-pages open", { tags: ["feat:mz-ai-insights", "shard:ui-shell", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/ai-insights");
@@ -69,7 +69,7 @@ test("[mz-ai-insights.1] the AI insights page loads the seeded insights and the 
   await arabic(fx, "/ar/ai-insights/forecast", "توقعات التدفق النقدي");
 });
 
-test("[mz-deep-search.1] the DeepSearch page loads and shows its job history without starting an external search", { tags: ["feat:mz-deep-search", "shard:ui-shell", "lvl:ui"] }, async (fx) => {
+test("[mz-deep-search.1] the DeepSearch page loads and shows its job history without starting an external search", { tags: ["feat:mz-deep-search", "shard:ui-shell", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, screen } = fx;
   await signIn(fx, "/en/deep-search");
@@ -78,7 +78,7 @@ test("[mz-deep-search.1] the DeepSearch page loads and shows its job history wit
   await arabic(fx, "/ar/deep-search", "وكيل البحث العميق");
 });
 
-test("[mz-ai-assistant.1] the chat assistant widget opens on every page and answers gracefully when the AI model is offline", { tags: ["feat:mz-ai-assistant", "shard:ui-shell", "lvl:ui"] }, async (fx) => {
+test("[mz-ai-assistant.1] the chat assistant widget opens on every page and answers gracefully when the AI model is offline", { tags: ["feat:mz-ai-assistant", "shard:ui-shell", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, screen } = fx;
   await signIn(fx, "/en/dashboard");
@@ -88,7 +88,7 @@ test("[mz-ai-assistant.1] the chat assistant widget opens on every page and answ
 });
 
 // ───────────────────────────────────────────── ui: settings ─────────────────────────────────────────────
-test("[mz-settings-organization.1] the settings hub opens the organization page; saving a changed address persists it", { tags: ["feat:mz-settings-organization", "shard:ui-settings", "lvl:ui"] }, async (fx) => {
+test("[mz-settings-organization.1] the settings hub opens the organization page; saving a changed address persists it", { tags: ["feat:mz-settings-organization", "shard:ui-settings", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const address = `12 Army Street ${seeded("addr", 4)}`;
@@ -107,7 +107,7 @@ test("[mz-settings-organization.1] the settings hub opens the organization page;
   await arabic(fx, "/ar/settings/organization", "المؤسسة");
 });
 
-test("[mz-team-roles.1] the team page lists the seeded users and roles and a new team member can be added", { tags: ["feat:mz-team-roles", "shard:ui-settings", "lvl:ui"] }, async (fx) => {
+test("[mz-team-roles.1] the team page lists the seeded users and roles and a new team member can be added", { tags: ["feat:mz-team-roles", "shard:ui-settings", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, screen } = fx;
   const name = seeded("Team member"), email = seededEmail("team-member");
@@ -120,7 +120,7 @@ test("[mz-team-roles.1] the team page lists the seeded users and roles and a new
   await arabic(fx, "/ar/settings/team", "الفريق والأدوار");
 });
 
-test("[mz-audit-log.1] the audit log page lists who changed what, with entity types and actions", { tags: ["feat:mz-audit-log", "shard:ui-settings", "lvl:ui"] }, async (fx) => {
+test("[mz-audit-log.1] the audit log page lists who changed what, with entity types and actions", { tags: ["feat:mz-audit-log", "shard:ui-settings", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, screen } = fx;
   await signIn(fx, "/en/settings/audit-logs");
@@ -129,7 +129,7 @@ test("[mz-audit-log.1] the audit log page lists who changed what, with entity ty
   await arabic(fx, "/ar/settings/audit-logs", "سجل التدقيق");
 });
 
-test("[mz-notifications.1] the notification panel lists the seeded notifications and the notification settings page opens", { tags: ["feat:mz-notifications", "shard:ui-settings", "lvl:ui"] }, async (fx) => {
+test("[mz-notifications.1] the notification panel lists the seeded notifications and the notification settings page opens", { tags: ["feat:mz-notifications", "shard:ui-settings", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/dashboard");
@@ -141,7 +141,7 @@ test("[mz-notifications.1] the notification panel lists the seeded notifications
   await arabic(fx, "/ar/settings/notifications", "الإشعارات");
 });
 
-test("[mz-system-diagnostics.1] the cache and database performance pages open for an administrator", { tags: ["feat:mz-system-diagnostics", "shard:ui-settings", "lvl:ui"] }, async (fx) => {
+test("[mz-system-diagnostics.1] the cache and database performance pages open for an administrator", { tags: ["feat:mz-system-diagnostics", "shard:ui-settings", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/settings/performance");

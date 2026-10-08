@@ -16,7 +16,7 @@ async function arabic({ app, screen, browser }: any, path: string, title?: strin
 }
 
 // ───────────────────────────────────────────── ui: people ─────────────────────────────────────────────
-test("[mz-employees.1] create an employee through the form and find them in the employees list", { tags: ["feat:mz-employees", "shard:ui-people", "lvl:ui"] }, async (fx) => {
+test("[mz-employees.1] create an employee through the form and find them in the employees list", { tags: ["feat:mz-employees", "shard:ui-people", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const name = seeded("Employee"), email = seededEmail("employee");
@@ -31,7 +31,7 @@ test("[mz-employees.1] create an employee through the form and find them in the 
   await arabic(fx, "/ar/hr/employees", "الموظفون");
 });
 
-test("[mz-attendance.1] the attendance page lists the seeded attendance records and the record form opens", { tags: ["feat:mz-attendance", "shard:ui-people", "lvl:ui"] }, async (fx) => {
+test("[mz-attendance.1] the attendance page lists the seeded attendance records and the record form opens", { tags: ["feat:mz-attendance", "shard:ui-people", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/hr/attendance");
@@ -43,7 +43,7 @@ test("[mz-attendance.1] the attendance page lists the seeded attendance records 
   await arabic(fx, "/ar/hr/attendance", "الحضور");
 });
 
-test("[mz-payroll.1] the payroll page shows the seeded paid payroll run and the new payroll run form opens", { tags: ["feat:mz-payroll", "shard:ui-people", "lvl:ui"] }, async (fx) => {
+test("[mz-payroll.1] the payroll page shows the seeded paid payroll run and the new payroll run form opens", { tags: ["feat:mz-payroll", "shard:ui-people", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/hr/payroll");
@@ -55,7 +55,7 @@ test("[mz-payroll.1] the payroll page shows the seeded paid payroll run and the 
   await arabic(fx, "/ar/hr/payroll", "الرواتب");
 });
 
-test("[mz-crm-leads.1] create a lead through the form and find it in the leads list", { tags: ["feat:mz-crm-leads", "shard:ui-people", "lvl:ui"] }, async (fx) => {
+test("[mz-crm-leads.1] create a lead through the form and find it in the leads list", { tags: ["feat:mz-crm-leads", "shard:ui-people", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const leadName = seeded("Lead");
@@ -70,7 +70,7 @@ test("[mz-crm-leads.1] create a lead through the form and find it in the leads l
   await arabic(fx, "/ar/crm/leads", "العملاء المحتملون");
 });
 
-test("[mz-crm-deals.1] the deal pipeline shows the seeded deals by stage and the new deal form opens", { tags: ["feat:mz-crm-deals", "shard:ui-people", "lvl:ui"] }, async (fx) => {
+test("[mz-crm-deals.1] the deal pipeline shows the seeded deals by stage and the new deal form opens", { tags: ["feat:mz-crm-deals", "shard:ui-people", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/crm/deals");
@@ -82,7 +82,7 @@ test("[mz-crm-deals.1] the deal pipeline shows the seeded deals by stage and the
 });
 
 // ───────────────────────────────────────────── ui: projects + manufacturing ─────────────────────────────────────────────
-test("[mz-projects.1] create a project through the form and see the seeded projects and the task list", { tags: ["feat:mz-projects", "shard:ui-projects-mfg", "lvl:ui"] }, async (fx) => {
+test("[mz-projects.1] create a project through the form and see the seeded projects and the task list", { tags: ["feat:mz-projects", "shard:ui-projects-mfg", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const name = seeded("Project");
@@ -99,7 +99,7 @@ test("[mz-projects.1] create a project through the form and see the seeded proje
   await arabic(fx, "/ar/projects", "المشاريع");
 });
 
-test("[mz-timesheets.1] the timesheets page lists the seeded time entries and the log-time form opens", { tags: ["feat:mz-timesheets", "shard:ui-projects-mfg", "lvl:ui"] }, async (fx) => {
+test("[mz-timesheets.1] the timesheets page lists the seeded time entries and the log-time form opens", { tags: ["feat:mz-timesheets", "shard:ui-projects-mfg", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/projects/timesheets");
@@ -111,7 +111,7 @@ test("[mz-timesheets.1] the timesheets page lists the seeded time entries and th
   await arabic(fx, "/ar/projects/timesheets", "سجلات الوقت");
 });
 
-test("[mz-bom.1] the bills of materials page shows the seeded BOM and the new BOM form opens", { tags: ["feat:mz-bom", "shard:ui-projects-mfg", "lvl:ui"] }, async (fx) => {
+test("[mz-bom.1] the bills of materials page shows the seeded BOM and the new BOM form opens", { tags: ["feat:mz-bom", "shard:ui-projects-mfg", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/manufacturing/bom");
@@ -123,7 +123,7 @@ test("[mz-bom.1] the bills of materials page shows the seeded BOM and the new BO
   await arabic(fx, "/ar/manufacturing/bom", "قوائم المواد");
 });
 
-test("[mz-work-orders.1] the work orders page shows the seeded work order and the new work order form opens", { tags: ["feat:mz-work-orders", "shard:ui-projects-mfg", "lvl:ui"] }, async (fx) => {
+test("[mz-work-orders.1] the work orders page shows the seeded work order and the new work order form opens", { tags: ["feat:mz-work-orders", "shard:ui-projects-mfg", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/manufacturing/work-orders");

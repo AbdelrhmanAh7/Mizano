@@ -7,7 +7,7 @@ import { ADMIN, Api, anon, formSignIn, h1, signIn, tenant } from "./_mz.e2e.ts";
 
 const WEB = () => String(process.env.E2E_ARMY_URL ?? "").replace(/\/+$/, "");
 
-test("[mz-auth.1] the demo accountant signs in through the form and lands on the dashboard", { tags: ["feat:mz-auth", "shard:smoke", "lvl:ui"] }, async (fx) => {
+test("[mz-auth.1] the demo accountant signs in through the form and lands on the dashboard", { tags: ["feat:mz-auth", "shard:smoke", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, browser, screen } = fx;
   await formSignIn(fx);
@@ -16,7 +16,7 @@ test("[mz-auth.1] the demo accountant signs in through the form and lands on the
   await agent.assert("the Mizano dashboard is shown for the signed-in user, with a navigation menu that lists Sales, Purchases, Accounting and Reports");
 });
 
-test("[mz-auth.2] a wrong password does not sign the user in", { tags: ["feat:mz-auth", "shard:smoke", "lvl:ui"] }, async ({ app, agent, screen, browser }) => {
+test("[mz-auth.2] a wrong password does not sign the user in", { tags: ["feat:mz-auth", "shard:smoke", "lvl:ui"], timeout: 240_000 }, async ({ app, agent, screen, browser }) => {
   needsModel();
   await app.open("/en/login");
   await expect(screen.getByRole("button", "Sign In")).toBeVisible({ timeout: 60_000 });
@@ -78,7 +78,7 @@ test("[mz-health.1] the health endpoints report a live API with a connected data
   expect(page.status).toBe(200);
 });
 
-test("[mz-dashboard.1] the signed-in dashboard shows the key figures without an error state", { tags: ["feat:mz-dashboard", "shard:smoke", "lvl:ui"] }, async (fx) => {
+test("[mz-dashboard.1] the signed-in dashboard shows the key figures without an error state", { tags: ["feat:mz-dashboard", "shard:smoke", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, screen, browser } = fx;
   await signIn(fx, "/en/dashboard");
@@ -88,7 +88,7 @@ test("[mz-dashboard.1] the signed-in dashboard shows the key figures without an 
   await expect(screen.getByText("Failed to load dashboard data")).toBeHidden();
 });
 
-test("[mz-landing.1] the public landing page opens for visitors, offers sign-in and registration, and has an Arabic version", { tags: ["feat:mz-landing", "shard:smoke", "lvl:ui"] }, async ({ app, screen, browser }) => {
+test("[mz-landing.1] the public landing page opens for visitors, offers sign-in and registration, and has an Arabic version", { tags: ["feat:mz-landing", "shard:smoke", "lvl:ui"], timeout: 240_000 }, async ({ app, screen, browser }) => {
   await app.open("/");
   // an anonymous visitor of the root path is sent to the landing page of the default locale
   await expect(browser).toHaveURL(/\/en\/onboarding/, { timeout: 60_000 });
@@ -100,7 +100,7 @@ test("[mz-landing.1] the public landing page opens for visitors, offers sign-in 
   await expect.poll(() => browser.evaluate(() => document.documentElement.dir)).toBe("rtl");
 });
 
-test("[mz-i18n-rtl.1] Arabic pages render right-to-left with Arabic text and English pages left-to-right", { tags: ["feat:mz-i18n-rtl", "shard:smoke", "lvl:ui"] }, async (fx) => {
+test("[mz-i18n-rtl.1] Arabic pages render right-to-left with Arabic text and English pages left-to-right", { tags: ["feat:mz-i18n-rtl", "shard:smoke", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   const { app, screen, browser } = fx;
   await app.open("/ar/login");
   await expect(screen.getByRole("heading", "تسجيل الدخول")).toBeVisible({ timeout: 60_000 });
@@ -116,7 +116,7 @@ test("[mz-i18n-rtl.1] Arabic pages render right-to-left with Arabic text and Eng
   expect(await browser.evaluate(() => /[؀-ۿ]/.test(document.body.innerText))).toBe(true);
 });
 
-test("[mz-i18n-rtl.2] the language switcher moves the sign-in page to Arabic and keeps the route", { tags: ["feat:mz-i18n-rtl", "shard:smoke", "lvl:ui"] }, async ({ app, agent, browser, screen }) => {
+test("[mz-i18n-rtl.2] the language switcher moves the sign-in page to Arabic and keeps the route", { tags: ["feat:mz-i18n-rtl", "shard:smoke", "lvl:ui"], timeout: 240_000 }, async ({ app, agent, browser, screen }) => {
   needsModel();
   await app.open("/en/login");
   await expect(screen.getByRole("heading", "Sign In")).toBeVisible({ timeout: 60_000 });

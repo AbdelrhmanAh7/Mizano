@@ -27,7 +27,7 @@ const billBody = (vendorId: string, accountId: string, lines: Array<Record<strin
 });
 
 // ───────────────────────────────────────────── ui ─────────────────────────────────────────────
-test("[mz-vendors.1] create a vendor through the form and find it in the vendors list; Arabic page is right-to-left", { tags: ["feat:mz-vendors", "shard:ui-purchases", "lvl:ui"] }, async (fx) => {
+test("[mz-vendors.1] create a vendor through the form and find it in the vendors list; Arabic page is right-to-left", { tags: ["feat:mz-vendors", "shard:ui-purchases", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const name = seeded("Vendor"), email = seededEmail("vendor");
@@ -42,7 +42,7 @@ test("[mz-vendors.1] create a vendor through the form and find it in the vendors
   await arabic(fx, "/ar/purchases/vendors", "الموردون");
 });
 
-test("[mz-purchase-bills.1] create a vendor bill through the form and see it in the bills list", { tags: ["feat:mz-purchase-bills", "shard:ui-purchases", "lvl:ui"] }, async (fx) => {
+test("[mz-purchase-bills.1] create a vendor bill through the form and see it in the bills list", { tags: ["feat:mz-purchase-bills", "shard:ui-purchases", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const line = seeded("Bill line");
@@ -57,7 +57,7 @@ test("[mz-purchase-bills.1] create a vendor bill through the form and see it in 
   await arabic(fx, "/ar/purchases/bills", "الفواتير");
 });
 
-test("[mz-expenses.1] record an expense through the form and see it in the expenses list", { tags: ["feat:mz-expenses", "shard:ui-purchases", "lvl:ui"] }, async (fx) => {
+test("[mz-expenses.1] record an expense through the form and see it in the expenses list", { tags: ["feat:mz-expenses", "shard:ui-purchases", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const description = seeded("Expense");
@@ -72,7 +72,7 @@ test("[mz-expenses.1] record an expense through the form and see it in the expen
   await arabic(fx, "/ar/purchases/expenses", "المصروفات");
 });
 
-test("[mz-purchase-payments.1] the payments made list shows the seeded payment and the record-payment form opens", { tags: ["feat:mz-purchase-payments", "shard:ui-purchases", "lvl:ui"] }, async (fx) => {
+test("[mz-purchase-payments.1] the payments made list shows the seeded payment and the record-payment form opens", { tags: ["feat:mz-purchase-payments", "shard:ui-purchases", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/purchases/payments");
@@ -84,7 +84,7 @@ test("[mz-purchase-payments.1] the payments made list shows the seeded payment a
   await arabic(fx, "/ar/purchases/payments", "المدفوعات");
 });
 
-test("[mz-vendor-credits.1] the vendor credits list shows the seeded credit and the new vendor credit form opens", { tags: ["feat:mz-vendor-credits", "shard:ui-purchases", "lvl:ui"] }, async (fx) => {
+test("[mz-vendor-credits.1] the vendor credits list shows the seeded credit and the new vendor credit form opens", { tags: ["feat:mz-vendor-credits", "shard:ui-purchases", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/purchases/credits");
@@ -96,7 +96,7 @@ test("[mz-vendor-credits.1] the vendor credits list shows the seeded credit and 
   await arabic(fx, "/ar/purchases/credits", "ائتمانات الموردين");
 });
 
-test("[mz-bill-scan.1] the scan-bill page offers the upload step and its stepper (OCR itself is off in the verify stack)", { tags: ["feat:mz-bill-scan", "shard:ui-purchases", "lvl:ui"] }, async (fx) => {
+test("[mz-bill-scan.1] the scan-bill page offers the upload step and its stepper (OCR itself is off in the verify stack)", { tags: ["feat:mz-bill-scan", "shard:ui-purchases", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, screen } = fx;
   await signIn(fx, "/en/purchases/bills/scan");

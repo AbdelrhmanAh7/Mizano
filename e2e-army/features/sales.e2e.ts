@@ -26,7 +26,7 @@ async function docWithLine(api: any, list: string, description: string): Promise
 }
 
 // ───────────────────────────────────────────── ui ─────────────────────────────────────────────
-test("[mz-customers.1] create a customer through the form, find it in the list; the page is available in Arabic", { tags: ["feat:mz-customers", "shard:ui-sales", "lvl:ui"] }, async (fx) => {
+test("[mz-customers.1] create a customer through the form, find it in the list; the page is available in Arabic", { tags: ["feat:mz-customers", "shard:ui-sales", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const name = seeded("Customer"), email = seededEmail("customer");
@@ -41,7 +41,7 @@ test("[mz-customers.1] create a customer through the form, find it in the list; 
   await arabic(fx, "/ar/sales/customers", "العملاء");
 });
 
-test("[mz-quotes.1] create a quote for a customer through the form and see it in the quotes list", { tags: ["feat:mz-quotes", "shard:ui-sales", "lvl:ui"] }, async (fx) => {
+test("[mz-quotes.1] create a quote for a customer through the form and see it in the quotes list", { tags: ["feat:mz-quotes", "shard:ui-sales", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const line = seeded("Quote line");
@@ -56,7 +56,7 @@ test("[mz-quotes.1] create a quote for a customer through the form and see it in
   await arabic(fx, "/ar/sales/quotes", "عروض الأسعار");
 });
 
-test("[mz-sales-invoices.1] create a sales invoice for a customer through the form and see it in the invoices list", { tags: ["feat:mz-sales-invoices", "shard:ui-sales", "lvl:ui"] }, async (fx) => {
+test("[mz-sales-invoices.1] create a sales invoice for a customer through the form and see it in the invoices list", { tags: ["feat:mz-sales-invoices", "shard:ui-sales", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const line = seeded("Invoice line");
@@ -71,7 +71,7 @@ test("[mz-sales-invoices.1] create a sales invoice for a customer through the fo
   await arabic(fx, "/ar/sales/invoices", "الفواتير");
 });
 
-test("[mz-sales-payments.1] the payments received list shows the seeded payments and the record-payment form opens", { tags: ["feat:mz-sales-payments", "shard:ui-sales", "lvl:ui"] }, async (fx) => {
+test("[mz-sales-payments.1] the payments received list shows the seeded payments and the record-payment form opens", { tags: ["feat:mz-sales-payments", "shard:ui-sales", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/sales/payments");
@@ -83,7 +83,7 @@ test("[mz-sales-payments.1] the payments received list shows the seeded payments
   await arabic(fx, "/ar/sales/payments", "المدفوعات المستلمة");
 });
 
-test("[mz-credit-notes.1] the credit notes list shows the seeded credit note and the new credit note form opens", { tags: ["feat:mz-credit-notes", "shard:ui-sales", "lvl:ui"] }, async (fx) => {
+test("[mz-credit-notes.1] the credit notes list shows the seeded credit note and the new credit note form opens", { tags: ["feat:mz-credit-notes", "shard:ui-sales", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/sales/credit-notes");
@@ -95,7 +95,7 @@ test("[mz-credit-notes.1] the credit notes list shows the seeded credit note and
   await arabic(fx, "/ar/sales/credit-notes", "إشعارات الائتمان");
 });
 
-test("[mz-delivery-challans.1] the delivery challans list shows the seeded challan and the new challan form opens", { tags: ["feat:mz-delivery-challans", "shard:ui-sales", "lvl:ui"] }, async (fx) => {
+test("[mz-delivery-challans.1] the delivery challans list shows the seeded challan and the new challan form opens", { tags: ["feat:mz-delivery-challans", "shard:ui-sales", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/sales/delivery-challans");

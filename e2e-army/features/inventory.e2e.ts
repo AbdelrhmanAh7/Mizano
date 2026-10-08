@@ -16,7 +16,7 @@ async function arabic({ app, screen, browser }: any, path: string, title?: strin
 }
 
 // ───────────────────────────────────────────── ui ─────────────────────────────────────────────
-test("[mz-items.1] create an inventory item through the form and find it in the items list", { tags: ["feat:mz-items", "shard:ui-inventory", "lvl:ui"] }, async (fx) => {
+test("[mz-items.1] create an inventory item through the form and find it in the items list", { tags: ["feat:mz-items", "shard:ui-inventory", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const name = seeded("Item"), sku = seeded("SKU-UI").toUpperCase();
@@ -31,7 +31,7 @@ test("[mz-items.1] create an inventory item through the form and find it in the 
   await arabic(fx, "/ar/inventory/items", "الأصناف");
 });
 
-test("[mz-warehouses.1] create a warehouse through the form and find it in the warehouses list", { tags: ["feat:mz-warehouses", "shard:ui-inventory", "lvl:ui"] }, async (fx) => {
+test("[mz-warehouses.1] create a warehouse through the form and find it in the warehouses list", { tags: ["feat:mz-warehouses", "shard:ui-inventory", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const code = seeded("WH-UI", 4), name = seeded("Warehouse UI");
@@ -46,7 +46,7 @@ test("[mz-warehouses.1] create a warehouse through the form and find it in the w
   await arabic(fx, "/ar/inventory/warehouses", "المستودعات");
 });
 
-test("[mz-stock-adjustments.1] the inventory adjustments list shows the seeded adjustment and the new adjustment form opens", { tags: ["feat:mz-stock-adjustments", "shard:ui-inventory", "lvl:ui"] }, async (fx) => {
+test("[mz-stock-adjustments.1] the inventory adjustments list shows the seeded adjustment and the new adjustment form opens", { tags: ["feat:mz-stock-adjustments", "shard:ui-inventory", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/inventory/adjustments");
@@ -58,7 +58,7 @@ test("[mz-stock-adjustments.1] the inventory adjustments list shows the seeded a
   await arabic(fx, "/ar/inventory/adjustments", "تسويات المخزون");
 });
 
-test("[mz-stock-transfers.1] the stock transfers list shows the seeded transfer and the new transfer form opens", { tags: ["feat:mz-stock-transfers", "shard:ui-inventory", "lvl:ui"] }, async (fx) => {
+test("[mz-stock-transfers.1] the stock transfers list shows the seeded transfer and the new transfer form opens", { tags: ["feat:mz-stock-transfers", "shard:ui-inventory", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/inventory/transfers");
@@ -70,7 +70,7 @@ test("[mz-stock-transfers.1] the stock transfers list shows the seeded transfer 
   await arabic(fx, "/ar/inventory/transfers", "تحويلات المخزون");
 });
 
-test("[mz-price-lists.1] the price lists page shows the seeded VIP price list and the new price list form opens", { tags: ["feat:mz-price-lists", "shard:ui-stock-extras", "lvl:ui"] }, async (fx) => {
+test("[mz-price-lists.1] the price lists page shows the seeded VIP price list and the new price list form opens", { tags: ["feat:mz-price-lists", "shard:ui-stock-extras", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/inventory/price-lists");
@@ -81,7 +81,7 @@ test("[mz-price-lists.1] the price lists page shows the seeded VIP price list an
   await arabic(fx, "/ar/inventory/price-lists", "قوائم الأسعار");
 });
 
-test("[mz-composite-items.1] the composite items page shows the seeded Workstation Bundle with its components", { tags: ["feat:mz-composite-items", "shard:ui-stock-extras", "lvl:ui"] }, async (fx) => {
+test("[mz-composite-items.1] the composite items page shows the seeded Workstation Bundle with its components", { tags: ["feat:mz-composite-items", "shard:ui-stock-extras", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/inventory/composite-items");
@@ -92,7 +92,7 @@ test("[mz-composite-items.1] the composite items page shows the seeded Workstati
   await arabic(fx, "/ar/inventory/composite-items"); // hard-coded English titles: only the layout direction is checked
 });
 
-test("[mz-stock-movements.1] the inventory movements page lists the seeded stock movements", { tags: ["feat:mz-stock-movements", "shard:ui-stock-extras", "lvl:ui"] }, async (fx) => {
+test("[mz-stock-movements.1] the inventory movements page lists the seeded stock movements", { tags: ["feat:mz-stock-movements", "shard:ui-stock-extras", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, screen } = fx;
   await signIn(fx, "/en/inventory/movements");

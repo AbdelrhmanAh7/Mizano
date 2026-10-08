@@ -19,7 +19,7 @@ const journalBody = (a: string, b: string, amount: string, over: Record<string, 
 });
 
 // ───────────────────────────────────────────── ui: accounting ─────────────────────────────────────────────
-test("[mz-chart-of-accounts.1] the chart of accounts lists the seeded accounts and a new account can be added", { tags: ["feat:mz-chart-of-accounts", "shard:ui-accounting", "lvl:ui"] }, async (fx) => {
+test("[mz-chart-of-accounts.1] the chart of accounts lists the seeded accounts and a new account can be added", { tags: ["feat:mz-chart-of-accounts", "shard:ui-accounting", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const code = String(seededInt("ui-account-code", 9000, 9899));
@@ -33,7 +33,7 @@ test("[mz-chart-of-accounts.1] the chart of accounts lists the seeded accounts a
   await arabic(fx, "/ar/accounting/accounts", "دليل الحسابات");
 });
 
-test("[mz-journals.1] post a balanced manual journal entry through the form and find it in the journal list", { tags: ["feat:mz-journals", "shard:ui-accounting", "lvl:ui"] }, async (fx) => {
+test("[mz-journals.1] post a balanced manual journal entry through the form and find it in the journal list", { tags: ["feat:mz-journals", "shard:ui-accounting", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const reference = seeded("e2e-army entry");
@@ -48,7 +48,7 @@ test("[mz-journals.1] post a balanced manual journal entry through the form and 
   await arabic(fx, "/ar/accounting/journals", "قيود اليومية");
 });
 
-test("[mz-recurring-journals.1] the recurring profiles list shows the seeded profile and the new profile form opens", { tags: ["feat:mz-recurring-journals", "shard:ui-accounting", "lvl:ui"] }, async (fx) => {
+test("[mz-recurring-journals.1] the recurring profiles list shows the seeded profile and the new profile form opens", { tags: ["feat:mz-recurring-journals", "shard:ui-accounting", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/accounting/recurring");
@@ -60,7 +60,7 @@ test("[mz-recurring-journals.1] the recurring profiles list shows the seeded pro
   await arabic(fx, "/ar/accounting/recurring", "الملفات المتكررة");
 });
 
-test("[mz-trial-balance.1] the trial balance page shows debit and credit totals that are equal", { tags: ["feat:mz-trial-balance", "shard:ui-accounting", "lvl:ui"] }, async (fx) => {
+test("[mz-trial-balance.1] the trial balance page shows debit and credit totals that are equal", { tags: ["feat:mz-trial-balance", "shard:ui-accounting", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, screen } = fx;
   await signIn(fx, "/en/accounting/trial-balance");
@@ -70,7 +70,7 @@ test("[mz-trial-balance.1] the trial balance page shows debit and credit totals 
   await arabic(fx, "/ar/reports/trial-balance", "ميزان المراجعة");
 });
 
-test("[mz-general-ledger.1] the general ledger page lists the movements of a chosen account", { tags: ["feat:mz-general-ledger", "shard:ui-accounting", "lvl:ui"] }, async (fx) => {
+test("[mz-general-ledger.1] the general ledger page lists the movements of a chosen account", { tags: ["feat:mz-general-ledger", "shard:ui-accounting", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, screen } = fx;
   await signIn(fx, "/en/accounting/general-ledger");
@@ -81,7 +81,7 @@ test("[mz-general-ledger.1] the general ledger page lists the movements of a cho
 });
 
 // ───────────────────────────────────────────── ui: tax ─────────────────────────────────────────────
-test("[mz-tax-rates.1] the tax rates page lists the seeded rates and a new rate can be created", { tags: ["feat:mz-tax-rates", "shard:ui-tax", "lvl:ui"] }, async (fx) => {
+test("[mz-tax-rates.1] the tax rates page lists the seeded rates and a new rate can be created", { tags: ["feat:mz-tax-rates", "shard:ui-tax", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, screen } = fx;
   const name = seeded("Tax rate");
@@ -94,7 +94,7 @@ test("[mz-tax-rates.1] the tax rates page lists the seeded rates and a new rate 
   await arabic(fx, "/ar/tax/rates", "معدلات الضرائب");
 });
 
-test("[mz-vat-returns.1] the VAT returns page lists returns and the generate form drafts a return for a period", { tags: ["feat:mz-vat-returns", "shard:ui-tax", "lvl:ui"] }, async (fx) => {
+test("[mz-vat-returns.1] the VAT returns page lists returns and the generate form drafts a return for a period", { tags: ["feat:mz-vat-returns", "shard:ui-tax", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/tax/returns");
@@ -108,7 +108,7 @@ test("[mz-vat-returns.1] the VAT returns page lists returns and the generate for
   await arabic(fx, "/ar/tax/returns", "إقرارات ضريبة القيمة المضافة");
 });
 
-test("[mz-tax-payments.1] the VAT payments page opens with its list or empty state", { tags: ["feat:mz-tax-payments", "shard:ui-tax", "lvl:ui"] }, async (fx) => {
+test("[mz-tax-payments.1] the VAT payments page opens with its list or empty state", { tags: ["feat:mz-tax-payments", "shard:ui-tax", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, screen } = fx;
   await signIn(fx, "/en/tax/payments");

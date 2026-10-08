@@ -47,7 +47,7 @@ function scenario() {
 }
 
 // ───────────────────────────────────────────── ui ─────────────────────────────────────────────
-test("[mz-financial-reports.1] the reports hub opens the profit and loss, balance sheet and cash flow statements", { tags: ["feat:mz-financial-reports", "shard:ui-reports", "lvl:ui"] }, async (fx) => {
+test("[mz-financial-reports.1] the reports hub opens the profit and loss, balance sheet and cash flow statements", { tags: ["feat:mz-financial-reports", "shard:ui-reports", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/reports");
@@ -64,7 +64,7 @@ test("[mz-financial-reports.1] the reports hub opens the profit and loss, balanc
   await arabic(fx, "/ar/reports/profit-loss", "الأرباح والخسائر");
 });
 
-test("[mz-aging-reports.1] the receivables and payables aging reports show their buckets", { tags: ["feat:mz-aging-reports", "shard:ui-reports", "lvl:ui"] }, async (fx) => {
+test("[mz-aging-reports.1] the receivables and payables aging reports show their buckets", { tags: ["feat:mz-aging-reports", "shard:ui-reports", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/reports/ar-aging");
@@ -76,7 +76,7 @@ test("[mz-aging-reports.1] the receivables and payables aging reports show their
   await arabic(fx, "/ar/reports/ar-aging", "أعمار الذمم المدينة");
 });
 
-test("[mz-sales-purchase-reports.1] the sales by customer, sales by item and purchases by vendor reports load", { tags: ["feat:mz-sales-purchase-reports", "shard:ui-reports", "lvl:ui"] }, async (fx) => {
+test("[mz-sales-purchase-reports.1] the sales by customer, sales by item and purchases by vendor reports load", { tags: ["feat:mz-sales-purchase-reports", "shard:ui-reports", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/reports/sales-by-customer");

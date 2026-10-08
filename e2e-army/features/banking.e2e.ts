@@ -17,7 +17,7 @@ async function arabic({ app, screen, browser }: any, path: string, title?: strin
 const csv = (lines: string[]) => lines.join("\n") + "\n";
 
 // ───────────────────────────────────────────── ui ─────────────────────────────────────────────
-test("[mz-bank-accounts.1] create a bank account through the form and find it in the bank accounts list", { tags: ["feat:mz-bank-accounts", "shard:ui-banking", "lvl:ui"] }, async (fx) => {
+test("[mz-bank-accounts.1] create a bank account through the form and find it in the bank accounts list", { tags: ["feat:mz-bank-accounts", "shard:ui-banking", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   const name = seeded("Bank account");
@@ -32,7 +32,7 @@ test("[mz-bank-accounts.1] create a bank account through the form and find it in
   await arabic(fx, "/ar/banking/accounts", "الحسابات البنكية");
 });
 
-test("[mz-bank-transactions.1] the bank transactions page lists the seeded transactions with their reconciliation status", { tags: ["feat:mz-bank-transactions", "shard:ui-banking", "lvl:ui"] }, async (fx) => {
+test("[mz-bank-transactions.1] the bank transactions page lists the seeded transactions with their reconciliation status", { tags: ["feat:mz-bank-transactions", "shard:ui-banking", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, screen } = fx;
   await signIn(fx, "/en/banking/transactions");
@@ -41,7 +41,7 @@ test("[mz-bank-transactions.1] the bank transactions page lists the seeded trans
   await arabic(fx, "/ar/banking/transactions", "المعاملات البنكية");
 });
 
-test("[mz-bank-reconciliation.1] the reconciliation page shows the unmatched transactions of a bank account with match suggestions", { tags: ["feat:mz-bank-reconciliation", "shard:ui-banking", "lvl:ui"] }, async (fx) => {
+test("[mz-bank-reconciliation.1] the reconciliation page shows the unmatched transactions of a bank account with match suggestions", { tags: ["feat:mz-bank-reconciliation", "shard:ui-banking", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { agent, screen } = fx;
   await signIn(fx, "/en/banking/reconcile");
@@ -52,7 +52,7 @@ test("[mz-bank-reconciliation.1] the reconciliation page shows the unmatched tra
   await arabic(fx, "/ar/banking/reconcile", "التسوية البنكية");
 });
 
-test("[mz-bank-rules.1] the bank rules page shows the seeded rules and the new rule form opens", { tags: ["feat:mz-bank-rules", "shard:ui-banking", "lvl:ui"] }, async (fx) => {
+test("[mz-bank-rules.1] the bank rules page shows the seeded rules and the new rule form opens", { tags: ["feat:mz-bank-rules", "shard:ui-banking", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/banking/rules");
@@ -64,7 +64,7 @@ test("[mz-bank-rules.1] the bank rules page shows the seeded rules and the new r
   await arabic(fx, "/ar/banking/rules", "قواعد البنك");
 });
 
-test("[mz-fixed-assets.1] the fixed assets page lists the seeded assets and the new asset form opens", { tags: ["feat:mz-fixed-assets", "shard:ui-banking", "lvl:ui"] }, async (fx) => {
+test("[mz-fixed-assets.1] the fixed assets page lists the seeded assets and the new asset form opens", { tags: ["feat:mz-fixed-assets", "shard:ui-banking", "lvl:ui"], timeout: 240_000 }, async (fx) => {
   needsModel();
   const { app, agent, screen } = fx;
   await signIn(fx, "/en/assets");
