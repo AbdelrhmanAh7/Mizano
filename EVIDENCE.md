@@ -183,6 +183,36 @@ Run 1's failures were in suites this change does not touch. Those suites use `cr
 
 ## Remaining risks
 
-- `.github/workflows/deploy.yml` does not write `REDIS_PASSWORD`. Implementers may not edit CI, so the owner follow-up is in `AI_QUESTIONS.md`. That workflow is currently disabled.
+- Without `REDIS_PASSWORD`, Redis shares `POSTGRES_PASSWORD`, which is what `.github/workflows/deploy.yml` deploys today. Neither store is published; only containers on `mizano-network` reach them. Giving Redis its own secret is an optional owner CI change, described in `AI_QUESTIONS.md`.
 - `TRUST_PROXY_HOPS=1` assumes exactly one proxy appends `X-Forwarded-For` in front of the API. A client that can reach the API or web port directly can choose its own throttle key. That is the trade-off the issue asks for, in place of one shared lockout.
 - `docker-compose.yml` (local/SIT) still publishes 5435/6380 with the dev password. It is out of scope for this issue.
+
+## Review round 2 (PR #137 quality review)
+
+- **Tested code SHA**: `47cfa94a56be8631620a120d74000203500eff26`. The commit after it changes only Markdown (`AI_QUESTIONS.md`, `docs/agents/review-lessons.md`, this file).
+- **Findings fixed**: (1) `TRUST_PROXY_HOPS` is now passed into the `api` container (`${TRUST_PROXY_HOPS:-1}`). (2) Compose no longer requires a variable that `deploy.yml` does not write. Redis uses `${REDIS_PASSWORD:-${POSTGRES_PASSWORD:?}}`; the API gets `REDIS_PASSWORD` on its own and percent-encodes it into `REDIS_URL` (`apps/api/src/cache/redis-url.ts`, used by the cache module, cache service and intake queue). `deploy.yml` is unchanged.
+
+| REQ | Check                                                                                                                                                    | Test                                                                                                        | Result |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------ |
+| AC1 | Every `${VAR:?}` in the compose file is written by deploy.yml's "Write .env on server"; Redis, `REDISCLI_AUTH` and the API share one password expression | `apps/api/test/production-compose.e2e-spec.ts` (5 tests; the 3 new or changed ones failed before `47cfa94`) | pass   |
+| AC2 | `TRUST_PROXY_HOPS` reaches the API container                                                                                                             | same file                                                                                                   | pass   |
+| AC2 | One `X-Forwarded-For` client at the login limit gets 429, another gets 401, and a spoofed prefix stays limited                                           | `e2e-army/132-auth-hardening.e2e.ts` (`feat:mz-auth`), real stack                                           | pass   |
+| AC3 | `/api/auth/session` after a credentials sign-in has `accessToken` and no `refreshToken`                                                                  | `e2e-army/132-auth-hardening.e2e.ts`, real stack                                                            | pass   |
+| -   | A Redis password with URL characters round-trips through `REDIS_URL`                                                                                     | `apps/api/src/cache/redis-url.spec.ts` (4 tests)                                                            | pass   |
+
+```bash
+# apps/api
+REDIS_URL= npx jest --config ./test/jest-e2e.json --runInBand test/production-compose
+# Tests: 5 passed, 5 total   (before the fix: 3 failed, 2 passed)
+npx jest --config ./_jest.config.js --testPathPattern "(redis-url|cache|intake|trust-proxy)"
+# Test Suites: 11 passed, 11 total; Tests: 119 passed, 119 total
+npx tsc --noEmit -p tsconfig.json   # exit 0; eslint on the changed files: no findings
+
+# hub: HOLD=1800 ops/verify/e2e-army/run-local.sh Mizano 47cfa94  (throwaway DB, API + next dev), then
+e2e run tests/132-auth-hardening.e2e.ts --reporter list
+# ✓ @issue-132 AC2: one client exceeding the login limit does not lock other clients out
+# ✓ @issue-132 AC3: /api/auth/session after sign-in has the access token but no refreshToken
+# Tests  2 passed (2); an immediate rerun (attacker already limited) also passed 2 of 2
+```
+
+Per the owner's rule (2026-10-08), the full suite runs on GitHub-hosted CI after the push, not locally. Docker is not installed here, so the compose test used its YAML fallback.

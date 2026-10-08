@@ -1,22 +1,14 @@
 # AI questions — issue #132
 
-The implementation is complete. One follow-up needs the owner because it touches CI, which implementers must not edit.
+No blocking questions. The implementation is complete, and `.github/workflows/deploy.yml` keeps working unchanged: every variable `docker-compose.production.yml` requires (`${VAR:?}`) is one the workflow's "Write .env on server" step already writes. `apps/api/test/production-compose.e2e-spec.ts` checks this.
 
-## CI suggestion: `deploy.yml` must write `REDIS_PASSWORD`
+## Optional CI suggestion (owner only, not needed for this PR)
 
-`docker-compose.production.yml` now requires `REDIS_PASSWORD` (Redis `--requirepass`, and the API's `REDIS_URL` is `redis://:${REDIS_PASSWORD}@redis:6379`). The "Write .env on server" step in `.github/workflows/deploy.yml` writes `REDIS_URL=redis://redis:6379` and no `REDIS_PASSWORD`, so the next GCP rollout would stop at `docker compose ... up` with `set REDIS_PASSWORD`. That workflow is currently disabled and the VM unreachable, so nothing breaks today.
+Without `REDIS_PASSWORD`, Redis uses the required `POSTGRES_PASSWORD`, so the current workflow deploys an authenticated Redis. To give Redis its own secret:
 
-Suggested change (owner only):
+1. Add a repository secret `REDIS_PASSWORD`, for example from `openssl rand -hex 32`. Any characters work, because the API percent-encodes it into `REDIS_URL`.
+2. In "Write .env on server", pass it as an env var (`REDIS_PASS: ${{ secrets.REDIS_PASSWORD }}`, also listed in `envs:`) and add `printf 'REDIS_PASSWORD=%s\n' "${REDIS_PASS}"`. The workflow's `REDIS_URL` line can stay: compose sets the API's `REDIS_URL` itself.
 
-1. Add a repository secret `REDIS_PASSWORD`, URL-safe, for example from `openssl rand -hex 32`.
-2. In "Write .env on server", pass it as an env var (`REDIS_PASS: ${{ secrets.REDIS_PASSWORD }}`, also listed in `envs:`), then replace the `REDIS_URL` line with:
+Redis reads `--requirepass` only at start. The first rollout after this PR changes the redis `command`, so `up -d postgres redis` recreates the container. The same happens after a password change.
 
-   ```sh
-   printf 'REDIS_PASSWORD=%s\n' "${REDIS_PASS}"
-   ```
-
-   The compose file builds `REDIS_URL` itself. Optionally add `TRUST_PROXY_HOPS=1`, which is already the default.
-
-3. Redis loads `--requirepass` only when it starts, so the first rollout after this change must recreate the `redis` container. `up -d postgres redis` does that automatically because the command changed.
-
-The deploy step `npx prisma db seed ... || true` now exits non-zero in production (the seed refuses `NODE_ENV=production` without `SEED_ALLOW_PROD=1`). The `|| true` already tolerates that, so no change is needed unless the owner wants the step removed.
+The deploy step `npx prisma db seed ... || true` now exits non-zero in production, because the seed refuses `NODE_ENV=production` without `SEED_ALLOW_PROD=1`. The `|| true` already tolerates that.
