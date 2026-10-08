@@ -45,11 +45,12 @@ describe('@issue-109 normalizeDigits: Arabic-Indic and Persian digit normalizati
 describe('@issue-109 parseAmount: decimal-safe parsing with normalized input', () => {
   // AC1: amounts parse to correct decimal values
   it('parses Arabic-Indic normalized amounts to correct Decimal', () => {
-    expect(parseAmount('123.45')?.toString()).toBe('123.45');
-    expect(parseAmount('1,234.50')?.toString()).toBe('1234.5'); // Decimal.js drops trailing zeros
+    expect(parseAmount(normalizeDigits('١٢٣٫٤٥'))?.toString()).toBe('123.45');
+    expect(parseAmount(normalizeDigits('١٬٢٣٤٫٥٠'))?.toString()).toBe('1234.5'); // Decimal.js drops trailing zeros
   });
 
-  it('parses Arabic thousands/decimal separator style', () => {
+  it('parses ASCII amounts in US and European separator styles', () => {
+    expect(parseAmount('1,234.50')?.toString()).toBe('1234.5');
     expect(parseAmount('1.234,50')?.toString()).toBe('1234.5');
   });
 
@@ -63,8 +64,10 @@ describe('@issue-109 parseAmount: decimal-safe parsing with normalized input', (
   });
 
   it('rejects values beyond Decimal(19,4) bounds', () => {
-    expect(parseAmount('12345678901234567')).toBeNull(); // > 15 integer digits
-    expect(parseAmount('1.12345')).toBeNull(); // > 4 decimal places
+    expect(parseAmount('123456789012345')?.toString()).toBe('123456789012345'); // 15 integer digits: allowed
+    expect(parseAmount('1234567890123456')).toBeNull(); // 16 integer digits: rejected
+    expect(parseAmount('1.1234')?.toString()).toBe('1.1234'); // 4 decimal places: allowed
+    expect(parseAmount('1.12345')).toBeNull(); // 5 decimal places: rejected
   });
 });
 

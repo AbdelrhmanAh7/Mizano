@@ -149,16 +149,17 @@ Tested code head: `a5aeed02dcd38442bca11c75ca6b13d4945152e5` (this file is commi
 
 `normalizeDigits` (`apps/api/src/modules/ai/extraction/rules/rules-normalize.ts`) and its use in the intake rules extractor already exist on master. This PR only adds the acceptance spec `rules-normalize.spec.ts` (tagged `@issue-109`); no production code changes remain. An earlier attempt that also wired the helper into `entity-extraction.service.ts` and `ollama.service.ts` was reverted because dropped bidi marks shift entity offsets.
 
-| REQ | Verified by |
-|---|---|
-| AC1 `١٢٣٫٤٥` → 123.45, `١٬٢٣٤٫٥٠` → 1234.50 | `normalizeDigits` + `findAmounts` cases in rules-normalize.spec.ts |
-| AC2 `٠٧/١٠/٢٠٢٦` = `07/10/2026` | `parseDate` cases (Arabic-Indic and Persian) |
-| AC3 mixed script `EGP ١٢٠٠` | mixed-script `normalizeDigits` and `extractInvoiceFields` cases |
-| AC4 English tests unchanged | `invoice-rules-extractor.spec.ts`, `rules-strategy.spec.ts` untouched and passing |
-| AC5 no float math | `parseAmount` returns Decimal (asserted) |
-| AC6 ≤ ~200 lines | no production code in the diff |
+| REQ                                         | Verified by                                                                       |
+| ------------------------------------------- | --------------------------------------------------------------------------------- |
+| AC1 `١٢٣٫٤٥` → 123.45, `١٬٢٣٤٫٥٠` → 1234.50 | `normalizeDigits` + `findAmounts` cases in rules-normalize.spec.ts                |
+| AC2 `٠٧/١٠/٢٠٢٦` = `07/10/2026`             | `parseDate` cases (Arabic-Indic and Persian)                                      |
+| AC3 mixed script `EGP ١٢٠٠`                 | mixed-script `normalizeDigits` and `extractInvoiceFields` cases                   |
+| AC4 English tests unchanged                 | `invoice-rules-extractor.spec.ts`, `rules-strategy.spec.ts` untouched and passing |
+| AC5 no float math                           | `parseAmount` returns Decimal (asserted)                                          |
+| AC6 ≤ ~200 lines                            | no production code in the diff                                                    |
 
 Commands run (sandbox off, local):
+
 - `npx jest src/modules/ai` in apps/api: Test Suites 60 passed, Tests 1096 passed
 - `npx tsc --noEmit -p .` in apps/api: no errors
 - `prettier --check` on the spec: clean
@@ -166,3 +167,5 @@ Commands run (sandbox off, local):
 Not run: the seeded PDF e2e (removed; see commit a5aeed0).
 
 E2E gate note (#109): this PR changes no production code and no UI or user-flow files, only the unit acceptance spec `rules-normalize.spec.ts`. It is therefore not a user-facing change for e2e-army, which reports "n/a" for PRs that touch no UI. The legacy `e2e-first` status is the retired Playwright gate (owner 2026-10-08) and fails only because the added test is a jest `.spec.ts`, not an e2e file. No e2e-army test was added: it could not exercise the Arabic-digit acceptance criteria, and a smoke test that never checks them would only satisfy the gate.
+
+Review round 3 (#109): the PDF-fixture, offset-preservation and async-path threads target code removed in a5aeed0 (no e2e PDF spec, no wiring in `entity-extraction.service.ts` / `ollama.service.ts`), so nothing remains to fix there. CodeRabbit's spec notes are fixed in `rules-normalize.spec.ts`: amount tests now pass `normalizeDigits(...)` output into `parseAmount`, the European-format case is renamed, and the Decimal(19,4) bound test covers 15/16 integer digits and 4/5 decimals. `npx jest src/modules/ai/extraction/rules` in apps/api: 3 suites, 66 tests passed.
