@@ -143,19 +143,31 @@
   Lint: 4 packages successful
   ```
 
-### PR #106
+### Issue #105 (PR #106) — outbound invoice e-mail volume anomaly alert
 
-- **Commit SHA**: `60309706d1f4a4d44835f06c4f7c22ee50f2bdb3`
-- **Branch**: `ai/105`
+- **Tested commit SHA**: `5cafcc3c4ece8ada25372096348ffa63b9c4a036` (branch `ai/105`)
 - **Commands**:
   ```bash
-  pnpm --filter ./apps/api test email.service
-  pnpm --filter api lint
+  cd apps/api
+  npx jest src/modules/documents/services/email.service.spec.ts
+  npx jest
+  npx eslint src/modules/documents && npx prettier --check src/modules/documents ../../deploy/pi
   ```
-- **Output**:
-  ```text
-  PASS src/modules/documents/services/email.service.spec.ts
-  Test Suites: 1 passed, 1 total
-  Tests:       12 passed, 12 total
-  Lint: 4 packages successful
-  ```
+- **Result**: `email.service.spec.ts` 24 passed. Full API run: 131 of 136 suites pass; after building
+  `@mizano/shared-types` the 4 logger suites pass too. `auth.service.spec.ts` cannot load the native
+  `bcrypt` binding (worktree installed with `--ignore-scripts`); no auth file is changed here.
+  ESLint and Prettier are clean.
+
+| REQ ID    | Requirement                                                                     | Verified by (`email.service.spec.ts`)                                          |
+| --------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| REQ-105-1 | Cold start (no history): only the floor applies                                 | `cold start: ...` (2 tests)                                                    |
+| REQ-105-2 | Zero or tiny baseline never lowers the threshold below the floor                | `zero baseline inside the warm-up`, `a zero floor is rejected`                 |
+| REQ-105-3 | Warm-up boundary: 7 full days floor only, 8 full days `2 x baseline`            | `warm-up boundary: 7 ...`, `warm-up boundary: 8 ...`                           |
+| REQ-105-4 | Floor versus ratio selection; baseline capped at 30 full days                   | `after the warm-up ...`, `never averages over more than 30`                    |
+| REQ-105-5 | One alert on start, one on recovery, deduped; retried if Telegram fails         | `alerts once ...`, `does not record the alert ...`, `retries the recovery ...` |
+| REQ-105-6 | Alert text is count and threshold only, no invoice data or addresses            | `alert text carries the count and threshold only`                              |
+| REQ-105-7 | Notify only: a failing check never changes the send result; no raw error logged | `a failing check is logged without the raw error ...`                          |
+| REQ-105-8 | `NOTIFY_ANOMALY_MIN_DAILY` (and the Telegram chat id) wired for the Pi          | `deploy/pi/.env.pi.example`, `deploy/pi/docker-compose.pi.yml` diff            |
+
+Not verified here: the `EmailLog (organizationId, entityType, sentAt)` index (requested in `AI_QUESTIONS.md`,
+schema change left to the coordinator) and an HTTP-level E2E, which needs Postgres and Redis (no Redis in this worktree).
