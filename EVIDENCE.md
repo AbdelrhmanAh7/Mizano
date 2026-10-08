@@ -229,3 +229,9 @@ is executed. The PR should reference the issue (`Refs #42`), not close it.
 | ↳ Web Jest (inside `ci:full`)                                               | 48 suites passed, 458 tests passed                                                           |
 | `bash deploy/pi/scripts/worker-health.test.sh`                              | 8 checks passed                                                                              |
 | Pi p50/p95 and peak RAM per document type; API p95 on the Pi during a batch | Unknown — not measured                                                                       |
+
+### Review-round additions (PR #93)
+
+- **Unresolved vendor goes to review**: `needsReview` treats `matchedVendor === null` (no match, or a tie) as an exception; `undefined` (matching not run, e.g. the benchmark) is not. Verified in `intake-processor.service.spec.ts`.
+- **Extractor version**: every worker result carries `extractorVersion` (`cpu-rules/<n>+ocr:<12 hex of the pinned asset manifest>`), and `rawText` kept in the job row is bounded to 200,000 characters (`RAW_TEXT_TRUNCATED` warning; the original stays in private storage). Verified in `cpu-structured.spec.ts`.
+- **Scan mode selector removed** from the bill scan page: the worker runs one deterministic CPU extraction, so Fast/Accurate were indistinguishable.

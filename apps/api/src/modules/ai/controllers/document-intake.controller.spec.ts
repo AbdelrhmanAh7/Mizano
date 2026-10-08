@@ -210,7 +210,7 @@ describe('DocumentIntakeController', () => {
         );
         const current = jest
           .spyOn(I18nContext, 'current')
-          .mockReturnValue({ lang } as unknown as I18nContext);
+          .mockReturnValue({ lang } as unknown as ReturnType<typeof I18nContext.current>);
         try {
           const stream = await controller.streamProgress(ORG_A, 'job-1');
           const events = await firstValueFrom(stream.pipe(toArray()));

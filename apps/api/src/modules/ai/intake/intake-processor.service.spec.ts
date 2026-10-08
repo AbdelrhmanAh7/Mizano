@@ -230,6 +230,10 @@ describe('IntakeProcessorService', () => {
   describe('structured CPU extraction and database matching', () => {
     it('a worker job with OCR text becomes structured fields and is ready without review', async () => {
       intake.run.mockResolvedValue(structuredCpuResult(fixture('en-eg-invoice.txt'), 0.95));
+      const vendor = { id: 'vendor-1', name: 'Cairo Office Supplies Co.', similarity: 1 };
+      matching.enrich.mockImplementation((_org: string, r: DocumentIntakeResult) =>
+        Promise.resolve({ ...r, matchedVendor: vendor, vendorCandidates: [vendor] }),
+      );
       const job = await seed();
       await processor.handle({ jobId: job.id, organizationId: ORG_A });
       expect(table.rows[0].status).toBe(IntakeJobStatus.EXTRACTED);
@@ -245,6 +249,25 @@ describe('IntakeProcessorService', () => {
           currency: 'EGP',
           vendorName: 'Cairo Office Supplies Co.',
         },
+      });
+    });
+
+    it('sends a fully read document with no resolved vendor (none or a tie) to review', async () => {
+      intake.run.mockResolvedValue(structuredCpuResult(fixture('en-eg-invoice.txt'), 0.95));
+      matching.enrich.mockImplementation((_org: string, r: DocumentIntakeResult) =>
+        Promise.resolve({ ...r, matchedVendor: null }),
+      );
+      const job = await seed();
+      await processor.handle({ jobId: job.id, organizationId: ORG_A });
+      expect(table.rows[0].status).toBe(IntakeJobStatus.NEEDS_REVIEW);
+    });
+
+    it('records the extractor version with the stored result', async () => {
+      intake.run.mockResolvedValue(structuredCpuResult(fixture('en-eg-invoice.txt'), 0.95));
+      const job = await seed();
+      await processor.handle({ jobId: job.id, organizationId: ORG_A });
+      expect(table.rows[0].result).toMatchObject({
+        extractorVersion: expect.stringMatching(/^cpu-rules\/\d+\+ocr:/),
       });
     });
 

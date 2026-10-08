@@ -6,6 +6,8 @@ import { RulesStrategy } from '../extraction/rules-strategy.service';
 import {
   classifyDocumentText,
   cpuReviewResult,
+  extractorVersion,
+  MAX_STORED_RAW_TEXT,
   MIN_RULES_TEXT_LENGTH,
   NATIVE_TEXT_CONFIDENCE,
   structuredCpuResult,
@@ -103,9 +105,24 @@ describe('structuredCpuResult: rules extraction over worker text', () => {
     expect(weak).toBeLessThan(0.6);
   });
 
+  it('stamps the extractor version and bounds the raw text kept with the result', () => {
+    const text = fixture('en-eg-invoice.txt');
+    const result = structuredCpuResult(text, 0.95);
+    expect(result.extractorVersion).toMatch(/^cpu-rules\/\d+\+ocr:[0-9a-f]{12}$/);
+    expect(result.extractionWarnings).not.toContain('RAW_TEXT_TRUNCATED');
+
+    const huge = structuredCpuResult(`${text}\n${'x'.repeat(MAX_STORED_RAW_TEXT)}`, 0.95);
+    expect(huge.rawText).toHaveLength(MAX_STORED_RAW_TEXT);
+    expect(huge.extractionWarnings).toContain('RAW_TEXT_TRUNCATED');
+    expect(huge.extractedFields.total).toBe('1140.0000');
+  });
+
   it(`stays evidence-only below ${MIN_RULES_TEXT_LENGTH} characters of text`, () => {
     const result = structuredCpuResult('  ab \n ', 0.9);
-    expect(result).toEqual(cpuReviewResult('  ab \n ', 0.9));
+    expect(result).toEqual({
+      ...cpuReviewResult('  ab \n ', 0.9),
+      extractorVersion: extractorVersion(),
+    });
     expect(result).toMatchObject({
       documentType: 'OTHER',
       extractionMethod: 'cpu-ocr',
@@ -126,6 +143,7 @@ describe('structuredCpuResult: rules extraction over worker text', () => {
       expect(result).toEqual({
         ...cpuReviewResult(text, NATIVE_TEXT_CONFIDENCE),
         extractionWarnings: ['RULES_FAILED'],
+        extractorVersion: extractorVersion(),
       });
       expect(result.extractedFields.total).toBeNull();
       expect(JSON.stringify(result.extractionWarnings)).not.toContain('SECRET');

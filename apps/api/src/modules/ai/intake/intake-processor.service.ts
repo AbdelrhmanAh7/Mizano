@@ -21,6 +21,7 @@ export type ReviewInput = Pick<
 > & {
   extractedFields: Pick<DocumentIntakeResult['extractedFields'], 'total' | 'date'>;
   duplicateWarning?: DocumentIntakeResult['duplicateWarning'];
+  matchedVendor?: DocumentIntakeResult['matchedVendor'];
 };
 
 /** Decide whether an accountant must look before approval. */
@@ -33,7 +34,9 @@ export function needsReview(result: ReviewInput): boolean {
     fields.date === null ||
     result.documentType === 'OTHER' ||
     result.documentType === 'RECEIPT' ||
-    result.duplicateWarning?.isDuplicate === true
+    result.duplicateWarning?.isDuplicate === true ||
+    // No resolved supplier (none found, or two strong candidates tied); undefined means matching has not run: a draft needs one.
+    result.matchedVendor === null
   );
 }
 

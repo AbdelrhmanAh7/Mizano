@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { toExtractionResult } from '../extraction/rules-strategy.service';
 import { extractInvoiceFields } from '../extraction/rules/invoice-rules-extractor';
 import { foldForMatch, normalizeDigits } from '../extraction/rules/rules-normalize';
@@ -9,6 +12,29 @@ import type { DocumentIntakeResult, IntakeDocumentType } from '../services/docum
  * structured fields with evidence out. Tenant-scoped matching needs the database and runs later
  * in the worker process (`IntakeMatchingService`).
  */
+
+/** Bump when the rules, classifier or review thresholds change in a way that alters results. */
+export const CPU_RULES_VERSION = 'cpu-rules/1';
+
+/** Raw text kept with a job is bounded: the original document stays in private storage. */
+export const MAX_STORED_RAW_TEXT = 200_000;
+
+let cachedVersion: string | undefined;
+
+/** Rules version plus a short hash of the pinned OCR asset manifest baked into the image. */
+export function extractorVersion(): string {
+  if (!cachedVersion) {
+    let assets = 'unpinned';
+    try {
+      const manifest = readFileSync(join(__dirname, '../../../../ocr-assets.sha256'));
+      assets = createHash('sha256').update(manifest).digest('hex').slice(0, 12);
+    } catch {
+      // Outside the image the manifest may be absent; the version then says so.
+    }
+    cachedVersion = `${CPU_RULES_VERSION}+ocr:${assets}`;
+  }
+  return cachedVersion;
+}
 
 /** Same floor as the rules strategy: shorter text is not a document, so nothing is parsed. */
 export const MIN_RULES_TEXT_LENGTH = 10;
@@ -106,6 +132,23 @@ export function classifyDocumentText(rawText: string): {
  *   {@link NATIVE_TEXT_CONFIDENCE} for an embedded text layer
  */
 export function structuredCpuResult(rawText: string, textConfidence: number): DocumentIntakeResult {
+  return stamped(buildResult(rawText, textConfidence), rawText);
+}
+
+/** Record which extractor produced the result and bound the raw text kept in the job row. */
+function stamped(result: DocumentIntakeResult, rawText: string): DocumentIntakeResult {
+  const truncated = rawText.length > MAX_STORED_RAW_TEXT;
+  return {
+    ...result,
+    rawText: truncated ? rawText.slice(0, MAX_STORED_RAW_TEXT) : rawText,
+    ...(truncated && {
+      extractionWarnings: [...(result.extractionWarnings ?? []), 'RAW_TEXT_TRUNCATED'],
+    }),
+    extractorVersion: extractorVersion(),
+  };
+}
+
+function buildResult(rawText: string, textConfidence: number): DocumentIntakeResult {
   if (rawText.trim().length < MIN_RULES_TEXT_LENGTH) {
     return cpuReviewResult(rawText, textConfidence);
   }

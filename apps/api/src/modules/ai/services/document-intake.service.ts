@@ -121,6 +121,9 @@ export interface DocumentIntakeResult {
     | 'hybrid-ocr'
     | 'hybrid-vlm'
     | 'rules';
+
+  /** CPU worker only: rules version and pinned OCR asset hash that produced this result. */
+  extractorVersion?: string;
 }
 
 /**
