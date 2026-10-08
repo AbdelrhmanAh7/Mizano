@@ -12,10 +12,10 @@
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "type-check": "tsc --noEmit && tsc --noEmit -p test/tsconfig.e2e.json",
-    "test": "jest --maxWorkers=2",
-    "test:watch": "jest --watch --maxWorkers=2",
-    "test:cov": "jest --coverage --maxWorkers=2",
-    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test": "jest --config _jest.config.js --maxWorkers=2",
+    "test:watch": "jest --config _jest.config.js --watch --maxWorkers=2",
+    "test:cov": "jest --config _jest.config.js --coverage --maxWorkers=2",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --config _jest.config.js --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "download-ocr-models": "bash scripts/download-paddle-models.sh"
   },
@@ -115,25 +115,5 @@
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node",
-    "setupFilesAfterEnv": [
-      "<rootDir>/test/setup.ts"
-    ]
   }
 }

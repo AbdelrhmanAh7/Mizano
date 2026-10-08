@@ -25,7 +25,14 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "test/**", "jest.config.*", "tsconfig.json"],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "jest.config.*",
+        "_jest.config.js",
+        "_jest_resolver.js",
+        "tsconfig.json"
+      ],
       "outputs": ["coverage/**"]
     },
     "type-check": {
