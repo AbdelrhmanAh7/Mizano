@@ -97,6 +97,7 @@ services:
       OLLAMA_ENABLED: ${OLLAMA_ENABLED:-false}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       INTAKE_STORAGE_DIR: /data/originals
+      AI_SCHEDULERS_ENABLED: ${AI_SCHEDULERS_ENABLED:-false}
     volumes:
       - ${MIZANO_DATA_DIR:-/mnt/ssd/mizano}/originals:/data/originals
     depends_on:

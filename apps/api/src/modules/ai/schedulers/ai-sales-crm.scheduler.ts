@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ChurnPredictionService } from '../services/churn-prediction.service';
 import { ClvAnalysisService } from '../services/clv-analysis.service';
@@ -13,6 +14,7 @@ const BATCH_SIZE = 5;
 @Injectable()
 export class AiSalesCrmScheduler {
   private readonly logger = new Logger(AiSalesCrmScheduler.name);
+  private readonly enabled: boolean;
 
   constructor(
     private prisma: PrismaService,
@@ -21,13 +23,30 @@ export class AiSalesCrmScheduler {
     private crossSellService: CrossSellService,
     private pricingService: DynamicPricingService,
     private pipelineService: PipelineForecastService,
-  ) {}
+    private config: ConfigService,
+  ) {
+    this.enabled = config.get('AI_SCHEDULERS_ENABLED') === 'true';
+    if (!this.enabled) {
+      this.logger.log(
+        'AI_SCHEDULERS_ENABLED is not set to true; AI Sales/CRM schedulers are disabled',
+      );
+    }
+  }
+
+  private guard(): boolean {
+    if (!this.enabled) {
+      this.logger.debug('AI scheduler skipped (AI_SCHEDULERS_ENABLED != true)');
+      return false;
+    }
+    return true;
+  }
 
   /**
    * Weekly churn prediction - runs every Sunday at 4 AM
    */
   @Cron('0 4 * * 0')
   async runWeeklyChurnPrediction() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly churn prediction...');
 
     try {
@@ -71,6 +90,7 @@ export class AiSalesCrmScheduler {
    */
   @Cron('0 3 1 * *')
   async runMonthlyCLVCalculation() {
+    if (!this.guard()) return;
     this.logger.log('Starting monthly CLV calculation...');
 
     try {
@@ -110,6 +130,7 @@ export class AiSalesCrmScheduler {
    */
   @Cron('0 2 * * 6')
   async runWeeklyCrossSellRebuild() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly cross-sell matrix rebuild...');
 
     try {
@@ -153,6 +174,7 @@ export class AiSalesCrmScheduler {
    */
   @Cron('0 4 1 * *')
   async runMonthlyPricingAnalysis() {
+    if (!this.guard()) return;
     this.logger.log('Starting monthly pricing analysis...');
 
     try {
@@ -196,6 +218,7 @@ export class AiSalesCrmScheduler {
    */
   @Cron('0 6 * * 1')
   async runWeeklyPipelineForecast() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly pipeline forecast...');
 
     try {

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AnomalyDetectionService } from '../services/anomaly-detection.service';
 import { ReorderPointsService } from '../services/reorder-points.service';
@@ -17,6 +18,7 @@ const BATCH_SIZE = 5;
 @Injectable()
 export class AiOperationsScheduler {
   private readonly logger = new Logger(AiOperationsScheduler.name);
+  private readonly enabled: boolean;
 
   constructor(
     private prisma: PrismaService,
@@ -29,7 +31,23 @@ export class AiOperationsScheduler {
     private leadScoringService: LeadScoringService,
     private patternDetectionService: PatternDetectionService,
     private aiAlertsService: AiAlertsService,
-  ) {}
+    private config: ConfigService,
+  ) {
+    this.enabled = config.get('AI_SCHEDULERS_ENABLED') === 'true';
+    if (!this.enabled) {
+      this.logger.log(
+        'AI_SCHEDULERS_ENABLED is not set to true; AI Operations schedulers are disabled',
+      );
+    }
+  }
+
+  private guard(): boolean {
+    if (!this.enabled) {
+      this.logger.debug('AI scheduler skipped (AI_SCHEDULERS_ENABLED != true)');
+      return false;
+    }
+    return true;
+  }
 
   /**
    * Daily anomaly scan - runs at 2 AM
@@ -37,6 +55,7 @@ export class AiOperationsScheduler {
    */
   @Cron('0 2 * * *')
   async runDailyAnomalyScan() {
+    if (!this.guard()) return;
     this.logger.log('Starting daily anomaly scan...');
 
     try {
@@ -86,6 +105,7 @@ export class AiOperationsScheduler {
    */
   @Cron('0 0 * * 0')
   async runWeeklyReorderUpdate() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly reorder points update...');
 
     try {
@@ -128,6 +148,7 @@ export class AiOperationsScheduler {
    */
   @Cron('0 1 * * 0')
   async runWeeklyDemandForecast() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly demand forecast update...');
 
     try {
@@ -179,6 +200,7 @@ export class AiOperationsScheduler {
    */
   @Cron('0 3 * * *')
   async runDailyCashFlowPrediction() {
+    if (!this.guard()) return;
     this.logger.log('Starting daily cash flow prediction update...');
 
     try {
@@ -224,6 +246,7 @@ export class AiOperationsScheduler {
    */
   @Cron('0 0 * * 0')
   async runWeeklyLeadScoringUpdate() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly lead scoring update...');
 
     try {
@@ -269,6 +292,7 @@ export class AiOperationsScheduler {
    */
   @Cron('0 2 * * 0')
   async runWeeklyPaymentPredictionUpdate() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly payment prediction update...');
 
     try {
@@ -311,6 +335,7 @@ export class AiOperationsScheduler {
    */
   @Cron('0 6 1 * *')
   async runMonthlyNarrativeGeneration() {
+    if (!this.guard()) return;
     this.logger.log('Starting monthly narrative generation...');
 
     try {
@@ -382,6 +407,7 @@ export class AiOperationsScheduler {
    */
   @Cron('0 3 * * 0')
   async runWeeklyPatternDetection() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly pattern detection analysis...');
 
     try {
@@ -427,6 +453,7 @@ export class AiOperationsScheduler {
    */
   @Cron('30 */4 * * *')
   async runHourlyAlertAggregation() {
+    if (!this.guard()) return;
     this.logger.log('Starting hourly AI alerts aggregation...');
 
     try {
@@ -474,6 +501,7 @@ export class AiOperationsScheduler {
    */
   @Cron('0 4 * * *')
   async runDailyAlertCleanup() {
+    if (!this.guard()) return;
     this.logger.log('Starting daily AI alerts cleanup...');
 
     try {
@@ -518,6 +546,7 @@ export class AiOperationsScheduler {
    */
   @Cron('0 5 * * 0')
   async runWeeklyStalePatternCheck() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly stale pattern check...');
 
     try {
@@ -548,6 +577,7 @@ export class AiOperationsScheduler {
    */
   @Cron('0 4 * * 6')
   async runWeeklyCleanup() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly AI data cleanup...');
 
     try {
@@ -586,6 +616,7 @@ export class AiOperationsScheduler {
    */
   @Cron('0 2 1 * *')
   async runMonthlyAbcAnalysis() {
+    if (!this.guard()) return;
     this.logger.log('Starting monthly ABC analysis...');
 
     try {

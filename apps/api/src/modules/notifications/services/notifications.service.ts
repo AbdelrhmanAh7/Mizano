@@ -5,6 +5,9 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { UserStatus } from '@prisma/client';
 
+const NOTIFICATION_BATCH_SIZE = 50;
+const NOTIFICATION_QUERY_LIMIT = 100;
+
 @Injectable()
 export class NotificationsService {
   constructor(private prisma: PrismaService) {}
@@ -134,29 +137,40 @@ export class NotificationsService {
   // Scheduled notification checks
   @Cron(CronExpression.EVERY_HOUR)
   async checkOverdueInvoices() {
-    const overdueInvoices = await this.prisma.invoice.findMany({
-      where: {
-        deletedAt: null,
-        dueDate: { lt: new Date() },
-        balanceDue: { gt: 0 },
-        status: { not: 'OVERDUE' },
-      },
-      include: {
-        organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
-      },
+    // Process in batches to avoid memory pressure on Pi
+    const organizations = await this.prisma.organization.findMany({
+      where: {},
+      select: { id: true },
+      take: NOTIFICATION_BATCH_SIZE,
     });
 
-    for (const invoice of overdueInvoices) {
-      const adminUser = invoice.organization.users[0];
-      if (adminUser) {
-        await this.createForUser(
-          adminUser.id,
-          invoice.organizationId,
-          'INVOICE_OVERDUE',
-          'Invoice Overdue',
-          `Invoice ${invoice.invoiceNumber} is now overdue.`,
-          { entityType: 'invoice', entityId: invoice.id },
-        );
+    for (const org of organizations) {
+      const overdueInvoices = await this.prisma.invoice.findMany({
+        where: {
+          organizationId: org.id,
+          deletedAt: null,
+          dueDate: { lt: new Date() },
+          balanceDue: { gt: 0 },
+          status: { not: 'OVERDUE' },
+        },
+        take: NOTIFICATION_QUERY_LIMIT,
+        include: {
+          organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
+        },
+      });
+
+      for (const invoice of overdueInvoices) {
+        const adminUser = invoice.organization.users[0];
+        if (adminUser) {
+          await this.createForUser(
+            adminUser.id,
+            invoice.organizationId,
+            'INVOICE_OVERDUE',
+            'Invoice Overdue',
+            `Invoice ${invoice.invoiceNumber} is now overdue.`,
+            { entityType: 'invoice', entityId: invoice.id },
+          );
+        }
       }
     }
   }
@@ -166,63 +180,84 @@ export class NotificationsService {
     const threeDaysFromNow = new Date();
     threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
 
-    const upcomingBills = await this.prisma.bill.findMany({
-      where: {
-        deletedAt: null,
-        dueDate: { gte: new Date(), lte: threeDaysFromNow },
-        balanceDue: { gt: 0 },
-      },
-      include: {
-        organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
-      },
+    // Process in batches to avoid memory pressure on Pi
+    const organizations = await this.prisma.organization.findMany({
+      where: {},
+      select: { id: true },
+      take: NOTIFICATION_BATCH_SIZE,
     });
 
-    for (const bill of upcomingBills) {
-      const adminUser = bill.organization.users[0];
-      if (adminUser) {
-        await this.createForUser(
-          adminUser.id,
-          bill.organizationId,
-          'BILL_DUE',
-          'Bill Payment Due Soon',
-          `Bill ${bill.billNumber} is due in ${Math.ceil((bill.dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))} days.`,
-          { entityType: 'bill', entityId: bill.id },
-        );
+    for (const org of organizations) {
+      const upcomingBills = await this.prisma.bill.findMany({
+        where: {
+          organizationId: org.id,
+          deletedAt: null,
+          dueDate: { gte: new Date(), lte: threeDaysFromNow },
+          balanceDue: { gt: 0 },
+        },
+        take: NOTIFICATION_QUERY_LIMIT,
+        include: {
+          organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
+        },
+      });
+
+      for (const bill of upcomingBills) {
+        const adminUser = bill.organization.users[0];
+        if (adminUser) {
+          await this.createForUser(
+            adminUser.id,
+            bill.organizationId,
+            'BILL_DUE',
+            'Bill Payment Due Soon',
+            `Bill ${bill.billNumber} is due in ${Math.ceil((bill.dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))} days.`,
+            { entityType: 'bill', entityId: bill.id },
+          );
+        }
       }
     }
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_8AM)
   async checkLowInventory() {
-    const items = await this.prisma.item.findMany({
-      where: { type: 'GOODS' },
-      include: {
-        organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
-      },
+    // Process in batches to avoid memory pressure on Pi
+    const organizations = await this.prisma.organization.findMany({
+      where: {},
+      select: { id: true },
+      take: NOTIFICATION_BATCH_SIZE,
     });
 
-    for (const item of items) {
-      const movements = await this.prisma.inventoryMovement.findMany({
-        where: { itemId: item.id, organizationId: item.organizationId },
-        select: { quantity: true, movementType: true },
+    for (const org of organizations) {
+      const items = await this.prisma.item.findMany({
+        where: { organizationId: org.id, type: 'GOODS' },
+        take: NOTIFICATION_QUERY_LIMIT,
+        include: {
+          organization: { include: { users: { where: { status: UserStatus.ACTIVE }, take: 1 } } },
+        },
       });
-      const currentStock = movements.reduce(
-        (sum: number, m) => sum + signedMovementQuantity(m.quantity, m.movementType),
-        0,
-      );
-      const reorderPoint = item.reorderPoint || 10;
 
-      if (currentStock <= reorderPoint) {
-        const adminUser = item.organization.users[0];
-        if (adminUser) {
-          await this.createForUser(
-            adminUser.id,
-            item.organizationId,
-            'LOW_STOCK',
-            'Low Stock Alert',
-            `${item.name} is running low (${currentStock} remaining).`,
-            { entityType: 'item', entityId: item.id },
-          );
+      for (const item of items) {
+        const movements = await this.prisma.inventoryMovement.findMany({
+          where: { itemId: item.id, organizationId: item.organizationId },
+          select: { quantity: true, movementType: true },
+        });
+        const currentStock = movements.reduce(
+          (sum: number, m) => sum + signedMovementQuantity(m.quantity, m.movementType),
+          0,
+        );
+        const reorderPoint = item.reorderPoint || 10;
+
+        if (currentStock <= reorderPoint) {
+          const adminUser = item.organization.users[0];
+          if (adminUser) {
+            await this.createForUser(
+              adminUser.id,
+              item.organizationId,
+              'LOW_STOCK',
+              'Low Stock Alert',
+              `${item.name} is running low (${currentStock} remaining).`,
+              { entityType: 'item', entityId: item.id },
+            );
+          }
         }
       }
     }

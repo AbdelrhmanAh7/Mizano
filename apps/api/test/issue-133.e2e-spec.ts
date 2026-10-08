@@ -4,13 +4,11 @@
  */
 import { INestApplication } from '@nestjs/common';
 import { DiscoveryService, MetadataScanner } from '@nestjs/core';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ScheduleModule, SchedulerRegistry } from '@nestjs/schedule';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { ThrottlerModule } from '@nestjs/throttler';
 
 class UnlimitedThrottlerStorage implements ThrottlerStorage {
   async increment(_key: string, ttl: number): ReturnType<ThrottlerStorage['increment']> {

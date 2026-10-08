@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { DocumentClassificationService } from '../services/document-classification.service';
 import { KnowledgeAssistantService } from '../services/knowledge-assistant.service';
@@ -10,18 +11,36 @@ const BATCH_SIZE = 5;
 @Injectable()
 export class AiNlpChatScheduler {
   private readonly logger = new Logger(AiNlpChatScheduler.name);
+  private readonly enabled: boolean;
 
   constructor(
     private prisma: PrismaService,
     private docClassificationService: DocumentClassificationService,
     private knowledgeService: KnowledgeAssistantService,
-  ) {}
+    private config: ConfigService,
+  ) {
+    this.enabled = config.get('AI_SCHEDULERS_ENABLED') === 'true';
+    if (!this.enabled) {
+      this.logger.log(
+        'AI_SCHEDULERS_ENABLED is not set to true; AI NLP/Chat schedulers are disabled',
+      );
+    }
+  }
+
+  private guard(): boolean {
+    if (!this.enabled) {
+      this.logger.debug('AI scheduler skipped (AI_SCHEDULERS_ENABLED != true)');
+      return false;
+    }
+    return true;
+  }
 
   /**
    * Periodic document classification retraining - runs every 6 hours
    */
   @Cron('30 */6 * * *')
   async checkDocClassificationRetraining() {
+    if (!this.guard()) return;
     this.logger.log('Running periodic document classification retraining...');
 
     try {
@@ -66,6 +85,7 @@ export class AiNlpChatScheduler {
    */
   @Cron('0 3 * * 6')
   async runWeeklyKnowledgeIndexRebuild() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly knowledge index rebuild...');
 
     try {

@@ -94,7 +94,6 @@ pnpm test:e2e
 apps/web     Next.js 14 accountant UI (en/ar, RTL)
 apps/api     NestJS 10 API, Prisma schema, migrations and seed
 packages/    shared-types and validators (Zod)
-services/    legacy ollama-proxy (Colab tunnel) still referenced by the AI module
 docs/        ARCHITECTURE, DEVELOPMENT, DESIGN-SYSTEM, roadmap, strategy, planning, agents, archive
 scripts/     GitHub planning sync and its offline tests
 nginx/       production reverse proxy configuration

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FraudDetectionService } from '../services/fraud-detection.service';
 import { ComplianceMonitoringService } from '../services/compliance-monitoring.service';
@@ -11,19 +12,37 @@ const BATCH_SIZE = 5;
 @Injectable()
 export class AiSecurityScheduler {
   private readonly logger = new Logger(AiSecurityScheduler.name);
+  private readonly enabled: boolean;
 
   constructor(
     private prisma: PrismaService,
     private fraudService: FraudDetectionService,
     private complianceService: ComplianceMonitoringService,
     private auditRiskService: AuditRiskService,
-  ) {}
+    private config: ConfigService,
+  ) {
+    this.enabled = config.get('AI_SCHEDULERS_ENABLED') === 'true';
+    if (!this.enabled) {
+      this.logger.log(
+        'AI_SCHEDULERS_ENABLED is not set to true; AI Security schedulers are disabled',
+      );
+    }
+  }
+
+  private guard(): boolean {
+    if (!this.enabled) {
+      this.logger.debug('AI scheduler skipped (AI_SCHEDULERS_ENABLED != true)');
+      return false;
+    }
+    return true;
+  }
 
   /**
    * Daily fraud scan - runs at 1 AM
    */
   @Cron('0 1 * * *')
   async runDailyFraudScan() {
+    if (!this.guard()) return;
     this.logger.log('Starting daily fraud scan...');
 
     try {
@@ -69,6 +88,7 @@ export class AiSecurityScheduler {
    */
   @Cron('0 5 * * *')
   async runDailyComplianceCheck() {
+    if (!this.guard()) return;
     this.logger.log('Starting daily compliance check...');
 
     try {
@@ -112,6 +132,7 @@ export class AiSecurityScheduler {
    */
   @Cron('0 6 * * 0')
   async runWeeklyAuditRiskScoring() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly audit risk scoring...');
 
     try {
@@ -159,6 +180,7 @@ export class AiSecurityScheduler {
    */
   @Cron('0 3 * * 6')
   async runWeeklyFraudAlertCleanup() {
+    if (!this.guard()) return;
     this.logger.log('Starting weekly fraud alert cleanup...');
 
     try {

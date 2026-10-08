@@ -20,10 +20,6 @@ import { TransactionCategorizerService } from './services/transaction-categorize
 import { AiController } from './controllers/ai.controller';
 import { CategorizationController } from './controllers/categorization.controller';
 import { DeepSearchController } from './controllers/deep-search.controller';
-import { NarrativeController } from './controllers/narrative.controller';
-
-// Financial narrative
-import { FinancialNarrativeService } from './services/financial-narrative.service';
 
 // Cross-cutting operations scheduler
 import { AiOperationsScheduler } from './schedulers/ai-operations.scheduler';
@@ -39,7 +35,7 @@ import { AiOperationsScheduler } from './schedulers/ai-operations.scheduler';
     AiOperationsModule,
     AiHrModule,
   ],
-  controllers: [AiController, CategorizationController, DeepSearchController, NarrativeController],
+  controllers: [AiController, CategorizationController, DeepSearchController],
   providers: [
     // Legacy orchestration services
     AiCategorizationService,
@@ -48,8 +44,6 @@ import { AiOperationsScheduler } from './schedulers/ai-operations.scheduler';
     TransactionCategorizerService,
     // DeepSearch is standalone
     DeepSearchService,
-    // Financial narrative
-    FinancialNarrativeService,
     // Cross-cutting operations scheduler (uses services from core, operations, forecasting, sales-crm)
     AiOperationsScheduler,
   ],
@@ -67,7 +61,6 @@ import { AiOperationsScheduler } from './schedulers/ai-operations.scheduler';
     AiForecastingService,
     TransactionCategorizerService,
     DeepSearchService,
-    FinancialNarrativeService,
   ],
 })
 export class AiModule {}
