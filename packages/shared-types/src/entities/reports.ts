@@ -134,6 +134,15 @@ export interface VatReturnDraftException {
   reason: string;
 }
 
+/** A document whose header tax differs from the per-line tax ETA recomputes at submission. */
+export interface VatReturnDraftEtaMismatch {
+  id: string;
+  type: 'invoice' | 'bill';
+  documentNumber: string;
+  headerTax: string;
+  lineTax: string;
+}
+
 export const VAT_RETURN_DRAFT_LABEL = 'DRAFT, not for filing' as const;
 
 export interface VatReturnDraft {
@@ -145,4 +154,5 @@ export interface VatReturnDraft {
   inputTax: string;
   netPayable: string;
   exceptions: VatReturnDraftException[];
+  etaMismatches: VatReturnDraftEtaMismatch[];
 }
