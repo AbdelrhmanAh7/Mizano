@@ -312,6 +312,21 @@ Checking formatting...
 All matched files use Prettier code style!
 ```
 
+## Round 7 recheck (tested head `e2a560a`)
+
+The remaining `.gitignore` thread (CRLF on the added lines) was written against commit `55bc448`; round 6 already replaced that diff. At this head the two added lines are LF: no `\r` byte in any `+` line, and `git diff --check` is clean. The only CRLF bytes in the `.gitignore` diff are `master`'s own unchanged context lines, which round 6 deliberately left alone. Round 7 also merged `origin/master` (`4b6edad`, an unrelated CI change) into the branch; no conflicts.
+
+```text
+$ git rev-parse HEAD   (before the evidence commit)
+e2a560af33f92c932b9d2fc3976960127ccebef0
+$ git diff --check origin/master...HEAD; echo exit=$?
+exit=0
+$ git diff origin/master...HEAD -- .gitignore | grep '^+' | od -c | grep -c '\\r'
+0
+$ git check-ignore -v deploy/pi/.env.pi
+.gitignore:16:deploy/pi/.env.pi	deploy/pi/.env.pi
+```
+
 ## Acceptance checklist (Tech Lead plan)
 
 | Item                                                                           | Status                                                                                                                                                        |
