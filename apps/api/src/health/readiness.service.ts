@@ -27,11 +27,14 @@ function envNumber(name: string, fallback: number, max: number): number {
  * Readiness probes for the Pi monitor (#43). Both probes always run so one failure cannot hide
  * the other, the DB probe is raced against a timeout so a hung database cannot hold the request
  * open, and the report only ever contains fixed strings and two numbers: error text and paths
- * stay in the (redacted) log.
+ * stay in the (redacted) log. At most one `SELECT 1` is in flight: requests arriving while it is
+ * pending share it, so timed-out probes cannot pile up in the Prisma pool queue (that wait is
+ * itself bounded by `pool_timeout`, see PrismaService).
  */
 @Injectable()
 export class ReadinessService {
   private readonly logger = new Logger(ReadinessService.name);
+  private pendingDbQuery?: Promise<unknown>;
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -48,7 +51,10 @@ export class ReadinessService {
       timer = setTimeout(() => reject(new Error('readiness db probe timed out')), timeoutMs);
     });
     try {
-      await Promise.race([this.prisma.$queryRaw`SELECT 1`, timeout]);
+      this.pendingDbQuery ??= Promise.resolve(this.prisma.$queryRaw`SELECT 1`).finally(() => {
+        this.pendingDbQuery = undefined;
+      });
+      await Promise.race([this.pendingDbQuery, timeout]);
       return 'ok';
     } catch (error) {
       this.logger.warn(`DB probe failed: ${describeError(error, { includeMessage: false })}`);
@@ -62,14 +68,16 @@ export class ReadinessService {
     const minFreePct = envNumber('READY_MIN_FREE_PCT', DEFAULT_MIN_FREE_PCT, 100);
     try {
       const stat = await fs.promises.statfs(process.env.DATA_DIR || process.cwd());
+      // bavail, not bfree: root-reserved blocks are not usable by the API process.
       const blocks = Number(stat.blocks);
-      const bfree = Number(stat.bfree);
-      const freePct = blocks > 0 ? Math.round((bfree / blocks) * 10_000) / 100 : 0;
-      if (freePct < minFreePct) {
+      const bavail = Number(stat.bavail);
+      const rawPct = blocks > 0 ? (bavail / blocks) * 100 : 0;
+      const freePct = Math.round(rawPct * 100) / 100;
+      if (rawPct < minFreePct) {
         this.logger.warn(`Disk probe below threshold: ${freePct}% free, minimum ${minFreePct}%`);
         return 'fail';
       }
-      return { freeBytes: bfree * Number(stat.bsize), freePct };
+      return { freeBytes: bavail * Number(stat.bsize), freePct };
     } catch (error) {
       this.logger.warn(`Disk probe failed: ${describeError(error, { includeMessage: false })}`);
       return 'fail';
