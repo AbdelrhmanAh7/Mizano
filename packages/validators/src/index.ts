@@ -948,3 +948,17 @@ export const recordSearchHistorySchema = z.object({
 
 export type GlobalSearchInput = z.infer<typeof globalSearchSchema>;
 export type RecordSearchHistoryInput = z.infer<typeof recordSearchHistorySchema>;
+
+// System / Environment configuration
+export const nodeHeapMbSchema = z.preprocess(
+  (val) => (val === '' ? NaN : val),
+  z.coerce
+    .number({
+      invalid_type_error: 'MIZANO_NODE_HEAP_MB must be an integer between 128 and 4096',
+    })
+    .int('MIZANO_NODE_HEAP_MB must be an integer between 128 and 4096')
+    .min(128, 'MIZANO_NODE_HEAP_MB must be an integer between 128 and 4096')
+    .max(4096, 'MIZANO_NODE_HEAP_MB must be an integer between 128 and 4096')
+    .optional(),
+);
+export type NodeHeapMb = z.infer<typeof nodeHeapMbSchema>;
