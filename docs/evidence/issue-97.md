@@ -262,6 +262,28 @@ $ grep -n "notify-volume" AI_QUESTIONS.md | cut -c1-110
 
 `.gitignore` was LF-normalised in round 3 at the reviewer's request (`master` mixes CRLF and LF), so the plain `--stat` shows a whole-file rewrite; ignoring line endings the real change is the two lines that ignore `deploy/pi/.env.pi`.
 
+## Round 5 recheck (tested head `505651b`)
+
+Round 5 re-sent the two threads from round 3 (CRLF in `.gitignore`, flat `notify-volume` key). Both were fixed in `cc4a3fb` and no code or doc change was needed; the threads are anchored to older commits (`55bc448`, `6c9f420`), so they still show as open. Checked on the current head:
+
+```text
+$ git rev-parse HEAD   (before this evidence commit)
+505651b053477a96a8de4a8561184198d7a5b081
+$ git ls-files --eol .gitignore
+i/lf    w/lf    attr/                 	.gitignore
+$ grep -c $'\r' .gitignore
+0
+$ git diff --check master..HEAD; echo exit=$?
+exit=0
+$ git diff -w --ignore-cr-at-eol --stat master..HEAD -- .gitignore
+ .gitignore | 2 ++
+ 1 file changed, 2 insertions(+)
+$ grep -n "notify-volume" AI_QUESTIONS.md | grep -o '`notify-volume[^`]*`'
+`notify-volume:<organizationId>`
+```
+
+The alert key carries the organization id, so one organization staying anomalous cannot hide a second one's alert or recovery in the shared `active-keys` state of `healthcheck.sh`.
+
 ## Acceptance checklist (Tech Lead plan)
 
 | Item                                                                           | Status                                                                                                                                                        |
