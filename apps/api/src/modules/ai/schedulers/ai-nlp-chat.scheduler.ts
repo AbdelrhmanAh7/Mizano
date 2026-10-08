@@ -38,7 +38,7 @@ export class AiNlpChatScheduler {
   /**
    * Periodic document classification retraining - runs every 6 hours
    */
-  @Cron('30 */6 * * *')
+  @Cron('30 */6 * * *', { name: 'ai:nlp:doc-classification-retraining' })
   async checkDocClassificationRetraining() {
     if (!this.guard()) return;
     this.logger.log('Running periodic document classification retraining...');
@@ -83,7 +83,7 @@ export class AiNlpChatScheduler {
   /**
    * Weekly knowledge index rebuild - runs every Saturday at 3 AM
    */
-  @Cron('0 3 * * 6')
+  @Cron('0 3 * * 6', { name: 'ai:nlp:weekly-knowledge-index-rebuild' })
   async runWeeklyKnowledgeIndexRebuild() {
     if (!this.guard()) return;
     this.logger.log('Starting weekly knowledge index rebuild...');

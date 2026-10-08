@@ -23,6 +23,7 @@ import { DeepSearchController } from './controllers/deep-search.controller';
 
 // Cross-cutting operations scheduler
 import { AiOperationsScheduler } from './schedulers/ai-operations.scheduler';
+import { aiSchedulerProviders } from './schedulers/ai-schedulers.enabled';
 
 @Module({
   imports: [
@@ -45,7 +46,7 @@ import { AiOperationsScheduler } from './schedulers/ai-operations.scheduler';
     // DeepSearch is standalone
     DeepSearchService,
     // Cross-cutting operations scheduler (uses services from core, operations, forecasting, sales-crm)
-    AiOperationsScheduler,
+    ...aiSchedulerProviders([AiOperationsScheduler]),
   ],
   exports: [
     // Re-export all sub-modules

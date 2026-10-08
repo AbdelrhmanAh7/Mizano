@@ -229,22 +229,23 @@ All workflows are in `.agents/workflows/`. Use these commands for full project c
 > Extraction uses local OCR (Tesseract.js + PaddleOCR Python) and rule-based parsers.
 > LLM-based features (narratives, categorization) require `OLLAMA_ENABLED=true` and a reachable Ollama endpoint.
 
-### Architecture
+### Architecture (current)
 
 ```
-Web/API → Intake Queue (BullMQ/Redis) → Worker Container (CPU OCR + Rules) → Draft Invoices
-                     ↓ (optional, when OLLAMA_ENABLED)
-              Ollama Service (text model for structured extraction)
+Browser → API (6001) → Intake job (BullMQ/Redis) → extraction strategies in-process → Draft Bills/Invoices
+                                  ↓ (optional, when OLLAMA_ENABLED)
+                           Ollama Service (text model for structured extraction)
 ```
 
 ### How it works
 
-- Document intake goes through `IntakeQueueService` (BullMQ on Redis)
-- CPU extraction worker runs in a separate container (not in API process)
+- Document intake goes through `IntakeQueueService` (BullMQ on Redis); a BullMQ `Worker` currently runs **inside the API process**
 - OCR: Tesseract.js (fallback) or PaddleOCR via Python subprocess (preferred)
-- Structured extraction: RulesStrategy (deterministic) or OcrLlmStrategy (optional Ollama)
-- Results stored as validated drafts; batch approval posts to ledger
-- No external model calls, no model downloads at runtime, no GPU required
+- Structured extraction: RulesStrategy (deterministic) or OcrLlmStrategy (optional Ollama), selected by `EXTRACTION_STRATEGY` / request mode
+- Results stored as validated drafts; `POST /confirm` approves and posts a draft Bill/Invoice to the ledger
+- No GPU, Colab, paid cloud AI or runtime model download is required
+
+> **Target (not implemented yet):** move the extraction worker out of the API process into its own container. The Pi compose file reserves a commented-out `worker` service (§`deploy/pi/docker-compose.pi.yml`). Land the CPU extraction runtime first (epic #45, issues #39/#42, branches `ai/39`/`ai/42`), then flip the worker profile on.
 
 ### Key env vars
 
@@ -252,19 +253,23 @@ Web/API → Intake Queue (BullMQ/Redis) → Worker Container (CPU OCR + Rules) �
 - `OLLAMA_BASE_URL` — Ollama endpoint when enabled (e.g., `http://ollama:11434`)
 - `INTAKE_STORAGE_DIR` — path for original document storage (default: `/data/originals`)
 - `INTAKE_TESSDATA_DIR` — path to Tesseract traineddata files (required offline)
+- `AI_SCHEDULERS_ENABLED` — set `true` to register the AI cron schedulers (default: `false`, see issue #133 AC3)
 
 ### Endpoints
 
-- `POST /api/intake/jobs` — upload document, create intake job
-- `GET /api/intake/jobs/:id` — check job status and extraction result
-- `POST /api/intake/batch-approve` — approve validated drafts in batch
+- `POST /api/ai/document-intake/process` — upload document, create intake job
+- `GET /api/ai/document-intake/jobs` — list jobs with status
+- `GET /api/ai/document-intake/:jobId/result` — extraction result (owner-guarded)
+- `GET /api/ai/document-intake/:jobId/original` — original document
+- `POST /api/ai/document-intake/:jobId/retry` — re-run extraction
+- `POST /api/ai/document-intake/confirm` — approve extracted data and create a draft Bill/Invoice
 
 ### Never
 
-- Add GPU config or model download logic to the worker
-- Call external AI APIs (Gemini, OpenAI, etc.) — demo is fully offline-capable
-- Run OCR/extraction in the API container (memory/CPU isolation)
-- Assume Ollama is available — always handle gracefully when disabled
+- Add GPU config, Colab tunnels or paid cloud AI (Gemini, OpenAI, etc.) — the demo is fully offline-capable
+- Call external AI APIs as a fallback
+- Assume Ollama is available — always handle it gracefully when disabled
+- Ship employed `ai/schedulers/*` crons on the Pi: `AI_SCHEDULERS_ENABLED=false` unless explicitly enabled
 
 ## Docs Reference
 

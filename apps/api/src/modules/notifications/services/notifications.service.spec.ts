@@ -8,6 +8,7 @@ describe('NotificationsService movement signs', () => {
     const prisma = createMockPrisma();
     const service = new NotificationsService(prisma as unknown as PrismaService);
     const notify = jest.spyOn(service, 'createForUser').mockResolvedValue({} as never);
+    prisma.organization.findMany.mockResolvedValue([{ id: 'org' }] as never);
     prisma.item.findMany.mockResolvedValue([
       {
         id: 'item',

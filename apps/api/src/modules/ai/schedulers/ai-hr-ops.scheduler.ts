@@ -44,7 +44,7 @@ export class AiHrOpsScheduler {
   /**
    * Monthly attrition prediction - runs on the 1st at 5 AM
    */
-  @Cron('0 5 1 * *')
+  @Cron('0 5 1 * *', { name: 'ai:hr:monthly-attrition-prediction' })
   async runMonthlyAttritionPrediction() {
     if (!this.guard()) return;
     this.logger.log('Starting monthly attrition prediction...');
@@ -88,7 +88,7 @@ export class AiHrOpsScheduler {
   /**
    * Monthly compensation benchmarking - runs on the 1st at 4 AM
    */
-  @Cron('0 4 1 * *')
+  @Cron('0 4 1 * *', { name: 'ai:hr:monthly-compensation-benchmark' })
   async runMonthlyCompensationBenchmark() {
     if (!this.guard()) return;
     this.logger.log('Starting monthly compensation benchmark...');
@@ -132,7 +132,7 @@ export class AiHrOpsScheduler {
   /**
    * Weekly quality prediction - runs every Monday at 5 AM
    */
-  @Cron('0 5 * * 1')
+  @Cron('0 5 * * 1', { name: 'ai:hr:weekly-quality-prediction' })
   async runWeeklyQualityPrediction() {
     if (!this.guard()) return;
     this.logger.log('Starting weekly quality prediction...');
@@ -174,7 +174,7 @@ export class AiHrOpsScheduler {
   /**
    * Monthly predictive maintenance - runs on the 1st at 6 AM
    */
-  @Cron('0 6 1 * *')
+  @Cron('0 6 1 * *', { name: 'ai:hr:monthly-predictive-maintenance' })
   async runMonthlyPredictiveMaintenance() {
     if (!this.guard()) return;
     this.logger.log('Starting monthly predictive maintenance...');
@@ -218,7 +218,7 @@ export class AiHrOpsScheduler {
   /**
    * Monthly resource optimization - runs on the 1st at 7 AM
    */
-  @Cron('0 7 1 * *')
+  @Cron('0 7 1 * *', { name: 'ai:hr:monthly-resource-optimization' })
   async runMonthlyResourceOptimization() {
     if (!this.guard()) return;
     this.logger.log('Starting monthly resource optimization...');

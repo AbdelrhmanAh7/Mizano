@@ -40,7 +40,7 @@ export class AiSecurityScheduler {
   /**
    * Daily fraud scan - runs at 1 AM
    */
-  @Cron('0 1 * * *')
+  @Cron('0 1 * * *', { name: 'ai:security:daily-fraud-scan' })
   async runDailyFraudScan() {
     if (!this.guard()) return;
     this.logger.log('Starting daily fraud scan...');
@@ -86,7 +86,7 @@ export class AiSecurityScheduler {
   /**
    * Daily compliance check - runs at 5 AM
    */
-  @Cron('0 5 * * *')
+  @Cron('0 5 * * *', { name: 'ai:security:daily-compliance-check' })
   async runDailyComplianceCheck() {
     if (!this.guard()) return;
     this.logger.log('Starting daily compliance check...');
@@ -130,7 +130,7 @@ export class AiSecurityScheduler {
   /**
    * Weekly audit risk scoring - runs every Sunday at 6 AM
    */
-  @Cron('0 6 * * 0')
+  @Cron('0 6 * * 0', { name: 'ai:security:weekly-audit-risk-scoring' })
   async runWeeklyAuditRiskScoring() {
     if (!this.guard()) return;
     this.logger.log('Starting weekly audit risk scoring...');
@@ -178,7 +178,7 @@ export class AiSecurityScheduler {
   /**
    * Weekly resolved fraud alert cleanup - runs Saturday at 3 AM
    */
-  @Cron('0 3 * * 6')
+  @Cron('0 3 * * 6', { name: 'ai:security:weekly-fraud-alert-cleanup' })
   async runWeeklyFraudAlertCleanup() {
     if (!this.guard()) return;
     this.logger.log('Starting weekly fraud alert cleanup...');
