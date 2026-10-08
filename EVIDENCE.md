@@ -151,11 +151,11 @@
 
 - **Issue**: #102 (Post-merge: CI red after #98)
 - **Base Commit (`master`)**: `615060ed6294e16375a1f1ea9385cb7e812cd24f`
-- **Tested Commit SHA**: `373cd82487a2050b2b7ff8af1766db1fee891b09` (from `git rev-parse HEAD`; the commit the tests ran on; the later commit changes only `EVIDENCE.md`)
+- **Tested Commit SHA**: `9c937820f910b01c87ba221f42fed90cebabc987` (from `git rev-parse HEAD`; the commit the tests ran on; the later commit changes only `EVIDENCE.md`)
 - **Audit Date**: 2026-10-08
 - **Failing Check**: Deploy to GCP (Workflow: `Deploy to Production`)
 - **Root Cause Classification**: **(B)** — deployment host unreachable over SSH (`dial tcp ***:22: i/o timeout`). Contributing observation: documentation-only merges still trigger a rollout (owner decision needed; see `AI_QUESTIONS.md`).
-- **Fix status**: not fixed by this PR. Both fixes are owner actions (see `AI_QUESTIONS.md`); #102 stays open.
+- **Fix status**: this PR changes no workflow. The owner has since stopped the failing rollout themselves: on 2026-10-08 `gh workflow list --all` shows `Deploy to Production` (id `231427938`) as `disabled_manually`, and master's `CI` run `37750856091` on `4b6edad` (08:35Z) succeeded with no follow-on deploy run (the newest deploy run is still `37540990404` from 2026-10-06). Restoring the GCP host (Option A) remains an owner action; #102 can close once the owner confirms the disabled workflow is the intended state.
 
 ### One-Line Justification
 
@@ -171,7 +171,7 @@
 | REQ-102-2 | Investigate historical "Deploy to Production" runs prior to #98                                 | `gh run list --workflow "Deploy to Production"`                                                            | PASSED |
 | REQ-102-3 | Classify root cause (A vs B vs C) with justification                                            | Analysis against build logs & network errors                                                               | PASSED |
 | REQ-102-4 | Propose options and technical analysis in `AI_QUESTIONS.md` without modifying workflows/secrets | Review against repo owner policy                                                                           | PASSED |
-| REQ-102-5 | Bind evidence to the verified tree and record exact tested SHA                                  | Tested SHA `373cd82487a2050b2b7ff8af1766db1fee891b09` (from `git rev-parse HEAD`), local gate tests passed | PASSED |
+| REQ-102-5 | Bind evidence to the verified tree and record exact tested SHA                                  | Tested SHA `9c937820f910b01c87ba221f42fed90cebabc987` (from `git rev-parse HEAD`), local gate tests passed | PASSED |
 | REQ-102-6 | Preserve #95 audit evidence                                                                     | #95 audit preserved above; `docs/planning/EVIDENCE-95.md` removed                                          | PASSED |
 
 ---
@@ -235,7 +235,7 @@
 
 The changes in this PR are documentation-only (`AI_QUESTIONS.md`, `EVIDENCE.md`, `docs/agents/review-lessons.md`). The failing `Deploy to GCP` step requires SSH connectivity to the remote host.
 
-- **Verified Commit SHA**: `373cd82487a2050b2b7ff8af1766db1fee891b09` (from `git rev-parse HEAD`; the commit the tests ran on; the later commit changes only `EVIDENCE.md`)
+- **Verified Commit SHA**: `9c937820f910b01c87ba221f42fed90cebabc987` (from `git rev-parse HEAD`; the commit the tests ran on; the later commit changes only `EVIDENCE.md`)
 - **Local Checks Executed**:
 
 ```bash
@@ -252,4 +252,4 @@ npx prettier --check EVIDENCE.md AI_QUESTIONS.md docs/agents/review-lessons.md
 # All matched files use Prettier code style!
 ```
 
-- **Diff from tested SHA to HEAD**: `git diff --stat 373cd82487a2050b2b7ff8af1766db1fee891b09..HEAD` shows only `EVIDENCE.md` changed.
+- **Diff from tested SHA to HEAD**: `git diff --stat 9c937820f910b01c87ba221f42fed90cebabc987..HEAD` shows only `EVIDENCE.md` and `AI_QUESTIONS.md` changed.
