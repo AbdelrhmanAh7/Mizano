@@ -142,3 +142,47 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+---
+
+# EVIDENCE.md — Production compose, login throttling, session and seed hardening (#132)
+
+- **Issue**: #132 (security, high). Branch `ai/132`, based on master `615060e`.
+- **Tested code SHA**: `5a842f284d5b55a41cdf0f559491a19849d9bced`. Later commits on the branch change only Markdown (`AI_QUESTIONS.md`, `docs/agents/review-lessons.md`, this file).
+- **Provider**: Claude Opus 5.5 (`claude-opus-5-5`) via Claude Code. This record is author evidence, not an independent review.
+- **Environment**: macOS, Node 26, PostgreSQL 16 throwaway cluster on `127.0.0.1:55532`, fresh database per full run, `REDIS_URL=` (blank). Docker is not installed here, so the compose test used its YAML fallback; it runs `docker compose config` wherever Docker exists.
+
+## Acceptance criteria
+
+| REQ | Criterion                                                                                                     | Test (`@issue-132`)                                                                     | Result |
+| --- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------ |
+| AC1 | Compose publishes no 5432/6379; `POSTGRES_PASSWORD` is required; Redis uses `--requirepass`                   | `apps/api/test/production-compose.e2e-spec.ts` (3 tests)                                | pass   |
+| AC2 | Login throttling counts per `X-Forwarded-For` (right-most, proxy-appended address); the web login forwards it | `apps/api/test/auth-throttle.e2e-spec.ts` (2), `apps/web/lib/auth-session.spec.ts` (2)  | pass   |
+| AC3 | `/api/auth/session` JSON contains no `refreshToken`                                                           | `apps/web/lib/auth-session.spec.ts` (real NextAuth handler: csrf, sign-in, session)     | pass   |
+| AC4 | Seed refuses `NODE_ENV=production` unless `SEED_ALLOW_PROD=1`                                                 | `apps/api/test/seed-guard.e2e-spec.ts` (4 tests, real `ts-node prisma/seed.ts` process) | pass   |
+
+The test-only commit `ff870fe` was run before any production change. AC1 failed on 3 of 3 tests, AC2 (API) on 2 of 2, AC2 forwarding and AC3 (web) on 2 of 3, and AC4 on the 2 production-refusal tests. The 3 tests that passed at that point are regression guards: development seeding, explicit `SEED_ALLOW_PROD=1`, and no forwarded header.
+
+## Commands and results
+
+```bash
+npx turbo lint type-check test --force
+# api:test        Test Suites: 137 passed, 137 total; Tests: 2207 passed, 2207 total
+# @mizano/web:test Test Suites: 49 passed, 49 total;  Tests: 461 passed, 461 total
+# Tasks: 12 successful, 12 total (web lint: 13 warnings, all pre-existing in files this branch does not touch)
+
+# fresh DB: drop/create mizano_e2e, prisma migrate deploy, then
+REDIS_URL= npx jest --config ./test/jest-e2e.json --runInBand   # in apps/api
+# run 1: Test Suites: 2 failed, 12 passed; Tests: 9 failed, 257 passed, 266 total
+#        (purchases: a 401 midway through setup, then cascading; accountant-journey: 1 test)
+# rerun of purchases + accountant-journey alone: 69 passed, 69 total
+# run 2 (fresh DB again): Test Suites: 14 passed, 14 total; Tests: 266 passed, 266 total
+```
+
+Run 1's failures were in suites this change does not touch. Those suites use `createTestApp`, whose unlimited throttler storage this branch leaves unchanged. Both passed alone and in the second full fresh run. The same flake pattern was seen on earlier branches.
+
+## Remaining risks
+
+- `.github/workflows/deploy.yml` does not write `REDIS_PASSWORD`. Implementers may not edit CI, so the owner follow-up is in `AI_QUESTIONS.md`. That workflow is currently disabled.
+- `TRUST_PROXY_HOPS=1` assumes exactly one proxy appends `X-Forwarded-For` in front of the API. A client that can reach the API or web port directly can choose its own throttle key. That is the trade-off the issue asks for, in place of one shared lockout.
+- `docker-compose.yml` (local/SIT) still publishes 5435/6380 with the dev password. It is out of scope for this issue.
