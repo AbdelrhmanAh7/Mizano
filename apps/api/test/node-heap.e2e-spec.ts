@@ -33,7 +33,7 @@ const runStartNode = (
 
 const loadNodeHeapModule = (): NodeHeapModule | null => {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-var-requires -- require() needed to load CommonJS module before build step
     return require(nodeHeapModulePath);
   } catch {
     return null;
