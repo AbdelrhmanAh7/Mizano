@@ -4,7 +4,7 @@
 
 - **Issue**: #102 (Post-merge: CI red after #98)
 - **Base Commit (`master`)**: `615060ed6294e16375a1f1ea9385cb7e812cd24f`
-- **Tested Commit SHA**: `70f7eeddd326d07f093cc7550a315d62b47fe20c` (all gate tests passing; subsequent commit changes only `EVIDENCE.md`)
+- **Tested Commit SHA**: `c4f3cef759ea9029fc750ae82a9a04d0d12bfd88` (all gate tests passing; subsequent commit changes only `EVIDENCE.md`)
 - **Audit Date**: 2026-10-07 / 2026-10-08
 - **Failing Check**: Deploy to GCP (Workflow: `Deploy to Production`)
 - **Root Cause Classification**: **(B)** — deployment host unreachable over SSH (`dial tcp ***:22: i/o timeout`). Contributing observation: documentation-only merges still trigger a rollout (owner decision needed; see `AI_QUESTIONS.md`).
@@ -25,7 +25,7 @@
 | REQ-102-2 | Investigate historical "Deploy to Production" runs prior to #98                                 | `gh run list --workflow "Deploy to Production"`                          | PASSED |
 | REQ-102-3 | Classify root cause (A vs B vs C) with justification                                            | Analysis against build logs & network errors                             | PASSED |
 | REQ-102-4 | Propose options and technical analysis in `AI_QUESTIONS.md` without modifying workflows/secrets | Review against repo owner policy                                         | PASSED |
-| REQ-102-5 | Bind evidence to the verified tree and record exact tested SHA                                  | Tested SHA `70f7eeddd326d07f093cc7550a315d62b47fe20c`, gate tests passed | PASSED |
+| REQ-102-5 | Bind evidence to the verified tree and record exact tested SHA                                  | Tested SHA `c4f3cef759ea9029fc750ae82a9a04d0d12bfd88`, gate tests passed | PASSED |
 | REQ-102-6 | Preserve #95 audit evidence and resolve review threads                                          | `docs/planning/EVIDENCE-95.md` preserved; review threads resolved        | PASSED |
 
 ---
@@ -89,7 +89,7 @@
 
 The changes in this PR are documentation-only (`AI_QUESTIONS.md`, `EVIDENCE.md`, `docs/planning/EVIDENCE-95.md`, `docs/planning/MERGE-QUEUE.md`, `docs/agents/review-lessons.md`). The failing `Deploy to GCP` step requires SSH connectivity to the remote host.
 
-- **Verified Commit SHA**: `70f7eeddd326d07f093cc7550a315d62b47fe20c` (all local checks and PR checks passed; following commit modifies only `EVIDENCE.md`)
+- **Verified Commit SHA**: `c4f3cef759ea9029fc750ae82a9a04d0d12bfd88` (all local checks and PR checks passed; following commit modifies only `EVIDENCE.md`)
 - **PR Head Checks (`70f7eed`)**: All 5 checks passed on GitHub Actions (`gh pr checks 103`):
   - `Build`: passed in 1m14s
   - `Install Dependencies`: passed in 15s
@@ -101,9 +101,13 @@ The changes in this PR are documentation-only (`AI_QUESTIONS.md`, `EVIDENCE.md`,
 ```bash
 # 1. Rollout scope unit tests (offline gate)
 python3 scripts/test_demo_rollout_scope.py
-# Ran 12 tests in 0.039s, OK
+# Ran 12 tests in 0.020s, OK
 
 # 2. Monorepo lint check
 pnpm lint
 # turbo lint: 4 successful, 4 cached, 4 total (FULL TURBO)
+
+# 3. Prettier check
+npx prettier --check EVIDENCE.md AI_QUESTIONS.md docs/agents/review-lessons.md
+# All matched files use Prettier code style!
 ```
