@@ -89,7 +89,7 @@ describe('System postings through JournalsService (e2e) @issue-130', () => {
           dateOfJoining: new Date(Date.UTC(2020, 0, 1)),
           basicSalary: new Prisma.Decimal('10000'),
           allowances: { housing: 333.33 },
-          deductions: { loan: 100.005 },
+          deductions: { loan: 100.25 },
           organizationId: tenant.organizationId,
         },
       });
@@ -109,16 +109,17 @@ describe('System postings through JournalsService (e2e) @issue-130', () => {
       const slip = await prisma.payslip.findFirstOrThrow({
         where: { payrollRunId: runId, employeeId },
       });
-      // 10000 / 22 x 1 day = 454.5455; + 333.33 allowance; 15% tax per line; net absorbs the rest.
-      expect(slip.grossSalary.toFixed(4)).toBe('787.8755');
-      expect(slip.taxes.toFixed(4)).toBe('118.1813');
-      expect(slip.netSalary.toFixed(4)).toBe('569.6892');
-      expect(slip.netSalary.add(slip.taxes).add('100.005').toFixed(4)).toBe(
+      // 10000 / 22 x 1 day = 454.55 (currency scale); + 333.33 allowance; 15% tax rounded per
+      // payslip; net absorbs the rest.
+      expect(slip.grossSalary.toFixed(4)).toBe('787.8800');
+      expect(slip.taxes.toFixed(4)).toBe('118.1800');
+      expect(slip.netSalary.toFixed(4)).toBe('569.4500');
+      expect(slip.netSalary.add(slip.taxes).add('100.25').toFixed(4)).toBe(
         slip.grossSalary.toFixed(4),
       );
       const run = await prisma.payrollRun.findUniqueOrThrow({ where: { id: runId } });
       expect(run.totalGross.toFixed(4)).toBe(run.totalNet.add(run.totalDeductions).toFixed(4));
-      expect(run.totalDeductions.toFixed(4)).toBe('218.1863');
+      expect(run.totalDeductions.toFixed(4)).toBe('218.4300');
     });
 
     it('@e2e @flow:payroll @issue-130 AC1: paying a run twice concurrently posts one balanced PAYROLL journal dated on the period end', async () => {
@@ -239,7 +240,8 @@ describe('System postings through JournalsService (e2e) @issue-130', () => {
       expect(rows).toHaveLength(12);
       const total = rows.reduce((s, r) => s.add(r.amount), new Prisma.Decimal(0));
       expect(total.toFixed(4)).toBe('1000.0000');
-      expect(rows[0].amount.toFixed(4)).toBe('83.3333');
+      expect(rows[0].amount.toFixed(4)).toBe('83.3300');
+      expect(rows[11].amount.toFixed(4)).toBe('83.3700');
       expect(rows[11].accumulatedTotal.toFixed(4)).toBe('1000.0000');
       expect(rows[11].bookValue.toFixed(4)).toBe('0.0000');
     });
@@ -430,8 +432,8 @@ describe('System postings through JournalsService (e2e) @issue-130', () => {
       const journals = await journalsFor(tenant.organizationId, 'COGM', workOrderId);
       expect(journals).toHaveLength(1);
       expectBalanced(journals[0].lines);
-      // 1 of 3 outputs consumes 0.3333 of the 1-unit input at 3.3333 = 1.1110 (4-dp per line).
-      expect(sumLines(journals[0].lines).debit.toFixed(4)).toBe('1.1110');
+      // 1 of 3 outputs consumes 0.3333 of the 1-unit input; x 3.3333 = 1.11 at currency scale.
+      expect(sumLines(journals[0].lines).debit.toFixed(4)).toBe('1.1100');
 
       const consumed = await prisma.inventoryMovement.findMany({
         where: { referenceId: workOrderId, itemId: rawItemId, movementType: 'OUT' },
