@@ -139,6 +139,25 @@ describe('Tenant isolation of ledger and invoice reads (e2e) @issue-108', () => 
         }
       }
     });
+
+    it('@e2e @flow:tenant-isolation @issue-108 AC1: returns 404 for soft-deleted and malformed ids', async () => {
+      const vendor = await tenantA.api.post('/vendors').send({ name: `Vendor ${uniqueSuffix()}` });
+      const draft = await tenantA.api.post('/bills').send({
+        vendorId: vendor.body.id,
+        date: isoDay(-1),
+        dueDate: isoDay(30),
+        lines: [{ description: 'Deleted draft', quantity: '1', rate: '55' }],
+      });
+      expect(draft.status).toBe(201);
+      expect((await tenantA.api.delete(`/bills/${draft.body.id}`)).status).toBe(200);
+      expect((await tenantA.api.get(`/bills/${draft.body.id}`)).status).toBe(404);
+      for (const path of ['/invoices', '/bills', '/journals'].map((p) => `${p}/not-a-real-id`)) {
+        expect({ path, status: (await tenantA.api.get(path)).status }).toEqual({
+          path,
+          status: 404,
+        });
+      }
+    });
   });
 
   describe('AC2: lists and reports carry only the caller rows and totals', () => {
