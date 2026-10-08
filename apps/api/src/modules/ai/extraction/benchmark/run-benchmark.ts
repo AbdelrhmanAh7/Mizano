@@ -10,10 +10,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { extname, join, resolve } from 'path';
 import { Logger } from '@nestjs/common';
 import { needsReview } from '../../intake/intake-processor.service';
-import { buildExtractionContext } from '../../services/document-intake.service';
 import { DocumentExtractionResult } from '../../services/ollama.service';
-import { ExtractionContext } from '../extraction-strategy.interface';
-import { ExactMoney, requireLocalOcrAssets, RulesStrategy } from '../rules-strategy.service';
+import { ExactMoney, requireLocalOcrAssets } from '../rules-strategy.service';
 import { describeError } from '../../../../common/utils/redact';
 import Decimal from 'decimal.js';
 import {

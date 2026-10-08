@@ -81,9 +81,9 @@ describe('CPU extraction without an LLM', () => {
       extractedFields: {
         documentNumber: 'INV-2024-0042',
         date: '2024-03-15',
-        subtotal: 1000,
-        tax: 140,
-        total: 1140,
+        subtotal: '1000.0000',
+        tax: '140.0000',
+        total: '1140.0000',
         currency: 'EGP',
         vendorName: 'Cairo Office Supplies Co.',
       },
@@ -134,7 +134,7 @@ describe('CPU extraction without an LLM', () => {
       extractedFields: {
         documentNumber: 'INV-2024-0150',
         date: '2024-03-15',
-        total: 1140,
+        total: '1140.0000',
         currency: 'EGP',
         vendorName: 'شركة النيل للتوريدات',
       },
@@ -212,7 +212,7 @@ describe('CPU extraction without an LLM', () => {
       expect(result.extractedFields).toMatchObject({
         documentNumber: 'INV-2024-0042',
         date: '2024-03-15',
-        total: 1140,
+        total: '1140.0000',
         currency: 'EGP',
       });
       expect(createOfflineTesseractWorker).toHaveBeenCalledTimes(1);

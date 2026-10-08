@@ -68,7 +68,7 @@ describe('RulesStrategy worker cache', () => {
       pdfText: 'Total: 1.23454',
       pdfIsNativeText: true,
     });
-    expect(result?.exactMoney.total).toBe('1.23454');
+    expect(result?.exactMoney.total).toBe('1.2345');
     spy.mockRestore();
   });
   it('never logs document content in OCR errors', async () => {

@@ -177,9 +177,9 @@ export class RulesStrategy implements ExtractionStrategy {
     return {
       extraction: toExtractionResult(rules, text, elapsed),
       exactMoney: {
-        subtotal: rules.subtotal?.value.toFixed() ?? null,
-        tax: rules.tax?.value.toFixed() ?? null,
-        total: rules.total?.value.toFixed() ?? null,
+        subtotal: rules.subtotal?.value.toFixed(4) ?? null,
+        tax: rules.tax?.value.toFixed(4) ?? null,
+        total: rules.total?.value.toFixed(4) ?? null,
       },
       strategyUsed: 'rules',
       ocrRawConfidence: textConfidence * 100,
@@ -191,7 +191,7 @@ export class RulesStrategy implements ExtractionStrategy {
     imageBuffer: Buffer,
     language: string,
   ): Promise<{ text: string; confidence: number }> {
-    const { lang, localPath } = requireLocalOcrAssets(language);
+    const { lang } = requireLocalOcrAssets(language);
     let pending = this.workers.get(lang);
     if (!pending) {
       pending = new Promise<TesseractWorker>((done, reject) => {
@@ -202,6 +202,7 @@ export class RulesStrategy implements ExtractionStrategy {
           reject(new Error('OCR worker initialization failed'));
         };
         const timer = setTimeout(fail, WORKER_INIT_TIMEOUT_MS);
+        timer.unref();
         createOfflineTesseractWorker().then((worker: TesseractWorker) => {
           clearTimeout(timer);
           if (failed) {

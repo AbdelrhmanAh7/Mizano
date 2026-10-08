@@ -714,29 +714,33 @@ export default function ScanBillPage() {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">{ts('extractedSubtotal')}</span>
                       <span className="font-mono">
-                        {result.extractedFields.subtotal.toFixed(2)}
+                        {Number(result.extractedFields.subtotal).toFixed(2)}
                       </span>
                     </div>
                   )}
                   {result.extractedFields.tax != null && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">{ts('extractedTax')}</span>
-                      <span className="font-mono">{result.extractedFields.tax.toFixed(2)}</span>
+                      <span className="font-mono">
+                        {Number(result.extractedFields.tax).toFixed(2)}
+                      </span>
                     </div>
                   )}
                   {result.extractedFields.discount != null &&
-                    result.extractedFields.discount > 0 && (
+                    Number(result.extractedFields.discount) > 0 && (
                       <div className="flex justify-between text-yellow-600">
                         <span>{ts('extractedDiscount')}</span>
                         <span className="font-mono">
-                          -{result.extractedFields.discount.toFixed(2)}
+                          -{Number(result.extractedFields.discount).toFixed(2)}
                         </span>
                       </div>
                     )}
                   {result.extractedFields.total != null && (
                     <div className="flex justify-between font-medium border-t pt-1 mt-1">
                       <span>{ts('extractedTotal')}</span>
-                      <span className="font-mono">{result.extractedFields.total.toFixed(2)}</span>
+                      <span className="font-mono">
+                        {Number(result.extractedFields.total).toFixed(2)}
+                      </span>
                     </div>
                   )}
                 </div>

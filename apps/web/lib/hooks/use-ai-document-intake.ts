@@ -55,10 +55,10 @@ export interface DocumentIntakeResult {
   extractedFields: {
     date: string | null;
     dueDate: string | null;
-    total: number | null;
-    subtotal: number | null;
-    tax: number | null;
-    discount: number | null;
+    total: number | string | null;
+    subtotal: number | string | null;
+    tax: number | string | null;
+    discount: number | string | null;
     documentNumber: string | null;
     vendorName: string | null;
     vendorTaxId: string | null;
