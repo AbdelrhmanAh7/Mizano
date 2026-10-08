@@ -147,187 +147,69 @@
 
 # EVIDENCE.md — Post-merge CI red after #98 (#113, MZ #102)
 
-## Overview
-
-| Item                 | Value                                                                                    |
-| -------------------- | ---------------------------------------------------------------------------------------- |
-| Master SHA at report | `615060ed6294e16375a1f1ea9385cb7e812cd24f` (merge of PR #98)                             |
-| Failing check        | `Deploy to GCP` job of workflow `Deploy to Production` (`.github/workflows/deploy.yml`)  |
-| Failing run          | https://github.com/AbdelrhmanAh7/Mizano/actions/runs/37540990404 (job `112537411880`)    |
-| Root cause class     | **(B) infrastructure** — the GCP VM behind `DEPLOY_HOST` does not answer on TCP port 22  |
-| Introduced by #98?   | **No.** Same error on every deploy run since 2026-10-01, five commits before #98 merged  |
-| Code fix in this PR  | None possible; this PR records the diagnosis and the owner decision in `AI_QUESTIONS.md` |
-| Tested head SHA      | recorded in the final commit of this branch, see "Tested commit" below                   |
+| Item             | Value                                                                                  |
+| ---------------- | -------------------------------------------------------------------------------------- |
+| Master SHA       | `615060ed6294e16375a1f1ea9385cb7e812cd24f` (merge of PR #98)                           |
+| Red check        | `Deploy to GCP`, workflow `Deploy to Production`, run 37540990404                      |
+| Root cause       | Infrastructure: the VM behind `DEPLOY_HOST` does not answer on TCP 22                  |
+| Caused by #98?   | No. The same error is on every deploy run since 2026-10-01                             |
+| Code fix         | None possible; owner decisions are in `AI_QUESTIONS.md`                                |
+| Regression tests | `apps/api/test/ci-health.e2e-spec.ts` (AC1 API healthy, AC2/AC3 #98 touched docs only) |
 
 ## What PR #98 changed
 
-`git diff --stat 615060e~1 615060e`:
+`git diff --stat 615060e~1 615060e`: two markdown files (`EVIDENCE.md`, `docs/planning/MERGE-QUEUE.md`),
+230 insertions. No source, lockfile, compose, env or workflow file.
+
+## Same checks on the merge commit and its parent
+
+`gh api repos/AbdelrhmanAh7/Mizano/commits/615060e.../check-runs` (repo workflows only):
 
 ```text
- EVIDENCE.md                  | 144 +++++++++++++++++++++++++++++++++++++++++++
- docs/planning/MERGE-QUEUE.md |  86 ++++++++++++++++++++++++++
- 2 files changed, 230 insertions(+)
-```
-
-Two markdown files only. No source, lockfile, compose, env or workflow change.
-
-## CI status on the merge commit
-
-`gh api repos/AbdelrhmanAh7/Mizano/commits/615060ed6294e16375a1f1ea9385cb7e812cd24f/status`:
-
-```text
-success
-Install Dependencies success
-Lint & Type Check success
-Unit Tests success
-Build success
-```
-
-`gh api --paginate .../commits/615060e.../check-runs` (repo workflows only, AI-implementer jobs omitted):
-
-```text
-Health Check               | skipped | run 37540990404
-Deploy to GCP              | failure | run 37540990404  <-- the only red check
+Deploy to GCP              | failure | run 37540990404   <-- the only red check
 Build & Push Docker Images | success | run 37540990404
-Verify CI Passed           | success | run 37540990404
-Unit Tests                 | success | run 37540682498
-Build                      | success | run 37540682498
-Lint & Type Check          | success | run 37540682498
-Install Dependencies       | success | run 37540682498
+Unit Tests / Build / Lint & Type Check / Install Dependencies | success | run 37540682498
 ```
 
-The `CI` workflow (lint, type-check, unit tests, build) is green on master. The red check is
-the deployment workflow that `workflow_run` chains after CI.
-
-## Failing step output
-
-`gh run view 37540990404 --log-failed`, step `Clean up server disk and prepare directory`
-(`appleboy/ssh-action@v1.0.3`, first SSH step of the `Deploy to GCP` job):
-
-```text
-2026-10-06T22:41:25.7112782Z ##[group]Run appleboy/ssh-action@v1.0.3
-2026-10-06T22:41:25.7113594Z   host: ***
-2026-10-06T22:41:25.7116224Z   port: 22
-2026-10-06T22:41:25.7118237Z   timeout: 30s
-2026-10-06T22:41:26.8143179Z ======CMD======
-2026-10-06T22:41:26.8143880Z echo "=== Disk before cleanup ==="
-2026-10-06T22:41:26.8148564Z ======END======
-2026-10-06T22:41:56.8152060Z 2026/10/06 22:41:56 dial tcp ***:22: i/o timeout
-```
-
-The SSH client never reaches the host. Nothing from the repository runs on the VM before the
-failure, so no repository content can influence this step.
-
-## The failure predates #98
-
-`gh run list --workflow deploy.yml --limit 100` (conclusion, head SHA, created):
-
-```text
-37540990404 failure 615060e 2026-10-06T22:30:17Z   <- merge of #98 (MZ #102 opened on this)
-37403603742 failure b83d72b 2026-10-06T02:19:58Z   <- parent of #98, same error (below)
-37394379413 failure 50db1e8 2026-10-06T00:30:34Z
-37392525356 failure 8529fff 2026-10-06T00:09:53Z
-37208787051 failure 987a109 2026-10-04T14:18:42Z
-37132798411 failure 82f02e4 2026-10-03T15:18:47Z
-37086511261 failure 56b9a59 2026-10-03T01:32:52Z
-37065100781 failure 1d37f28 2026-10-02T21:09:12Z
-37063759596 failure 9951402 2026-10-02T20:56:24Z
-37041580340 failure 3d0c719 2026-10-02T17:34:08Z
-37027962235 failure a58ce52 2026-10-02T15:34:42Z
-36854180434 failure 40176d6 2026-10-01T11:15:02Z   <- first failure after the last green run
-33939629464 success 99415b7 2026-09-05T02:38:07Z   <- last green deploy
-```
-
-Parent-of-#98 run `37403603742` (`gh run view 37403603742 --log-failed`):
+Parent `b83d72b`, run 37403603742 (`gh run view 37403603742 --log-failed`):
 
 ```text
 2026-10-06T02:29:27.0159571Z 2026/10/06 02:29:27 dial tcp ***:22: i/o timeout
 ```
 
-First failing run `36854180434` (`gh run view 36854180434 --log-failed`):
+Merge commit, run 37540990404, step `Clean up server disk and prepare directory` (first SSH step):
 
 ```text
-2026-10-01T11:30:08.8250369Z 2026/10/01 11:30:08 dial tcp ***:22: i/o timeout
+2026-10-06T22:41:56.8152060Z 2026/10/06 22:41:56 dial tcp ***:22: i/o timeout
 ```
 
-Same step, same error, on every run from 2026-10-01 onward. The MZ #102 "CI red after #98"
-alert is a false attribution: the Follow-up Manager compared the merge commit's checks against
-"all green" instead of against the parent commit's checks.
+`gh run list --workflow deploy.yml`: failure on all 12 runs from 36854180434 (2026-10-01, first
+failure) to 37540990404; last success is 33939629464 (2026-09-05). MZ #102 compared the merge
+commit with "all green" instead of with its parent.
 
-## Workflow state at the time of this report
+## State of workflows
 
-`gh workflow list --all`:
+`gh workflow list --all`: `CI` and `Deploy to Production` are `disabled_manually`. No GitHub run
+exists for this PR or for master after it merges, so the "post-merge master run is green" item
+cannot be met with a run link. The local gate below stands in; the owner decides in `AI_QUESTIONS.md`.
+
+## Regression test and local run
+
+`apps/api/test/ci-health.e2e-spec.ts` pins what is checkable in the repo: the API boots and
+`/health` is healthy, and PR #98 changed only `.md` files. The SSH timeout itself is external and
+cannot fail a repository test. Run on a fresh Postgres 16 cluster, in band, `REDIS_URL` blank:
 
 ```text
-AI implementers (Claude <-> Codex) | .github/workflows/ai-implementers.yml | disabled_manually
-CI                                 | .github/workflows/ci.yml              | disabled_manually
-Demo planning metadata             | .github/workflows/demo-planning.yml   | disabled_manually
-Deploy to Production               | .github/workflows/deploy.yml          | disabled_manually
+$ npx jest --config ./test/jest-e2e.json --runInBand test/ci-health
+PASS test/ci-health.e2e-spec.ts
+  ✓ @e2e @flow:ci-health @issue-113 AC1: API boots and /health reports healthy
+  ✓ @e2e @flow:ci-health @issue-113 AC2: PR #98 touched only markdown docs
+  ✓ @e2e @flow:ci-health @issue-113 AC3: PR #98 changed no code, lockfile, compose or workflow
+Tests:       3 passed, 3 total
 ```
 
-Both `CI` and `Deploy to Production` are now disabled by hand. No GitHub run will be produced
-for this PR or for master after it merges until the owner re-enables them; the "post-merge master
-run is green" checklist item therefore cannot be satisfied with a run link. The local gate
-below is the substitute, and `AI_QUESTIONS.md` asks the owner which workflows to re-enable.
-
-## Unrelated failure seen while reading the logs
-
-Run `37629176009` (`AI implementers`, job `automerge`) fails with:
-
-```text
-/Users/abdelrahmanahmed/agents/nql-agents/bin/automerge.sh: line 103: syntax error near unexpected token `done'
-##[error]Process completed with exit code 2.
-```
-
-That script lives on the Mac mini hub, outside this repository. Reported in `AI_QUESTIONS.md`,
-not fixed here.
-
-## Regression test
-
-None added. The failing behaviour is TCP reachability of an external VM from a GitHub-hosted
-runner. No test in this repository can fail for that reason on master and pass after a repository
-change, and the owner rule forbids editing `.github/workflows`. `AI_QUESTIONS.md` records the
-reachability preflight the owner can add to the deploy job instead.
-
-## Local gate on this branch
-
-Run on commit `628525baf084e4a2ba55c3dab763e05cb43a4e70` (the diagnosis commit; the final commit
-only adds this section). Mac mini, Node v26.10.0, offline `pnpm install --frozen-lockfile`
-followed by `pnpm db:generate`.
-
-```text
-$ node_modules/.bin/prettier --check EVIDENCE.md AI_QUESTIONS.md
-Checking formatting...
-All matched files use Prettier code style!
-
-$ pnpm lint
- Tasks:    4 successful, 4 total
-LINT_EXIT=0
-
-$ pnpm type-check
- Tasks:    6 successful, 6 total
-TYPECHECK_EXIT=0
-
-$ cd apps/web && npx jest
-Test Suites: 48 passed, 48 total
-Tests:       458 passed, 458 total
-
-$ node apps/api/_run_tests.js
-FAIL src/modules/import-export/services/import.service.hardening.spec.ts
-Test Suites: 1 failed, 135 passed, 136 total
-Tests:       4 failed, 2193 passed, 2197 total
-```
-
-The one API failure is pre-existing and environment-dependent, not caused by this branch (which
-changes two markdown files): all four assertions fail with `TypeError: csv is not a function`
-from `import * as csv from 'csv-parser'` in `apps/api/src/modules/import-export/services/import.service.ts`
-line 5, called at lines 87 and 1488. The same spec fails identically when run alone on this
-machine under Node v26.10.0. The `Unit Tests` check on master `615060e` (GitHub runner, Node 20
-per `deploy.yml` and `ci.yml`) is `success`, so the difference is the local Node major, not the
-code. Reported, not fixed here.
+Lint, type-check and unit-test output for the final head is under "Tested commit".
 
 ## Tested commit
 
-- Diagnosis and gate: `628525baf084e4a2ba55c3dab763e05cb43a4e70`
-- Final head (this section added, `prettier --check` re-run on it): see the last commit on
-  branch `ai/113`; its SHA is in the PR description.
+FINAL_SHA_PLACEHOLDER
