@@ -12,7 +12,7 @@ storybook-static
 # Environment files (actual secrets)
 .env
 .env.production
-# Raspberry Pi runtime secrets (template: deploy/pi/.env.pi.example)
+# Raspberry Pi runtime secrets (host env file, chmod 600)
 deploy/pi/.env.pi
 
 # Allow environment templates (no secrets, only placeholders)

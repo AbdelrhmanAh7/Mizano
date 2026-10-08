@@ -17,7 +17,7 @@ Slice 1 is documentation only. No `apps/api` code changed: the repository has no
 - `AI_QUESTIONS.md`: tracking section records the `Refs #97` edit and links the filed issues #104 and #105 (the drafted `gh issue create` commands are gone), the slice 2 and 3 headings carry their issue numbers, the "earlier claim in this file" sentence now reads "an earlier draft of this file claimed", corrected inventory of outbound senders, slice 2 and 3 defaults extended to the per-organization SMTP password and to `EmailLog` as the volume source.
 - `deploy/pi/README.md`: production checklist item names the tokens to rotate, including each organization's SMTP password, asks for the rotation date and points at #104 for the check that will read it.
 - `docs/agents/review-lessons.md`: five root causes from the PR #100 reviews (Pi env wiring, ratio-alert floor, evidence SHA, slice PRs must not close the parent issue, grep the mechanism not the product name); the split-issue lesson was revised in round 3 so the implementer edits the PR body and files the follow-up issues itself instead of leaving both to the owner.
-- `.gitignore`: ignores `deploy/pi/.env.pi` (the Pi runtime secrets file was not ignored before; the `.env.pi.example` template stays tracked).
+- `.gitignore`: ignores `deploy/pi/.env.pi` (the Pi runtime secrets file was not ignored before). Only these two lines differ from `master`; its mixed CRLF/LF endings are untouched. `deploy/pi/.env.pi.example` does not exist yet, so nothing points at it; #104 adds it.
 - `docs/evidence/issue-97.md`: this file.
 
 ## GitHub actions taken in round 3 (outside the repository)
@@ -260,7 +260,7 @@ $ grep -n "notify-volume" AI_QUESTIONS.md | cut -c1-110
 40:- **Delivery.** Same channel and dedupe as `deploy/pi/scripts/healthcheck.sh`: one Telegram alert keyed `no
 ```
 
-`.gitignore` was LF-normalised in round 3 at the reviewer's request (`master` mixes CRLF and LF), so the plain `--stat` shows a whole-file rewrite; ignoring line endings the real change is the two lines that ignore `deploy/pi/.env.pi`.
+Round 4 note, superseded in round 6: `.gitignore` had been LF-normalised in round 3, which made the plain `--stat` show a whole-file rewrite. Round 6 restored `master`'s bytes.
 
 ## Round 5 recheck (tested head `505651b`)
 
