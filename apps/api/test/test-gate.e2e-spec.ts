@@ -88,6 +88,9 @@ describe('@issue-134 test gates', () => {
     const apiE2e = readJson<PackageJson>('apps/api/package.json').scripts['test:e2e'];
     expect(apiE2e).toMatch(/--config \.\/test\/jest-e2e\.json/);
     expect(apiE2e).not.toMatch(/passWithNoTests|\|\|/);
+    // Every suite boots a full app on the shared database. In parallel, another suite's intake
+    // sweep picks up intake.e2e-spec's jobs with the real extractor and the gate flakes.
+    expect(apiE2e).toMatch(/--runInBand/);
   });
 
   it('@e2e @flow:test-gate @issue-134 AC1: the e2e config collects reports.e2e-spec.ts and every other suite', () => {
