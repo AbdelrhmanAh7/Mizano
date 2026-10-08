@@ -70,7 +70,8 @@ function tenant() {
 
 test(
   '@issue-153 AC1: the demo accountant signs in through the form and reaches the dashboard; a wrong password is refused',
-  { tags: ['feat:mz-auth', 'lvl:ui'] },
+  // 240 s like the hub's browser tests: next dev compiles /en/login and /en/dashboard on first hit (150 s timed out once under load)
+  { tags: ['feat:mz-auth', 'lvl:ui'], timeout: 240_000 },
   async ({ app, screen, browser }) => {
     const bad = await call('POST', '/auth/login', {
       email: ADMIN.email,
