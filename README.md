@@ -88,6 +88,8 @@ pnpm test:e2e
 
 `pnpm ci:full` currently combines lint/type-check/unit tests; it does **not** run E2E. Browser acceptance also requires a configured test harness and seeded environment; the [acceptance contract](docs/strategy/demo-acceptance.md) decides readiness.
 
+The blocking E2E gate is **e2e-army** ([tester-army/e2e](https://github.com/tester-army/e2e), plain-language Playwright tests in `e2e-army/`): `DATABASE_URL=<throwaway test db> pnpm e2e:army` starts the API and web app and runs it. Every PR that touches a user flow adds or updates `e2e-army/<issue>-<flow>.e2e.ts` in its first commit; see [CONTRIBUTING.md](CONTRIBUTING.md#e2e-tests-e2e-army-blocking).
+
 ## Repository layout
 
 ```
