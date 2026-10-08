@@ -19,7 +19,7 @@ services:
       - NODE_ENV=production
       - API_PORT=6001
       - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}}
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD}@redis:6379
       - JWT_SECRET=${JWT_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5001}
@@ -98,11 +98,10 @@ services:
     image: postgres:16-alpine
     container_name: mizano-postgres
     restart: unless-stopped
-    ports:
-      - "5432:5432"
+    # Not published: only services on mizano-network reach PostgreSQL.
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-mizano}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mizano_secret}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB:-mizano_db}
     command: >
       postgres
@@ -135,9 +134,11 @@ services:
     image: redis:7-alpine
     container_name: mizano-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    # Not published: only services on mizano-network reach Redis, and only with the password.
+    # REDIS_PASSWORD is embedded in REDIS_URL, so use a URL-safe value (openssl rand -hex 32).
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+    environment:
+      - REDISCLI_AUTH=${REDIS_PASSWORD:?set REDIS_PASSWORD}
     deploy:
       resources:
         limits:
@@ -149,7 +150,7 @@ services:
     networks:
       - mizano-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
