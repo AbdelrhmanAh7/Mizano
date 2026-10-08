@@ -59,6 +59,22 @@ Mutation check: with the healthcheck branch probing only `/tmp/mizano-worker.hea
 
 Commands: `npx jest --config ./test/jest-e2e.json worker-healthcheck` (apps/api): 3/3 pass. `node apps/api/_run_tests.js --testPathPattern=worker`: 7/7 pass. `eslint` and `prettier --check` on the new spec: clean.
 
+## Review round 6 (PR #92): CodeRabbit CHANGES_REQUESTED (written against 8ee65c9)
+
+Each of the seven CodeRabbit items was re-checked against the current head; only the soak unit was still open.
+
+| Finding                                                | State at the head                                                                                                                                        |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `worker.ts` discards the bootstrap rejection           | Already fixed: `bootstrap().catch` logs the error type only and exits 1                                                                                  |
+| Worker OCR language data via runtime download          | Already satisfied: `INTAKE_TESSDATA_DIR=/app/apps/api` holds the git-tracked `eng`/`ara.traineddata`, copied by the api Dockerfile. Now pinned by a test |
+| `assert_ssd` accepts the root filesystem               | Already fixed: `findmnt` target `/` returns failure (`lib.sh`)                                                                                           |
+| `soak-report.sh` PASS without full coverage            | Already fixed: window and 90% sample coverage gate, otherwise INCOMPLETE                                                                                 |
+| `soak-report.sh` ignores unhealthy or missing services | Already fixed: `bad[s]` and per-service `gaps` set FAIL                                                                                                  |
+| `soak-sample.sh` writes before the SSD check           | Script already runs `assert_ssd` first; the **unit** had no mount dependency. Fixed: `RequiresMountsFor=/mnt/ssd/mizano` in `mizano-soak.service`        |
+| `EVIDENCE.md` "Commands run" names no SHA              | Root file is master's record again; each "Commands run" heading here names its tested head                                                               |
+
+Commands run, round 6 (tested head = 74fb2d307aadaffa269aa8864928af42d1434950; docs-only commits follow): `pnpm test:deploy` equivalent (`node --test` on `check-env`, `pi-systemd`, `pi-scripts`): 27/27 pass. The new soak-unit test failed before the unit change (`undefined` vs `/mnt/ssd/mizano`). `bash -n deploy/pi/scripts/*.sh`: clean. Not run: lint, type-check, jest and prettier (no `node_modules` in this worktree; only a unit file and a node:test file changed). A1 (24 h soak) and A2 (reboot recovery) remain unverified: they need the Pi.
+
 ## Commands run, round 4 (tested head = 52ef990; docs-only commits follow)
 
 Environment: macOS arm64, Node 26, no Docker, no Redis; throwaway Postgres 16 on 127.0.0.1:55439 (`initdb` + `prisma db push`), stopped and deleted afterwards.
