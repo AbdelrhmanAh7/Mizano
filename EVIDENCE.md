@@ -164,5 +164,5 @@
   ```
 - **Result**: `Test Suites: 1 passed, 1 total`, `Tests: 13 passed, 13 total` (26.3 s).
 - **Static checks on the changed files**: `eslint src/health test/health-ready.e2e-spec.ts` no output, `tsc --noEmit -p tsconfig.json` no output, `prettier --check` clean.
-- **Line counts** (`git diff origin/master...HEAD --shortstat`): `apps/api/src` 3 files, +96/−8; `apps/api/test` +184; `docs` +6/−1; whole branch 7 files, +312/−9 including this file and `AI_QUESTIONS.md`. The ≤ ~200 line limit holds for the implementation; the e2e spec (184 lines) is additional.
+- **Line counts** (`git diff origin/master...HEAD --shortstat`): `apps/api/src` 3 files, +96/−8; `apps/api/test` +184; `docs` +6/−1; whole branch except this file 6 files, +293/−9 (`AI_QUESTIONS.md` included; this file adds 24 more lines). The ≤ ~200 line limit holds for the implementation; the e2e spec (184 lines) is additional.
 - **Not run locally**: the full API unit suite and the web suite (the full suite runs on GitHub-hosted CI after the push). Status of those is unverified here. No e2e-army test was added: the endpoint has no UI flow, and its request-level behaviour is covered by the e2e spec above.
