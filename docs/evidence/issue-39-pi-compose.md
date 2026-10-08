@@ -49,6 +49,16 @@ The issue has no REQ ids, so the ids below are scope (S) and acceptance (A) item
 | Council: `Closes #39` → `Refs #39`                               | PR body edited (A1/A2 stay open until run on the Pi)                                                                                                                                                                                                                | PR body |
 | QA: reverse proxy is `cloudflared`                               | Documented in `docs/DEVELOPMENT.md` ("Cloudflare Tunnel reverse proxy") and README section 3; the stack publishes no ports by design                                                                                                                                | docs    |
 
+## Review round 5 (PR #92): Codex thread on `worker.ts` healthcheck
+
+| Thread                                                                         | Fix                                                                                                                                                                                                                                                                                                                                                                          | Commit  |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Codex `worker.ts`: `--healthcheck` ignores a heartbeat path set in an env file | Already fixed by `resolveHeartbeatFile` (03a9e76); the thread was written against an older SHA. Added `apps/api/test/worker-healthcheck.e2e-spec.ts` (3 tests, `@issue-39` AC2) that runs the real `worker.ts --healthcheck` as a child process from a directory holding only `.env.pi`: env-file path fresh = exit 0, missing or stale = exit 1, an exported variable wins. | 02a2dd9 |
+
+Mutation check: with the healthcheck branch probing only `/tmp/mizano-worker.heartbeat`, 2 of the 3 tests fail. Note: `WorkerModule` calls `ConfigModule.forRoot` at import time, which already copies the env files into `process.env`, so the original code may have worked by that side effect; `resolveHeartbeatFile` makes the probe independent of it. The test passes at its own commit because the fix predates it.
+
+Commands: `npx jest --config ./test/jest-e2e.json worker-healthcheck` (apps/api): 3/3 pass. `node apps/api/_run_tests.js --testPathPattern=worker`: 7/7 pass. `eslint` and `prettier --check` on the new spec: clean.
+
 ## Commands run, round 4 (tested head = 52ef990; docs-only commits follow)
 
 Environment: macOS arm64, Node 26, no Docker, no Redis; throwaway Postgres 16 on 127.0.0.1:55439 (`initdb` + `prisma db push`), stopped and deleted afterwards.
