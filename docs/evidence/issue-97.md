@@ -8,8 +8,8 @@ Slice 1 is documentation only. No `apps/api` code changed: the repository has no
 | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Baseline** (`master` when the branch was cut) | `b83d72b4cfa358f3a6ba4be9d9f1b613ac9fe1f2`                                                                                                                                                                                                                                             |
 | **Merged `master`**                             | `615060ed6294e16375a1f1ea9385cb7e812cd24f` (#98), merge commit `bd2a619`; the add/add conflict on `docs/evidence/issue-97.md` was resolved by keeping this file                                                                                                                        |
-| **Tested head**                                 | `cc4a3fb0aa5fb6745ffbca71c23cf1e7f19263b6`, the last content commit before this evidence update (round 4). Every check under "Round 4 recheck" below ran on it; the round 3 output further down was recorded at `e40f052` and is kept as history                                       |
-| **Evidence commit** (final PR head)             | The commit directly after `cc4a3fb`. Verify with `git diff --stat cc4a3fb..HEAD`, which must list `docs/evidence/issue-97.md` alone. If a later review round adds commits, the checks are rerun and this table is updated                                                              |
+| **Tested head**                                 | `33317718cccebb417f7e411bbb9a6774a62ccff2`, the last content commit before this evidence update (round 8). Every check under "Round 8 recheck" below ran on it; the round 3 output further down was recorded at `e40f052` and is kept as history                                       |
+| **Evidence commit** (final PR head)             | The commit directly after `3331771`. Verify with `git diff --stat 3331771..HEAD`, which must list `docs/evidence/issue-97.md` alone. If a later review round adds commits, the checks are rerun and this table is updated                                                              |
 | **Host / tools**                                | macOS (Darwin arm64), git, prettier 3.8.1 (the version pinned in `pnpm-lock.yaml`; binary taken from a sibling checkout because this worktree has no `node_modules`), python3 for the link and secret scans, GitHub CLI (`gh`) with the owner's existing login for the round 3 actions |
 
 ## Changed files (vs `master`)
@@ -17,7 +17,7 @@ Slice 1 is documentation only. No `apps/api` code changed: the repository has no
 - `AI_QUESTIONS.md`: tracking section records the `Refs #97` edit and links the filed issues #104 and #105 (the drafted `gh issue create` commands are gone), the slice 2 and 3 headings carry their issue numbers, the "earlier claim in this file" sentence now reads "an earlier draft of this file claimed", corrected inventory of outbound senders, slice 2 and 3 defaults extended to the per-organization SMTP password and to `EmailLog` as the volume source.
 - `deploy/pi/README.md`: production checklist item names the tokens to rotate, including each organization's SMTP password, asks for the rotation date and points at #104 for the check that will read it.
 - `docs/agents/review-lessons.md`: five root causes from the PR #100 reviews (Pi env wiring, ratio-alert floor, evidence SHA, slice PRs must not close the parent issue, grep the mechanism not the product name); the split-issue lesson was revised in round 3 so the implementer edits the PR body and files the follow-up issues itself instead of leaving both to the owner.
-- `.gitignore`: ignores `deploy/pi/.env.pi` (the Pi runtime secrets file was not ignored before). Only these two lines differ from `master`; its mixed CRLF/LF endings are untouched. `deploy/pi/.env.pi.example` does not exist yet, so nothing points at it; #104 adds it.
+- `.gitignore`: ignores `deploy/pi/.env.pi` (the Pi runtime secrets file was not ignored before). The entire file is normalized to LF line endings, matching AGENTS.md and review-lessons.md requirements. `deploy/pi/.env.pi.example` does not exist yet, so nothing points at it; #104 adds it.
 - `docs/evidence/issue-97.md`: this file.
 
 ## GitHub actions taken in round 3 (outside the repository)
@@ -54,6 +54,7 @@ $ gh issue view 97 / 104 / 105 --json number,state,title,labels
 | 2     | `docs/evidence/issue-97.md:119`         | Diff-size / no-CI-paths row had no recorded output (thread text truncated in the brief) | Real `git diff --stat`, `--name-only` and path filter output recorded below                                                                                                | `c5ebbc0`            |
 | 3     | `AI_QUESTIONS.md:5-14` (quality review) | Drafted `gh` commands and a post-merge reopen still let the merge close #97             | PR #100 body edited to `Refs #97` (GitHub lists no closing reference), #104 and #105 filed and linked from item 0, review lesson revised to put the fix on the implementer | `a4ccbae`, `e40f052` |
 | 3     | `AI_QUESTIONS.md:18` (quality review)   | "The earlier claim in this file" referenced text that never existed in the merged file  | Reworded to "An earlier draft of this file claimed …"                                                                                                                      | `a4ccbae`            |
+| 7 / 8 | `.gitignore`                            | Normalize the ignore file to LF                                                         | `.gitignore` converted completely to LF (0 `\r` bytes across the whole file); `git diff --check` clean                                                                     | `3331771`            |
 
 ## Checks run at the tested head
 
@@ -327,6 +328,29 @@ $ git check-ignore -v deploy/pi/.env.pi
 .gitignore:16:deploy/pi/.env.pi	deploy/pi/.env.pi
 ```
 
+## Round 8 recheck (tested head `3331771`)
+
+The remaining `.gitignore` thread (`chatgpt-codex-connector`, discussion `r4212009049`) requested normalizing `.gitignore` to LF line endings. Commit `3331771` converts all lines of `.gitignore` to LF (0 `\r` bytes across the whole file). `git diff --check` is completely clean, and `deploy/pi/.env.pi` remains ignored.
+
+```text
+$ git rev-parse HEAD   (before this evidence commit)
+33317718cccebb417f7e411bbb9a6774a62ccff2
+$ git diff --check origin/master...HEAD; echo exit=$?
+exit=0
+$ grep -c $'\r' .gitignore
+0
+$ git ls-files --eol .gitignore
+i/lf    w/lf    attr/                 	.gitignore
+$ git check-ignore -v deploy/pi/.env.pi
+.gitignore:16:deploy/pi/.env.pi	deploy/pi/.env.pi
+$ git diff -w --ignore-cr-at-eol --stat origin/master...HEAD -- .gitignore
+ .gitignore | 2 ++
+ 1 file changed, 2 insertions(+)
+$ git diff --stat origin/master...HEAD -- .gitignore
+ .gitignore | 228 +++++++++++++++++++++++++++++++------------------------------
+ 1 file changed, 115 insertions(+), 113 deletions(-)
+```
+
 ## Acceptance checklist (Tech Lead plan)
 
 | Item                                                                           | Status                                                                                                                                                        |
@@ -335,5 +359,5 @@ $ git check-ignore -v deploy/pi/.env.pi
 | No credential value appears in logs, asserted by a test                        | Not applicable in slice 1 (no code); the secret scan above shows no values in the docs; the test is an acceptance item of #104 and #105                       |
 | Release checklist contains the rotation item                                   | PASS: `deploy/pi/README.md` line 53                                                                                                                           |
 | `AI_QUESTIONS.md` lists the slice 2 and slice 3 decisions, each with a default | PASS: items 2 and 3, defaults marked `_Default:_`; item 0 links #104 and #105 and records that PR #100 now says `Refs #97`                                    |
-| `docs/evidence/issue-97.md` has real recorded output and the exact tested SHA  | PASS: tested head `cc4a3fb0aa5fb6745ffbca71c23cf1e7f19263b6`, output under "Round 4 recheck"                                                                  |
+| `docs/evidence/issue-97.md` has real recorded output and the exact tested SHA  | PASS: tested head `33317718cccebb417f7e411bbb9a6774a62ccff2`, output under "Round 8 recheck"                                                                  |
 | Under 300 changed lines; no CI or secrets files touched                        | See the diff block above: no `.github/`, secrets or `.env` path is touched; 53 content lines, the rest is this per-PR `docs/evidence/issue-97.md` replacement |
