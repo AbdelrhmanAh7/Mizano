@@ -19,6 +19,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **An idempotency key must stay the same across retries of one action.** Generating a fresh random id on the server for each request defeats it. A client UUID created once per user action and reused on every retry is fine (`idempotencyKeyFor`); so are `profileId:YYYY-MM-DD` or a sha256 of file + row. _(manual recurring execute, import retries)_
 - **Store idempotency markers where users cannot edit them.** Notes, reason and reference text get edited; use an append-only store such as AuditLog `IMPORT_ROW`. _(import markers)_
 - **Bulk operations reuse the single-record command through `runBulk`** and report `{ processed, total, failures }`. Never write a bulk `updateMany` that skips the posting logic.
+- **Automated postings (payroll, depreciation, disposal, COGM) also go through `JournalsService.create/reverse`** with a source key, never a raw `tx.journal.create` with a private `createdAt`/`parseInt` journal number. The private numbering collided with `MAX(JRN-n)` on backdated posts and skipped the balance, lock-date and idempotency checks. Claim the source row (schedule, run, work order) with a guarded update inside the same transaction. _(#130)_
 
 ## 3. Use the accounts that were actually posted
 
@@ -49,6 +50,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Decimal precision must cover products before subtraction.** Two `Decimal(19,4)` factors can require 38 significant digits; the default 20 can lose 4-dp amounts when large valuations cancel. Use a locally cloned constructor with aggregation headroom, never change global precision, and test large products as well as fractional values. _(inventory value trend, PR #59)_
 - **Bound inputs to `Decimal(19,4)`:** at most 15 integer and 4 fraction digits, validated with `common/dto/decimal-string.ts`. Bound computed totals before writing.
 - **Allocate VAT cumulatively.** Each partial credit's VAT = `round(totalVAT × cumulative/total) − already allocated`, so the parts sum exactly to the whole.
+- **Round computed amounts per line at `CURRENCY_SCALE` and let one figure absorb the remainder** (net pay, the last depreciation period), so gross = net + deductions and a schedule sums to the depreciable amount. _(payroll, depreciation, #130)_
 - **The web preview rounds per line exactly like the server** (`computeDocumentTotals`), otherwise the shown and stored totals differ.
 - **When storage changes (net vs. gross), update every view:** list, detail, PDF and report. _(tax-inclusive expenses)_
 - **Keep accepted amounts.** Converting a quote copies its stored lines and totals rather than recomputing them.
@@ -66,6 +68,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 ## 8. Voided and deleted records
 
+- **Never un-post a journal (`isPosted = false`) to undo it.** Create a linked reversal and leave the original posted. _(depreciation reversal, #130)_
 - **Posted documents that were voided stay readable** (read-only, with `deletedAt` set) on their detail endpoint so journal source links resolve. Lists exclude them. Deleted drafts, which never posted, return 404.
 - **Current figures (open balances, aging, dashboards) exclude DRAFT, VOID and deleted documents.** Historical statements and period reports keep a posted document that was voided later in its original period, with the reversal on the void date (see 4).
 

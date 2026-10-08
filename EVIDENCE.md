@@ -142,3 +142,64 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+---
+
+# Issue #130 — Payroll, depreciation and COGM post through JournalsService
+
+- **Tested code SHA**: `9bae74c92cfbce4ace45cf98952894f62664bfeb` (branch `ai/130`, based on master `615060e`). Later commits on the branch only touch `EVIDENCE.md` and `docs/agents/review-lessons.md`.
+- **Environment**: macOS, Node with offline pnpm install, private PostgreSQL 16 cluster on `127.0.0.1:55130` (fresh database, `prisma migrate deploy`), `REDIS_URL=` blank.
+
+## Acceptance criteria
+
+| REQ                                                                                                     | Verified by                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| AC1 a double run of each posting yields one journal                                                     | `test/system-postings.e2e-spec.ts`: concurrent `POST /payroll/runs/:id/paid` x2, manual `POST /assets/:id/depreciate` + `POST /assets/depreciation/run`, concurrent `POST /assets/:id/dispose` x2, concurrent `POST /manufacturing/work-orders/:id/complete` x2 each leave exactly one journal for `PAYROLL`, `DEPRECIATION`, `ASSET_DISPOSAL`, `COGM` + source id |
+| AC2 reversing depreciation keeps the original `isPosted=true` and creates a linked reversal             | e2e `AC2: reversing depreciation…` (original still posted, `reversedBy` set, reversal posted and balanced, period re-runnable); unit `depreciation.service.spec.ts` (no `journal.update`, `reversalOfId` set)                                                                                                                                                      |
+| AC3 unit tests assert debits = credits and that a lock date rejects the post                            | `payroll.service.spec.ts`, `depreciation.service.spec.ts`, `assets.service.spec.ts` (disposal), `work-orders.service.spec.ts` (COGM) run the real `JournalsService` over the mocked client; e2e `AC3` tests for payroll, depreciation and COGM                                                                                                                     |
+| Decimal: gross = net + deductions; schedule sums to the depreciable amount; COGM quantities not rounded | e2e `AC-Decimal` tests and the COGM AC1 test (`0.3333` consumed, not `0`); unit tests for payslip and schedule rounding                                                                                                                                                                                                                                            |
+| Payslips soft-deleted, draft runs reused instead of hard-deleted                                        | e2e `AC-SoftDelete` tests; migration `20261008000000_payslip_soft_delete`                                                                                                                                                                                                                                                                                          |
+
+The acceptance tests were committed failing first (`5bb0a38`): 12 of 12 failed on master behaviour (float totals `569.6891`, no source-linked journal, lock date ignored, two concurrent disposals/completions both returning 2xx). `4bb3a60` changed the expected rounding scale from 4 dp to the codebase's `CURRENCY_SCALE` (2 dp); the assertions stay exact.
+
+## Commands and results
+
+```bash
+cd apps/api && npx jest --config ./test/jest-e2e.json --runInBand   # fresh DB
+```
+
+```text
+Test Suites: 12 passed, 12 total
+Tests:       269 passed, 269 total
+```
+
+```bash
+cd apps/api && node _run_tests.js
+```
+
+```text
+Test Suites: 1 failed, 136 passed, 137 total
+Tests:       4 failed, 2213 passed, 2217 total
+```
+
+The one failing suite is `import.service.hardening.spec.ts`, which this branch does not touch. It passes on its own (`npx jest src/modules/import-export/services/import.service.hardening.spec.ts`: 9 passed) and fails only inside the full run after the offline install.
+
+```bash
+cd apps/web && npx jest
+cd apps/api && npx tsc --noEmit -p . && npx tsc --noEmit -p test/tsconfig.e2e.json
+cd apps/api && npx eslint "{src,test}/**/*.ts" --max-warnings 0
+```
+
+```text
+Test Suites: 48 passed, 48 total
+Tests:       458 passed, 458 total
+tsc: exit 0 (both projects)
+eslint: exit 0, no warnings
+```
+
+## Remaining limitations
+
+- Account selection for payroll, disposal and COGM still uses the existing name/code lookups (now ordered by code and rejecting a missing account). The disposal gain/loss lookup still accepts code `6100`, which is "Rent Expense" in the default chart; choosing dedicated configured accounts is left for a follow-up.
+- `POST /manufacturing/work-orders/bulk-complete` still marks work orders completed with an `updateMany` and posts no COGM journal. It should reuse `completeWorkOrder` through `runBulk`; left out to keep this PR's scope.
+- `checkMaterialAvailability` and the asset summary still use float arithmetic for display figures (not postings).
+- Reviewer: none yet. This record is the author's own run.
