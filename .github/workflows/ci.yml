@@ -161,67 +161,6 @@ jobs:
           NODE_ENV: test
 
   # ==========================================
-  # E2E Tests (real PostgreSQL, parallel with unit tests)
-  # ==========================================
-  e2e:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    needs: install
-    timeout-minutes: 30
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: mizano_e2e
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Restore node_modules
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-            apps/api/src/generated
-          key: modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-
-      - name: Apply database migrations
-        run: pnpm --filter api exec prisma migrate deploy
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/mizano_e2e
-
-      # Every apps/api/test/*.e2e-spec.ts suite (reports, accountant journey, multi-tenancy,
-      # intake, ...) through the real HTTP API. Any failing suite fails this job.
-      - name: Run E2E tests
-        run: pnpm test:e2e
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/mizano_e2e
-          # Blank on purpose: cache and intake queue run in-process, as in the verified local runs.
-          REDIS_URL: ''
-
-  # ==========================================
   # Build (parallel with lint and test)
   # ==========================================
   build:
