@@ -46,7 +46,7 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
     lines: Array<{ quantity: string; rate: string; taxRate?: string }>,
     date: string,
     due: string,
-  ): Promise<{ id: string; grandTotal: string }> {
+  ): Promise<{ id: string; grandTotal: string; invoiceNumber: string }> {
     const res = await a.post('/invoices').send({
       customerId,
       date,
@@ -572,115 +572,118 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
   });
 
   describe('tenant A: VAT return draft (@issue-114)', () => {
-    it('AC1, AC2, AC3: sums posted documents in the period, excludes void and draft, flags foreign currency', async () => {
-      const start = isoDay(200);
-      const end = isoDay(230);
+    const vat = (from: string, to: string): ReturnType<ApiHelper['get']> =>
+      a.get('/reports/vat-return-draft').query({ from, to });
+    const oneLine = (
+      rate: string,
+      taxRate?: string,
+    ): Array<{ quantity: string; rate: string; taxRate?: string }> => [
+      { quantity: '1', rate, taxRate },
+    ];
+    let vatCustomer = '';
 
-      const p1 = await a.post('/customers').send({ name: 'VAT Customer', currency: 'USD' });
-      const customerVat = p1.body.id;
+    async function postedInvoice(
+      day: number,
+      rate: string,
+      taxRate?: string,
+    ): Promise<{ id: string; invoiceNumber: string }> {
+      const invoice = await createInvoice(
+        vatCustomer,
+        oneLine(rate, taxRate),
+        isoDay(day),
+        isoDay(day + 20),
+      );
+      await sendInvoice(invoice.id);
+      return invoice;
+    }
 
-      const v1 = await a.post('/vendors').send({ name: 'VAT Vendor', currency: 'USD' });
-      const vendorVat = v1.body.id;
-
-      // 1. Output VAT (Invoice)
-      const i1 = await a.post('/invoices').send({
-        customerId: customerVat,
-        date: isoDay(205),
-        dueDate: isoDay(230),
-        lines: [{ description: 'Line', quantity: '1', rate: '1000', taxRate: '14' }],
-      });
-      expect((await a.patch(`/invoices/${i1.body.id}/send`)).status).toBe(200);
-
-      // 2. Input VAT (Bill)
-      const b1 = await a.post('/bills').send({
-        vendorId: vendorVat,
+    it('@issue-114 AC2, AC3, AC4: sums posted documents in the period, excludes void and draft, flags foreign currency', async () => {
+      vatCustomer = (await a.post('/customers').send({ name: 'VAT Customer' })).body.id;
+      const vatVendor = (await a.post('/vendors').send({ name: 'VAT Vendor' })).body.id;
+      await postedInvoice(205, '1000', '14');
+      const bill = await a.post('/bills').send({
+        vendorId: vatVendor,
         date: isoDay(206),
         dueDate: isoDay(230),
         lines: [
           { description: 'Line', accountId: acc.rent, quantity: '1', rate: '500', taxRate: '14' },
         ],
       });
-      expect((await a.post(`/bills/${b1.body.id}/approve`)).status).toBe(201);
+      expect((await a.post(`/bills/${bill.body.id}/approve`)).status).toBe(201);
+      const voided = await postedInvoice(208, '1000', '14');
+      expect((await a.patch(`/invoices/${voided.id}/void`)).status).toBe(200);
+      // The API never stamps a foreign code on a postable invoice; mark it the way an imported row would.
+      const foreign = await postedInvoice(210, '100', '14');
+      await prisma.invoice.update({ where: { id: foreign.id }, data: { currencyCode: 'EUR' } });
+      await postedInvoice(211, '300'); // zero-rated: counts as 0, not an exception
+      await createInvoice(vatCustomer, oneLine('1000', '14'), isoDay(212), isoDay(230)); // draft: ignored
 
-      // 3. Voided invoice (excluded outright)
-      const iToVoid = await a.post('/invoices').send({
-        customerId: customerVat,
-        date: isoDay(208),
-        dueDate: isoDay(230),
-        lines: [{ description: 'Line', quantity: '1', rate: '1000', taxRate: '14' }],
-      });
-      expect((await a.patch(`/invoices/${iToVoid.body.id}/send`)).status).toBe(200);
-      expect((await a.patch(`/invoices/${iToVoid.body.id}/void`)).status).toBe(200);
-
-      // 4. Exception: foreign currency invoice. The API never stamps a foreign code on a
-      // postable invoice, so mark it the way a legacy row would carry one.
-      const fc = await a.post('/customers').send({ name: 'Foreign Customer', currency: 'EUR' });
-      const iForeign = await a.post('/invoices').send({
-        customerId: fc.body.id,
-        date: isoDay(210),
-        dueDate: isoDay(230),
-        lines: [{ description: 'Line', quantity: '1', rate: '100', taxRate: '14' }],
-      });
-      expect((await a.patch(`/invoices/${iForeign.body.id}/send`)).status).toBe(200);
-      await prisma.invoice.update({
-        where: { id: iForeign.body.id },
-        data: { currencyCode: 'EUR' },
-      });
-
-      // 5. Zero-tax invoice: taxAmount is never null in the schema, so it counts as 0 and is
-      // not an exception.
-      const iNoTax = await a.post('/invoices').send({
-        customerId: customerVat,
-        date: isoDay(211),
-        dueDate: isoDay(230),
-        lines: [{ description: 'Line', quantity: '1', rate: '300' }],
-      });
-      expect((await a.patch(`/invoices/${iNoTax.body.id}/send`)).status).toBe(200);
-
-      // Draft invoice (should be ignored)
-      await a.post('/invoices').send({
-        customerId: customerVat,
-        date: isoDay(212),
-        dueDate: isoDay(230),
-        lines: [{ description: 'Line', quantity: '1', rate: '1000', taxRate: '14' }],
-      });
-
-      const res = await a.get('/reports/vat-return-draft').query({ from: start, to: end });
+      const res = await vat(isoDay(200), isoDay(230));
       expect(res.status).toBe(200);
-      expect(res.body.label).toBe('DRAFT, not for filing');
-      expect(res.body.status).toBe('incomplete');
-      expect(D(res.body.outputTax).equals('140')).toBe(true);
-      expect(D(res.body.inputTax).equals('70')).toBe(true);
-      expect(D(res.body.netPayable).equals('70')).toBe(true);
+      expect(res.body).toMatchObject({
+        label: 'DRAFT, not for filing',
+        status: 'incomplete',
+        outputTax: '140.0000',
+        inputTax: '70.0000',
+        netPayable: '70.0000',
+        etaMismatches: [],
+      });
       expect(res.body.exceptions).toEqual([
         {
-          id: iForeign.body.id,
+          id: foreign.id,
           type: 'invoice',
-          documentNumber: iForeign.body.invoiceNumber,
+          documentNumber: foreign.invoiceNumber,
           reason: 'Foreign currency',
         },
       ]);
-
-      // Empty period
-      const resEmpty = await a
-        .get('/reports/vat-return-draft')
-        .query({ from: isoDay(300), to: isoDay(330) });
-      expect(resEmpty.status).toBe(200);
-      expect(resEmpty.body.status).toBe('complete');
-      expect(resEmpty.body.outputTax).toBe('0.0000');
     });
 
-    it('AC4: Invalid range (from > to) returns 400 with the range message', async () => {
-      const res = await a
-        .get('/reports/vat-return-draft')
-        .query({ from: isoDay(10), to: isoDay(5) });
-      expect(res.status).toBe(400);
-      expect(res.body.message).toContain('from date must be before or equal to to date');
+    it('@issue-114 AC2: an empty period is a complete draft of zero decimal strings', async () => {
+      const res = await vat(isoDay(300), isoDay(330));
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        status: 'complete',
+        outputTax: '0.0000',
+        inputTax: '0.0000',
+        netPayable: '0.0000',
+        exceptions: [],
+        etaMismatches: [],
+      });
+    });
+
+    it('@issue-114 AC6: flags a posted invoice whose header tax no longer matches its lines (ETA pre-filing check)', async () => {
+      const edited = await postedInvoice(255, '1000', '14');
+      // A header changed outside the line maths (import, manual fix) is what ETA rejects at submission.
+      await prisma.invoice.update({ where: { id: edited.id }, data: { taxAmount: D('139.99') } });
+
+      const res = await vat(isoDay(250), isoDay(260));
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        status: 'incomplete',
+        outputTax: '139.9900',
+        exceptions: [],
+      });
+      expect(res.body.etaMismatches).toEqual([
+        {
+          id: edited.id,
+          type: 'invoice',
+          documentNumber: edited.invoiceNumber,
+          headerTax: '139.9900',
+          lineTax: '140.0000',
+        },
+      ]);
+    });
+
+    it('@issue-114 AC5: an inverted or malformed range returns 400', async () => {
+      const inverted = await vat(isoDay(10), isoDay(5));
+      expect(inverted.status).toBe(400);
+      expect(inverted.body.message).toContain('from date must be before or equal to to date');
+      expect((await vat('not-a-date', isoDay(5))).status).toBe(400);
     });
   });
 
   describe('isolation and authentication', () => {
-    it("tenant B sees none of tenant A's figures", async () => {
+    it("@issue-114 AC1: tenant B sees none of tenant A's figures", async () => {
       expect((await b.get(`/accounts/${acc.bank}/balance`)).status).toBe(404);
       expect((await b.get(`/accounting-reports/general-ledger/${acc.bank}`)).status).toBe(404);
       const foreignStatement = await b.get(`/reports/customer-statement/${customer1}`).query(wide);
@@ -714,6 +717,7 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
         inputTax: '0.0000',
         netPayable: '0.0000',
         exceptions: [],
+        etaMismatches: [],
       });
     });
 
