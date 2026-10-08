@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IntakeJob, IntakeJobStatus, Prisma } from '@prisma/client';
 import { describeError } from '../../../common/utils/redact';
@@ -8,6 +8,7 @@ import { DocumentIntakeResult, DocumentIntakeService } from '../services/documen
 import { intakeLeaseMs, queueJobId } from './intake-jobs.service';
 import { IntakeQueuePayload, IntakeQueueService } from './intake-queue.service';
 import { IntakeStorage } from './intake-storage';
+import { Clock, INTAKE_CLOCK, monotonicClock, StageTimer } from './stage-timer';
 
 const LOW_CONFIDENCE = 0.6;
 const DEFAULT_RETRY_BASE_MS = 5000;
@@ -41,6 +42,7 @@ export class IntakeProcessorService implements OnModuleInit {
     private readonly intake: DocumentIntakeService,
     private readonly queue: IntakeQueueService,
     private readonly config: ConfigService,
+    @Optional() @Inject(INTAKE_CLOCK) private readonly clock: Clock = monotonicClock,
   ) {}
 
   onModuleInit(): void {
@@ -116,8 +118,14 @@ export class IntakeProcessorService implements OnModuleInit {
       Math.max(100, Math.floor(leaseMs / 3)),
     );
 
+    // Worker stages: load the original; extract (text/OCR + strategy fields) until
+    // 'classifying'; parse (classification + entity parsing) until 'matching';
+    // validate (party matching, duplicate check, review decision).
+    const timer = new StageTimer(this.clock);
     try {
+      timer.start('load');
       const buffer = await this.storage.get(job.storageKey, job.sha256);
+      timer.start('extract');
       const result = await Promise.race([
         this.intake.processDocument(
           organizationId,
@@ -125,7 +133,9 @@ export class IntakeProcessorService implements OnModuleInit {
           job.mimeType,
           job.originalFileName,
           job.language ?? 'eng+ara',
-          (_stage, progress) => {
+          (stage, progress) => {
+            if (stage === 'classifying') timer.start('parse');
+            if (stage === 'matching') timer.start('validate');
             void this.prisma.intakeJob
               .updateMany({
                 where: {
@@ -143,6 +153,7 @@ export class IntakeProcessorService implements OnModuleInit {
         lostLease,
       ]);
       const status = needsReview(result) ? IntakeJobStatus.NEEDS_REVIEW : IntakeJobStatus.EXTRACTED;
+      timer.stop();
       const written = await this.prisma.intakeJob.updateMany({
         where: { id: jobId, organizationId, status: IntakeJobStatus.PROCESSING, leaseToken },
         data: {
@@ -152,6 +163,7 @@ export class IntakeProcessorService implements OnModuleInit {
           leaseToken: null,
           leaseExpiresAt: null,
           result: JSON.parse(JSON.stringify(result)) as Prisma.InputJsonValue,
+          stageTimingsMs: timer.snapshot(),
         },
       });
       if (written.count === 0) throw new LeaseLostError();
@@ -161,7 +173,8 @@ export class IntakeProcessorService implements OnModuleInit {
         this.logger.warn(`Intake job ${jobId} lost its lease; abandoning this run`);
         return;
       }
-      await this.recordFailure(job, leaseToken, error);
+      timer.stop();
+      await this.recordFailure(job, leaseToken, error, timer.snapshot());
     } finally {
       clearInterval(heartbeat);
     }
@@ -181,7 +194,12 @@ export class IntakeProcessorService implements OnModuleInit {
     );
   }
 
-  private async recordFailure(job: IntakeJob, leaseToken: string, error: unknown): Promise<void> {
+  private async recordFailure(
+    job: IntakeJob,
+    leaseToken: string,
+    error: unknown,
+    stageTimingsMs: Record<string, number>,
+  ): Promise<void> {
     // Extractor errors may quote document text: keep the error type/code only.
     const lastError = describeError(error, { includeMessage: false }).slice(0, 200);
     // `job` was read after the claim, so job.attempts already counts this run.
@@ -195,7 +213,14 @@ export class IntakeProcessorService implements OnModuleInit {
         status: IntakeJobStatus.PROCESSING,
         leaseToken,
       },
-      data: { status, lastError, progress: 0, leaseToken: null, leaseExpiresAt: null },
+      data: {
+        status,
+        lastError,
+        progress: 0,
+        leaseToken: null,
+        leaseExpiresAt: null,
+        stageTimingsMs,
+      },
     });
     this.logger.error(
       `Intake job ${job.id} failed: status=${status} attempts=${attempts}/${job.maxAttempts} error=${lastError}`,
