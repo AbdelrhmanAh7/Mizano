@@ -198,6 +198,45 @@ describe('OcrLlmStrategy offline worker', () => {
     expect(output).not.toContain('secret-value');
   });
 
+  it('falls back to native PDF text when Paddle yields too little, never Tesseract on PDF bytes', async () => {
+    const extractFromOcrText = jest.fn().mockResolvedValue(null);
+    const strategy = new OcrLlmStrategy(
+      { extractFromOcrText } as unknown as OllamaService,
+      {
+        isAvailable: async () => true,
+        recognize: async () => ({ text: 'short', confidence: 10 }),
+      } as unknown as PaddleOcrService,
+    );
+    const pdfText = 'native pdf text longer than twenty characters';
+    await strategy.extract({
+      fileBuffer: Buffer.from('%PDF'),
+      mimeType: 'application/pdf',
+      language: 'en',
+      isPdf: true,
+      pdfText,
+      pdfIsNativeText: false,
+    });
+    expect(extractFromOcrText).toHaveBeenCalledWith(pdfText, 90, undefined);
+    expect(createWorker).not.toHaveBeenCalled();
+  });
+
+  it('returns null for a PDF without usable text and never starts Tesseract', async () => {
+    const strategy = new OcrLlmStrategy(
+      { extractFromOcrText: async () => null } as unknown as OllamaService,
+      { isAvailable: async () => false } as unknown as PaddleOcrService,
+    );
+    expect(
+      await strategy.extract({
+        fileBuffer: Buffer.from('%PDF'),
+        mimeType: 'application/pdf',
+        language: 'en',
+        isPdf: true,
+        pdfText: 'tiny',
+      }),
+    ).toBeNull();
+    expect(createWorker).not.toHaveBeenCalled();
+  });
+
   it('logs metadata only when an OCR error contains document values', async () => {
     const errorLog = jest.spyOn(Logger.prototype, 'error').mockImplementation();
     createWorker.mockRejectedValueOnce(new Error('ZXQ invoice total 8,765.43 token=secret-value'));
