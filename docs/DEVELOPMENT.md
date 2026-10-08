@@ -144,7 +144,7 @@ Rules:
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pushes and PRs to `master`/`develop`: install (pnpm 8, Node 20, `prisma generate`) → lint and type-check → unit tests (with PostgreSQL 16 and Redis 7 services, `db:push`) → build. E2E is not part of CI yet.
+`.github/workflows/ci.yml` runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (PostgreSQL 16 and Redis 7 service containers, `db:push`) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); fork PRs run only after approval in the repository settings. E2E is not part of CI yet. `deploy.yml` stays disabled (it needs deployment secrets).
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 
