@@ -145,7 +145,7 @@
 
 ## Issue #109 — Arabic-Indic/Persian digit normalization
 
-Tested code head: `a5aeed02dcd38442bca11c75ca6b13d4945152e5` (this file is committed after it; only EVIDENCE.md differs).
+Tested code head: `65a635172907434efa52bec650fbd54fa4f87777` (this file is committed after it; only EVIDENCE.md differs).
 
 `normalizeDigits` (`apps/api/src/modules/ai/extraction/rules/rules-normalize.ts`) and its use in the intake rules extractor already exist on master. This PR only adds the acceptance spec `rules-normalize.spec.ts` (tagged `@issue-109`); no production code changes remain. An earlier attempt that also wired the helper into `entity-extraction.service.ts` and `ollama.service.ts` was reverted because dropped bidi marks shift entity offsets.
 
@@ -155,19 +155,25 @@ Tested code head: `a5aeed02dcd38442bca11c75ca6b13d4945152e5` (this file is commi
 | AC2 `٠٧/١٠/٢٠٢٦` = `07/10/2026`             | `parseDate` cases (Arabic-Indic and Persian)                                      |
 | AC3 mixed script `EGP ١٢٠٠`                 | mixed-script `normalizeDigits` and `extractInvoiceFields` cases                   |
 | AC4 English tests unchanged                 | `invoice-rules-extractor.spec.ts`, `rules-strategy.spec.ts` untouched and passing |
-| AC5 no float math                           | `parseAmount` returns Decimal (asserted)                                          |
+| AC5 no float math                           | `parseAmount` returns Decimal and preserves precision (asserted)                  |
 | AC6 ≤ ~200 lines                            | no production code in the diff                                                    |
 
 Commands run (sandbox off, local):
 
-- `npx jest src/modules/ai` in apps/api: Test Suites 60 passed, Tests 1096 passed
+- `npx jest src/modules/ai/extraction/rules` in apps/api: 3 suites passed, 66 tests passed
 - `npx tsc --noEmit -p .` in apps/api: no errors
 - `prettier --check` on the spec: clean
 
 Not run: the seeded PDF e2e (removed; see commit a5aeed0).
 
-E2E: not needed — #109 changes no production code and no UI or user-flow files, only the jest acceptance spec `rules-normalize.spec.ts`, so `e2e-army` reports "n/a" (the blocking gate is tester-army/e2e, status `e2e-army`). The legacy Playwright `e2e-first` status looks only for an e2e file and cannot be satisfied by a jest `.spec.ts`. No e2e-army test was added because none could exercise the Arabic-digit acceptance criteria; a smoke test that never checks them would only satisfy the gate.
+E2E gate note (#109): this PR changes no production code and no UI or user-flow files, only the unit acceptance spec `rules-normalize.spec.ts`. The round-two `e2e-first` review still reports “E2E-first rule not met” because no E2E or acceptance tests were added or changed. Record the gate as unresolved unless an authoritative retirement decision and the `e2e-army` result are available.
 
 Review round 3 (#109): the PDF-fixture, offset-preservation and async-path threads target code removed in a5aeed0 (no e2e PDF spec, no wiring in `entity-extraction.service.ts` / `ollama.service.ts`), so nothing remains to fix there. CodeRabbit's spec notes are fixed in `rules-normalize.spec.ts`: amount tests now pass `normalizeDigits(...)` output into `parseAmount`, the European-format case is renamed, and the Decimal(19,4) bound test covers 15/16 integer digits and 4/5 decimals. `npx jest src/modules/ai/extraction/rules` in apps/api: 3 suites, 66 tests passed.
 
 Review round 4 (#109): the three code threads (Unicode PDF fixtures, original-text offsets, async entity-extraction path) are all OUTDATED. They target the e2e PDF spec and the `entity-extraction.service.ts` / `ollama.service.ts` wiring, which were removed in a5aeed0 and are not on this branch, so no code change is needed. The EVIDENCE.md e2e note is reworded to the `E2E: not needed — <reason>` waiver form. The spec fixes from round 3 (aed8cb7) are unchanged.
+
+Review round 5 (#109):
+
+- Fixed CodeRabbit finding on `rules-normalize.spec.ts:64`: AC5 test now verifies `parseAmount('10000000000000.0001')` returns a Decimal instance (`toBeInstanceOf(Decimal)`) and preserves the exact 4-decimal fraction string that JS Number conversion would lose.
+- Fixed CodeRabbit finding on `EVIDENCE.md`: E2E gate note updated to report the round-two `e2e-first` review status as unresolved without an authoritative retirement decision and the `e2e-army` result.
+- Confirmed the 3 outdated review threads on `intake-arabic-digits.e2e-spec.ts` and `entity-extraction.service.ts` are satisfied because the relevant code was reverted in commit a5aeed0.
