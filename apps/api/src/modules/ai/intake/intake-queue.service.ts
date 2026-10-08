@@ -33,13 +33,6 @@ export function connectionFromUrl(url: string): ConnectionOptions {
   };
 }
 
-/**
- * Handler for the no-Redis inline mode. The API and the worker module hold separate
- * IntakeQueueService instances, so the handler lives at process scope: when both are
- * booted in one process (tests, bare local runs) the API's enqueue still reaches the worker.
- */
-let inlineHandler: IntakeQueueHandler | null = null;
-
 @Injectable()
 export class IntakeQueueService implements OnModuleDestroy {
   private readonly logger = new Logger(IntakeQueueService.name);
@@ -63,7 +56,6 @@ export class IntakeQueueService implements OnModuleDestroy {
   /** Called once by the processor; starts consuming. */
   registerHandler(handler: IntakeQueueHandler): void {
     this.handler = handler;
-    inlineHandler = handler;
     const url = this.redisUrl;
     if (!url || this.worker) return;
     this.worker = new Worker<IntakeQueuePayload>(
@@ -103,7 +95,7 @@ export class IntakeQueueService implements OnModuleDestroy {
       if (this.timers.has(queueJobId)) return;
       const timer = setTimeout(() => {
         this.timers.delete(queueJobId);
-        const handler = this.handler ?? inlineHandler;
+        const handler = this.handler;
         if (!handler) return;
         handler(payload).catch((error: unknown) => {
           this.logger.error(
@@ -135,7 +127,6 @@ export class IntakeQueueService implements OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
-    if (this.handler && inlineHandler === this.handler) inlineHandler = null;
     this.timers.forEach((t) => clearTimeout(t));
     this.timers.clear();
     await this.worker?.close();

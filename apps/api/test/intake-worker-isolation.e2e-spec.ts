@@ -1,18 +1,24 @@
 /**
  * E2E tests for issue #142: heavy OCR/PDF dependencies live in the worker only.
  *
- * Jest runs each test file in its own module registry, so `require.cache` is not a faithful
- * view of what the process loaded. The two heavy packages are therefore replaced with
- * recording mocks: any `require('pdf-parse')` / `require('tesseract.js')` is logged in
- * `loaded`, which is the registry-level equivalent of inspecting `require.cache`.
+ * Why a recording mock instead of `require.cache`: Jest runs every test file in its own module
+ * registry and does not populate Node's `require.cache` for modules it loads, so inspecting
+ * `require.cache` would pass vacuously. `jest.mock` factories run exactly when the module
+ * registry first loads the package, so each factory records its load in `loaded`; that is the
+ * registry-level equivalent of "is this key in require.cache". (tesseract.js is required lazily
+ * at OCR time, so its factory fires only if an OCR call actually happens.)
  */
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { INestApplication } from '@nestjs/common';
+import { ModulesContainer } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { IntakeJobStatus } from '@prisma/client';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
 import { eventually } from './helpers/journey.helper';
 import { IntakeJobsService } from '../src/modules/ai/intake/intake-jobs.service';
+import { IntakeQueueService } from '../src/modules/ai/intake/intake-queue.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const loaded: string[] = [];
@@ -74,6 +80,19 @@ function pdfFixture(marker: string): Buffer {
   );
 }
 
+/** Body of one top-level service in the compose file (text slice; no YAML parser in the repo). */
+function composeService(name: string): string {
+  const file = readFileSync(
+    join(__dirname, '..', '..', '..', 'docker-compose.production.yml'),
+    'utf8',
+  );
+  const start = file.search(new RegExp(`^  ${name}:\\s*$`, 'm'));
+  expect(start).toBeGreaterThanOrEqual(0);
+  const rest = file.slice(start + 1);
+  const next = rest.search(/^ {2}[\w-]+:\s*$|^[\w-]+:/m);
+  return next === -1 ? rest : rest.slice(0, next);
+}
+
 describe('Intake worker isolation (e2e) @issue-142', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -90,8 +109,15 @@ describe('Intake worker isolation (e2e) @issue-142', () => {
     await app.close();
   });
 
-  it('@e2e @flow:intake @issue-142 AC1: API process has no tesseract.js or pdf-parse loaded, even after an upload', async () => {
+  it('@e2e @flow:intake @issue-142 AC1: API app graph never loads tesseract.js or pdf-parse, even after an upload', async () => {
     expect(loaded).toEqual([]);
+    // The API graph has no extraction providers at all: nothing in it can consume the queue.
+    // (Looked up by name: importing these classes here would itself load pdf-parse.)
+    const providers = [...app.get(ModulesContainer).values()].flatMap((m) =>
+      [...m.providers.values()].map((p) => p.name),
+    );
+    expect(providers).not.toContain('IntakeProcessorService');
+    expect(providers).not.toContain('DocumentIntakeService');
 
     const res = await tenant.api
       .post('/ai/document-intake/process')
@@ -105,20 +131,25 @@ describe('Intake worker isolation (e2e) @issue-142', () => {
     expect(loaded).toEqual([]);
   });
 
-  it('@e2e @flow:intake @issue-142 AC2: without a worker the job is only queued, never extracted by the API', async () => {
+  it('@e2e @flow:intake @issue-142 AC2: without AiWorkerModule the enqueued job is never processed', async () => {
+    await app.get(IntakeJobsService).recoverJobs();
     await new Promise((resolve) => setTimeout(resolve, 300));
     const job = await prisma.intakeJob.findUniqueOrThrow({ where: { id: jobId } });
     expect(job.status).toBe(IntakeJobStatus.QUEUED);
     expect(job.attempts).toBe(0);
   });
 
-  it('@e2e @flow:intake @issue-142 AC2: the worker container picks the job up and extracts it', async () => {
+  it('@e2e @flow:intake @issue-142 AC2: once AiWorkerModule is booted the same job is processed', async () => {
+    // Imported here, not at the top, so the API graph above is measured before the PDF stack loads.
     const { AiWorkerModule } = await import('../src/modules/ai/worker/ai-worker.module');
     const { ExtractionStrategyResolver } =
       await import('../src/modules/ai/extraction/extraction-strategy-resolver.service');
+    // Without REDIS_URL the queue is in-process, so the worker shares the API's queue instance.
     const worker = await Test.createTestingModule({ imports: [AiWorkerModule] })
       .overrideProvider(ExtractionStrategyResolver)
       .useValue(stubResolver)
+      .overrideProvider(IntakeQueueService)
+      .useValue(app.get(IntakeQueueService))
       .compile();
     await worker.init();
     try {
@@ -137,5 +168,16 @@ describe('Intake worker isolation (e2e) @issue-142', () => {
     } finally {
       await worker.close();
     }
+  });
+
+  it('@e2e @flow:intake @issue-142 AC2: compose runs the worker from the API image with the worker entrypoint', () => {
+    const api = composeService('api');
+    const worker = composeService('intake-worker');
+
+    const imageOf = (block: string): string | undefined => /^\s+image:\s*(\S+)/m.exec(block)?.[1];
+    expect(imageOf(worker)).toBeDefined();
+    expect(imageOf(worker)).toBe(imageOf(api));
+    expect(worker).toMatch(/^\s+command:\s*\["node",\s*"dist\/main\.worker\.js"\]\s*$/m);
+    expect(api).not.toContain('main.worker');
   });
 });

@@ -1,5 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { AiFeature, AiFeedbackAction } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { AiFeedbackService } from './ai-feedback.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { assertTotalsFit } from '../../sales/utils/sales-helpers';
@@ -65,7 +67,10 @@ function uniqueIds(values: Array<string | undefined>): string[] {
 export class IntakeConfirmationService {
   private readonly logger = new Logger(IntakeConfirmationService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private feedbackService: AiFeedbackService,
+  ) {}
 
   /**
    * Confirm extracted data and create a draft Bill or Invoice.
@@ -313,6 +318,21 @@ export class IntakeConfirmationService {
       },
       select: { id: true },
     });
+
+    // Log feedback for AI improvement
+    try {
+      await this.feedbackService.processFeedback(organizationId, {
+        feature: AiFeature.DOCUMENT_CLASSIFICATION,
+        aiSuggestion: { type: 'document_intake', documentType: 'BILL' },
+        userAction: dto.corrections ? AiFeedbackAction.CORRECTED : AiFeedbackAction.ACCEPTED,
+        userAnswer: dto.corrections ? JSON.stringify(dto.corrections) : undefined,
+        inputData: { billNumber, vendorId },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to log intake feedback: ${error instanceof Error ? error.name : 'unknown error'}`,
+      );
+    }
 
     this.logger.log(
       `Created draft bill ${bill.id} (${resolved.lines.length} lines) from document intake for org ${organizationId}`,

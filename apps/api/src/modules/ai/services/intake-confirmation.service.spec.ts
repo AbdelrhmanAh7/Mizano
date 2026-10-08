@@ -1,6 +1,7 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { AiFeedbackService } from './ai-feedback.service';
 import { IntakeConfirmationService, ConfirmIntakeInput } from './intake-confirmation.service';
 import { computeDocumentTotals } from '../../../common/utils/document-totals';
 import { BillsService } from '../../purchases/services/bills.service';
@@ -89,11 +90,16 @@ function baseBill(overrides: Partial<ConfirmIntakeInput> = {}): ConfirmIntakeInp
 
 describe('IntakeConfirmationService', () => {
   let prisma: PrismaMock;
+  let feedback: { processFeedback: jest.Mock };
   let service: IntakeConfirmationService;
 
   beforeEach(() => {
     prisma = buildPrisma();
-    service = new IntakeConfirmationService(prisma as unknown as PrismaService);
+    feedback = { processFeedback: jest.fn().mockResolvedValue(undefined) };
+    service = new IntakeConfirmationService(
+      prisma as unknown as PrismaService,
+      feedback as unknown as AiFeedbackService,
+    );
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
@@ -388,6 +394,42 @@ describe('IntakeConfirmationService', () => {
     });
   });
 
+  describe('confirmAndCreate — AI feedback', () => {
+    it('logs ACCEPTED feedback for a bill confirmed without corrections', async () => {
+      await service.confirmAndCreate(ORG_A, baseBill());
+
+      expect(feedback.processFeedback).toHaveBeenCalledWith(ORG_A, {
+        feature: 'DOCUMENT_CLASSIFICATION',
+        aiSuggestion: { type: 'document_intake', documentType: 'BILL' },
+        userAction: 'ACCEPTED',
+        userAnswer: undefined,
+        inputData: { billNumber: 'BILL-001', vendorId: 'vendor-a' },
+      });
+    });
+
+    it('logs CORRECTED feedback with the corrections', async () => {
+      await service.confirmAndCreate(ORG_A, baseBill({ corrections: { vendor: 'Acme' } }));
+
+      expect(feedback.processFeedback).toHaveBeenCalledWith(
+        ORG_A,
+        expect.objectContaining({
+          userAction: 'CORRECTED',
+          userAnswer: JSON.stringify({ vendor: 'Acme' }),
+        }),
+      );
+    });
+
+    it('still creates the bill when feedback logging fails, logging only the error name', async () => {
+      feedback.processFeedback.mockRejectedValue(new TypeError('secret vendor detail'));
+      const warn = jest.spyOn(Logger.prototype, 'warn');
+
+      const result = await service.confirmAndCreate(ORG_A, baseBill());
+
+      expect(result.id).toBe('bill-1');
+      expect(warn).toHaveBeenCalledWith('Failed to log intake feedback: TypeError');
+    });
+  });
+
   describe('confirmAndCreate — tenant ownership of referenced ids', () => {
     const cases: Array<[string, Partial<ConfirmIntakeInput>]> = [
       ['vendorId', { vendorId: 'vendor-b' }],
@@ -433,6 +475,7 @@ describe('IntakeConfirmationService', () => {
       await expect(promise).rejects.toBeInstanceOf(BadRequestException);
       await expect(promise).rejects.toThrow(field);
       expect(prisma.bill.create).not.toHaveBeenCalled();
+      expect(feedback.processFeedback).not.toHaveBeenCalled();
     });
 
     it('rejects a foreign customerId on invoices with 400 and writes nothing', async () => {
