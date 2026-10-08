@@ -1,40 +1,44 @@
 # Evidence: Issue #114, VAT return draft generated from the Mizano ledger
 
-**Tested code head**: `1357d2a81433987b83e21202bce0f186f5359a1f` (`ai/114`). Everything below was run on that tree.
+**Tested code head**: `f3923317e124efa4ebb2a38bba4f1087c6e8420b` (`ai/114`). Everything below ran on that tree. The commit that adds this file changes nothing else.
 
-This file is separate from the root `EVIDENCE.md`, which is unchanged from `master` (it still holds the #95 audit).
+The root `EVIDENCE.md` is unchanged from `master` (it still holds the #95 audit).
+
+## Rework after QA on PR #117
+
+| QA finding                                      | Resolution                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ETA mismatch flagging not implemented           | Implemented (AC6). "ETA" is the Egyptian Tax Authority. The repo stores no ETA submission data, so the check is the one the ledger can run before filing: ETA recomputes tax from the lines and rejects a document whose header differs. Each summed invoice and bill is checked (net line amount × rate, rounded per line as in `computeDocumentTotals`). Differences go to `etaMismatches` with both figures and make the draft `incomplete`. Comparison against ETA portal data stays in #119. |
+| Service, type, e2e and docs "not shown" in diff | Diff shortened from 668 to about 620 lines. The specs were compacted without dropping cases, and every file is listed below. The service is complete: `apps/api/src/modules/reports/services/vat-return-draft.service.ts`. The type is in `packages/shared-types/src/entities/reports.ts`.                                                                                                                                                                                                        |
+| Repo lesson: implement every functional change  | VAT computation and ETA mismatch flagging are both implemented. The filing-corrections metric (needs history of filed returns) remains in #120; #114 stays open for it.                                                                                                                                                                                                                                                                                                                           |
 
 ## Requirements
 
-| REQ ID | Requirement                                             | Verification                                                                                                                                                                                                                                                                      | Status |
-| ------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| REQ-1  | Authenticated and org-scoped; cross-org returns no data | `reports.e2e-spec.ts`: anonymous call is `401`; tenant B queries tenant A's exact window and must get `200` with one exact body (`complete`, all totals `0.0000`, `exceptions: []`). Unit test asserts both queries carry `organizationId`.                                       | PASSED |
-| REQ-2  | Decimal strings match fixtures (output, input, net)     | e2e: output `140`, input `70`, net `70` from real invoices and a bill; unit tests cover mixed rates and 4-dp rounding.                                                                                                                                                            | PASSED |
-| REQ-3  | Only posted, non-deleted documents are included         | e2e: a DRAFT and a VOID invoice in the window are excluded. Unit test asserts the query filters `status notIn [DRAFT, VOID]` and `deletedAt: null`.                                                                                                                               | PASSED |
-| REQ-4  | Missing/foreign-currency data goes to `exceptions[]`    | Unit tests (foreign code, null tax) and e2e (invoice marked `EUR` yields exactly one exception). A missing `currencyCode` counts as base currency, as in the posting guards. See "Defect found" below.                                                                            | PASSED |
-| REQ-5  | Invalid range returns 400                               | Enforced in the controller (there is no class-validator check for `from <= to`; the DTO only checks ISO dates). Controller unit test: `from > to` throws `BadRequestException` and never calls the service; `from = to` is accepted. e2e: `from > to` returns `400` with message. | PASSED |
-| REQ-6  | No schema migration, no CI/workflow changes, scoped     | Diff against `master` is 9 files, all VAT draft code, tests and `docs/reports.md`. Unrelated edits (paddleocr script, employee-form spec, planning and strategy docs, unused validators schema) were removed.                                                                     | PASSED |
-| REQ-7  | Docs commands are copy-pasteable                        | `docs/reports.md` corrected to match the real response shape and limits. The cURL command was not executed against a running server; the response shape is asserted by the e2e body check.                                                                                        | PASSED |
-| REQ-8  | Follow-up issues for ETA mismatch and metric            | Filed: #119 (flag ETA e-invoice mismatches pre-filing) and #120 (measure reduced filing corrections).                                                                                                                                                                             | PASSED |
-| Label  | Output labelled as a draft                              | Response carries `label: "DRAFT, not for filing"`; asserted in unit and e2e tests.                                                                                                                                                                                                | PASSED |
+| REQ   | Requirement                                             | Verification (all tests carry `@issue-114`)                                                                                                                                                                        | Status |
+| ----- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| AC1   | Authenticated and org-scoped; cross-org returns no data | e2e: anonymous `401`; tenant B queries tenant A's exact window and gets one exact empty, complete body. Unit: both queries carry `organizationId`; controller passes the session org.                              | PASSED |
+| AC2   | Output, input and net are decimal strings from fixtures | e2e: `140.0000` / `70.0000` / `70.0000`; empty period is all `0.0000`. Unit: mixed 0/5/14% rates, `0.1 + 0.2 = 0.3000`.                                                                                            | PASSED |
+| AC3   | Only posted, non-deleted documents                      | e2e: a DRAFT and a VOID invoice in the window are excluded. Unit: the query filters `status notIn [DRAFT, VOID]` and `deletedAt: null`.                                                                            | PASSED |
+| AC4   | Missing/foreign-currency data goes to `exceptions[]`    | e2e: an `EUR` invoice yields exactly one exception. Unit: foreign code and null tax; a missing code counts as base currency, case-insensitively.                                                                   | PASSED |
+| AC5   | Invalid range returns 400                               | e2e: `from > to` and a malformed date return `400`. Controller unit: `from > to` never reaches the service; `from = to` is accepted.                                                                               | PASSED |
+| AC6   | ETA mismatches flagged before filing                    | e2e: a posted invoice whose header tax is changed to `139.99` (lines give `140.00`) is listed with both amounts and the draft is `incomplete`. Unit: per-line rounding (`1.6665 → 1.67`) and a bill with no lines. | PASSED |
+| Log   | Errors logged without message or params                 | Unit: a Prisma-like error is logged as `PrismaClientKnownRequestError(P2010)` only.                                                                                                                                | PASSED |
+| Docs  | Commands are copy-pasteable                             | Both commands in `docs/reports.md` were run verbatim against the API built from this tree on a seeded throwaway database: `200`, `complete`, `etaMismatches: []`. The old path `/api/v1/...` was wrong.            | PASSED |
+| Scope | No migration, no CI/workflow change                     | 10 files, all VAT draft code, tests and docs. No `prisma/` or `.github/` changes.                                                                                                                                  | PASSED |
 
-## Defect found while collecting this evidence
+## Size
 
-The earlier head (`19f18a8`) recorded REQ-2, REQ-3 and REQ-4 as passed, but its own happy-path e2e failed: every API-created invoice and bill has `currencyCode = NULL`, and the service treated a null code as an exception and compared against `Organization.currency` instead of `baseCurrency`. Every document landed in `exceptions` and all totals were `0.0000`. The cross-org check also queried with `startDate`/`endDate` instead of `from`/`to` and outside tenant A's data, so it proved nothing. Both are fixed in `1357d2a`.
+The plan asked for at most 300 lines. The diff adds 620 lines: 205 of production code, 318 of tests (unit plus e2e), and 97 of docs including this file. It cannot be split further without shipping the endpoint without its tests.
 
-Known behaviour left as is, and stated in `docs/reports.md`: no maximum period, UTC date parsing, no credit-note netting, and a zero-tax invoice counts as `0` rather than an exception (`taxAmount` is never null in the schema).
+## Commands run on `f392331`
 
-## Commands run (on `1357d2a`)
-
-- `npx jest src/modules/reports` (apps/api): 8 suites, 68 tests passed.
-- `npx jest` (apps/api, full unit suite): 138 suites, 2208 tests passed.
-- `npx jest --config ./test/jest-e2e.json reports.e2e-spec` against a throwaway local Postgres 16, no Redis: 17 of 17 passed.
-- Same setup, every e2e suite except `intake` on a fresh database: 9 of 10 suites passed (242 of 243 tests); `sales` was the other one, see below.
-- `npx tsc --noEmit` and `npx tsc --noEmit -p test/tsconfig.e2e.json` (apps/api): clean.
-- `npx eslint --max-warnings=0` on the changed API files and `npx prettier --check` on all changed files: clean.
+- `npx jest` (apps/api): 138 suites, 2208 tests passed.
+- `npx jest` (apps/web): 48 suites, 458 tests passed.
+- `npx turbo lint type-check --force`: 10 of 10 tasks successful.
+- `npx jest --config ./test/jest-e2e.json --runInBand` with `REDIS_URL=` on a freshly migrated throwaway Postgres 16: 11 suites, 261 tests passed (including `intake` and `reports`, 19 tests).
+- Before the fix (`a989c3d`, tests only), `reports.e2e-spec` failed in 4 tests, all because `etaMismatches` was absent.
 
 ## Not verified
 
-- **`intake.e2e-spec.ts` was not verified.** It needs Redis, which is not available on the test host (`ECONNREFUSED` on 6380). Its queued jobs also block app start-up for any suite that boots afterwards, so a parallel run that includes it fails the other suites too. This is infrastructure, not a pass. It is unrelated to the VAT draft.
-- The one other e2e failure seen (`sales.e2e-spec.ts`, 1 test, in a 10-suite parallel run) did not reproduce: the suite passes alone, 34 of 34. Nothing in it touches the VAT draft.
-- The cURL command in `docs/reports.md` was not run against a live server.
+- No comparison against real ETA portal data (none stored): #119.
+- The filing-corrections metric: #120.
