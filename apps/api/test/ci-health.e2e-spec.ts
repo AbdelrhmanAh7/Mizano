@@ -12,15 +12,19 @@ import { createTestApp } from './helpers/app.helper';
 
 const PR98_MERGE = '615060ed6294e16375a1f1ea9385cb7e812cd24f';
 
-function changedFilesInPr98(): string[] | null {
+function changedFilesInPr98(): string[] {
   try {
     const out = execFileSync('git', ['diff', '--name-only', `${PR98_MERGE}~1`, PR98_MERGE], {
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
     return out.split('\n').filter(Boolean);
-  } catch {
-    return null;
+  } catch (err) {
+    // Fail loudly: a shallow clone must not let AC2/AC3 pass without comparing anything.
+    throw new Error(
+      `PR #98 merge commit ${PR98_MERGE} is not in this clone, so AC2/AC3 cannot be verified. ` +
+        `Run "git fetch --unshallow origin master" and retry. Cause: ${String(err)}`,
+    );
   }
 }
 
@@ -43,9 +47,6 @@ describe('CI health after PR #98 (e2e)', () => {
 
   it('@e2e @flow:ci-health @issue-113 AC2: PR #98 touched only markdown docs', () => {
     const files = changedFilesInPr98();
-    if (files === null) {
-      return; // shallow clone without the merge commit: nothing to compare
-    }
     expect(files.length).toBeGreaterThan(0);
     const nonDocs = files.filter((f) => !f.endsWith('.md'));
     expect(nonDocs).toEqual([]);
@@ -53,9 +54,6 @@ describe('CI health after PR #98 (e2e)', () => {
 
   it('@e2e @flow:ci-health @issue-113 AC3: PR #98 changed no code, lockfile, compose or workflow', () => {
     const files = changedFilesInPr98();
-    if (files === null) {
-      return;
-    }
     const risky = files.filter((f) =>
       /^(apps|packages|\.github|deploy)\/|pnpm-lock\.yaml$|docker-compose|(^|\/)\.env/.test(f),
     );
