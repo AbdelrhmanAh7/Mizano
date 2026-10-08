@@ -2,7 +2,7 @@
 
 ## Status of this PR
 
-**Diagnosis only. This PR does not fix the failing check and does not close #102.** The failing job is `Deploy to GCP` in `.github/workflows/deploy.yml`; it fails on an SSH connection timeout to the deployment host. Both possible fixes (restoring the host, or changing when the workflow deploys) are owner actions: repository policy for implementers is "never modify `.github/workflows`, CI config or secrets — write CI suggestions in `AI_QUESTIONS.md`; CI changes always stop at the owner". Master stays red until the owner applies one of the options below. Merging this PR will itself trigger another `Deploy to Production` run, which is expected to fail the same way while the host is unreachable.
+**Diagnosis only. This PR does not fix the failing check and does not close #102.** The failing job is `Deploy to GCP` in `.github/workflows/deploy.yml`; it fails on an SSH connection timeout to the deployment host. Both possible fixes (restoring the host, or changing when the workflow deploys) are owner actions: repository policy for implementers is "never modify `.github/workflows`, CI config or secrets — write CI suggestions in `AI_QUESTIONS.md`; CI changes always stop at the owner". Master stays red until the owner applies one of the options below. Merging this PR will itself trigger another `Deploy to Production` run, which is expected to fail the same way while the host is unreachable. If the `Deploy to Production` workflow is already disabled (via `gh workflow disable deploy.yml` or the Actions settings), a merge will not trigger a rollout.
 
 ## Diagnosis
 

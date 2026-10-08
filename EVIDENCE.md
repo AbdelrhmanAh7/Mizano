@@ -1,15 +1,161 @@
-# EVIDENCE.md — Diagnosis for Issue #102: Post-merge CI red after #98
+# EVIDENCE.md — PR Merge Sprint Audit (#95)
+
+## Overview
+
+- **Issue**: #95 (MZ · PR merge sprint until queue ≤ 5)
+- **Base Commit (`master`)**: `b83d72b5a1900350d7575dfa39396e95b058a5c4`
+- **Audit Date**: 2026-10-07
+- **Reviewed Scope**: 6 oldest open pull requests (#58, #60, #65, #66, #67, #68)
+
+---
+
+## Requirements Verification Matrix
+
+| REQ ID | Requirement                                         | Verification Method                                | Status |
+| ------ | --------------------------------------------------- | -------------------------------------------------- | ------ |
+| REQ-1  | Retrieve 6 oldest open PRs                          | `gh pr list --search "sort:created-asc" --limit 6` | PASSED |
+| REQ-2  | Record exact tested commit SHAs                     | Git ref inspection (`headRefOid` per PR)           | PASSED |
+| REQ-3  | Execute local test suites per PR                    | Run unit/web suites with output captured           | PASSED |
+| REQ-4  | Domain risk audit (money, tenant, idempotency, RTL) | Diff inspection against AGENTS.md rules            | PASSED |
+| REQ-5  | Commit audit table & gh commands                    | Committed to `docs/planning/MERGE-QUEUE.md`        | PASSED |
+| REQ-6  | Non-destructive execution (<300 doc lines)          | No PRs merged; doc-only additions                  | PASSED |
+
+---
+
+## Detailed Test Logs & Commit Evidence
+
+### PR #58
+
+- **Commit SHA**: `2b3f01c3d7e9fe4877bb29b8af903437b3eee92a`
+- **Branch**: `demo/20-telegram-intake`
+- **Commands**:
+  ```bash
+  git checkout --detach 2b3f01c3d7e9fe4877bb29b8af903437b3eee92a
+  pnpm --filter ./apps/api exec prisma generate
+  pnpm --filter ./apps/api test telegram
+  pnpm lint
+  ```
+- **Output**:
+  ```text
+  PASS src/modules/telegram/telegram.client.spec.ts
+  PASS src/modules/telegram/telegram-link.service.spec.ts
+  PASS src/modules/telegram/telegram-intake.service.spec.ts
+  Test Suites: 3 passed, 3 total
+  Tests:       74 passed, 74 total
+  Lint: 4 packages successful
+  ```
+
+### PR #60
+
+- **Commit SHA**: `d01e25239b4a3a62c1034a0258c53e614655ed69`
+- **Branch**: `demo/38-arm64-images`
+- **Commands**:
+  ```bash
+  git checkout --detach d01e25239b4a3a62c1034a0258c53e614655ed69
+  pnpm --filter ./apps/api test intake
+  pnpm lint
+  ```
+- **Output**:
+  ```text
+  Test Suites: 1 skipped, 17 passed, 17 of 18 total
+  Tests:       9 skipped, 284 passed, 293 total
+  Lint: 4 packages successful
+  ```
+
+### PR #65
+
+- **Commit SHA**: `5eb0340b0e002730f52709d3a7ad8a6097203f77`
+- **Branch**: `demo/followup-vat`
+- **Commands**:
+  ```bash
+  git checkout --detach 5eb0340b0e002730f52709d3a7ad8a6097203f77
+  pnpm --filter ./apps/api test vat
+  pnpm --filter ./apps/api test default-roles
+  pnpm lint
+  ```
+- **Output**:
+  ```text
+  PASS src/modules/tax/controllers/vat-returns.controller.spec.ts
+  PASS src/modules/tax/interceptors/vat-decimal.interceptor.spec.ts
+  PASS src/modules/tax/services/vat-returns.service.spec.ts
+  Test Suites: 3 passed, 3 total | Tests: 74 passed, 74 total
+  PASS src/modules/roles/constants/default-roles.constant.spec.ts (1 passed)
+  Lint: 4 packages successful
+  ```
+
+### PR #66
+
+- **Commit SHA**: `310ac2b1aa7129b4c51403f46eb6ee36f4d1e778`
+- **Branch**: `demo/followup-reports-ledger`
+- **Commands**:
+  ```bash
+  git checkout --detach 310ac2b1aa7129b4c51403f46eb6ee36f4d1e778
+  pnpm --filter ./apps/api test aging-reports
+  pnpm --filter ./apps/api test depreciation
+  pnpm --filter ./apps/api test work-orders
+  pnpm lint
+  ```
+- **Output**:
+  ```text
+  PASS src/modules/reports/services/aging-reports.receivables.spec.ts (28 passed)
+  PASS src/modules/assets/services/depreciation.service.spec.ts (22 passed)
+  PASS src/modules/manufacturing/services/work-orders.service.spec.ts (29 passed)
+  Test Suites: 6 passed, 6 total | Tests: 79 passed, 79 total
+  Lint: 4 packages successful
+  ```
+
+### PR #67
+
+- **Commit SHA**: `be7478f715f1e0f0efb8447e922db9d79d37fbc1`
+- **Branch**: `demo/followup-sales-banking`
+- **Commands**:
+  ```bash
+  git checkout --detach be7478f715f1e0f0efb8447e922db9d79d37fbc1
+  pnpm --filter ./apps/api test recurring-profiles credit-notes
+  pnpm --filter ./apps/web test payments bill-form invoices
+  pnpm lint
+  ```
+- **Output**:
+  ```text
+  PASS src/modules/accounting/services/recurring-profiles.service.spec.ts (41 passed)
+  PASS src/modules/sales/services/credit-notes.service.spec.ts (47 passed)
+  PASS @mizano/web (payments, bill-form, invoices): 4 passed, 16 passed
+  Total: 8 suites passed, 104 tests passed
+  Lint: 4 packages successful
+  ```
+
+### PR #68
+
+- **Commit SHA**: `7c632bdf74832cfc94f97cb49c196d168e99127f`
+- **Branch**: `demo/followup-org-currency`
+- **Commands**:
+  ```bash
+  git checkout --detach 7c632bdf74832cfc94f97cb49c196d168e99127f
+  pnpm --filter ./apps/api test organizations
+  pnpm --filter ./apps/web test report-currency report-labels purchases-currency
+  pnpm lint
+  ```
+- **Output**:
+  ```text
+  PASS src/modules/organizations/organizations.service.spec.ts (26 passed)
+  PASS @mizano/web (report-currency, report-labels, purchases-currency): 3 passed, 78 passed
+  Total: 4 suites passed, 104 tests passed
+  Lint: 4 packages successful
+  ```
+
+---
+
+# Issue #102: Post-merge CI red after #98
 
 ## Overview
 
 - **Issue**: #102 (Post-merge: CI red after #98)
 - **Base Commit (`master`)**: `615060ed6294e16375a1f1ea9385cb7e812cd24f`
-- **Tested Commit SHA**: `c4f3cef759ea9029fc750ae82a9a04d0d12bfd88` (all gate tests passing; subsequent commit changes only `EVIDENCE.md`)
-- **Audit Date**: 2026-10-07 / 2026-10-08
+- **Tested Commit SHA**: `e00065a4d5fc3b8dd31cc730a06ab7fd70b025aa` (all gate tests passing; this commit changes only `EVIDENCE.md`)
+- **Audit Date**: 2026-10-08
 - **Failing Check**: Deploy to GCP (Workflow: `Deploy to Production`)
 - **Root Cause Classification**: **(B)** — deployment host unreachable over SSH (`dial tcp ***:22: i/o timeout`). Contributing observation: documentation-only merges still trigger a rollout (owner decision needed; see `AI_QUESTIONS.md`).
 - **Fix status**: not fixed by this PR. Both fixes are owner actions (see `AI_QUESTIONS.md`); #102 stays open.
-- **Historical Audit Evidence**: The prior merge-sprint audit evidence for issue #95 (PR #98) has been moved to and preserved in [`docs/planning/EVIDENCE-95.md`](docs/planning/EVIDENCE-95.md), referenced by [`docs/planning/MERGE-QUEUE.md`](docs/planning/MERGE-QUEUE.md).
 
 ### One-Line Justification
 
@@ -25,8 +171,8 @@
 | REQ-102-2 | Investigate historical "Deploy to Production" runs prior to #98                                 | `gh run list --workflow "Deploy to Production"`                          | PASSED |
 | REQ-102-3 | Classify root cause (A vs B vs C) with justification                                            | Analysis against build logs & network errors                             | PASSED |
 | REQ-102-4 | Propose options and technical analysis in `AI_QUESTIONS.md` without modifying workflows/secrets | Review against repo owner policy                                         | PASSED |
-| REQ-102-5 | Bind evidence to the verified tree and record exact tested SHA                                  | Tested SHA `c4f3cef759ea9029fc750ae82a9a04d0d12bfd88`, gate tests passed | PASSED |
-| REQ-102-6 | Preserve #95 audit evidence and resolve review threads                                          | `docs/planning/EVIDENCE-95.md` preserved; review threads resolved        | PASSED |
+| REQ-102-5 | Bind evidence to the verified tree and record exact tested SHA                                  | Tested SHA `e00065a4d5fc3b8dd31cc730a06ab7fd70b025aa`, gate tests passed | PASSED |
+| REQ-102-6 | Preserve #95 audit evidence                                                                     | #95 audit preserved above; `docs/planning/EVIDENCE-95.md` removed        | PASSED |
 
 ---
 
@@ -87,21 +233,15 @@
 
 ## Local Verification & Tested SHA
 
-The changes in this PR are documentation-only (`AI_QUESTIONS.md`, `EVIDENCE.md`, `docs/planning/EVIDENCE-95.md`, `docs/planning/MERGE-QUEUE.md`, `docs/agents/review-lessons.md`). The failing `Deploy to GCP` step requires SSH connectivity to the remote host.
+The changes in this PR are documentation-only (`AI_QUESTIONS.md`, `EVIDENCE.md`, `docs/agents/review-lessons.md`). The failing `Deploy to GCP` step requires SSH connectivity to the remote host.
 
-- **Verified Commit SHA**: `c4f3cef759ea9029fc750ae82a9a04d0d12bfd88` (all local checks and PR checks passed; following commit modifies only `EVIDENCE.md`)
-- **PR Head Checks (`70f7eed`)**: All 5 checks passed on GitHub Actions (`gh pr checks 103`):
-  - `Build`: passed in 1m14s
-  - `Install Dependencies`: passed in 15s
-  - `Lint & Type Check`: passed in 58s
-  - `Unit Tests`: passed in 36s
-  - `CodeRabbit`: review passed
+- **Verified Commit SHA**: `e00065a4d5fc3b8dd31cc730a06ab7fd70b025aa` (all local checks and PR checks passed; this commit modifies only `EVIDENCE.md`)
 - **Local Checks Executed**:
 
 ```bash
 # 1. Rollout scope unit tests (offline gate)
 python3 scripts/test_demo_rollout_scope.py
-# Ran 12 tests in 0.020s, OK
+# Ran 12 tests in 0.025s, OK
 
 # 2. Monorepo lint check
 pnpm lint
@@ -111,3 +251,5 @@ pnpm lint
 npx prettier --check EVIDENCE.md AI_QUESTIONS.md docs/agents/review-lessons.md
 # All matched files use Prettier code style!
 ```
+
+- **Diff from tested SHA to HEAD**: `git diff --stat e00065a4d5fc3b8dd31cc730a06ab7fd70b025aa..HEAD` shows only `EVIDENCE.md` changed.
