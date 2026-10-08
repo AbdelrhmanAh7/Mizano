@@ -309,3 +309,22 @@ All checks passed / All matched files use Prettier code style!
 - Codex (stale none): `usePossibleDuplicates` uses `staleTime: 0`, `refetchOnWindowFocus: 'always'`, `refetchInterval: 30_000`.
 - e2e-army test added: `e2e-army/96-duplicate-bill-warning.e2e.ts` (@issue-96 AC1, AC2).
 - Verified: `npx jest --testPathPattern="possible-duplicates|scan-duplicate"` in apps/web, 12 tests pass.
+
+## Round 6: verification on the merged head (#96)
+
+Tested head: `eb1216e` (master `4b6edad` merged into `ai/96`, no conflicts; the merge only touched `.github/workflows/ci.yml` and `docs/DEVELOPMENT.md`). Darwin arm64, Node v26, pnpm 8.14.0.
+
+All three open threads on PR #101 are already resolved in code; this round re-ran every gate on the merged head and changed no product code.
+
+| Thread                                       | Resolution                                                                                                                            | Proof                                            |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Copilot: seeded API E2E for both routes      | `apps/api/test/bill-duplicates.e2e-spec.ts` (real HTTP stack: auth/permission rejection, malformed input, matching, cross-tenant ids) | e2e below: 12 suites, 266 tests passed           |
+| Codex P2: banner vs. intake permission       | `PossibleDuplicatesBanner` renders nothing without `purchases.view` (8f7867a)                                                         | web suite, `possible-duplicates-banner.spec.tsx` |
+| Codex P2: refresh while approval is possible | `usePossibleDuplicates`: `staleTime: 0`, `refetchOnWindowFocus: 'always'`, `refetchInterval: 30_000` (78cc89b)                        | web suite                                        |
+
+Results (first-hand, this head):
+
+- `turbo run lint type-check test --force`: lint and type-check clean for all packages. Web: 50 suites / 470 tests passed. API: 137 of 138 suites passed on the first run; the one failure was `auth.service.spec.ts` because bcrypt's native binding was not built in this fresh worktree. After `node-pre-gyp install --fallback-to-build` it passed (5 tests), so the API unit total is 138 suites with 0 failures.
+- Seeded e2e: `npx jest --config ./test/jest-e2e.json --runInBand` with `REDIS_URL=` on a fresh throwaway PostgreSQL 16 cluster (port 57391, `prisma migrate deploy`), removed afterwards: 12 suites, 266 tests passed, including `bill-duplicates.e2e-spec.ts` and `intake.e2e-spec.ts`. This supersedes the earlier "intake blocked, no Redis" note: intake passes with `REDIS_URL` blank.
+- Not run: browser journey. The `e2e-army` test (`e2e-army/96-duplicate-bill-warning.e2e.ts`) runs in the hub's verify job, not locally.
+- Size: the diff is above the ~300-line guideline (see "Not verified / blocked"); unchanged this round.
