@@ -41,13 +41,18 @@ import { UserPreferencesModule } from './modules/user-preferences/user-preferenc
 import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { CommonModule } from './common/common.module';
-import { envFilePaths } from './env-files';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: envFilePaths(),
+      envFilePath: [
+        `.env.${process.env.APP_ENV || 'local'}`,
+        '.env',
+        // Also load from monorepo root (CWD is apps/api/ when run via turborepo)
+        `../../.env.${process.env.APP_ENV || 'local'}`,
+        '../../.env',
+      ],
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],

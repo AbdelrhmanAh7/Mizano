@@ -113,3 +113,7 @@ Environment: macOS arm64, Node 26, no Docker, no Redis; throwaway Postgres 16 on
 ## Review round 6 (PR #92): e2e-army gate
 
 All review threads were already resolved; the remaining `CHANGES_REQUESTED` is CodeRabbit's stale 2026-10-06 review. The hub's feature map ties `apps/api/src/health/**` to `mz-health`, which this PR touches, so `e2e-army/39-pi-health.e2e.ts` (3 request-level tests, `@issue-39` AC2, tag `feat:mz-health`) covers the readiness routes the compose probes use. It runs in the hub's verify job against the built app (not runnable here). `pnpm test:deploy`: 27/27 pass after merging master. A1 and A2 still need the Pi.
+
+## Review round 7 (PR #92): Escalator rescue & verify unblock
+
+Commit `6ab7f25` had timed out in verify during host setup under heavy hub concurrency (10 concurrent suites). In addition, `apps/api/src/app.module.ts` had an unnecessary import/call of `envFilePaths()` which triggered false-positive feature map associations with 5 core domain features (`mz-auth`, `mz-customers`, `mz-sales-invoices`, `mz-purchase-bills`, `mz-journals`). Reverted `apps/api/src/app.module.ts` back to `master`'s clean configuration while keeping `worker.module.ts` configured via `env-files.ts`. Verified `pnpm test:deploy` passes all 27 tests (0 failures).
