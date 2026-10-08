@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentOrg, Permissions } from '../../../common/decorators';
+import { CurrentOrg, InvalidatesLedger, Permissions } from '../../../common/decorators';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import {
@@ -106,6 +106,7 @@ export class WorkOrdersController {
 
   @Post(':id/complete')
   @Permissions('manufacturing.edit')
+  @InvalidatesLedger('inventory:*', 'items:*')
   @ApiOperation({ summary: 'Complete work order and record COGM' })
   complete(
     @CurrentOrg() orgId: string,
