@@ -212,4 +212,34 @@ Lint, type-check and unit-test output for the final head is under "Tested commit
 
 ## Tested commit
 
-FINAL_SHA_PLACEHOLDER
+b8e32b84bbeffb25a7c949492600f1f768994817 (`test(e2e): fail loudly when the #98 merge commit is missing (#113)`). The only commit after it edits this file.
+
+Run 2026-10-08 on own Postgres 16 (port 56432, fresh DB, `prisma migrate deploy`), `REDIS_URL=` blank, `--runInBand`:
+
+```
+$ npx eslint test/ci-health.e2e-spec.ts            -> no output, exit 0
+$ npx prettier --check test/ci-health.e2e-spec.ts EVIDENCE.md AI_QUESTIONS.md
+All matched files use Prettier code style!
+$ npx tsc --noEmit -p test/tsconfig.e2e.json        -> no output, exit 0
+$ npx jest --config ./test/jest-e2e.json --runInBand ci-health
+  PASS test/ci-health.e2e-spec.ts
+    AC1 API boots and /health reports healthy
+    AC2 PR #98 touched only markdown docs
+    AC3 PR #98 changed no code, lockfile, compose or workflow
+  Tests: 3 passed, 3 total
+```
+
+Loud failure check: with the merge SHA temporarily altered, AC2 and AC3 fail (`Tests: 2 failed, 1 passed`) with
+"PR #98 merge commit ... is not in this clone, so AC2/AC3 cannot be verified. Run "git fetch --unshallow origin master" and retry."
+The change was reverted before committing.
+
+Unit suite (`node apps/api/_run_tests.js`): 134 of 136 suites passed. Failures, none touching this PR (`git diff master -- apps/api/src` is empty):
+
+- `import.service.hardening.spec.ts`: 4 tests fail with `TypeError: csv is not a function`. Pre-existing jest config drift (`esModuleInterop`), reproduced alone on this branch.
+- `intake-storage.spec.ts`: failed once in the full run, passes alone (9/9). Flake.
+
+Not run: web tests and full `pnpm ci:full` (only a test file and markdown changed); full e2e suite (only `ci-health` run).
+
+## PR #116 review findings
+
+The QA comment (sha 40a29ea) arrived with its four bullet items rendered as `[object Object]`, so they cannot be read. Its readable claim is that this PR must also fix CI and close MZ #102. That is out of scope: the red check is the `Deploy to GCP` SSH timeout to an unreachable VM, which needs the owner (see AI_QUESTIONS.md). The security review passed and the E2E-first exemption was accepted.
