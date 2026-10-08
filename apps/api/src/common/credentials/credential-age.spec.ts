@@ -5,7 +5,7 @@ const NOW = new Date('2026-10-08T12:00:00.000Z');
 
 describe('classifyCredentialAge (@issue-104)', () => {
   const status = (rotatedAt: string | null | undefined, now = NOW, maxAgeDays?: number): string =>
-    classifyCredentialAge('TELEGRAM_BOT', rotatedAt, now, maxAgeDays).status;
+    classifyCredentialAge('TELEGRAM_BOT_TOKEN', rotatedAt, now, maxAgeDays).status;
 
   it('AC1: 89 days old is ok, 90 days is due, 91 days is expired', () => {
     expect(status('2026-07-11')).toBe('ok');
@@ -52,8 +52,8 @@ describe('classifyCredentialAge (@issue-104)', () => {
   });
 
   it('returns the credential name with its classification', () => {
-    expect(classifyCredentialAge('CLOUDFLARE_TUNNEL', '2026-07-09', NOW)).toEqual({
-      name: 'CLOUDFLARE_TUNNEL',
+    expect(classifyCredentialAge('CLOUDFLARE_TUNNEL_TOKEN', '2026-07-09', NOW)).toEqual({
+      name: 'CLOUDFLARE_TUNNEL_TOKEN',
       status: 'expired',
     });
   });

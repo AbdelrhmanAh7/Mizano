@@ -107,8 +107,8 @@ describe('Credential rotation (e2e) @issue-104', () => {
     capture();
     setEnv('TELEGRAM_BOT_TOKEN', TELEGRAM_SECRET);
     setEnv('CLOUDFLARE_TUNNEL_TOKEN', TUNNEL_SECRET);
-    setEnv('TELEGRAM_BOT_CREDENTIAL_ROTATED_AT', '2026-07-11'); // 89 days at BOOT_NOW
-    setEnv('CLOUDFLARE_TUNNEL_CREDENTIAL_ROTATED_AT', '2026-07-09'); // 91 days at BOOT_NOW
+    setEnv('TELEGRAM_BOT_TOKEN_CREDENTIAL_ROTATED_AT', '2026-07-11'); // 89 days at BOOT_NOW
+    setEnv('CLOUDFLARE_TUNNEL_TOKEN_CREDENTIAL_ROTATED_AT', '2026-07-09'); // 91 days at BOOT_NOW
     app = await createTestApp();
     tenantA = await registerTenant(app, 'RotationA');
     tenantB = await registerTenant(app, 'RotationB');
@@ -192,8 +192,8 @@ describe('Credential rotation (e2e) @issue-104', () => {
     const { level, entries } = await bootAndReadLine();
 
     expect(level).toBe('warn');
-    expect(entries.get('TELEGRAM_BOT')).toBe('ok');
-    expect(entries.get('CLOUDFLARE_TUNNEL')).toBe('expired');
+    expect(entries.get('TELEGRAM_BOT_TOKEN')).toBe('ok');
+    expect(entries.get('CLOUDFLARE_TUNNEL_TOKEN')).toBe('expired');
     expect(entries.get(`SMTP_PASSWORD[org=${tenantA.organizationId}]`)).toBe('due');
     expect(entries.get(`SMTP_PASSWORD[org=${tenantB.organizationId}]`)).toBe('unknown');
     expect(entries.has(`SMTP_PASSWORD[org=${tenantC.organizationId}]`)).toBe(false);
@@ -203,14 +203,14 @@ describe('Credential rotation (e2e) @issue-104', () => {
   });
 
   it('@e2e @flow:credential-rotation @issue-104 AC2: a malformed or missing host rotation date is unknown', async () => {
-    setEnv('TELEGRAM_BOT_CREDENTIAL_ROTATED_AT', '2026-7-11');
-    setEnv('CLOUDFLARE_TUNNEL_CREDENTIAL_ROTATED_AT', '');
+    setEnv('TELEGRAM_BOT_TOKEN_CREDENTIAL_ROTATED_AT', '2026-7-11');
+    setEnv('CLOUDFLARE_TUNNEL_TOKEN_CREDENTIAL_ROTATED_AT', '');
 
     const { level, entries } = await bootAndReadLine();
 
     expect(level).toBe('warn');
-    expect(entries.get('TELEGRAM_BOT')).toBe('unknown');
-    expect(entries.get('CLOUDFLARE_TUNNEL')).toBe('unknown');
+    expect(entries.get('TELEGRAM_BOT_TOKEN')).toBe('unknown');
+    expect(entries.get('CLOUDFLARE_TUNNEL_TOKEN')).toBe('unknown');
   });
 
   it('@e2e @flow:credential-rotation @issue-104 AC5: no credential value appears in any log output', () => {
