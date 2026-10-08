@@ -146,6 +146,7 @@
 ### Issue #105 (PR #106) — outbound invoice e-mail volume anomaly alert
 
 - **Tested commit SHA**: `744ed04` (branch `ai/105`; adds the atomic alert claim on top of `5cafcc3c4ece8ada25372096348ffa63b9c4a036`)
+- **Re-run after merging master** (`e1c8bf5`; the merge only adds `.github/workflows/claude.yml`, no #105 file changed): the two specs again 34 passed, eslint `--max-warnings 0` on `src/modules/documents` + `src/cache`, `tsc --noEmit` and prettier clean (2026-10-08).
 - **Commands**:
   ```bash
   cd apps/api
