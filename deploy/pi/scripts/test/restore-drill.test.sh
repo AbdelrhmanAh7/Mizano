@@ -4,10 +4,8 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/drill-test.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
-: >"$tmp/env.pi"
-export ENV_FILE="$tmp/env.pi" MIZANO_DATA_DIR="$tmp/data"
-# shellcheck source=deploy/pi/scripts/restore-drill.sh
-. "$here/../restore-drill.sh"
+# shellcheck source=deploy/pi/scripts/drill-lib.sh
+. "$here/../drill-lib.sh"
 
 fails=0
 check() { # check <name> <expected-exit> <cmd...>
@@ -41,7 +39,7 @@ check "originals match" 0 verify_originals "$root" <<<"org1/2026/10/abc $sum"
 check "no intake jobs is fine" 0 verify_originals "$root" </dev/null
 check "missing original fails" 1 verify_originals "$root" <<<"org1/2026/10/missing $sum"
 check "checksum mismatch fails" 1 verify_originals "$root" <<<"org1/2026/10/abc ${sum/?/0}0"
-check "traversal key is refused" 1 verify_originals "$root" <<<"../../env.pi $sum"
+check "traversal key is refused" 1 verify_originals "$root" <<<"../../etc/passwd $sum"
 
 [ "$fails" -eq 0 ] || { echo "$fails failed"; exit 1; }
 echo "all passed"
