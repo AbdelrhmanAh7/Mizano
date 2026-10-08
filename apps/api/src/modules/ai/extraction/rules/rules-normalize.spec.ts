@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { normalizeDigits } from './rules-normalize';
 import { parseAmount, findAmounts } from './rules-amounts';
 import { parseDate } from './rules-dates';
@@ -55,12 +56,10 @@ describe('@issue-109 parseAmount: decimal-safe parsing with normalized input', (
   });
 
   // AC5: amounts remain decimal-safe (no float math)
-  it('uses Decimal.js for precise arithmetic', () => {
-    const result = parseAmount('123.4567');
-    expect(result).not.toBeNull();
-    expect(result!.toString()).toBe('123.4567');
-    // Verify it's a Decimal instance
-    expect(result!.constructor.name).toBe('Decimal');
+  it('preserves decimal-string precision', () => {
+    const result = parseAmount('10000000000000.0001');
+    expect(result).toBeInstanceOf(Decimal);
+    expect(result!.toString()).toBe('10000000000000.0001');
   });
 
   it('rejects values beyond Decimal(19,4) bounds', () => {
