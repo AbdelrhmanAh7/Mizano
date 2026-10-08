@@ -301,8 +301,15 @@ describe('EmailService.checkVolumeAnomaly', () => {
     await service.checkVolumeAnomaly(orgId);
 
     expect(telegramText()).not.toMatch(/@|INV-|\.com/);
-    expect(telegramText()).toMatch(
-      /^\[Mizano\] ALERT: Outbound invoice email volume anomaly detected for organization org-123\. Count: 100, Threshold: 50$/,
+    expect(telegramText()).toBe(
+      '[Mizano] ALERT: Outbound invoice email volume anomaly. Count: 100, Threshold: 50',
+    );
+
+    mockCounts(10);
+    await service.checkVolumeAnomaly(orgId);
+
+    expect(telegramText(1)).toBe(
+      '[Mizano] RECOVERED: Outbound invoice email volume back to normal. Count: 10, Threshold: 50',
     );
   });
 

@@ -12,6 +12,15 @@ import nodemailer from 'nodemailer';
 import type { Attachment } from 'nodemailer/lib/mailer';
 
 import { CacheService } from '../../../cache/cache.service';
+import { describeError } from '../../../common/utils/redact';
+
+const DEFAULT_MIN_DAILY = 50;
+const WARM_UP_FULL_DAYS = 7;
+const BASELINE_FULL_DAYS = 30;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+/** Alert state outlives the 5-minute cache default so one alert covers a whole incident. */
+const ALERT_STATE_TTL_SECONDS = 7 * 24 * 60 * 60;
+const TELEGRAM_TIMEOUT_MS = 5000;
 
 @Injectable()
 export class EmailService {
@@ -99,9 +108,7 @@ export class EmailService {
         },
       });
 
-      await this.checkVolumeAnomaly(organizationId).catch((e) =>
-        this.logger.error('Failed to check volume anomaly', e),
-      );
+      await this.checkVolumeAnomalySafely(organizationId);
 
       return { success: true, emailLogId: emailLog.id };
     } catch (error: unknown) {
@@ -119,9 +126,7 @@ export class EmailService {
         },
       });
 
-      await this.checkVolumeAnomaly(organizationId).catch((e) =>
-        this.logger.error('Failed to check volume anomaly', e),
-      );
+      await this.checkVolumeAnomalySafely(organizationId);
 
       return { success: false, error: errorMessage };
     }
@@ -634,95 +639,109 @@ export class EmailService {
 
   // ============ Anomaly Alert ============
 
+  /** Notify-only: a failing check must never change the outcome of the send itself. */
+  private async checkVolumeAnomalySafely(organizationId: string): Promise<void> {
+    try {
+      await this.checkVolumeAnomaly(organizationId);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Volume anomaly check failed: ${describeError(error, { includeMessage: false })}`,
+      );
+    }
+  }
+
+  /**
+   * Compares today's invoice send attempts (sent and failed) with
+   * max(floor, 2 x mean of the last 30 full UTC days) and alerts once per incident.
+   */
   async checkVolumeAnomaly(organizationId: string): Promise<void> {
     const todayStart = new Date();
     todayStart.setUTCHours(0, 0, 0, 0);
+    const windowStart = new Date(todayStart.getTime() - BASELINE_FULL_DAYS * MS_PER_DAY);
 
-    const thirtyDaysAgo = new Date(todayStart);
-    thirtyDaysAgo.setUTCDate(todayStart.getUTCDate() - 30);
+    const [todayCount, historyCount, firstLog] = await Promise.all([
+      this.prisma.emailLog.count({
+        where: { organizationId, entityType: 'invoice', sentAt: { gte: todayStart } },
+      }),
+      this.prisma.emailLog.count({
+        where: {
+          organizationId,
+          entityType: 'invoice',
+          sentAt: { gte: windowStart, lt: todayStart },
+        },
+      }),
+      this.prisma.emailLog.findFirst({
+        where: { organizationId, entityType: 'invoice' },
+        orderBy: { sentAt: 'asc' },
+        select: { sentAt: true },
+      }),
+    ]);
 
-    // Get today's count
-    const todayCount = await this.prisma.emailLog.count({
-      where: {
-        organizationId,
-        entityType: 'invoice',
-        sentAt: { gte: todayStart },
-      },
-    });
-
-    // Get historical logs to calculate baseline
-    const historyLogs = await this.prisma.emailLog.findMany({
-      where: {
-        organizationId,
-        entityType: 'invoice',
-        sentAt: { gte: thirtyDaysAgo, lt: todayStart },
-      },
-      select: { sentAt: true },
-    });
-
-    const firstLog = await this.prisma.emailLog.findFirst({
-      where: { organizationId, entityType: 'invoice' },
-      orderBy: { sentAt: 'asc' },
-      select: { sentAt: true },
-    });
-
-    let fullDaysAvailable = 0;
-    if (firstLog && firstLog.sentAt < todayStart) {
-      const firstLogDate = new Date(firstLog.sentAt);
-      firstLogDate.setUTCHours(0, 0, 0, 0);
-      const msPerDay = 24 * 60 * 60 * 1000;
-      const totalDaysHistory = Math.floor(
-        (todayStart.getTime() - firstLogDate.getTime()) / msPerDay,
+    const floor = this.getMinDaily();
+    let threshold = floor;
+    if (firstLog) {
+      const firstDay = new Date(firstLog.sentAt);
+      firstDay.setUTCHours(0, 0, 0, 0);
+      const fullDays = Math.min(
+        BASELINE_FULL_DAYS,
+        Math.floor((todayStart.getTime() - firstDay.getTime()) / MS_PER_DAY),
       );
-      fullDaysAvailable = Math.min(30, totalDaysHistory);
+      // Until 7 full days exist only the floor applies; from day 8 the baseline uses what exists.
+      if (fullDays > WARM_UP_FULL_DAYS) {
+        threshold = Math.max(floor, Math.floor((2 * historyCount) / fullDays));
+      }
     }
-
-    let baseline = 0;
-    if (fullDaysAvailable > 0) {
-      baseline = historyLogs.length / fullDaysAvailable;
-    }
-
-    const minDaily = parseInt(process.env.NOTIFY_ANOMALY_MIN_DAILY || '50', 10);
-    const threshold = Math.floor(Math.max(minDaily, 2 * baseline));
-
-    const activeThreshold = fullDaysAvailable < 8 ? minDaily : threshold;
 
     const stateKey = `notify-volume-${organizationId}`;
-    const currentlyFailing = (await this.cacheService.get<boolean>(stateKey)) || false;
+    const alerting = (await this.cacheService.get<boolean>(stateKey)) === true;
 
-    if (todayCount > activeThreshold) {
-      if (!currentlyFailing) {
-        await this.cacheService.set(stateKey, true);
-        await this.notifyTelegram(
-          `[Mizano] ALERT: Outbound invoice email volume anomaly detected for organization ${organizationId}. Count: ${todayCount}, Threshold: ${activeThreshold}`,
-        );
+    // Dedupe state is recorded only after Telegram confirms delivery, so a failed call is retried.
+    if (todayCount > threshold && !alerting) {
+      const delivered = await this.notifyTelegram(
+        `[Mizano] ALERT: Outbound invoice email volume anomaly. Count: ${todayCount}, Threshold: ${threshold}`,
+      );
+      if (delivered) {
+        await this.cacheService.set(stateKey, true, { ttl: ALERT_STATE_TTL_SECONDS });
       }
-    } else {
-      if (currentlyFailing) {
-        await this.cacheService.set(stateKey, false);
-        await this.notifyTelegram(
-          `[Mizano] RECOVERED: Outbound invoice email volume normalized for organization ${organizationId}.`,
-        );
+    } else if (todayCount <= threshold && alerting) {
+      const delivered = await this.notifyTelegram(
+        `[Mizano] RECOVERED: Outbound invoice email volume back to normal. Count: ${todayCount}, Threshold: ${threshold}`,
+      );
+      if (delivered) {
+        await this.cacheService.set(stateKey, false, { ttl: ALERT_STATE_TTL_SECONDS });
       }
     }
   }
 
-  private async notifyTelegram(message: string): Promise<void> {
+  private getMinDaily(): number {
+    const parsed = Number.parseInt(process.env.NOTIFY_ANOMALY_MIN_DAILY ?? '', 10);
+    return Number.isFinite(parsed) && parsed >= 1 ? parsed : DEFAULT_MIN_DAILY;
+  }
+
+  /** Returns true only when Telegram accepted the message. */
+  private async notifyTelegram(message: string): Promise<boolean> {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_ALERT_CHAT_ID;
-    if (!token || !chatId) return;
+    if (!token || !chatId) return false;
 
     try {
-      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-        }),
+        body: JSON.stringify({ chat_id: chatId, text: message }),
+        signal: AbortSignal.timeout(TELEGRAM_TIMEOUT_MS),
       });
-    } catch (error) {
-      // Ignore errors for notifications
+      if (!response.ok) {
+        this.logger.warn(`Telegram alert rejected: status=${response.status}`);
+        return false;
+      }
+      return true;
+    } catch (error: unknown) {
+      // The request URL carries the bot token, so never log the raw error.
+      this.logger.warn(
+        `Telegram alert not delivered: ${describeError(error, { includeMessage: false })}`,
+      );
+      return false;
     }
   }
 }
