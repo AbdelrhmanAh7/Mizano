@@ -23,6 +23,16 @@ implementer stopped before writing any code or tests, for these reasons:
 4. **Backlog triage flagged it.** An earlier triage comment marked this issue "unclear or
    sensitive" and left it for a human or the High Board. A later comment queued it anyway.
 
+## Child issue status (checked 2026-10-08)
+
+Closed (6): #8, #9, #10, #15, #16, #19. The epic body still shows these as unticked.
+
+Open (16): #11, #12, #17, #18, #20, #21, #22, #23, #24 (accounting, intake, verification)
+and #38, #39, #40, #41, #42, #43, #44 (Pi platform).
+
+A second run on 2026-10-08 found no owner answer on #45 or draft PR #122, so it stopped again
+without code changes.
+
 ## Questions for the owner
 
 - Should #45 be removed from the `ai-ready` queue and kept as a tracking epic only, with the
