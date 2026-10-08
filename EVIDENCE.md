@@ -173,3 +173,15 @@
 
 Not verified here: the `EmailLog (organizationId, entityType, sentAt)` index (requested in `AI_QUESTIONS.md`,
 schema change left to the coordinator) and an HTTP-level E2E, which needs Postgres and Redis (no Redis in this worktree).
+
+## Review round 6 re-check at de7fc75
+
+All open threads were already satisfied by earlier commits; no code change was needed:
+
+- Telegram chat id reaches the api container: `deploy/pi/docker-compose.pi.yml` passes `TELEGRAM_ALERT_CHAT_ID` (pinned by `Pi deployment wiring`).
+- Telegram call bounded: `AbortSignal.timeout(5000)` (`bounds the Telegram call with a timeout signal`).
+- State recorded only after `response.ok` (`does not record the alert when Telegram rejects it`).
+- Aggregate `count` replaces loading rows; atomic `SET NX` claim (`concurrent sends ... exactly one alert`).
+- Still open: the range index, which the brief says to request from the coordinator (`AI_QUESTIONS.md`).
+
+`node apps/api/_run_tests.js --testPathPattern="email\.service"`: 28 passed. `cache\.service`: 6 passed.
