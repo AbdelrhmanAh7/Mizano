@@ -291,6 +291,12 @@ All checks passed / All matched files use Prettier code style!
 - **Environment notes (round 4):** run on the existing Darwin arm64 worktree (Node v26.10.0, pnpm 8.14.0) against the local PostgreSQL 16.15 server on `/tmp:5432`, using a throwaway database `mizano_96_e2e` created with `prisma db push --skip-generate` for this session. No Redis server is available, so `test/intake.e2e-spec.ts` stays blocked (unchanged by this branch).
 - **Size:** the diff is above the ~300-line guideline (about 390 non-test lines). Round 1 asked for the UI and e2e in this PR.
 
+## Round 5 (review round 4/3)
+
+- **Seeded API E2E for both routes (Copilot):** already in `apps/api/test/bill-duplicates.e2e-spec.ts` since `be582d2`. It runs the real HTTP stack for `POST /bills/possible-duplicates` and `GET /bills/:id/possible-duplicates`: 401 anonymous, 403 for a role without permissions, 400 for malformed bodies (numeric amount, exponent, timestamp, unknown property), a successful match with the ±3-day boundary, and tenant B getting 404/400/none for tenant A's ids. Neither route takes a query string, so there is no query input to malform. No new e2e was needed.
+- **Scan banner vs. intake permission (Codex):** `PossibleDuplicatesBanner` now renders nothing and issues no request unless the user has `purchases.view`, the permission the check routes require. A role with only `purchases.create` no longer sees a permanent failed-check state. Test: `@issue-96 does not check or show anything without purchases.view` in `possible-duplicates-banner.spec.tsx`.
+- **Verified:** `jest --testPathPattern=possible-duplicates-banner` (apps/web): 9 passed. `tsc --noEmit`, `eslint` and `prettier --check` on the changed files: clean. API code and e2e were not touched this round, so they were not re-run.
+
 ## Index note
 
 `Bill` has `@@index([organizationId, vendorId])`, and the candidate query is bounded to one vendor and a 7-day window. No migration was added. An index on `(organizationId, vendorId, date)` can be considered if tenants grow large.

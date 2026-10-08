@@ -11,6 +11,7 @@ import {
   usePossibleDuplicates,
   type PossibleDuplicatesTarget,
 } from '@/lib/hooks/use-bills';
+import { usePermissions } from '@/lib/hooks/use-permissions';
 
 interface PossibleDuplicatesBannerProps {
   target: PossibleDuplicatesTarget;
@@ -24,6 +25,13 @@ interface PossibleDuplicatesBannerProps {
 export function PossibleDuplicatesBanner({
   target,
 }: PossibleDuplicatesBannerProps): JSX.Element | null {
+  const { hasPermission } = usePermissions();
+  // The check route requires purchases.view; a role with only purchases.create must not see a failed check.
+  if (!hasPermission('purchases.view')) return null;
+  return <DuplicatesAlert target={target} />;
+}
+
+function DuplicatesAlert({ target }: PossibleDuplicatesBannerProps): JSX.Element | null {
   const t = useTranslations('purchases.bills.duplicates');
   const { data, isError, refetch } = usePossibleDuplicates(target);
   const [dismissed, setDismissed] = useState(false);

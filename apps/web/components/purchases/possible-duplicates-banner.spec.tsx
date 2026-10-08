@@ -19,6 +19,11 @@ jest.mock('@/lib/hooks/use-bills', () => ({
   usePossibleDuplicates: (target: unknown) => usePossibleDuplicates(target),
 }));
 
+let canView = true;
+jest.mock('@/lib/hooks/use-permissions', () => ({
+  usePermissions: () => ({ hasPermission: (key: string) => canView && key === 'purchases.view' }),
+}));
+
 const possible: DuplicateCheckResult = {
   status: 'possible',
   matches: [
@@ -38,6 +43,16 @@ describe('PossibleDuplicatesBanner', () => {
     query.isError = false;
     query.refetch.mockReset();
     usePossibleDuplicates.mockClear();
+    canView = true;
+  });
+
+  it('@issue-96 does not check or show anything without purchases.view', () => {
+    canView = false;
+    query.data = possible;
+    query.isError = true;
+    const { container } = render(<PossibleDuplicatesBanner target={{ billId: 'draft-1' }} />);
+    expect(container).toBeEmptyDOMElement();
+    expect(usePossibleDuplicates).not.toHaveBeenCalled();
   });
 
   it('checks a stored bill by ID or an unsaved intake draft by its fields', () => {
