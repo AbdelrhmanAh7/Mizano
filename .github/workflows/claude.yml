@@ -102,10 +102,12 @@ jobs:
             --max-turns 30
 
   review:
+    # ai/* = the hub's own AI PRs: reviewed locally by src/jobs/claude-review.ts (quota-paced, feeds the automerge board), so skipped here.
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.draft == false
+      github.event.pull_request.draft == false &&
+      !startsWith(github.event.pull_request.head.ref, 'ai/')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     concurrency:
