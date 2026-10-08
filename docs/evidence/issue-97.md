@@ -284,6 +284,34 @@ $ grep -n "notify-volume" AI_QUESTIONS.md | grep -o '`notify-volume[^`]*`'
 
 The alert key carries the organization id, so one organization staying anomalous cannot hide a second one's alert or recovery in the shared `active-keys` state of `healthcheck.sh`.
 
+## Round 6 recheck (tested head `f8122af`)
+
+The council and the open `.gitignore` thread asked for a minimal `.gitignore` diff. `master` mixes CRLF and LF, so round 3's LF normalisation rewrote 228 lines. Round 6 restores `master`'s bytes and adds only the two ignore lines (LF, so `git diff --check` stays clean). The comment above the rule no longer points at the not-yet-existing `.env.pi.example`. `AI_QUESTIONS.md` stays at the repository root because `review-lessons.md` and the filed issues #104 and #105 reference it by that path.
+
+```text
+$ git rev-parse HEAD   (before the evidence commit)
+f8122af529f08ab01ddd0c7eadd6c02ef17fa3cd
+$ git diff --stat master..HEAD -- .gitignore
+ .gitignore | 2 ++
+ 1 file changed, 2 insertions(+)
+$ git diff --check master..HEAD; echo exit=$?
+exit=0
+$ git diff master..HEAD -- .gitignore | grep -c "^[+-][^+-]"
+2
+$ git check-ignore -v deploy/pi/.env.pi
+.gitignore:16:deploy/pi/.env.pi	deploy/pi/.env.pi
+$ git diff --stat master..HEAD
+ .gitignore                    |   2 +
+ AI_QUESTIONS.md               |  43 ++++++
+ deploy/pi/README.md           |   1 +
+ docs/agents/review-lessons.md |   7 +-
+ docs/evidence/issue-97.md     | 296 ++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 348 insertions(+), 1 deletion(-)
+$ prettier --check (touched docs)
+Checking formatting...
+All matched files use Prettier code style!
+```
+
 ## Acceptance checklist (Tech Lead plan)
 
 | Item                                                                           | Status                                                                                                                                                        |
