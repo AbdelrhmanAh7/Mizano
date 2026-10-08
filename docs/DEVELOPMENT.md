@@ -97,7 +97,7 @@ The `ollama-proxy` container (`services/ollama-proxy`) has no default `WEBHOOK_S
 
 ## Database
 
-- Schema: `apps/api/prisma/schema.prisma`; migrations in `apps/api/prisma/migrations/`; seed in `apps/api/prisma/seed.ts` (`prisma db seed`).
+- Schema: `apps/api/prisma/schema.prisma`; migrations in `apps/api/prisma/migrations/`; seed in `apps/api/prisma/seed.ts` (`prisma db seed`). The seed creates demo logins (`admin@mizano.com` / `password123`), so it refuses to run with `NODE_ENV=production` unless `SEED_ALLOW_PROD=1` is set.
 - After any schema change: `pnpm db:generate`, then `pnpm db:migrate` locally. Production applies `prisma migrate deploy` during deployment.
 - The schema has one owner at a time (the coordinator). Workers request changes instead of editing it in parallel.
 
@@ -146,7 +146,7 @@ Zero-tolerance policy: `pnpm ci:full` must pass with no warnings or errors (no `
 1. skips the rollout only for the reviewed planning-only paths in `docs/planning/rollout-exemption.json`;
 2. builds `apps/api/Dockerfile` and `apps/web/Dockerfile`, pushing `ghcr.io/abdelrhmanah7/mizano-{api,web}` tagged with the short SHA and `latest`;
 3. copies `docker-compose.production.yml`, `apps/api/prisma/` and `nginx/` to the VM, writes `~/mizano/.env` from repository secrets;
-4. starts PostgreSQL/Redis, syncs the DB password, restarts `api`, `web`, `nginx`, then runs `prisma migrate deploy` and the idempotent seed;
+4. starts PostgreSQL/Redis, syncs the DB password, restarts `api`, `web`, `nginx`, then runs `prisma migrate deploy` and the seed (a no-op there: it refuses `NODE_ENV=production` without `SEED_ALLOW_PROD=1`);
 5. checks `GET /api/health` over SSH.
 
 Required secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `PRODUCTION_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `NEXTAUTH_SECRET`.

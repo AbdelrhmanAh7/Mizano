@@ -54,6 +54,7 @@ import {
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { Decimal } from '@prisma/client/runtime/library';
+import { assertSeedAllowed } from './seed-guard';
 
 const prisma = new PrismaClient();
 const DEFAULT_PASSWORD = 'password123';
@@ -63,6 +64,8 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
 const daysAhead = (n: number) => new Date(Date.now() + n * 86_400_000);
 
 async function main() {
+  assertSeedAllowed();
+
   console.log('='.repeat(60));
   console.log('Mizano ERP - Full Database Seed');
   console.log('='.repeat(60));
