@@ -17,7 +17,6 @@ import { INestApplication, RequestMethod, ValidationPipe } from '@nestjs/common'
 import { DiscoveryService } from '@nestjs/core';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import * as request from 'supertest';
-import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import {
   NOTIFICATION_BATCH_SIZE,
@@ -201,15 +200,9 @@ describe('@issue-133 AC3b: AI cron jobs register when AI_SCHEDULERS_ENABLED=true
     // flag set; the "flag unset" graphs created earlier keep their own bindings.
     process.env.AI_SCHEDULERS_ENABLED = 'true';
     jest.resetModules();
-    const { AppModule: EnabledAppModule } = require('../src/app.module') as {
-      AppModule: typeof AppModule;
-    };
-    const { Test: FreshTest } = require('@nestjs/testing') as {
-      Test: typeof import('@nestjs/testing').Test;
-    };
-    const { ThrottlerStorage: FreshThrottlerStorage } = require('@nestjs/throttler') as {
-      ThrottlerStorage: typeof import('@nestjs/throttler').ThrottlerStorage;
-    };
+    const { AppModule: EnabledAppModule } = await import('../src/app.module');
+    const { Test: FreshTest } = await import('@nestjs/testing');
+    const { ThrottlerStorage: FreshThrottlerStorage } = await import('@nestjs/throttler');
 
     const builder = FreshTest.createTestingModule({ imports: [EnabledAppModule] })
       .overrideProvider(FreshThrottlerStorage)
@@ -239,10 +232,8 @@ describe('@issue-133 AC3b: AI cron jobs register when AI_SCHEDULERS_ENABLED=true
     delete process.env.AI_SCHEDULERS_ENABLED;
   });
 
-  it('registers every ai: cron job from the five scheduler classes', () => {
-    const { SchedulerRegistry: FreshSchedulerRegistry } = require('@nestjs/schedule') as {
-      SchedulerRegistry: typeof SchedulerRegistry;
-    };
+  it('registers every ai: cron job from the five scheduler classes', async () => {
+    const { SchedulerRegistry: FreshSchedulerRegistry } = await import('@nestjs/schedule');
     const cronKeys = [...app.get(FreshSchedulerRegistry).getCronJobs().keys()];
     const aiKeys = cronKeys.filter((name) => name.startsWith('ai:'));
     expect(aiKeys).toHaveLength(EXPECTED_AI_CRON_NAMES.length);
