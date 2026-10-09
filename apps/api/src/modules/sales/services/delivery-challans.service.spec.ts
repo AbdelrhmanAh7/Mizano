@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ChallanStatus, ChallanType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { DeliveryChallansService } from './delivery-challans.service';
@@ -61,6 +61,7 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
       prisma.invoice.findFirst.mockResolvedValue({ id: 'inv-b' } as never);
       prisma.item.findFirst.mockResolvedValue({ id: 'item-b' } as never);
       prisma.warehouse.findFirst.mockResolvedValue({ id: 'wh-b' } as never);
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 1 } as never);
       await service.update(ORG, 'dc-1', {
         customerId: 'cust-b',
         invoiceId: 'inv-b',
@@ -77,7 +78,27 @@ describe('DeliveryChallansService tenant scoping (#131)', () => {
           expect.objectContaining({ organizationId: ORG, deletedAt: null }),
         ]);
       }
-      expect(prisma.deliveryChallan.update).toHaveBeenCalled();
+      expect(prisma.deliveryChallan.updateMany).toHaveBeenCalled();
+    });
+
+    it('rejects with 400 and writes no lines when the challan is no longer DRAFT', async () => {
+      prisma.item.findFirst.mockResolvedValue({ id: 'item-b' } as never);
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 0 } as never);
+      await expect(
+        service.update(ORG, 'dc-1', { lines: [{ itemId: 'item-b', quantity: 1 }] }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.deliveryChallanLine.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.deliveryChallanLine.createMany).not.toHaveBeenCalled();
+    });
+
+    it('propagates a mid-update failure out of the transaction', async () => {
+      prisma.item.findFirst.mockResolvedValue({ id: 'item-b' } as never);
+      prisma.deliveryChallan.updateMany.mockResolvedValue({ count: 1 } as never);
+      prisma.deliveryChallanLine.createMany.mockRejectedValue(new Error('boom') as never);
+      await expect(
+        service.update(ORG, 'dc-1', { lines: [{ itemId: 'item-b', quantity: 1 }] }),
+      ).rejects.toThrow('boom');
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
   });
 

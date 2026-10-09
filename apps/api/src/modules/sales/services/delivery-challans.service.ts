@@ -145,43 +145,48 @@ export class DeliveryChallansService {
     // Validate before touching the existing lines
     await this.assertReferencesInOrg(organizationId, dto);
 
-    // Update lines if provided
-    if (dto.lines) {
-      // Delete existing lines
-      await this.prisma.deliveryChallanLine.deleteMany({
-        where: { challanId: id },
+    return this.prisma.$transaction(async (tx) => {
+      // Re-check DRAFT + org atomically to close the race with issue()
+      const res = await tx.deliveryChallan.updateMany({
+        where: { id, organizationId, deletedAt: null, status: ChallanStatus.DRAFT },
+        data: {
+          customerId: dto.customerId,
+          invoiceId: dto.invoiceId,
+          challanType: dto.challanType,
+          date: dto.date ? new Date(dto.date) : undefined,
+          notes: dto.notes,
+        },
       });
-    }
+      if (res.count !== 1) {
+        throw new BadRequestException('Only draft challans can be updated');
+      }
 
-    return this.prisma.deliveryChallan.update({
-      where: { id },
-      data: {
-        customerId: dto.customerId,
-        invoiceId: dto.invoiceId,
-        challanType: dto.challanType,
-        date: dto.date ? new Date(dto.date) : undefined,
-        notes: dto.notes,
-        ...(dto.lines && {
+      if (dto.lines) {
+        await tx.deliveryChallanLine.deleteMany({ where: { challanId: id } });
+        await tx.deliveryChallanLine.createMany({
+          data: dto.lines.map((line) => ({
+            challanId: id,
+            itemId: line.itemId,
+            quantity: new Decimal(line.quantity),
+            description: line.description,
+            warehouseId: line.warehouseId,
+          })),
+        });
+      }
+
+      return tx.deliveryChallan.findFirst({
+        where: { id, organizationId },
+        include: {
+          customer: { select: { id: true, name: true } },
+          invoice: { select: { id: true, invoiceNumber: true } },
           lines: {
-            create: dto.lines.map((line) => ({
-              itemId: line.itemId,
-              quantity: new Decimal(line.quantity),
-              description: line.description,
-              warehouseId: line.warehouseId,
-            })),
-          },
-        }),
-      },
-      include: {
-        customer: { select: { id: true, name: true } },
-        invoice: { select: { id: true, invoiceNumber: true } },
-        lines: {
-          include: {
-            item: { select: { id: true, name: true, sku: true } },
-            warehouse: { select: { id: true, name: true } },
+            include: {
+              item: { select: { id: true, name: true, sku: true } },
+              warehouse: { select: { id: true, name: true } },
+            },
           },
         },
-      },
+      });
     });
   }
 
