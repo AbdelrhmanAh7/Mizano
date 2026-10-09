@@ -16,34 +16,7 @@ export class DeliveryChallansService {
   // ============ CRUD Operations ============
 
   async create(organizationId: string, dto: CreateDeliveryChallanDto) {
-    // Validate customer
-    const customer = await this.prisma.customer.findFirst({
-      where: { id: dto.customerId, organizationId, deletedAt: null },
-    });
-
-    if (!customer) {
-      throw new NotFoundException('Customer not found');
-    }
-
-    // Validate invoice if provided
-    if (dto.invoiceId) {
-      const invoice = await this.prisma.invoice.findFirst({
-        where: { id: dto.invoiceId, organizationId, deletedAt: null },
-      });
-      if (!invoice) {
-        throw new NotFoundException('Invoice not found');
-      }
-    }
-
-    // Validate items
-    for (const line of dto.lines) {
-      const item = await this.prisma.item.findFirst({
-        where: { id: line.itemId, organizationId, deletedAt: null },
-      });
-      if (!item) {
-        throw new NotFoundException(`Item ${line.itemId} not found`);
-      }
-    }
+    await this.assertReferencesInOrg(organizationId, dto);
 
     // Generate challan number
     const challanNumber = await this.generateChallanNumber(organizationId);
@@ -169,43 +142,51 @@ export class DeliveryChallansService {
       throw new BadRequestException('Only draft challans can be updated');
     }
 
-    // Update lines if provided
-    if (dto.lines) {
-      // Delete existing lines
-      await this.prisma.deliveryChallanLine.deleteMany({
-        where: { challanId: id },
-      });
-    }
+    // Validate before touching the existing lines
+    await this.assertReferencesInOrg(organizationId, dto);
 
-    return this.prisma.deliveryChallan.update({
-      where: { id },
-      data: {
-        customerId: dto.customerId,
-        invoiceId: dto.invoiceId,
-        challanType: dto.challanType,
-        date: dto.date ? new Date(dto.date) : undefined,
-        notes: dto.notes,
-        ...(dto.lines && {
+    return this.prisma.$transaction(async (tx) => {
+      // Re-check DRAFT + org atomically to close the race with issue()
+      const res = await tx.deliveryChallan.updateMany({
+        where: { id, organizationId, deletedAt: null, status: ChallanStatus.DRAFT },
+        data: {
+          customerId: dto.customerId,
+          invoiceId: dto.invoiceId,
+          challanType: dto.challanType,
+          date: dto.date ? new Date(dto.date) : undefined,
+          notes: dto.notes,
+        },
+      });
+      if (res.count !== 1) {
+        throw new BadRequestException('Only draft challans can be updated');
+      }
+
+      if (dto.lines) {
+        await tx.deliveryChallanLine.deleteMany({ where: { challanId: id } });
+        await tx.deliveryChallanLine.createMany({
+          data: dto.lines.map((line) => ({
+            challanId: id,
+            itemId: line.itemId,
+            quantity: new Decimal(line.quantity),
+            description: line.description,
+            warehouseId: line.warehouseId,
+          })),
+        });
+      }
+
+      return tx.deliveryChallan.findFirst({
+        where: { id, organizationId },
+        include: {
+          customer: { select: { id: true, name: true } },
+          invoice: { select: { id: true, invoiceNumber: true } },
           lines: {
-            create: dto.lines.map((line) => ({
-              itemId: line.itemId,
-              quantity: new Decimal(line.quantity),
-              description: line.description,
-              warehouseId: line.warehouseId,
-            })),
-          },
-        }),
-      },
-      include: {
-        customer: { select: { id: true, name: true } },
-        invoice: { select: { id: true, invoiceNumber: true } },
-        lines: {
-          include: {
-            item: { select: { id: true, name: true, sku: true } },
-            warehouse: { select: { id: true, name: true } },
+            include: {
+              item: { select: { id: true, name: true, sku: true } },
+              warehouse: { select: { id: true, name: true } },
+            },
           },
         },
-      },
+      });
     });
   }
 
@@ -233,15 +214,13 @@ export class DeliveryChallansService {
       throw new BadRequestException('Only draft challans can be issued');
     }
 
+    const tracked = await this.trackedLineItems(organizationId, challan.lines);
+
     // Check inventory availability for tracked items
     for (const line of challan.lines) {
-      const item = await this.prisma.item.findUnique({
-        where: { id: line.itemId },
-      });
-
-      if (item?.trackInventory) {
+      if (tracked.has(line.itemId)) {
         const warehouseId = line.warehouseId;
-        const currentStock = await this.getItemStock(line.itemId, warehouseId);
+        const currentStock = await this.getItemStock(organizationId, line.itemId, warehouseId);
 
         if (currentStock < parseFloat(line.quantity.toString())) {
           throw new BadRequestException(
@@ -253,11 +232,7 @@ export class DeliveryChallansService {
 
     // Decrease inventory
     for (const line of challan.lines) {
-      const item = await this.prisma.item.findUnique({
-        where: { id: line.itemId },
-      });
-
-      if (item?.trackInventory) {
+      if (tracked.has(line.itemId)) {
         await this.decreaseInventory(
           organizationId,
           line.itemId,
@@ -293,13 +268,11 @@ export class DeliveryChallansService {
       throw new BadRequestException('Only issued challans can be marked as returned');
     }
 
+    const tracked = await this.trackedLineItems(organizationId, challan.lines);
+
     // Increase inventory (reverse the decrease)
     for (const line of challan.lines) {
-      const item = await this.prisma.item.findUnique({
-        where: { id: line.itemId },
-      });
-
-      if (item?.trackInventory) {
+      if (tracked.has(line.itemId)) {
         await this.increaseInventory(
           organizationId,
           line.itemId,
@@ -418,6 +391,78 @@ export class DeliveryChallansService {
 
   // ============ Helper Methods ============
 
+  /** Every customer, invoice, item and warehouse id in the payload must belong to the org. */
+  private async assertReferencesInOrg(
+    organizationId: string,
+    dto: UpdateDeliveryChallanDto,
+  ): Promise<void> {
+    if (dto.customerId !== undefined) {
+      const customer = await this.prisma.customer.findFirst({
+        where: { id: dto.customerId, organizationId, deletedAt: null },
+      });
+      if (!customer) {
+        throw new NotFoundException('Customer not found');
+      }
+    }
+
+    if (dto.invoiceId) {
+      const invoice = await this.prisma.invoice.findFirst({
+        where: { id: dto.invoiceId, organizationId, deletedAt: null },
+      });
+      if (!invoice) {
+        throw new NotFoundException('Invoice not found');
+      }
+    }
+
+    for (const line of dto.lines ?? []) {
+      const item = await this.prisma.item.findFirst({
+        where: { id: line.itemId, organizationId, deletedAt: null },
+      });
+      if (!item) {
+        throw new NotFoundException(`Item ${line.itemId} not found`);
+      }
+      if (line.warehouseId) {
+        const warehouse = await this.prisma.warehouse.findFirst({
+          where: { id: line.warehouseId, organizationId, deletedAt: null },
+        });
+        if (!warehouse) {
+          throw new NotFoundException(`Warehouse ${line.warehouseId} not found`);
+        }
+      }
+    }
+  }
+
+  /**
+   * Ids of the inventory-tracked items on the lines, checked against the org before any stock
+   * moves. Soft-deleted items and warehouses still count, so older challans can be returned.
+   */
+  private async trackedLineItems(
+    organizationId: string,
+    lines: Array<{ itemId: string; warehouseId: string | null }>,
+  ): Promise<Set<string>> {
+    const tracked = new Set<string>();
+    for (const line of lines) {
+      const item = await this.prisma.item.findFirst({
+        where: { id: line.itemId, organizationId },
+      });
+      if (!item) {
+        throw new NotFoundException(`Item ${line.itemId} not found`);
+      }
+      if (line.warehouseId) {
+        const warehouse = await this.prisma.warehouse.findFirst({
+          where: { id: line.warehouseId, organizationId },
+        });
+        if (!warehouse) {
+          throw new NotFoundException(`Warehouse ${line.warehouseId} not found`);
+        }
+      }
+      if (item.trackInventory) {
+        tracked.add(item.id);
+      }
+    }
+    return tracked;
+  }
+
   private async generateChallanNumber(organizationId: string): Promise<string> {
     const lastChallan = await this.prisma.deliveryChallan.findFirst({
       where: { organizationId },
@@ -433,8 +478,12 @@ export class DeliveryChallansService {
     return `DC-${String(lastNumber + 1).padStart(3, '0')}`;
   }
 
-  private async getItemStock(itemId: string, warehouseId?: string | null): Promise<number> {
-    const where: Prisma.InventoryLevelWhereInput = { itemId };
+  private async getItemStock(
+    organizationId: string,
+    itemId: string,
+    warehouseId?: string | null,
+  ): Promise<number> {
+    const where: Prisma.InventoryLevelWhereInput = { itemId, organizationId };
     if (warehouseId) {
       where.warehouseId = warehouseId;
     }
