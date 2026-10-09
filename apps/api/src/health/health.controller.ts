@@ -1,8 +1,10 @@
-import { Controller, Get, Inject, Optional } from '@nestjs/common';
+import { Controller, Get, Inject, Optional, Res } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
+import { ReadinessService } from './readiness.service';
 
 interface HealthCheckResponse {
   status: 'healthy' | 'unhealthy';
@@ -26,6 +28,7 @@ interface HealthCheckResponse {
 export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly readinessService: ReadinessService,
     @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
   ) {}
 
@@ -80,14 +83,11 @@ export class HealthController {
     return response;
   }
 
+  /** Readiness for the Pi monitor: 200 when DB and data disk are fine, 503 otherwise. */
   @Get('ready')
-  async readiness(): Promise<{ ready: boolean; message: string }> {
-    try {
-      await this.prisma.$queryRaw`SELECT 1`;
-      return { ready: true, message: 'Service is ready' };
-    } catch {
-      return { ready: false, message: 'Database not available' };
-    }
+  async readiness(@Res() res: Response): Promise<void> {
+    const report = await this.readinessService.check();
+    res.status(report.status === 'ok' ? 200 : 503).json(report);
   }
 
   @Get('live')

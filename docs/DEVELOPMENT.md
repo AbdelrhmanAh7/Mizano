@@ -30,7 +30,12 @@ Never initialize, migrate or reset a shared or production database from a workst
 | PostgreSQL | 5435       | `postgresql://mizano:…@localhost:5435/mizano_db`   |
 | Redis      | 6380       | `redis://localhost:6380`                           |
 
-Health: `GET /api/health`, `/api/health/ready`, `/api/health/live`.
+Health: `GET /api/health`, `/api/health/ready`, `/api/health/live`. All three are unauthenticated and carry no tenant data.
+`/api/health/ready` races `SELECT 1` against `READY_DB_TIMEOUT_MS` (default 2000; concurrent requests share one query)
+and reads the space available to the API on `DATA_DIR` (default: the API working directory). It answers 200 with
+`{status:"ok", db:"ok", disk:{freeBytes, freePct}}`, otherwise 503 with `status:"fail"` and only the failed probe marked:
+`db:"fail"` when the query fails or times out (`disk` keeps its numbers), `disk:"fail"` when free space is below
+`READY_MIN_FREE_PCT` (default 10; invalid values fall back to 10) or unreadable (`db` stays `"ok"`).
 
 ## Commands
 

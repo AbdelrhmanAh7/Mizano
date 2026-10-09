@@ -142,3 +142,27 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+## Issue #110 (API readiness endpoint)
+
+- **Tested commit SHA**: `9527405cbf64b3b9a605c72cc4c12f0f133199bd` (no source change after it; later commits touch only this file)
+- **Branch**: `ai/110`
+- **Run date**: 2026-10-08
+- **Environment**: throwaway local PostgreSQL 16 on port 55481 (fresh database, `prisma migrate deploy`), `REDIS_URL` blank, Jest `--runInBand`. The DB query and `fs.promises.statfs` are stubbed inside the spec; the app, routing and guards are real.
+
+| REQ ID | Requirement                                                 | Verification                                                                                       | Status   |
+| ------ | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------- |
+| AC1    | Healthy DB and enough disk returns 200 with the JSON shape  | `health-ready.e2e-spec.ts`: AC1, AC1 boundary (exactly 10 % passes), `/health` liveness unchanged  | VERIFIED |
+| AC2    | Failing DB returns 503 within the timeout, names `db`       | `health-ready.e2e-spec.ts`: AC2 and AC2 timeout (hung query, 216 ms, one shared probe)             | VERIFIED |
+| AC3    | Free space below the threshold returns 503, names `disk`    | `health-ready.e2e-spec.ts`: AC3 (below threshold, statfs error, unrounded `bavail`, env fallbacks) | VERIFIED |
+| AC4    | No connection strings, paths or tenant data in the response | `health-ready.e2e-spec.ts`: AC4 (DSN and path in thrown errors absent from body and warn logs)     | VERIFIED |
+| AC5    | Change is ≤ ~200 lines                                      | `git diff --numstat`: implementation +96/−8 fits; branch total with tests does not (see below)     | PARTIAL  |
+
+- **Test command** (from `apps/api`, `DATABASE_URL` pointing at the throwaway database):
+  ```bash
+  npx jest --config ./test/jest-e2e.json --runInBand health-ready
+  ```
+- **Result**: `Test Suites: 1 passed, 1 total`, `Tests: 13 passed, 13 total` (26.3 s).
+- **Static checks on the changed files**: `eslint src/health test/health-ready.e2e-spec.ts` no output, `tsc --noEmit -p tsconfig.json` no output, `prettier --check` clean.
+- **Line counts** (`git diff origin/master...HEAD --numstat`, measured on this branch): `readiness.service.ts` +86, `health.controller.ts` +8/−8, `health.module.ts` +2 (implementation +96/−8, within ~200); `apps/api/test/health-ready.e2e-spec.ts` +184; `docs/DEVELOPMENT.md` +6/−1; `AI_QUESTIONS.md` +7; this file +24. Whole branch: 7 files, +317/−9. AC5 is therefore met for the implementation only: service plus e2e spec alone is 270 lines, so the ~200 line figure is exceeded once tests are counted. Marked PARTIAL, not VERIFIED.
+- **Not run locally**: the full API unit suite and the web suite (the full suite runs on GitHub-hosted CI after the push). Status of those is unverified here. No e2e-army test was added: the endpoint has no UI flow, and its request-level behaviour is covered by the e2e spec above.
