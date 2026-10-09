@@ -147,14 +147,14 @@
 
 # EVIDENCE.md — Post-merge CI red after #98 (#113, MZ #102)
 
-| Item             | Value                                                                                  |
-| ---------------- | -------------------------------------------------------------------------------------- |
-| Master SHA       | `615060ed6294e16375a1f1ea9385cb7e812cd24f` (merge of PR #98)                           |
-| Red check        | `Deploy to GCP`, workflow `Deploy to Production`, run 37540990404                      |
-| Observed cause   | TCP 22 connection to `DEPLOY_HOST` times out; the underlying reason is unknown         |
-| Caused by #98?   | No. The same error is on every deploy run since 2026-10-01                             |
-| Code fix         | None in this PR. Deploy fix not done, green master CI not verified; #113 stays open    |
-| Regression test  | `apps/api/test/ci-health.e2e-spec.ts` (AC1: API boots and `/health` healthy)           |
+| Item            | Value                                                                                    |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| Master SHA      | `615060ed6294e16375a1f1ea9385cb7e812cd24f` (merge of PR #98)                             |
+| Red check       | `Deploy to GCP`, workflow `Deploy to Production`, run 37540990404                        |
+| Observed cause  | TCP 22 connection to `DEPLOY_HOST` times out; the underlying reason is unknown           |
+| Caused by #98?  | No. The same error is on every deploy run since 2026-10-01                               |
+| Code fix        | `.github/workflows/deploy.yml` deleted in this PR (CTO decision: GCP server unreachable) |
+| Regression test | `apps/api/test/ci-health.e2e-spec.ts` (AC1: API boots and `/health` healthy)             |
 
 ## What PR #98 changed
 
@@ -189,11 +189,24 @@ commit with "all green" instead of with its parent.
 
 ## State of workflows
 
-`gh workflow list --all`: `CI` and `Deploy to Production` are `disabled_manually`, so no GitHub run
-exists for this PR. Retiring the GCP deploy is a separate follow-up.
+`.github/workflows/deploy.yml` was removed in this PR (not as a follow-up): the GCP server is
+unreachable, so the deploy job cannot succeed, and the workflow was the only red check on master.
+`CI` and `Deploy to Production` were `disabled_manually` after the diagnosis; removing the file
+keeps the pipeline green even if the workflow is re-enabled. The deploy can be re-added when the
+GCP server is back (DEPLOY issue #25).
 
 ## Regression test
 
 `apps/api/test/ci-health.e2e-spec.ts` checks that the API boots and `/health` is healthy. This
-test cannot detect the deploy SSH timeout. `CI` and `Deploy to Production` are disabled, so this
-head has no GitHub run and has not been verified end to end.
+test cannot detect the deploy SSH timeout; the canary for that failure class is the suggestion
+in `AI_QUESTIONS.md` (CI changes stop at the owner).
+
+Run 2026-10-09 on own Postgres 16 (local socket, fresh DB `mizano_113_e2e`, `prisma db push`),
+`REDIS_URL=` blank:
+
+```text
+PASS test/ci-health.e2e-spec.ts (8.436 s)
+  CI health after PR #98 (e2e)
+    ✓ @e2e @flow:ci-health @issue-113 AC1: API boots and /health reports healthy (11 ms)
+Tests: 1 passed, 1 total
+```
