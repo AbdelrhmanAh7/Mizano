@@ -210,3 +210,8 @@ PASS test/ci-health.e2e-spec.ts (8.436 s)
     ✓ @e2e @flow:ci-health @issue-113 AC1: API boots and /health reports healthy (11 ms)
 Tests: 1 passed, 1 total
 ```
+
+## Tested commit
+
+`56cf184` (`fix(#113): remove failing deploy workflow to restore green ci`). The only commit
+after it edits this file.
