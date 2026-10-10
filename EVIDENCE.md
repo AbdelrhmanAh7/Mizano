@@ -142,3 +142,9 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+---
+
+## Index: other issues
+
+- Issue #94 (decimal money math and idempotent posting): [docs/evidence/94/EVIDENCE.md](docs/evidence/94/EVIDENCE.md). Open questions and follow-ups: [docs/evidence/94/AI_QUESTIONS.md](docs/evidence/94/AI_QUESTIONS.md).

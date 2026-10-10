@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { BulkResultDto } from '../../../common/dto/bulk-result.dto';
+import { MAX_FRACTION_DIGITS, MAX_INTEGER_DIGITS } from '../../../common/dto/decimal-string';
 import { cursorPaginate } from '../../../common/utils/cursor-paginate';
 import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 import { runBulk } from '../../../common/utils/run-bulk';
@@ -56,6 +57,8 @@ export interface CreateJournalOptions {
 
 type JournalLineInput = CreateJournalDto['lines'][number];
 
+const AMOUNT_LIMIT = new Decimal(10).pow(MAX_INTEGER_DIGITS);
+
 const JOURNAL_INCLUDE = {
   lines: {
     include: {
@@ -78,6 +81,13 @@ function parseAmount(value: string | undefined, field: string): Decimal {
   }
   if (!amount.isFinite() || amount.isNegative()) {
     throw new BadRequestException(`${field} must be a non-negative decimal number`);
+  }
+  // The Decimal(19, 4) column would round extra decimals per line (or overflow), so a journal
+  // balanced here could be stored unbalanced. Balance is only checked on storable amounts.
+  if (amount.decimalPlaces() > MAX_FRACTION_DIGITS || amount.greaterThanOrEqualTo(AMOUNT_LIMIT)) {
+    throw new BadRequestException(
+      `${field} must have at most ${MAX_INTEGER_DIGITS} integer digits and ${MAX_FRACTION_DIGITS} decimal places`,
+    );
   }
   return amount;
 }
