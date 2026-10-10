@@ -39,8 +39,8 @@ and against the diffs of all open PRs, so nothing an open PR builds on is remove
 | Storybook (`.storybook/`, 10 `*.stories.tsx`, 6 packages, 2 scripts) | remove | never built in CI or by the hub; UI is covered by `e2e-army` |
 | api deps `brain.js`, `ml-naivebayes`, `onnxruntime-node`, `form-data`, `ts-loader` | remove | no import anywhere (`knip` + grep); `ts-loader` is unused because `nest-cli.json` builds with SWC |
 | web deps `react-dropzone`, `@types/react-dropzone`, `@testing-library/user-event` | remove | no import anywhere |
-| 43 unused source files (api: unused DTOs, barrels, `base-crud.service`, `where-builder`, `date-filter`, `transform.interceptor`, `paddle-ocr-api.service`, `batch-processor`, `pdf-to-images`, redis mock; web: 20 unused hooks/components/utils) | remove | `knip` "unused files", no import in master or in any open PR |
-| `common/utils/decimal.ts`, AI DTOs/`ai-alerts.tsx` used by PR #99, dashboard charts and `use-formatters` used by PR #84 | keep | unused on master but open PRs build on them |
+| 42 unused source files (api: unused DTOs, barrels, `base-crud.service`, `where-builder`, `date-filter`, `transform.interceptor`, `paddle-ocr-api.service`, `batch-processor`, `pdf-to-images`; web: 20 unused hooks/components/utils) | remove | `knip` "unused files", no import in master or in any open PR |
+| `common/utils/decimal.ts`, `src/test/mocks/redis.mock.ts` (documented test infrastructure), AI DTOs/`ai-alerts.tsx` used by PR #99, dashboard charts and `use-formatters` used by PR #84 | keep | unused on master but open PRs build on them |
 | `apps/api/{eng,ara}.traineddata`, `services/ollama-proxy`, docker-compose files, `nginx/` | keep | runtime OCR assets / local dev stack / referenced by docs |
 
 ### PR 2 — test pruning (supersedes #155)
@@ -49,17 +49,17 @@ and against the diffs of all open PRs, so nothing an open PR builds on is remove
 | --- | --- | --- |
 | #155's changes (`command.spec`, `use-bulk-action.spec`, the `transformJournal` copy in `journals/page.spec`) | remove | trivial library wiring, mock-only, tautology (tests a copy of production code) |
 | 11 API e2e-specs (203 tests) | move to a **nightly** workflow (Postgres + Redis, `db:push`, seed) | they guard money/ledger/tenancy end to end but never ran; nightly makes them run without slowing PRs |
-| Web page/component render specs for non-pilot screens (HR, payroll, attendance, assets, manufacturing, bank transactions/accounts, AI insights detail, logger dashboard, sidebar, breadcrumbs, stat card) | remove | mock-only rendering, duplicated by `e2e-army` staging tests (people, banking, inventory, platform, ai suites cover each feature) |
-| API specs of out-of-pilot HR/CRM/ops AI services (skills gap, compensation, workforce scheduling, attrition, route optimisation, predictive maintenance, quality prediction, voice command, sentiment, contract analysis, churn, CLV, cross-sell, lead scoring, dynamic pricing, pipeline forecast, resource optimisation) | remove | features with `mvp: false`, outside the pilot ("full ERP breadth … stay out of scope"), tests mock Prisma and only re-assert scoring constants |
-| Accounting, sales, purchases, tax/VAT, banking, reconciliation, currency, reports, inventory valuation, intake/extraction, auth/tenancy guards, AI math utils, finance AI (cash flow, payment prediction, anomaly/fraud, audit risk, compliance) | **keep** | real domain logic; owner rule for Mizano |
+| Web page/component render specs for screens outside the pilot (HR ×6, assets ×2, manufacturing ×2, bank transactions/accounts ×2, AI insights detail, logger dashboard, sidebar, breadcrumbs, stat card) — 17 files | remove | mock-only rendering or styling assertions; each feature has `e2e-army` staging tests (`tests-dev/Mizano`: people, banking, inventory, platform, ai) |
+| API AI service specs (1,010 tests) | **keep** | they assert real scoring/forecast logic and run in seconds; the earlier rule "never remove a logic test whose feature has no passing e2e" still holds and no Mizano feature has a recorded e2e-army pass yet |
+| Accounting, sales, purchases, tax/VAT, banking, reconciliation, currency, reports, inventory valuation, intake/extraction, auth/tenancy guards, logger tenancy | **keep** | real domain logic; owner rule for Mizano |
 
 ### PR 3 — CI consolidation and caching
 
 | Item | Decision | Evidence |
 | --- | --- | --- |
 | Unit Tests: Postgres/Redis service containers and `db:push` | remove | all 2,655 unit tests pass with an unreachable `DATABASE_URL`/`REDIS_URL` (verified locally); saves ~30 s and two containers per run |
-| Build: `.next/cache` + turbo cache | add (`actions/cache`) | `next build` is the critical path (123 s) and starts cold every run |
-| Lint & Type Check: turbo cache | add | unchanged packages (`shared-types`, `validators`) are re-linted every run |
+| Build: `.next/cache` | add (`actions/cache`) | `next build` is the critical path (123 s) and starts cold every run |
+| turbo cache in CI | **do not add** | `turbo.json` inputs for `lint`/`build`/`test` list `src/**`, but `apps/web` has no `src/`, so a restored turbo cache would replay a stale web result as a pass |
 | Job names (`Install Dependencies`, `Lint & Type Check`, `Unit Tests`, `Build`) | keep | the hub's local-CI and automerge gates require these exact contexts |
 | `claude.yml` | keep | the owner's Claude review; its runs are skipped jobs (no runner minutes) |
 
