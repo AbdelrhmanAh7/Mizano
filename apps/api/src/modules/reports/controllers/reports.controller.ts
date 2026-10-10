@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { PdfService } from '../../documents/services/pdf.service';
 import { AgingReportsService } from '../services/aging-reports.service';
+import { ApReconciliationService } from '../services/ap-reconciliation.service';
 import { DashboardService } from '../services/dashboard.service';
 import { FinancialReportsService } from '../services/financial-reports.service';
 import { FinancialNarrativeService } from '../../ai/services/financial-narrative.service';
@@ -19,6 +20,7 @@ export class ReportsController {
   constructor(
     private readonly financialReportsService: FinancialReportsService,
     private readonly agingReportsService: AgingReportsService,
+    private readonly apReconciliationService: ApReconciliationService,
     private readonly dashboardService: DashboardService,
     private readonly pdfService: PdfService,
     private readonly narrativeService: FinancialNarrativeService,
@@ -528,6 +530,14 @@ export class ReportsController {
   @ApiOperation({ summary: 'Get Accounts Payable Aging' })
   getPayablesAging(@CurrentOrg() orgId: string, @Query('asOfDate') asOfDate?: string) {
     return this.agingReportsService.getPayablesAging(orgId, asOfDate);
+  }
+
+  // Not cached: a reconciliation check must read the current subledger and ledger.
+  @Get('reconciliation/ap')
+  @Permissions('reports.view')
+  @ApiOperation({ summary: 'Reconcile the AP subledger with the AP control account (read-only)' })
+  getApReconciliation(@CurrentOrg() orgId: string, @Query('asOf') asOf?: string) {
+    return this.apReconciliationService.reconcileApControl(orgId, asOf);
   }
 
   @Get('customer-statement/:customerId')

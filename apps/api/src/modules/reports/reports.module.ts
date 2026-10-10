@@ -5,13 +5,19 @@ import { DocumentsModule } from '../documents/documents.module';
 import { AiModule } from '../ai/ai.module';
 import { ReportsController } from './controllers/reports.controller';
 import { AgingReportsService } from './services/aging-reports.service';
+import { ApReconciliationService } from './services/ap-reconciliation.service';
 import { DashboardService } from './services/dashboard.service';
 import { FinancialReportsService } from './services/financial-reports.service';
 
 @Module({
   imports: [PrismaModule, DocumentsModule, CacheModule, AiModule],
   controllers: [ReportsController],
-  providers: [FinancialReportsService, AgingReportsService, DashboardService],
+  providers: [
+    FinancialReportsService,
+    AgingReportsService,
+    ApReconciliationService,
+    DashboardService,
+  ],
   exports: [FinancialReportsService, AgingReportsService, DashboardService],
 })
 export class ReportsModule {}
