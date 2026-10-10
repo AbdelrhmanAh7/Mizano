@@ -1,1 +1,31 @@
-NODE_OPTIONS="--max-old-space-size=8192" node "$(git rev-parse --show-toplevel)/_lint_staged.js"
+#!/usr/bin/env sh
+# Mizano pre-commit: FAST (hard limit 60 s), staged files only (ESLint --fix + Prettier via
+# _lint_staged.js, the Windows-safe lint-staged replacement).
+#
+# Full CI (lint, type-check, unit tests, build, E2E) runs on the Mac mini via
+# the hub's `localci` job, which posts the GitHub commit statuses.
+# Escape hatch: HUSKY=0 git commit ...
+#
+# Linked-worktree safe and non-interactive: a worktree without node_modules
+# skips with a one-line note instead of failing or installing anything.
+# Hard wall-clock limit: re-run this hook under a perl watchdog that kills the
+# whole process group after the limit (macOS has no `timeout`); stdin is inherited.
+if [ -z "${MZ_HOOK_LIMITED:-}" ] && command -v perl >/dev/null 2>&1; then
+  MZ_HOOK_LIMITED=1 exec perl -e '
+    my ($t, $name) = (shift, shift); my $p = fork; die "fork: $!" unless defined $p;
+    if (!$p) { setpgrp(0, 0); exec @ARGV; exit 127 }
+    my $stop = sub { kill "TERM", -$p; sleep 2; kill "KILL", -$p };
+    $SIG{INT} = $SIG{TERM} = sub { $stop->(); exit 130 };
+    $SIG{ALRM} = sub { $stop->(); print STDERR "\n$name exceeded the ${t}s limit: stage less at once, or commit with HUSKY=0 - localci runs the full CI\n"; exit 124 };
+    alarm $t; waitpid($p, 0); exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
+  ' "${MZ_PRECOMMIT_LIMIT_SECONDS:-60}" pre-commit sh "$0" "$@"
+fi
+
+root=$(git rev-parse --show-toplevel)
+if [ ! -f "$root/node_modules/eslint/bin/eslint.js" ] || [ ! -f "$root/node_modules/prettier/bin/prettier.cjs" ]; then
+  echo "pre-commit: node_modules missing in this worktree; skipping staged lint (localci runs full CI)"
+  exit 0
+fi
+# _lint_staged.js reads and re-stages the index itself, so git's hook
+# environment (GIT_INDEX_FILE etc.) is deliberately kept.
+NODE_OPTIONS="--max-old-space-size=8192" node "$root/_lint_staged.js" </dev/null
