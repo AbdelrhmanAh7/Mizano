@@ -21,9 +21,11 @@ describe('VatReturnDraftService', () => {
       user: { findFirst: jest.fn() },
       invoice: { findMany: jest.fn() },
       bill: { findMany: jest.fn() },
+      account: { count: jest.fn() },
+      journalLine: { findMany: jest.fn(), aggregate: jest.fn() },
       vATReturn: { findMany: jest.fn() },
       auditLog: { create: jest.fn(), findMany: jest.fn() },
-    };
+    } as any;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [VatReturnDraftService, { provide: PrismaService, useValue: prisma }],
@@ -40,44 +42,30 @@ describe('VatReturnDraftService', () => {
       );
     });
 
-    it('computes VAT draft, flags foreign currency exception, and records audit event', async () => {
+    it('computes VAT draft from posted journal movements and records audit event', async () => {
       prisma.organization.findUnique.mockResolvedValue({ currency: 'EGP' });
       prisma.user.findFirst.mockResolvedValue({ id: 'user-1' });
+      prisma.account.count.mockResolvedValue(2); // Both payable and receivable accounts exist
 
-      prisma.invoice.findMany.mockResolvedValue([
-        {
-          id: 'inv-1',
-          invoiceNumber: 'INV-001',
-          taxAmount: new Decimal('140.0000'),
-          currencyCode: 'EGP',
-        },
-        {
-          id: 'inv-2',
-          invoiceNumber: 'INV-002',
-          taxAmount: new Decimal('20.0000'),
-          currencyCode: 'USD', // Foreign currency exception
-        },
-      ]);
+      // Mock VAT accounts resolution
+      prisma.journalLine.findMany.mockResolvedValue([]);
 
-      prisma.bill.findMany.mockResolvedValue([
-        {
-          id: 'bill-1',
-          billNumber: 'BILL-001',
-          taxAmount: new Decimal('50.0000'),
-          currencyCode: 'EGP',
-        },
-      ]);
+      // Mock VAT figures computation
+      prisma.journalLine.aggregate
+        .mockResolvedValueOnce({ _sum: { debit: new Decimal('100'), credit: new Decimal('200') } })
+        .mockResolvedValueOnce({ _sum: { debit: new Decimal('50'), credit: new Decimal('50') } })
+        .mockResolvedValueOnce({ _sum: { debit: new Decimal('0'), credit: new Decimal('0') } })
+        .mockResolvedValueOnce({ _sum: { debit: new Decimal('0'), credit: new Decimal('0') } });
 
       const draft = await service.getDraft('org-1', '2024-01-01', '2024-01-31', 'user-1');
 
-      expect(draft.status).toBe('incomplete');
-      expect(draft.outputTax).toBe('140.0000');
+      expect(draft.status).toBe('complete');
+      expect(draft.outputTax).toBe('100.0000');
       expect(draft.inputTax).toBe('50.0000');
-      expect(draft.netPayable).toBe('90.0000');
-      expect(draft.exceptions).toHaveLength(1);
-      expect(draft.exceptions[0].id).toBe('inv-2');
+      expect(draft.netPayable).toBe('50.0000');
+      expect(draft.exceptions).toHaveLength(0);
 
-      // Verified AuditLog event creation
+      // Verify AuditLog event creation
       expect(prisma.auditLog.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -85,8 +73,8 @@ describe('VatReturnDraftService', () => {
             userId: 'user-1',
             entityType: 'VAT_RETURN_DRAFT_EVENT',
             newValues: expect.objectContaining({
-              status: 'incomplete',
-              exceptionCount: 1,
+              status: 'complete',
+              exceptionCount: 0,
             }),
           }),
         }),
@@ -100,7 +88,7 @@ describe('VatReturnDraftService', () => {
 
       const res = await service.recordCorrection('org-1', 'user-1', {
         period: '2024-01',
-        reason: 'omitted_invoice',
+        reason: 'omitted_invoice_adjustment',
       });
 
       expect(res).toEqual({ success: true, period: '2024-01' });
@@ -112,11 +100,33 @@ describe('VatReturnDraftService', () => {
             entityType: 'VAT_RETURN_CORRECTION_EVENT',
             newValues: {
               period: '2024-01',
-              reason: 'omitted_invoice',
+              reason: 'omitted_invoice_adjustment',
             },
           }),
         }),
       );
+    });
+
+    it('is idempotent across retries using the same reason', async () => {
+      prisma.user.findFirst.mockResolvedValue({ id: 'user-1' });
+
+      // First call succeeds
+      const res1 = await service.recordCorrection('org-1', 'user-1', {
+        period: '2024-01',
+        reason: 'tax_rate_error',
+      });
+
+      expect(res1).toEqual({ success: true, period: '2024-01' });
+      expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+
+      // Second call with same reason is a retry; should succeed without duplicate row
+      const res2 = await service.recordCorrection('org-1', 'user-1', {
+        period: '2024-01',
+        reason: 'tax_rate_error',
+      });
+
+      expect(res2).toEqual({ success: true, period: '2024-01' });
+      expect(prisma.auditLog.create).toHaveBeenCalledTimes(1); // Still only 1 row
     });
   });
 

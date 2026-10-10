@@ -29,7 +29,7 @@ export class VatReturnDraftController {
   }
 
   @Post('vat-return-draft/corrections')
-  @Permissions('reports.view')
+  @Permissions('tax.manage')
   @ApiOperation({ summary: 'Record a VAT return filing correction or amendment for a period' })
   recordCorrection(
     @CurrentOrg() orgId: string,
