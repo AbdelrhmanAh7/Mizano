@@ -33,11 +33,8 @@ import { PermissionsGuard } from '../../../common/guards/permissions.guard';
 import { CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Permissions } from '../../../common/decorators/permissions.decorator';
-import {
-  DocumentIntakeResult,
-  DocumentIntakeService,
-  IntakeProgressEvent,
-} from '../services/document-intake.service';
+import { DocumentIntakeResult, IntakeProgressEvent } from '../services/document-intake.types';
+import { IntakeConfirmationService } from '../services/intake-confirmation.service';
 import { IntakeJobOwnerGuard } from '../intake/intake-job-owner.guard';
 import {
   IntakeJobsService,
@@ -70,7 +67,7 @@ export class DocumentIntakeController {
   private readonly logger = new Logger(DocumentIntakeController.name);
 
   constructor(
-    private intakeService: DocumentIntakeService,
+    private confirmationService: IntakeConfirmationService,
     private jobs: IntakeJobsService,
   ) {}
 
@@ -308,12 +305,12 @@ export class DocumentIntakeController {
   ): Promise<{ data: { type: 'bill' | 'invoice'; id: string; number: string } }> {
     const { jobId, ...input } = dto;
     if (!jobId) {
-      return { data: await this.intakeService.confirmAndCreate(orgId, input) };
+      return { data: await this.confirmationService.confirmAndCreate(orgId, input) };
     }
     // Replay-safe: only one confirm can move the job to APPROVED.
     const restore = await this.jobs.claimForApproval(jobId, orgId);
     try {
-      const result = await this.intakeService.confirmAndCreate(orgId, input);
+      const result = await this.confirmationService.confirmAndCreate(orgId, input);
       // The draft is committed: from here on the job is never reopened. If linking fails the
       // job stays APPROVED, so a second confirm is refused (409) instead of creating a duplicate.
       await this.jobs.linkDraft(jobId, orgId, { type: result.type, id: result.id }).catch(() => {

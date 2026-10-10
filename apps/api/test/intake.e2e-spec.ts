@@ -4,13 +4,16 @@
  * fixed extraction, or throws when `stub.mode === 'fail'`.
  */
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { IntakeJobStatus } from '@prisma/client';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
 import { registerTenant, TestTenant } from './helpers/tenant.helper';
 import { eventually } from './helpers/journey.helper';
 import { ApiHelper } from './helpers/api-client.helper';
 import { ExtractionStrategyResolver } from '../src/modules/ai/extraction/extraction-strategy-resolver.service';
+import { IntakeQueueService } from '../src/modules/ai/intake/intake-queue.service';
 import { IntakeStorage, sha256Hex } from '../src/modules/ai/intake/intake-storage';
+import { AiWorkerModule } from '../src/modules/ai/worker/ai-worker.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 process.env.INTAKE_RETRY_BASE_MS = '50';
@@ -64,8 +67,17 @@ function pdfFixture(marker: string): Buffer {
 }
 
 async function boot(): Promise<INestApplication> {
-  return createTestApp((builder) =>
-    builder.overrideProvider(ExtractionStrategyResolver).useValue(stubResolver),
+  // Without REDIS_URL the queue is in-process, so the API and the worker module must share one
+  // IntakeQueueService instance for an enqueue to reach the worker's handler.
+  const queue = new IntakeQueueService(new ConfigService());
+  return createTestApp(
+    (builder) =>
+      builder
+        .overrideProvider(ExtractionStrategyResolver)
+        .useValue(stubResolver)
+        .overrideProvider(IntakeQueueService)
+        .useValue(queue),
+    [AiWorkerModule],
   );
 }
 

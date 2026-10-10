@@ -4,7 +4,7 @@ import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { IntakeJob, IntakeJobStatus } from '@prisma/client';
 import { firstValueFrom, toArray } from 'rxjs';
 import { DocumentIntakeController } from './document-intake.controller';
-import { DocumentIntakeService } from '../services/document-intake.service';
+import { IntakeConfirmationService } from '../services/intake-confirmation.service';
 import { IntakeJobOwnerGuard } from '../intake/intake-job-owner.guard';
 import { IntakeJobsService } from '../intake/intake-jobs.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -89,7 +89,7 @@ describe('DocumentIntakeController', () => {
       toView: jest.fn((j: IntakeJob) => ({ id: j.id, status: j.status })),
     };
     controller = new DocumentIntakeController(
-      service as unknown as DocumentIntakeService,
+      service as unknown as IntakeConfirmationService,
       jobs as unknown as IntakeJobsService,
     );
   });
