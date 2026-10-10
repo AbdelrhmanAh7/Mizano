@@ -1,15 +1,27 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 import { AssetStatus, Prisma } from '@prisma/client';
 import { describeError } from '../../../common/utils/redact';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
+import { JournalsService } from '../../accounting/services/journals.service';
+import { money, sumDecimals } from '../../reports/utils/report-utils';
 
 @Injectable()
 export class DepreciationService {
   private readonly logger = new Logger(DepreciationService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private journalsService: JournalsService,
+  ) {}
 
   /**
    * Run monthly depreciation for all organizations
@@ -51,7 +63,7 @@ export class DepreciationService {
   async runMonthlyDepreciation(organizationId: string): Promise<{
     processed: number;
     journalsCreated: number;
-    totalDepreciation: number;
+    totalDepreciation: string;
   }> {
     const today = new Date();
     const currentMonth = today.getMonth() + 1;
@@ -64,41 +76,32 @@ export class DepreciationService {
         status: AssetStatus.ACTIVE,
         deletedAt: null,
       },
-      include: {
-        assetAccount: true,
-        depreciationAccount: true,
-        accumulatedDeprAccount: true,
-      },
+      select: { id: true },
     });
 
     let processed = 0;
     let journalsCreated = 0;
-    let totalDepreciation = 0;
+    let totalDepreciation = new Decimal(0);
 
     for (const asset of activeAssets) {
-      // Get the schedule entry for this month
-      const scheduleEntry = await this.prisma.depreciationSchedule.findUnique({
-        where: {
-          assetId_month_year: {
-            assetId: asset.id,
-            month: currentMonth,
-            year: currentYear,
-          },
-        },
-      });
-
-      if (!scheduleEntry || scheduleEntry.executedAt) {
-        continue; // Skip if no schedule or already executed
-      }
-
-      const depreciationAmount = scheduleEntry.amount;
-
-      if (depreciationAmount.lessThanOrEqualTo(0)) {
-        continue; // Skip if no depreciation
-      }
-
       try {
-        await this.prisma.$transaction(async (tx) => {
+        const amount = await this.prisma.$transaction(async (tx) => {
+          await lockOrganizationLedger(tx, organizationId);
+          const currentAsset = await tx.asset.findFirst({
+            where: { id: asset.id, organizationId, status: AssetStatus.ACTIVE, deletedAt: null },
+          });
+          if (!currentAsset) return null;
+          const scheduleEntry = await tx.depreciationSchedule.findFirst({
+            where: { assetId: asset.id, organizationId, month: currentMonth, year: currentYear },
+          });
+          if (
+            !scheduleEntry ||
+            scheduleEntry.executedAt ||
+            scheduleEntry.amount.lessThanOrEqualTo(0)
+          ) {
+            return null;
+          }
+          const depreciationAmount = scheduleEntry.amount;
           // Create depreciation journal entry
           const journalNumber = await this.generateJournalNumber(tx, organizationId);
 
@@ -106,23 +109,23 @@ export class DepreciationService {
             data: {
               journalNumber,
               date: today,
-              reference: `DEP-${asset.assetNumber}-${currentYear}-${String(currentMonth).padStart(2, '0')}`,
-              notes: `Monthly depreciation: ${asset.name}`,
+              reference: `DEP-${currentAsset.assetNumber}-${currentYear}-${String(currentMonth).padStart(2, '0')}`,
+              notes: `Monthly depreciation: ${currentAsset.name}`,
               isPosted: true,
               organizationId,
               lines: {
                 create: [
                   {
-                    accountId: asset.depreciationAccountId,
+                    accountId: currentAsset.depreciationAccountId,
                     debit: depreciationAmount,
                     credit: new Decimal(0),
-                    description: `Depreciation expense - ${asset.assetNumber}`,
+                    description: `Depreciation expense - ${currentAsset.assetNumber}`,
                   },
                   {
-                    accountId: asset.accumulatedDeprAccountId,
+                    accountId: currentAsset.accumulatedDeprAccountId,
                     debit: new Decimal(0),
                     credit: depreciationAmount,
-                    description: `Accumulated depreciation - ${asset.assetNumber}`,
+                    description: `Accumulated depreciation - ${currentAsset.assetNumber}`,
                   },
                 ],
               },
@@ -130,17 +133,19 @@ export class DepreciationService {
           });
 
           // Mark schedule entry as executed
-          await tx.depreciationSchedule.update({
-            where: { id: scheduleEntry.id },
+          const transition = await tx.depreciationSchedule.updateMany({
+            where: { id: scheduleEntry.id, organizationId, executedAt: null },
             data: {
               journalId: journal.id,
               executedAt: today,
             },
           });
 
+          if (transition.count !== 1) throw new ConflictException('Depreciation already executed');
+
           // Update asset accumulated depreciation and book value
           await tx.asset.update({
-            where: { id: asset.id },
+            where: { id: asset.id, organizationId },
             data: {
               accumulatedDepreciation: scheduleEntry.accumulatedTotal,
               currentBookValue: scheduleEntry.bookValue,
@@ -148,18 +153,20 @@ export class DepreciationService {
           });
 
           // Check if fully depreciated
-          if (scheduleEntry.bookValue.equals(asset.salvageValue)) {
+          if (scheduleEntry.bookValue.equals(currentAsset.salvageValue)) {
             await tx.asset.update({
-              where: { id: asset.id },
+              where: { id: asset.id, organizationId },
               data: { status: AssetStatus.FULLY_DEPRECIATED },
             });
           }
 
-          journalsCreated++;
+          return depreciationAmount;
         });
 
+        if (amount === null) continue;
+        journalsCreated++;
         processed++;
-        totalDepreciation += depreciationAmount.toNumber();
+        totalDepreciation = totalDepreciation.add(amount);
       } catch (error) {
         this.logger.error(
           `Failed to process depreciation for asset ${asset.id}: ${describeError(error, { includeMessage: false })}`,
@@ -167,7 +174,7 @@ export class DepreciationService {
       }
     }
 
-    return { processed, journalsCreated, totalDepreciation };
+    return { processed, journalsCreated, totalDepreciation: money(totalDepreciation) };
   }
 
   /**
@@ -178,47 +185,43 @@ export class DepreciationService {
     assetId: string,
     month?: number,
     year?: number,
-  ): Promise<{ journalId: string; amount: number }> {
+  ): Promise<{ journalId: string; amount: string }> {
     const today = new Date();
     const targetMonth = month || today.getMonth() + 1;
     const targetYear = year || today.getFullYear();
 
-    const asset = await this.prisma.asset.findFirst({
-      where: {
-        id: assetId,
-        organizationId,
-        status: AssetStatus.ACTIVE,
-        deletedAt: null,
-      },
-      include: {
-        depreciationAccount: true,
-        accumulatedDeprAccount: true,
-      },
-    });
+    const result = await this.prisma.$transaction(async (tx) => {
+      await lockOrganizationLedger(tx, organizationId);
+      const asset = await tx.asset.findFirst({
+        where: {
+          id: assetId,
+          organizationId,
+          status: AssetStatus.ACTIVE,
+          deletedAt: null,
+        },
+      });
 
-    if (!asset) {
-      throw new Error('Asset not found or not active');
-    }
+      if (!asset) {
+        throw new Error('Asset not found or not active');
+      }
 
-    const scheduleEntry = await this.prisma.depreciationSchedule.findUnique({
-      where: {
-        assetId_month_year: {
+      const scheduleEntry = await tx.depreciationSchedule.findFirst({
+        where: {
           assetId,
+          organizationId,
           month: targetMonth,
           year: targetYear,
         },
-      },
-    });
+      });
 
-    if (!scheduleEntry) {
-      throw new Error('No depreciation scheduled for this period');
-    }
+      if (!scheduleEntry) {
+        throw new Error('No depreciation scheduled for this period');
+      }
 
-    if (scheduleEntry.executedAt) {
-      throw new Error('Depreciation already executed for this period');
-    }
+      if (scheduleEntry.executedAt) {
+        throw new Error('Depreciation already executed for this period');
+      }
 
-    const result = await this.prisma.$transaction(async (tx) => {
       const journalNumber = await this.generateJournalNumber(tx, organizationId);
 
       const journal = await tx.journal.create({
@@ -248,16 +251,18 @@ export class DepreciationService {
         },
       });
 
-      await tx.depreciationSchedule.update({
-        where: { id: scheduleEntry.id },
+      const transition = await tx.depreciationSchedule.updateMany({
+        where: { id: scheduleEntry.id, organizationId, executedAt: null },
         data: {
           journalId: journal.id,
           executedAt: new Date(),
         },
       });
 
+      if (transition.count !== 1) throw new ConflictException('Depreciation already executed');
+
       await tx.asset.update({
-        where: { id: assetId },
+        where: { id: assetId, organizationId },
         data: {
           accumulatedDepreciation: scheduleEntry.accumulatedTotal,
           currentBookValue: scheduleEntry.bookValue,
@@ -266,14 +271,14 @@ export class DepreciationService {
 
       if (scheduleEntry.bookValue.equals(asset.salvageValue)) {
         await tx.asset.update({
-          where: { id: assetId },
+          where: { id: assetId, organizationId },
           data: { status: AssetStatus.FULLY_DEPRECIATED },
         });
       }
 
       return {
         journalId: journal.id,
-        amount: scheduleEntry.amount.toNumber(),
+        amount: money(scheduleEntry.amount),
       };
     });
 
@@ -322,7 +327,7 @@ export class DepreciationService {
 
       const activeSchedules = schedules.filter((s) => s.asset.status === AssetStatus.ACTIVE);
 
-      const totalDepreciation = activeSchedules.reduce((sum, s) => sum + s.amount.toNumber(), 0);
+      const totalDepreciation = sumDecimals(activeSchedules.map((s) => s.amount)).toNumber();
 
       results.push({
         month: currentMonth,
@@ -342,60 +347,89 @@ export class DepreciationService {
   }
 
   /**
-   * Reverse a depreciation entry
+   * Reverses the latest executed depreciation entry of an asset. Posted history is immutable: the
+   * original journal stays posted and a linked, dated reversal journal (the shared
+   * `JournalsService.reverse` command: `max(today, original date)`, period lock enforced) takes the
+   * expense back. Lock order: ledger -> asset, like depreciation and disposal.
+   *
+   * Only the latest executed entry can be reversed. The asset's accumulated depreciation and book
+   * value follow its latest executed entry, so reversing an earlier month while later ones stay
+   * executed would reverse the ledger but leave the asset untouched. A disposed asset is refused:
+   * its disposal journal already removed the accumulated depreciation.
    */
   async reverseDepreciation(organizationId: string, scheduleId: string): Promise<void> {
-    const schedule = await this.prisma.depreciationSchedule.findFirst({
-      where: { id: scheduleId, organizationId },
-      include: {
-        asset: true,
-        journal: true,
-      },
-    });
-
-    if (!schedule) {
-      throw new Error('Depreciation schedule not found');
-    }
-
-    if (!schedule.executedAt) {
-      throw new Error('Depreciation was not executed');
-    }
-
     await this.prisma.$transaction(async (tx) => {
-      // Mark schedule as not executed
-      await tx.depreciationSchedule.update({
-        where: { id: scheduleId },
-        data: {
-          journalId: null,
-          executedAt: null,
-        },
+      await lockOrganizationLedger(tx, organizationId);
+      // Everything below is read after the lock, so a concurrent run, reversal or disposal that
+      // held it first is already visible.
+      const schedule = await tx.depreciationSchedule.findFirst({
+        where: { id: scheduleId, organizationId },
+        include: { asset: true },
       });
 
-      // Void the journal entry by marking it as not posted
-      if (schedule.journalId) {
-        await tx.journal.update({
-          where: { id: schedule.journalId },
-          data: { isPosted: false },
-        });
+      if (!schedule) {
+        throw new NotFoundException('Depreciation schedule not found');
+      }
+      if (!schedule.executedAt) {
+        throw new BadRequestException('Depreciation was not executed');
+      }
+      if (!schedule.journalId) {
+        throw new BadRequestException(
+          'This depreciation entry has no linked ledger entry and cannot be reversed',
+        );
+      }
+      if (
+        schedule.asset.status === AssetStatus.DISPOSED ||
+        schedule.asset.status === AssetStatus.SOLD
+      ) {
+        throw new BadRequestException('Depreciation of a disposed asset cannot be reversed');
       }
 
-      // Recalculate asset accumulated depreciation
-      const executedSchedules = await tx.depreciationSchedule.findMany({
+      const later = await tx.depreciationSchedule.findFirst({
         where: {
           assetId: schedule.assetId,
+          organizationId,
           executedAt: { not: null },
+          OR: [
+            { year: { gt: schedule.year } },
+            { year: schedule.year, month: { gt: schedule.month } },
+          ],
         },
+        select: { id: true },
+      });
+      if (later) {
+        throw new BadRequestException(
+          'Only the latest executed depreciation entry can be reversed; reverse the later periods first',
+        );
+      }
+
+      // Guarded transition first: a lost guard aborts before anything is posted.
+      const transition = await tx.depreciationSchedule.updateMany({
+        where: {
+          id: scheduleId,
+          organizationId,
+          executedAt: { not: null },
+          journalId: schedule.journalId,
+        },
+        data: { journalId: null, executedAt: null },
+      });
+      if (transition.count !== 1) {
+        throw new ConflictException('Depreciation was changed concurrently');
+      }
+
+      await this.journalsService.reverse(organizationId, schedule.journalId, undefined, { tx });
+
+      // The previous executed entry (if any) is the asset's new latest one.
+      const previous = await tx.depreciationSchedule.findFirst({
+        where: { assetId: schedule.assetId, organizationId, executedAt: { not: null } },
         orderBy: [{ year: 'desc' }, { month: 'desc' }],
-        take: 1,
       });
 
-      const lastExecuted = executedSchedules[0];
-
       await tx.asset.update({
-        where: { id: schedule.assetId },
+        where: { id: schedule.assetId, organizationId },
         data: {
-          accumulatedDepreciation: lastExecuted?.accumulatedTotal || new Decimal(0),
-          currentBookValue: lastExecuted?.bookValue || schedule.asset.purchasePrice,
+          accumulatedDepreciation: previous?.accumulatedTotal ?? new Decimal(0),
+          currentBookValue: previous?.bookValue ?? schedule.asset.purchasePrice,
           status: AssetStatus.ACTIVE,
         },
       });

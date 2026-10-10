@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AccountType, Prisma } from '@prisma/client';
 import { lockOrganizationLedger } from '../../common/utils/ledger-lock';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -137,7 +137,7 @@ export class OrganizationsService {
           organizationId: id,
           isActive: true,
         },
-        select: { id: true },
+        select: { id: true, type: true },
       });
 
       const foundIds = accounts.map((a) => a.id);
@@ -145,6 +145,17 @@ export class OrganizationsService {
 
       if (invalidIds.length > 0) {
         throw new BadRequestException(`Invalid or inactive account IDs: ${invalidIds.join(', ')}`);
+      }
+
+      const typeById = new Map(accounts.map((a) => [a.id, a.type]));
+      const typed: Array<[string | undefined, AccountType, string]> = [
+        [updateAccountSettingsDto.defaultArAccountId, AccountType.ASSET, 'defaultArAccountId'],
+        [updateAccountSettingsDto.defaultApAccountId, AccountType.LIABILITY, 'defaultApAccountId'],
+      ];
+      for (const [accountId, type, field] of typed) {
+        if (accountId && typeById.get(accountId) !== type) {
+          throw new BadRequestException(`${field} must reference an account of type ${type}`);
+        }
       }
     }
 

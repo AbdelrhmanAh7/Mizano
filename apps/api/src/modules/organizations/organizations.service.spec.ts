@@ -71,6 +71,7 @@ const mockPrisma = {
   },
   account: {
     findMany: jest.fn(),
+    findFirst: jest.fn(),
   },
   journal: {
     count: jest.fn(),
@@ -386,7 +387,7 @@ describe('OrganizationsService', () => {
 
   describe('updateAccountSettings', () => {
     it('updates default account mappings', async () => {
-      mockPrisma.account.findMany.mockResolvedValue([{ id: 'acc-1' }]);
+      mockPrisma.account.findMany.mockResolvedValue([{ id: 'acc-1', type: 'ASSET' }]);
       mockPrisma.organization.update.mockResolvedValue({ id: ORG_ID, defaultArAccountId: 'acc-1' });
 
       await service.updateAccountSettings(ORG_ID, { defaultArAccountId: 'acc-1' });
@@ -403,6 +404,32 @@ describe('OrganizationsService', () => {
           data: expect.objectContaining({ defaultArAccountId: 'acc-1' }),
         }),
       );
+    });
+
+    it('rejects an AR default that is not an asset and an AP default that is not a liability', async () => {
+      mockPrisma.account.findMany.mockResolvedValue([{ id: 'acc-1', type: 'EXPENSE' }]);
+
+      await expect(
+        service.updateAccountSettings(ORG_ID, { defaultArAccountId: 'acc-1' }),
+      ).rejects.toThrow('defaultArAccountId must reference an account of type ASSET');
+      await expect(
+        service.updateAccountSettings(ORG_ID, { defaultApAccountId: 'acc-1' }),
+      ).rejects.toThrow('defaultApAccountId must reference an account of type LIABILITY');
+      expect(mockPrisma.organization.update).not.toHaveBeenCalled();
+    });
+
+    it('accepts correctly typed AR and AP defaults', async () => {
+      mockPrisma.account.findMany.mockResolvedValue([
+        { id: 'a', type: 'ASSET' },
+        { id: 'b', type: 'LIABILITY' },
+      ]);
+      mockPrisma.organization.update.mockResolvedValue({ id: ORG_ID });
+
+      await service.updateAccountSettings(ORG_ID, {
+        defaultArAccountId: 'a',
+        defaultApAccountId: 'b',
+      });
+      expect(mockPrisma.organization.update).toHaveBeenCalled();
     });
 
     it('throws BadRequestException for invalid account IDs', async () => {

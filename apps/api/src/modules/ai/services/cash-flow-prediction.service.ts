@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { bankBookBalances, totalBankBookBalance } from '../../reports/utils/report-utils';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PaymentPredictionService } from './payment-prediction.service';
 import {
@@ -491,17 +492,8 @@ export class CashFlowPredictionService {
    * Get current cash balance from bank accounts
    */
   private async getCurrentCashBalance(organizationId: string): Promise<number> {
-    const bankAccounts = await this.prisma.bankAccount.findMany({
-      where: {
-        organizationId,
-        isActive: true,
-      },
-      select: {
-        systemBalance: true,
-      },
-    });
-
-    return bankAccounts.reduce((sum, acc) => sum + Number(acc.systemBalance), 0);
+    const books = await bankBookBalances(this.prisma, organizationId);
+    return totalBankBookBalance(books).toNumber();
   }
 
   /**

@@ -81,6 +81,139 @@ describe('DashboardService', () => {
   }
 
   describe('getDashboardOverview', () => {
+    it('historical AR/AP and cash use one cutoff despite later payments, credits and voids', async () => {
+      arrangeOverview({ receivables: '1', payables: '2' });
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultArAccountId: 'ar-new',
+        defaultApAccountId: 'ap-new',
+        defaultCashAccountId: 'cash',
+      } as never);
+      prisma.account.findMany.mockImplementation((async (args: {
+        where?: { type?: unknown; OR?: unknown; id?: unknown; subType?: unknown };
+      }) => {
+        if (args.where?.OR)
+          return args.where.type === AccountType.ASSET
+            ? [{ id: 'ar-old' }, { id: 'ar-new' }]
+            : [{ id: 'ap-old' }, { id: 'ap-new' }];
+        if (args.where?.subType) return [];
+        if (args.where?.id) return [{ id: 'cash' }];
+        return ACCOUNTS;
+      }) as never);
+      const events = [
+        // Source documents retain their January ledger entries even after a February void.
+        { id: 'ar-old', date: '2026-01-05', debit: '100.1', credit: '0' },
+        { id: 'ar-new', date: '2026-01-10', debit: '50.2', credit: '0' },
+        { id: 'ap-old', date: '2026-01-05', debit: '0', credit: '90.4' },
+        { id: 'ap-new', date: '2026-01-10', debit: '0', credit: '40.1' },
+        // Payments and credits on the end date count, including the last millisecond.
+        { id: 'ar-old', date: '2026-01-31T23:59:59.999Z', debit: '0', credit: '20.05' },
+        { id: 'ar-new', date: '2026-01-31', debit: '0', credit: '0.15' },
+        { id: 'ap-old', date: '2026-01-31', debit: '10.05', credit: '0' },
+        { id: 'ap-new', date: '2026-01-31', debit: '0.25', credit: '0' },
+        { id: 'cash', date: '2026-01-31', debit: '25.3', credit: '0' },
+        // Later payments/reversals must not rewrite the January snapshot.
+        { id: 'ar-old', date: '2026-02-01', debit: '0', credit: '80.05' },
+        { id: 'ar-new', date: '2026-02-01', debit: '0', credit: '50.05' },
+        { id: 'ap-old', date: '2026-02-01', debit: '80.35', credit: '0' },
+        { id: 'ap-new', date: '2026-02-01', debit: '39.85', credit: '0' },
+      ];
+      prisma.journalLine.groupBy.mockImplementation((async (args: {
+        where: { accountId: { in: string[] }; journal: { date: { lte: Date; gte?: Date } } };
+      }) => {
+        const {
+          accountId,
+          journal: { date },
+        } = args.where;
+        return accountId.in.map((id) => {
+          const included = events.filter(
+            (event) =>
+              event.id === id &&
+              new Date(event.date) <= date.lte &&
+              (!date.gte || new Date(event.date) >= date.gte),
+          );
+          return {
+            accountId: id,
+            _sum: {
+              debit: included.reduce((sum, event) => sum.add(event.debit), D(0)),
+              credit: included.reduce((sum, event) => sum.add(event.credit), D(0)),
+            },
+          };
+        });
+      }) as never);
+
+      const { overview } = await service.getDashboardOverview(ORG_ID, '2026-01-01', '2026-01-31');
+      expect(overview).toMatchObject({
+        totalReceivables: '130.1000',
+        totalPayables: '120.2000',
+        netPosition: '9.9000',
+        cashBalance: '25.3000',
+      });
+      expect(prisma.invoice.aggregate).not.toHaveBeenCalled();
+      expect(prisma.bill.aggregate).not.toHaveBeenCalled();
+      expect(prisma.creditNote.aggregate).not.toHaveBeenCalled();
+      expect(prisma.vendorCredit.aggregate).not.toHaveBeenCalled();
+      const controlQueries = prisma.account.findMany.mock.calls.filter(([args]) => args?.where?.OR);
+      expect(controlQueries).toHaveLength(2);
+      for (const [args] of controlQueries) {
+        expect(args?.where?.organizationId).toBe(ORG_ID);
+        expect(args?.where?.OR).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              journalLines: {
+                some: expect.objectContaining({
+                  journal: {
+                    organizationId: ORG_ID,
+                    isPosted: true,
+                    deletedAt: null,
+                    date: { lte: new Date('2026-01-31T23:59:59.999Z') },
+                    sourceType:
+                      args?.where?.type === AccountType.ASSET ? 'INVOICE_SEND' : 'BILL_APPROVAL',
+                  },
+                }),
+              },
+            }),
+          ]),
+        );
+      }
+      for (const [args] of prisma.journalLine.groupBy.mock.calls) {
+        const where = args.where as {
+          accountId: { in: string[] };
+          journal: { organizationId: string; date: { lte: Date } };
+        };
+        if (
+          where.accountId.in.some((id) =>
+            ['ar-old', 'ar-new', 'ap-old', 'ap-new', 'cash'].includes(id),
+          )
+        ) {
+          expect(where.journal.organizationId).toBe(ORG_ID);
+          expect(where.journal.date.lte.toISOString()).toBe('2026-01-31T23:59:59.999Z');
+        }
+      }
+    });
+
+    it('honors an explicit historical timestamp for all balance components', async () => {
+      arrangeOverview({});
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultArAccountId: 'ar',
+        defaultApAccountId: 'ap',
+      } as never);
+      prisma.account.findMany.mockResolvedValue([
+        { id: 'ar' },
+        { id: 'ap' },
+        { id: 'cash' },
+      ] as never);
+      await service.getDashboardOverview(ORG_ID, '2026-01-01', '2026-01-31T12:34:56.789Z');
+      const queries = prisma.journalLine.groupBy.mock.calls.filter(([args]) => {
+        const date = (args.where as { journal: { date: { gte?: Date } } }).journal.date;
+        return !date.gte;
+      });
+      expect(queries).toHaveLength(3);
+      for (const [args] of queries)
+        expect(args.where).toMatchObject({
+          journal: { organizationId: ORG_ID, date: { lte: new Date('2026-01-31T12:34:56.789Z') } },
+        });
+    });
+
     it('derives revenue and expenses from posted ledger lines, as 4-dp strings', async () => {
       arrangeOverview({
         sums: [
@@ -148,6 +281,19 @@ describe('DashboardService', () => {
 
       expect(overview.totalPayables).toBe('8000.0000');
       expect(overview.netPosition).toBe('7000.2000');
+    });
+
+    it('computes cash as of the requested end date, not a separate server cutoff', async () => {
+      arrangeOverview({});
+      ledger([{ accountId: 'cash', debit: '10', credit: '0' }]);
+
+      await service.getDashboardOverview(ORG_ID, '2026-01-01', '2026-01-31');
+
+      const cashQuery = prisma.journalLine.groupBy.mock.calls.find(([args]) =>
+        (args.where as { accountId?: { in: string[] } }).accountId?.in?.includes('cash'),
+      );
+      const date = (cashQuery?.[0].where as { journal: { date: { lte: Date } } }).journal.date;
+      expect(date.lte.toISOString()).toBe('2026-01-31T23:59:59.999Z');
     });
 
     it('reports cash from the ledger accounts, not stored bank balances', async () => {

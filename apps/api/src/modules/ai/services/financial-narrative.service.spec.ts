@@ -10,6 +10,25 @@ import {
   TEST_ORG_ID,
   mockDecimal,
 } from '../__tests__/fixtures/ai-test-helpers';
+import { bankBookBalances } from '../../reports/utils/report-utils';
+
+// Book balances come from the linked ledger; these specs feed them from the mocked bank rows.
+jest.mock('../../reports/utils/report-utils', () => ({
+  ...jest.requireActual('../../reports/utils/report-utils'),
+  bankBookBalances: jest.fn(),
+}));
+const feedBookBalances = (prismaMock: { bankAccount: { findMany: jest.Mock } }): void => {
+  (bankBookBalances as jest.Mock).mockImplementation(async () =>
+    (
+      (await prismaMock.bankAccount.findMany()) as Array<{ name?: string; systemBalance: unknown }>
+    ).map((a, i) => ({
+      id: `bank-${i}`,
+      name: a.name ?? 'Account',
+      linkedAccountId: `acc-${i}`,
+      balance: a.systemBalance,
+    })),
+  );
+};
 
 // Mock the query-templates module with stable template objects.
 // The key fix: getQueryTemplate returns the SAME object reference each call
@@ -112,6 +131,7 @@ describe('FinancialNarrativeService', () => {
 
   beforeEach(async () => {
     prisma = createMockPrisma();
+    feedBookBalances(prisma);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

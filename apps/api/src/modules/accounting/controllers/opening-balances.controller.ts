@@ -20,7 +20,7 @@ export class OpeningBalancesController {
   constructor(private readonly openingBalancesService: OpeningBalancesService) {}
 
   @Post()
-  @Permissions('settings.edit', 'accounting.create')
+  @Permissions('accounting.create')
   @InvalidatesLedger('organization:*')
   @ApiOperation({
     summary: 'Post opening balances as one balanced journal and complete the onboarding step',

@@ -1,7 +1,13 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, PayrollStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { lockOrganizationLedger } from '../../../common/utils/ledger-lock';
 
 @Injectable()
 export class PayrollService {
@@ -151,19 +157,20 @@ export class PayrollService {
   }
 
   async markAsPaid(organizationId: string, payrollRunId: string) {
-    const payrollRun = await this.prisma.payrollRun.findFirst({
-      where: { id: payrollRunId, organizationId },
-    });
-    if (!payrollRun) throw new NotFoundException('Payroll run not found');
-    if (payrollRun.status !== PayrollStatus.PROCESSED) {
-      throw new BadRequestException('Payroll must be processed before marking as paid');
-    }
-
-    const totalGross = payrollRun.totalGross;
-    const totalNet = payrollRun.totalNet;
-    const totalDeductions = payrollRun.totalDeductions;
-
     return this.prisma.$transaction(async (tx) => {
+      await lockOrganizationLedger(tx, organizationId);
+      const payrollRun = await tx.payrollRun.findFirst({
+        where: { id: payrollRunId, organizationId, deletedAt: null },
+      });
+      if (!payrollRun) throw new NotFoundException('Payroll run not found');
+      if (payrollRun.status !== PayrollStatus.PROCESSED) {
+        throw new BadRequestException('Payroll must be processed before marking as paid');
+      }
+
+      const totalGross = payrollRun.totalGross;
+      const totalNet = payrollRun.totalNet;
+      const totalDeductions = payrollRun.totalDeductions;
+
       // Find salary expense account (EXPENSE type, name containing "Salary" or "Wages")
       const salaryAccount = await tx.account.findFirst({
         where: {
@@ -262,13 +269,27 @@ export class PayrollService {
           notes: `Payroll for ${payrollRun.month}/${payrollRun.year}`,
           isPosted: true,
           organizationId,
+          sourceType: 'PAYROLL_PAYMENT',
+          sourceId: payrollRunId,
           lines: { create: journalLines },
         },
       });
 
+      // Guard the transition as well as the snapshot; a failed guard rolls the journal back.
+      const transition = await tx.payrollRun.updateMany({
+        where: {
+          id: payrollRunId,
+          organizationId,
+          deletedAt: null,
+          status: PayrollStatus.PROCESSED,
+        },
+        data: { status: PayrollStatus.PAID },
+      });
+      if (transition.count !== 1) throw new ConflictException('Payroll status changed');
+
       // Update payroll run
       return tx.payrollRun.update({
-        where: { id: payrollRunId },
+        where: { id: payrollRunId, organizationId, status: PayrollStatus.PAID },
         data: {
           status: PayrollStatus.PAID,
           paidAt: new Date(),

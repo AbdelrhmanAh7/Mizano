@@ -149,7 +149,7 @@ export class AssetsController {
     @Param('id') assetId: string,
     @Query('month') month?: number,
     @Query('year') year?: number,
-  ): Promise<{ journalId: string; amount: number }> {
+  ): Promise<{ journalId: string; amount: string }> {
     return this.depreciationService.runDepreciationForAsset(organizationId, assetId, month, year);
   }
 

@@ -13,11 +13,13 @@ export interface LedgerBalance {
 
 /**
  * Ground truth read straight from the database: debit minus credit per account over posted,
- * non-deleted journals of the organization. Never reads `Account.openingBalance`.
+ * non-deleted journals of the organization dated up to `until` (all of them when omitted).
+ * Never reads `Account.openingBalance`.
  */
 export async function ledgerNetByAccount(
   prisma: PrismaService,
   organizationId: string,
+  until?: Date,
 ): Promise<Map<string, LedgerBalance>> {
   const accounts = await prisma.account.findMany({
     where: { organizationId },
@@ -25,7 +27,14 @@ export async function ledgerNetByAccount(
   });
   const groups = await prisma.journalLine.groupBy({
     by: ['accountId'],
-    where: { journal: { organizationId, isPosted: true, deletedAt: null } },
+    where: {
+      journal: {
+        organizationId,
+        isPosted: true,
+        deletedAt: null,
+        ...(until ? { date: { lte: until } } : {}),
+      },
+    },
     _sum: { debit: true, credit: true },
   });
   const sums = new Map(groups.map((g) => [g.accountId, g._sum]));

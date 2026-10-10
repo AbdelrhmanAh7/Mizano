@@ -8,10 +8,12 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 
 - **Lock the ledger before reading what you post with.** Take `lockOrganizationLedger(tx, orgId)` (`common/utils/ledger-lock.ts`) before reading org settings, the base currency or default accounts that the journal depends on. Every path that makes a journal posted must hold it: `create`, `reverse` and `post`. _(bill approve, invoice send, VAT submit, journal post)_
 - **Lock the document row before snapshotting the values you post.** If you post from a plain read, an edit that commits concurrently makes the ledger disagree with the document. Use `SELECT … FOR UPDATE` on the document first. _(invoice send/update)_
-- **Pick one lock order per workflow and use it on every path that touches the same rows.** The default is document → other documents (sorted by id) → ledger. VAT returns are a deliberate exception: submit and payment both take ledger → return row, because submission must freeze the ledger before recomputing. What deadlocks is two paths taking the same locks in opposite orders. _(VAT submit vs. payment)_
+- **Pick one lock order per workflow and use it on every path that touches the same rows.** The default is document → other documents (sorted by id) → ledger. Deliberate exceptions take ledger → row on every path that touches that row: VAT returns (submit and payment freeze the ledger before recomputing) and posting commands that claim their document under the ledger lock (work-order completion, asset disposal/depreciation). Such a document must never also be locked document → ledger anywhere. What deadlocks is two paths taking the same locks in opposite orders. _(VAT submit vs. payment)_
 - **Scope every row lock by organization:** `WHERE id = $1 AND "organizationId" = $2 FOR UPDATE`. A caller-supplied foreign id must lock nothing. _(lockInvoices, lockBills)_
 - **A check and the write it guards share one transaction and one lock.** Duplicate and overlap checks run inside the same tx as the insert, under an advisory lock. _(VAT period overlap)_
+- **Reload mutable posting state after waiting for the ledger lock.** Payroll status, depreciation execution markers and asset book values read before the lock can be stale. Asset disposal and depreciation use ledger → asset consistently; skipped scheduled entries do not count as processed. _(PR #66)_
 - **Lock every record you read to decide a mutation.** For example, voiding a credit note must lock the note before reading `appliedToInvoiceId`, or a concurrent apply slips through. _(credit-note void vs. apply)_
+- **A posting command is one transaction from claim to commit.** Take the ledger lock, claim the document with a guarded transition (`updateMany({ where: { id, organizationId, status: FROM } })` plus a count check), then write stock movements, the journal and the closing fields with that same `tx`. A status read outside the transaction, or side writes through the outer client, let a retry or a concurrent call post twice, or leave a journal behind a document that is still open. Guard every other path that can overwrite the closed state (cancel) the same way. _(work-order completion, PR #66)_
 
 ## 2. Idempotency and retries
 
@@ -34,6 +36,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **"Current" figures exclude future-dated entries.** Cash today means lines dated ≤ end of today.
 - **Side records carry the document date.** Inventory movements are dated on the adjustment date, not on `createdAt` = now.
 - **Historical reports keep later-voided documents in their original period** and show the reversal on the void date. Filtering on today's status rewrites history. _(customer statement)_
+- **An as-of report rebuilds balances from dated events.** Today's stored `balanceDue` is not a historical balance: subtract only payments and credits dated on or before the cutoff, and count a void only if its reversal journal is dated on or before the cutoff. _(receivables aging)_
+- **Date every void through its reversal journal.** `deletedAt` is only the fallback for legacy voids that have no journal. Payment voids on statements and the vendor credits netted in payables aging go through `voidJournalDates`, receivables aging reads the same journals, and no report decides a void's date on `deletedAt` alone. _(payables aging, PR #66)_
 
 ## 5. Single-currency ledger and data
 
@@ -67,6 +71,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 ## 8. Voided and deleted records
 
 - **Posted documents that were voided stay readable** (read-only, with `deletedAt` set) on their detail endpoint so journal source links resolve. Lists exclude them. Deleted drafts, which never posted, return 404.
+- **Correct posted history with a linked reversal, never by setting `isPosted: false`.** Call `JournalsService.reverse` (dated `max(today, original date)`, period lock enforced, linked by `reversalOfId`). A schedule-driven entry follows its latest executed row (asset book value), so reverse only the latest one and refuse once the asset is disposed. _(depreciation reversal, PR #66)_
 - **Current figures (open balances, aging, dashboards) exclude DRAFT, VOID and deleted documents.** Historical statements and period reports keep a posted document that was voided later in its original period, with the reversal on the void date (see 4).
 
 ## 9. Reports must reconcile
@@ -75,6 +80,7 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Ledger figures come only from posted, non-deleted journal lines.** Never add `Account.openingBalance`; opening balances are journals.
 - **Scope every component of a report to the same period** (bills and credits alike).
 - **Use grouped aggregates, not one query per account.**
+- **Multiple bank registers may link to one ledger account.** Preserve the register detail rows, but sum each linked account once in Decimal for headline cash. _(PR #66)_
 
 ## 10. Logging, audit and secrets
 

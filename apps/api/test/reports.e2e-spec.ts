@@ -10,8 +10,8 @@ import { INestApplication } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ApiHelper } from './helpers/api-client.helper';
 import { createTestApp, getPrisma, uniqueSuffix } from './helpers/app.helper';
-import { registerTenant, TestTenant } from './helpers/tenant.helper';
-import { isoDay } from './helpers/journey.helper';
+import { registerTenant, TEST_PASSWORD, TestTenant } from './helpers/tenant.helper';
+import { eventually, isoDay } from './helpers/journey.helper';
 import { createAccount } from './helpers/postings.helper';
 import { cashAccountIds, ledgerNetByAccount, natural } from './helpers/reports.helper';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -35,6 +35,8 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
   let vendorId = '';
   let inv1 = '';
   let inv2 = '';
+  let invVoided = '';
+  let savingsRegister = '';
   let billId = '';
   let billDraftId = '';
 
@@ -148,6 +150,16 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       const savingsBalance = await a.get(`/accounts/${savings}/balance`);
       expect(savingsBalance.body.balance).toBe('250.2500');
 
+      // The bank register's book balance is the linked ledger account (the stored
+      // systemBalance stays 0): the opening posted through Opening Balances shows up on it.
+      savingsRegister = bankAccount.body.id;
+      const register = await a.get(`/bank-accounts/${savingsRegister}`);
+      expect(register.status).toBe(200);
+      expect(D(register.body.systemBalance).equals('250.25')).toBe(true);
+      const stats = await a.get('/bank-accounts/stats');
+      expect(stats.status).toBe(200);
+      expect(D(stats.body.totalSystemBalance).equals('250.25')).toBe(true);
+
       const c1 = await a.post('/customers').send({ name: 'Nile Trading', currency: 'EGP' });
       const c2 = await a.post('/customers').send({ name: 'Delta Retail', currency: 'EGP' });
       const c3 = await a.post('/customers').send({ name: 'Tiny Amounts', currency: 'EGP' });
@@ -202,6 +214,7 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       );
       await sendInvoice(toVoid.id);
       expect((await a.patch(`/invoices/${toVoid.id}/void`)).status).toBe(200);
+      invVoided = toVoid.id;
 
       // A draft that was deleted (soft-deleted) is excluded as well.
       const deleted = await createInvoice(
@@ -430,6 +443,41 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       expect(aging.buckets.days31_60).toHaveLength(1);
     });
 
+    it('receivables aging as of a past date keeps the later-voided invoice and equals AR as of then', async () => {
+      // Yesterday: the invoice voided today and the payment voided today were both still live
+      // (their reversal journals are dated today), so the historical snapshot keeps them.
+      const asOf = isoDay(-1);
+      const aging = (await a.get('/reports/receivables-aging').query({ asOfDate: asOf })).body;
+      const net = await ledgerNetByAccount(
+        prisma,
+        tenantA.organizationId,
+        new Date(`${asOf}T23:59:59.999Z`),
+      );
+      const arAsOf = net.get(acc.ar) as { type: string; net: Prisma.Decimal };
+      const control = natural(arAsOf.type, arAsOf.net);
+      // 1140 + 1500.30 + 0.30 + 333 (voided later) - 100 - 50 (voided later) - 57 - 20.
+      expect(control.equals('2746.6')).toBe(true);
+      expect(D(aging.summary.netTotal).equals(control)).toBe(true);
+      expect(D(aging.summary.unappliedCredits).equals('20')).toBe(true);
+
+      const items = Object.values(aging.buckets as Record<string, unknown[]>).flat() as Array<{
+        invoiceId: string;
+        balanceDue: string;
+      }>;
+      expect(items).toHaveLength(5);
+      expect(items.find((i) => i.invoiceId === invVoided)?.balanceDue).toBe('333.0000');
+      // Invoice 2's balance as of yesterday still carries the payment that was voided today.
+      expect(items.find((i) => i.invoiceId === inv2)?.balanceDue).toBe('1450.3000');
+      expect(items.find((i) => i.invoiceId === inv1)?.balanceDue).toBe('983.0000');
+      expect(aging.invoiceCount).toBe(5);
+
+      // Before any invoice existed nothing is open, whatever today's balances say.
+      const empty = (await a.get('/reports/receivables-aging').query({ asOfDate: isoDay(-100) }))
+        .body;
+      expect(empty.invoiceCount).toBe(0);
+      expect(empty.summary.netTotal).toBe('0.0000');
+    });
+
     it('dashboard AP equals the AP control account and the payables aging net total', async () => {
       const dash = (await a.get('/reports/dashboard')).body;
       const aging = (await a.get('/reports/payables-aging')).body;
@@ -443,6 +491,49 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       expect(
         D(dash.overview.netPosition).equals(D(dash.overview.totalReceivables).sub(control)),
       ).toBe(true);
+    });
+
+    it('payables aging as of a past date keeps a vendor credit voided later and equals AP as of then', async () => {
+      // Dated three days ago and voided today: the void is dated on its reversal journal (today),
+      // so yesterday the credit still debited AP and is still netted. Today it nets to nothing.
+      const credit = await a.post('/vendor-credits').send({
+        vendorId,
+        billId,
+        date: isoDay(-3),
+        reason: 'Overbilled',
+        amount: '10',
+      });
+      expect(credit.status).toBe(201);
+      expect((await a.delete(`/vendor-credits/${credit.body.id}`)).status).toBe(200);
+      const reversal = await prisma.journal.findFirstOrThrow({
+        where: {
+          organizationId: tenantA.organizationId,
+          sourceType: 'VENDOR_CREDIT_VOID',
+          sourceId: credit.body.id,
+        },
+      });
+      expect(reversal.date.toISOString().slice(0, 10)).toBe(today);
+
+      const asOf = isoDay(-1);
+      const aging = (await a.get('/reports/payables-aging').query({ asOfDate: asOf })).body;
+      const net = await ledgerNetByAccount(
+        prisma,
+        tenantA.organizationId,
+        new Date(`${asOf}T23:59:59.999Z`),
+      );
+      const apAsOf = net.get(acc.ap) as { type: string; net: Prisma.Decimal };
+      const control = natural(apAsOf.type, apAsOf.net);
+      // Bills 912 + 456, less the 100 payment (dated yesterday), the 50 credit and this 10 one.
+      expect(control.equals('1208')).toBe(true);
+      expect(D(aging.summary.netTotal).equals(control)).toBe(true);
+      expect(D(aging.summary.unappliedCredits).equals('60')).toBe(true);
+
+      const current = await eventually(async () => {
+        const body = (await a.get('/reports/payables-aging')).body;
+        expect(D(body.summary.unappliedCredits).equals('50')).toBe(true);
+        return body;
+      });
+      expect(D(current.summary.netTotal).equals('1218')).toBe(true);
     });
 
     it('customer statements are exact, show credit notes and net voided payments', async () => {
@@ -514,6 +605,19 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
 
       const cash = await a.get(`/accounts/${acc.cash}/balance`);
       expect(D(cash.body.balance).equals(truth.get(acc.cash) as Prisma.Decimal)).toBe(true);
+
+      // Bank registers report the linked ledger balance, never the stored systemBalance.
+      const registers = (await a.get('/bank-accounts')).body.data as Array<{
+        id: string;
+        linkedAccountId: string;
+        systemBalance: string;
+      }>;
+      expect(registers.map((r) => r.id)).toContain(savingsRegister);
+      for (const r of registers) {
+        expect(D(r.systemBalance).equals(truth.get(r.linkedAccountId) as Prisma.Decimal)).toBe(
+          true,
+        );
+      }
 
       const dash = (await a.get('/reports/dashboard/account-balances')).body as Array<{
         type: string;
@@ -607,6 +711,59 @@ describe('Reports and dashboard reconcile with the ledger (e2e)', () => {
       ]) {
         expect((await anon.get(path)).status).toBe(401);
       }
+    });
+  });
+
+  // Runs after the isolation checks: it is the first posting in tenant B.
+  describe('tenant B: default Accountant role', () => {
+    it('posts opening balances without settings access and the bank book balance follows the ledger', async () => {
+      expect((await b.post('/accounts/seed-defaults')).status).toBe(201);
+      await createAccount(b, '3900', 'Opening Balance Equity', 'EQUITY');
+      const bankLedger = await createAccount(b, '1050', 'Main Bank', 'ASSET');
+      const register = await b
+        .post('/bank-accounts')
+        .send({ name: 'Main', type: 'BANK', linkedAccountId: bankLedger });
+      expect(register.status).toBe(201);
+
+      // The default Accountant role (seeded, not Admin) through the real user and login routes.
+      expect((await b.post('/roles/seed-defaults')).status).toBe(201);
+      const roles = (await b.get('/roles').query({ limit: 50 })).body.data as Array<{
+        id: string;
+        name: string;
+      }>;
+      const accountantRole = roles.find((r) => r.name === 'Accountant');
+      expect(accountantRole).toBeDefined();
+      const email = `e2e-accountant-${uniqueSuffix()}@mizano.test`;
+      const created = await b.post('/users').send({
+        email,
+        password: TEST_PASSWORD,
+        name: 'E2E Accountant',
+        roleId: accountantRole?.id,
+      });
+      expect(created.status).toBe(201);
+      const login = await anon.post('/auth/login').send({ email, password: TEST_PASSWORD });
+      expect(login.status).toBe(200);
+      const accountant = anon.withToken(login.body.tokens.accessToken as string);
+
+      // No settings permission: organization settings stay closed to this role...
+      expect((await accountant.get('/organization')).status).toBe(403);
+      // ...but posting opening balances needs only accounting.create.
+      const opening = await accountant.post('/organization/onboarding/opening-balances').send({
+        openingDate: isoDay(-30),
+        balances: [{ accountId: bankLedger, amount: '1200.75' }],
+      });
+      expect(opening.status).toBe(201);
+
+      const ledger = await accountant.get(`/accounts/${bankLedger}/balance`);
+      expect(ledger.status).toBe(200);
+      expect(ledger.body.balance).toBe('1200.7500');
+      const book = await accountant.get(`/bank-accounts/${register.body.id}`);
+      expect(book.status).toBe(200);
+      expect(D(book.body.systemBalance).equals(ledger.body.balance)).toBe(true);
+      const stats = await accountant.get('/bank-accounts/stats');
+      expect(D(stats.body.totalSystemBalance).equals('1200.75')).toBe(true);
+      const dash = (await accountant.get('/reports/dashboard')).body;
+      expect(D(dash.overview.cashBalance).equals('1200.75')).toBe(true);
     });
   });
 });

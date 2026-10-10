@@ -262,7 +262,7 @@ export class DepreciationRunResponse {
   journalsCreated: number;
 
   @ApiProperty()
-  totalDepreciation: number;
+  totalDepreciation: string;
 }
 
 export class AssetSummaryResponse {

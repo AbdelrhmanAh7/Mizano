@@ -34,6 +34,7 @@ import {
   naturalBalance,
   parseReportDate,
   postedLineRows,
+  postedJournalWhere,
   resolveCashAccountIds,
   startOfUtcDay,
   sumDecimals,
@@ -93,6 +94,7 @@ export class DashboardService {
     const startOfYear = new Date(Date.UTC(today.getUTCFullYear(), 0, 1));
 
     const accounts = await this.getPlAccounts(organizationId);
+    const balanceCutoff = periodEnd < endOfUtcDay(today) ? periodEnd : undefined;
 
     const [
       totalReceivables,
@@ -108,12 +110,12 @@ export class DashboardService {
       activeProjects,
       upcomingPayments,
     ] = await Promise.all([
-      this.getTotalReceivables(organizationId),
-      this.getTotalPayables(organizationId),
+      this.getTotalReceivables(organizationId, balanceCutoff),
+      this.getTotalPayables(organizationId, balanceCutoff),
       this.getLedgerProfitAndLoss(organizationId, accounts, periodStart, periodEnd),
       this.getLedgerProfitAndLoss(organizationId, accounts, prevPeriodStart, prevPeriodEnd),
       this.getLedgerProfitAndLoss(organizationId, accounts, startOfYear, endOfUtcDay(today)),
-      this.getCashAndBank(organizationId),
+      this.getCashAndBank(organizationId, periodEnd),
       this.getOverdueInvoicesCount(organizationId),
       this.getOverdueBillsCount(organizationId),
       this.getRecentInvoices(organizationId, 5),
@@ -197,7 +199,10 @@ export class DashboardService {
    * Cash and bank from the posted ledger: the total over every cash/bank ledger account plus each
    * active bank account's ledger balance (its stored balance only when nothing is linked).
    */
-  private async getCashAndBank(organizationId: string): Promise<{
+  private async getCashAndBank(
+    organizationId: string,
+    cutoff: Date,
+  ): Promise<{
     total: Decimal;
     accounts: Array<{
       id: string;
@@ -223,13 +228,10 @@ export class DashboardService {
       }),
     ]);
     const linkedIds = bankAccounts.map((b) => b.linkedAccountId);
-    // Current balance: nothing dated after the end of today (UTC) counts yet.
-    const totals = await sumPostedLinesByAccount(
-      this.prisma,
-      organizationId,
-      { lte: endOfUtcDay(new Date()) },
-      [...new Set([...cashIds, ...linkedIds])],
-    );
+    // Balance as of the requested report cutoff (the same one the other KPIs use).
+    const totals = await sumPostedLinesByAccount(this.prisma, organizationId, { lte: cutoff }, [
+      ...new Set([...cashIds, ...linkedIds]),
+    ]);
     const balance = (accountId: string): Decimal => {
       const t = totals.get(accountId);
       return t ? t.debit.sub(t.credit) : ZERO;
@@ -467,7 +469,8 @@ export class DashboardService {
    * yet applied (they credited AR without reducing any invoice), so it matches the AR control
    * account. DRAFT, VOID and deleted records never count.
    */
-  private async getTotalReceivables(organizationId: string): Promise<Decimal> {
+  private async getTotalReceivables(organizationId: string, cutoff?: Date): Promise<Decimal> {
+    if (cutoff) return this.getControlBalance(organizationId, 'AR', cutoff);
     const [invoices, credits] = await Promise.all([
       this.prisma.invoice.aggregate({
         where: {
@@ -495,7 +498,8 @@ export class DashboardService {
    * AP total = balances of bills posted to AP minus live, unapplied, unrefunded vendor credits
    * (they debited AP without reducing any bill), so it matches the AP control account.
    */
-  private async getTotalPayables(organizationId: string): Promise<Decimal> {
+  private async getTotalPayables(organizationId: string, cutoff?: Date): Promise<Decimal> {
+    if (cutoff) return this.getControlBalance(organizationId, 'AP', cutoff);
     const [bills, credits] = await Promise.all([
       this.prisma.bill.aggregate({
         where: {
@@ -512,6 +516,56 @@ export class DashboardService {
       }),
     ]);
     return toDecimal(bills._sum.balanceDue).sub(toDecimal(credits._sum.amount));
+  }
+
+  /**
+   * Historical AR/AP come from dated posted events, including later-voided documents and their
+   * reversals. Include control accounts used by earlier postings even if defaults changed since.
+   * Today's stored document balanceDue and applied/refunded state cannot rebuild that snapshot.
+   */
+  private async getControlBalance(
+    organizationId: string,
+    kind: 'AR' | 'AP',
+    cutoff: Date,
+  ): Promise<Decimal> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { defaultArAccountId: true, defaultApAccountId: true },
+    });
+    const receivable = kind === 'AR';
+    const defaultId = receivable ? org?.defaultArAccountId : org?.defaultApAccountId;
+    const accounts = await this.prisma.account.findMany({
+      where: {
+        organizationId,
+        type: receivable ? AccountType.ASSET : AccountType.LIABILITY,
+        OR: [
+          ...(defaultId ? [{ id: defaultId }] : []),
+          {
+            journalLines: {
+              some: {
+                ...(receivable ? { debit: { gt: 0 } } : { credit: { gt: 0 } }),
+                journal: {
+                  ...postedJournalWhere(organizationId, { lte: cutoff }),
+                  sourceType: receivable ? 'INVOICE_SEND' : 'BILL_APPROVAL',
+                },
+              },
+            },
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    const totals = await sumPostedLinesByAccount(
+      this.prisma,
+      organizationId,
+      { lte: cutoff },
+      accounts.map((account) => account.id),
+    );
+    return sumDecimals(
+      [...totals.values()].map((total) =>
+        receivable ? total.debit.sub(total.credit) : total.credit.sub(total.debit),
+      ),
+    );
   }
 
   private async getOverdueInvoicesCount(organizationId: string) {
