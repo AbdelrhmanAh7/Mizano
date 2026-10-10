@@ -191,6 +191,97 @@ describe('DashboardService', () => {
       }
     });
 
+    it('includes inactive and soft-deleted historical control accounts in AR/AP balances', async () => {
+      arrangeOverview({ receivables: '1', payables: '2' });
+      prisma.organization.findUnique.mockResolvedValue({
+        defaultArAccountId: 'ar-new',
+        defaultApAccountId: 'ap-new',
+        defaultCashAccountId: 'cash',
+      } as never);
+      let calledWithActiveFilter = false;
+      let calledWithDeletedFilter = false;
+      prisma.account.findMany.mockImplementation((async (args: {
+        where?: {
+          type?: unknown;
+          OR?: unknown;
+          id?: unknown;
+          subType?: unknown;
+          isActive?: unknown;
+          deletedAt?: unknown;
+        };
+      }) => {
+        if (args.where?.OR) {
+          // Detect if an incorrect isActive/deletedAt filter is applied
+          if (args.where.isActive === true) calledWithActiveFilter = true;
+          if (args.where.deletedAt === null) calledWithDeletedFilter = true;
+          // Historical control accounts are inactive and soft-deleted
+          return args.where.type === AccountType.ASSET
+            ? [
+                { id: 'ar-old', isActive: false, deletedAt: new Date() },
+                { id: 'ar-new', isActive: true, deletedAt: null },
+              ]
+            : [
+                { id: 'ap-old', isActive: false, deletedAt: new Date() },
+                { id: 'ap-new', isActive: true, deletedAt: null },
+              ];
+        }
+        if (args.where?.subType) return [];
+        if (args.where?.id) return [{ id: 'cash' }];
+        return ACCOUNTS;
+      }) as never);
+      const events = [
+        { id: 'ar-old', date: '2026-01-05', debit: '100.1', credit: '0' },
+        { id: 'ar-new', date: '2026-01-10', debit: '50.2', credit: '0' },
+        { id: 'ap-old', date: '2026-01-05', debit: '0', credit: '90.4' },
+        { id: 'ap-new', date: '2026-01-10', debit: '0', credit: '40.1' },
+        { id: 'ar-old', date: '2026-01-31T23:59:59.999Z', debit: '0', credit: '20.05' },
+        { id: 'ar-new', date: '2026-01-31', debit: '0', credit: '0.15' },
+        { id: 'ap-old', date: '2026-01-31', debit: '10.05', credit: '0' },
+        { id: 'ap-new', date: '2026-01-31', debit: '0.25', credit: '0' },
+        { id: 'cash', date: '2026-01-31', debit: '25.3', credit: '0' },
+        { id: 'ar-old', date: '2026-02-01', debit: '0', credit: '80.05' },
+        { id: 'ar-new', date: '2026-02-01', debit: '0', credit: '50.05' },
+        { id: 'ap-old', date: '2026-02-01', debit: '80.35', credit: '0' },
+        { id: 'ap-new', date: '2026-02-01', debit: '39.85', credit: '0' },
+      ];
+      prisma.journalLine.groupBy.mockImplementation((async (args: {
+        where: { accountId: { in: string[] }; journal: { date: { lte: Date; gte?: Date } } };
+      }) => {
+        const {
+          accountId,
+          journal: { date },
+        } = args.where;
+        return accountId.in.map((id) => {
+          const included = events.filter(
+            (event) =>
+              event.id === id &&
+              new Date(event.date) <= date.lte &&
+              (!date.gte || new Date(event.date) >= date.gte),
+          );
+          return {
+            accountId: id,
+            _sum: {
+              debit: included.reduce((sum, event) => sum.add(event.debit), D(0)),
+              credit: included.reduce((sum, event) => sum.add(event.credit), D(0)),
+            },
+          };
+        });
+      }) as never);
+
+      const { overview } = await service.getDashboardOverview(ORG_ID, '2026-01-01', '2026-01-31');
+
+      // Balances must include both old (inactive/deleted) and new accounts
+      expect(overview).toMatchObject({
+        totalReceivables: '130.1000',
+        totalPayables: '120.2000',
+        netPosition: '9.9000',
+        cashBalance: '25.3000',
+      });
+      // The account query must NOT filter by isActive or deletedAt for historical control accounts
+      expect(calledWithActiveFilter).toBe(false);
+      expect(calledWithDeletedFilter).toBe(false);
+    });
+
     it('honors an explicit historical timestamp for all balance components', async () => {
       arrangeOverview({});
       prisma.organization.findUnique.mockResolvedValue({
