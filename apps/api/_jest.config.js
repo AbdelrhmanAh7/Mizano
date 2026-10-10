@@ -9,24 +9,21 @@ module.exports = {
   rootDir: 'src',
   testRegex: '.*\\.spec\\.ts$',
   transform: {
-    '^.+\\.(t|j)s$': [
+    '^.+\\.ts$': [
       tsJestPath,
       {
+        // Type errors in specs fail `pnpm type-check` (tsconfig.json includes src/**).
         diagnostics: false,
-        tsconfig: {
-          types: ['jest', 'node'],
-          module: 'commonjs',
-          esModuleInterop: true,
-          emitDecoratorMetadata: true,
-          experimentalDecorators: true,
-          skipLibCheck: true,
-        },
+        // Compile specs exactly like the app (no esModuleInterop, so `import * as csv` matches
+        // the production build).
+        tsconfig: path.join(__dirname, 'tsconfig.json'),
       },
     ],
   },
   collectCoverageFrom: ['**/*.(t|j)s'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
+  setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
   resolver: path.join(__dirname, '_jest_resolver.js'),
   moduleNameMapper: {
     '^@mizano/shared-types$': path.join(root, 'packages/shared-types/src/index.ts'),

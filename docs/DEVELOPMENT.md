@@ -109,11 +109,13 @@ Troubleshooting: `docker ps` to confirm `mizano-postgres`/`mizano-redis`, `redis
 | -------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
 | API unit       | `apps/api/src/**/*.spec.ts`                                | `node apps/api/_run_tests.js [--testPathPattern=…]`     |
 | Web unit       | `apps/web/**/*.spec.ts(x)` (Jest + Testing Library, jsdom) | `cd apps/web && npx jest [--testPathPattern=…]`         |
-| API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a seeded database               |
+| API E2E        | `apps/api/test/*.e2e-spec.ts` (supertest, `jest-e2e.json`) | `pnpm test:e2e` against a migrated database (in band)   |
 | Browser E2E    | not wired yet                                              | tracked by the seeded API/browser journey issue         |
 | Planning tools | `scripts/test_*.py`                                        | `python -m unittest discover -s scripts -p 'test_*.py'` |
 
-`_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly.
+`_run_tests.js`, `_jest.config.js` and `_jest_resolver.js` make the API suite resolve pnpm's store on Windows/WSL; use them instead of calling Jest directly. `_jest.config.js` is the only API unit-test config: `pnpm --filter api test` and `_run_tests.js` both load it, and it compiles with `apps/api/tsconfig.json`.
+
+The E2E suites boot the full app against one shared database, so `test:e2e` runs them in band: in parallel, one suite's intake sweep picks up another suite's jobs. Run them on a fresh database (`prisma migrate deploy`) with `REDIS_URL=` blank so the cache and intake queue run in-process.
 
 Unit-test infrastructure lives in `apps/api/src/test/`: `mocks/prisma.mock.ts` (deep Prisma mock, transactions call back with the mock), `mocks/redis.mock.ts` (in-memory cache), `mocks/{sharp,tesseract}.mock.js` (heavy native/OCR libraries), `helpers/test-utils.ts` (typed factories) and `helpers/decimal.helpers.ts`. Unit tests must not need Redis, PostgreSQL, Ollama or the network.
 
@@ -126,7 +128,7 @@ Rules:
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (PostgreSQL 16 and Redis 7 service containers, `db:push`) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); fork PRs run only after approval in the repository settings. E2E is not part of CI yet. `deploy.yml` stays disabled (it needs deployment secrets).
+`.github/workflows/ci.yml` runs on pushes to `master` and on PRs to `master`/`develop`, on GitHub-hosted runners only (`ubuntu-latest`; free and unlimited because the repository is public; no self-hosted labels, no secrets beyond `GITHUB_TOKEN`). Four independent parallel jobs, each limited to 5 minutes (`timeout-minutes: 5`; split a job rather than raising the limit): **Install Dependencies** (pnpm 8, Node 20, `prisma generate`), **Lint & Type Check**, **Unit Tests** (PostgreSQL 16 and Redis 7 service containers, `db:push`) and **Build**. Their names are the check names the automerge gates wait for, so keep them stable. A newer push to a PR cancels its older run. The workflow uses `pull_request` (never `pull_request_target`); fork PRs run only after approval in the repository settings. E2E is not part of CI yet: `pnpm test:e2e` (a `turbo` task) runs the real-database suites in band, and the CI job for it waits for the owner (#134, `AI_QUESTIONS.md`). `pnpm ci:full` and the pre-push hook run no E2E. `deploy.yml` stays disabled (it needs deployment secrets).
 
 `.github/workflows/demo-planning.yml` validates and syncs `docs/planning/` metadata with `scripts/sync-demo-planning.py`; see the [planning guide](planning/README.md).
 

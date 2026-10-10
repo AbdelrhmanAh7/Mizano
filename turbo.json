@@ -25,8 +25,20 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "inputs": ["src/**", "test/**", "jest.config.*", "tsconfig.json"],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "jest.config.*",
+        "_jest.config.js",
+        "_jest_resolver.js",
+        "tsconfig.json"
+      ],
       "outputs": ["coverage/**"]
+    },
+    "test:e2e": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL", "REDIS_URL", "APP_ENV"]
     },
     "type-check": {
       "dependsOn": ["^build"],

@@ -87,6 +87,16 @@ describe('PaymentPredictionService', () => {
     service = module.get<PaymentPredictionService>(PaymentPredictionService);
   });
 
+  // Pin the clock: fixtures and the service both read "now", so results must not depend on the
+  // day the suite runs.
+  beforeEach(() => {
+    jest.useFakeTimers({ now: new Date('2025-12-15T12:00:00Z') });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('should be defined', () => {
     expect(service).toBeDefined();
   });

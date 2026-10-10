@@ -94,6 +94,8 @@ Every rule below comes from a real review finding on PRs #33–#47. Each one cos
 - **Every endpoint that posts or reverses uses one `@InvalidatesLedger(...)`,** imports included.
 - **After changing behaviour, rerun the affected seeded E2E before pushing,** and update E2E expectations that legitimately changed. Never weaken an assertion to pass.
 - **Don't add a new money path inside a fix PR.** If a feature needs its own posting (for example bank-account opening journals), reject the input and route to the existing command, such as Opening Balances. New paths bring currency, retry, relink and equity-account edge cases.
+- **One jest config per package, compiled with the app's tsconfig.** Two configs drifted (`esModuleInterop`, setup file, native stubs), so `import * as csv` passed in CI and failed locally. Every script and runner passes `--config _jest.config.js`. _(#134)_
+- **E2E suites share one database and each boots the whole app, so run them in band.** In parallel, one suite's background sweep processed another suite's jobs with the real extractor. _(intake e2e, #134)_
 - **Keep files LF** (`core.autocrlf=false`), with lower-case conventional commit subjects of 72 characters or fewer. Never use `--no-verify`.
 
 ## Review process
