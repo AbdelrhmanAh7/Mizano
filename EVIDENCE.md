@@ -147,36 +147,35 @@
 
 # EVIDENCE.md — Cross-tenant isolation of ledger and invoice reads (#108)
 
-- **Tested commit**: `8da8aea0d286c73af6c4f2a846c88d0a88a4f152` (branch `ai/108`; this doc is the only later change)
-- **Suite**: `apps/api/test/tenant-isolation.e2e-spec.ts`. Two registered tenants (A: 1111, B: 7777), each with a sent invoice, an approved bill and a manual journal
-- **Database**: throwaway Postgres 16 on `127.0.0.1:55461`, `prisma migrate deploy`, `REDIS_URL=` blank. No new services or secrets
-- **Production code changed**: none. No endpoint leaked, so no fix was needed
+- **Tested commit**: `289fff4634e7557f15dd816e3f5190c8cbb0c863` (branch `ai/108`, review round 2)
+- **Suite**: `apps/api/test/tenant-isolation.e2e-spec.ts`. Two registered tenants (A: 1111, B: 7777), each with a sent invoice, an approved bill, a manual journal and a distinct unapplied vendor credit (A 222.22, B 333.33)
+- **Database**: throwaway Postgres 16 (`mizano_e2e_108` on `127.0.0.1:5432`, `prisma migrate deploy`), Redis `127.0.0.1:6380`. No new services or secrets
+- **Production code changed**: tenant guard on the cursor parameter of the three cursor endpoints — `invoices.service.ts`, `bills.service.ts`, `journals.service.ts` `findAllCursor` (foreign/unknown cursor → 404). No auth-model change.
 
-| REQ | Requirement                                                                | Test (`@issue-108`)                                                                            | Status |
-| --- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------ |
-| AC1 | A's token on B's invoice, bill, journal or GL account id returns 404       | `AC1: returns 404 for every foreign id`; `AC1: returns 404 for soft-deleted and malformed ids` | PASSED |
-| AC2 | Lists, AP aging and both trial balances hold no B rows or totals           | four `AC2:` tests, checked against the tenant's own DB ground truth                            | PASSED |
-| AC3 | No token, an expired token or a forged signature gets 401 on all 13 routes | three `AC3:` tests                                                                             | PASSED |
-| AC4 | Existing command, no new services                                          | `jest --config ./test/jest-e2e.json` (`pnpm --filter api test:e2e`)                            | PASSED |
-| AC5 | Change ≤ ~300 lines                                                        | 280 test lines plus this record; no production code                                            | PASSED |
+| REQ      | Requirement                                                             | Test (`@issue-108`)                                                                                                             | Status             |
+| -------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| AC1      | A's token on B's invoice, bill, journal, GL account id returns 404      | `AC1: returns 404 for every foreign id` (both GL routes); `AC1: returns 404 for soft-deleted and malformed ids`                 | PASSED             |
+| AC2      | Lists, AP aging and both trial balances hold no B rows or totals        | `AC2:` invoice/bill lists, journal lists, AP aging (T3), both trial balances — checked against the tenant's own DB ground truth | PASSED             |
+| AC2b     | Cursor endpoints reject the other tenant's id (T4, review finding)      | `AC2b: foreign ids as cursor return 404, own ids 200`                                                                           | PASSED             |
+| AC2c     | List endpoints report tenant-scoped `meta.total` (T2, review finding)   | `AC2c:` invoice, bill and journal `meta.total` equals the scoped Prisma count                                                   | PASSED             |
+| AC3      | No token, an expired token or a forged signature gets 401 on all routes | three `AC3:` tests (all 14 routes, incl. `/reports/general-ledger/…`)                                                           | PASSED             |
+| AC4      | Existing command, no new services                                       | `jest --config ./test/jest-e2e.json` (`pnpm --filter api test:e2e`)                                                             | PASSED             |
+| AC5      | Change ≤ ~300 lines                                                     | 300 changed lines in `tenant-isolation.e2e-spec.ts` + 27 in three services + this record                                        | PASSED             |
+| E2E gate | pr tests for the touched features                                       | `e2e-army/108-cursor-isolation.e2e.ts` tagged `feat:mz-sales-invoices`, `feat:mz-purchase-bills`, `feat:mz-journals` (lvl:api)  | PASSED (hub stack) |
 
 **Commands and output** (at the tested commit):
 
 ```text
-$ npx jest --config ./test/jest-e2e.json tenant-isolation
-Tests:       9 passed, 9 total
-$ npx jest --config ./test/jest-e2e.json        # fresh DB, all 12 suites in parallel
-Tests:       2 failed, 264 passed, 266 total   # ai + intake: HTTP 407, unrelated
-$ npx jest --config ./test/jest-e2e.json "ai|intake|purchases"
-Tests:       65 passed, 65 total
-$ pnpm --filter api lint && pnpm --filter api type-check   # clean
-$ node apps/api/_run_tests.js                   # API unit suite
-Tests:       4 failed, 2193 passed, 2197 total  # import.service.hardening: "csv is not a function"
+$ DATABASE_URL=…mizano_e2e_108 node node_modules/jest/bin/jest.js --config ./test/jest-e2e.json tenant-isolation
+Test Suites: 1 passed, 1 total   Tests: 13 passed, 13 total
+$ node node_modules/jest/bin/jest.js --maxWorkers=2 src/modules/sales/services/invoices.service.spec.ts \
+    src/modules/purchases/services/bills.service.spec.ts src/modules/accounting/services/journals.service.spec.ts
+Test Suites: 3 passed, 3 total   Tests: 155 passed, 155 total
+$ pnpm exec tsc --noEmit && pnpm exec tsc --noEmit -p test/tsconfig.e2e.json   # clean
+$ pnpm exec eslint "{src,test}/**/*.ts"                                        # clean
 ```
 
-The full parallel run is flaky outside this suite. One run failed one `purchases` test and the next failed `ai` and `intake` with 407s. Each of those suites passes when rerun. `tenant-isolation` passed in every run. The unit failures come from this worktree's offline dependency install. This branch changes no file under `apps/api/src` and no unit spec.
-
-**Mutation check** (issue test plan): each filter was removed, the suite was rerun, and the file was restored.
+**Mutation check** (issue test plan + CTO round-2 targets: drop one tenant filter, confirm the matching test fails, restore):
 
 | Removed tenant guard                                                                                 | Failing test                   |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------ |
@@ -186,5 +185,8 @@ The full parallel run is flaky outside this suite. One run failed one `purchases
 | `aging-reports.service.ts:171` `organizationId` in payables aging                                    | AC2 AP aging                   |
 | `report-utils.ts:230` org filter on line totals plus the account-list filter of either trial balance | AC2 trial balances             |
 | `jwt.strategy.ts:23` `ignoreExpiration: true`                                                        | AC3 expired token              |
+| `journals.service.ts` cursor guard lost `organizationId` (round 2)                                   | AC2b cursor 404                |
+| `aging-reports.service.ts:187` `organizationId` in the vendor-credit query (round 2)                 | AC2 AP aging (T3)              |
+| `invoices.service.ts:149` count query lost `organizationId` (round 2)                                | AC2c invoice `meta.total`      |
 
 Each trial balance has two tenant filters: the account list and the line totals. Removing only one of them leaks nothing, because foreign totals are keyed by foreign account ids that the org-scoped account list never holds. The suite passes in that case, which is correct. Removing both makes the AC2 trial balance test fail.
