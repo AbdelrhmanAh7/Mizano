@@ -142,3 +142,46 @@
   Total: 4 suites passed, 104 tests passed
   Lint: 4 packages successful
   ```
+
+### Issue #105 (PR #106) — outbound invoice e-mail volume anomaly alert
+
+- **Tested commit SHA**: `744ed04` (branch `ai/105`; adds the atomic alert claim on top of `5cafcc3c4ece8ada25372096348ffa63b9c4a036`)
+- **Re-run after merging master** (`e1c8bf5`; the merge only adds `.github/workflows/claude.yml`, no #105 file changed): the two specs again 34 passed, eslint `--max-warnings 0` on `src/modules/documents` + `src/cache`, `tsc --noEmit` and prettier clean (2026-10-08).
+- **Commands**:
+  ```bash
+  cd apps/api
+  npx jest -c _jest.config.js --testPathPattern='(email|cache)\.service\.spec'
+  npx jest
+  npx eslint src/modules/documents && npx prettier --check src/modules/documents ../../deploy/pi
+  ```
+- **Result**: `email.service.spec.ts` + `cache.service.spec.ts` 34 passed, 2 suites (acceptance tests are titled `@issue-105 AC1`/`AC2`). Earlier full API run: 131 of 136 suites pass; after building
+  `@mizano/shared-types` the 4 logger suites pass too. `auth.service.spec.ts` cannot load the native
+  `bcrypt` binding (worktree installed with `--ignore-scripts`); no auth file is changed here.
+  ESLint and Prettier are clean.
+
+| REQ ID    | Requirement                                                                     | Verified by (`email.service.spec.ts`)                                          |
+| --------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| REQ-105-1 | Cold start (no history): only the floor applies                                 | `cold start: ...` (2 tests)                                                    |
+| REQ-105-2 | Zero or tiny baseline never lowers the threshold below the floor                | `zero baseline inside the warm-up`, `a zero floor is rejected`                 |
+| REQ-105-3 | Warm-up boundary: 7 full days floor only, 8 full days `2 x baseline`            | `warm-up boundary: 7 ...`, `warm-up boundary: 8 ...`                           |
+| REQ-105-4 | Floor versus ratio selection; baseline capped at 30 full days                   | `after the warm-up ...`, `never averages over more than 30`                    |
+| REQ-105-5 | One alert on start, one on recovery, deduped; retried if Telegram fails         | `alerts once ...`, `does not record the alert ...`, `retries the recovery ...` |
+| REQ-105-6 | Alert text is count and threshold only, no invoice data or addresses            | `alert text carries the count and threshold only`                              |
+| REQ-105-7 | Notify only: a failing check never changes the send result; no raw error logged | `a failing check is logged without the raw error ...`                          |
+| REQ-105-8 | `NOTIFY_ANOMALY_MIN_DAILY` (and the Telegram chat id) wired for the Pi          | `Pi deployment wiring ...` (2 tests: compose api env, `.env.pi.example`)       |
+| REQ-105-9 | Concurrent sends crossing the threshold emit exactly one alert (atomic claim)   | `concurrent sends ... exactly one alert`, `cache.service.spec.ts` `claim` (3)  |
+
+Not verified here: the `EmailLog (organizationId, entityType, sentAt)` index (requested in `AI_QUESTIONS.md`,
+schema change left to the coordinator) and an HTTP-level E2E, which needs Postgres and Redis (no Redis in this worktree).
+
+## Review round 6 re-check at de7fc75
+
+All open threads were already satisfied by earlier commits; no code change was needed:
+
+- Telegram chat id reaches the api container: `deploy/pi/docker-compose.pi.yml` passes `TELEGRAM_ALERT_CHAT_ID` (pinned by `Pi deployment wiring`).
+- Telegram call bounded: `AbortSignal.timeout(5000)` (`bounds the Telegram call with a timeout signal`).
+- State recorded only after `response.ok` (`does not record the alert when Telegram rejects it`).
+- Aggregate `count` replaces loading rows; atomic `SET NX` claim (`concurrent sends ... exactly one alert`).
+- Still open: the range index, which the brief says to request from the coordinator (`AI_QUESTIONS.md`).
+
+`node apps/api/_run_tests.js --testPathPattern="email\.service"`: 28 passed. `cache\.service`: 6 passed.

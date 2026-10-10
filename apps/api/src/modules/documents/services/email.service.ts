@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PdfService } from './pdf.service';
 import {
@@ -11,11 +11,27 @@ import { escapeHtml, formatCurrency, formatDate, safeColor } from '../templates/
 import nodemailer from 'nodemailer';
 import type { Attachment } from 'nodemailer/lib/mailer';
 
+import { CacheService } from '../../../cache/cache.service';
+import { describeError } from '../../../common/utils/redact';
+
+const DEFAULT_MIN_DAILY = 50;
+const WARM_UP_FULL_DAYS = 7;
+const BASELINE_FULL_DAYS = 30;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+/** Alert state outlives the 5-minute cache default so one alert covers a whole incident. */
+const ALERT_STATE_TTL_SECONDS = 7 * 24 * 60 * 60;
+const TELEGRAM_TIMEOUT_MS = 5000;
+/** Outlives the bounded Telegram call, so a crashed holder cannot block alerts for long. */
+const ALERT_CLAIM_TTL_SECONDS = 30;
+
 @Injectable()
 export class EmailService {
+  private readonly logger = new Logger(EmailService.name);
+
   constructor(
     private prisma: PrismaService,
     private pdfService: PdfService,
+    private cacheService: CacheService,
   ) {}
 
   // ============ Invoice Emails ============
@@ -94,6 +110,8 @@ export class EmailService {
         },
       });
 
+      await this.checkVolumeAnomalySafely(organizationId);
+
       return { success: true, emailLogId: emailLog.id };
     } catch (error: unknown) {
       // Log the failed email
@@ -109,6 +127,8 @@ export class EmailService {
           organizationId,
         },
       });
+
+      await this.checkVolumeAnomalySafely(organizationId);
 
       return { success: false, error: errorMessage };
     }
@@ -617,5 +637,119 @@ export class EmailService {
     ]);
 
     return { data, total };
+  }
+
+  // ============ Anomaly Alert ============
+
+  /** Notify-only: a failing check must never change the outcome of the send itself. */
+  private async checkVolumeAnomalySafely(organizationId: string): Promise<void> {
+    try {
+      await this.checkVolumeAnomaly(organizationId);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Volume anomaly check failed: ${describeError(error, { includeMessage: false })}`,
+      );
+    }
+  }
+
+  /**
+   * Compares today's invoice send attempts (sent and failed) with
+   * max(floor, 2 x mean of the last 30 full UTC days) and alerts once per incident.
+   */
+  async checkVolumeAnomaly(organizationId: string): Promise<void> {
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const windowStart = new Date(todayStart.getTime() - BASELINE_FULL_DAYS * MS_PER_DAY);
+
+    const [todayCount, historyCount, firstLog] = await Promise.all([
+      this.prisma.emailLog.count({
+        where: { organizationId, entityType: 'invoice', sentAt: { gte: todayStart } },
+      }),
+      this.prisma.emailLog.count({
+        where: {
+          organizationId,
+          entityType: 'invoice',
+          sentAt: { gte: windowStart, lt: todayStart },
+        },
+      }),
+      this.prisma.emailLog.findFirst({
+        where: { organizationId, entityType: 'invoice' },
+        orderBy: { sentAt: 'asc' },
+        select: { sentAt: true },
+      }),
+    ]);
+
+    const floor = this.getMinDaily();
+    let threshold = floor;
+    if (firstLog) {
+      const firstDay = new Date(firstLog.sentAt);
+      firstDay.setUTCHours(0, 0, 0, 0);
+      const fullDays = Math.min(
+        BASELINE_FULL_DAYS,
+        Math.floor((todayStart.getTime() - firstDay.getTime()) / MS_PER_DAY),
+      );
+      // Until 7 full days exist only the floor applies; from day 8 the baseline uses what exists.
+      if (fullDays > WARM_UP_FULL_DAYS) {
+        threshold = Math.max(floor, Math.floor((2 * historyCount) / fullDays));
+      }
+    }
+
+    const stateKey = `notify-volume-${organizationId}`;
+    const alerting = (await this.cacheService.get<boolean>(stateKey)) === true;
+    const shouldAlert = todayCount > threshold && !alerting;
+    const shouldRecover = todayCount <= threshold && alerting;
+    if (!shouldAlert && !shouldRecover) return;
+
+    // Concurrent sends cross the threshold together: only the request holding the claim may notify.
+    const claimKey = `${stateKey}-claim`;
+    if (!(await this.cacheService.claim(claimKey, ALERT_CLAIM_TTL_SECONDS))) return;
+    try {
+      // Another request may have finished the same transition between our read and our claim.
+      if (((await this.cacheService.get<boolean>(stateKey)) === true) !== alerting) return;
+
+      // Dedupe state is recorded only after Telegram confirms delivery, so a failed call is retried.
+      const delivered = await this.notifyTelegram(
+        shouldAlert
+          ? `[Mizano] ALERT: Outbound invoice email volume anomaly. Count: ${todayCount}, Threshold: ${threshold}`
+          : `[Mizano] RECOVERED: Outbound invoice email volume back to normal. Count: ${todayCount}, Threshold: ${threshold}`,
+      );
+      if (delivered) {
+        await this.cacheService.set(stateKey, shouldAlert, { ttl: ALERT_STATE_TTL_SECONDS });
+      }
+    } finally {
+      await this.cacheService.releaseClaim(claimKey);
+    }
+  }
+
+  private getMinDaily(): number {
+    const parsed = Number.parseInt(process.env.NOTIFY_ANOMALY_MIN_DAILY ?? '', 10);
+    return Number.isFinite(parsed) && parsed >= 1 ? parsed : DEFAULT_MIN_DAILY;
+  }
+
+  /** Returns true only when Telegram accepted the message. */
+  private async notifyTelegram(message: string): Promise<boolean> {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_ALERT_CHAT_ID;
+    if (!token || !chatId) return false;
+
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: message }),
+        signal: AbortSignal.timeout(TELEGRAM_TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        this.logger.warn(`Telegram alert rejected: status=${response.status}`);
+        return false;
+      }
+      return true;
+    } catch (error: unknown) {
+      // The request URL carries the bot token, so never log the raw error.
+      this.logger.warn(
+        `Telegram alert not delivered: ${describeError(error, { includeMessage: false })}`,
+      );
+      return false;
+    }
   }
 }

@@ -53,3 +53,35 @@ describe('CacheService pattern invalidation (memory store, no Redis)', () => {
     expect(cache.store.size).toBe(0);
   });
 });
+
+describe('CacheService.claim (no Redis)', () => {
+  function service(): CacheService {
+    return new CacheService(memoryCache(), { get: () => undefined } as unknown as ConfigService);
+  }
+
+  it('grants a concurrent claim to exactly one caller', async () => {
+    const svc = service();
+
+    const results = await Promise.all([svc.claim('k', 30), svc.claim('k', 30), svc.claim('k', 30)]);
+
+    expect(results.filter(Boolean)).toHaveLength(1);
+  });
+
+  it('lets the next caller claim after a release', async () => {
+    const svc = service();
+    await svc.claim('k', 30);
+    await svc.releaseClaim('k');
+
+    expect(await svc.claim('k', 30)).toBe(true);
+  });
+
+  it('lets the next caller claim once the TTL has passed', async () => {
+    const svc = service();
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    await svc.claim('k', 30);
+    now.mockReturnValue(1_000 + 31_000);
+
+    expect(await svc.claim('k', 30)).toBe(true);
+    now.mockRestore();
+  });
+});
