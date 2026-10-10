@@ -124,3 +124,45 @@ export interface DashboardChartData {
   expensesByCategory: { category: string; amount: number }[];
   receivablesVsPayables: { receivables: number; payables: number };
 }
+
+// --- VAT Return Draft & Filing Corrections Metric ---
+
+export interface VatReturnDraftException {
+  id: string;
+  type: 'invoice' | 'bill';
+  documentNumber: string;
+  reason: string;
+}
+
+export interface VatReturnDraft {
+  from: string;
+  to: string;
+  status: 'complete' | 'incomplete';
+  outputTax: string;
+  inputTax: string;
+  netPayable: string;
+  exceptions: VatReturnDraftException[];
+}
+
+export interface VatFilingCohortStats {
+  filedPeriods: number;
+  correctionsCount: number;
+  correctionRate: string | null;
+  completeDraftCount?: number;
+  incompleteDraftCount?: number;
+}
+
+export interface VatFilingCorrectionsComparison {
+  reductionRate: string | null;
+  reductionPercentage: string | null;
+}
+
+export interface VatFilingCorrectionsMetric {
+  status: 'active' | 'no data';
+  hasData: boolean;
+  message: string;
+  filedPeriodsCount: number;
+  withDraft: VatFilingCohortStats;
+  withoutDraft: VatFilingCohortStats;
+  comparison: VatFilingCorrectionsComparison;
+}

@@ -783,9 +783,24 @@ export const createTaxRateSchema = z.object({
 // ============================================
 
 export const createVATReturnSchema = z.object({
-  period: z.string().min(1).max(20),
+  period: z.string().min(1).max(20).optional(),
   startDate: dateSchema,
   endDate: dateSchema,
+});
+
+export const vatReturnDraftQuerySchema = z
+  .object({
+    from: z.string().or(z.date()),
+    to: z.string().or(z.date()),
+  })
+  .refine((data) => new Date(data.from) <= new Date(data.to), {
+    message: 'from date must be before or equal to to date',
+    path: ['from'],
+  });
+
+export const recordVatFilingCorrectionSchema = z.object({
+  period: z.string().min(1, 'Period is required'),
+  reason: z.string().optional(),
 });
 
 // ============================================

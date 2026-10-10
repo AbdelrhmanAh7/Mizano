@@ -133,7 +133,7 @@ export class VatReturnsService {
     const startDate = utcDay(parseDate(dto.startDate, 'startDate'));
     const endDate = utcDay(parseDate(dto.endDate, 'endDate'));
     if (endDate < startDate) throw new BadRequestException('endDate must not be before startDate');
-    const period = derivePeriodLabel(startDate, endDate);
+    const period = dto.period ? dto.period.trim() : derivePeriodLabel(startDate, endDate);
 
     try {
       return await this.prisma.$transaction(async (tx) => {
