@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Layers, Wrench, ArrowRight, Factory, CheckCircle, FileStack } from 'lucide-react';
+import { Layers, Wrench, ArrowRight, CheckCircle, FileStack } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
