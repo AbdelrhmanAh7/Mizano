@@ -68,6 +68,7 @@ export class FakeIntakeJobTable {
         maxAttempts: 3,
         lastError: null,
         result: null,
+        stageTimingsMs: null,
         forceType: null,
         strategy: null,
         language: null,
