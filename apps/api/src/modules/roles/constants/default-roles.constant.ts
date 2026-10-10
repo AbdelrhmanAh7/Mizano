@@ -33,7 +33,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       { module: 'hr', actions: ['view', 'create', 'edit', 'delete', 'export'] },
       { module: 'manufacturing', actions: ['view', 'create', 'edit', 'delete', 'export'] },
       { module: 'projects', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'tax', actions: ['view', 'create', 'edit', 'delete', 'export'] },
+      { module: 'tax', actions: ['view', 'create', 'edit', 'delete', 'export', 'submit'] },
       { module: 'reports', actions: ['view', 'export'] },
       { module: 'crm', actions: ['view', 'create', 'edit', 'delete', 'export'] },
       { module: 'settings', actions: ['view', 'create', 'edit', 'delete'] },
@@ -67,7 +67,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       { module: 'sales', actions: ['view', 'export'] },
       { module: 'purchases', actions: ['view', 'export'] },
       { module: 'banking', actions: ['view', 'create', 'edit', 'delete', 'export'] },
-      { module: 'tax', actions: ['view', 'create', 'edit', 'delete', 'export'] },
+      { module: 'tax', actions: ['view', 'create', 'edit', 'delete', 'export', 'submit'] },
       { module: 'reports', actions: ['view', 'export'] },
       { module: 'hr', actions: ['view'] },
     ],
@@ -117,7 +117,7 @@ export const AVAILABLE_MODULES = [
 /**
  * All available actions
  */
-export const AVAILABLE_ACTIONS = ['view', 'create', 'edit', 'delete', 'export'] as const;
+export const AVAILABLE_ACTIONS = ['view', 'create', 'edit', 'delete', 'export', 'submit'] as const;
 
 export type AvailableModule = (typeof AVAILABLE_MODULES)[number];
 export type AvailableAction = (typeof AVAILABLE_ACTIONS)[number];

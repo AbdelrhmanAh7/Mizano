@@ -13,6 +13,7 @@ import { runBulk } from '../../../common/utils/run-bulk';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { JournalSourceType, JournalsService } from '../../accounting/services/journals.service';
 import { LEGACY_OPENING_JOURNAL_NUMBER } from '../../accounting/services/opening-balances.service';
+import { assertMoneyFits } from '../../sales/utils/sales-helpers';
 import { CreateVatReturnDto } from '../dto/create-vat-return.dto';
 import { RecordVatPaymentDto } from '../dto/record-vat-payment.dto';
 import { VatReturnQueryDto } from '../dto/vat-return-query.dto';
@@ -28,7 +29,7 @@ const TAXABLE_INVOICE_STATUSES: InvoiceStatus[] = [
   InvoiceStatus.OVERDUE,
 ];
 
-/** Approved bills (not drafts, not voided). */
+/** Approved bills for the current dashboard, not historical VAT return bases. */
 const TAXABLE_BILL_STATUSES: BillStatus[] = [
   BillStatus.OPEN,
   BillStatus.PARTIALLY_PAID,
@@ -48,6 +49,39 @@ const VAT_NON_ACTIVITY_SOURCES: string[] = [
 
 /** The legacy onboarding implementation posted its opening journal without a source type. */
 const LEGACY_OPENING = { journalNumber: LEGACY_OPENING_JOURNAL_NUMBER, sourceType: null };
+
+// Before source linking, bill approval still wrote this fixed reference and AP control line.
+// Do not treat arbitrary source-less debits (including opening balances) as purchases.
+const LEGACY_BILL_APPROVAL: Prisma.JournalWhereInput = {
+  sourceType: null,
+  reversalOfId: null,
+  isPosted: true,
+  deletedAt: null,
+  reference: { startsWith: 'Bill ' },
+  lines: {
+    some: {
+      credit: { gt: ZERO },
+      description: { startsWith: 'Bill ', endsWith: '- Accounts Payable' },
+    },
+  },
+};
+
+// Before source linking, invoice send still wrote this fixed reference and Sales Revenue line.
+// A source-less journal is a legacy invoice send only with that evidence; a manual journal whose
+// line merely ends with "- Sales Revenue" must not inflate the sales base.
+const LEGACY_INVOICE_SEND: Prisma.JournalWhereInput = {
+  sourceType: null,
+  reversalOfId: null,
+  isPosted: true,
+  deletedAt: null,
+  reference: { startsWith: 'Invoice ' },
+  lines: {
+    some: {
+      credit: { gt: ZERO },
+      description: { startsWith: 'Invoice ', endsWith: '- Sales Revenue' },
+    },
+  },
+};
 
 type Db = Prisma.TransactionClient;
 
@@ -209,6 +243,14 @@ export class VatReturnsService {
 
     const accounts = await this.resolveVatAccounts(this.prisma, organizationId);
     const figures = await this.computeFigures(this.prisma, organizationId, vatReturn, accounts);
+    const totals = {
+      totalSales: figures.totalSales,
+      outputVAT: figures.outputVat,
+      totalPurchases: figures.totalPurchases,
+      inputVAT: figures.inputVat,
+      netPayable: figures.netPayable,
+    };
+    for (const [field, amount] of Object.entries(totals)) assertMoneyFits(amount, field);
 
     // Guarded: a concurrent submit must not be overwritten by a recalculation.
     const { count } = await this.prisma.vATReturn.updateMany({
@@ -219,11 +261,7 @@ export class VatReturnsService {
         status: { in: [VATReturnStatus.DRAFT, VATReturnStatus.CALCULATED] },
       },
       data: {
-        totalSales: figures.totalSales,
-        outputVAT: figures.outputVat,
-        totalPurchases: figures.totalPurchases,
-        inputVAT: figures.inputVat,
-        netPayable: figures.netPayable,
+        ...totals,
         status: VATReturnStatus.CALCULATED,
       },
     });
@@ -231,7 +269,9 @@ export class VatReturnsService {
       throw new ConflictException('VAT return changed while it was being calculated');
     }
 
-    return this.prisma.vATReturn.findUniqueOrThrow({ where: { id } });
+    return this.prisma.vATReturn.findUniqueOrThrow({
+      where: { id, organizationId, deletedAt: null },
+    });
   }
 
   async findAll(organizationId: string, query: VatReturnQueryDto) {
@@ -297,16 +337,22 @@ export class VatReturnsService {
       });
       if (count === 0) throw new ConflictException('VAT return has already been submitted');
 
-      const vatReturn = await tx.vATReturn.findUniqueOrThrow({ where: { id } });
+      const vatReturn = await tx.vATReturn.findUniqueOrThrow({
+        where: { id, organizationId, deletedAt: null },
+      });
 
       // The settlement must clear exactly what the return declares.
       const figures = await this.computeFigures(tx, organizationId, vatReturn, accounts);
       if (
         !figures.outputVat.equals(vatReturn.outputVAT) ||
-        !figures.inputVat.equals(vatReturn.inputVAT)
+        !figures.inputVat.equals(vatReturn.inputVAT) ||
+        !figures.totalSales.equals(vatReturn.totalSales) ||
+        !figures.totalPurchases.equals(vatReturn.totalPurchases)
       ) {
+        // Bases are compared too: a zero-rated document moves totalSales/totalPurchases without
+        // touching either VAT figure, and the submitted declaration must match the ledger.
         throw new ConflictException(
-          'VAT in the ledger changed since this return was calculated; recalculate it before submitting',
+          'Ledger activity changed since this return was calculated (VAT or the sales/purchases base); recalculate it before submitting',
         );
       }
 
@@ -331,7 +377,10 @@ export class VatReturnsService {
         data: { lockDate: periodEnd },
       });
 
-      return tx.vATReturn.findUniqueOrThrow({ where: { id }, include: { payment: true } });
+      return tx.vATReturn.findUniqueOrThrow({
+        where: { id, organizationId, deletedAt: null },
+        include: { payment: true },
+      });
     });
   }
 
@@ -502,7 +551,10 @@ export class VatReturnsService {
           'This VAT return has VAT payable; record its payment to file it',
         );
       }
-      return tx.vATReturn.findUniqueOrThrow({ where: { id }, include: { payment: true } });
+      return tx.vATReturn.findUniqueOrThrow({
+        where: { id, organizationId, deletedAt: null },
+        include: { payment: true },
+      });
     });
   }
 
@@ -637,8 +689,22 @@ export class VatReturnsService {
     return runBulk(ids, (id) => this.deleteReturn(organizationId, id));
   }
 
-  bulkSubmit(organizationId: string, ids: string[]): Promise<BulkResultDto> {
-    return runBulk(ids, (id) => this.submit(organizationId, id));
+  async bulkSubmit(organizationId: string, ids: string[]): Promise<BulkResultDto> {
+    // Submitting locks the ledger up to the period end, so older periods must go first.
+    const returns = await this.prisma.vATReturn.findMany({
+      where: { id: { in: ids }, organizationId, deletedAt: null },
+      select: { id: true, periodEnd: true, endDate: true },
+    });
+    const end = (r: { periodEnd: Date | null; endDate: Date }): number =>
+      (r.periodEnd ?? r.endDate).getTime();
+    const known = new Set(returns.map((r) => r.id));
+    // Ties (same period end) break on id so the order is deterministic; ids not found in this
+    // organization run last and fail with the single-record 404.
+    const ordered = [
+      ...returns.sort((a, b) => end(a) - end(b) || a.id.localeCompare(b.id)).map((r) => r.id),
+      ...ids.filter((id) => !known.has(id)),
+    ];
+    return runBulk(ordered, (id) => this.submit(organizationId, id));
   }
 
   // === Helpers ===
@@ -702,13 +768,23 @@ export class VatReturnsService {
       JournalSourceType.INVOICE_SEND,
       JournalSourceType.BILL_APPROVAL,
       JournalSourceType.CREDIT_NOTE,
+      JournalSourceType.EXPENSE,
+      JournalSourceType.VENDOR_CREDIT,
       JournalSourceType.VAT_RETURN,
     ];
     const lines = (descriptions: string[]) =>
       db.journalLine.findMany({
         where: {
           OR: descriptions.map((d) => ({ description: { endsWith: d } })),
-          journal: { organizationId, deletedAt: null, sourceType: { in: sources } },
+          // Source-less journals are legacy document postings (invoices, bills, credits and
+          // expenses written before journals were source-linked; the source-link migration
+          // backfilled nothing), identified by the same line markers.
+          journal: {
+            organizationId,
+            deletedAt: null,
+            isPosted: true,
+            OR: [{ sourceType: { in: sources } }, { sourceType: null }],
+          },
         },
         select: { accountId: true },
         distinct: ['accountId'],
@@ -754,18 +830,40 @@ export class VatReturnsService {
       return { debit: _sum.debit ?? ZERO, credit: _sum.credit ?? ZERO };
     };
 
-    const [output, input, sales, creditedNet, purchases] = await Promise.all([
+    const [output, input, sales, shipping, creditedNet, purchases] = await Promise.all([
       Promise.all(accounts.outputIds.map(movement)),
       Promise.all(accounts.inputIds.map(movement)),
-      db.invoice.aggregate({
+      // Sales are the dated Sales Revenue lines of invoice issue and void journals, so an invoice
+      // voided in a later period keeps its base in the original period (like its VAT credit)
+      // and the reversal lowers the base of the period the void is dated in. Source-less
+      // journals count only as legacy invoice sends (written before journals were source-linked,
+      // evidenced by their Invoice reference and revenue line) and the linked reversals of
+      // those, which lower the base on their own date like the VAT credit they carry.
+      db.journalLine.aggregate({
         where: {
-          organizationId,
-          deletedAt: null,
-          status: { in: TAXABLE_INVOICE_STATUSES },
-          date: window,
+          description: { endsWith: '- Sales Revenue' },
+          journal: {
+            organizationId,
+            isPosted: true,
+            deletedAt: null,
+            date: window,
+            OR: [
+              {
+                sourceType: {
+                  in: [JournalSourceType.INVOICE_SEND, JournalSourceType.INVOICE_VOID],
+                },
+              },
+              LEGACY_INVOICE_SEND,
+              {
+                sourceType: null,
+                reversalOf: { is: { ...LEGACY_INVOICE_SEND, organizationId } },
+              },
+            ],
+          },
         },
-        _sum: { subtotal: true },
+        _sum: { debit: true, credit: true },
       }),
+      this.invoiceShippingInWindow(db, organizationId, window),
       // Credit notes (and their voids) in the period, net of VAT: the Sales Returns lines of the
       // same posted journals that carry the VAT, so the base matches the output VAT.
       db.journalLine.aggregate({
@@ -781,14 +879,47 @@ export class VatReturnsService {
         },
         _sum: { debit: true, credit: true },
       }),
-      db.bill.aggregate({
+      // The base-side lines of each posting (and its reversal), excluding historical input
+      // VAT accounts. Direction identifies the base without trusting editable line labels.
+      db.journalLine.aggregate({
         where: {
-          organizationId,
-          deletedAt: null,
-          status: { in: TAXABLE_BILL_STATUSES },
-          date: window,
+          accountId: { notIn: accounts.inputIds },
+          journal: {
+            organizationId,
+            isPosted: true,
+            deletedAt: null,
+            date: window,
+          },
+          OR: [
+            {
+              journal: {
+                sourceType: { in: [JournalSourceType.BILL_APPROVAL, JournalSourceType.EXPENSE] },
+              },
+              debit: { gt: ZERO },
+            },
+            {
+              journal: { sourceType: { in: ['BILL_VOID', JournalSourceType.EXPENSE_VOID] } },
+              credit: { gt: ZERO },
+            },
+            {
+              journal: { sourceType: JournalSourceType.VENDOR_CREDIT },
+              credit: { gt: ZERO },
+            },
+            {
+              journal: { sourceType: JournalSourceType.VENDOR_CREDIT_VOID },
+              debit: { gt: ZERO },
+            },
+            { journal: LEGACY_BILL_APPROVAL, debit: { gt: ZERO } },
+            {
+              journal: {
+                sourceType: null,
+                reversalOf: { is: { ...LEGACY_BILL_APPROVAL, organizationId } },
+              },
+              credit: { gt: ZERO },
+            },
+          ],
         },
-        _sum: { subtotal: true },
+        _sum: { debit: true, credit: true },
       }),
     ]);
 
@@ -805,14 +936,101 @@ export class VatReturnsService {
     return {
       outputByAccount,
       inputByAccount,
-      totalSales: (sales._sum.subtotal ?? ZERO)
+      totalSales: (sales._sum.credit ?? ZERO)
+        .sub(sales._sum.debit ?? ZERO)
+        .sub(shipping)
         .sub(creditedNet._sum.debit ?? ZERO)
         .add(creditedNet._sum.credit ?? ZERO),
       outputVat,
-      totalPurchases: purchases._sum.subtotal ?? ZERO,
+      totalPurchases: (purchases._sum.debit ?? ZERO).sub(purchases._sum.credit ?? ZERO),
       inputVat,
       netPayable: outputVat.sub(inputVat),
     };
+  }
+
+  /**
+   * Shipping charged on the invoices issued (minus those voided) in the window, dated on the
+   * same INVOICE_SEND / INVOICE_VOID journals as the sales base. Shipping carries no VAT
+   * (`computeDocumentTotals`: grandTotal = subtotal + tax + shipping, tax is per line), so it is
+   * not part of the taxable base the return pairs with output VAT; the Sales Revenue line is
+   * subtotal + shipping, so the shipping share is taken back out here. Legacy source-less sends
+   * cannot be mapped to their invoice, so their shipping stays in the base.
+   */
+  private async invoiceShippingInWindow(
+    db: Db,
+    organizationId: string,
+    window: { gte: Date; lt: Date },
+  ): Promise<Decimal> {
+    const events = await db.journal.findMany({
+      where: {
+        organizationId,
+        isPosted: true,
+        deletedAt: null,
+        date: window,
+        OR: [
+          { sourceType: { in: [JournalSourceType.INVOICE_SEND, JournalSourceType.INVOICE_VOID] } },
+          LEGACY_INVOICE_SEND,
+          {
+            sourceType: null,
+            reversalOf: { is: { ...LEGACY_INVOICE_SEND, organizationId } },
+          },
+        ],
+      },
+      select: {
+        sourceType: true,
+        sourceId: true,
+        reference: true,
+        reversalOfId: true,
+        reversalOf: { select: { reference: true } },
+      },
+    });
+
+    const idsOf = (type: string): string[] =>
+      events.flatMap((e) => (e.sourceType === type && e.sourceId ? [e.sourceId] : []));
+
+    const legacyNumbersOf = (isVoid: boolean): string[] =>
+      events.flatMap((e) => {
+        if (e.sourceType !== null) return [];
+        const isCurrentlyVoid = !!e.reversalOfId;
+        if (isCurrentlyVoid !== isVoid) return [];
+        const ref = isVoid ? e.reversalOf?.reference : e.reference;
+        if (!ref || !ref.startsWith('Invoice ')) return [];
+        return [ref.slice(8)];
+      });
+
+    const shippingOfIds = async (ids: string[]): Promise<Decimal> => {
+      if (ids.length === 0) return ZERO;
+      const { _sum } = await db.invoice.aggregate({
+        where: { organizationId, id: { in: ids } },
+        _sum: { shippingAmount: true },
+      });
+      return _sum.shippingAmount ?? ZERO;
+    };
+
+    const shippingOfNumbers = async (numbers: string[]): Promise<Decimal> => {
+      if (numbers.length === 0) return ZERO;
+      const invoices = await db.invoice.findMany({
+        where: { organizationId, invoiceNumber: { in: numbers } },
+        select: { invoiceNumber: true, shippingAmount: true },
+      });
+
+      const foundNumbers = new Set(invoices.map((i) => i.invoiceNumber));
+      const missing = numbers.filter((n) => !foundNumbers.has(n));
+      if (missing.length > 0) {
+        throw new BadRequestException(
+          `Cannot compute VAT: missing legacy invoices ${missing.join(', ')}`,
+        );
+      }
+      return invoices.reduce((sum, inv) => sum.add(inv.shippingAmount ?? ZERO), ZERO);
+    };
+
+    const [sent, voided, legacySent, legacyVoided] = await Promise.all([
+      shippingOfIds(idsOf(JournalSourceType.INVOICE_SEND)),
+      shippingOfIds(idsOf(JournalSourceType.INVOICE_VOID)),
+      shippingOfNumbers(legacyNumbersOf(false)),
+      shippingOfNumbers(legacyNumbersOf(true)),
+    ]);
+    return sent.add(legacySent).sub(voided).sub(legacyVoided);
   }
 
   /** Balanced by construction: output closing - input closing - net = 0 for any signs. */

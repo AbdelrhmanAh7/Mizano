@@ -135,7 +135,7 @@ export const MODULES = [
 /**
  * Available actions
  */
-export const ACTIONS = ['view', 'create', 'edit', 'delete', 'export'] as const;
+export const ACTIONS = ['view', 'create', 'edit', 'delete', 'export', 'submit'] as const;
 
 export type Module = (typeof MODULES)[number];
 export type Action = (typeof ACTIONS)[number];

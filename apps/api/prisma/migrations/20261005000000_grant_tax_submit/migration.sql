@@ -1,0 +1,5 @@
+-- Intentionally no data changes: VAT submit/file/bulk-submit already require tax.submit.
+-- Neither tax.edit, a mutable role name, nor isDefault proves submission authorization.
+-- Preserve every stored permission, including explicit grants and intentional omissions.
+-- Existing roles need an explicit tax.submit grant by an authorized role administrator;
+-- DEFAULT_ROLES supplies the permission when creating new Admin/Accountant roles only.

@@ -14,6 +14,30 @@ const PERIOD_END = new Date('2026-03-31T00:00:00.000Z');
 
 const dec = (v: string): Decimal => new Decimal(v);
 
+type MockModel = Record<
+  | 'findFirst'
+  | 'findUnique'
+  | 'findUniqueOrThrow'
+  | 'findMany'
+  | 'aggregate'
+  | 'count'
+  | 'create'
+  | 'updateMany',
+  jest.Mock
+>;
+type VatPrismaMock = Record<
+  | 'organization'
+  | 'account'
+  | 'journal'
+  | 'journalLine'
+  | 'invoice'
+  | 'bill'
+  | 'vATReturn'
+  | 'vATPayment'
+  | 'taxRate',
+  MockModel
+> & { $transaction: jest.Mock; $executeRaw: jest.Mock; $queryRaw: jest.Mock };
+
 function vatReturn(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 'vr-1',
@@ -45,9 +69,24 @@ describe('derivePeriodLabel', () => {
   });
 });
 
+/** The evidence that identifies a source-less journal as a pre-linking invoice send. */
+const legacyInvoiceSend = {
+  sourceType: null,
+  reversalOfId: null,
+  isPosted: true,
+  deletedAt: null,
+  reference: { startsWith: 'Invoice ' },
+  lines: {
+    some: {
+      credit: { gt: dec('0') },
+      description: { startsWith: 'Invoice ', endsWith: '- Sales Revenue' },
+    },
+  },
+};
+
 describe('VatReturnsService', () => {
   let service: VatReturnsService;
-  let prisma: any;
+  let prisma: VatPrismaMock;
   let journals: { create: jest.Mock };
 
   /** Ledger movements and document bases the figures are computed from. */
@@ -57,9 +96,25 @@ describe('VatReturnsService', () => {
     inputDebit: string;
     inputCredit?: string;
     creditNotesNet?: string;
+    salesBase?: string;
+    purchasesBase?: string;
+    purchasesCredit?: string;
   }): void {
     prisma.journalLine.aggregate.mockImplementation(
-      async (args: { where: { accountId?: string; description?: unknown } }) => {
+      async (args: {
+        where: { accountId?: string; description?: { endsWith?: string }; OR?: unknown[] };
+      }) => {
+        if (args.where.OR) {
+          return {
+            _sum: {
+              debit: dec(opts.purchasesBase ?? '400'),
+              credit: dec(opts.purchasesCredit ?? '0'),
+            },
+          };
+        }
+        if (args.where.description?.endsWith === '- Sales Revenue') {
+          return { _sum: { debit: dec('0'), credit: dec(opts.salesBase ?? '1000') } };
+        }
         if (args.where.description) {
           return { _sum: { debit: dec(opts.creditNotesNet ?? '0'), credit: dec('0') } };
         }
@@ -69,12 +124,10 @@ describe('VatReturnsService', () => {
         return { _sum: { debit: dec(opts.inputDebit), credit: dec(opts.inputCredit ?? '0') } };
       },
     );
-    prisma.invoice.aggregate.mockResolvedValue({ _sum: { subtotal: dec('1000') } });
-    prisma.bill.aggregate.mockResolvedValue({ _sum: { subtotal: dec('400') } });
   }
 
   beforeEach(async () => {
-    prisma = createMockPrisma();
+    prisma = createMockPrisma() as unknown as VatPrismaMock;
     journals = { create: jest.fn().mockResolvedValue({ id: 'j1' }) };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -91,6 +144,8 @@ describe('VatReturnsService', () => {
       baseCurrency: 'EGP',
     });
     prisma.account.count.mockResolvedValue(2);
+    // No invoice issue/void events in the window unless a test says otherwise.
+    prisma.journal.findMany.mockResolvedValue([]);
   });
 
   describe('calculate', () => {
@@ -109,6 +164,9 @@ describe('VatReturnsService', () => {
       expect((update.data.netPayable as Decimal).toFixed(4)).toBe('83.9000');
       expect(update.data.status).toBe('CALCULATED');
       expect(update.where.organizationId).toBe(ORG);
+      expect(prisma.vATReturn.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: 'vr-1', organizationId: ORG, deletedAt: null },
+      });
 
       const ledgerWhere = prisma.journalLine.aggregate.mock.calls[0][0].where;
       expect(ledgerWhere.journal).toEqual(
@@ -152,9 +210,84 @@ describe('VatReturnsService', () => {
       // invoices 1000 - credit notes 100.25
       expect((update.data.totalSales as Decimal).toFixed(4)).toBe('899.7500');
       const creditNoteQuery = prisma.journalLine.aggregate.mock.calls.find(
-        (c: any) => c[0].where.description,
+        (c) => c[0].where.description?.endsWith === '- Sales Returns',
       )[0].where;
       expect(creditNoteQuery.journal.sourceType.in).toEqual(['CREDIT_NOTE', 'CREDIT_NOTE_VOID']);
+      // Sales come from dated issue/void journals, so a later-voided invoice keeps its original
+      // period base and the void reduces the period it is dated in.
+      const salesQuery = prisma.journalLine.aggregate.mock.calls.find(
+        (c) => c[0].where.description?.endsWith === '- Sales Revenue',
+      )[0].where;
+      expect(salesQuery.journal.OR).toEqual([
+        { sourceType: { in: ['INVOICE_SEND', 'INVOICE_VOID'] } },
+        legacyInvoiceSend,
+        { sourceType: null, reversalOf: { is: { ...legacyInvoiceSend, organizationId: ORG } } },
+      ]);
+      // No issue/void events in the window: the invoice table is not consulted at all.
+      expect(prisma.invoice.aggregate).not.toHaveBeenCalled();
+    });
+
+    it('takes untaxed shipping back out of the sales base, dated on the issue/void journals', async () => {
+      prisma.vATReturn.findFirst.mockResolvedValue(vatReturn({ status: 'DRAFT' }));
+      prisma.vATReturn.updateMany.mockResolvedValue({ count: 1 });
+      prisma.vATReturn.findUniqueOrThrow.mockResolvedValue({ id: 'vr-1' });
+      givenLedger({ outputCredit: '140.1', inputDebit: '56.2' });
+      prisma.journal.findMany.mockResolvedValue([
+        { sourceType: 'INVOICE_SEND', sourceId: 'inv-1' },
+        { sourceType: 'INVOICE_SEND', sourceId: 'inv-2' },
+        { sourceType: 'INVOICE_VOID', sourceId: 'inv-9' },
+      ]);
+      prisma.invoice.aggregate.mockImplementation(
+        async (args: { where: { id: { in: string[] } } }) => ({
+          _sum: {
+            shippingAmount: args.where.id.in.includes('inv-9') ? dec('10.25') : dec('30.5'),
+          },
+        }),
+      );
+
+      await service.calculate(ORG, 'vr-1');
+
+      // Sales Revenue 1000 (subtotal + shipping) - shipping issued 30.5 + shipping voided 10.25
+      const update = prisma.vATReturn.updateMany.mock.calls[0][0];
+      expect((update.data.totalSales as Decimal).toFixed(4)).toBe('979.7500');
+      const calls = prisma.invoice.aggregate.mock.calls.map((c) => c[0].where);
+      expect(calls).toEqual(
+        expect.arrayContaining([
+          { organizationId: ORG, id: { in: ['inv-1', 'inv-2'] } },
+          { organizationId: ORG, id: { in: ['inv-9'] } },
+        ]),
+      );
+    });
+
+    it('counts a source-less journal as sales only with legacy invoice evidence', async () => {
+      prisma.vATReturn.findFirst.mockResolvedValue(vatReturn({ status: 'DRAFT' }));
+      prisma.vATReturn.updateMany.mockResolvedValue({ count: 1 });
+      prisma.vATReturn.findUniqueOrThrow.mockResolvedValue({ id: 'vr-1' });
+      givenLedger({ outputCredit: '0', inputDebit: '0' });
+
+      await service.calculate(ORG, 'vr-1');
+
+      const salesWhere = prisma.journalLine.aggregate.mock.calls.find(
+        (c) => c[0].where.description?.endsWith === '- Sales Revenue',
+      )[0].where;
+      // A manual journal whose line merely ends with "- Sales Revenue" has no invoice reference
+      // or invoice-prefixed revenue credit, so no bare source-less branch may accept it.
+      expect(salesWhere.journal.OR).not.toContainEqual({ sourceType: null });
+      const sourceless = salesWhere.journal.OR.filter(
+        (branch: { sourceType?: unknown }) => branch.sourceType === null,
+      );
+      expect(sourceless).toHaveLength(2);
+      for (const branch of sourceless) {
+        const original = branch.reversalOf ? branch.reversalOf.is : branch;
+        expect(original.reference).toEqual({ startsWith: 'Invoice ' });
+        expect(original.lines.some.credit).toEqual({ gt: dec('0') });
+        expect(original.lines.some.description).toEqual({
+          startsWith: 'Invoice ',
+          endsWith: '- Sales Revenue',
+        });
+      }
+      // Linked reversals are matched only against this tenant's legacy invoice journals.
+      expect(sourceless[1].reversalOf.is.organizationId).toBe(ORG);
     });
 
     it('includes VAT on an account that was a default VAT account before', async () => {
@@ -170,18 +303,28 @@ describe('VatReturnsService', () => {
           return { _sum: { debit: dec('0'), credit: dec(credit[args.where.accountId] ?? '0') } };
         },
       );
-      prisma.invoice.aggregate.mockResolvedValue({ _sum: { subtotal: dec('0') } });
-      prisma.bill.aggregate.mockResolvedValue({ _sum: { subtotal: dec('0') } });
 
       await service.calculate(ORG, 'vr-1');
 
       const update = prisma.vATReturn.updateMany.mock.calls[0][0];
       expect((update.data.outputVAT as Decimal).toFixed(4)).toBe('125.5000');
       const marker = prisma.journalLine.findMany.mock.calls[0][0].where;
-      expect(marker.journal).toMatchObject({ organizationId: ORG });
-      expect(marker.journal.sourceType.in).toEqual(
-        expect.arrayContaining(['INVOICE_SEND', 'BILL_APPROVAL', 'CREDIT_NOTE', 'VAT_RETURN']),
+      expect(marker.journal).toMatchObject({
+        organizationId: ORG,
+        isPosted: true,
+        deletedAt: null,
+      });
+      expect(marker.journal.OR[0].sourceType.in).toEqual(
+        expect.arrayContaining([
+          'INVOICE_SEND',
+          'BILL_APPROVAL',
+          'CREDIT_NOTE',
+          'EXPENSE',
+          'VENDOR_CREDIT',
+          'VAT_RETURN',
+        ]),
       );
+      expect(marker.journal.OR).toContainEqual({ sourceType: null });
     });
 
     it('nets credit-note style debits against output VAT', async () => {
@@ -195,6 +338,135 @@ describe('VatReturnsService', () => {
       const data = prisma.vATReturn.updateMany.mock.calls[0][0].data;
       expect((data.outputVAT as Decimal).toFixed(4)).toBe('120.0000');
       expect((data.netPayable as Decimal).toFixed(4)).toBe('100.0000');
+    });
+
+    it('uses posted purchase and reversal lines in the tenant journal window, net of credits', async () => {
+      prisma.vATReturn.findFirst.mockResolvedValue(vatReturn({ status: 'DRAFT' }));
+      prisma.vATReturn.updateMany.mockResolvedValue({ count: 1 });
+      prisma.vATReturn.findUniqueOrThrow.mockResolvedValue({ id: 'vr-1' });
+      prisma.journalLine.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ accountId: 'historical-input-vat' }]);
+      givenLedger({
+        outputCredit: '0',
+        inputDebit: '0',
+        purchasesBase: '500',
+        purchasesCredit: '600.2501',
+      });
+
+      await service.calculate(ORG, 'vr-1');
+
+      const calls = prisma.journalLine.aggregate.mock.calls as Array<
+        [{ where: { OR?: unknown[]; journal: unknown } }]
+      >;
+      const query = calls.find(([args]) => args.where.OR)?.[0].where;
+      expect(query?.journal).toEqual({
+        organizationId: ORG,
+        isPosted: true,
+        deletedAt: null,
+        date: { gte: new Date('2026-01-01'), lt: new Date('2026-04-01') },
+      });
+      expect(query?.OR).toEqual(
+        expect.arrayContaining([
+          {
+            journal: { sourceType: { in: ['BILL_APPROVAL', 'EXPENSE'] } },
+            debit: { gt: dec('0') },
+          },
+          {
+            journal: { sourceType: { in: ['BILL_VOID', 'EXPENSE_VOID'] } },
+            credit: { gt: dec('0') },
+          },
+          { journal: { sourceType: 'VENDOR_CREDIT' }, credit: { gt: dec('0') } },
+          { journal: { sourceType: 'VENDOR_CREDIT_VOID' }, debit: { gt: dec('0') } },
+        ]),
+      );
+      expect(query).toHaveProperty('accountId', {
+        notIn: [RECEIVABLE, 'historical-input-vat'],
+      });
+      expect(prisma.vATReturn.updateMany.mock.calls[0][0].data.totalPurchases.toFixed(4)).toBe(
+        '-100.2501',
+      );
+      expect(prisma.bill.aggregate).not.toHaveBeenCalled();
+    });
+
+    it('recognizes legacy bill approval evidence and dates linked reversals independently', async () => {
+      prisma.vATReturn.findFirst.mockResolvedValue(vatReturn({ status: 'DRAFT' }));
+      prisma.vATReturn.updateMany.mockResolvedValue({ count: 1 });
+      prisma.vATReturn.findUniqueOrThrow.mockResolvedValue({ id: 'vr-1' });
+      givenLedger({ outputCredit: '0', inputDebit: '28', purchasesBase: '200' });
+
+      await service.calculate(ORG, 'vr-1');
+
+      const purchaseWhere = prisma.journalLine.aggregate.mock.calls.find(
+        ([args]) => args.where.OR,
+      )?.[0].where;
+      const legacy = {
+        sourceType: null,
+        reversalOfId: null,
+        isPosted: true,
+        deletedAt: null,
+        reference: { startsWith: 'Bill ' },
+        lines: {
+          some: {
+            credit: { gt: dec('0') },
+            description: { startsWith: 'Bill ', endsWith: '- Accounts Payable' },
+          },
+        },
+      };
+      expect(purchaseWhere.OR).toEqual(
+        expect.arrayContaining([
+          { journal: legacy, debit: { gt: dec('0') } },
+          {
+            journal: { sourceType: null, reversalOf: { is: { ...legacy, organizationId: ORG } } },
+            credit: { gt: dec('0') },
+          },
+        ]),
+      );
+      expect(purchaseWhere.journal.date).toEqual({
+        gte: new Date('2026-01-01'),
+        lt: new Date('2026-04-01'),
+      });
+      expect(prisma.vATReturn.updateMany.mock.calls[0][0].data.totalPurchases.toFixed(4)).toBe(
+        '200.0000',
+      );
+    });
+
+    it('calculates a zero purchase base when the journal window has no purchase lines', async () => {
+      prisma.vATReturn.findFirst.mockResolvedValue(vatReturn({ status: 'DRAFT' }));
+      prisma.vATReturn.updateMany.mockResolvedValue({ count: 1 });
+      prisma.vATReturn.findUniqueOrThrow.mockResolvedValue({ id: 'vr-1' });
+      prisma.journalLine.aggregate.mockResolvedValue({ _sum: { debit: null, credit: null } });
+
+      await service.calculate(ORG, 'vr-1');
+
+      expect(prisma.vATReturn.updateMany.mock.calls[0][0].data.totalPurchases.toFixed(4)).toBe(
+        '0.0000',
+      );
+      expect(prisma.bill.aggregate).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { purchasesBase: '1000000000000000', purchasesCredit: '0' },
+      { purchasesBase: '0', purchasesCredit: '1000000000000000' },
+    ])(
+      'rejects purchase aggregates outside Decimal(19,4) before writing (%s)',
+      async (purchases) => {
+        prisma.vATReturn.findFirst.mockResolvedValue(vatReturn({ status: 'DRAFT' }));
+        givenLedger({ outputCredit: '0', inputDebit: '0', ...purchases });
+        await expect(service.calculate(ORG, 'vr-1')).rejects.toThrow('totalPurchases is too large');
+        expect(prisma.vATReturn.updateMany).not.toHaveBeenCalled();
+      },
+    );
+
+    it('keeps all four places at the largest valid purchase aggregate', async () => {
+      prisma.vATReturn.findFirst.mockResolvedValue(vatReturn({ status: 'DRAFT' }));
+      prisma.vATReturn.updateMany.mockResolvedValue({ count: 1 });
+      prisma.vATReturn.findUniqueOrThrow.mockResolvedValue({ id: 'vr-1' });
+      givenLedger({ outputCredit: '0', inputDebit: '0', purchasesBase: '999999999999999.9999' });
+      await service.calculate(ORG, 'vr-1');
+      expect(prisma.vATReturn.updateMany.mock.calls[0][0].data.totalPurchases.toFixed(4)).toBe(
+        '999999999999999.9999',
+      );
     });
 
     it('fails clearly when VAT accounts are not configured', async () => {
@@ -251,8 +523,14 @@ describe('VatReturnsService', () => {
         expect.objectContaining({ accountId: RECEIVABLE, debit: '0', credit: '56.2000' }),
         expect.objectContaining({ accountId: PAYABLE, debit: '0', credit: '83.9000' }),
       ]);
-      const debits = dto.lines.reduce((s: Decimal, l: any) => s.add(l.debit), dec('0'));
-      const credits = dto.lines.reduce((s: Decimal, l: any) => s.add(l.credit), dec('0'));
+      const debits = dto.lines.reduce(
+        (s: Decimal, l: { debit: string }) => s.add(l.debit),
+        dec('0'),
+      );
+      const credits = dto.lines.reduce(
+        (s: Decimal, l: { credit: string }) => s.add(l.credit),
+        dec('0'),
+      );
       expect(debits.equals(credits)).toBe(true);
 
       // Period lock is applied after the journal (journal create precedes lock update).
@@ -309,6 +587,34 @@ describe('VatReturnsService', () => {
 
       await expect(service.submit(ORG, 'vr-1')).rejects.toThrow('recalculate');
       expect(journals.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects when only the sales or purchases base moved (zero-rated document posted)', async () => {
+      prisma.vATReturn.findUniqueOrThrow.mockResolvedValueOnce(vatReturn());
+      givenLedger({ outputCredit: '140.1', inputDebit: '56.2', salesBase: '1500' });
+      await expect(service.submit(ORG, 'vr-1')).rejects.toThrow('recalculate');
+
+      prisma.vATReturn.findUniqueOrThrow.mockResolvedValueOnce(vatReturn());
+      givenLedger({ outputCredit: '140.1', inputDebit: '56.2', purchasesBase: '999' });
+      await expect(service.submit(ORG, 'vr-1')).rejects.toThrow('recalculate');
+      expect(journals.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects when purchase credits change the base without changing VAT', async () => {
+      prisma.vATReturn.findUniqueOrThrow.mockResolvedValueOnce(vatReturn());
+      givenLedger({
+        outputCredit: '140.1',
+        inputDebit: '56.2',
+        purchasesBase: '400',
+        purchasesCredit: '0.0001',
+      });
+
+      await expect(service.submit(ORG, 'vr-1')).rejects.toThrow('recalculate');
+      expect(journals.create).not.toHaveBeenCalled();
+      // The guarded transition acquires the row lock before the comparison; the real
+      // transaction rolls it back on rejection (covered by the VAT purchase E2E).
+      expect(prisma.vATReturn.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.organization.updateMany).not.toHaveBeenCalled();
     });
 
     it('errors clearly when the VAT Payable account is not configured', async () => {
@@ -544,7 +850,29 @@ describe('VatReturnsService', () => {
   });
 
   describe('bulk operations', () => {
+    it('bulkSubmit submits older periods first even when ids arrive newest-first', async () => {
+      prisma.vATReturn.findMany = jest.fn().mockResolvedValue([
+        { id: 'mar', periodEnd: new Date('2025-03-31'), endDate: new Date('2025-03-31') },
+        { id: 'jan', periodEnd: new Date('2025-01-31'), endDate: new Date('2025-01-31') },
+        { id: 'feb', periodEnd: null, endDate: new Date('2025-02-28') },
+      ]);
+      const order: string[] = [];
+      jest.spyOn(service, 'submit').mockImplementation(async (_org, id) => {
+        order.push(id);
+        return {} as never;
+      });
+
+      const result = await service.bulkSubmit(ORG, ['mar', 'feb', 'jan']);
+
+      expect(order).toEqual(['jan', 'feb', 'mar']);
+      expect(result.processed).toBe(3);
+    });
+
     it('bulkSubmit reuses submit and reports per-record outcomes', async () => {
+      prisma.vATReturn.findMany = jest.fn().mockResolvedValue([
+        { id: 'a', periodEnd: new Date('2025-01-31'), endDate: new Date('2025-01-31') },
+        { id: 'b', periodEnd: new Date('2025-02-28'), endDate: new Date('2025-02-28') },
+      ]);
       const submit = jest
         .spyOn(service, 'submit')
         .mockResolvedValueOnce({} as never)

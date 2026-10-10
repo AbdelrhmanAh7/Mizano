@@ -78,7 +78,7 @@ const MODULES = [
   'users',
 ] as const;
 
-const ACTIONS = ['view', 'create', 'edit', 'delete', 'export'] as const;
+const ACTIONS = ['view', 'create', 'edit', 'delete', 'export', 'submit'] as const;
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
