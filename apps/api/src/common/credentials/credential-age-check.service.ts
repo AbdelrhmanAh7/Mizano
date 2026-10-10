@@ -54,9 +54,9 @@ export class CredentialAgeCheckService implements OnApplicationBootstrap {
     }
 
     const summary = results.map((r) => `${r.name}=${r.status}`).join(', ');
-    const line = `Credential age check (max ${MAX_AGE_DAYS} days): ${summary}`;
-    if (results.every((r) => r.status === 'ok')) this.logger.log(line);
-    else this.logger.warn(line);
+    // Issue #104 requires one warning per boot regardless of the classifications, so a healthy
+    // boot still surfaces the line (names and classifications only, never a value).
+    this.logger.warn(`Credential age check (max ${MAX_AGE_DAYS} days): ${summary}`);
     return results;
   }
 }
